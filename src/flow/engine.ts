@@ -14,6 +14,8 @@ export interface EngineOptions {
   waitTimeoutMs?: number;
   ensureTimeoutMs?: number;
   optionalTimeoutMs?: number;
+  /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
+  pinKeyDelayMs?: number;
 }
 
 /**
@@ -29,6 +31,7 @@ export class FlowEngine {
   private readonly waitTimeoutMs: number;
   private readonly ensureTimeoutMs: number;
   private readonly optionalTimeoutMs: number;
+  private readonly pinKeyDelayMs: number;
 
   constructor(
     private readonly cfg: AveriConfig,
@@ -40,6 +43,7 @@ export class FlowEngine {
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
     this.ensureTimeoutMs = opts.ensureTimeoutMs ?? 20_000;
     this.optionalTimeoutMs = opts.optionalTimeoutMs ?? 1_500;
+    this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
   }
 
   /** Detect → run reach flows → confirm. Idempotent. */
@@ -105,7 +109,10 @@ export class FlowEngine {
       return;
     }
     if ('type_pin' in step) {
-      const { value: pin } = this.resolveValue(step.type_pin.value);
+      const { value: raw } = this.resolveValue(step.type_pin.value);
+      // PIN/OTP inputs are numeric; formatting in the credential ("111-111-111")
+      // is display convention, not keystrokes.
+      const pin = raw.replace(/\D/g, '');
       const rounds = step.type_pin.twice ? 2 : 1;
       for (let round = 0; round < rounds; round++) {
         if (step.type_pin.keypad) {
@@ -117,7 +124,12 @@ export class FlowEngine {
             await this.tapSpec(spec, this.tapTimeoutMs, true);
           }
         } else {
-          await this.adapter.typeText(pin);
+          // One keystroke at a time: auto-advancing multi-box inputs (OTP
+          // fields) move focus per digit and silently drop bulk-typed text.
+          for (const digit of pin) {
+            await this.adapter.typeText(digit);
+            await new Promise((r) => setTimeout(r, this.pinKeyDelayMs));
+          }
         }
       }
       this.log('type_pin', `${pin.length} digits${rounds === 2 ? ', twice' : ''}`);
