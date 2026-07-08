@@ -27,7 +27,7 @@
   },
   "scripts": {
     "prepublishOnly": "npm test && npm run build",
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "dev": "tsx src/mcp/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
