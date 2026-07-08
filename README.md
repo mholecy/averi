@@ -101,10 +101,6 @@ flows:
 
 Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
 
-## Privacy
-
-averi is free — no license key, no accounts, no telemetry. Everything runs locally; screenshots, UI trees and credentials never leave your machine.
-
 ## Development
 
 ```bash
