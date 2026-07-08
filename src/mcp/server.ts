@@ -8,11 +8,24 @@ import { findAll } from '../ui-tree/selectors.js';
 import { loadConfig, type AveriConfig } from '../flow/config.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import { acquireLicense, DEFAULT_SERVICE_URL, type Entitlements } from '../license/client.js';
+import { UsageTracker } from '../license/usage.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
 const registry = new AdapterRegistry();
 
 const server = new McpServer({ name: 'averi', version: '0.0.1' });
+
+// Populated at startup (bottom of this file) before the transport connects.
+let entitlements: Entitlements = { plan: 'dev', features: new Set(['core']) };
+let usage: UsageTracker | undefined;
+
+/** registerTool + anonymous usage counting (tool names only, §6). */
+const registerTool: typeof server.registerTool = ((name: string, def: unknown, handler: (args: never) => unknown) =>
+  server.registerTool(name as never, def as never, (async (args: never) => {
+    usage?.bump(name);
+    return handler(args);
+  }) as never)) as typeof server.registerTool;
 
 const platform = z.enum(['android', 'ios']).describe('Target platform');
 
@@ -27,7 +40,7 @@ const text = (value: unknown) => ({
   ],
 });
 
-server.registerTool(
+registerTool(
   'list_devices',
   {
     description: 'List available iOS simulators and Android emulators/devices with boot state.',
@@ -36,7 +49,7 @@ server.registerTool(
   async () => text(await registry.listAll()),
 );
 
-server.registerTool(
+registerTool(
   'install_app',
   {
     description:
@@ -61,7 +74,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'launch_app',
   {
     description: 'Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login).',
@@ -77,7 +90,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'terminate_app',
   {
     description: 'Force-stop an app.',
@@ -89,7 +102,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'open_deep_link',
   {
     description: 'Open a deep link / universal link URL on the device.',
@@ -104,7 +117,7 @@ server.registerTool(
 const STABILITY_ATTEMPTS = 5;
 const STABILITY_DELAY_MS = 300;
 
-server.registerTool(
+registerTool(
   'screenshot',
   {
     description:
@@ -126,7 +139,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'ui_snapshot',
   {
     description:
@@ -139,7 +152,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'tap',
   {
     description:
@@ -165,7 +178,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'swipe',
   {
     description: 'Swipe in a direction (up/down/left/right over the screen center is approximated by the given coordinates).',
@@ -182,7 +195,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'type_text',
   {
     description: 'Type text into the focused element (tap the field first).',
@@ -194,7 +207,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'press_key',
   {
     description: 'Press a hardware/system key. back is Android-only.',
@@ -242,7 +255,7 @@ const assertsInput = z
 
 const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
 
-server.registerTool(
+registerTool(
   'ensure_state',
   {
     description:
@@ -264,7 +277,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'run_flow',
   {
     description:
@@ -279,7 +292,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'assert',
   {
     description:
@@ -302,7 +315,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'verify_both',
   {
     description:
@@ -319,19 +332,33 @@ server.registerTool(
     const specs = parseAsserts(asserts ?? []);
     const platforms: Platform[] = ['android', 'ios'];
 
-    const runs = await Promise.allSettled(
-      platforms.map(async (p) => {
-        const adapter = await registry.get(p);
-        const engine = new FlowEngine(cfg, adapter);
-        const trace: TraceEntry[] = [];
-        if (state) trace.push(...(await engine.ensureState(state)));
-        if (flow) trace.push(...(await engine.runFlow(flow)));
-        const results = await new Verifier(adapter, { baselineDir: resolve('.averi/baselines') }).assertAll(specs);
-        const shot = await adapter.screenshot();
-        const health = await appHealth(p, cfg);
-        return { trace, results, shot, health };
-      }),
-    );
+    const runOne = async (p: Platform) => {
+      const adapter = await registry.get(p);
+      const engine = new FlowEngine(cfg, adapter);
+      const trace: TraceEntry[] = [];
+      if (state) trace.push(...(await engine.ensureState(state)));
+      if (flow) trace.push(...(await engine.runFlow(flow)));
+      const results = await new Verifier(adapter, { baselineDir: resolve('.averi/baselines') }).assertAll(specs);
+      const shot = await adapter.screenshot();
+      const health = await appHealth(p, cfg);
+      return { trace, results, shot, health };
+    };
+
+    // Parallel device driving is a Team-plan entitlement; Solo runs sequentially.
+    let runs: PromiseSettledResult<Awaited<ReturnType<typeof runOne>>>[];
+    if (entitlements.features.has('parallel_verify')) {
+      runs = await Promise.allSettled(platforms.map(runOne));
+    } else {
+      runs = [];
+      for (const p of platforms) {
+        runs.push(
+          await runOne(p).then(
+            (value) => ({ status: 'fulfilled' as const, value }),
+            (reason) => ({ status: 'rejected' as const, reason }),
+          ),
+        );
+      }
+    }
 
     const sections: string[] = [];
     const images: { type: 'image'; data: string; mimeType: string }[] = [];
@@ -352,7 +379,7 @@ server.registerTool(
   },
 );
 
-server.registerTool(
+registerTool(
   'get_logs',
   {
     description: 'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions.',
@@ -376,6 +403,29 @@ function stripChildren(node: UiNode): Omit<UiNode, 'children'> {
   const { children: _children, ...rest } = node;
   return rest;
 }
+
+// --- startup: license, then transport (stderr only — stdout is the protocol) ---
+
+try {
+  entitlements = await acquireLicense();
+} catch (e) {
+  console.error(`averi: ${e instanceof Error ? e.message : String(e)}`);
+  process.exit(1);
+}
+if (entitlements.plan === 'dev') {
+  console.error('averi: running unlicensed (dev mode) — set AVERI_API_KEY for licensed use');
+} else {
+  const until = entitlements.validUntil?.toISOString().slice(0, 10);
+  console.error(
+    `averi: licensed — plan=${entitlements.plan}${entitlements.stale ? ' (offline grace)' : ''}${until ? `, token valid until ${until}` : ''}`,
+  );
+}
+usage = new UsageTracker(
+  process.env.AVERI_LICENSE_URL ?? DEFAULT_SERVICE_URL,
+  entitlements.plan,
+  entitlements.plan !== 'dev',
+);
+usage.start();
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
