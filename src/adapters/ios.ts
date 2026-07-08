@@ -190,6 +190,11 @@ export class IosAdapter implements DeviceAdapter {
     await this.exec('xcrun', ['simctl', 'pbcopy', this.target()], { stdin: text, env });
   }
 
+  async isAppRunning(bundleId: string): Promise<boolean> {
+    const { stdout } = await this.simctl(['spawn', this.target(), 'launchctl', 'list']);
+    return stdout.toString('utf8').includes(`UIKitApplication:${bundleId}`);
+  }
+
   async logs(sinceMs: number): Promise<string[]> {
     const start = formatLogDate(new Date(sinceMs));
     const { stdout } = await this.simctl(

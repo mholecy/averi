@@ -60,4 +60,7 @@ export interface DeviceAdapter {
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;
+
+  /** Is the app process currently running? Used for appAlive crash detection. */
+  isAppRunning(appId: string): Promise<boolean>;
 }

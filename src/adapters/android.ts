@@ -138,6 +138,16 @@ export class AndroidAdapter implements DeviceAdapter {
     throw new Error('setClipboard is not supported on Android yet');
   }
 
+  async isAppRunning(packageName: string): Promise<boolean> {
+    // pidof exits non-zero when no process matches
+    try {
+      const { stdout } = await this.adb(['shell', 'pidof', packageName]);
+      return stdout.toString('utf8').trim() !== '';
+    } catch {
+      return false;
+    }
+  }
+
   async logs(sinceMs: number): Promise<string[]> {
     const seconds = (sinceMs / 1000).toFixed(3);
     const { stdout } = await this.adb(['logcat', '-d', '-T', seconds]);
