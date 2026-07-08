@@ -2,8 +2,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { resolve } from 'node:path';
 import { AdapterRegistry } from './registry.js';
 import { findAll } from '../ui-tree/selectors.js';
+import { loadConfig } from '../flow/config.js';
+import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import type { UiNode } from '../adapters/types.js';
 
 const registry = new AdapterRegistry();
@@ -11,6 +14,11 @@ const registry = new AdapterRegistry();
 const server = new McpServer({ name: 'averi', version: '0.0.1' });
 
 const platform = z.enum(['android', 'ios']).describe('Target platform');
+
+const configPath = z
+  .string()
+  .optional()
+  .describe('Path to averi.yaml (default: ./averi.yaml in the server working directory)');
 
 const text = (value: unknown) => ({
   content: [
@@ -30,12 +38,25 @@ server.registerTool(
 server.registerTool(
   'install_app',
   {
-    description: 'Install an app build (.apk / .app bundle) on the booted device.',
-    inputSchema: { platform, path: z.string().describe('Path to .apk (android) or .app (ios)') },
+    description:
+      'Install an app build (.apk / .app bundle) on the booted device. Omit path to use the build path from averi.yaml (app.android.apk / app.ios.app).',
+    inputSchema: {
+      platform,
+      path: z.string().optional().describe('Path to .apk (android) or .app (ios)'),
+      configPath,
+    },
   },
-  async ({ platform: p, path }) => {
-    await (await registry.get(p)).install(path);
-    return text(`Installed ${path} on ${p}`);
+  async ({ platform: p, path, configPath: cp }) => {
+    let appPath = path;
+    if (appPath === undefined) {
+      const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+      appPath = p === 'android' ? cfg.app.android?.apk : cfg.app.ios?.app;
+      if (appPath === undefined) {
+        throw new Error(`No path given and averi.yaml has no app.${p} build path`);
+      }
+    }
+    await (await registry.get(p)).install(appPath);
+    return text(`Installed ${appPath} on ${p}`);
   },
 );
 
@@ -181,6 +202,47 @@ server.registerTool(
   async ({ platform: p, key }) => {
     await (await registry.get(p)).pressKey(key);
     return text(`Pressed ${key}`);
+  },
+);
+
+async function engineFor(p: 'android' | 'ios', path: string | undefined) {
+  const cfg = await loadConfig(resolve(path ?? 'averi.yaml'));
+  return new FlowEngine(cfg, await registry.get(p));
+}
+
+const formatTrace = (trace: TraceEntry[]) =>
+  trace.map((t) => (t.detail === undefined ? t.action : `${t.action}: ${t.detail}`)).join('\n');
+
+server.registerTool(
+  'ensure_state',
+  {
+    description:
+      'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. Returns the step trace and a final screenshot.',
+    inputSchema: { platform, state: z.string().describe('State name from averi.yaml'), configPath },
+  },
+  async ({ platform: p, state, configPath: cp }) => {
+    const engine = await engineFor(p, cp);
+    const trace = await engine.ensureState(state);
+    const shot = await (await registry.get(p)).screenshot();
+    return {
+      content: [
+        { type: 'text' as const, text: formatTrace(trace) },
+        { type: 'image' as const, data: shot.toString('base64'), mimeType: 'image/png' },
+      ],
+    };
+  },
+);
+
+server.registerTool(
+  'run_flow',
+  {
+    description:
+      'Run a named flow from averi.yaml (e.g. "goto_transfers"). Honors the flow\'s `requires:` state. Returns the step trace.',
+    inputSchema: { platform, flow: z.string().describe('Flow name from averi.yaml'), configPath },
+  },
+  async ({ platform: p, flow, configPath: cp }) => {
+    const engine = await engineFor(p, cp);
+    return text(formatTrace(await engine.runFlow(flow)));
   },
 );
 

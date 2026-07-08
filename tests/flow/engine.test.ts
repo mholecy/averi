@@ -260,6 +260,41 @@ describe('secrets', () => {
   });
 });
 
+describe('tap stability', () => {
+  it('does not tap an element while it is still moving (launch animation)', async () => {
+    nextY = 0;
+    const positions = [100, 160, 220, 220, 220]; // animates, then settles at 220
+    let poll = 0;
+    const target = el({ role: 'button', identifier: 'tab_payments' });
+    const dash = screen(
+      el({ identifier: 'dashboard_root' }),
+      el({ role: 'text', label: 'Accounts' }),
+      target,
+    );
+    class AnimatedFake extends FakeAdapter {
+      override async uiTree(): Promise<UiNode> {
+        target.rect = { ...target.rect, y: positions[Math.min(poll++, positions.length - 1)] };
+        return dash;
+      }
+    }
+    const fake = new AnimatedFake({ dashboard: dash }, 'dashboard');
+    await new FlowEngine(CONFIG, fake, FAST).runFlow('goto_transfers');
+    // tapped exactly once, at the settled position
+    expect(fake.taps).toEqual(['tab_payments']);
+    expect(poll).toBeGreaterThanOrEqual(4); // needed at least two identical polls after moving
+  });
+
+  it('ignores zero-area nodes as tap targets', async () => {
+    nextY = 0;
+    const ghost = node({ role: 'other', identifier: 'tab_payments', rect: { x: 5, y: 5, width: 0, height: 0 } });
+    const real = el({ role: 'button', identifier: 'tab_payments' });
+    const dash = screen(el({ identifier: 'dashboard_root' }), ghost, real);
+    const fake = new FakeAdapter({ dashboard: dash }, 'dashboard');
+    await new FlowEngine(CONFIG, fake, FAST).runFlow('goto_transfers');
+    expect(fake.taps).toEqual(['tab_payments']); // resolved via the real node's rect
+  });
+});
+
 describe('failure modes', () => {
   it('branch with no matching arm times out with the tried conditions', async () => {
     nextY = 0;

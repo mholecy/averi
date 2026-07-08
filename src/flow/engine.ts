@@ -159,12 +159,30 @@ export class FlowEngine {
     throw new Error(`Unhandled step: ${JSON.stringify(step)}`);
   }
 
-  /** Wait for the element to appear, then tap its center. */
+  /**
+   * Wait for the element to appear AND settle (identical rect in two
+   * consecutive polls — screens animate on launch/transition and tapping
+   * mid-animation lands on whatever moved into that spot), then tap its
+   * center. Zero-area nodes are never tap targets.
+   */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
+    let lastRect: string | undefined;
     const node = await this.pollUntil(
-      async (tree) => findBySpec(tree, spec)[0],
+      async (tree) => {
+        const candidate = findBySpec(tree, spec).find(
+          (n) => n.rect.width > 0 && n.rect.height > 0,
+        );
+        if (!candidate) {
+          lastRect = undefined;
+          return undefined;
+        }
+        const rect = JSON.stringify(candidate.rect);
+        if (rect === lastRect) return candidate;
+        lastRect = rect;
+        return undefined;
+      },
       timeoutMs,
-      `element ${describeSpec(spec)}`,
+      `element ${describeSpec(spec)} (visible and settled)`,
     );
     const point = tapPoint(node);
     await this.adapter.tap(point.x, point.y);
