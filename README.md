@@ -6,7 +6,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
 
 ## Status
 
-Pre-MVP. Current phase: **Phase 2 — Flow engine** (see [docs/plans/phase-2-flow-engine.md](docs/plans/phase-2-flow-engine.md)). Phase 1 (adapter core) is complete.
+Pre-MVP. Current phase: **Phase 4 — Licensing + packaging** next. Phases 1–3 complete: adapters, flow engine (`ensure_state`), verification (`assert`, `verify_both`, appAlive) and the agent skill ([skill/SKILL.md](skill/SKILL.md)).
 
 ## Layout
 
@@ -16,6 +16,8 @@ src/
   flow/            averi.yaml config schema + flow engine (ensure_state, secrets)
   mcp/             MCP server wiring (thin tool layer)
   ui-tree/         Normalized accessibility tree model + selector resolution
+  verify/          Assert engine (element checks, screenshot baselines) + crash scan
+skill/             SKILL.md shipped to subscribers
 docs/plans/        Phase plans
 ```
 

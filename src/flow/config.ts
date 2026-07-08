@@ -23,6 +23,7 @@ export type Step =
   | { tap: ElementSpec }
   | { type: { value: string } }
   | { type_pin: { value: string; keypad?: { id_pattern: string }; twice?: boolean } }
+  | { swipe: { direction: 'up' | 'down' | 'left' | 'right'; times?: number } }
   | { wait: { element?: ElementSpec; state?: string; timeout?: string | number } }
   | { branch: { when: Condition; do: Step[] }[] }
   | { optional: Step[] }
@@ -68,6 +69,16 @@ const step: z.ZodType<Step> = z.lazy(() =>
             value: z.string(),
             keypad: z.object({ id_pattern: z.string() }).strict().optional(),
             twice: z.boolean().optional(),
+          })
+          .strict(),
+      })
+      .strict(),
+    z
+      .object({
+        swipe: z
+          .object({
+            direction: z.enum(['up', 'down', 'left', 'right']),
+            times: z.number().int().min(1).optional(),
           })
           .strict(),
       })

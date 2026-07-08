@@ -180,6 +180,24 @@ describe('secrets', () => {
   });
 });
 
+describe('swipe step', () => {
+  it('swipes over the screen center in the gesture direction, times N', async () => {
+    const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  scroll_up:
+    steps:
+      - swipe: { direction: down, times: 2 }
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    await new FlowEngine(cfg, fake, FAST).runFlow('scroll_up');
+    expect(fake.swipes).toHaveLength(2);
+    const { from, to } = fake.swipes[0];
+    expect(from.x).toBe(to.x); // vertical gesture
+    expect(to.y).toBeGreaterThan(from.y); // finger moves down
+  });
+});
+
 describe('tap stability', () => {
   it('does not tap an element while it is still moving (launch animation)', async () => {
     resetLayout();
