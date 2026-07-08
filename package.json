@@ -9,7 +9,8 @@
   "files": [
     "dist",
     "skill",
-    "ARCHITECTURE.md"
+    "ARCHITECTURE.md",
+    "LICENSE"
   ],
   "keywords": [
     "mcp",
@@ -20,7 +21,7 @@
     "agent",
     "verification"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "node": ">=20"
   },
@@ -47,5 +48,6 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.10"
-  }
+  },
+  "author": "Michal Holécy <michal.holecy@finshape.com>"
 }
