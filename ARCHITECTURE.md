@@ -1,6 +1,6 @@
 # Agent Mobile Verify — Architecture & Design Doc
 
-*A subscription-based MCP server that lets coding agents verify their work on iOS Simulators and Android Emulators, including apps that require a login step.*
+*A free MCP server that lets coding agents verify their work on iOS Simulators and Android Emulators, including apps that require a login step.*
 
 Working name: **`averi`** (Agent VERIfier). Rename freely.
 
@@ -12,11 +12,11 @@ Coding agents (Claude Code, Cursor, etc.) can now write native mobile code, but 
 
 | Tool | Strength | Gap for us |
 |---|---|---|
-| [mobile-mcp](https://github.com/mobile-next/mobile-mcp) | Generic taps/screenshots via accessibility tree, iOS+Android | No app knowledge: agent must rediscover login every session; free/OSS, no revenue model |
+| [mobile-mcp](https://github.com/mobile-next/mobile-mcp) | Generic taps/screenshots via accessibility tree, iOS+Android | No app knowledge: agent must rediscover login every session |
 | [Maestro MCP](https://docs.maestro.dev/get-started/maestro-mcp) | Agent writes/repairs Maestro YAML tests | Oriented at producing test suites, heavy dependency; login state still the agent's problem each run |
 | Appium | Mature drivers | Per-project setup, slow, overkill for "verify my change" |
 
-**Differentiator:** the tool is *app-aware*. Teams check an `averi.yaml` descriptor into the repo that declares how to reach known states (logged-in, specific screens). The agent calls one high-level tool — `ensure_state("logged_in")` — instead of fumbling through a PIN keyboard with 15 tap calls. That determinism + cross-platform parity + verification helpers is the paid product.
+**Differentiator:** the tool is *app-aware*. Teams check an `averi.yaml` descriptor into the repo that declares how to reach known states (logged-in, specific screens). The agent calls one high-level tool — `ensure_state("logged_in")` — instead of fumbling through a PIN keyboard with 15 tap calls. That determinism + cross-platform parity + verification helpers is the product.
 
 ---
 
@@ -38,12 +38,7 @@ Coding agents (Claude Code, Cursor, etc.) can now write native mobile code, but 
                                │ │ (adb +   │   │ (simctl + │ │
                                │ │ uiauto)  │   │ idb/WDA)  │ │
                                │ └──────────┘   └───────────┘ │
-                               │  ┌──────────────────────────┐│
-                               │  │ License client → cloud   ││
-                               └──┴──────────────┬───────────┴┘
-                                                 ▼
-                                        License/API service
-                                        (subscription check)
+                               └──────────────────────────────┘
 ```
 
 Clean separation of concerns:
@@ -52,9 +47,8 @@ Clean separation of concerns:
 - **Flow Engine** — interprets `averi.yaml` descriptors (login, navigation recipes), maintains a state model of "where the app is".
 - **Verification Engine** — screenshots, accessibility-tree assertions, diffing.
 - **MCP layer** — thin; exposes tools, no logic.
-- **License client** — validates subscription; degrades gracefully offline.
 
-Runs locally on the dev machine (device access requires it); only licensing talks to the cloud.
+Runs entirely locally on the dev machine (device access requires it); nothing talks to the cloud.
 
 ---
 
@@ -186,18 +180,17 @@ Verification philosophy: three tiers, cheapest first — (1) AX-tree asserts (fa
 
 ---
 
-## 6. Subscription & licensing
+## 6. Distribution & privacy
 
-- Server requires `AVERI_API_KEY`. On startup it exchanges the key for a short-lived signed license token (JWT, ~24 h) and caches it — so flaky network doesn't block work; hard fail only after grace expiry (e.g. 7 days).
-- Entitlements in the token gate features by plan: e.g. **Solo** (1 device at a time, core tools), **Team** (parallel `verify_both`, baseline storage, seats), **CI** (headless, usage-based minutes).
-- Anonymous usage pings (tool-call counts only, no screenshots/secrets) for billing and abuse detection. Screenshots and UI trees never leave the machine — an easy compliance story for banking clients.
-- Distribution: `npm i -g @averi/mcp` or brew; binary checks license at runtime, so piracy pressure is on the API, not the binary.
+- averi is **free**: no license key, no accounts, no feature gating.
+- Distribution: `npm i -g @averi/mcp` (or run from a clone with `npx tsx`).
+- Zero telemetry. Everything runs locally; screenshots, UI trees and secrets never leave the machine — an easy compliance story for banking clients.
 
 ---
 
 ## 7. The skill
 
-Ships with the subscription (`averi` skill). SKILL.md teaches the agent the workflow, not the plumbing:
+Ships with the package (`averi` skill — copy into the app repo). SKILL.md teaches the agent the workflow, not the plumbing:
 
 1. **Golden path**: build app → `install_app` → `ensure_state("logged_in")` → `run_flow`/low-level navigation to the changed screen → `screenshot` + `assert` → report with paired iOS/Android images.
 2. **Rules**: always `ensure_state` instead of manual login; prefer `ui_snapshot` asserts over screenshots for text checks; use `verify_both` before declaring a cross-platform task done; on unexpected screen, take screenshot + `ui_snapshot`, try `optional` dismissals, else surface to the human; never ask the user for credentials — if a `${VAR}` is missing, tell them which env var to set.
@@ -220,12 +213,12 @@ Ships with the subscription (`averi` skill). SKILL.md teaches the agent the work
 1. **Weeks 1–3 — Adapter core**: adb + simctl/idb adapters, screenshot, tap/type/swipe, normalized `ui_snapshot`; MCP wiring; manual smoke test on your banking app.
 2. **Weeks 4–6 — Flow engine**: YAML schema, `ensure_state`, branch/optional/wait, secret injection; login works end-to-end on both platforms after reinstall.
 3. **Weeks 7–8 — Verification + skill**: `assert`, `verify_both`, log scan; write SKILL.md; dogfood with Claude Code on a real feature task.
-4. **Weeks 9–10 — Licensing + packaging**: key service, npm package, docs site; pilot with 2–3 friendly teams.
-5. **v2**: `record_flow`, baseline image storage (cloud, per-plan), real devices, CI mode (GitHub Action).
+4. **Weeks 9–10 — Packaging**: npm package, docs site; pilot with 2–3 friendly teams.
+5. **v2**: `record_flow`, real devices, CI mode (GitHub Action).
 
 ## 10. Risks
 
 - **Compose/SwiftUI semantics gaps** → AX tree may be sparse; mitigation: coordinate-tap fallback + a lint tool that reports missing `testTag`/`accessibilityIdentifier` (also a selling point: it pushes teams toward accessible apps).
 - **idb maintenance risk** (Meta's investment fluctuates) → adapter abstraction keeps WDA as swap-in.
-- **OSS squeeze** (mobile-mcp is free) → moat is the flow-descriptor layer, cross-platform parity, and the maintained skill, not raw taps.
+- **Overlap with mobile-mcp** → averi's value over raw taps is the flow-descriptor layer, cross-platform parity, and the maintained skill.
 - **Secrets in a banking context** → local-only processing, redaction, and keychain integration must be in v1, not later.
