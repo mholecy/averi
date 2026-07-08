@@ -43,9 +43,14 @@ Exit criteria: from a coding agent connected over stdio, on both a booted Androi
 - [x] Adapter registry binds each platform to the first booted device; rebinds if the device vanishes
 
 ### 1.6 Smoke test (manual, real devices)
-- [x] Stdio round-trip verified: initialize → tools/list → `list_devices` found a real booted device (Pixel 8 Pro over adb); `screenshot` returned a real PNG; `ui_snapshot` dumped and filtered the tree (screen was locked, so the tree was empty — plumbing confirmed, app-level walk still pending)
-- [ ] Booted Android emulator + iOS simulator; connect Claude Code to the server; install the banking app dev build; navigate one screen by taps; capture paired screenshots
-- [ ] Write findings back into this doc (AX-tree quality on Compose/SwiftUI screens — feeds the §10 risk assessment)
+- [x] Stdio round-trip verified: initialize → tools/list → `list_devices` found a real booted device (Pixel 8 Pro over adb); `screenshot` returned a real PNG
+- [x] Full walk on booted Android emulator + iOS simulator (2026-07-08): `launch_app` Settings on both → `ui_snapshot` → selector tap (`text~"Network"` / `label:General`) → screenshot confirmed the navigation happened → `press_key back` / `get_logs`. Every tool worked on both platforms.
+- [ ] Repeat against the banking app dev build with paired screenshots (needs the app build — first real dogfood, ties into Phase 2 `averi.yaml`)
+
+**Findings (feeds §10 risk assessment):**
+- Android Settings tree is rich: stable `resource-id`s (`title`, `summary`), labels intact. `uiautomator dump /dev/tty` worked as expected.
+- iOS Settings tree via `idb ui describe-all` is a flat list but very usable: buttons carry stable identifiers (`com.apple.settings.general`) and full labels. Screen-level containers come back as role `other` with null ids — selector matching should prefer `id:`/`label:` over structure. Flat-list normalization (synthetic root) was the right call.
+- Environment gotchas fixed in code/docs: `xcode-select` pointing at CommandLineTools breaks simctl AND idb_companion — adapter now auto-injects `DEVELOPER_DIR` when Xcode is at the default path. fb-idb is broken on Python 3.14 (`asyncio.get_event_loop`) — needs pipx install with ≤3.13. idb_companion logs its full environment (secrets included) to stderr — never forward adapter stderr into agent-visible output or telemetry.
 
 ## Deliberately out of scope for Phase 1
 Flow engine / `averi.yaml`, `ensure_state`, secrets, asserts, `verify_both`, licensing. (Phases 2–4.)

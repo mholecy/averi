@@ -27,4 +27,8 @@ npm test           # vitest
 npm run dev        # run MCP server over stdio
 ```
 
-Requirements: Node 20+, Xcode command line tools + `idb` (iOS), Android SDK platform-tools (`adb`).
+Requirements: Node 20+, Xcode + `idb` (iOS), Android SDK platform-tools (`adb`).
+
+iOS notes:
+- `idb`: `brew install idb-companion` + `pipx install fb-idb --python python3.13` (fb-idb breaks on Python 3.14).
+- If `xcode-select -p` points at CommandLineTools, the adapter automatically injects `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for simctl/idb — no sudo needed.
