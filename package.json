@@ -7,12 +7,25 @@
     "averi-mcp": "dist/mcp/server.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "skill",
+    "ARCHITECTURE.md"
   ],
+  "keywords": [
+    "mcp",
+    "mobile",
+    "testing",
+    "ios-simulator",
+    "android-emulator",
+    "agent",
+    "verification"
+  ],
+  "license": "UNLICENSED",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "prepublishOnly": "npm test && npm run build",
     "build": "tsc",
     "dev": "tsx src/mcp/server.ts",
     "test": "vitest run",

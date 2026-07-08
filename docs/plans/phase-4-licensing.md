@@ -13,19 +13,25 @@ Decision: the cloud license service is a separate deliverable. This phase ships 
 ## Milestones
 
 ### 4.1 License client (`src/license/client.ts`)
-- [ ] Exchange key for token, verify signature (jose, embedded public JWK), parse entitlements
-- [ ] Cache token at `~/.averi/license.json`; offline → cached token; expired-but-within-grace (7 days) → stale-but-valid; beyond grace → hard fail
-- [ ] Plan → default features: solo=core; team=+parallel_verify,baselines; ci=+headless; dev=all
-- [ ] Tests against a local mock service (real keypair, wrong-key rejection, grace windows, dev mode)
+- [x] Exchange key for token, verify signature (jose, embedded public JWK), parse entitlements
+- [x] Cache token at `~/.averi/license.json`; offline → cached token; expired-but-within-grace (7 days) → stale-but-valid; beyond grace → hard fail with renewal message
+- [x] A REJECTED key (401/403) never falls back to the cache — only network failures do
+- [x] Plan → default features: solo=core; team=+parallel_verify,baselines; ci=+headless; dev=all
+- [x] Tests against a local mock service (real ES256 keypair, wrong-key rejection, grace windows, dev mode)
 
 ### 4.2 Usage pings (`src/license/usage.ts`)
-- [ ] Tool-call counter, periodic fire-and-forget flush; disabled in dev mode; payload is counts only
+- [x] Tool-call counter, periodic fire-and-forget flush (unref'd timer); disabled in dev mode; payload is counts only; failed flushes retry next interval
 
 ### 4.3 Server integration
-- [ ] Startup license check (stderr logging — stdout is MCP protocol); entitlements exposed to tools
-- [ ] `verify_both` runs platforms in parallel only with `parallel_verify` (Team+); sequential on Solo
-- [ ] Every tool call counted via a registerTool wrapper
+- [x] Startup license check (stderr logging — stdout is MCP protocol); entitlements exposed to tools
+- [x] `verify_both` runs platforms in parallel only with `parallel_verify` (Team+); sequential on Solo
+- [x] Every tool call counted via a registerTool wrapper
 
 ### 4.4 Packaging
-- [ ] npm audit triage; `files`/`prepublishOnly`; bin smoke test from `dist/` (shebang intact)
-- [ ] README install/licensing docs
+- [x] npm audit → 0 vulnerabilities (fast-xml-parser@5, vitest@4); `files` (dist, skill, ARCHITECTURE.md), `prepublishOnly`; dist bin smoke-tested (shebang intact, 16 tools, dev-mode stderr warning)
+- [x] README licensing + Claude Code integration docs
+
+## GA blockers (deliberate)
+- Provision the license service and PIN the real token-verification public key (placeholder in `src/license/client.ts`)
+- Flip dev mode to hard-require `AVERI_API_KEY`
+- Decide usage-ping auth (currently anonymous per §6; consider signing with the license token)
