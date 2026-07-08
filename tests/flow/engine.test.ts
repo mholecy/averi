@@ -121,6 +121,55 @@ describe('ensureState', () => {
     expect(setupTaps).toBe(8);
   });
 
+  it('type_pin keypad matches digits by visible text when there are no ids', async () => {
+    // Real-world case (Finshape skeleton): Compose keypad digits are text
+    // nodes with no resource-id — only the label distinguishes them.
+    resetLayout();
+    const textKeys = ['1', '2', '3', '4'].map((d) =>
+      el({ role: 'text', identifier: `key_${d}`, label: d }));
+    const screens = {
+      ...buildScreens(),
+      text_keypad: screen(el({ identifier: 'text_keypad_screen' }), ...textKeys),
+    };
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+credentials:
+  pin: \${TEST_PIN}
+states:
+  done:
+    detect: { element: { id: dashboard_root } }
+flows:
+  enter_pin:
+    steps:
+      - type_pin: { value: $pin, keypad: { text_pattern: "{digit}" } }
+      - wait: { state: done, timeout: 1s }
+`);
+    let entered = '';
+    const fake = new FakeAdapter(screens, 'text_keypad', (id, self) => {
+      const digit = id.match(/^key_(\d)$/)?.[1];
+      if (digit) {
+        entered += digit;
+        if (entered === '1234') self.current = 'dashboard';
+      }
+    });
+    await new FlowEngine(cfg, fake, FAST).runFlow('enter_pin');
+    expect(fake.taps).toEqual(['key_1', 'key_2', 'key_3', 'key_4']);
+  });
+
+  it('rejects a keypad with both id_pattern and text_pattern', () => {
+    expect(() =>
+      parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  bad:
+    steps:
+      - type_pin: { value: "1234", keypad: { id_pattern: "a{digit}", text_pattern: "{digit}" } }
+`),
+    ).toThrow(/exactly one of: id_pattern, text_pattern/);
+  });
+
   it('dismisses the optional interstitial when present', async () => {
     let entered = '';
     const fake = new FakeAdapter(buildScreens(), 'pin_login', (id, self) => {

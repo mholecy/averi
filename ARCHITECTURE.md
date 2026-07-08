@@ -125,6 +125,9 @@ flows:
       - branch:
           - when: { element: { id: pin_keyboard } }     # returning user → PIN
             do:
+              # keypad matches per-digit keys by resource-id or, for keypads
+              # without ids (common in Compose), by visible text:
+              #   keypad: { text_pattern: "{digit}" }
               - type_pin: { value: $pin, keypad: { id_pattern: "pin_key_{digit}" } }
           - when: { element: { id: username_field } }   # fresh install → full login
             do:

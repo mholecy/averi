@@ -109,12 +109,12 @@ export class FlowEngine {
       const rounds = step.type_pin.twice ? 2 : 1;
       for (let round = 0; round < rounds; round++) {
         if (step.type_pin.keypad) {
+          const { id_pattern, text_pattern } = step.type_pin.keypad;
           for (const digit of pin) {
-            await this.tapSpec(
-              { id: step.type_pin.keypad.id_pattern.replace('{digit}', digit) },
-              this.tapTimeoutMs,
-              true,
-            );
+            const spec: ElementSpec = id_pattern
+              ? { id: id_pattern.replace('{digit}', digit) }
+              : { text: text_pattern!.replace('{digit}', digit) };
+            await this.tapSpec(spec, this.tapTimeoutMs, true);
           }
         } else {
           await this.adapter.typeText(pin);

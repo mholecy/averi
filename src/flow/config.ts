@@ -22,7 +22,13 @@ export type Step =
   | { launch: { clearState?: boolean } }
   | { tap: ElementSpec }
   | { type: { value: string } }
-  | { type_pin: { value: string; keypad?: { id_pattern: string }; twice?: boolean } }
+  | {
+      type_pin: {
+        value: string;
+        keypad?: { id_pattern?: string; text_pattern?: string };
+        twice?: boolean;
+      };
+    }
   | { swipe: { direction: 'up' | 'down' | 'left' | 'right'; times?: number } }
   | { wait: { element?: ElementSpec; state?: string; timeout?: string | number } }
   | { branch: { when: Condition; do: Step[] }[] }
@@ -67,7 +73,16 @@ const step: z.ZodType<Step> = z.lazy(() =>
         type_pin: z
           .object({
             value: z.string(),
-            keypad: z.object({ id_pattern: z.string() }).strict().optional(),
+            keypad: z
+              .object({
+                id_pattern: z.string().optional(),
+                text_pattern: z.string().optional(),
+              })
+              .strict()
+              .refine((k) => (k.id_pattern === undefined) !== (k.text_pattern === undefined), {
+                message: 'keypad needs exactly one of: id_pattern, text_pattern',
+              })
+              .optional(),
             twice: z.boolean().optional(),
           })
           .strict(),
