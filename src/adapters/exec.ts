@@ -8,6 +8,8 @@ export interface ExecResult {
 
 export interface ExecOptions {
   timeoutMs?: number;
+  /** Written to the child's stdin, then stdin is closed. */
+  stdin?: string;
 }
 
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
@@ -33,7 +35,7 @@ const MAX_BUFFER = 64 * 1024 * 1024; // screenshots can be several MB
 
 export const exec: ExecFn = (cmd, args, opts = {}) =>
   new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       cmd,
       args,
       {
@@ -54,4 +56,5 @@ export const exec: ExecFn = (cmd, args, opts = {}) =>
         }
       },
     );
+    if (opts.stdin !== undefined) child.stdin?.end(opts.stdin);
   });
