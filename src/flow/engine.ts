@@ -123,6 +123,26 @@ export class FlowEngine {
       this.log('type_pin', `${pin.length} digits${rounds === 2 ? ', twice' : ''}`);
       return;
     }
+    if ('swipe' in step) {
+      // Gesture direction (finger movement): swipe down at the top of a list
+      // rubber-bands harmlessly; swipe up reveals content further down.
+      const box = boundingBox(await this.adapter.uiTree());
+      const cx = Math.round(box.x + box.width / 2);
+      const cy = Math.round(box.y + box.height / 2);
+      const dx = Math.round(box.width * 0.3);
+      const dy = Math.round(box.height * 0.3);
+      const vectors = {
+        up: { from: { x: cx, y: cy + dy }, to: { x: cx, y: cy - dy } },
+        down: { from: { x: cx, y: cy - dy }, to: { x: cx, y: cy + dy } },
+        left: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
+        right: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
+      };
+      const { from, to } = vectors[step.swipe.direction];
+      const times = step.swipe.times ?? 1;
+      for (let i = 0; i < times; i++) await this.adapter.swipe(from, to);
+      this.log('swipe', `${step.swipe.direction}${times > 1 ? ` ×${times}` : ''}`);
+      return;
+    }
     if ('wait' in step) {
       const timeoutMs = step.wait.timeout !== undefined ? parseDuration(step.wait.timeout) : this.waitTimeoutMs;
       const cond: Condition = step.wait.element ? { element: step.wait.element } : { state: step.wait.state };
@@ -286,6 +306,18 @@ export class FlowEngine {
       throw new Error(this.redact(e instanceof Error ? e.message : String(e)));
     }
   }
+}
+
+/** Screen area to swipe over: the root rect, or the union of children (iOS synthetic root is 0×0). */
+function boundingBox(root: UiNode): UiNode['rect'] {
+  if (root.rect.width > 0 && root.rect.height > 0) return root.rect;
+  let maxX = 0;
+  let maxY = 0;
+  for (const c of root.children) {
+    maxX = Math.max(maxX, c.rect.x + c.rect.width);
+    maxY = Math.max(maxY, c.rect.y + c.rect.height);
+  }
+  return { x: 0, y: 0, width: maxX, height: maxY };
 }
 
 /** Exact-match element lookup; `text` matches label or value (selector semantics). */

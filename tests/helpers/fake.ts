@@ -34,6 +34,7 @@ export class FakeAdapter implements DeviceAdapter {
   typed: string[] = [];
   launches: { appId: string; clearState?: boolean }[] = [];
   appRunning = true;
+  swipes: { from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
   screenshots: Buffer[] = [];
   nextScreenshot: Buffer = Buffer.alloc(0);
   logLines: string[] = [];
@@ -94,7 +95,9 @@ export class FakeAdapter implements DeviceAdapter {
   async openDeepLink(): Promise<void> {}
   async tapElement(_s: Selector): Promise<void> {}
   async longPress(): Promise<void> {}
-  async swipe(): Promise<void> {}
+  async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+    this.swipes.push({ from, to });
+  }
   async pressKey(_k: Key): Promise<void> {}
   async setClipboard(): Promise<void> {}
 }

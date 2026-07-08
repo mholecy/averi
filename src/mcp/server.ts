@@ -5,9 +5,10 @@ import { z } from 'zod';
 import { resolve } from 'node:path';
 import { AdapterRegistry } from './registry.js';
 import { findAll } from '../ui-tree/selectors.js';
-import { loadConfig } from '../flow/config.js';
+import { loadConfig, type AveriConfig } from '../flow/config.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
-import type { UiNode } from '../adapters/types.js';
+import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import type { Platform, UiNode } from '../adapters/types.js';
 
 const registry = new AdapterRegistry();
 
@@ -205,13 +206,41 @@ server.registerTool(
   },
 );
 
-async function engineFor(p: 'android' | 'ios', path: string | undefined) {
-  const cfg = await loadConfig(resolve(path ?? 'averi.yaml'));
-  return new FlowEngine(cfg, await registry.get(p));
-}
-
 const formatTrace = (trace: TraceEntry[]) =>
   trace.map((t) => (t.detail === undefined ? t.action : `${t.action}: ${t.detail}`)).join('\n');
+
+/**
+ * appAlive check (ARCHITECTURE.md §8): is the app-under-test still running?
+ * When it died, include a crash excerpt from recent logs so flows fail fast
+ * with the reason, not just a blank screen.
+ */
+async function appHealth(p: Platform, cfg: AveriConfig): Promise<string> {
+  const app = cfg.app[p];
+  if (!app) return '';
+  const appId = 'package' in app ? app.package : app.bundleId;
+  const adapter = await registry.get(p);
+  if (await adapter.isAppRunning(appId)) return '\nappAlive: true';
+  const lines = await adapter.logs(Date.now() - 60_000).catch(() => [] as string[]);
+  const crashes = scanForCrashes(lines, p).slice(0, 24);
+  return (
+    `\nappAlive: false — ${appId} is not running!` +
+    (crashes.length > 0 ? `\nCrash excerpt:\n${crashes.join('\n')}` : '\n(no crash signature in the last 60s of logs)')
+  );
+}
+
+const formatAsserts = (results: AssertResult[]) =>
+  results
+    .map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.description}${r.detail ? ` — ${r.detail}` : ''}`)
+    .join('\n');
+
+const assertsInput = z
+  .array(z.unknown())
+  .describe(
+    'Assert specs, e.g. [{"element":{"id":"transfer_form"}}, {"element":{"id":"error_banner"},"absent":true}, ' +
+      '{"element":{"id":"amount"},"text":"100.00"}, {"screenshot":{"baseline":"transfers","threshold":0.01}}]',
+  );
+
+const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
 
 server.registerTool(
   'ensure_state',
@@ -221,12 +250,14 @@ server.registerTool(
     inputSchema: { platform, state: z.string().describe('State name from averi.yaml'), configPath },
   },
   async ({ platform: p, state, configPath: cp }) => {
-    const engine = await engineFor(p, cp);
+    const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+    const engine = new FlowEngine(cfg, await registry.get(p));
     const trace = await engine.ensureState(state);
+    const health = await appHealth(p, cfg);
     const shot = await (await registry.get(p)).screenshot();
     return {
       content: [
-        { type: 'text' as const, text: formatTrace(trace) },
+        { type: 'text' as const, text: formatTrace(trace) + health },
         { type: 'image' as const, data: shot.toString('base64'), mimeType: 'image/png' },
       ],
     };
@@ -241,8 +272,83 @@ server.registerTool(
     inputSchema: { platform, flow: z.string().describe('Flow name from averi.yaml'), configPath },
   },
   async ({ platform: p, flow, configPath: cp }) => {
-    const engine = await engineFor(p, cp);
-    return text(formatTrace(await engine.runFlow(flow)));
+    const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+    const engine = new FlowEngine(cfg, await registry.get(p));
+    const trace = await engine.runFlow(flow);
+    return text(formatTrace(trace) + (await appHealth(p, cfg)));
+  },
+);
+
+server.registerTool(
+  'assert',
+  {
+    description:
+      'Run declarative checks against the current screen: element exists (default) / absent / text exact / match regex, and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots.',
+    inputSchema: { platform, asserts: assertsInput, configPath },
+  },
+  async ({ platform: p, asserts, configPath: cp }) => {
+    const specs = parseAsserts(asserts);
+    const verifier = new Verifier(await registry.get(p), { baselineDir: resolve('.averi/baselines') });
+    const results = await verifier.assertAll(specs);
+    let health = '';
+    try {
+      health = await appHealth(p, await loadConfig(resolve(cp ?? 'averi.yaml')));
+    } catch {
+      // no averi.yaml → no app to health-check; asserts stand on their own
+    }
+    const failed = results.filter((r) => !r.pass).length;
+    const summary = failed === 0 ? `All ${results.length} asserts passed` : `${failed}/${results.length} asserts FAILED`;
+    return text(`${summary}\n${formatAsserts(results)}${health}`);
+  },
+);
+
+server.registerTool(
+  'verify_both',
+  {
+    description:
+      'Cross-platform verification: run the same sequence on iOS AND Android — optional ensure_state, optional flow, then asserts — and return per-platform results plus paired screenshots (first image android, second ios). Use before declaring a cross-platform task done.',
+    inputSchema: {
+      state: z.string().optional().describe('State to ensure first (from averi.yaml)'),
+      flow: z.string().optional().describe('Flow to run (from averi.yaml)'),
+      asserts: assertsInput.optional(),
+      configPath,
+    },
+  },
+  async ({ state, flow, asserts, configPath: cp }) => {
+    const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+    const specs = parseAsserts(asserts ?? []);
+    const platforms: Platform[] = ['android', 'ios'];
+
+    const runs = await Promise.allSettled(
+      platforms.map(async (p) => {
+        const adapter = await registry.get(p);
+        const engine = new FlowEngine(cfg, adapter);
+        const trace: TraceEntry[] = [];
+        if (state) trace.push(...(await engine.ensureState(state)));
+        if (flow) trace.push(...(await engine.runFlow(flow)));
+        const results = await new Verifier(adapter, { baselineDir: resolve('.averi/baselines') }).assertAll(specs);
+        const shot = await adapter.screenshot();
+        const health = await appHealth(p, cfg);
+        return { trace, results, shot, health };
+      }),
+    );
+
+    const sections: string[] = [];
+    const images: { type: 'image'; data: string; mimeType: string }[] = [];
+    platforms.forEach((p, i) => {
+      const run = runs[i];
+      if (run.status === 'rejected') {
+        sections.push(`## ${p}\nFAILED: ${run.reason instanceof Error ? run.reason.message : String(run.reason)}`);
+        return;
+      }
+      const { trace, results, shot, health } = run.value;
+      const failed = results.filter((r) => !r.pass).length;
+      const verdict = specs.length === 0 ? '' : failed === 0 ? `\nAll ${results.length} asserts passed` : `\n${failed}/${results.length} asserts FAILED`;
+      sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${health}`);
+      images.push({ type: 'image', data: shot.toString('base64'), mimeType: 'image/png' });
+    });
+
+    return { content: [{ type: 'text' as const, text: sections.join('\n\n') }, ...images] };
   },
 );
 
