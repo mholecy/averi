@@ -81,9 +81,26 @@ export class IosAdapter implements DeviceAdapter {
 
   // --- idb boundary (swap candidate: WebDriverAgent) ---
 
+  /**
+   * idb rejects simctl's `booted` alias — it wants a concrete UDID. Resolve
+   * it once via `simctl list` when no explicit udid was given.
+   */
+  private bootedUdidPromise: Promise<string> | undefined;
+
+  private resolveTarget(): Promise<string> {
+    if (this.udid) return Promise.resolve(this.udid);
+    this.bootedUdidPromise ??= (async () => {
+      const devices = await this.listDevices();
+      const booted = devices.find((d) => d.state === 'booted');
+      if (!booted) throw new Error('No booted simulator — boot one with `xcrun simctl boot <name>`');
+      return booted.id;
+    })();
+    return this.bootedUdidPromise;
+  }
+
   private async idb(args: string[], timeoutMs?: number) {
     const env = await this.detectEnv();
-    return this.exec('idb', [...args, '--udid', this.target()],
+    return this.exec('idb', [...args, '--udid', await this.resolveTarget()],
       { env, ...(timeoutMs ? { timeoutMs } : {}) });
   }
 

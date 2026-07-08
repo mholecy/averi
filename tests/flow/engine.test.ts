@@ -44,7 +44,7 @@ flows:
       - tap: { id: tab_payments }
 `);
 
-const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50 };
+const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, pinKeyDelayMs: 1 };
 
 function buildScreens() {
   resetLayout();
@@ -155,6 +155,41 @@ flows:
     });
     await new FlowEngine(cfg, fake, FAST).runFlow('enter_pin');
     expect(fake.taps).toEqual(['key_1', 'key_2', 'key_3', 'key_4']);
+  });
+
+  it('type_pin without keypad types digit-by-digit and strips formatting', async () => {
+    // Real-world case (Finshape skeleton iOS): 9-box OTP inputs auto-advance
+    // focus per digit and drop bulk-typed text; the credential is formatted
+    // "111-111-111" but only digits are keystrokes.
+    resetLayout();
+    const screens = {
+      ...buildScreens(),
+      otp: screen(el({ identifier: 'otp_screen' })),
+    };
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+credentials:
+  sms: \${TEST_SMS}
+states:
+  done:
+    detect: { element: { id: dashboard_root } }
+flows:
+  enter_otp:
+    steps:
+      - type_pin: { value: $sms }
+      - wait: { state: done, timeout: 1s }
+`);
+    process.env.TEST_SMS = '111-111-111';
+    const fake = new FakeAdapter(screens, 'otp');
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      await origType(text);
+      if (fake.typed.length === 9) fake.current = 'dashboard';
+    };
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('enter_otp');
+    expect(fake.typed).toEqual(['1', '1', '1', '1', '1', '1', '1', '1', '1']);
+    expect(trace).toContainEqual({ action: 'type_pin', detail: '9 digits' });
   });
 
   it('rejects a keypad with both id_pattern and text_pattern', () => {
