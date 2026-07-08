@@ -6,13 +6,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
 
 ## Status
 
-Pre-MVP. Current phase: **Phase 1 — Adapter core** (see [docs/plans/phase-1-adapter-core.md](docs/plans/phase-1-adapter-core.md)).
+Pre-MVP. Current phase: **Phase 2 — Flow engine** (see [docs/plans/phase-2-flow-engine.md](docs/plans/phase-2-flow-engine.md)). Phase 1 (adapter core) is complete.
 
 ## Layout
 
 ```
 src/
   adapters/        Device Adapter interface + Android (adb) and iOS (simctl/idb) implementations
+  flow/            averi.yaml config schema + flow engine (ensure_state, secrets)
   mcp/             MCP server wiring (thin tool layer)
   ui-tree/         Normalized accessibility tree model + selector resolution
 docs/plans/        Phase plans
