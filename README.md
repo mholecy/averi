@@ -101,9 +101,9 @@ flows:
 
 Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
 
-## Licensing
+## Privacy
 
-`AVERI_API_KEY` is exchanged on startup for a signed ~24 h token (cached at `~/.averi/license.json`, 7-day offline grace; a *rejected* key never falls back). Without a key the server runs in **dev mode** — fully featured, stderr warning — until the license service goes live. Usage pings carry tool-call counts only; screenshots, UI trees and secrets never leave the machine.
+averi is free — no license key, no accounts, no telemetry. Everything runs locally; screenshots, UI trees and credentials never leave your machine.
 
 ## Development
 
@@ -114,4 +114,4 @@ npm run build      # tsc → dist/
 npm run dev        # run the MCP server over stdio from source
 ```
 
-Layout: `src/adapters/` (adb, simctl/idb, one normalized tree) · `src/flow/` (yaml schema + engine) · `src/verify/` (asserts, baselines, crash scan) · `src/mcp/` (tool layer) · `src/license/` · `skill/` · `docs/plans/`.
+Layout: `src/adapters/` (adb, simctl/idb, one normalized tree) · `src/flow/` (yaml schema + engine) · `src/verify/` (asserts, baselines, crash scan) · `src/mcp/` (tool layer) · `skill/` · `docs/plans/`.
