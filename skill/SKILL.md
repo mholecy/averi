@@ -27,7 +27,7 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 - Off-screen elements aren't in the tree (especially iOS). If an expected element is missing, scroll: `swipe` or a flow `swipe:` step, then re-check.
 - Watch `appAlive` in every flow/assert response. `appAlive: false` comes with a crash excerpt — report it with the log lines, don't retry blindly.
 - On an unexpected screen: `screenshot` + `ui_snapshot`, try the flow's `optional` dismissals by re-running `ensure_state`, and if still stuck, surface to the human with both artifacts.
-- **Never ask the user for credentials.** If a `${VAR}` is missing, the error names it — tell the user which env var to export. You never see credential values; traces show `***`.
+- **Never ask the user for credentials.** If a `${VAR}` is missing, the error names it — tell the user which env var to export, or to put `VAR=value` in a gitignored `.env.averi` next to averi.yaml (auto-loaded; real env vars take precedence). You never see credential values; traces show `***`.
 
 ## Recipes
 
@@ -42,7 +42,7 @@ app:
   android: { package: com.example.dev, apk: path/to.apk }
   ios:     { bundleId: com.example.dev, app: path/to.app }
 credentials:          # env refs only — values never live in YAML
-  pin: ${AVERI_PIN}
+  pin: ${AVERI_PIN}   # from env, or gitignored .env.averi beside this file
 states:
   logged_in:
     detect: { any: [ { element: { id: dashboard_root } } ] }

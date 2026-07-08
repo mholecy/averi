@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseConfig, parseDuration } from '../../src/flow/config.js';
+import { loadEnvBeside, parseConfig, parseDuration } from '../../src/flow/config.js';
 
 const VALID = `
 app:
@@ -74,5 +74,44 @@ describe('parseDuration', () => {
 
   it('rejects garbage', () => {
     expect(() => parseDuration('soon')).toThrow(/Invalid duration/);
+  });
+});
+
+describe('loadEnvBeside', () => {
+  it('loads .env.averi next to the config without overriding existing env', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'averi-env-'));
+    try {
+      await writeFile(
+        join(dir, '.env.averi'),
+        [
+          '# comment',
+          'AVERI_T_PLAIN=hello',
+          'export AVERI_T_EXPORTED=world',
+          'AVERI_T_QUOTED="with spaces"',
+          "AVERI_T_SINGLE='single'",
+          'AVERI_T_EXISTING=from-file',
+          '',
+          'not a valid line',
+        ].join('\n'),
+      );
+      process.env.AVERI_T_EXISTING = 'from-shell';
+      const applied = await loadEnvBeside(join(dir, 'averi.yaml'));
+      expect(applied.sort()).toEqual(['AVERI_T_EXPORTED', 'AVERI_T_PLAIN', 'AVERI_T_QUOTED', 'AVERI_T_SINGLE']);
+      expect(process.env.AVERI_T_PLAIN).toBe('hello');
+      expect(process.env.AVERI_T_EXPORTED).toBe('world');
+      expect(process.env.AVERI_T_QUOTED).toBe('with spaces');
+      expect(process.env.AVERI_T_SINGLE).toBe('single');
+      expect(process.env.AVERI_T_EXISTING).toBe('from-shell'); // shell wins
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      for (const k of Object.keys(process.env)) if (k.startsWith('AVERI_T_')) delete process.env[k];
+    }
+  });
+
+  it('returns empty when no .env.averi exists', async () => {
+    expect(await loadEnvBeside('/nonexistent/averi.yaml')).toEqual([]);
   });
 });

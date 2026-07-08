@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { resolve } from 'node:path';
 import { AdapterRegistry } from './registry.js';
 import { findAll } from '../ui-tree/selectors.js';
-import { loadConfig, type AveriConfig } from '../flow/config.js';
+import { loadConfig, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
 import { acquireLicense, DEFAULT_SERVICE_URL, type Entitlements } from '../license/client.js';
@@ -33,6 +33,18 @@ const configPath = z
   .string()
   .optional()
   .describe('Path to averi.yaml (default: ./averi.yaml in the server working directory)');
+
+/**
+ * All project configuration lives with the project, not with averi: averi.yaml
+ * resolves against the server cwd (the project root when launched from
+ * .mcp.json) and credential values auto-load from a sibling .env.averi.
+ */
+async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
+  const path = resolve(configPath ?? 'averi.yaml');
+  const applied = await loadEnvBeside(path);
+  if (applied.length > 0) console.error(`averi: loaded ${applied.join(', ')} from .env.averi`);
+  return loadConfig(path);
+}
 
 const text = (value: unknown) => ({
   content: [
@@ -63,7 +75,7 @@ registerTool(
   async ({ platform: p, path, configPath: cp }) => {
     let appPath = path;
     if (appPath === undefined) {
-      const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+      const cfg = await loadProjectConfig(cp);
       appPath = p === 'android' ? cfg.app.android?.apk : cfg.app.ios?.app;
       if (appPath === undefined) {
         throw new Error(`No path given and averi.yaml has no app.${p} build path`);
@@ -263,7 +275,7 @@ registerTool(
     inputSchema: { platform, state: z.string().describe('State name from averi.yaml'), configPath },
   },
   async ({ platform: p, state, configPath: cp }) => {
-    const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+    const cfg = await loadProjectConfig(cp);
     const engine = new FlowEngine(cfg, await registry.get(p));
     const trace = await engine.ensureState(state);
     const health = await appHealth(p, cfg);
@@ -285,7 +297,7 @@ registerTool(
     inputSchema: { platform, flow: z.string().describe('Flow name from averi.yaml'), configPath },
   },
   async ({ platform: p, flow, configPath: cp }) => {
-    const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+    const cfg = await loadProjectConfig(cp);
     const engine = new FlowEngine(cfg, await registry.get(p));
     const trace = await engine.runFlow(flow);
     return text(formatTrace(trace) + (await appHealth(p, cfg)));
@@ -305,7 +317,7 @@ registerTool(
     const results = await verifier.assertAll(specs);
     let health = '';
     try {
-      health = await appHealth(p, await loadConfig(resolve(cp ?? 'averi.yaml')));
+      health = await appHealth(p, await loadProjectConfig(cp));
     } catch {
       // no averi.yaml → no app to health-check; asserts stand on their own
     }
@@ -328,7 +340,7 @@ registerTool(
     },
   },
   async ({ state, flow, asserts, configPath: cp }) => {
-    const cfg = await loadConfig(resolve(cp ?? 'averi.yaml'));
+    const cfg = await loadProjectConfig(cp);
     const specs = parseAsserts(asserts ?? []);
     const platforms: Platform[] = ['android', 'ios'];
 

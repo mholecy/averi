@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
@@ -164,6 +165,36 @@ export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfi
 
 export async function loadConfig(path: string): Promise<AveriConfig> {
   return parseConfig(await readFile(path, 'utf8'), path);
+}
+
+/**
+ * Load `.env.averi` sitting next to averi.yaml into process.env — the
+ * project-local home for credential values (gitignored). Existing env vars
+ * win, so CI/shell exports override the file. Returns the names applied.
+ *
+ * Format: `KEY=value` per line; `export KEY=value`, blank lines, `#` comments
+ * and single/double quotes around the value are tolerated.
+ */
+export async function loadEnvBeside(configPath: string): Promise<string[]> {
+  const envPath = join(dirname(configPath), '.env.averi');
+  let raw: string;
+  try {
+    raw = await readFile(envPath, 'utf8');
+  } catch {
+    return [];
+  }
+  const applied: string[] = [];
+  for (const line of raw.split('\n')) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!m || line.trimStart().startsWith('#')) continue;
+    const [, name, rawValue] = m;
+    const value = rawValue.replace(/^(['"])(.*)\1$/, '$2');
+    if (process.env[name] === undefined) {
+      process.env[name] = value;
+      applied.push(name);
+    }
+  }
+  return applied;
 }
 
 /** Cross-reference checks zod can't express: state/flow names must exist. */
