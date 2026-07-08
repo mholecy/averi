@@ -58,4 +58,4 @@ flows:
       - wait: { state: logged_in, timeout: 20s }
 ```
 
-Steps: `launch`, `tap`, `type`, `type_pin` (`twice:` for set+confirm), `swipe` (`direction`, `times`), `wait` (element/state), `branch` (first matching `when` wins), `optional` (absence is fine), and per-platform overrides (`android:`/`ios:` on one step).
+Steps: `launch`, `tap`, `type`, `type_pin` (`twice:` for set+confirm; `keypad:` takes `id_pattern` or — for keypads without resource-ids, common in Compose — `text_pattern: "{digit}"`), `swipe` (`direction`, `times`), `wait` (element/state), `branch` (first matching `when` wins), `optional` (absence is fine), and per-platform overrides (`android:`/`ios:` on one step).
