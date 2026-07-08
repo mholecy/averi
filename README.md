@@ -1,52 +1,117 @@
-# averi — Agent Mobile Verify
+# averi — on-device verification for AI coding agents
 
-A subscription-based MCP server that lets coding agents verify their work on iOS Simulators and Android Emulators, including apps that require a login step.
+averi is an [MCP](https://modelcontextprotocol.io) server that gives a coding agent hands on **iOS Simulators and Android Emulators**: launch the app, tap, type, read the screen, assert, screenshot. Its differentiator is `ensure_state` — the project checks in an `averi.yaml` describing app states (like *logged in*) and how to reach them, so the agent gets past login and deep into the app **deterministically**, instead of fumbling through it tap by tap on every task.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
+averi itself is project-independent: it ships only tools. Everything app-specific — states, flows, credentials — lives in **your app repo**.
 
-## Status
-
-MVP feature-complete (phases 1–4): adapters, flow engine (`ensure_state`), verification (`assert`, `verify_both`, appAlive), agent skill ([skill/SKILL.md](skill/SKILL.md)), license client + packaging. Remaining before launch: license service provisioning, banking-app dogfood, pilot teams.
-
-## Layout
+## How it works
 
 ```
-src/
-  adapters/        Device Adapter interface + Android (adb) and iOS (simctl/idb) implementations
-  flow/            averi.yaml config schema + flow engine (ensure_state, secrets)
-  mcp/             MCP server wiring (thin tool layer)
-  ui-tree/         Normalized accessibility tree model + selector resolution
-  verify/          Assert engine (element checks, screenshot baselines) + crash scan
-skill/             SKILL.md shipped to subscribers
-docs/plans/        Phase plans
+agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator / simulator
+                    │
+                    ├── averi.yaml   (in YOUR repo: states, flows, selectors)
+                    └── .env.averi   (in YOUR repo, gitignored: credential values)
 ```
+
+1. Both platforms' accessibility trees are normalized into one model, so one selector language (`id:`, `text:"…"`, `role:`) and often **one yaml** drives both OSes (per-platform step overrides where they differ).
+2. `ensure_state("logged_in")` checks the screen against the state's `detect:` element; if it doesn't match, it runs the state's `reach:` flow (e.g. `login`) and confirms. Idempotent — costs ~1 s when already there.
+3. Credential values never live in yaml — `${ENV_VAR}` references resolve from the environment, with a gitignored `.env.averi` next to averi.yaml auto-loaded (real env vars win, so CI injects secrets normally). Values are redacted (`***`) from every trace and error.
+4. Verification is tiered: element asserts (deterministic, cheap) → screenshots for the agent to look at → pixel-diff against stored baselines. Every flow response reports `appAlive` with a crash-log excerpt if the app died.
+
+## Requirements
+
+- macOS, Node 20+
+- **Android**: `adb` on PATH (Android SDK platform-tools), an emulator running
+- **iOS**: Xcode, a booted simulator, and `idb`:
+  `brew install idb-companion && pipx install fb-idb --python python3.13` (fb-idb breaks on 3.14).
+  If `xcode-select -p` points at CommandLineTools, averi injects `DEVELOPER_DIR` itself — no sudo needed.
+
+## Installation (in your app repo)
+
+Until the npm package is published, clone and build averi once:
+
+```bash
+git clone git@github.com:mholecy/native-app-verify.git ~/tools/averi
+cd ~/tools/averi && npm install && npm run build
+```
+
+(For a team, pin a tag/commit so everyone runs the same build.)
+
+Then add three things to the **app repo root** (`averi.yaml` and `.env.averi` must sit in the directory the agent session runs from — the same place as `.mcp.json`):
+
+1. `.mcp.json` — registers the server. The server's working directory is your repo root; that is how averi finds your config, so no paths need configuring:
+
+```json
+{
+  "mcpServers": {
+    "averi": { "command": "node", "args": ["/absolute/path/to/averi/dist/mcp/server.js"] }
+  }
+}
+```
+
+2. `.gitignore` entry for `.env.averi`, then create that file with the test credentials your login flow needs. Variable names are yours to choose — they only have to match the `${...}` references in `averi.yaml`:
+
+```
+APP_USERNAME=...
+APP_PASSWORD=...
+```
+
+3. The agent skill — copy `skill/SKILL.md` to `.claude/skills/averi/SKILL.md` (or your agent's equivalent) so the agent knows the golden path: build → install → `ensure_state` → navigate → assert → `verify_both`.
+
+Restart the agent session; it now has 16 `averi` tools (`list_devices`, `install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, `ui_snapshot`, `tap`, `swipe`, `type_text`, `press_key`, `ensure_state`, `run_flow`, `assert`, `verify_both`, `get_logs`). Notes: averi never builds your app — your normal build produces the `.apk`/`.app`, whose path in `averi.yaml` is what `install_app` installs; `verify_both` runs the same state/flow/asserts on **both platforms** and returns paired screenshots; screenshot baselines auto-create under `.averi/baselines/` on first use (delete one to re-baseline).
+
+## Let the agent write `averi.yaml` for you
+
+You don't hand-author the login flow — **the agent bootstraps it by driving your app**. With a booted device and the dev build installed, prompt your agent:
+
+> Using the averi tools, author an `averi.yaml` for this repo. Launch the app with `clearState`, and at each screen use `ui_snapshot` (and `screenshot` when unsure) to find stable selectors — prefer `id:`, else exact visible `text:` (text selectors are locale-sensitive: pin the device language they were captured in). Walk the full login using the test credentials from `.env.averi` (reference them as `${VARS}` in yaml, never paste values). Record every screen as flow steps; wrap dismissable interstitials (permission dialogs, promos) in `optional:`. Define a `logged_out` state (first screen after clearState) and a `logged_in` state (a stable element on the home screen) with `reach: [login]`. Then prove it: run `ensure_state("logged_in")` twice — once from a cleared app (full flow) and once already logged in (must detect in ~1 s) — and iterate on the yaml until both pass.
+
+The yaml is code: it lives in the repo, and when navigation changes and a flow times out, the agent fixes the descriptor as part of the change. Real-world quirks the schema already covers: per-platform steps (`android:`/`ios:`), keypads whose digits have no resource-ids (`type_pin` with `text_pattern: "{digit}"`), auto-advancing OTP boxes (per-digit typing built in), and `branch:` for state-dependent paths (e.g. Keychain-surviving PIN login on iOS).
+
+### Minimal `averi.yaml`
+
+```yaml
+app:
+  android: { package: com.example.dev, apk: app/build/outputs/apk/dev/debug/app.apk }
+  ios:     { bundleId: com.example.dev, app: build/Debug-iphonesimulator/Example.app }
+
+credentials:                 # env refs only — values come from .env.averi / real env
+  password: ${APP_PASSWORD}
+
+states:
+  logged_out:
+    detect: { element: { text: "Welcome!" } }
+  logged_in:
+    detect: { element: { text: "Accounts" } }
+    reach: [login]
+
+flows:
+  login:
+    steps:
+      - launch: { clearState: true }
+      - wait: { element: { text: "Welcome!" }, timeout: 15s }
+      - tap: { text: "Log in" }
+      - tap: { role: textfield }
+      - type: { value: $password }
+      - tap: { text: "Continue" }
+      - optional:
+          - android: { tap: { id: permission_allow_button } }   # Android 13+ notifications
+      - wait: { state: logged_in, timeout: 20s }
+```
+
+Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
+
+## Licensing
+
+`AVERI_API_KEY` is exchanged on startup for a signed ~24 h token (cached at `~/.averi/license.json`, 7-day offline grace; a *rejected* key never falls back). Without a key the server runs in **dev mode** — fully featured, stderr warning — until the license service goes live. Usage pings carry tool-call counts only; screenshots, UI trees and secrets never leave the machine.
 
 ## Development
 
 ```bash
 npm install
-npm run build      # tsc
 npm test           # vitest
-npm run dev        # run MCP server over stdio
+npm run build      # tsc → dist/
+npm run dev        # run the MCP server over stdio from source
 ```
 
-Requirements: Node 20+, Xcode + `idb` (iOS), Android SDK platform-tools (`adb`).
-
-iOS notes:
-- `idb`: `brew install idb-companion` + `pipx install fb-idb --python python3.13` (fb-idb breaks on Python 3.14).
-- If `xcode-select -p` points at CommandLineTools, the adapter automatically injects `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for simctl/idb — no sudo needed.
-
-## Licensing
-
-- `AVERI_API_KEY` — subscription key. On startup the server exchanges it for a signed ~24 h license token (cached at `~/.averi/license.json`); a network failure falls back to the cached token with a 7-day grace past expiry. A *rejected* key never falls back.
-- Without a key the server runs in **dev mode** (all features, stderr warning) — pre-launch behavior, flips to hard-require at GA. The token-verification public key in `src/license/client.ts` is a placeholder to regenerate when the license service is provisioned (service API contract: `docs/plans/phase-4-licensing.md`).
-- Plans: Solo (core tools, sequential `verify_both`), Team (parallel `verify_both`, baselines), CI (headless). Usage pings carry tool-call counts only — screenshots, UI trees, and secrets never leave the machine.
-
-## Using with Claude Code
-
-```json
-// .mcp.json in the app repo (next to averi.yaml)
-{ "mcpServers": { "averi": { "command": "averi-mcp" } } }
-```
-
-`skill/SKILL.md` teaches the agent the workflow (golden path, rules, recipes).
+Layout: `src/adapters/` (adb, simctl/idb, one normalized tree) · `src/flow/` (yaml schema + engine) · `src/verify/` (asserts, baselines, crash scan) · `src/mcp/` (tool layer) · `src/license/` · `skill/` · `docs/plans/`.
