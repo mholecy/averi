@@ -10,6 +10,8 @@ export interface ExecOptions {
   timeoutMs?: number;
   /** Written to the child's stdin, then stdin is closed. */
   stdin?: string;
+  /** Merged over process.env for the child. */
+  env?: Record<string, string>;
 }
 
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
@@ -43,6 +45,7 @@ export const exec: ExecFn = (cmd, args, opts = {}) =>
         timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         maxBuffer: MAX_BUFFER,
         killSignal: 'SIGKILL',
+        env: opts.env ? { ...process.env, ...opts.env } : undefined,
       },
       (err, stdout, stderr) => {
         const stderrText = stderr.toString('utf8');

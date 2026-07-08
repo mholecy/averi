@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -47,15 +48,43 @@ export class IosAdapter implements DeviceAdapter {
     return this.udid ?? 'booted';
   }
 
-  private simctl(args: string[], timeoutMs?: number) {
-    return this.exec('xcrun', ['simctl', ...args], timeoutMs ? { timeoutMs } : undefined);
+  /**
+   * simctl/idb need xcode-select to point at Xcode, but many machines point
+   * at CommandLineTools. Probe once; if broken and Xcode exists at the
+   * default location, inject DEVELOPER_DIR instead of requiring sudo.
+   */
+  private envPromise: Promise<Record<string, string> | undefined> | undefined;
+
+  private detectEnv(): Promise<Record<string, string> | undefined> {
+    this.envPromise ??= (async () => {
+      if (process.env.DEVELOPER_DIR) return undefined;
+      try {
+        await this.exec('xcrun', ['--find', 'simctl']);
+        return undefined;
+      } catch {
+        const xcode = '/Applications/Xcode.app/Contents/Developer';
+        if (existsSync(xcode)) return { DEVELOPER_DIR: xcode };
+        throw new Error(
+          'simctl not found: xcode-select points at CommandLineTools and no ' +
+            '/Applications/Xcode.app — install Xcode or run ' +
+            '`sudo xcode-select -s /path/to/Xcode.app/Contents/Developer`',
+        );
+      }
+    })();
+    return this.envPromise;
+  }
+
+  private async simctl(args: string[], timeoutMs?: number) {
+    const env = await this.detectEnv();
+    return this.exec('xcrun', ['simctl', ...args], { env, ...(timeoutMs ? { timeoutMs } : {}) });
   }
 
   // --- idb boundary (swap candidate: WebDriverAgent) ---
 
-  private idb(args: string[], timeoutMs?: number) {
+  private async idb(args: string[], timeoutMs?: number) {
+    const env = await this.detectEnv();
     return this.exec('idb', [...args, '--udid', this.target()],
-      timeoutMs ? { timeoutMs } : undefined);
+      { env, ...(timeoutMs ? { timeoutMs } : {}) });
   }
 
   private idbUi(args: string[]) {
@@ -157,7 +186,8 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   async setClipboard(text: string): Promise<void> {
-    await this.exec('xcrun', ['simctl', 'pbcopy', this.target()], { stdin: text });
+    const env = await this.detectEnv();
+    await this.exec('xcrun', ['simctl', 'pbcopy', this.target()], { stdin: text, env });
   }
 
   async logs(sinceMs: number): Promise<string[]> {

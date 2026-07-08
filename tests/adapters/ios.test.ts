@@ -84,13 +84,21 @@ describe('IosAdapter interactions', () => {
   it('targets "booted" when no udid is given', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ exec: fn }).openDeepLink('myapp://home');
-    expect(calls[0].full).toBe('xcrun simctl openurl booted myapp://home');
+    expect(calls.at(-1)?.full).toBe('xcrun simctl openurl booted myapp://home');
+  });
+
+  it('probes for simctl once, not per call', async () => {
+    const { fn, calls } = fakeExec({});
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    await adapter.openDeepLink('a://b');
+    await adapter.openDeepLink('c://d');
+    expect(calls.filter((c) => c.full === 'xcrun --find simctl')).toHaveLength(1);
   });
 
   it('setClipboard pipes text to simctl pbcopy via stdin', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).setClipboard('secret');
-    expect(calls[0]).toEqual({ full: 'xcrun simctl pbcopy AAAA-1111', stdin: 'secret' });
+    expect(calls.at(-1)).toMatchObject({ full: 'xcrun simctl pbcopy AAAA-1111', stdin: 'secret' });
   });
 
   it('pressKey back is rejected with guidance, home uses the HOME button', async () => {
@@ -98,6 +106,6 @@ describe('IosAdapter interactions', () => {
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
     await expect(adapter.pressKey('back')).rejects.toThrow(/no iOS equivalent/);
     await adapter.pressKey('home');
-    expect(calls[0].full).toBe('idb ui button HOME --udid AAAA-1111');
+    expect(calls.at(-1)?.full).toBe('idb ui button HOME --udid AAAA-1111');
   });
 });
