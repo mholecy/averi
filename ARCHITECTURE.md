@@ -109,6 +109,9 @@ credentials:              # values come from env / OS keychain, never from YAML
   username: ${AVERI_USER}
   password: ${AVERI_PASSWORD}
   pin:      ${AVERI_PIN}
+# Values resolve from process.env; a `.env.averi` file next to averi.yaml
+# (gitignore it) is auto-loaded first, existing env vars taking precedence —
+# so the project is self-contained and CI can still inject via real env.
 
 states:
   logged_in:
