@@ -28,7 +28,7 @@ export type Step =
   | { optional: Step[] }
   | { android?: Step; ios?: Step };
 
-const elementSpec: z.ZodType<ElementSpec> = z
+export const elementSpecSchema: z.ZodType<ElementSpec> = z
   .object({
     id: z.string().optional(),
     text: z.string().optional(),
@@ -43,7 +43,7 @@ const elementSpec: z.ZodType<ElementSpec> = z
 const condition: z.ZodType<Condition> = z.lazy(() =>
   z
     .object({
-      element: elementSpec.optional(),
+      element: elementSpecSchema.optional(),
       state: z.string().optional(),
       any: z.array(condition).optional(),
       all: z.array(condition).optional(),
@@ -59,7 +59,7 @@ const timeout = z.union([z.number(), z.string()]);
 const step: z.ZodType<Step> = z.lazy(() =>
   z.union([
     z.object({ launch: z.object({ clearState: z.boolean().optional() }).strict() }).strict(),
-    z.object({ tap: elementSpec }).strict(),
+    z.object({ tap: elementSpecSchema }).strict(),
     z.object({ type: z.object({ value: z.string() }).strict() }).strict(),
     z
       .object({
@@ -76,7 +76,7 @@ const step: z.ZodType<Step> = z.lazy(() =>
       .object({
         wait: z
           .object({
-            element: elementSpec.optional(),
+            element: elementSpecSchema.optional(),
             state: z.string().optional(),
             timeout: timeout.optional(),
           })

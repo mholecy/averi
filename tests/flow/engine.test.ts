@@ -1,88 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Device, DeviceAdapter, Key, Selector, UiNode } from '../../src/adapters/types.js';
+import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { FlowEngine } from '../../src/flow/engine.js';
-
-const node = (partial: Partial<UiNode>): UiNode => ({
-  role: 'other',
-  label: null,
-  identifier: null,
-  value: null,
-  rect: { x: 0, y: 0, width: 10, height: 10 },
-  children: [],
-  ...partial,
-});
-
-/** Each element gets a distinct rect so coordinate taps map back to one node. */
-let nextY = 0;
-const el = (partial: Partial<UiNode>): UiNode => {
-  nextY += 20;
-  return node({ rect: { x: 0, y: nextY, width: 100, height: 10 }, ...partial });
-};
-
-const screen = (...children: UiNode[]): UiNode =>
-  node({ role: 'container', rect: { x: 0, y: 0, width: 1000, height: 2000 }, children });
-
-/**
- * Programmable fake device: named screens, tap-driven transitions.
- * `onTap(identifier)` mutates `current` to simulate the app reacting.
- */
-class FakeAdapter implements DeviceAdapter {
-  readonly platform = 'android' as const;
-  current: string;
-  taps: string[] = [];
-  typed: string[] = [];
-  launches: { appId: string; clearState?: boolean }[] = [];
-
-  constructor(
-    private screens: Record<string, UiNode>,
-    start: string,
-    private onTap: (id: string, self: FakeAdapter) => void = () => {},
-  ) {
-    this.current = start;
-  }
-
-  async uiTree(): Promise<UiNode> {
-    return this.screens[this.current];
-  }
-
-  async tap(x: number, y: number): Promise<void> {
-    const hit = (n: UiNode): UiNode | undefined => {
-      for (const c of n.children) {
-        const found = hit(c);
-        if (found) return found;
-      }
-      const { rect } = n;
-      const inside = x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
-      return inside && n.identifier ? n : undefined;
-    };
-    const target = hit(await this.uiTree());
-    if (!target?.identifier) throw new Error(`FakeAdapter: nothing tappable at (${x},${y})`);
-    this.taps.push(target.identifier);
-    this.onTap(target.identifier, this);
-  }
-
-  async typeText(text: string): Promise<void> {
-    this.typed.push(text);
-  }
-
-  async launch(appId: string, opts: { clearState?: boolean } = {}): Promise<void> {
-    this.launches.push({ appId, clearState: opts.clearState });
-  }
-
-  // Unused by the engine tests:
-  async listDevices(): Promise<Device[]> { return []; }
-  async install(): Promise<void> {}
-  async terminate(): Promise<void> {}
-  async openDeepLink(): Promise<void> {}
-  async screenshot(): Promise<Buffer> { return Buffer.alloc(0); }
-  async tapElement(_s: Selector): Promise<void> {}
-  async longPress(): Promise<void> {}
-  async swipe(): Promise<void> {}
-  async pressKey(_k: Key): Promise<void> {}
-  async setClipboard(): Promise<void> {}
-  async logs(): Promise<string[]> { return []; }
-}
+import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -127,7 +47,7 @@ flows:
 const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50 };
 
 function buildScreens() {
-  nextY = 0;
+  resetLayout();
   const pinKeys = ['1', '2', '3', '4', '7'].map((d) =>
     el({ role: 'button', identifier: `pin_key_${d}`, label: d }));
   const setupKeys = ['1', '2', '3', '4', '7'].map((d) =>
@@ -262,7 +182,7 @@ describe('secrets', () => {
 
 describe('tap stability', () => {
   it('does not tap an element while it is still moving (launch animation)', async () => {
-    nextY = 0;
+    resetLayout();
     const positions = [100, 160, 220, 220, 220]; // animates, then settles at 220
     let poll = 0;
     const target = el({ role: 'button', identifier: 'tab_payments' });
@@ -285,7 +205,7 @@ describe('tap stability', () => {
   });
 
   it('ignores zero-area nodes as tap targets', async () => {
-    nextY = 0;
+    resetLayout();
     const ghost = node({ role: 'other', identifier: 'tab_payments', rect: { x: 5, y: 5, width: 0, height: 0 } });
     const real = el({ role: 'button', identifier: 'tab_payments' });
     const dash = screen(el({ identifier: 'dashboard_root' }), ghost, real);
@@ -297,7 +217,7 @@ describe('tap stability', () => {
 
 describe('failure modes', () => {
   it('branch with no matching arm times out with the tried conditions', async () => {
-    nextY = 0;
+    resetLayout();
     const fake = new FakeAdapter({ blank: screen(el({ identifier: 'something_else' })) }, 'blank');
     await expect(new FlowEngine(CONFIG, fake, FAST).runFlow('login'))
       .rejects.toThrow(/any branch condition.*pin_keyboard.*username_field/);
