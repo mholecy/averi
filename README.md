@@ -1,0 +1,30 @@
+# averi — Agent Mobile Verify
+
+A subscription-based MCP server that lets coding agents verify their work on iOS Simulators and Android Emulators, including apps that require a login step.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
+
+## Status
+
+Pre-MVP. Current phase: **Phase 1 — Adapter core** (see [docs/plans/phase-1-adapter-core.md](docs/plans/phase-1-adapter-core.md)).
+
+## Layout
+
+```
+src/
+  adapters/        Device Adapter interface + Android (adb) and iOS (simctl/idb) implementations
+  mcp/             MCP server wiring (thin tool layer)
+  ui-tree/         Normalized accessibility tree model + selector resolution
+docs/plans/        Phase plans
+```
+
+## Development
+
+```bash
+npm install
+npm run build      # tsc
+npm test           # vitest
+npm run dev        # run MCP server over stdio
+```
+
+Requirements: Node 20+, Xcode command line tools + `idb` (iOS), Android SDK platform-tools (`adb`).
