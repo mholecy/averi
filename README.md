@@ -20,11 +20,12 @@ agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator /
 
 ## Requirements
 
-- macOS, Node 20+
-- **Android**: `adb` on PATH (Android SDK platform-tools), an emulator running
-- **iOS**: Xcode, a booted simulator, and `idb`:
+- Node 20+
+- **Android**: `adb` on PATH (Android SDK platform-tools), an emulator running. Works on macOS, and nothing in the Android path is macOS-specific — Linux/Windows should work but are untested.
+- **iOS**: **macOS only** (Apple ships simulators only with Xcode). Xcode, a booted simulator, and `idb`:
   `brew install idb-companion && pipx install fb-idb --python python3.13` (fb-idb breaks on 3.14).
   If `xcode-select -p` points at CommandLineTools, averi injects `DEVELOPER_DIR` itself — no sudo needed.
+- `verify_both` needs both platforms, hence a Mac. Everything else degrades per platform: on a Linux/Windows box you get the full Android toolset; iOS tools error only when called.
 
 ## Installation (in your app repo)
 
