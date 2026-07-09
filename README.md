@@ -37,17 +37,26 @@ cd ~/tools/averi && npm install && npm run build
 
 (For a team, pin a tag/commit so everyone runs the same build.)
 
-Then add three things to the **app repo root** (`averi.yaml` and `.env.averi` must sit in the directory the agent session runs from — the same place as `.mcp.json`):
+Then set up three things in the **app repo root** (`averi.yaml` and `.env.averi` must sit in the directory the agent session runs from):
 
-1. `.mcp.json` — registers the server. The server's working directory is your repo root; that is how averi finds your config, so no paths need configuring:
+1. Register the MCP server — two ways, same result. Either way Claude Code runs the server with your **repo root as its working directory**, which is how averi finds the config below; no paths need configuring in averi itself.
 
-```json
-{
-  "mcpServers": {
-    "averi": { "command": "node", "args": ["/absolute/path/to/averi/dist/mcp/server.js"] }
-  }
-}
-```
+   **For yourself** (recommended while averi is unpublished — the command embeds a machine-specific path that shouldn't be committed):
+
+   ```bash
+   claude mcp add averi -- node /absolute/path/to/averi/dist/mcp/server.js
+   # add --scope user to enable averi in all your projects at once
+   ```
+
+   **For the whole team** — `.mcp.json` at the repo root, committed (teammates get a one-time approval prompt). Best once the npm package is published, when the command becomes portable (`"command": "npx", "args": ["-y", "averi-mcp"]`):
+
+   ```json
+   {
+     "mcpServers": {
+       "averi": { "command": "node", "args": ["/absolute/path/to/averi/dist/mcp/server.js"] }
+     }
+   }
+   ```
 
 2. `.gitignore` entry for `.env.averi`, then create that file with the test credentials your login flow needs. Variable names are yours to choose — they only have to match the `${...}` references in `averi.yaml`:
 
