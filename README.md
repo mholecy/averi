@@ -77,6 +77,15 @@ You don't hand-author the login flow — **the agent bootstraps it by driving yo
 
 The yaml is code: it lives in the repo, and when navigation changes and a flow times out, the agent fixes the descriptor as part of the change. Real-world quirks the schema already covers: per-platform steps (`android:`/`ios:`), keypads whose digits have no resource-ids (`type_pin` with `text_pattern: "{digit}"`), auto-advancing OTP boxes (per-digit typing built in), and `branch:` for state-dependent paths (e.g. Keychain-surviving PIN login on iOS).
 
+### Give your screens stable ids — it pays off immediately
+
+averi can only select what the accessibility tree exposes. Screens without identifiers force `text:"…"` selectors, which are **locale-fragile** (break the moment the device language changes) and **blind to which component** rendered the text. Stable ids make flows locale-proof and asserts component-precise — on **both platforms**:
+
+- **Android (Compose)**: `Modifier.testTag("login_submit")` — and note it only surfaces as a `resource-id` averi can see if the app sets `testTagsAsResourceId = true` on the semantics tree (`Modifier.semantics { testTagsAsResourceId = true }` at the root).
+- **iOS (SwiftUI/UIKit)**: `.accessibilityIdentifier("login_submit")`.
+
+Adding ids to every **new** feature screen as you build it is cheap; retrofitting an entire app is not. Make it part of the definition of done — it also improves real accessibility tooling.
+
 ### Minimal `averi.yaml`
 
 ```yaml
