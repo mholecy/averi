@@ -141,14 +141,16 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async typeText(text: string): Promise<void> {
-    // One `input text` call PER CHARACTER. Bulk injection races Compose's
-    // async text state and silently drops most characters (measured
-    // 2026-08-05 on the login username field: 3 of 11 landed; per-char
-    // landed 11/11 — the adb round-trip itself is the pacing). Escape shell
-    // metachars; `input text` wants spaces encoded as %s.
+    // One `input text` call PER CHARACTER, with explicit pacing. Bulk injection
+    // races Compose's async text state and silently drops most characters
+    // (measured 2026-08-05 on the login username field: 3 of 11 landed). The adb
+    // round-trip alone is NOT enough pacing on a loaded emulator — re-measured
+    // the same evening after hours of uptime: per-char with no delay landed 5 of
+    // 8, per-char with 300ms landed 8/8. 250ms keeps a 12-char value at ~3s.
     for (const ch of text) {
       const escaped = ch.replace(/([\\"'`$&*()[\]{}|;<>?~#])/, '\\$1').replace(/ /, '%s');
       await this.adb(['shell', 'input', 'text', escaped]);
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
 
