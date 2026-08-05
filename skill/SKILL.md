@@ -12,9 +12,9 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 1. Build the app (the project's usual build command).
 2. `install_app(platform)` — uses the build path from `averi.yaml`.
 3. `ensure_state("logged_in", platform)` — detects, logs in only if needed, returns a screenshot.
-4. Navigate to the changed screen: `run_flow` if a flow exists, else `tap`/`swipe` with selectors.
+4. Navigate to the changed screen: `run_flow` if a flow exists, else `tap`/`scroll_until` with selectors.
 5. Verify, cheapest tier first:
-   - `assert` with element specs — deterministic, no vision needed: `{"element":{"id":"amount"},"text":"100.00"}`, `{"element":{"id":"error_banner"},"absent":true}`
+   - `assert` with element specs — deterministic, no vision needed: `{"element":{"id":"amount"},"text":"100.00"}`, `{"element":{"id":"error_banner"},"absent":true}`, `{"element":{"id":"amount"},"error":"Required"}` (validation message paired to the input, where the platform exposes it — `absent` means gone from the tree OR outside the viewport, the same on both platforms)
    - `screenshot` — look at it yourself for layout/visual judgment.
    - `assert` with `{"screenshot":{"baseline":"name"}}` — pixel regression vs. stored baseline (auto-created on first run under `.averi/baselines/`).
 6. Cross-platform tasks: finish with `verify_both(state, flow?, asserts)` — same sequence on both platforms, paired screenshots. Do this before declaring the task done.
@@ -24,14 +24,16 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 - **Always `ensure_state` instead of manual login.** It is idempotent — call it freely; it no-ops when already there.
 - **Prefer `ui_snapshot` + element asserts over screenshots** for text/presence checks. Screenshots are for visual judgment, baselines for regression.
 - Selectors: prefer `id:` (stable), then `label:`/`text:`, then `role:` combinations. `ui_snapshot(platform, filter)` shows you what's there.
-- Off-screen elements aren't in the tree (especially iOS). If an expected element is missing, scroll: `swipe` or a flow `swipe:` step, then re-check.
+- If an expected element is missing or below the fold, use `scroll_until(platform, selector)` (or the `scroll_until:` flow step) — element-targeted, no coordinates, portable. Raw `swipe` remains for gestures that aren't "bring X into view" (its coordinates are per-platform units).
+- Filling fields: `type_text(platform, text, selector, clear)` focuses the field for you; `clear: true` deletes existing content first — typing APPENDS on both platforms, so pass `clear` when a value may already be there, and leave it off for pre-filled fields that must survive (dev-flavor logins). In flows use `fill: { id: amount, value: "1.00", clear: true }`.
 - Watch `appAlive` in every flow/assert response. `appAlive: false` comes with a crash excerpt — report it with the log lines, don't retry blindly.
 - On an unexpected screen: `screenshot` + `ui_snapshot`, try the flow's `optional` dismissals by re-running `ensure_state`, and if still stuck, surface to the human with both artifacts.
 - **Never ask the user for credentials.** If a `${VAR}` is missing, the error names it — tell the user which env var to export, or to put `VAR=value` in a gitignored `.env.averi` next to averi.yaml (auto-loaded; real env vars take precedence). You never see credential values; traces show `***`.
 
 ## Recipes
 
-- **Reproduce a bug report**: `ensure_state` → `run_flow`/taps along the reported path → `screenshot` + `get_logs(platform, sinceSeconds)` → compare with the report.
+- **Reproduce a bug report**: `ensure_state` → `run_flow`/taps along the reported path → `screenshot` + `get_logs(platform, sinceSeconds, grep)` → compare with the report. Always pass `grep` (case-insensitive regex, e.g. `"okhttp|validation"`) — unfiltered pulls run to thousands of lines.
+- **Test form validation**: dirty-submit (tap submit on an invalid form), `assert` the error text or the field's `error` attribute, fix the field with `fill`/`type_text(clear)`, then assert the error `absent` — the disappearance check is portable. Flows can assert mid-way with an inline `assert:` step (a failing spec fails the flow with the diff in the trace).
 - **Check a flow after refactor**: `verify_both(state, flow, asserts)` with the flow's key asserts; baselines catch visual drift.
 - **Update `averi.yaml` when navigation changes**: if a flow times out because the UI changed, fix the descriptor as part of your change (it lives in the repo — treat it like code) and re-run. Keep selectors on stable `id:`s; add `optional:` steps for new interstitials.
 
@@ -58,4 +60,6 @@ flows:
       - wait: { state: logged_in, timeout: 20s }
 ```
 
-Steps: `launch`, `tap`, `type`, `type_pin` (`twice:` for set+confirm; `keypad:` takes `id_pattern` or — for keypads without resource-ids, common in Compose — `text_pattern: "{digit}"`), `swipe` (`direction`, `times`), `wait` (element/state), `branch` (first matching `when` wins), `optional` (absence is fine), and per-platform overrides (`android:`/`ios:` on one step).
+Steps: `launch`, `tap`, `type`, `type_pin` (`twice:` for set+confirm; `keypad:` takes `id_pattern` or — for keypads without resource-ids, common in Compose — `text_pattern: "{digit}"`), `fill` (element spec + `value`, opt-in `clear`), `swipe` (`direction`, `times`), `scroll_until` (`element`, optional `direction`/`maxSwipes`/`timeout` — swipe until visible), `assert` (inline element asserts; a failure fails the flow), `wait` (element/state), `branch` (first matching `when` wins), `optional` (absence is fine), and per-platform overrides (`android:`/`ios:` on one step).
+
+State `detect:` conditions take `element`/`state`/`any`/`all`, and an element condition accepts `absent: true` — "row visible AND card face gone" is expressible, which disambiguates screens that embed the same reused list.
