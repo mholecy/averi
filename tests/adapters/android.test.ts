@@ -82,6 +82,25 @@ describe('parseUiautomatorXml', () => {
   it('maps TextView to text with a null identifier for empty resource-id', () => {
     expect(tree.children[2]).toMatchObject({ role: 'text', label: 'Log in', identifier: null });
   });
+
+  it('recognizes Compose text inputs dumped as focusable+long-clickable scroll views', () => {
+    // Measured 2026-08-05: the login username field dumps as
+    // HorizontalScrollView with the content in `text` — no EditText anywhere.
+    const composeXml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="app" content-desc="" bounds="[0,0][1080,2400]">
+    <node index="0" text="Martha.Key" resource-id="app:id/login.username.input" class="android.widget.HorizontalScrollView" package="app" content-desc="" focusable="true" long-clickable="true" bounds="[44,511][1036,654]"/>
+    <node index="1" text="" resource-id="app:id/real_scroller" class="android.widget.HorizontalScrollView" package="app" content-desc="" focusable="false" long-clickable="false" scrollable="true" bounds="[0,700][1080,900]"/>
+  </node>
+</hierarchy>`;
+    const t = parseUiautomatorXml(composeXml);
+    expect(t.children[0]).toMatchObject({
+      role: 'textfield',
+      identifier: 'login.username.input',
+      value: 'Martha.Key',
+    });
+    expect(t.children[1]).toMatchObject({ role: 'scrollable', value: null });
+  });
 });
 
 describe('AndroidAdapter interactions', () => {
@@ -97,10 +116,15 @@ describe('AndroidAdapter interactions', () => {
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 540 1350');
   });
 
-  it('typeText encodes spaces and escapes shell metacharacters', async () => {
+  it('typeText sends one input-text call per character (bulk injection drops chars on Compose fields)', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('hi there $USER');
-    expect(calls[0]).toBe('adb -s emulator-5554 shell input text hi%sthere%s\\$USER');
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('a $b');
+    expect(calls).toEqual([
+      'adb -s emulator-5554 shell input text a',
+      'adb -s emulator-5554 shell input text %s',
+      'adb -s emulator-5554 shell input text \\$',
+      'adb -s emulator-5554 shell input text b',
+    ]);
   });
 
   it('launch with clearState clears app data first', async () => {

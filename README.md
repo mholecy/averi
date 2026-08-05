@@ -135,7 +135,7 @@ flows:
 ```
 
 - **`absent` semantics** (assert + state `detect:`): an element is absent when it is *not in the tree, or its rect does not intersect the visible viewport*. This is the one portable meaning — Android prunes off-screen nodes from its tree while iOS keeps them with off-viewport rects, so a raw tree check would pass on one platform and fail on the other for the same screen. (Behavior change for iOS `absent` asserts, which previously only checked tree presence.)
-- **`fill`** clears opt-in only: typing APPENDS on both platforms, but dev flavors may pre-fill login fields that must survive.
+- **`fill`** clears opt-in only: typing APPENDS on both platforms, but dev flavors may pre-fill login fields that must survive. Fills are verified against a fresh accessibility tree when the field exposes its text — a clear-fill that lands wrong is wiped and retyped once; a no-clear fill never destroys existing content (it fails loudly instead). Android types one character per `input text` call: bulk injection races Compose's async state and drops most characters (measured 3 of 11 landing).
 - **Field errors**: `ui_snapshot` attaches `error` to an input when the platform exposes the association (iOS: a same-identifier text below the field — the SwiftUI convention when titles/errors share the field's `accessibilityIdentifier`); assert with `{ element: { id: amount_input }, error: "Required" }`.
 - **Tap disambiguation**: when a selector matches several nodes and exactly one is interactive (button/textfield/switch/…), `tap`/`fill` target that one and say so in the trace. Several interactive matches stay an error.
 

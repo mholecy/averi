@@ -64,17 +64,26 @@ export class FakeAdapter implements DeviceAdapter {
     const target = hit(await this.uiTree());
     if (!target?.identifier) throw new Error(`FakeAdapter: nothing tappable at (${x},${y})`);
     this.taps.push(target.identifier);
+    this.focused = target.role === 'textfield' ? target : undefined;
     this.onTap(target.identifier, this);
   }
 
+  /** Last tapped textfield — typeText/clearText mutate its value like a real field. */
+  focused: UiNode | undefined;
+
   async typeText(text: string): Promise<void> {
     this.typed.push(text);
+    if (this.focused) this.focused.value = (this.focused.value ?? '') + text;
   }
 
   deletes: number[] = [];
 
   async clearText(count: number): Promise<void> {
     this.deletes.push(count);
+    if (this.focused) {
+      const remaining = (this.focused.value ?? '').slice(0, Math.max(0, (this.focused.value ?? '').length - count));
+      this.focused.value = remaining === '' ? null : remaining;
+    }
   }
 
   viewportSize = { width: 1000, height: 2000 };

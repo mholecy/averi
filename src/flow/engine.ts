@@ -187,7 +187,13 @@ export class FlowEngine {
       const { value: rawValue, clear, dismissKeyboard, ...spec } = step.fill;
       const { value, secret } = this.resolveValue(rawValue);
       const node = await this.settledNode(spec, this.tapTimeoutMs);
-      await fillField(this.adapter, node, value, { clear });
+      const refetch = async () => {
+        const candidates = findBySpec(await this.adapter.uiTree(), spec).filter(
+          (n) => n.rect.width > 0 && n.rect.height > 0,
+        );
+        return candidates.length > 1 ? (preferInteractive(candidates)?.node ?? candidates[0]) : candidates[0];
+      };
+      await fillField(this.adapter, node, value, { clear, refetch, pollMs: this.pollMs });
       if (dismissKeyboard) await this.adapter.pressKey(this.adapter.platform === 'android' ? 'back' : 'enter');
       this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
       return;
@@ -453,22 +459,86 @@ export async function scrollUntilVisible(
  * is deleted first via clearText — typing otherwise APPENDS, the measured
  * Android login trap. A right-edge tap is NOT how clear works: measured
  * 2026-08-05, taps in the field's trailing padding do not focus iOS fields.
+ *
+ * When `refetch` is given, every phase is VERIFIED against a fresh tree and
+ * retried once — synthetic input is droppable end to end (Compose async
+ * state, IME queues), so "the call returned" is not "the text landed":
+ * - clear: the field must actually be empty; a second pass uses the length
+ *   the field still reports.
+ * - type with clear: the field must show exactly the value; the retry may
+ *   safely wipe and retype (the content is ours).
+ * - type without clear: the typed value must appear IN the field (contiguous
+ *   insert at the cursor); no destructive retry — clear stays opt-in, so a
+ *   mismatch throws instead of corrupting content the field came with.
+ * Fields that never expose text (masked/password) verify as best-effort.
+ * Errors carry LENGTHS only, never content — values may be credentials.
  */
 export async function fillField(
   adapter: DeviceAdapter,
   node: UiNode,
   value: string,
-  opts: { clear?: boolean } = {},
+  opts: {
+    clear?: boolean;
+    refetch?: () => Promise<UiNode | undefined>;
+    pollMs?: number;
+  } = {},
 ): Promise<void> {
+  const { clear, refetch } = opts;
+  const pollMs = opts.pollMs ?? 400;
   const point = tapPoint(node);
   await adapter.tap(point.x, point.y);
-  await new Promise((r) => setTimeout(r, 350)); // focus + keyboard
-  if (opts.clear) {
-    const existing = node.value?.length ?? 0;
-    if (existing > 0) await adapter.clearText(existing);
+  await sleep(350); // focus + keyboard
+
+  let current: UiNode | undefined = node;
+  if (clear) {
+    for (let attempt = 0; ; attempt++) {
+      const existing = current?.value?.length ?? 0;
+      if (existing === 0) break;
+      await adapter.clearText(existing);
+      if (!refetch) break;
+      current = await refetch();
+      const left = current?.value?.length ?? 0;
+      if (left === 0) break;
+      if (attempt >= 1) {
+        throw new Error(`fill: field still shows ${left} characters after clearing twice`);
+      }
+    }
   }
+
   await adapter.typeText(value);
+  if (!refetch || value === '') return;
+
+  const landed = (observed: string) => (clear ? observed === value : observed.includes(value));
+  let observed = await pollValue(refetch, landed, pollMs);
+  if (observed === undefined || landed(observed)) return; // undefined: field withholds its text
+  if (clear) {
+    await adapter.clearText(observed.length);
+    await adapter.typeText(value);
+    observed = await pollValue(refetch, landed, pollMs);
+    if (observed === undefined || landed(observed)) return;
+  }
+  throw new Error(
+    `fill: typed ${value.length} characters but the field shows ${observed.length} (content withheld from this error)`,
+  );
 }
+
+/** Poll the field until its exposed value satisfies `ok`; returns the last observation. */
+async function pollValue(
+  refetch: () => Promise<UiNode | undefined>,
+  ok: (observed: string) => boolean,
+  pollMs: number,
+): Promise<string | undefined> {
+  let observed: string | undefined;
+  for (let i = 0; i < 5; i++) {
+    observed = (await refetch())?.value ?? undefined;
+    if (observed !== undefined && ok(observed)) return observed;
+    if (observed === undefined && i >= 1) return undefined; // field exposes no text — stop waiting
+    await sleep(pollMs);
+  }
+  return observed;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Screen area to swipe over: the root rect, or the union of children (iOS synthetic root is 0×0). */
 function boundingBox(root: UiNode): UiNode['rect'] {

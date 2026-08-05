@@ -216,7 +216,14 @@ registerTool(
       return text(`Typed ${value.length} characters`);
     }
     const { node, note } = resolveOne(await adapter.uiTree(), selector);
-    await fillField(adapter, node, value, { clear });
+    const refetch = async () => {
+      try {
+        return resolveOne(await adapter.uiTree(), selector).node;
+      } catch {
+        return undefined;
+      }
+    };
+    await fillField(adapter, node, value, { clear, refetch });
     return text(
       `Filled ${selector} (${value.length} characters${clear ? ', cleared first' : ''})${note ? ` (${note})` : ''}`,
     );

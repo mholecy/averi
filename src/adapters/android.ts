@@ -141,9 +141,15 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async typeText(text: string): Promise<void> {
-    // `input text` cannot handle every character; escape shell metachars, encode spaces.
-    const escaped = text.replace(/([\\"'`$&*()[\]{}|;<>?~#])/g, '\\$1').replace(/ /g, '%s');
-    await this.adb(['shell', 'input', 'text', escaped]);
+    // One `input text` call PER CHARACTER. Bulk injection races Compose's
+    // async text state and silently drops most characters (measured
+    // 2026-08-05 on the login username field: 3 of 11 landed; per-char
+    // landed 11/11 — the adb round-trip itself is the pacing). Escape shell
+    // metachars; `input text` wants spaces encoded as %s.
+    for (const ch of text) {
+      const escaped = ch.replace(/([\\"'`$&*()[\]{}|;<>?~#])/, '\\$1').replace(/ /, '%s');
+      await this.adb(['shell', 'input', 'text', escaped]);
+    }
   }
 
   async pressKey(key: Key): Promise<void> {
@@ -188,6 +194,8 @@ interface RawNode {
   'resource-id'?: string;
   text?: string;
   'content-desc'?: string;
+  focusable?: string;
+  'long-clickable'?: string;
   bounds?: string;
   node?: RawNode | RawNode[];
 }
@@ -213,12 +221,22 @@ function normalizeNode(raw: RawNode): UiNode {
   const text = emptyToNull(raw.text);
   const contentDesc = emptyToNull(raw['content-desc']);
   const rawChildren = raw.node === undefined ? [] : Array.isArray(raw.node) ? raw.node : [raw.node];
+  // Compose text inputs don't always dump as EditText: a BasicTextField with
+  // scroll semantics surfaces as (Horizontal)ScrollView carrying the content
+  // in `text` (measured 2026-08-05, login username field — value came back
+  // null and fill's clear silently no-oped). A focusable AND long-clickable
+  // scroll view is a text input; real scroll containers are neither.
+  const composeTextInput =
+    (className === 'HorizontalScrollView' || className === 'ScrollView') &&
+    raw.focusable === 'true' &&
+    raw['long-clickable'] === 'true';
+  const isTextInput = className.endsWith('EditText') || composeTextInput;
   return {
-    role: ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other'),
+    role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),
     label: contentDesc ?? text,
     // resource-id is "com.example.app:id/login_button" — selectors use the short name
     identifier: emptyToNull(raw['resource-id']?.split('/').pop()),
-    value: className.endsWith('EditText') ? text : null,
+    value: isTextInput ? text : null,
     rect: parseBounds(raw.bounds),
     children: rawChildren.map(normalizeNode),
   };

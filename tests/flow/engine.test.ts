@@ -421,6 +421,47 @@ flows:
     expect(fake.typed).toEqual(['1.00']);
   });
 
+  it('verifies the typed value landed and retries a clear-fill whose input was dropped', async () => {
+    // Compose async state can swallow synthetic input (measured 2026-08-05:
+    // bulk typing landed 3 of 11 chars). First typeText drops chars; the
+    // verify pass must wipe and retype.
+    const fake = formFake('9.99');
+    let drops = 1;
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      if (drops-- > 0) return origType(text.slice(-1)); // only the last char lands
+      return origType(text);
+    };
+    await new FlowEngine(cfg('{ id: amount_input, value: "12.34", clear: true }'), fake, FAST).runFlow('f');
+    // cleared prefill (4), dropped attempt left "4", verify wiped it (1) and retyped
+    expect(fake.deletes).toEqual([4, 1]);
+    expect(fake.typed).toEqual(['4', '12.34']);
+  });
+
+  it('re-clears once when the first clear leaves content behind', async () => {
+    const fake = formFake('2.50');
+    let swallow = 1;
+    const origClear = fake.clearText.bind(fake);
+    fake.clearText = async (count: number) => {
+      if (swallow-- > 0) return origClear(Math.max(0, count - 2)); // 2 deletes dropped
+      return origClear(count);
+    };
+    await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
+    expect(fake.deletes).toEqual([2, 2]); // first pass left "2.", second cleared the remainder
+    expect(fake.typed).toEqual(['7']);
+  });
+
+  it('fill WITHOUT clear never wipes the field when verification mismatches — it fails instead', async () => {
+    const fake = formFake('9.99');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text); // drop everything: value never changes
+    };
+    await expect(
+      new FlowEngine(cfg('{ id: amount_input, value: "12.34" }'), fake, FAST).runFlow('f'),
+    ).rejects.toThrow(/typed 5 characters but the field shows 4/);
+    expect(fake.deletes).toEqual([]); // clear stays opt-in even during verification
+  });
+
   it('redacts credential values in the fill trace', async () => {
     process.env.TEST_PIN = '4321';
     const cfgSecret = parseConfig(`
