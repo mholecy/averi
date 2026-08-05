@@ -14,9 +14,41 @@ export interface ElementSpec {
 
 export interface Condition {
   element?: ElementSpec;
+  /** With element: true inverts the check — element gone or off-viewport. */
+  absent?: boolean;
   state?: string;
   any?: Condition[];
   all?: Condition[];
+}
+
+/**
+ * Element assert, shared by the `assert` tool/step (verify/assert.ts builds
+ * its schema from this): exists (default) / absent / text / match / error.
+ * `absent` means gone from the tree OR outside the visible viewport — the
+ * portable meaning of "disappeared" (iOS keeps off-screen nodes in its tree).
+ */
+export interface ElementAssert {
+  element: ElementSpec;
+  absent?: boolean;
+  text?: string;
+  match?: string;
+  error?: string;
+  timeout?: string | number;
+}
+
+export interface FillSpec extends ElementSpec {
+  value: string;
+  /** Delete the field's current content before typing (opt-in: pre-filled login fields must survive). */
+  clear?: boolean;
+  dismissKeyboard?: boolean;
+}
+
+export interface ScrollUntilSpec {
+  element: ElementSpec;
+  /** Which way the CONTENT moves into view (down = reveal content below). */
+  direction?: 'up' | 'down' | 'left' | 'right';
+  maxSwipes?: number;
+  timeout?: string | number;
 }
 
 export type Step =
@@ -31,6 +63,9 @@ export type Step =
       };
     }
   | { swipe: { direction: 'up' | 'down' | 'left' | 'right'; times?: number } }
+  | { scroll_until: ScrollUntilSpec }
+  | { fill: FillSpec }
+  | { assert: ElementAssert[] }
   | { wait: { element?: ElementSpec; state?: string; timeout?: string | number } }
   | { branch: { when: Condition; do: Step[] }[] }
   | { optional: Step[] }
@@ -52,6 +87,7 @@ const condition: z.ZodType<Condition> = z.lazy(() =>
   z
     .object({
       element: elementSpecSchema.optional(),
+      absent: z.boolean().optional(),
       state: z.string().optional(),
       any: z.array(condition).optional(),
       all: z.array(condition).optional(),
@@ -59,10 +95,28 @@ const condition: z.ZodType<Condition> = z.lazy(() =>
     .strict()
     .refine((c) => [c.element, c.state, c.any, c.all].filter((v) => v !== undefined).length === 1, {
       message: 'condition must have exactly one of: element, state, any, all',
+    })
+    .refine((c) => c.absent === undefined || c.element !== undefined, {
+      message: 'absent is only valid together with element',
     }),
 );
 
 const timeout = z.union([z.number(), z.string()]);
+
+export const elementAssertSchema: z.ZodType<ElementAssert> = z
+  .object({
+    element: elementSpecSchema,
+    absent: z.boolean().optional(),
+    text: z.string().optional(),
+    match: z.string().optional(),
+    error: z.string().optional(),
+    timeout: timeout.optional(),
+  })
+  .strict()
+  .refine(
+    (a) => !(a.absent && (a.text !== undefined || a.match !== undefined || a.error !== undefined)),
+    { message: 'absent cannot be combined with text/match/error' },
+  );
 
 const step: z.ZodType<Step> = z.lazy(() =>
   z.union([
@@ -99,6 +153,37 @@ const step: z.ZodType<Step> = z.lazy(() =>
           .strict(),
       })
       .strict(),
+    z
+      .object({
+        scroll_until: z
+          .object({
+            element: elementSpecSchema,
+            direction: z.enum(['up', 'down', 'left', 'right']).optional(),
+            maxSwipes: z.number().int().min(1).optional(),
+            timeout: timeout.optional(),
+          })
+          .strict(),
+      })
+      .strict(),
+    z
+      .object({
+        fill: z
+          .object({
+            id: z.string().optional(),
+            text: z.string().optional(),
+            role: z.string().optional(),
+            label: z.string().optional(),
+            value: z.string(),
+            clear: z.boolean().optional(),
+            dismissKeyboard: z.boolean().optional(),
+          })
+          .strict()
+          .refine((f) => [f.id, f.text, f.role, f.label].some((v) => v !== undefined), {
+            message: 'fill needs at least one of: id, text, role, label',
+          }),
+      })
+      .strict(),
+    z.object({ assert: z.array(elementAssertSchema).min(1) }).strict(),
     z
       .object({
         wait: z

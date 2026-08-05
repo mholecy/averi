@@ -4,9 +4,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { resolve } from 'node:path';
 import { AdapterRegistry } from './registry.js';
-import { findAll } from '../ui-tree/selectors.js';
+import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { loadConfig, loadEnvBeside, type AveriConfig } from '../flow/config.js';
-import { FlowEngine, type TraceEntry } from '../flow/engine.js';
+import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
 import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
@@ -168,8 +168,8 @@ registerTool(
   async ({ platform: p, selector, x, y }) => {
     const adapter = await registry.get(p);
     if (selector !== undefined) {
-      await adapter.tapElement(selector);
-      return text(`Tapped ${selector}`);
+      const note = await adapter.tapElement(selector);
+      return text(`Tapped ${selector}${note ? ` (${note})` : ''}`);
     }
     if (x === undefined || y === undefined) {
       throw new Error('Provide either selector or both x and y');
@@ -199,12 +199,51 @@ registerTool(
 registerTool(
   'type_text',
   {
-    description: 'Type text into the focused element (tap the field first).',
-    inputSchema: { platform, text: z.string() },
+    description:
+      'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields). Without selector: types into whatever is focused.',
+    inputSchema: {
+      platform,
+      text: z.string(),
+      selector: z.string().optional().describe('Field to focus first, e.g. \'id:amount_input\''),
+      clear: z.boolean().optional().describe('Delete existing content before typing (needs selector)'),
+    },
   },
-  async ({ platform: p, text: value }) => {
-    await (await registry.get(p)).typeText(value);
-    return text(`Typed ${value.length} characters`);
+  async ({ platform: p, text: value, selector, clear }) => {
+    const adapter = await registry.get(p);
+    if (selector === undefined) {
+      if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
+      await adapter.typeText(value);
+      return text(`Typed ${value.length} characters`);
+    }
+    const { node, note } = resolveOne(await adapter.uiTree(), selector);
+    await fillField(adapter, node, value, { clear });
+    return text(
+      `Filled ${selector} (${value.length} characters${clear ? ', cleared first' : ''})${note ? ` (${note})` : ''}`,
+    );
+  },
+);
+
+registerTool(
+  'scroll_until',
+  {
+    description:
+      'Swipe until the element is visible in the viewport — the portable way to reach content below the fold (no coordinates). direction = where the content lies (down = below the current view).',
+    inputSchema: {
+      platform,
+      selector: z.string().describe('Element to scroll into view, e.g. \'id:submit_button\''),
+      direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Default down'),
+      maxSwipes: z.number().int().min(1).optional().describe('Default 6'),
+      timeoutMs: z.number().optional().describe('Default 15000'),
+    },
+  },
+  async ({ platform: p, selector, direction, maxSwipes, timeoutMs }) => {
+    const adapter = await registry.get(p);
+    const swipes = await scrollUntilVisible(
+      adapter,
+      { find: (tree) => findAll(tree, selector), describe: selector },
+      { direction, maxSwipes, timeout: timeoutMs },
+    );
+    return text(`Element ${selector} visible after ${swipes} swipe${swipes === 1 ? '' : 's'}`);
   },
 );
 
@@ -369,19 +408,22 @@ registerTool(
 registerTool(
   'get_logs',
   {
-    description: 'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions.',
+    description:
+      'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions. grep filters to lines matching a case-insensitive regex (e.g. "tpm|validation") — prefer it, unfiltered pulls run to thousands of lines.',
     inputSchema: {
       platform,
       sinceSeconds: z.number().default(60).describe('How far back to read'),
+      grep: z.string().optional().describe('Case-insensitive regex; only matching lines are returned'),
     },
   },
-  async ({ platform: p, sinceSeconds }) => {
-    const lines = await (await registry.get(p)).logs(Date.now() - sinceSeconds * 1000);
+  async ({ platform: p, sinceSeconds, grep }) => {
+    const all = await (await registry.get(p)).logs(Date.now() - sinceSeconds * 1000);
+    const lines = grep === undefined ? all : all.filter((l) => new RegExp(grep, 'i').test(l));
     const MAX_LINES = 2000;
     const tail = lines.slice(-MAX_LINES);
-    const header = lines.length > tail.length
-      ? [`[truncated: showing last ${MAX_LINES} of ${lines.length} lines]`]
-      : [];
+    const header: string[] = [];
+    if (grep !== undefined) header.push(`[grep /${grep}/i matched ${lines.length} of ${all.length} lines]`);
+    if (lines.length > tail.length) header.push(`[truncated: showing last ${MAX_LINES} of ${lines.length} lines]`);
     return text([...header, ...tail].join('\n'));
   },
 );

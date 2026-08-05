@@ -20,6 +20,8 @@ export interface UiNode {
   label: string | null; // visible text / content description
   identifier: string | null; // resource-id / accessibilityIdentifier
   value: string | null; // current value (text field contents, toggle state)
+  /** Validation message associated with an input, when the platform exposes one. */
+  error?: string;
   rect: { x: number; y: number; width: number; height: number };
   children: UiNode[];
 }
@@ -46,8 +48,15 @@ export interface DeviceAdapter {
   screenshot(): Promise<Buffer>; // PNG bytes
   uiTree(): Promise<UiNode>;
 
+  /**
+   * Visible screen size in the SAME units as uiTree rects (Android: pixels,
+   * iOS: points) — the reference frame for viewport-visibility checks.
+   */
+  viewport(): Promise<{ width: number; height: number }>;
+
   tap(x: number, y: number): Promise<void>;
-  tapElement(selector: Selector): Promise<void>;
+  /** Returns a disambiguation note when the selector matched multiple nodes. */
+  tapElement(selector: Selector): Promise<string | undefined>;
   longPress(x: number, y: number, durationMs?: number): Promise<void>;
   swipe(
     from: { x: number; y: number },
@@ -55,6 +64,14 @@ export interface DeviceAdapter {
     durationMs?: number,
   ): Promise<void>;
   typeText(text: string): Promise<void>;
+  /**
+   * Clear up to `count` characters on EACH side of the cursor in the focused
+   * field (backspaces then forward-deletes). Position-independent: a tap may
+   * leave the cursor anywhere in the text, and neither platform offers a
+   * reliable move-to-end (measured 2026-08-05: iOS taps land the cursor at
+   * the glyph, Android MOVE_END left one char behind on the amount field).
+   */
+  clearText(count: number): Promise<void>;
   pressKey(key: Key): Promise<void>;
   setClipboard(text: string): Promise<void>;
 

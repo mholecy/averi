@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { findAll, findOne, parseSelector, tapPoint } from '../../src/ui-tree/selectors.js';
+import {
+  findAll,
+  findOne,
+  intersectsViewport,
+  parseSelector,
+  resolveOne,
+  tapPoint,
+} from '../../src/ui-tree/selectors.js';
 
 const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'container',
@@ -73,6 +80,44 @@ describe('findAll / findOne', () => {
     expect(() => findOne(tree, 'id:nope')).toThrow(/No element matches/);
     expect(() => findOne(tree, 'role:button label~"Pay.*"')).toThrow(/matches 2 elements/);
     expect(findOne(tree, 'id:login_button').role).toBe('button');
+  });
+
+  it('disambiguates to the sole interactive node when labels share the id (iOS field convention)', () => {
+    // Measured on the payment form: textfield + title label + error label all
+    // carry the field's accessibilityIdentifier.
+    const shared: UiNode = node({
+      children: [
+        node({ role: 'textfield', identifier: 'payment.form.amount_input' }),
+        node({ role: 'text', identifier: 'payment.form.amount_input', label: 'Amount' }),
+        node({ role: 'text', identifier: 'payment.form.amount_input', label: 'Value is too small' }),
+      ],
+    });
+    const { node: chosen, note } = resolveOne(shared, 'id:payment.form.amount_input');
+    expect(chosen.role).toBe('textfield');
+    expect(note).toMatch(/3 matches.*interactive/);
+    expect(findOne(shared, 'id:payment.form.amount_input').role).toBe('textfield');
+  });
+
+  it('still errors when multiple interactive nodes match', () => {
+    const twoButtons: UiNode = node({
+      children: [
+        node({ role: 'button', identifier: 'dup', label: 'A' }),
+        node({ role: 'button', identifier: 'dup', label: 'B' }),
+      ],
+    });
+    expect(() => resolveOne(twoButtons, 'id:dup')).toThrow(/matches 2 elements/);
+  });
+});
+
+describe('intersectsViewport', () => {
+  const vp = { width: 400, height: 800 };
+  it('true for on-screen rects, false for off-viewport and zero-area rects', () => {
+    expect(intersectsViewport({ x: 10, y: 10, width: 50, height: 50 }, vp)).toBe(true);
+    expect(intersectsViewport({ x: 390, y: 790, width: 50, height: 50 }, vp)).toBe(true); // partial
+    expect(intersectsViewport({ x: 0, y: 900, width: 50, height: 50 }, vp)).toBe(false); // below
+    expect(intersectsViewport({ x: -60, y: 10, width: 50, height: 50 }, vp)).toBe(false); // left
+    expect(intersectsViewport({ x: 0, y: -100, width: 400, height: 100 }, vp)).toBe(false); // edge-touching
+    expect(intersectsViewport({ x: 10, y: 10, width: 0, height: 0 }, vp)).toBe(false); // zero-area
   });
 });
 

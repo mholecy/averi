@@ -44,7 +44,7 @@ flows:
       - tap: { id: tab_payments }
 `);
 
-const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, pinKeyDelayMs: 1 };
+const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1 };
 
 function buildScreens() {
   resetLayout();
@@ -314,6 +314,199 @@ describe('tap stability', () => {
     const fake = new FakeAdapter({ dashboard: dash }, 'dashboard');
     await new FlowEngine(CONFIG, fake, FAST).runFlow('goto_transfers');
     expect(fake.taps).toEqual(['tab_payments']); // resolved via the real node's rect
+  });
+});
+
+describe('scroll_until step', () => {
+  const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  to_submit:
+    steps:
+      - scroll_until: { element: { id: submit_button }, maxSwipes: 4, timeout: 2s }
+`);
+
+  /** Fake whose target starts below the fold and moves up per swipe. */
+  function scrollingFake(startY: number, perSwipe = 600) {
+    resetLayout();
+    const target = node({
+      role: 'button',
+      identifier: 'submit_button',
+      rect: { x: 0, y: startY, width: 100, height: 40 },
+    });
+    const form = screen(el({ identifier: 'form_root' }), target);
+    class ScrollingFake extends FakeAdapter {
+      override async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+        await super.swipe(from, to);
+        target.rect = { ...target.rect, y: target.rect.y - perSwipe };
+      }
+    }
+    return new ScrollingFake({ form }, 'form');
+  }
+
+  it('swipes until the element intersects the viewport', async () => {
+    const fake = scrollingFake(3100); // needs 2 swipes to get under y=2000
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    expect(fake.swipes).toHaveLength(2);
+    // content below → finger moves up
+    expect(fake.swipes[0].to.y).toBeLessThan(fake.swipes[0].from.y);
+    expect(trace).toContainEqual({ action: 'scroll_until', detail: 'id:"submit_button" visible after 2 swipes' });
+  });
+
+  it('passes with 0 swipes when the element is already visible (fast path)', async () => {
+    const fake = scrollingFake(500);
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    expect(fake.swipes).toHaveLength(0);
+    expect(trace).toContainEqual({ action: 'scroll_until', detail: 'id:"submit_button" visible after 0 swipes' });
+  });
+
+  it('fails after maxSwipes with a diagnosis of the last tree', async () => {
+    const fake = scrollingFake(50_000, 10); // never gets there in 4 swipes
+    await expect(new FlowEngine(cfg, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+      /scroll_until id:"submit_button" failed after 4 swipes \(maxSwipes\) — element in tree but never intersected/,
+    );
+  });
+
+  it('reports when the element never appeared at all', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ form: screen(el({ identifier: 'form_root' })) }, 'form');
+    await expect(new FlowEngine(cfg, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+      /element never appeared in the tree/,
+    );
+  });
+});
+
+describe('fill step', () => {
+  function formFake(amountValue: string | null = null) {
+    resetLayout();
+    return new FakeAdapter(
+      {
+        form: screen(
+          el({ role: 'textfield', identifier: 'amount_input', value: amountValue }),
+          el({ role: 'button', identifier: 'submit_button' }),
+        ),
+      },
+      'form',
+    );
+  }
+  const cfg = (fill: string) =>
+    parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - fill: ${fill}
+`);
+
+  it('taps the field then types; no clearing by default (pre-filled login fields must survive)', async () => {
+    const fake = formFake('9.99');
+    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "2.50" }'), fake, FAST).runFlow('f');
+    expect(fake.taps).toEqual(['amount_input']);
+    expect(fake.deletes).toEqual([]);
+    expect(fake.typed).toEqual(['2.50']);
+    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 2.50' });
+  });
+
+  it('clear: true deletes the existing value length before typing', async () => {
+    const fake = formFake('2.50');
+    await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
+    expect(fake.deletes).toEqual([4]); // "2.50".length
+    expect(fake.typed).toEqual(['7']);
+  });
+
+  it('clear on an empty field skips deleting', async () => {
+    const fake = formFake(null);
+    await new FlowEngine(cfg('{ id: amount_input, value: "1.00", clear: true }'), fake, FAST).runFlow('f');
+    expect(fake.deletes).toEqual([]);
+    expect(fake.typed).toEqual(['1.00']);
+  });
+
+  it('redacts credential values in the fill trace', async () => {
+    process.env.TEST_PIN = '4321';
+    const cfgSecret = parseConfig(`
+app: { android: { package: md.bank.app } }
+credentials:
+  pin: \${TEST_PIN}
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: $pin }
+`);
+    const fake = formFake();
+    const trace = await new FlowEngine(cfgSecret, fake, FAST).runFlow('f');
+    expect(JSON.stringify(trace)).not.toContain('4321');
+    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = ***' });
+  });
+});
+
+describe('assert step', () => {
+  const cfg = (assert: string) =>
+    parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - assert:
+${assert}
+`);
+
+  it('passing asserts are logged in the trace and the flow continues', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const trace = await new FlowEngine(cfg('          - { element: { id: dashboard_root } }'), fake, FAST).runFlow('f');
+    expect(trace).toContainEqual({ action: 'assert PASS', detail: 'element id:"dashboard_root" exists' });
+  });
+
+  it('a failing assert fails the FLOW with the diff in the error', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    await expect(
+      new FlowEngine(cfg('          - { element: { text: "No such text" } }'), fake, FAST).runFlow('f'),
+    ).rejects.toThrow(/1\/1 flow asserts failed:[\s\S]*FAIL.*No such text/);
+  });
+});
+
+describe('absent detect conditions', () => {
+  // The transactions_list ambiguity: Card Detail embeds the same list, so
+  // "row present" alone matches both screens; "row present AND card face
+  // absent" is the discriminator that was previously inexpressible.
+  const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  transactions_only:
+    detect:
+      all:
+        - element: { id: row_0 }
+        - element: { id: card_face }
+          absent: true
+`);
+
+  function fakeOn(screenName: 'transactions' | 'cards' | 'cards_offscreen') {
+    resetLayout();
+    const screens = {
+      transactions: screen(el({ identifier: 'row_0' })),
+      cards: screen(el({ identifier: 'card_face' }), el({ identifier: 'row_0' })),
+      // iOS-style: card face still in the tree but pushed off-viewport → counts as absent
+      cards_offscreen: screen(
+        node({ identifier: 'card_face', rect: { x: 0, y: -300, width: 100, height: 100 } }),
+        el({ identifier: 'row_0' }),
+      ),
+    };
+    return new FakeAdapter(screens, screenName);
+  }
+
+  it('matches when the discriminator element is gone', async () => {
+    const trace = await new FlowEngine(cfg, fakeOn('transactions'), FAST).ensureState('transactions_only');
+    expect(trace).toEqual([{ action: 'state transactions_only', detail: 'already active' }]);
+  });
+
+  it('does not match while the discriminator is visible', async () => {
+    await expect(new FlowEngine(cfg, fakeOn('cards'), FAST).ensureState('transactions_only')).rejects.toThrow(
+      /no reach flows/,
+    );
+  });
+
+  it('treats an off-viewport node as absent (portable across the platform tree semantics)', async () => {
+    const trace = await new FlowEngine(cfg, fakeOn('cards_offscreen'), FAST).ensureState('transactions_only');
+    expect(trace).toEqual([{ action: 'state transactions_only', detail: 'already active' }]);
   });
 });
 

@@ -1,6 +1,16 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
-import { tapPoint } from '../ui-tree/selectors.js';
-import { parseDuration, type AveriConfig, type Condition, type ElementSpec, type Step } from './config.js';
+import { findBySpec, intersectsViewport, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
+import { Verifier } from '../verify/assert.js';
+import {
+  parseDuration,
+  type AveriConfig,
+  type Condition,
+  type ElementSpec,
+  type ScrollUntilSpec,
+  type Step,
+} from './config.js';
+
+export { findBySpec } from '../ui-tree/selectors.js';
 
 export interface TraceEntry {
   action: string;
@@ -14,6 +24,8 @@ export interface EngineOptions {
   waitTimeoutMs?: number;
   ensureTimeoutMs?: number;
   optionalTimeoutMs?: number;
+  /** Default timeout for inline `assert:` steps (each spec can override). */
+  assertTimeoutMs?: number;
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
   pinKeyDelayMs?: number;
 }
@@ -31,6 +43,7 @@ export class FlowEngine {
   private readonly waitTimeoutMs: number;
   private readonly ensureTimeoutMs: number;
   private readonly optionalTimeoutMs: number;
+  private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
 
   constructor(
@@ -43,6 +56,7 @@ export class FlowEngine {
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
     this.ensureTimeoutMs = opts.ensureTimeoutMs ?? 20_000;
     this.optionalTimeoutMs = opts.optionalTimeoutMs ?? 1_500;
+    this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
   }
 
@@ -155,6 +169,42 @@ export class FlowEngine {
       this.log('swipe', `${step.swipe.direction}${times > 1 ? ` ×${times}` : ''}`);
       return;
     }
+    if ('scroll_until' in step) {
+      const { element, ...spec } = step.scroll_until;
+      const swipes = await scrollUntilVisible(
+        this.adapter,
+        { find: (tree) => findBySpec(tree, element), describe: describeSpec(element) },
+        spec,
+        { settleMs: this.pollMs },
+      );
+      this.log(
+        'scroll_until',
+        `${describeSpec(step.scroll_until.element)} visible after ${swipes} swipe${swipes === 1 ? '' : 's'}`,
+      );
+      return;
+    }
+    if ('fill' in step) {
+      const { value: rawValue, clear, dismissKeyboard, ...spec } = step.fill;
+      const { value, secret } = this.resolveValue(rawValue);
+      const node = await this.settledNode(spec, this.tapTimeoutMs);
+      await fillField(this.adapter, node, value, { clear });
+      if (dismissKeyboard) await this.adapter.pressKey(this.adapter.platform === 'android' ? 'back' : 'enter');
+      this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
+      return;
+    }
+    if ('assert' in step) {
+      const verifier = new Verifier(this.adapter, { pollMs: this.pollMs, timeoutMs: this.assertTimeoutMs });
+      const results = await verifier.assertAll(step.assert);
+      for (const r of results) this.log(r.pass ? 'assert PASS' : 'assert FAIL', r.description + (r.detail ? ` — ${r.detail}` : ''));
+      const failed = results.filter((r) => !r.pass);
+      if (failed.length > 0) {
+        throw new Error(
+          `${failed.length}/${results.length} flow asserts failed:\n` +
+            failed.map((r) => `  FAIL ${r.description}${r.detail ? ` — ${r.detail}` : ''}`).join('\n'),
+        );
+      }
+      return;
+    }
     if ('wait' in step) {
       const timeoutMs = step.wait.timeout !== undefined ? parseDuration(step.wait.timeout) : this.waitTimeoutMs;
       const cond: Condition = step.wait.element ? { element: step.wait.element } : { state: step.wait.state };
@@ -198,12 +248,29 @@ export class FlowEngine {
    * center. Zero-area nodes are never tap targets.
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
+    const node = await this.settledNode(spec, timeoutMs);
+    const point = tapPoint(node);
+    await this.adapter.tap(point.x, point.y);
+    if (!quiet) this.log('tap', describeSpec(spec));
+  }
+
+  /**
+   * Poll until the spec resolves to a visible node whose rect is identical in
+   * two consecutive polls (tapping mid-animation lands on whatever moved into
+   * that spot). Among several candidates a sole interactive one wins — on iOS
+   * a field's title/error labels share the field's identifier.
+   */
+  private async settledNode(spec: ElementSpec, timeoutMs: number): Promise<UiNode> {
     let lastRect: string | undefined;
-    const node = await this.pollUntil(
+    return this.pollUntil(
       async (tree) => {
-        const candidate = findBySpec(tree, spec).find(
+        const candidates = findBySpec(tree, spec).filter(
           (n) => n.rect.width > 0 && n.rect.height > 0,
         );
+        const candidate =
+          candidates.length > 1
+            ? (preferInteractive(candidates)?.node ?? candidates[0])
+            : candidates[0];
         if (!candidate) {
           lastRect = undefined;
           return undefined;
@@ -216,13 +283,24 @@ export class FlowEngine {
       timeoutMs,
       `element ${describeSpec(spec)} (visible and settled)`,
     );
-    const point = tapPoint(node);
-    await this.adapter.tap(point.x, point.y);
-    if (!quiet) this.log('tap', describeSpec(spec));
+  }
+
+  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
+
+  private viewport(): Promise<{ width: number; height: number }> {
+    this.viewportPromise ??= this.adapter.viewport();
+    return this.viewportPromise;
   }
 
   private async matches(cond: Condition, tree: UiNode): Promise<boolean> {
-    if (cond.element) return findBySpec(tree, cond.element).length > 0;
+    if (cond.element) {
+      const found = findBySpec(tree, cond.element);
+      if (!cond.absent) return found.length > 0;
+      // absent: gone from the tree OR nothing visibly on screen (iOS keeps
+      // off-viewport nodes in its tree; Android prunes them — one meaning).
+      const viewport = await this.viewport();
+      return !found.some((n) => intersectsViewport(n.rect, viewport));
+    }
     if (cond.state) {
       const state = this.cfg.states[cond.state];
       if (!state) throw new Error(`Unknown state "${cond.state}"`);
@@ -320,6 +398,78 @@ export class FlowEngine {
   }
 }
 
+/**
+ * Swipe until the element is present AND visibly inside the viewport
+ * (ARCHITECTURE.md §4, C1). `direction` is where the content lies relative to
+ * the current view (down = below the fold → finger swipes up). Returns the
+ * number of swipes performed; throws with a diagnosis of the last tree.
+ */
+export async function scrollUntilVisible(
+  adapter: DeviceAdapter,
+  target: { find: (tree: UiNode) => UiNode[]; describe: string },
+  spec: Omit<ScrollUntilSpec, 'element'>,
+  opts: { settleMs?: number } = {},
+): Promise<number> {
+  const direction = spec.direction ?? 'down';
+  const maxSwipes = spec.maxSwipes ?? 6;
+  const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : 15_000;
+  const settleMs = opts.settleMs ?? 400;
+  const viewport = await adapter.viewport();
+
+  const cx = Math.round(viewport.width / 2);
+  const cy = Math.round(viewport.height / 2);
+  const dx = Math.round(viewport.width * 0.3);
+  const dy = Math.round(viewport.height * 0.3);
+  // Finger moves opposite to where the content lies: content below → finger up.
+  const vectors = {
+    down: { from: { x: cx, y: cy + dy }, to: { x: cx, y: cy - dy } },
+    up: { from: { x: cx, y: cy - dy }, to: { x: cx, y: cy + dy } },
+    right: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
+    left: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
+  } as const;
+
+  const deadline = Date.now() + timeoutMs;
+  let lastFound: UiNode[] = [];
+  for (let swipes = 0; ; swipes++) {
+    lastFound = target.find(await adapter.uiTree());
+    if (lastFound.some((n) => intersectsViewport(n.rect, viewport))) return swipes;
+    if (swipes >= maxSwipes || Date.now() >= deadline) {
+      const why =
+        lastFound.length === 0
+          ? 'element never appeared in the tree'
+          : `element in tree but never intersected the ${viewport.width}x${viewport.height} viewport ` +
+            `(last rect ${JSON.stringify(lastFound[0].rect)})`;
+      const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
+      throw new Error(`scroll_until ${target.describe} failed ${cause} — ${why}`);
+    }
+    const { from, to } = vectors[direction];
+    await adapter.swipe(from, to);
+    await new Promise((r) => setTimeout(r, settleMs));
+  }
+}
+
+/**
+ * Focus a field (center tap) and type into it. With clear, the current value
+ * is deleted first via clearText — typing otherwise APPENDS, the measured
+ * Android login trap. A right-edge tap is NOT how clear works: measured
+ * 2026-08-05, taps in the field's trailing padding do not focus iOS fields.
+ */
+export async function fillField(
+  adapter: DeviceAdapter,
+  node: UiNode,
+  value: string,
+  opts: { clear?: boolean } = {},
+): Promise<void> {
+  const point = tapPoint(node);
+  await adapter.tap(point.x, point.y);
+  await new Promise((r) => setTimeout(r, 350)); // focus + keyboard
+  if (opts.clear) {
+    const existing = node.value?.length ?? 0;
+    if (existing > 0) await adapter.clearText(existing);
+  }
+  await adapter.typeText(value);
+}
+
 /** Screen area to swipe over: the root rect, or the union of children (iOS synthetic root is 0×0). */
 function boundingBox(root: UiNode): UiNode['rect'] {
   if (root.rect.width > 0 && root.rect.height > 0) return root.rect;
@@ -330,22 +480,6 @@ function boundingBox(root: UiNode): UiNode['rect'] {
     maxY = Math.max(maxY, c.rect.y + c.rect.height);
   }
   return { x: 0, y: 0, width: maxX, height: maxY };
-}
-
-/** Exact-match element lookup; `text` matches label or value (selector semantics). */
-export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
-  const found: UiNode[] = [];
-  const walk = (n: UiNode) => {
-    const ok =
-      (spec.id === undefined || n.identifier === spec.id) &&
-      (spec.role === undefined || n.role === spec.role) &&
-      (spec.label === undefined || n.label === spec.label) &&
-      (spec.text === undefined || n.label === spec.text || n.value === spec.text);
-    if (ok) found.push(n);
-    n.children.forEach(walk);
-  };
-  walk(root);
-  return found;
 }
 
 function describeSpec(spec: ElementSpec): string {

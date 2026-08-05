@@ -118,6 +118,27 @@ flows:
       - wait: { state: logged_in, timeout: 20s }
 ```
 
+Forms & validation (added 2026-08-05, dogfooded on a real cross-platform payment form):
+
+```yaml
+flows:
+  check_validation:
+    requires: payment_form
+    steps:
+      - scroll_until: { element: { id: submit_button } }   # swipe until visible — no coordinates
+      - tap: { id: submit_button }                          # dirty submit
+      - assert:                                             # inline checks mid-flow
+          - { element: { text: "Required" } }
+      - fill: { id: amount_input, value: "1.00", clear: true }  # focus + clear + type in one step
+      - assert:
+          - { element: { text: "Required" }, absent: true }
+```
+
+- **`absent` semantics** (assert + state `detect:`): an element is absent when it is *not in the tree, or its rect does not intersect the visible viewport*. This is the one portable meaning — Android prunes off-screen nodes from its tree while iOS keeps them with off-viewport rects, so a raw tree check would pass on one platform and fail on the other for the same screen. (Behavior change for iOS `absent` asserts, which previously only checked tree presence.)
+- **`fill`** clears opt-in only: typing APPENDS on both platforms, but dev flavors may pre-fill login fields that must survive.
+- **Field errors**: `ui_snapshot` attaches `error` to an input when the platform exposes the association (iOS: a same-identifier text below the field — the SwiftUI convention when titles/errors share the field's `accessibilityIdentifier`); assert with `{ element: { id: amount_input }, error: "Required" }`.
+- **Tap disambiguation**: when a selector matches several nodes and exactly one is interactive (button/textfield/switch/…), `tap`/`fill` target that one and say so in the trace. Several interactive matches stay an error.
+
 Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
 
 ## Development

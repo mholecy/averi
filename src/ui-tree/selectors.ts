@@ -1,4 +1,5 @@
 import type { Selector, UiNode } from '../adapters/types.js';
+import type { ElementSpec } from '../flow/config.js';
 
 /**
  * Selector syntax (ARCHITECTURE.md §3): space-separated conditions, all must match.
@@ -83,18 +84,70 @@ export function findAll(root: UiNode, selector: Selector): UiNode[] {
   return found;
 }
 
-/** Resolve a selector to exactly one node; throws with a helpful message otherwise. */
-export function findOne(root: UiNode, selector: Selector): UiNode {
+/**
+ * Roles a user can operate. Used to disambiguate selectors that also match
+ * decorative text (e.g. on iOS a field's title and error label share the
+ * field's accessibilityIdentifier).
+ */
+const INTERACTIVE_ROLES = new Set([
+  'button',
+  'textfield',
+  'switch',
+  'checkbox',
+  'radiobutton',
+  'slider',
+]);
+
+export const isInteractive = (node: UiNode): boolean => INTERACTIVE_ROLES.has(node.role);
+
+/**
+ * Pick a single target from multiple matches: when exactly one is interactive,
+ * that is the one the author meant. Returns undefined when still ambiguous.
+ */
+export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string } | undefined {
+  const interactive = nodes.filter(isInteractive);
+  if (interactive.length !== 1) return undefined;
+  const chosen = interactive[0];
+  return {
+    node: chosen,
+    note: `${nodes.length} matches; picked the only interactive one (${chosen.role})`,
+  };
+}
+
+/** Resolve a selector to one node, with a note when disambiguation kicked in. */
+export function resolveOne(
+  root: UiNode,
+  selector: Selector,
+): { node: UiNode; note?: string } {
   const found = findAll(root, selector);
   if (found.length === 0) throw new Error(`No element matches selector: ${selector}`);
-  if (found.length > 1) {
-    const summary = found
-      .slice(0, 5)
-      .map((n) => `  ${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`)
-      .join('\n');
-    throw new Error(`Selector matches ${found.length} elements: ${selector}\n${summary}`);
-  }
-  return found[0];
+  if (found.length === 1) return { node: found[0] };
+  const preferred = preferInteractive(found);
+  if (preferred) return preferred;
+  const summary = found
+    .slice(0, 5)
+    .map((n) => `  ${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`)
+    .join('\n');
+  throw new Error(`Selector matches ${found.length} elements: ${selector}\n${summary}`);
+}
+
+/** Resolve a selector to exactly one node; throws with a helpful message otherwise. */
+export function findOne(root: UiNode, selector: Selector): UiNode {
+  return resolveOne(root, selector).node;
+}
+
+/**
+ * Does the node's rect visibly intersect the screen? The shared meaning of
+ * "gone": Android prunes off-screen nodes from its tree, iOS keeps them with
+ * off-viewport rects — this check makes both read the same.
+ */
+export function intersectsViewport(
+  rect: UiNode['rect'],
+  viewport: { width: number; height: number },
+): boolean {
+  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
+  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
+  return w > 0 && h > 0;
 }
 
 /** Center of the node's rect — where taps land. */
@@ -103,4 +156,20 @@ export function tapPoint(node: UiNode): { x: number; y: number } {
     x: Math.round(node.rect.x + node.rect.width / 2),
     y: Math.round(node.rect.y + node.rect.height / 2),
   };
+}
+
+/** Exact-match element lookup; `text` matches label or value (selector semantics). */
+export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
+  const found: UiNode[] = [];
+  const walk = (n: UiNode) => {
+    const ok =
+      (spec.id === undefined || n.identifier === spec.id) &&
+      (spec.role === undefined || n.role === spec.role) &&
+      (spec.label === undefined || n.label === spec.label) &&
+      (spec.text === undefined || n.label === spec.text || n.value === spec.text);
+    if (ok) found.push(n);
+    n.children.forEach(walk);
+  };
+  walk(root);
+  return found;
 }

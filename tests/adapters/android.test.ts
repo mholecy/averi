@@ -114,4 +114,32 @@ describe('AndroidAdapter interactions', () => {
   it('setClipboard reports unsupported', async () => {
     await expect(new AndroidAdapter().setClipboard('x')).rejects.toThrow(/not supported/);
   });
+
+  it('viewport parses wm size (Override beats Physical) and caches', async () => {
+    const { fn, calls } = fakeExec({
+      'adb -s emulator-5554 shell wm size': 'Physical size: 1080x2280\nOverride size: 1000x2000\n',
+    });
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect(await adapter.viewport()).toEqual({ width: 1000, height: 2000 });
+    expect(await adapter.viewport()).toEqual({ width: 1000, height: 2000 });
+    expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
+  });
+
+  it('clearText moves to end, then one keyevent per call (batches drop events in the IME queue)', async () => {
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).clearText(2);
+    expect(calls).toEqual([
+      'adb -s emulator-5554 shell input keyevent 123', // MOVE_END
+      'adb -s emulator-5554 shell input keyevent 67',
+      'adb -s emulator-5554 shell input keyevent 67',
+      'adb -s emulator-5554 shell input keyevent 112',
+      'adb -s emulator-5554 shell input keyevent 112',
+    ]);
+  });
+
+  it('clearText(0) is a no-op', async () => {
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).clearText(0);
+    expect(calls).toHaveLength(0);
+  });
 });

@@ -72,6 +72,39 @@ describe('parseIdbDescribeAll', () => {
       role: 'text', identifier: null, rect: { x: 0, y: 0, width: 0, height: 0 },
     });
   });
+
+  it('pairs a same-identifier text BELOW a textfield as its error; the title above is not an error', () => {
+    // Measured convention (payment form, 2026-08-05): the field's title AND
+    // its validation message share the field's accessibilityIdentifier.
+    const withError = parseIdbDescribeAll(
+      JSON.stringify([
+        {
+          type: 'StaticText', AXLabel: 'Amount', AXUniqueId: 'payment.form.amount_input', AXValue: null,
+          frame: { x: 20, y: 380, width: 100, height: 18 },
+        },
+        {
+          type: 'TextField', AXLabel: 'Amount', AXUniqueId: 'payment.form.amount_input', AXValue: '',
+          frame: { x: 20, y: 400, width: 350, height: 44 },
+        },
+        {
+          type: 'StaticText', AXLabel: 'Value is too small', AXUniqueId: 'payment.form.amount_input', AXValue: null,
+          frame: { x: 20, y: 448, width: 200, height: 16 },
+        },
+        {
+          type: 'TextField', AXLabel: 'Note', AXUniqueId: 'note_input', AXValue: null,
+          frame: { x: 20, y: 500, width: 350, height: 44 },
+        },
+      ]),
+    );
+    const amount = withError.children.find((n) => n.role === 'textfield' && n.identifier === 'payment.form.amount_input');
+    expect(amount?.error).toBe('Value is too small');
+    const note = withError.children.find((n) => n.identifier === 'note_input');
+    expect(note?.error).toBeUndefined();
+  });
+
+  it('leaves error unset when no same-identifier text sits below the field', () => {
+    expect(tree.children[1].error).toBeUndefined();
+  });
 });
 
 describe('IosAdapter interactions', () => {
@@ -99,6 +132,25 @@ describe('IosAdapter interactions', () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).setClipboard('secret');
     expect(calls.at(-1)).toMatchObject({ full: 'xcrun simctl pbcopy AAAA-1111', stdin: 'secret' });
+  });
+
+  it('viewport reads point dimensions from idb describe and caches', async () => {
+    const { fn, calls } = fakeExec({
+      'idb describe --json': JSON.stringify({
+        screen_dimensions: { width: 1206, height: 2622, density: 3, width_points: 402, height_points: 874 },
+      }),
+    });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
+  });
+
+  it('clearText sends backspaces then forward-deletes (position-independent)', async () => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).clearText(3);
+    expect(calls.at(-2)?.full).toBe('idb ui key-sequence 42 42 42 --udid AAAA-1111');
+    expect(calls.at(-1)?.full).toBe('idb ui key-sequence 76 76 76 --udid AAAA-1111');
   });
 
   it('pressKey back is rejected with guidance, home uses the HOME button', async () => {

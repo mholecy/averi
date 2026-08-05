@@ -71,6 +71,18 @@ export class FakeAdapter implements DeviceAdapter {
     this.typed.push(text);
   }
 
+  deletes: number[] = [];
+
+  async clearText(count: number): Promise<void> {
+    this.deletes.push(count);
+  }
+
+  viewportSize = { width: 1000, height: 2000 };
+
+  async viewport(): Promise<{ width: number; height: number }> {
+    return this.viewportSize;
+  }
+
   async launch(appId: string, opts: { clearState?: boolean } = {}): Promise<void> {
     this.launches.push({ appId, clearState: opts.clearState });
   }
@@ -93,7 +105,7 @@ export class FakeAdapter implements DeviceAdapter {
   async install(): Promise<void> {}
   async terminate(): Promise<void> {}
   async openDeepLink(): Promise<void> {}
-  async tapElement(_s: Selector): Promise<void> {}
+  async tapElement(_s: Selector): Promise<string | undefined> { return undefined; }
   async longPress(): Promise<void> {}
   async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
     this.swipes.push({ from, to });

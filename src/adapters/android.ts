@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, type ExecFn } from './exec.js';
-import { findOne, tapPoint } from '../ui-tree/selectors.js';
+import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
 import type { Device, DeviceAdapter, Key, Selector, UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
@@ -104,9 +104,26 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.adb(['shell', 'input', 'tap', String(x), String(y)]);
   }
 
-  async tapElement(selector: Selector): Promise<void> {
-    const point = tapPoint(findOne(await this.uiTree(), selector));
+  async tapElement(selector: Selector): Promise<string | undefined> {
+    const { node, note } = resolveOne(await this.uiTree(), selector);
+    const point = tapPoint(node);
     await this.tap(point.x, point.y);
+    return note;
+  }
+
+  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
+
+  /** Screen size in device pixels — the units uiautomator bounds use. */
+  viewport(): Promise<{ width: number; height: number }> {
+    this.viewportPromise ??= (async () => {
+      const { stdout } = await this.adb(['shell', 'wm', 'size']);
+      const raw = stdout.toString('utf8');
+      // "Physical size: 1080x2280", optionally overridden ("Override size: ...")
+      const m = raw.match(/Override size:\s*(\d+)x(\d+)/) ?? raw.match(/Physical size:\s*(\d+)x(\d+)/);
+      if (!m) throw new Error(`Cannot parse wm size output: ${raw.slice(0, 120)}`);
+      return { width: Number(m[1]), height: Number(m[2]) };
+    })();
+    return this.viewportPromise;
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {
@@ -131,6 +148,17 @@ export class AndroidAdapter implements DeviceAdapter {
 
   async pressKey(key: Key): Promise<void> {
     await this.adb(['shell', 'input', 'keyevent', KEYCODES[key]]);
+  }
+
+  async clearText(count: number): Promise<void> {
+    if (count <= 0) return;
+    // One keyevent per adb call: batched multi-keycode calls drop events in
+    // the IME queue (measured 2026-08-05 — `input keyevent 67 67 67 67` on
+    // the amount field landed only 3 of 4). MOVE_END first, then backspaces;
+    // a forward-delete pass cleans up in case the cursor did not move.
+    await this.adb(['shell', 'input', 'keyevent', '123']); // KEYCODE_MOVE_END
+    for (let i = 0; i < count; i++) await this.adb(['shell', 'input', 'keyevent', '67']); // DEL
+    for (let i = 0; i < count; i++) await this.adb(['shell', 'input', 'keyevent', '112']); // FORWARD_DEL
   }
 
   async setClipboard(_text: string): Promise<void> {

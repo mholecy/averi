@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
-import { findOne, tapPoint } from '../ui-tree/selectors.js';
+import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
 import type { Device, DeviceAdapter, Key, Selector, UiNode } from './types.js';
 
 /** idb AX element `type` → normalized role. */
@@ -173,9 +173,29 @@ export class IosAdapter implements DeviceAdapter {
     await this.idbUi(['tap', String(x), String(y)]);
   }
 
-  async tapElement(selector: Selector): Promise<void> {
-    const point = tapPoint(findOne(await this.uiTree(), selector));
+  async tapElement(selector: Selector): Promise<string | undefined> {
+    const { node, note } = resolveOne(await this.uiTree(), selector);
+    const point = tapPoint(node);
     await this.tap(point.x, point.y);
+    return note;
+  }
+
+  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
+
+  /** Screen size in POINTS — the units idb AX frames use. */
+  viewport(): Promise<{ width: number; height: number }> {
+    this.viewportPromise ??= (async () => {
+      const { stdout } = await this.idb(['describe', '--json']);
+      const parsed = JSON.parse(stdout.toString('utf8')) as {
+        screen_dimensions?: { width_points?: number; height_points?: number };
+      };
+      const dims = parsed.screen_dimensions;
+      if (!dims?.width_points || !dims.height_points) {
+        throw new Error('idb describe returned no screen_dimensions.{width,height}_points');
+      }
+      return { width: dims.width_points, height: dims.height_points };
+    })();
+    return this.viewportPromise;
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {
@@ -194,6 +214,14 @@ export class IosAdapter implements DeviceAdapter {
 
   async typeText(text: string): Promise<void> {
     await this.idbUi(['text', text]);
+  }
+
+  async clearText(count: number): Promise<void> {
+    if (count <= 0) return;
+    // HID 42 = Backspace, HID 76 = Forward Delete — both verified against the
+    // simulator 2026-08-05. Together they clear regardless of cursor position.
+    await this.idbUi(['key-sequence', ...Array(count).fill('42')]);
+    await this.idbUi(['key-sequence', ...Array(count).fill('76')]);
   }
 
   async pressKey(key: Key): Promise<void> {
@@ -248,28 +276,54 @@ interface IdbElement {
 export function parseIdbDescribeAll(json: string): UiNode {
   const elements = JSON.parse(json) as IdbElement[];
   if (!Array.isArray(elements)) throw new Error('idb describe-all did not return an array');
+  const children: UiNode[] = elements.map((el) => ({
+    role: ROLE_MAP[el.type ?? ''] ?? 'other',
+    label: emptyToNull(el.AXLabel),
+    identifier: emptyToNull(el.AXUniqueId),
+    value: emptyToNull(el.AXValue),
+    rect: el.frame
+      ? {
+          x: Math.round(el.frame.x),
+          y: Math.round(el.frame.y),
+          width: Math.round(el.frame.width),
+          height: Math.round(el.frame.height),
+        }
+      : { x: 0, y: 0, width: 0, height: 0 },
+    children: [],
+  }));
+  attachFieldErrors(children);
   return {
     role: 'container',
     label: null,
     identifier: null,
     value: null,
     rect: { x: 0, y: 0, width: 0, height: 0 },
-    children: elements.map((el) => ({
-      role: ROLE_MAP[el.type ?? ''] ?? 'other',
-      label: emptyToNull(el.AXLabel),
-      identifier: emptyToNull(el.AXUniqueId),
-      value: emptyToNull(el.AXValue),
-      rect: el.frame
-        ? {
-            x: Math.round(el.frame.x),
-            y: Math.round(el.frame.y),
-            width: Math.round(el.frame.width),
-            height: Math.round(el.frame.height),
-          }
-        : { x: 0, y: 0, width: 0, height: 0 },
-      children: [],
-    })),
+    children,
   };
+}
+
+/**
+ * Pair validation messages with their inputs (measured convention, payment
+ * spike 2026-08-05): a field's title AND its error label share the field's
+ * accessibilityIdentifier. The title sits above the field, the error below —
+ * so a same-identifier text BELOW the input is its validation message.
+ */
+function attachFieldErrors(nodes: UiNode[]): void {
+  for (const field of nodes) {
+    if (field.role !== 'textfield' || field.identifier === null) continue;
+    const fieldBottom = field.rect.y + field.rect.height;
+    const below = nodes.filter(
+      (n) =>
+        n !== field &&
+        n.role === 'text' &&
+        n.identifier === field.identifier &&
+        n.label !== null &&
+        n.rect.y >= fieldBottom,
+    );
+    if (below.length === 0) continue;
+    below.sort((a, b) => a.rect.y - b.rect.y);
+    field.error = below[0].label!;
+  }
 }
 
 function emptyToNull(value: string | null | undefined): string | null {

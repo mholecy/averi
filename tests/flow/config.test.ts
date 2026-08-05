@@ -62,6 +62,68 @@ describe('parseConfig', () => {
       parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - wait: { element: { id: x }, state: s }\n'),
     ).toThrow(/Invalid averi\.yaml/);
   });
+
+  it('accepts scroll_until with defaults and with all options', () => {
+    const cfg = parseConfig(`
+app: {}
+flows:
+  f:
+    steps:
+      - scroll_until: { element: { id: submit_button } }
+      - scroll_until: { element: { text: "Row" }, direction: up, maxSwipes: 3, timeout: 10s }
+`);
+    expect(cfg.flows.f.steps).toHaveLength(2);
+  });
+
+  it('accepts fill with inline element spec + value/clear, rejects fill without a selector field', () => {
+    const cfg = parseConfig(`
+app: {}
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: "1.00", clear: true }
+`);
+    expect(cfg.flows.f.steps).toHaveLength(1);
+    expect(() =>
+      parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - fill: { value: "1.00" }\n'),
+    ).toThrow(/Invalid averi\.yaml/);
+  });
+
+  it('accepts assert steps with text/absent/error and rejects absent+text', () => {
+    const cfg = parseConfig(`
+app: {}
+flows:
+  f:
+    steps:
+      - assert:
+          - { element: { text: "Required" } }
+          - { element: { text: "Required" }, absent: true }
+          - { element: { id: amount_input }, error: "Required" }
+`);
+    expect(cfg.flows.f.steps).toHaveLength(1);
+    expect(() =>
+      parseConfig(
+        'app: {}\nflows:\n  f:\n    steps:\n      - assert:\n          - { element: { id: x }, absent: true, text: y }\n',
+      ),
+    ).toThrow(/Invalid averi\.yaml/);
+  });
+
+  it('accepts absent inside detect conditions, only next to element', () => {
+    const cfg = parseConfig(`
+app: {}
+states:
+  list_only:
+    detect:
+      all:
+        - element: { id: row_0 }
+        - element: { id: card_face, role: button }
+          absent: true
+`);
+    expect(cfg.states.list_only.detect.all).toHaveLength(2);
+    expect(() =>
+      parseConfig('app: {}\nstates:\n  s:\n    detect: { state: s, absent: true }\n'),
+    ).toThrow(/absent is only valid together with element|Invalid averi\.yaml/);
+  });
 });
 
 describe('parseDuration', () => {

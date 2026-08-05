@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
-import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { pollMs: 5, timeoutMs: 100 };
 
@@ -35,7 +35,52 @@ describe('element asserts', () => {
     expect(await verifier.assert({ element: { id: 'dashboard_root' } })).toMatchObject({ pass: true });
     expect(await verifier.assert({ element: { id: 'dashboard_root' }, absent: true })).toMatchObject({
       pass: false,
-      detail: expect.stringContaining('still present'),
+      detail: expect.stringContaining('still visible'),
+    });
+  });
+
+  it('absent passes for a node that is in the tree but outside the viewport (iOS keeps off-screen nodes)', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        form: screen(
+          el({ identifier: 'amount_input', role: 'textfield' }),
+          // iOS-style lingering node: still in the tree, pushed off-viewport
+          node({ role: 'text', label: 'Required', rect: { x: 0, y: 2500, width: 100, height: 20 } }),
+        ),
+      },
+      'form',
+    );
+    const verifier = new Verifier(fake, FAST);
+    expect(await verifier.assert({ element: { text: 'Required' }, absent: true })).toMatchObject({
+      pass: true,
+      detail: expect.stringContaining('none intersect the viewport'),
+    });
+    // and the inverse guard: a visible node must fail the absent assert
+    expect(await verifier.assert({ element: { id: 'amount_input' }, absent: true })).toMatchObject({ pass: false });
+  });
+
+  it('error asserts check the node error attribute and report the actual error on mismatch', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        form: screen(
+          el({ identifier: 'amount_input', role: 'textfield', error: 'Value is too small' }),
+          el({ identifier: 'note_input', role: 'textfield' }),
+        ),
+      },
+      'form',
+    );
+    const verifier = new Verifier(fake, FAST);
+    expect(
+      await verifier.assert({ element: { id: 'amount_input' }, error: 'Value is too small' }),
+    ).toMatchObject({ pass: true });
+    expect(await verifier.assert({ element: { id: 'amount_input' }, error: 'Required' })).toMatchObject({
+      pass: false,
+      detail: expect.stringContaining('"Value is too small"'),
+    });
+    expect(await verifier.assert({ element: { id: 'note_input' }, error: 'Required' })).toMatchObject({
+      pass: false,
     });
   });
 
@@ -106,12 +151,14 @@ describe('screenshot baseline asserts', () => {
 });
 
 describe('assertSpecSchema', () => {
-  it('rejects absent combined with text', () => {
+  it('rejects absent combined with text or error', () => {
     expect(() => assertSpecSchema.parse({ element: { id: 'x' }, absent: true, text: 'y' })).toThrow();
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, absent: true, error: 'y' })).toThrow();
   });
 
   it('accepts the documented shapes', () => {
     expect(assertSpecSchema.parse({ element: { id: 'x' } })).toBeDefined();
+    expect(assertSpecSchema.parse({ element: { id: 'x' }, error: 'Required' })).toBeDefined();
     expect(assertSpecSchema.parse({ screenshot: { baseline: 'home', threshold: 0.02 } })).toBeDefined();
   });
 });

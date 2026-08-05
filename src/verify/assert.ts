@@ -4,27 +4,14 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter } from '../adapters/types.js';
-import { elementSpecSchema, parseDuration, type ElementSpec } from '../flow/config.js';
-import { findBySpec } from '../flow/engine.js';
+import { elementAssertSchema, parseDuration, type ElementSpec } from '../flow/config.js';
+import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5). Three tiers, cheapest first:
  * element asserts (deterministic), agent-vision screenshots (not here — the
  * agent looks at `screenshot` output itself), pixel-diff vs. stored baseline.
  */
-
-const elementAssert = z
-  .object({
-    element: elementSpecSchema,
-    absent: z.boolean().optional(),
-    text: z.string().optional(),
-    match: z.string().optional(),
-    timeout: z.union([z.number(), z.string()]).optional(),
-  })
-  .strict()
-  .refine((a) => !(a.absent && (a.text !== undefined || a.match !== undefined)), {
-    message: 'absent cannot be combined with text/match',
-  });
 
 const screenshotAssert = z
   .object({
@@ -37,7 +24,7 @@ const screenshotAssert = z
   })
   .strict();
 
-export const assertSpecSchema = z.union([elementAssert, screenshotAssert]);
+export const assertSpecSchema = z.union([elementAssertSchema, screenshotAssert]);
 export type AssertSpec = z.infer<typeof assertSpecSchema>;
 
 export interface AssertResult {
@@ -78,18 +65,20 @@ export class Verifier {
     }
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.timeoutMs;
     if (spec.absent) return this.assertAbsent(spec.element, timeoutMs);
-    return this.assertElement(spec.element, spec.text, spec.match, timeoutMs);
+    return this.assertElement(spec.element, spec.text, spec.match, spec.error, timeoutMs);
   }
 
   private async assertElement(
     element: ElementSpec,
     text: string | undefined,
     match: string | undefined,
+    error: string | undefined,
     timeoutMs: number,
   ): Promise<AssertResult> {
     const wants =
       text !== undefined ? ` with text ${JSON.stringify(text)}`
       : match !== undefined ? ` matching /${match}/`
+      : error !== undefined ? ` with error ${JSON.stringify(error)}`
       : '';
     const description = `element ${describe(element)}${wants} exists`;
     const deadline = Date.now() + timeoutMs;
@@ -100,19 +89,20 @@ export class Verifier {
         const values = [n.label, n.value].filter((v): v is string => v !== null);
         if (text !== undefined) return values.includes(text);
         if (match !== undefined) return values.some((v) => new RegExp(match).test(v));
+        if (error !== undefined) return n.error === error;
         return true;
       });
       if (matching.length > 0) return { description, pass: true };
       if (found.length > 0) {
         lastSeen = found
           .slice(0, 3)
-          .map((n) => JSON.stringify(n.label ?? n.value))
+          .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
           .join(', ');
       }
       if (Date.now() >= deadline) {
         const detail =
           lastSeen !== undefined
-            ? `element found but content was: ${lastSeen}`
+            ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${lastSeen}`
             : `not found within ${timeoutMs}ms`;
         return { description, pass: false, detail };
       }
@@ -120,14 +110,24 @@ export class Verifier {
     }
   }
 
+  /**
+   * absent = gone from the tree OR present with a rect outside the visible
+   * viewport. The raw trees disagree (Android prunes off-screen nodes, iOS
+   * keeps them with off-viewport rects); this is the one portable meaning.
+   */
   private async assertAbsent(element: ElementSpec, timeoutMs: number): Promise<AssertResult> {
     const description = `element ${describe(element)} is absent`;
+    const viewport = await this.adapter.viewport();
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const found = findBySpec(await this.adapter.uiTree(), element);
-      if (found.length === 0) return { description, pass: true };
+      const visible = found.filter((n) => intersectsViewport(n.rect, viewport));
+      if (visible.length === 0) {
+        const detail = found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined;
+        return { description, pass: true, detail };
+      }
       if (Date.now() >= deadline) {
-        return { description, pass: false, detail: `still present after ${timeoutMs}ms` };
+        return { description, pass: false, detail: `still visible after ${timeoutMs}ms` };
       }
       await sleep(this.pollMs);
     }
