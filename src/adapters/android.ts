@@ -152,6 +152,11 @@ export class AndroidAdapter implements DeviceAdapter {
       await this.adb(['shell', 'input', 'text', escaped]);
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
+    // Let the IME commit the final character before the caller moves focus or
+    // dismisses the keyboard — a BACK/tap fired right after the last injection
+    // discards the still-composing char (measured 2026-08-05: field verified 8
+    // chars, BACK+continue submitted 7; a settled manual BACK kept all 8).
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
   async pressKey(key: Key): Promise<void> {
