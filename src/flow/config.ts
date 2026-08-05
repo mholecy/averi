@@ -254,12 +254,18 @@ export async function loadConfig(path: string): Promise<AveriConfig> {
 
 /**
  * Load `.env.averi` sitting next to averi.yaml into process.env — the
- * project-local home for credential values (gitignored). Existing env vars
- * win, so CI/shell exports override the file. Returns the names applied.
+ * project-local home for credential values (gitignored). Shell/CI exports
+ * win over the file; values the FILE itself supplied earlier are refreshed
+ * on every load, so editing .env.averi mid-session takes effect on the next
+ * tool call (measured 2026-08-05: the old first-load-wins behavior silently
+ * kept typing stale credentials for the server's whole lifetime). Returns
+ * the names applied or refreshed.
  *
  * Format: `KEY=value` per line; `export KEY=value`, blank lines, `#` comments
  * and single/double quotes around the value are tolerated.
  */
+const envVarsFromFile = new Set<string>();
+
 export async function loadEnvBeside(configPath: string): Promise<string[]> {
   const envPath = join(dirname(configPath), '.env.averi');
   let raw: string;
@@ -274,8 +280,11 @@ export async function loadEnvBeside(configPath: string): Promise<string[]> {
     if (!m || line.trimStart().startsWith('#')) continue;
     const [, name, rawValue] = m;
     const value = rawValue.replace(/^(['"])(.*)\1$/, '$2');
-    if (process.env[name] === undefined) {
+    const fresh = process.env[name] === undefined;
+    const refreshed = envVarsFromFile.has(name) && process.env[name] !== value;
+    if (fresh || refreshed) {
       process.env[name] = value;
+      envVarsFromFile.add(name);
       applied.push(name);
     }
   }

@@ -173,6 +173,29 @@ describe('loadEnvBeside', () => {
     }
   });
 
+  it('refreshes values the file supplied when the file changes, but never shell exports', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'averi-env-'));
+    try {
+      process.env.AVERI_T_SHELL = 'from-shell';
+      await writeFile(join(dir, '.env.averi'), 'AVERI_T_ROTATED=first\nAVERI_T_SHELL=from-file');
+      await loadEnvBeside(join(dir, 'averi.yaml'));
+      expect(process.env.AVERI_T_ROTATED).toBe('first');
+
+      // credential rotated mid-session — the next load must pick it up
+      await writeFile(join(dir, '.env.averi'), 'AVERI_T_ROTATED=second\nAVERI_T_SHELL=from-file');
+      const applied = await loadEnvBeside(join(dir, 'averi.yaml'));
+      expect(process.env.AVERI_T_ROTATED).toBe('second');
+      expect(applied).toContain('AVERI_T_ROTATED');
+      expect(process.env.AVERI_T_SHELL).toBe('from-shell'); // shell still wins
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      for (const k of Object.keys(process.env)) if (k.startsWith('AVERI_T_')) delete process.env[k];
+    }
+  });
+
   it('returns empty when no .env.averi exists', async () => {
     expect(await loadEnvBeside('/nonexistent/averi.yaml')).toEqual([]);
   });
