@@ -152,11 +152,16 @@ export class AndroidAdapter implements DeviceAdapter {
       await this.adb(['shell', 'input', 'text', escaped]);
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    // Let the IME commit the final character before the caller moves focus or
-    // dismisses the keyboard — a BACK/tap fired right after the last injection
-    // discards the still-composing char (measured 2026-08-05: field verified 8
-    // chars, BACK+continue submitted 7; a settled manual BACK kept all 8).
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Force the IME to COMMIT the final composing character: GBoard holds the
+    // last injected char in a composition span for seconds, and a BACK or a
+    // focus-moving tap discards it — a fixed post-type sleep (tried 500ms) is
+    // NOT enough. Moving the cursor left and back right commits the span
+    // deterministically (measured 2026-08-05: verified-8/submitted-7 with the
+    // sleep; 8/8 submitted with the cursor nudge even when BACK follows
+    // immediately).
+    await this.adb(['shell', 'input', 'keyevent', '21']); // DPAD_LEFT
+    await this.adb(['shell', 'input', 'keyevent', '22']); // DPAD_RIGHT
+    await new Promise((resolve) => setTimeout(resolve, 150));
   }
 
   async pressKey(key: Key): Promise<void> {
