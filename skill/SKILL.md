@@ -29,6 +29,7 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 - Watch `appAlive` in every flow/assert response. `appAlive: false` comes with a crash excerpt — report it with the log lines, don't retry blindly.
 - On an unexpected screen: `screenshot` + `ui_snapshot`, try the flow's `optional` dismissals by re-running `ensure_state`, and if still stuck, surface to the human with both artifacts.
 - **Never ask the user for credentials.** If a `${VAR}` is missing, the error names it — tell the user which env var to export, or to put `VAR=value` in a gitignored `.env.averi` next to averi.yaml (auto-loaded; real env vars take precedence). You never see credential values; traces show `***`.
+- **When one app targets several backends**, credentials live under `environments:` and you pick one with the `environment` argument on `ensure_state`/`run_flow`/`verify_both` (or `$AVERI_ENV`). Check the first trace line — it names the active environment. A login rejected as "user does not exist" right after a *correct-looking* username is usually the wrong environment, not a wrong credential: the bank rejects the login name one screen after it is typed.
 
 ## Recipes
 
@@ -45,6 +46,10 @@ app:
   ios:     { bundleId: com.example.dev, app: path/to.app }
 credentials:          # env refs only — values never live in YAML
   pin: ${AVERI_PIN}   # from env, or gitignored .env.averi beside this file
+environments:         # optional: per-backend overrides layered on `credentials`
+  staging:            # declare only the keys that differ; the rest is inherited
+    credentials:
+      username: ${STAGING_USERNAME}
 states:
   logged_in:
     detect: { any: [ { element: { id: dashboard_root } } ] }

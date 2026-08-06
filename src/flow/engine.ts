@@ -3,6 +3,7 @@ import { findBySpec, intersectsViewport, preferInteractive, tapPoint } from '../
 import { Verifier } from '../verify/assert.js';
 import {
   parseDuration,
+  resolveCredentials,
   type AveriConfig,
   type Condition,
   type ElementSpec,
@@ -28,6 +29,11 @@ export interface EngineOptions {
   assertTimeoutMs?: number;
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
   pinKeyDelayMs?: number;
+  /**
+   * Credential environment from `environments:` (see `resolveCredentials`).
+   * Omit to fall back to `AVERI_ENV` then `defaultEnvironment:`.
+   */
+  environment?: string;
 }
 
 /**
@@ -45,12 +51,20 @@ export class FlowEngine {
   private readonly optionalTimeoutMs: number;
   private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
+  private readonly credentials: Record<string, string>;
+  private readonly environment: string | undefined;
 
   constructor(
     private readonly cfg: AveriConfig,
     private readonly adapter: DeviceAdapter,
     opts: EngineOptions = {},
   ) {
+    // Resolved once per engine so a run cannot type one environment's username
+    // and another's password, and so an unknown name fails before touching the
+    // device rather than mid-login.
+    const resolved = resolveCredentials(cfg, opts.environment);
+    this.credentials = resolved.credentials;
+    this.environment = resolved.environment;
     this.pollMs = opts.pollMs ?? 500;
     this.tapTimeoutMs = opts.tapTimeoutMs ?? 5_000;
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
@@ -63,14 +77,28 @@ export class FlowEngine {
   /** Detect → run reach flows → confirm. Idempotent. */
   async ensureState(name: string): Promise<TraceEntry[]> {
     this.trace = [];
+    this.logEnvironment();
     await this.guard(() => this.ensureStateInner(name));
     return this.trace;
   }
 
   async runFlow(name: string): Promise<TraceEntry[]> {
     this.trace = [];
+    this.logEnvironment();
     await this.guard(() => this.runFlowInner(name));
     return this.trace;
+  }
+
+  /**
+   * First line of every run, when an environment is active. Values stay
+   * redacted, but the NAMES are the whole point: a wrong login name is rejected
+   * one screen after it is typed, so without this the caller sees a credentials
+   * error and has no way to tell it was really the wrong backend.
+   */
+  private logEnvironment(): void {
+    if (this.environment === undefined) return;
+    const overrides = Object.keys(this.cfg.environments?.[this.environment]?.credentials ?? {});
+    this.log(`environment ${this.environment}`, overrides.length > 0 ? `overrides: ${overrides.join(', ')}` : undefined);
   }
 
   private async ensureStateInner(name: string): Promise<void> {
@@ -355,9 +383,13 @@ export class FlowEngine {
   private resolveValue(raw: string): { value: string; secret: boolean } {
     if (raw.startsWith('$') && !raw.startsWith('${')) {
       const key = raw.slice(1);
-      const template = this.cfg.credentials?.[key];
+      const template = this.credentials[key];
       if (template === undefined) {
-        throw new Error(`Unknown credential "$${key}" — declare it under credentials:`);
+        const where =
+          this.environment === undefined ?
+            'declare it under credentials:'
+          : `declare it under credentials: or environments.${this.environment}.credentials`;
+        throw new Error(`Unknown credential "$${key}" — ${where}`);
       }
       const value = this.expandEnv(template, key);
       this.secrets.add(value);
@@ -375,8 +407,14 @@ export class FlowEngine {
     return template.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name: string) => {
       const value = process.env[name];
       if (value === undefined) {
-        const forWhom = credential ? ` (needed for credential "${credential}")` : '';
-        throw new Error(`Environment variable ${name} is not set${forWhom} — export it and retry`);
+        const forWhom =
+          credential ?
+            ` (needed for credential "${credential}"` +
+            `${this.environment === undefined ? '' : ` in environment "${this.environment}"`})`
+          : '';
+        throw new Error(
+          `Environment variable ${name} is not set${forWhom} — set it in .env.averi beside averi.yaml, or export it, and retry`,
+        );
       }
       return value;
     });

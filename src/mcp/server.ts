@@ -23,6 +23,13 @@ const configPath = z
   .optional()
   .describe('Path to averi.yaml (default: ./averi.yaml in the server working directory)');
 
+const environment = z
+  .string()
+  .optional()
+  .describe(
+    'Credential environment from averi.yaml `environments:` (e.g. "starterkit") — pass when the build under test points at a different backend than usual. Defaults to $AVERI_ENV (settable in .env.averi), then `defaultEnvironment:`.',
+  );
+
 /**
  * All project configuration lives with the project, not with averi: averi.yaml
  * resolves against the server cwd (the project root when launched from
@@ -307,11 +314,16 @@ registerTool(
   {
     description:
       'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. Returns the step trace and a final screenshot.',
-    inputSchema: { platform, state: z.string().describe('State name from averi.yaml'), configPath },
+    inputSchema: {
+      platform,
+      state: z.string().describe('State name from averi.yaml'),
+      configPath,
+      environment,
+    },
   },
-  async ({ platform: p, state, configPath: cp }) => {
+  async ({ platform: p, state, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
-    const engine = new FlowEngine(cfg, await registry.get(p));
+    const engine = new FlowEngine(cfg, await registry.get(p), { environment: env });
     const trace = await engine.ensureState(state);
     const health = await appHealth(p, cfg);
     const shot = await (await registry.get(p)).screenshot();
@@ -329,11 +341,16 @@ registerTool(
   {
     description:
       'Run a named flow from averi.yaml (e.g. "goto_transfers"). Honors the flow\'s `requires:` state. Returns the step trace.',
-    inputSchema: { platform, flow: z.string().describe('Flow name from averi.yaml'), configPath },
+    inputSchema: {
+      platform,
+      flow: z.string().describe('Flow name from averi.yaml'),
+      configPath,
+      environment,
+    },
   },
-  async ({ platform: p, flow, configPath: cp }) => {
+  async ({ platform: p, flow, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
-    const engine = new FlowEngine(cfg, await registry.get(p));
+    const engine = new FlowEngine(cfg, await registry.get(p), { environment: env });
     const trace = await engine.runFlow(flow);
     return text(formatTrace(trace) + (await appHealth(p, cfg)));
   },
@@ -372,16 +389,17 @@ registerTool(
       flow: z.string().optional().describe('Flow to run (from averi.yaml)'),
       asserts: assertsInput.optional(),
       configPath,
+      environment,
     },
   },
-  async ({ state, flow, asserts, configPath: cp }) => {
+  async ({ state, flow, asserts, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
     const specs = parseAsserts(asserts ?? []);
     const platforms: Platform[] = ['android', 'ios'];
 
     const runOne = async (p: Platform) => {
       const adapter = await registry.get(p);
-      const engine = new FlowEngine(cfg, adapter);
+      const engine = new FlowEngine(cfg, adapter, { environment: env });
       const trace: TraceEntry[] = [];
       if (state) trace.push(...(await engine.ensureState(state)));
       if (flow) trace.push(...(await engine.runFlow(flow)));

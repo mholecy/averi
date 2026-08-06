@@ -566,3 +566,88 @@ describe('failure modes', () => {
     await expect(engine.runFlow('fly')).rejects.toThrow(/Unknown flow "fly" — known: login, goto_transfers/);
   });
 });
+
+describe('credential environments', () => {
+  const MULTI_ENV = parseConfig(`
+app:
+  android: { package: md.bank.app }
+credentials:
+  username: \${TEST_USER}
+  password: \${TEST_PASSWORD}
+  pin: \${TEST_PIN}
+environments:
+  alfons_dev:
+    credentials:
+      username: \${TEST_ALFONS_USER}
+  starterkit:
+    credentials:
+      username: \${TEST_STARTERKIT_USER}
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+flows:
+  type_username:
+    steps:
+      - tap:  { id: username_field }
+      - type: { value: $username }
+      - tap:  { id: password_field }
+      - type: { value: $password }
+`);
+
+  beforeEach(() => {
+    process.env.TEST_ALFONS_USER = 'martha.key';
+    process.env.TEST_STARTERKIT_USER = 'starter.user';
+  });
+
+  afterEach(() => {
+    delete process.env.TEST_ALFONS_USER;
+    delete process.env.TEST_STARTERKIT_USER;
+    delete process.env.AVERI_ENV;
+  });
+
+  it('types the selected environment’s username and the shared password', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    await new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow('type_username');
+    // username from the environment, password inherited from base credentials
+    expect(fake.typed).toEqual(['starter.user', 'hunter2secret']);
+  });
+
+  it('switching environment switches the username without touching averi.yaml', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    process.env.AVERI_ENV = 'alfons_dev';
+    await new FlowEngine(MULTI_ENV, fake, FAST).runFlow('type_username');
+    expect(fake.typed[0]).toBe('martha.key');
+  });
+
+  it('names the active environment in the trace so a mix-up is visible', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    const trace = await new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow(
+      'type_username',
+    );
+    expect(trace[0]).toEqual({ action: 'environment starterkit', detail: 'overrides: username' });
+  });
+
+  it('keeps environment usernames redacted from the trace', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    const trace = await new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow(
+      'type_username',
+    );
+    expect(JSON.stringify(trace)).not.toContain('starter.user');
+  });
+
+  it('fails before touching the device when the environment is unknown', () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    expect(() => new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'nope' })).toThrow(
+      /Unknown environment "nope"/,
+    );
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('points at the environment when its env var is missing', async () => {
+    delete process.env.TEST_STARTERKIT_USER;
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    await expect(
+      new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow('type_username'),
+    ).rejects.toThrow(/TEST_STARTERKIT_USER is not set .*environment "starterkit"/);
+  });
+});

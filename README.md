@@ -118,6 +118,39 @@ flows:
       - wait: { state: logged_in, timeout: 20s }
 ```
 
+### One app, several backends
+
+When the same app is pointed at different backends, the credentials usually differ in one key — the
+login name — while the password/OTP/PIN are shared. Declaring that explicitly beats swapping a single
+env var by hand, because **the wrong login name is rejected one screen AFTER it is typed**, so an
+environment mix-up looks exactly like a credentials problem (this cost an hour on a real project).
+
+```yaml
+credentials:                 # base: shared by every environment
+  username: ${APP_USERNAME}
+  password: ${APP_PASSWORD}
+
+environments:                # per-backend overrides, layered ON TOP of `credentials`
+  dev:
+    credentials:
+      username: ${DEV_USERNAME}
+  staging:
+    credentials:
+      username: ${STAGING_USERNAME}
+
+defaultEnvironment: dev      # optional
+```
+
+Selection, most specific first: the tool's `environment` argument → `$AVERI_ENV` (set it in
+`.env.averi`, so switching backend is one line in an already-gitignored file) → `defaultEnvironment:`
+→ base `credentials:` alone. Only `ensure_state`, `run_flow` and `verify_both` take the argument —
+they are the tools that run flows.
+
+`ensure_state`/`run_flow` print the active environment and which keys it overrode as the first trace
+line, so the run's provenance is visible without printing any value. An unknown environment name fails
+before the device is touched, and a missing env var names both the credential and the environment that
+needed it.
+
 Forms & validation (added 2026-08-05, dogfooded on a real cross-platform payment form):
 
 ```yaml

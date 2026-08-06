@@ -220,6 +220,14 @@ const configSchema = z
       })
       .strict(),
     credentials: z.record(z.string()).optional(),
+    /**
+     * Per-environment credential overrides, layered ON TOP of `credentials:`.
+     * Only the keys that actually differ per backend need repeating — in
+     * practice that is the username, while password/sms/pin are shared.
+     */
+    environments: z.record(z.object({ credentials: z.record(z.string()) }).strict()).optional(),
+    /** Used when neither the tool call nor `AVERI_ENV` names one. */
+    defaultEnvironment: z.string().optional(),
     states: z
       .record(
         z.object({ detect: condition, reach: z.array(z.string()).optional() }).strict(),
@@ -250,6 +258,44 @@ export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfi
 
 export async function loadConfig(path: string): Promise<AveriConfig> {
   return parseConfig(await readFile(path, 'utf8'), path);
+}
+
+export interface ResolvedCredentials {
+  /** `$name` → template, base overlaid with the chosen environment. */
+  credentials: Record<string, string>;
+  /** The environment actually applied, or undefined when running on base only. */
+  environment?: string;
+}
+
+/**
+ * Pick the credential set for a run: base `credentials:` overlaid per-key with
+ * `environments.<name>.credentials`.
+ *
+ * Precedence, most specific first: explicit `requested` (tool argument) →
+ * `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in
+ * an already-gitignored file) → `defaultEnvironment:` → base only.
+ *
+ * Why this exists: one username for two backends caused an hour's misdiagnosis
+ * on 2026-08-06 — the wrong login name is rejected by the bank one screen AFTER
+ * it is typed, so an environment mix-up presents as a credentials problem.
+ */
+export function resolveCredentials(cfg: AveriConfig, requested?: string): ResolvedCredentials {
+  const name = requested ?? process.env.AVERI_ENV ?? cfg.defaultEnvironment;
+  const base = cfg.credentials ?? {};
+  if (name === undefined) return { credentials: base };
+
+  const known = Object.keys(cfg.environments ?? {});
+  const env = cfg.environments?.[name];
+  if (!env) {
+    const source =
+      requested !== undefined ? 'requested'
+      : process.env.AVERI_ENV !== undefined ? 'AVERI_ENV'
+      : 'defaultEnvironment';
+    throw new Error(
+      `Unknown environment "${name}" (from ${source}) — known: ${known.join(', ') || '(none declared)'}`,
+    );
+  }
+  return { credentials: { ...base, ...env.credentials }, environment: name };
 }
 
 /**
@@ -320,6 +366,12 @@ function validateReferences(cfg: AveriConfig, source: string): void {
       }
     }
   };
+  if (cfg.defaultEnvironment !== undefined && !(cfg.defaultEnvironment in (cfg.environments ?? {}))) {
+    fail(
+      `defaultEnvironment "${cfg.defaultEnvironment}" is not declared under environments: ` +
+        `(known: ${Object.keys(cfg.environments ?? {}).join(', ') || 'none'})`,
+    );
+  }
   for (const [name, state] of Object.entries(cfg.states)) {
     checkCondition(state.detect, `states.${name}.detect`);
     for (const flow of state.reach ?? []) {

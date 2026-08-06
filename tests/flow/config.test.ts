@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { loadEnvBeside, parseConfig, parseDuration } from '../../src/flow/config.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { loadEnvBeside, parseConfig, parseDuration, resolveCredentials } from '../../src/flow/config.js';
 
 const VALID = `
 app:
@@ -198,5 +198,72 @@ describe('loadEnvBeside', () => {
 
   it('returns empty when no .env.averi exists', async () => {
     expect(await loadEnvBeside('/nonexistent/averi.yaml')).toEqual([]);
+  });
+});
+
+const MULTI_ENV = `
+app:
+  ios: { bundleId: md.bank.app }
+credentials:
+  username: \${AVERI_BANK_USERNAME}
+  pin: \${AVERI_BANK_PIN}
+environments:
+  alfons_dev:
+    credentials:
+      username: \${AVERI_ALFONS_USERNAME}
+  starterkit:
+    credentials:
+      username: \${AVERI_STARTERKIT_USERNAME}
+flows:
+  login:
+    steps:
+      - type_pin: { value: $pin }
+`;
+
+describe('resolveCredentials', () => {
+  const cfg = () => parseConfig(MULTI_ENV);
+
+  afterEach(() => {
+    delete process.env.AVERI_ENV;
+  });
+
+  it('returns base credentials when no environment is selected', () => {
+    const r = resolveCredentials(cfg());
+    expect(r.environment).toBeUndefined();
+    expect(r.credentials.username).toBe('${AVERI_BANK_USERNAME}');
+  });
+
+  it('overlays only the keys the environment declares, inheriting the rest', () => {
+    const r = resolveCredentials(cfg(), 'starterkit');
+    expect(r.environment).toBe('starterkit');
+    expect(r.credentials.username).toBe('${AVERI_STARTERKIT_USERNAME}');
+    // the shared secret is NOT repeated per environment and must still resolve
+    expect(r.credentials.pin).toBe('${AVERI_BANK_PIN}');
+  });
+
+  it('prefers the explicit request over AVERI_ENV', () => {
+    process.env.AVERI_ENV = 'alfons_dev';
+    expect(resolveCredentials(cfg(), 'starterkit').environment).toBe('starterkit');
+  });
+
+  it('falls back to AVERI_ENV, then to defaultEnvironment', () => {
+    process.env.AVERI_ENV = 'starterkit';
+    expect(resolveCredentials(cfg()).environment).toBe('starterkit');
+    delete process.env.AVERI_ENV;
+
+    const withDefault = parseConfig(MULTI_ENV.replace('environments:', 'defaultEnvironment: alfons_dev\nenvironments:'));
+    expect(resolveCredentials(withDefault).environment).toBe('alfons_dev');
+  });
+
+  it('names the source when the environment is unknown — the mix-up must not be silent', () => {
+    expect(() => resolveCredentials(cfg(), 'nope')).toThrow(/Unknown environment "nope" \(from requested\)/);
+    process.env.AVERI_ENV = 'nope';
+    expect(() => resolveCredentials(cfg())).toThrow(/from AVERI_ENV/);
+  });
+
+  it('rejects a defaultEnvironment that is not declared', () => {
+    expect(() => parseConfig(MULTI_ENV.replace('environments:', 'defaultEnvironment: typo\nenvironments:'))).toThrow(
+      /defaultEnvironment "typo" is not declared/,
+    );
   });
 });

@@ -107,6 +107,21 @@ credentials:              # values come from env / OS keychain, never from YAML
 # (gitignore it) is auto-loaded first, existing env vars taking precedence —
 # so the project is self-contained and CI can still inject via real env.
 
+environments:             # optional: per-backend credential overrides
+  dev:
+    credentials:
+      username: ${AVERI_DEV_USER}
+  staging:
+    credentials:
+      username: ${AVERI_STAGING_USER}
+# Layered ON TOP of `credentials:` per key, so shared secrets are declared once.
+# Selected by the tool's `environment` argument, else $AVERI_ENV, else
+# `defaultEnvironment:`. Resolved once per engine, so one run can never mix one
+# environment's username with another's password, and an unknown name fails
+# before the device is touched. The active environment is the first trace line:
+# a wrong login name is rejected one screen AFTER it is typed, so without that
+# provenance an environment mix-up is indistinguishable from a bad credential.
+
 states:
   logged_in:
     detect:                       # how to recognize we're already there
