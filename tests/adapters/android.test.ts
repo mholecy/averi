@@ -124,6 +124,10 @@ describe('AndroidAdapter interactions', () => {
       'adb -s emulator-5554 shell input text %s',
       'adb -s emulator-5554 shell input text \\$',
       'adb -s emulator-5554 shell input text b',
+      // DPAD_LEFT + DPAD_RIGHT: the cursor nudge that commits GBoard's trailing
+      // composition span, so the last character survives a following BACK or tap.
+      'adb -s emulator-5554 shell input keyevent 21',
+      'adb -s emulator-5554 shell input keyevent 22',
     ]);
   });
 
