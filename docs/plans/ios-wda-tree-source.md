@@ -1,6 +1,7 @@
 # iOS tree source: XCTest/WDA fallback for identifiers idb cannot see
 
-Status: **planned** (finding logged 2026-08-12; not started).
+Status: **phase 0 executed 2026-08-12 — `idb --nested` ruled out, WDA build-out is the path.**
+Implementation not started.
 
 ## Problem
 
@@ -15,46 +16,103 @@ static text (and plain containers) is a child that carries no identifier. So on 
 - `verify_both` silently loses symmetry: Android resolves every `testID` as `resource-id`, iOS
   degrades to locale-fragile `text:` selectors for anything non-interactive.
 
-Two control experiments bound the problem precisely:
+Control experiments that bound the problem:
 
 1. Native SwiftUI static `Text` + `.accessibilityIdentifier` **does** surface through idb (swiftc
    probe, same simulator, same pipeline) — SwiftUI puts the id on the AX element itself. Not an
    iOS/idb limit in general.
 2. Maestro 2.8.0 (XCTest driver) on the exact screen idb sees 6 elements: **all** `testID`s present,
-   including static text and the plain container. The id lives on the host view (Maestro shows the
-   host/child pair; only the host carries `resource-id`).
+   including static text and the plain container. The id lives on the host view.
 
 This is the case ARCHITECTURE.md §3 pre-planned ("**WebDriverAgent** fallback for cases where idb's
 AX output is insufficient") and §10 lists as the idb-risk mitigation ("adapter abstraction keeps WDA
 as swap-in").
 
-## Direction
+## Phase 0 — kill-switch experiments (EXECUTED 2026-08-12)
 
-Give `IosAdapter` an XCTest-backed tree source behind the existing `uiTree()` interface. Keep idb
-for input and lifecycle (taps, typing, install/launch) — only the *tree read* changes. Nothing above
-the adapter layer changes: `identifier` stops being `null`, `id:` selectors start resolving on RN
-static text and containers.
+- **`idb ui describe-all --json --nested` on the exact RN repro screen** (MyPort placeholder,
+  iPhone 17 / iOS 26.5, idb with `--nested` support): output is the same AX-element set merely
+  tree-shaped — 6 nodes, `AXUniqueId: null` on every one, `placeholder_status` absent, ~2.3 KB in
+  both forms. **Option eliminated; measured, not assumed.**
+- **Local tooling survey**: no Appium install present; Maestro's `~/.maestro/deps/simulator-server`
+  (their private prebuilt XCTest runner) works on this machine — evidence the XCTest approach is
+  viable here, but it is an undocumented internal binary, not a dependency to consume.
 
-Candidate mechanics, to be evaluated in order:
+## Decisions (defaults — revisit only with data)
 
-1. **WebDriverAgent** (`/source?format=json`): full view hierarchy with `identifier` per node.
-   Cost: building/hosting WDA on the sim (xcodebuild once, then an HTTP session), a heavyweight
-   dependency averi has so far avoided. Appium's prebuilt WDA is the low-friction route.
-2. **idb `describe-all --nested`** (if available in the pinned idb version): check whether the
-   nested form exposes host views rather than flattened AX elements before reaching for WDA.
-3. A tiny XCTest runner of our own is out of scope — WDA *is* that runner, maintained.
+1. **WDA distribution**: npm devDependency `appium-webdriveragent` (ships the WDA Xcode project;
+   no Appium server involved). Pin the version. Rejected: vendoring WDA source (maintenance debt),
+   Maestro's simulator-server (private/undocumented), writing our own XCTest runner (WDA *is* that
+   runner, maintained).
+2. **Lifecycle**: build once per Xcode version (`xcodebuild build-for-testing`, cached in
+   DerivedData), start per session with `xcodebuild test-without-building` against the target UDID,
+   readiness = `GET /status`, port = per-UDID (8100 + offset) so parallel simulators don't collide.
+   Lazy start on the first `uiTree()` that needs it; teardown with the server process.
+3. **Integration policy**: config-driven, safe default — `app.ios.treeSource: idb (default) | wda`
+   in averi.yaml. Native projects (skeleton) see zero change; RN projects opt in with one line.
+   `auto` promotion is a later decision, taken only after the Phase 4 latency measurement.
+4. **Scope**: only the *tree read* moves to WDA. Taps, typing, install/launch stay on idb/simctl
+   (WDA input would drag in session management). Compatible by construction: WDA frames are in
+   points, the same units idb rects use, so `tapElement` coordinates keep working.
 
-Decision points to settle during implementation:
+## Phase 1 — `WdaServer` (new `src/adapters/wda.ts`)
 
-- Fallback policy: WDA-first on iOS, or idb-first with WDA only when a selector misses? (Latencies
-  differ; describe-all is ~1s, WDA /source on a deep tree can be slower.)
-- Tree merge: WDA nodes carry identifiers but different role vocabulary — normalization table needed
-  (mirror of the existing `ROLE_MAP`).
-- `error` attribute pairing (validation messages) currently exploits idb's flat sibling order —
-  re-verify on the WDA tree.
+- `class WdaServer { constructor(udid, port, exec); ensureRunning(); source(): Promise<unknown>; stop() }`
+- xcodebuild via the existing `exec.ts`; reuse the `DEVELOPER_DIR` detection currently private to
+  `IosAdapter.detectEnv()` — factor it out rather than duplicating.
+- `GET /source?format=json` → nested `{ type: XCUIElementType*, identifier, label, value, frame,
+  children }` (sessionless endpoint — no WebDriver session needed).
+- Failure surface: a build/start failure must name the xcodebuild log path and the one-time cost
+  ("first WDA build per Xcode version takes minutes") — never a bare timeout.
 
-## Acceptance
+## Phase 2 — parser + normalization (`parseWdaSource`)
 
-- The RN reproduction screen: `ui_snapshot(ios)` resolves `id:` on static text AND containers.
-- Native SwiftUI apps: no regression on the existing selector suite (skeleton averi.yaml states).
-- `verify_both` symmetric for the RN app's `id:`-only flow.
+- Map `XCUIElementType*` → the normalized role vocabulary (mirror of `ROLE_MAP`: Button→button,
+  StaticText→text, TextField/SecureTextField→textfield, Cell/Other-with-children→container, …).
+- Keep host-view nodes: that is the whole point — the RN host view appears as an `Other` node WITH
+  the identifier; normalize it to `container` rather than dropping it.
+- Re-implement the `error`-attribute pairing (validation text under a same-identifier field) on the
+  nested tree — the current logic in `ios.ts` exploits idb's flat sibling order and will not
+  transplant as-is.
+- Fixtures first: capture real `/source` dumps of (a) the RN repro screen, (b) a skeleton native
+  screen, into `tests/fixtures/`; parser unit tests run against those, in the style of the existing
+  `parseIdbDescribeAll` tests.
+
+## Phase 3 — `IosAdapter` wiring
+
+- `uiTree()` dispatches on the configured source; everything above the adapter is untouched.
+- Plumbing the config to the adapter is the one genuinely open design point: the registry
+  constructs adapters config-agnostically today. Recommendation: `registry.get(platform, opts?)`
+  where tool handlers that already loaded averi.yaml pass `{ treeSource }`, cache keyed by
+  `(platform, deviceId, treeSource)`. Avoid a mutable setter — two concurrent tool calls with
+  different configs must not race.
+- `select_device` interplay: `WdaServer` is keyed by UDID; a rebind starts a new server and stops
+  the orphan.
+
+## Phase 4 — verification, measurement, docs
+
+- Acceptance (unchanged):
+  - RN repro screen: `ui_snapshot(ios)` resolves `id:` on static text AND the plain container.
+  - Native suite: skeleton `averi.yaml` states pass on-device with `treeSource: idb` (default,
+    regression guard) and with `wda` (parity check).
+  - `verify_both` symmetric for an RN `id:`-only flow.
+- Measure `/source` vs `describe-all` latency on a deep screen (transactions list) → decides
+  whether `auto` (WDA-first on iOS) is worth proposing.
+- Docs: README known-gap box → resolved note; SKILL rule updated; ARCHITECTURE §3 marks the
+  fallback as implemented.
+
+## Risks
+
+- **First WDA build per Xcode version: minutes** (then cached). Must be loud and explained, or it
+  reads as a hang.
+- **WDA↔Xcode coupling**: appium-webdriveragent tracks new Xcode releases quickly, but a fresh
+  Xcode may need a version bump — pin and document the pairing.
+- **`/source` latency on deep trees** is the known WDA weakness — hence measure before any
+  WDA-by-default talk.
+- **CI/headless**: `xcodebuild test-without-building` on simulators works headless; simulator-only
+  scope (averi's stated boundary) keeps signing out of the picture.
+
+## Effort
+
+Phases 1–2 ≈ one day (server + parser with fixtures), phase 3 ≈ half a day (wiring + registry
+design), phase 4 ≈ half a day on-device. **~2 focused days**, independently landable per phase.
