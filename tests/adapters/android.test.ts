@@ -139,6 +139,39 @@ describe('AndroidAdapter interactions', () => {
     expect(calls[1]).toContain('monkey -p md.bank.app');
   });
 
+  it('launch with an activity uses am start -n, not monkey (monkey may pick LeakCanary)', async () => {
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn })
+      .launch('md.bank.app', { activity: '.MainActivity' });
+    expect(calls).toEqual([
+      'adb -s emulator-5554 shell am start -n md.bank.app/.MainActivity',
+    ]);
+  });
+
+  it('launch passes a full pkg/Activity component through unchanged', async () => {
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn })
+      .launch('md.bank.app', { activity: 'md.bank.app/md.bank.ShareActivity' });
+    expect(calls[0]).toBe('adb -s emulator-5554 shell am start -n md.bank.app/md.bank.ShareActivity');
+  });
+
+  it('launch with an intent builds am start action/data/type/categories/extras', async () => {
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).launch('md.bank.app', {
+      activity: '.ShareActivity',
+      intent: {
+        action: 'android.intent.action.SEND',
+        mimeType: 'image/png',
+        categories: ['android.intent.category.DEFAULT'],
+        extras: { qr: 'payload' },
+      },
+    });
+    expect(calls[0]).toBe(
+      'adb -s emulator-5554 shell am start -n md.bank.app/.ShareActivity ' +
+        '-a android.intent.action.SEND -t image/png -c android.intent.category.DEFAULT --es qr payload',
+    );
+  });
+
   it('setClipboard reports unsupported', async () => {
     await expect(new AndroidAdapter().setClipboard('x')).rejects.toThrow(/not supported/);
   });

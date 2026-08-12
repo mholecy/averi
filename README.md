@@ -68,7 +68,7 @@ APP_PASSWORD=...
 
 3. The agent skill — copy `skill/SKILL.md` to `.claude/skills/averi/SKILL.md` (or your agent's equivalent) so the agent knows the golden path: build → install → `ensure_state` → navigate → assert → `verify_both`.
 
-Restart the agent session; it now has 16 `averi` tools (`list_devices`, `install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, `ui_snapshot`, `tap`, `swipe`, `type_text`, `press_key`, `ensure_state`, `run_flow`, `assert`, `verify_both`, `get_logs`). Notes: averi never builds your app — your normal build produces the `.apk`/`.app`, whose path in `averi.yaml` is what `install_app` installs; `verify_both` runs the same state/flow/asserts on **both platforms** and returns paired screenshots; screenshot baselines auto-create under `.averi/baselines/` on first use (delete one to re-baseline).
+Restart the agent session; it now has 17 `averi` tools (`list_devices`, `select_device`, `install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, `ui_snapshot`, `tap`, `swipe`, `type_text`, `press_key`, `ensure_state`, `run_flow`, `assert`, `verify_both`, `get_logs`). Notes: tools target the **first booted device** per platform unless you pin one with `select_device` (with a phone, an emulator, and a watch emulator all connected, pin it — the pick is otherwise arbitrary, and a pinned device going offline is an error, never a silent fallback); averi never builds your app — your normal build produces the `.apk`/`.app`, whose path in `averi.yaml` is what `install_app` installs; `verify_both` runs the same state/flow/asserts on **both platforms** and returns paired screenshots; screenshot baselines auto-create under `.averi/baselines/` on first use (delete one to re-baseline).
 
 ## Let the agent write `averi.yaml` for you
 
@@ -91,7 +91,10 @@ Adding ids to every **new** feature screen as you build it is cheap; retrofittin
 
 ```yaml
 app:
-  android: { package: com.example.dev, apk: app/build/outputs/apk/dev/debug/app.apk }
+  # activity is optional but set it if your debug build bundles LeakCanary: without it,
+  # launches resolve the launcher activity via monkey, which picks ARBITRARILY among the
+  # package's launcher activities — and LeakCanary registers one, so it may open instead.
+  android: { package: com.example.dev, apk: app/build/outputs/apk/dev/debug/app.apk, activity: .MainActivity }
   ios:     { bundleId: com.example.dev, app: build/Debug-iphonesimulator/Example.app }
 
 credentials:                 # env refs only — values come from .env.averi / real env
@@ -117,6 +120,11 @@ flows:
           - android: { tap: { id: permission_allow_button } }   # Android 13+ notifications
       - wait: { state: logged_in, timeout: 20s }
 ```
+
+Non-launcher entry points (Android only): a flow's `launch:` step can name a specific activity
+and intent — `launch: { activity: .ShareActivity, intent: { action: android.intent.action.SEND,
+mimeType: image/png, extras: { ... } } }` — to exercise share-sheet or other deep-entry paths
+that never pass through the main activity. iOS has a single entry point; use deep links there.
 
 ### One app, several backends
 

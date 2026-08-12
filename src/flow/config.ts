@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
+import type { LaunchIntent } from '../adapters/types.js';
 
 /** Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4). */
 
@@ -52,7 +53,7 @@ export interface ScrollUntilSpec {
 }
 
 export type Step =
-  | { launch: { clearState?: boolean } }
+  | { launch: { clearState?: boolean; activity?: string; intent?: LaunchIntent } }
   | { tap: ElementSpec }
   | { type: { value: string } }
   | {
@@ -118,9 +119,30 @@ export const elementAssertSchema: z.ZodType<ElementAssert> = z
     { message: 'absent cannot be combined with text/match/error' },
   );
 
+/** Android-only `am start` parameters — see LaunchIntent in adapters/types.ts. */
+const launchIntent: z.ZodType<LaunchIntent> = z
+  .object({
+    action: z.string().optional(),
+    data: z.string().optional(),
+    mimeType: z.string().optional(),
+    categories: z.array(z.string()).optional(),
+    extras: z.record(z.string()).optional(),
+  })
+  .strict();
+
 const step: z.ZodType<Step> = z.lazy(() =>
   z.union([
-    z.object({ launch: z.object({ clearState: z.boolean().optional() }).strict() }).strict(),
+    z
+      .object({
+        launch: z
+          .object({
+            clearState: z.boolean().optional(),
+            activity: z.string().optional(),
+            intent: launchIntent.optional(),
+          })
+          .strict(),
+      })
+      .strict(),
     z.object({ tap: elementSpecSchema }).strict(),
     z.object({ type: z.object({ value: z.string() }).strict() }).strict(),
     z
@@ -215,7 +237,20 @@ const configSchema = z
   .object({
     app: z
       .object({
-        android: z.object({ package: z.string(), apk: z.string().optional() }).strict().optional(),
+        android: z
+          .object({
+            package: z.string(),
+            apk: z.string().optional(),
+            /**
+             * Entry activity for launches (".MainActivity" or fully-qualified).
+             * Without it launch uses `monkey -c LAUNCHER`, which picks
+             * arbitrarily among the package's launcher activities — debug
+             * builds bundling LeakCanary have two, so set this to pin the app.
+             */
+            activity: z.string().optional(),
+          })
+          .strict()
+          .optional(),
         ios: z.object({ bundleId: z.string(), app: z.string().optional() }).strict().optional(),
       })
       .strict(),

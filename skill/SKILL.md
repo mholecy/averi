@@ -22,6 +22,8 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 ## Rules
 
 - **Always `ensure_state` instead of manual login.** It is idempotent — call it freely; it no-ops when already there.
+- **Several devices booted (phone + emulator + watch)?** Pin the right one first: `list_devices` → `select_device(platform, id)`. Otherwise tools target the first booted device the platform tools list — an arbitrary pick.
+- **Launch opened LeakCanary instead of the app?** The debug build has two launcher activities and the default launch picks arbitrarily — set `app.android.activity` in `averi.yaml` (e.g. `.MainActivity`). Non-launcher entry points (share sheet etc.) are reachable with `launch: { activity: ..., intent: { action: ..., extras: {...} } }` — Android only; on iOS use deep links.
 - **Prefer `ui_snapshot` + element asserts over screenshots** for text/presence checks. Screenshots are for visual judgment, baselines for regression.
 - Selectors: prefer `id:` (stable), then `label:`/`text:`, then `role:` combinations. `ui_snapshot(platform, filter)` shows you what's there.
 - If an expected element is missing or below the fold, use `scroll_until(platform, selector)` (or the `scroll_until:` flow step) — element-targeted, no coordinates, portable. Raw `swipe` remains for gestures that aren't "bring X into view" (its coordinates are per-platform units).

@@ -220,6 +220,33 @@ flows:
   });
 });
 
+describe('launch step', () => {
+  it('defaults to app.android.activity; a step-level activity + intent wins', async () => {
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app, activity: .MainActivity }
+flows:
+  open:
+    steps:
+      - launch: { clearState: true }
+  share_qr:
+    steps:
+      - launch:
+          activity: .ShareActivity
+          intent: { action: android.intent.action.SEND }
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const engine = new FlowEngine(cfg, fake, FAST);
+    const trace = await engine.runFlow('open');
+    await engine.runFlow('share_qr');
+    expect(fake.launches).toEqual([
+      { appId: 'md.bank.app', clearState: true, activity: '.MainActivity' },
+      { appId: 'md.bank.app', activity: '.ShareActivity', intent: { action: 'android.intent.action.SEND' } },
+    ]);
+    expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app/.MainActivity (state cleared)' });
+  });
+});
+
 describe('runFlow', () => {
   it('requires: runs ensureState first, then the flow steps', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');

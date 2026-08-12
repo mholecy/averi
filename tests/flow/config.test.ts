@@ -40,6 +40,35 @@ describe('parseConfig', () => {
     expect(cfg.flows.goto_transfers.requires).toBe('logged_in');
   });
 
+  it('accepts app.android.activity and launch steps with activity/intent', () => {
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app, activity: .MainActivity }
+flows:
+  share_qr:
+    steps:
+      - launch:
+          activity: .ShareActivity
+          intent:
+            action: android.intent.action.SEND
+            mimeType: image/png
+            extras: { qr: payload }
+`);
+    expect(cfg.app.android?.activity).toBe('.MainActivity');
+    expect(cfg.flows.share_qr.steps[0]).toEqual({
+      launch: {
+        activity: '.ShareActivity',
+        intent: { action: 'android.intent.action.SEND', mimeType: 'image/png', extras: { qr: 'payload' } },
+      },
+    });
+  });
+
+  it('rejects unknown launch intent keys', () => {
+    expect(() =>
+      parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - launch: { intent: { flags: 32 } }\n'),
+    ).toThrow(/Invalid averi\.yaml/);
+  });
+
   it('rejects unknown step keys with a path', () => {
     expect(() => parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - frobnicate: {}\n'))
       .toThrow(/Invalid averi\.yaml/);

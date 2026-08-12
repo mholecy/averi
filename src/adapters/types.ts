@@ -34,6 +34,33 @@ export type Selector = string;
 
 export type Key = 'back' | 'home' | 'enter';
 
+/**
+ * Android-only intent parameters for `am start` — how a flow exercises entry
+ * points other than the launcher (share sheet, custom actions). String extras
+ * only: they cover the share/deep-entry cases; typed extras can come later.
+ */
+export interface LaunchIntent {
+  action?: string; // e.g. android.intent.action.SEND
+  data?: string; // intent data URI
+  mimeType?: string;
+  categories?: string[];
+  extras?: Record<string, string>; // --es key value
+}
+
+export interface LaunchOptions {
+  clearState?: boolean;
+  /**
+   * Android-only: exact activity to start (`.MainActivity`, fully-qualified,
+   * or full `pkg/Activity` component). Without it launch falls back to
+   * `monkey -c LAUNCHER`, which picks ARBITRARILY among a package's launcher
+   * activities — debug builds bundling LeakCanary have two, so monkey may
+   * open LeakCanary instead of the app. iOS rejects it (single entry point).
+   */
+  activity?: string;
+  /** Android-only, see LaunchIntent. iOS rejects it — use openDeepLink. */
+  intent?: LaunchIntent;
+}
+
 export interface DeviceAdapter {
   readonly platform: Platform;
 
@@ -41,7 +68,7 @@ export interface DeviceAdapter {
 
   /** Reinstall triggers the app's login requirement — intentional. */
   install(appPath: string): Promise<void>;
-  launch(bundleId: string, opts?: { clearState?: boolean }): Promise<void>;
+  launch(bundleId: string, opts?: LaunchOptions): Promise<void>;
   terminate(bundleId: string): Promise<void>;
   openDeepLink(url: string): Promise<void>;
 

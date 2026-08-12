@@ -179,7 +179,8 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 
 | Tool | Purpose |
 |---|---|
-| `list_devices()` | Booted simulators/emulators, platform, OS version |
+| `list_devices()` | Booted simulators/emulators, platform, OS version; `active` marks the current target |
+| `select_device(platform, device)` | Pin the device the platform's tools target (default: first booted). A pinned device going offline is an error, never a silent fallback |
 | `install_app(platform, path?)` | Uses `averi.yaml` defaults |
 | `ensure_state(state, platform)` | The killer tool: detect → run flows → confirm. Returns final screenshot |
 | `run_flow(flow, params?)` | Any named flow |

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
-import type { Device, DeviceAdapter, Key, Selector, UiNode } from './types.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from './types.js';
 
 /** idb AX element `type` → normalized role. */
 const ROLE_MAP: Record<string, string> = {
@@ -142,7 +142,13 @@ export class IosAdapter implements DeviceAdapter {
     await this.simctl(['install', this.target(), appPath], 120_000);
   }
 
-  async launch(bundleId: string, opts: { clearState?: boolean } = {}): Promise<void> {
+  async launch(bundleId: string, opts: LaunchOptions = {}): Promise<void> {
+    if (opts.activity !== undefined || opts.intent !== undefined) {
+      throw new Error(
+        'activity/intent launch is Android-only (iOS apps have a single entry point) — ' +
+          'use open_deep_link, or wrap the step in an `android:` platform override',
+      );
+    }
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.simctl(['launch', this.target(), bundleId]);
   }

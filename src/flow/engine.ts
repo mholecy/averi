@@ -136,8 +136,22 @@ export class FlowEngine {
       const app = this.cfg.app[this.adapter.platform];
       if (!app) throw new Error(`averi.yaml has no app.${this.adapter.platform} section`);
       const appId = 'package' in app ? app.package : app.bundleId;
-      await this.adapter.launch(appId, { clearState: step.launch.clearState });
-      this.log('launch', appId + (step.launch.clearState ? ' (state cleared)' : ''));
+      // Step-level activity wins over app.android.activity; neither applies on
+      // iOS unless the step names one — the adapter then rejects it loudly.
+      const activity =
+        step.launch.activity ??
+        (this.adapter.platform === 'android' ? this.cfg.app.android?.activity : undefined);
+      await this.adapter.launch(appId, {
+        clearState: step.launch.clearState,
+        activity,
+        intent: step.launch.intent,
+      });
+      this.log(
+        'launch',
+        appId +
+          (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
+          (step.launch.clearState ? ' (state cleared)' : ''),
+      );
       return;
     }
     if ('tap' in step) {

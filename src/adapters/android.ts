@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
-import type { Device, DeviceAdapter, Key, Selector, UiNode } from './types.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -72,10 +72,33 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.adb(['install', '-r', appPath], 120_000);
   }
 
-  async launch(packageName: string, opts: { clearState?: boolean } = {}): Promise<void> {
+  async launch(packageName: string, opts: LaunchOptions = {}): Promise<void> {
     if (opts.clearState) await this.adb(['shell', 'pm', 'clear', packageName]);
-    await this.adb(['shell', 'monkey', '-p', packageName, '-c',
-      'android.intent.category.LAUNCHER', '1']);
+    if (opts.activity === undefined && opts.intent === undefined) {
+      // monkey resolves the launcher activity for us, but picks ARBITRARILY
+      // when the package declares several (LeakCanary adds one in debug
+      // builds, so this may open LeakCanary) — set app.android.activity in
+      // averi.yaml to pin the entry point.
+      await this.adb(['shell', 'monkey', '-p', packageName, '-c',
+        'android.intent.category.LAUNCHER', '1']);
+      return;
+    }
+    const args = ['shell', 'am', 'start'];
+    if (opts.activity !== undefined) {
+      // ".MainActivity" and "com.foo.MainActivity" both resolve against the
+      // package; a full "pkg/Activity" component passes through unchanged.
+      const component = opts.activity.includes('/')
+        ? opts.activity
+        : `${packageName}/${opts.activity}`;
+      args.push('-n', component);
+    }
+    const intent = opts.intent ?? {};
+    if (intent.action !== undefined) args.push('-a', intent.action);
+    if (intent.data !== undefined) args.push('-d', intent.data);
+    if (intent.mimeType !== undefined) args.push('-t', intent.mimeType);
+    for (const category of intent.categories ?? []) args.push('-c', category);
+    for (const [key, value] of Object.entries(intent.extras ?? {})) args.push('--es', key, value);
+    await this.adb(args);
   }
 
   async terminate(packageName: string): Promise<void> {

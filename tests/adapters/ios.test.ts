@@ -114,6 +114,13 @@ describe('IosAdapter interactions', () => {
     expect(calls.at(-1)?.full).toBe('idb ui tap 196 724 --udid AAAA-1111');
   });
 
+  it('rejects activity/intent launches with Android-only guidance', async () => {
+    const { fn } = fakeExec({});
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    await expect(adapter.launch('com.app', { activity: '.Main' })).rejects.toThrow(/Android-only/);
+    await expect(adapter.launch('com.app', { intent: { action: 'SEND' } })).rejects.toThrow(/Android-only/);
+  });
+
   it('targets "booted" when no udid is given', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ exec: fn }).openDeepLink('myapp://home');

@@ -51,10 +51,36 @@ const text = (value: unknown) => ({
 registerTool(
   'list_devices',
   {
-    description: 'List available iOS simulators and Android emulators/devices with boot state.',
+    description:
+      'List available iOS simulators and Android emulators/devices with boot state. ' +
+      '`active: true` marks the device the platform\'s tools currently target (pin one with select_device).',
     inputSchema: {},
   },
-  async () => text(await registry.listAll()),
+  async () => {
+    const devices = await registry.listAll();
+    return text(
+      devices.map((d) => (registry.boundId(d.platform) === d.id ? { ...d, active: true } : d)),
+    );
+  },
+);
+
+registerTool(
+  'select_device',
+  {
+    description:
+      'Pin which booted device subsequent tools target for a platform. Without a pin, tools use the ' +
+      'first booted device adb/simctl lists — ambiguous when a phone, an emulator, and a watch are all ' +
+      'connected. The pin lasts for the server session; a pinned device going offline is an error, ' +
+      'never a silent fallback to another device.',
+    inputSchema: {
+      platform,
+      device: z.string().describe('Device id from list_devices (adb serial / simulator UDID)'),
+    },
+  },
+  async ({ platform: p, device }) => {
+    const selected = await registry.select(p, device);
+    return text(`${p} tools now target ${selected.id} (${selected.name}, OS ${selected.osVersion})`);
+  },
 );
 
 registerTool(
@@ -82,19 +108,49 @@ registerTool(
   },
 );
 
+const launchIntentInput = z
+  .object({
+    action: z.string().optional().describe('e.g. android.intent.action.SEND'),
+    data: z.string().optional().describe('Intent data URI'),
+    mimeType: z.string().optional(),
+    categories: z.array(z.string()).optional(),
+    extras: z.record(z.string()).optional().describe('String extras (--es key value)'),
+  })
+  .strict();
+
 registerTool(
   'launch_app',
   {
-    description: 'Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login).',
+    description:
+      'Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login). ' +
+      'Android: activity pins the entry point — without it (and without app.android.activity in ' +
+      'averi.yaml) the launcher activity is picked arbitrarily, which opens LeakCanary instead of the ' +
+      'app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND).',
     inputSchema: {
       platform,
       appId: z.string().describe('Android package name or iOS bundle id'),
       clearState: z.boolean().optional(),
+      activity: z
+        .string()
+        .optional()
+        .describe('Android only: activity to start (".MainActivity" or fully-qualified). Defaults to app.android.activity from averi.yaml.'),
+      intent: launchIntentInput
+        .optional()
+        .describe('Android only: am start parameters for custom entry points'),
+      configPath,
     },
   },
-  async ({ platform: p, appId, clearState }) => {
-    await (await registry.get(p)).launch(appId, { clearState });
-    return text(`Launched ${appId} on ${p}${clearState ? ' (state cleared)' : ''}`);
+  async ({ platform: p, appId, clearState, activity, intent, configPath: cp }) => {
+    if (p === 'android' && activity === undefined && intent === undefined) {
+      // No explicit entry point — fall back to averi.yaml's, when the project
+      // has one for this very package. No config, no match → monkey fallback.
+      const android = await loadProjectConfig(cp).then((cfg) => cfg.app.android, () => undefined);
+      if (android?.package === appId) activity = android.activity;
+    }
+    await (await registry.get(p)).launch(appId, { clearState, activity, intent });
+    return text(
+      `Launched ${appId}${activity === undefined ? '' : `/${activity.split('/').pop()}`} on ${p}${clearState ? ' (state cleared)' : ''}`,
+    );
   },
 );
 

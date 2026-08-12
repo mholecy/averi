@@ -1,4 +1,4 @@
-import type { Device, DeviceAdapter, Key, Selector, UiNode } from '../../src/adapters/types.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from '../../src/adapters/types.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -32,7 +32,7 @@ export class FakeAdapter implements DeviceAdapter {
   current: string;
   taps: string[] = [];
   typed: string[] = [];
-  launches: { appId: string; clearState?: boolean }[] = [];
+  launches: ({ appId: string } & LaunchOptions)[] = [];
   appRunning = true;
   swipes: { from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
   screenshots: Buffer[] = [];
@@ -92,8 +92,8 @@ export class FakeAdapter implements DeviceAdapter {
     return this.viewportSize;
   }
 
-  async launch(appId: string, opts: { clearState?: boolean } = {}): Promise<void> {
-    this.launches.push({ appId, clearState: opts.clearState });
+  async launch(appId: string, opts: LaunchOptions = {}): Promise<void> {
+    this.launches.push({ appId, ...opts });
   }
 
   async isAppRunning(): Promise<boolean> {
