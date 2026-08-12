@@ -3,9 +3,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { resolve } from 'node:path';
-import { AdapterRegistry } from './registry.js';
+import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
-import { loadConfig, loadEnvBeside, type AveriConfig } from '../flow/config.js';
+import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
 import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
 import type { Platform, UiNode } from '../adapters/types.js';
@@ -40,6 +40,25 @@ async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
   const applied = await loadEnvBeside(path);
   if (applied.length > 0) console.error(`averi: loaded ${applied.join(', ')} from .env.averi`);
   return loadConfig(path);
+}
+
+/**
+ * registry.get opts from a loaded config — plumbs app.ios.treeSource to the
+ * adapter. Safe to pass for an android leg: the registry normalizes android
+ * (and explicit idb) to the default variant, only ios+wda forks an adapter.
+ */
+const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
+  treeSource: cfg?.app.ios?.treeSource,
+});
+
+/**
+ * treeSource for tree-reading tools that predate averi.yaml and must keep
+ * working without one (ui_snapshot, tap, type_text, scroll_until): a missing
+ * config file means default idb, but a present-and-invalid one still errors
+ * loudly — see loadConfigIfPresent.
+ */
+async function loadIosOpts(configPath?: string): Promise<AdapterOpts> {
+  return iosOpts(await loadConfigIfPresent(resolve(configPath ?? 'averi.yaml')));
 }
 
 const text = (value: unknown) => ({
@@ -208,10 +227,14 @@ registerTool(
   {
     description:
       'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes.',
-    inputSchema: { platform, filter: z.string().optional().describe('Selector to filter nodes') },
+    inputSchema: {
+      platform,
+      filter: z.string().optional().describe('Selector to filter nodes'),
+      configPath,
+    },
   },
-  async ({ platform: p, filter }) => {
-    const tree = await (await registry.get(p)).uiTree();
+  async ({ platform: p, filter, configPath: cp }) => {
+    const tree = await (await registry.get(p, await loadIosOpts(cp))).uiTree();
     return text(filter ? findAll(tree, filter).map(stripChildren) : tree);
   },
 );
@@ -226,10 +249,11 @@ registerTool(
       selector: z.string().optional(),
       x: z.number().optional(),
       y: z.number().optional(),
+      configPath,
     },
   },
-  async ({ platform: p, selector, x, y }) => {
-    const adapter = await registry.get(p);
+  async ({ platform: p, selector, x, y, configPath: cp }) => {
+    const adapter = await registry.get(p, await loadIosOpts(cp));
     if (selector !== undefined) {
       const note = await adapter.tapElement(selector);
       return text(`Tapped ${selector}${note ? ` (${note})` : ''}`);
@@ -269,10 +293,11 @@ registerTool(
       text: z.string(),
       selector: z.string().optional().describe('Field to focus first, e.g. \'id:amount_input\''),
       clear: z.boolean().optional().describe('Delete existing content before typing (needs selector)'),
+      configPath,
     },
   },
-  async ({ platform: p, text: value, selector, clear }) => {
-    const adapter = await registry.get(p);
+  async ({ platform: p, text: value, selector, clear, configPath: cp }) => {
+    const adapter = await registry.get(p, await loadIosOpts(cp));
     if (selector === undefined) {
       if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
       await adapter.typeText(value);
@@ -304,10 +329,11 @@ registerTool(
       direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Default down'),
       maxSwipes: z.number().int().min(1).optional().describe('Default 6'),
       timeoutMs: z.number().optional().describe('Default 15000'),
+      configPath,
     },
   },
-  async ({ platform: p, selector, direction, maxSwipes, timeoutMs }) => {
-    const adapter = await registry.get(p);
+  async ({ platform: p, selector, direction, maxSwipes, timeoutMs, configPath: cp }) => {
+    const adapter = await registry.get(p, await loadIosOpts(cp));
     const swipes = await scrollUntilVisible(
       adapter,
       { find: (tree) => findAll(tree, selector), describe: selector },
@@ -341,7 +367,7 @@ async function appHealth(p: Platform, cfg: AveriConfig): Promise<string> {
   const app = cfg.app[p];
   if (!app) return '';
   const appId = 'package' in app ? app.package : app.bundleId;
-  const adapter = await registry.get(p);
+  const adapter = await registry.get(p, iosOpts(cfg));
   if (await adapter.isAppRunning(appId)) return '\nappAlive: true';
   const lines = await adapter.logs(Date.now() - 60_000).catch(() => [] as string[]);
   const crashes = scanForCrashes(lines, p).slice(0, 24);
@@ -379,10 +405,11 @@ registerTool(
   },
   async ({ platform: p, state, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
-    const engine = new FlowEngine(cfg, await registry.get(p), { environment: env });
+    const adapter = await registry.get(p, iosOpts(cfg));
+    const engine = new FlowEngine(cfg, adapter, { environment: env });
     const trace = await engine.ensureState(state);
     const health = await appHealth(p, cfg);
-    const shot = await (await registry.get(p)).screenshot();
+    const shot = await adapter.screenshot();
     return {
       content: [
         { type: 'text' as const, text: formatTrace(trace) + health },
@@ -406,7 +433,7 @@ registerTool(
   },
   async ({ platform: p, flow, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
-    const engine = new FlowEngine(cfg, await registry.get(p), { environment: env });
+    const engine = new FlowEngine(cfg, await registry.get(p, iosOpts(cfg)), { environment: env });
     const trace = await engine.runFlow(flow);
     return text(formatTrace(trace) + (await appHealth(p, cfg)));
   },
@@ -421,7 +448,11 @@ registerTool(
   },
   async ({ platform: p, asserts, configPath: cp }) => {
     const specs = parseAsserts(asserts);
-    const verifier = new Verifier(await registry.get(p), { baselineDir: resolve('.averi/baselines') });
+    // Lenient load: assert works configless, but a broken averi.yaml (or a
+    // wda treeSource it declares) must not be silently ignored here.
+    const verifier = new Verifier(await registry.get(p, await loadIosOpts(cp)), {
+      baselineDir: resolve('.averi/baselines'),
+    });
     const results = await verifier.assertAll(specs);
     let health = '';
     try {
@@ -454,7 +485,9 @@ registerTool(
     const platforms: Platform[] = ['android', 'ios'];
 
     const runOne = async (p: Platform) => {
-      const adapter = await registry.get(p);
+      // Only the ios leg has a treeSource; the registry normalizes it away
+      // for android, so one opts expression serves both legs.
+      const adapter = await registry.get(p, iosOpts(cfg));
       const engine = new FlowEngine(cfg, adapter, { environment: env });
       const trace: TraceEntry[] = [];
       if (state) trace.push(...(await engine.ensureState(state)));

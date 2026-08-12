@@ -251,7 +251,23 @@ const configSchema = z
           })
           .strict()
           .optional(),
-        ios: z.object({ bundleId: z.string(), app: z.string().optional() }).strict().optional(),
+        ios: z
+          .object({
+            bundleId: z.string(),
+            app: z.string().optional(),
+            /**
+             * Which backend reads the accessibility tree. Default idb —
+             * native projects see zero change. React Native projects opt in
+             * with `treeSource: wda`: RN puts testID on the HOST view whose
+             * AX child carries no identifier, so idb sees nothing (measured
+             * 2026-08-12, docs/plans/ios-wda-tree-source.md §Problem).
+             * No `auto` value — deferred until the Phase 4 latency
+             * measurement of /source on deep trees.
+             */
+            treeSource: z.enum(['idb', 'wda']).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     credentials: z.record(z.string()).optional(),
@@ -293,6 +309,23 @@ export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfi
 
 export async function loadConfig(path: string): Promise<AveriConfig> {
   return parseConfig(await readFile(path, 'utf8'), path);
+}
+
+/**
+ * loadConfig for tools that predate averi.yaml and must keep working without
+ * one (ui_snapshot, tap, ...): a MISSING file is `undefined`, but a
+ * present-and-invalid file still throws — silently ignoring a broken config
+ * would mask the very setting (e.g. app.ios.treeSource) the caller came for.
+ */
+export async function loadConfigIfPresent(path: string): Promise<AveriConfig | undefined> {
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
+  return parseConfig(raw, path);
 }
 
 export interface ResolvedCredentials {

@@ -107,4 +107,12 @@ export interface DeviceAdapter {
 
   /** Is the app process currently running? Used for appAlive crash detection. */
   isAppRunning(appId: string): Promise<boolean>;
+
+  /**
+   * Release device-bound resources the adapter lazily started (today: the
+   * iOS WdaServer). Optional and idempotent — the registry calls it when it
+   * evicts an adapter, so a rebind to another device cannot leak an orphan
+   * server driving the old one.
+   */
+  dispose?(): void;
 }

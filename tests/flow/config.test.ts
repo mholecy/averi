@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadEnvBeside, parseConfig, parseDuration, resolveCredentials } from '../../src/flow/config.js';
+import {
+  loadConfigIfPresent,
+  loadEnvBeside,
+  parseConfig,
+  parseDuration,
+  resolveCredentials,
+} from '../../src/flow/config.js';
 
 const VALID = `
 app:
@@ -137,6 +143,16 @@ flows:
     ).toThrow(/Invalid averi\.yaml/);
   });
 
+  it('accepts app.ios.treeSource wda, leaves it undefined by default, rejects unknown values', () => {
+    const cfg = parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
+    expect(cfg.app.ios?.treeSource).toBe('wda');
+    expect(parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: idb }\n').app.ios?.treeSource).toBe('idb');
+    expect(parseConfig(VALID).app.ios?.treeSource).toBeUndefined();
+    // `auto` is explicitly deferred (plan, decision 3) — it must not parse yet
+    expect(() => parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: auto }\n'))
+      .toThrow(/Invalid averi\.yaml/);
+  });
+
   it('accepts absent inside detect conditions, only next to element', () => {
     const cfg = parseConfig(`
 app: {}
@@ -227,6 +243,29 @@ describe('loadEnvBeside', () => {
 
   it('returns empty when no .env.averi exists', async () => {
     expect(await loadEnvBeside('/nonexistent/averi.yaml')).toEqual([]);
+  });
+});
+
+describe('loadConfigIfPresent', () => {
+  it('returns undefined for a missing file — configless tools stay configless', async () => {
+    expect(await loadConfigIfPresent('/nonexistent/averi.yaml')).toBeUndefined();
+  });
+
+  it('parses a present file and STILL throws on an invalid one', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'averi-cfg-'));
+    try {
+      const path = join(dir, 'averi.yaml');
+      await writeFile(path, 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
+      expect((await loadConfigIfPresent(path))?.app.ios?.treeSource).toBe('wda');
+
+      await writeFile(path, 'app:\n  ios: { bundleId: md.bank.app, treeSource: nope }\n');
+      await expect(loadConfigIfPresent(path)).rejects.toThrow(/Invalid/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

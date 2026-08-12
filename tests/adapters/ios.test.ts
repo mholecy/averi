@@ -168,3 +168,111 @@ describe('IosAdapter interactions', () => {
     expect(calls.at(-1)?.full).toBe('idb ui button HOME --udid AAAA-1111');
   });
 });
+
+describe('IosAdapter treeSource: wda', () => {
+  // Raw /source envelope as WdaServer.source() returns it — the host-view
+  // `Other` node carrying the identifier is what the wda path exists for.
+  const WDA_ENVELOPE = {
+    value: {
+      type: 'Application',
+      rawIdentifier: null,
+      label: 'MyPort',
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        {
+          type: 'Other',
+          rawIdentifier: 'home.header',
+          label: null,
+          rect: { x: 0, y: 100, width: 402, height: 50 },
+          children: [
+            {
+              type: 'StaticText',
+              rawIdentifier: 'home.title',
+              label: 'Welcome',
+              rect: { x: 16, y: 110, width: 200, height: 20 },
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+    sessionId: 'abc-123',
+  };
+
+  const fakeWda = () => {
+    const state = { udids: [] as string[], stops: 0 };
+    const factory = (udid: string) => {
+      state.udids.push(udid);
+      return {
+        source: async () => WDA_ENVELOPE,
+        stop: () => {
+          state.stops++;
+        },
+      };
+    };
+    return { state, factory };
+  };
+
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it('uiTree routes through ONE WdaServer and parses the raw envelope', async () => {
+    const { fn, calls } = fakeExec({});
+    const { state, factory } = fakeWda();
+    const adapter = new IosAdapter({
+      udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
+    });
+    const tree = await adapter.uiTree();
+    await adapter.uiTree();
+    expect(state.udids).toEqual(['AAAA-1111']); // one server, reused
+    expect(calls.filter((c) => c.full.startsWith('idb'))).toEqual([]); // tree read left idb entirely
+    expect(tree.role).toBe('container'); // Application root
+    expect(tree.children[0]).toMatchObject({ role: 'container', identifier: 'home.header' });
+    expect(tree.children[0].children[0]).toMatchObject({
+      role: 'text', identifier: 'home.title', label: 'Welcome',
+    });
+  });
+
+  it('resolves the booted simulator to a concrete UDID for the server', async () => {
+    const { fn } = fakeExec({ 'xcrun simctl list devices --json': SIMCTL_LIST });
+    const { state, factory } = fakeWda();
+    const adapter = new IosAdapter({ exec: fn, treeSource: 'wda', wdaServerFactory: factory });
+    await adapter.uiTree();
+    expect(state.udids).toEqual(['AAAA-1111']); // never the 'booted' alias
+  });
+
+  it('taps still go through idb — only the tree read moved', async () => {
+    const { fn, calls } = fakeExec({});
+    const { factory } = fakeWda();
+    const adapter = new IosAdapter({
+      udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
+    });
+    await adapter.tapElement('id:home.header');
+    // WDA rects are points, same units as idb — center of the host view
+    expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
+  });
+
+  it('dispose stops a started server once; before/after that it is a no-op', async () => {
+    const { fn } = fakeExec({});
+    const { state, factory } = fakeWda();
+    const adapter = new IosAdapter({
+      udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
+    });
+    adapter.dispose(); // nothing started yet
+    await tick();
+    expect(state.stops).toBe(0);
+    await adapter.uiTree();
+    adapter.dispose();
+    adapter.dispose();
+    await tick();
+    expect(state.stops).toBe(1);
+  });
+
+  it('dispose on the idb path never creates a server', async () => {
+    const { state, factory } = fakeWda();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, wdaServerFactory: factory });
+    adapter.dispose();
+    await tick();
+    expect(state.udids).toEqual([]);
+    expect(state.stops).toBe(0);
+  });
+});

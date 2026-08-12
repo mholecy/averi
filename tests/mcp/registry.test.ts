@@ -1,23 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry } from '../../src/mcp/registry.js';
+import { AdapterRegistry, type AdapterOpts } from '../../src/mcp/registry.js';
 import type { Device, DeviceAdapter, Platform } from '../../src/adapters/types.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
 /** Factory whose device list is mutable mid-test (devices boot and vanish). */
 function makeRegistry(devices: Device[]) {
   const bound: string[] = [];
-  const factory = (platform: Platform, deviceId?: string): DeviceAdapter => {
-    if (deviceId !== undefined) bound.push(deviceId);
+  const created: FakeAdapter[] = [];
+  const factory = (platform: Platform, deviceId?: string, opts?: AdapterOpts): DeviceAdapter => {
+    if (deviceId !== undefined) bound.push(opts?.treeSource === undefined ? deviceId : `${deviceId}+${opts.treeSource}`);
     const adapter = new FakeAdapter({}, 'none');
     adapter.listDevices = async () => devices.filter((d) => d.platform === platform);
+    if (deviceId !== undefined) created.push(adapter);
     return adapter;
   };
-  return { registry: new AdapterRegistry(factory), bound, devices };
+  return { registry: new AdapterRegistry(factory), bound, created, devices };
 }
 
-const device = (id: string, state: Device['state'] = 'booted'): Device => ({
+const device = (id: string, state: Device['state'] = 'booted', platform: Platform = 'android'): Device => ({
   id,
-  platform: 'android',
+  platform,
   name: id,
   osVersion: '14',
   state,
@@ -62,5 +64,69 @@ describe('AdapterRegistry', () => {
     devices.splice(0, 1); // first disconnects
     await registry.get('android');
     expect(bound).toEqual(['first', 'second']);
+  });
+
+  it('caches per treeSource: same opts share an instance, wda gets its own', async () => {
+    const { registry, bound } = makeRegistry([device('sim', 'booted', 'ios')]);
+    const dflt = await registry.get('ios');
+    const wda = await registry.get('ios', { treeSource: 'wda' });
+    expect(await registry.get('ios', { treeSource: 'wda' })).toBe(wda);
+    expect(wda).not.toBe(dflt);
+    // an explicit idb IS the default — no third instance
+    expect(await registry.get('ios', { treeSource: 'idb' })).toBe(dflt);
+    expect(bound).toEqual(['sim', 'sim+wda']);
+  });
+
+  it('android ignores treeSource — a stray value does not fork the cache', async () => {
+    const { registry, bound } = makeRegistry([device('phone')]);
+    const plain = await registry.get('android');
+    expect(await registry.get('android', { treeSource: 'wda' })).toBe(plain);
+    expect(bound).toEqual(['phone']);
+  });
+
+  it('select() pins ALL treeSource variants of the platform to the device', async () => {
+    const { registry, bound } = makeRegistry([
+      device('a', 'booted', 'ios'),
+      device('b', 'booted', 'ios'),
+    ]);
+    await registry.select('ios', 'b');
+    await registry.get('ios');
+    await registry.get('ios', { treeSource: 'wda' });
+    expect(bound).toEqual(['b', 'b+wda']);
+  });
+
+  it('select() to a DIFFERENT device disposes the old device\'s cached adapters', async () => {
+    const { registry, created } = makeRegistry([
+      device('a', 'booted', 'ios'),
+      device('b', 'booted', 'ios'),
+    ]);
+    const oldDefault = (await registry.get('ios')) as FakeAdapter;
+    const oldWda = (await registry.get('ios', { treeSource: 'wda' })) as FakeAdapter;
+    await registry.select('ios', 'b');
+    expect(oldDefault.disposed).toBe(1);
+    expect(oldWda.disposed).toBe(1);
+    // the new device gets fresh instances, disposed ones never resurface
+    expect(await registry.get('ios', { treeSource: 'wda' })).not.toBe(oldWda);
+    expect(created.filter((a) => a.disposed > 0)).toHaveLength(2);
+  });
+
+  it('re-selecting the SAME device keeps its adapters undisposed', async () => {
+    const { registry } = makeRegistry([device('a', 'booted', 'ios')]);
+    const adapter = (await registry.get('ios', { treeSource: 'wda' })) as FakeAdapter;
+    await registry.select('ios', 'a');
+    expect(adapter.disposed).toBe(0);
+    expect(await registry.get('ios', { treeSource: 'wda' })).toBe(adapter);
+  });
+
+  it('evicting a vanished auto-picked device disposes its adapters', async () => {
+    const { registry, devices } = makeRegistry([
+      device('first', 'booted', 'ios'),
+      device('second', 'booted', 'ios'),
+    ]);
+    const orphan = (await registry.get('ios', { treeSource: 'wda' })) as FakeAdapter;
+    devices.splice(0, 1); // first disconnects
+    const next = await registry.get('ios', { treeSource: 'wda' });
+    expect(orphan.disposed).toBe(1);
+    expect(next).not.toBe(orphan);
   });
 });

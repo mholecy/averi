@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
+import { WdaServer } from './wda.js';
+import { parseWdaSourceValue } from './wda-source.js';
 import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from './types.js';
 
@@ -38,10 +40,29 @@ export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   private readonly exec: ExecFn;
   private readonly udid: string | undefined;
+  private readonly treeSource: 'idb' | 'wda';
+  private readonly wdaServerFactory: (udid: string) => Pick<WdaServer, 'source' | 'stop'>;
 
-  constructor(opts: { udid?: string; exec?: ExecFn } = {}) {
+  constructor(
+    opts: {
+      udid?: string;
+      exec?: ExecFn;
+      /**
+       * 'wda' routes uiTree() through WebDriverAgent (RN host-view ids idb
+       * cannot see — docs/plans/ios-wda-tree-source.md). ONLY the tree read
+       * moves: taps/typing/install/launch stay on idb/simctl, compatible
+       * because WDA frames are points, the same units idb rects use
+       * (plan, decision 4).
+       */
+      treeSource?: 'idb' | 'wda';
+      /** Test seam, mirrors the injectable exec. */
+      wdaServerFactory?: (udid: string) => Pick<WdaServer, 'source' | 'stop'>;
+    } = {},
+  ) {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
+    this.treeSource = opts.treeSource ?? 'idb';
+    this.wdaServerFactory = opts.wdaServerFactory ?? ((udid) => new WdaServer({ udid, exec: this.exec }));
   }
 
   private target(): string {
@@ -88,8 +109,34 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   async uiTree(): Promise<UiNode> {
+    if (this.treeSource === 'wda') {
+      return parseWdaSourceValue(await (await this.wdaServer()).source());
+    }
     const { stdout } = await this.idb(['ui', 'describe-all', '--json'], 15_000);
     return parseIdbDescribeAll(stdout.toString('utf8'));
+  }
+
+  /**
+   * ONE server per adapter, started lazily on the first wda uiTree()
+   * (WdaServer.source() runs ensureRunning itself). WdaServer needs a
+   * concrete UDID — 'booted' is a simctl-only alias — hence resolveTarget.
+   */
+  private wdaServerPromise: Promise<Pick<WdaServer, 'source' | 'stop'>> | undefined;
+
+  private wdaServer(): Promise<Pick<WdaServer, 'source' | 'stop'>> {
+    this.wdaServerPromise ??= this.resolveTarget().then((udid) => this.wdaServerFactory(udid));
+    return this.wdaServerPromise;
+  }
+
+  /**
+   * Stop the WdaServer if one was started; no-op otherwise (and always a
+   * no-op on the idb path). Chained through the promise so a dispose racing
+   * the lazy start still stops the server instead of leaking it.
+   */
+  dispose(): void {
+    const pending = this.wdaServerPromise;
+    this.wdaServerPromise = undefined;
+    pending?.then((server) => server.stop()).catch(() => undefined);
   }
 
   // --- simctl-backed lifecycle ---

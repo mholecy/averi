@@ -109,6 +109,12 @@ export class FakeAdapter implements DeviceAdapter {
     return this.logLines;
   }
 
+  disposed = 0;
+
+  dispose(): void {
+    this.disposed++;
+  }
+
   // Unused by tests:
   async listDevices(): Promise<Device[]> { return []; }
   async install(): Promise<void> {}
