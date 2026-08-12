@@ -1,0 +1,825 @@
+{
+  "value" : {
+    "customActions" : null,
+    "nativeFrame" : "{{0, 0}, {402, 874}}",
+    "label" : "MyPort",
+    "rawIdentifier" : null,
+    "traits" : "",
+    "frame" : "{{0, 0}, {402, 874}}",
+    "isVisible" : "1",
+    "type" : "Application",
+    "value" : null,
+    "isEnabled" : "1",
+    "children" : [
+      {
+        "customActions" : null,
+        "nativeFrame" : "{{0, 0}, {402, 874}}",
+        "label" : null,
+        "rawIdentifier" : null,
+        "traits" : "",
+        "frame" : "{{0, 0}, {402, 874}}",
+        "isVisible" : "1",
+        "type" : "Window",
+        "value" : null,
+        "isEnabled" : "1",
+        "children" : [
+          {
+            "customActions" : null,
+            "nativeFrame" : "{{0, 0}, {402, 874}}",
+            "label" : null,
+            "rawIdentifier" : null,
+            "traits" : "",
+            "frame" : "{{0, 0}, {402, 874}}",
+            "isVisible" : "1",
+            "type" : "Other",
+            "value" : null,
+            "isEnabled" : "1",
+            "children" : [
+              {
+                "customActions" : null,
+                "nativeFrame" : "{{0, 0}, {402, 874}}",
+                "label" : null,
+                "rawIdentifier" : null,
+                "traits" : "",
+                "frame" : "{{0, 0}, {402, 874}}",
+                "isVisible" : "1",
+                "type" : "Other",
+                "value" : null,
+                "isEnabled" : "1",
+                "children" : [
+                  {
+                    "customActions" : null,
+                    "nativeFrame" : "{{0, 0}, {402, 874}}",
+                    "label" : null,
+                    "rawIdentifier" : null,
+                    "traits" : "",
+                    "frame" : "{{0, 0}, {402, 874}}",
+                    "isVisible" : "1",
+                    "type" : "Other",
+                    "value" : null,
+                    "isEnabled" : "1",
+                    "children" : [
+                      {
+                        "customActions" : null,
+                        "nativeFrame" : "{{0, 0}, {402, 874}}",
+                        "label" : null,
+                        "rawIdentifier" : null,
+                        "traits" : "",
+                        "frame" : "{{0, 0}, {402, 874}}",
+                        "isVisible" : "1",
+                        "type" : "Other",
+                        "value" : null,
+                        "isEnabled" : "1",
+                        "children" : [
+                          {
+                            "customActions" : null,
+                            "nativeFrame" : "{{0, 0}, {402, 874}}",
+                            "label" : null,
+                            "rawIdentifier" : null,
+                            "traits" : "",
+                            "frame" : "{{0, 0}, {402, 874}}",
+                            "isVisible" : "1",
+                            "type" : "Other",
+                            "value" : null,
+                            "isEnabled" : "1",
+                            "children" : [
+                              {
+                                "customActions" : null,
+                                "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                "label" : null,
+                                "rawIdentifier" : null,
+                                "traits" : "",
+                                "frame" : "{{0, 0}, {402, 874}}",
+                                "isVisible" : "1",
+                                "type" : "Other",
+                                "value" : null,
+                                "isEnabled" : "1",
+                                "children" : [
+                                  {
+                                    "customActions" : null,
+                                    "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                    "label" : null,
+                                    "rawIdentifier" : null,
+                                    "traits" : "",
+                                    "frame" : "{{0, 0}, {402, 874}}",
+                                    "isVisible" : "1",
+                                    "type" : "Other",
+                                    "value" : null,
+                                    "isEnabled" : "1",
+                                    "children" : [
+                                      {
+                                        "customActions" : null,
+                                        "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                        "label" : null,
+                                        "rawIdentifier" : null,
+                                        "traits" : "",
+                                        "frame" : "{{0, 0}, {402, 874}}",
+                                        "isVisible" : "1",
+                                        "type" : "Other",
+                                        "value" : null,
+                                        "isEnabled" : "1",
+                                        "children" : [
+                                          {
+                                            "customActions" : null,
+                                            "nativeFrame" : "{{0, 62}, {402, 54}}",
+                                            "label" : null,
+                                            "rawIdentifier" : "MyPort",
+                                            "traits" : "",
+                                            "frame" : "{{0, 62}, {402, 54}}",
+                                            "isVisible" : "1",
+                                            "type" : "NavigationBar",
+                                            "value" : null,
+                                            "isEnabled" : "1",
+                                            "children" : [
+                                              {
+                                                "customActions" : null,
+                                                "nativeFrame" : "{{172, 73.666666666666657}, {58, 20.666666666666671}}",
+                                                "label" : "MyPort",
+                                                "rawIdentifier" : null,
+                                                "traits" : "Header",
+                                                "frame" : "{{172, 73}, {58, 22}}",
+                                                "isVisible" : "1",
+                                                "type" : "StaticText",
+                                                "value" : "MyPort",
+                                                "isEnabled" : "1",
+                                                "isAccessible" : "1",
+                                                "isNativeAccessibilityElement" : "1",
+                                                "isFocused" : "0",
+                                                "name" : "MyPort",
+                                                "rect" : {
+                                                  "y" : 73,
+                                                  "x" : 172,
+                                                  "width" : 58,
+                                                  "height" : 22
+                                                }
+                                              }
+                                            ],
+                                            "isAccessible" : "0",
+                                            "isNativeAccessibilityElement" : "0",
+                                            "isFocused" : "0",
+                                            "name" : "MyPort",
+                                            "rect" : {
+                                              "y" : 62,
+                                              "x" : 0,
+                                              "width" : 402,
+                                              "height" : 54
+                                            }
+                                          },
+                                          {
+                                            "customActions" : null,
+                                            "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                            "label" : null,
+                                            "rawIdentifier" : null,
+                                            "traits" : "",
+                                            "frame" : "{{0, 0}, {402, 874}}",
+                                            "isVisible" : "1",
+                                            "type" : "Other",
+                                            "value" : null,
+                                            "isEnabled" : "1",
+                                            "children" : [
+                                              {
+                                                "customActions" : null,
+                                                "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                                "label" : null,
+                                                "rawIdentifier" : null,
+                                                "traits" : "",
+                                                "frame" : "{{0, 0}, {402, 874}}",
+                                                "isVisible" : "1",
+                                                "type" : "Other",
+                                                "value" : null,
+                                                "isEnabled" : "1",
+                                                "children" : [
+                                                  {
+                                                    "customActions" : null,
+                                                    "nativeFrame" : "{{0, 116}, {402, 758}}",
+                                                    "label" : null,
+                                                    "rawIdentifier" : null,
+                                                    "traits" : "",
+                                                    "frame" : "{{0, 116}, {402, 758}}",
+                                                    "isVisible" : "1",
+                                                    "type" : "Other",
+                                                    "value" : null,
+                                                    "isEnabled" : "1",
+                                                    "children" : [
+                                                      {
+                                                        "customActions" : null,
+                                                        "nativeFrame" : "{{0, 116}, {402, 758}}",
+                                                        "label" : null,
+                                                        "rawIdentifier" : null,
+                                                        "traits" : "",
+                                                        "frame" : "{{0, 116}, {402, 758}}",
+                                                        "isVisible" : "1",
+                                                        "type" : "Other",
+                                                        "value" : null,
+                                                        "isEnabled" : "1",
+                                                        "children" : [
+                                                          {
+                                                            "customActions" : null,
+                                                            "nativeFrame" : "{{0, 116}, {402, 758}}",
+                                                            "label" : null,
+                                                            "rawIdentifier" : null,
+                                                            "traits" : "",
+                                                            "frame" : "{{0, 116}, {402, 758}}",
+                                                            "isVisible" : "1",
+                                                            "type" : "Other",
+                                                            "value" : null,
+                                                            "isEnabled" : "1",
+                                                            "children" : [
+                                                              {
+                                                                "customActions" : null,
+                                                                "nativeFrame" : "{{0, 116}, {402, 758}}",
+                                                                "label" : null,
+                                                                "rawIdentifier" : "placeholder_screen",
+                                                                "traits" : "",
+                                                                "frame" : "{{0, 116}, {402, 758}}",
+                                                                "isVisible" : "1",
+                                                                "type" : "Other",
+                                                                "value" : null,
+                                                                "isEnabled" : "1",
+                                                                "isAccessible" : "0",
+                                                                "isNativeAccessibilityElement" : "0",
+                                                                "isFocused" : "0",
+                                                                "name" : "placeholder_screen",
+                                                                "rect" : {
+                                                                  "y" : 116,
+                                                                  "x" : 0,
+                                                                  "width" : 402,
+                                                                  "height" : 758
+                                                                }
+                                                              },
+                                                              {
+                                                                "customActions" : null,
+                                                                "nativeFrame" : "{{161.33332824707031, 443}, {79, 28.666656494140625}}",
+                                                                "label" : "MyPort",
+                                                                "rawIdentifier" : "placeholder_title",
+                                                                "traits" : "StaticText",
+                                                                "frame" : "{{161, 443}, {80, 29}}",
+                                                                "isVisible" : "1",
+                                                                "type" : "StaticText",
+                                                                "value" : "MyPort",
+                                                                "isEnabled" : "1",
+                                                                "children" : [
+                                                                  {
+                                                                    "customActions" : null,
+                                                                    "nativeFrame" : "{{161.33332824707031, 443}, {79, 28.666656494140625}}",
+                                                                    "label" : "MyPort",
+                                                                    "rawIdentifier" : null,
+                                                                    "traits" : "StaticText",
+                                                                    "frame" : "{{161, 443}, {80, 29}}",
+                                                                    "isVisible" : "1",
+                                                                    "type" : "StaticText",
+                                                                    "value" : "MyPort",
+                                                                    "isEnabled" : "1",
+                                                                    "isAccessible" : "1",
+                                                                    "isNativeAccessibilityElement" : "1",
+                                                                    "isFocused" : "0",
+                                                                    "name" : "MyPort",
+                                                                    "rect" : {
+                                                                      "y" : 443,
+                                                                      "x" : 161,
+                                                                      "width" : 80,
+                                                                      "height" : 29
+                                                                    }
+                                                                  }
+                                                                ],
+                                                                "isAccessible" : "0",
+                                                                "isNativeAccessibilityElement" : "0",
+                                                                "isFocused" : "0",
+                                                                "name" : "placeholder_title",
+                                                                "rect" : {
+                                                                  "y" : 443,
+                                                                  "x" : 161,
+                                                                  "width" : 80,
+                                                                  "height" : 29
+                                                                }
+                                                              },
+                                                              {
+                                                                "customActions" : null,
+                                                                "nativeFrame" : "{{138.66667175292969, 479.66665649414062}, {124.66667175292969, 17}}",
+                                                                "label" : "Scaffold is running.",
+                                                                "rawIdentifier" : "placeholder_status",
+                                                                "traits" : "StaticText",
+                                                                "frame" : "{{138, 479}, {126, 18}}",
+                                                                "isVisible" : "1",
+                                                                "type" : "StaticText",
+                                                                "value" : "Scaffold is running.",
+                                                                "isEnabled" : "1",
+                                                                "children" : [
+                                                                  {
+                                                                    "customActions" : null,
+                                                                    "nativeFrame" : "{{138.66667175292969, 479.66665649414062}, {124.66667175292969, 17}}",
+                                                                    "label" : "Scaffold is running.",
+                                                                    "rawIdentifier" : null,
+                                                                    "traits" : "StaticText",
+                                                                    "frame" : "{{138, 479}, {126, 18}}",
+                                                                    "isVisible" : "1",
+                                                                    "type" : "StaticText",
+                                                                    "value" : "Scaffold is running.",
+                                                                    "isEnabled" : "1",
+                                                                    "isAccessible" : "1",
+                                                                    "isNativeAccessibilityElement" : "1",
+                                                                    "isFocused" : "0",
+                                                                    "name" : "Scaffold is running.",
+                                                                    "rect" : {
+                                                                      "y" : 479,
+                                                                      "x" : 138,
+                                                                      "width" : 126,
+                                                                      "height" : 18
+                                                                    }
+                                                                  }
+                                                                ],
+                                                                "isAccessible" : "0",
+                                                                "isNativeAccessibilityElement" : "0",
+                                                                "isFocused" : "0",
+                                                                "name" : "placeholder_status",
+                                                                "rect" : {
+                                                                  "y" : 479,
+                                                                  "x" : 138,
+                                                                  "width" : 126,
+                                                                  "height" : 18
+                                                                }
+                                                              },
+                                                              {
+                                                                "customActions" : null,
+                                                                "nativeFrame" : "{{66.333335876464844, 504.66665649414062}, {269.33331298828125, 17}}",
+                                                                "label" : "Gateway: https:\/\/b2b-edu.finportal.sk\/esb",
+                                                                "rawIdentifier" : "placeholder_gateway",
+                                                                "traits" : "StaticText",
+                                                                "frame" : "{{66, 504}, {270, 18}}",
+                                                                "isVisible" : "1",
+                                                                "type" : "StaticText",
+                                                                "value" : "Gateway: https:\/\/b2b-edu.finportal.sk\/esb",
+                                                                "isEnabled" : "1",
+                                                                "children" : [
+                                                                  {
+                                                                    "customActions" : null,
+                                                                    "nativeFrame" : "{{66.333335876464844, 504.66665649414062}, {269.33331298828125, 17}}",
+                                                                    "label" : "Gateway: https:\/\/b2b-edu.finportal.sk\/esb",
+                                                                    "rawIdentifier" : null,
+                                                                    "traits" : "StaticText",
+                                                                    "frame" : "{{66, 504}, {270, 18}}",
+                                                                    "isVisible" : "1",
+                                                                    "type" : "StaticText",
+                                                                    "value" : "Gateway: https:\/\/b2b-edu.finportal.sk\/esb",
+                                                                    "isEnabled" : "1",
+                                                                    "isAccessible" : "1",
+                                                                    "isNativeAccessibilityElement" : "1",
+                                                                    "isFocused" : "0",
+                                                                    "name" : "Gateway: https:\/\/b2b-edu.finportal.sk\/esb",
+                                                                    "rect" : {
+                                                                      "y" : 504,
+                                                                      "x" : 66,
+                                                                      "width" : 270,
+                                                                      "height" : 18
+                                                                    }
+                                                                  }
+                                                                ],
+                                                                "isAccessible" : "0",
+                                                                "isNativeAccessibilityElement" : "0",
+                                                                "isFocused" : "0",
+                                                                "name" : "placeholder_gateway",
+                                                                "rect" : {
+                                                                  "y" : 504,
+                                                                  "x" : 66,
+                                                                  "width" : 270,
+                                                                  "height" : 18
+                                                                }
+                                                              },
+                                                              {
+                                                                "customActions" : null,
+                                                                "nativeFrame" : "{{164, 529.66665649414062}, {74, 17}}",
+                                                                "label" : "Scope: b2b",
+                                                                "rawIdentifier" : "placeholder_scope",
+                                                                "traits" : "StaticText",
+                                                                "frame" : "{{164, 529}, {74, 18}}",
+                                                                "isVisible" : "1",
+                                                                "type" : "StaticText",
+                                                                "value" : "Scope: b2b",
+                                                                "isEnabled" : "1",
+                                                                "children" : [
+                                                                  {
+                                                                    "customActions" : null,
+                                                                    "nativeFrame" : "{{164, 529.66665649414062}, {74, 17}}",
+                                                                    "label" : "Scope: b2b",
+                                                                    "rawIdentifier" : null,
+                                                                    "traits" : "StaticText",
+                                                                    "frame" : "{{164, 529}, {74, 18}}",
+                                                                    "isVisible" : "1",
+                                                                    "type" : "StaticText",
+                                                                    "value" : "Scope: b2b",
+                                                                    "isEnabled" : "1",
+                                                                    "isAccessible" : "1",
+                                                                    "isNativeAccessibilityElement" : "1",
+                                                                    "isFocused" : "0",
+                                                                    "name" : "Scope: b2b",
+                                                                    "rect" : {
+                                                                      "y" : 529,
+                                                                      "x" : 164,
+                                                                      "width" : 74,
+                                                                      "height" : 18
+                                                                    }
+                                                                  }
+                                                                ],
+                                                                "isAccessible" : "0",
+                                                                "isNativeAccessibilityElement" : "0",
+                                                                "isFocused" : "0",
+                                                                "name" : "placeholder_scope",
+                                                                "rect" : {
+                                                                  "y" : 529,
+                                                                  "x" : 164,
+                                                                  "width" : 74,
+                                                                  "height" : 18
+                                                                }
+                                                              }
+                                                            ],
+                                                            "isAccessible" : "0",
+                                                            "isNativeAccessibilityElement" : "0",
+                                                            "isFocused" : "0",
+                                                            "name" : null,
+                                                            "rect" : {
+                                                              "y" : 116,
+                                                              "x" : 0,
+                                                              "width" : 402,
+                                                              "height" : 758
+                                                            }
+                                                          }
+                                                        ],
+                                                        "isAccessible" : "0",
+                                                        "isNativeAccessibilityElement" : "0",
+                                                        "isFocused" : "0",
+                                                        "name" : null,
+                                                        "rect" : {
+                                                          "y" : 116,
+                                                          "x" : 0,
+                                                          "width" : 402,
+                                                          "height" : 758
+                                                        }
+                                                      }
+                                                    ],
+                                                    "isAccessible" : "0",
+                                                    "isNativeAccessibilityElement" : "0",
+                                                    "isFocused" : "0",
+                                                    "name" : null,
+                                                    "rect" : {
+                                                      "y" : 116,
+                                                      "x" : 0,
+                                                      "width" : 402,
+                                                      "height" : 758
+                                                    }
+                                                  }
+                                                ],
+                                                "isAccessible" : "0",
+                                                "isNativeAccessibilityElement" : "0",
+                                                "isFocused" : "0",
+                                                "name" : null,
+                                                "rect" : {
+                                                  "y" : 0,
+                                                  "x" : 0,
+                                                  "width" : 402,
+                                                  "height" : 874
+                                                }
+                                              }
+                                            ],
+                                            "isAccessible" : "0",
+                                            "isNativeAccessibilityElement" : "0",
+                                            "isFocused" : "0",
+                                            "name" : null,
+                                            "rect" : {
+                                              "y" : 0,
+                                              "x" : 0,
+                                              "width" : 402,
+                                              "height" : 874
+                                            }
+                                          },
+                                          {
+                                            "customActions" : null,
+                                            "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                            "label" : null,
+                                            "rawIdentifier" : null,
+                                            "traits" : "",
+                                            "frame" : "{{0, 0}, {402, 874}}",
+                                            "isVisible" : "0",
+                                            "type" : "Other",
+                                            "value" : null,
+                                            "isEnabled" : "1",
+                                            "children" : [
+                                              {
+                                                "customActions" : null,
+                                                "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                                "label" : null,
+                                                "rawIdentifier" : null,
+                                                "traits" : "",
+                                                "frame" : "{{0, 0}, {402, 874}}",
+                                                "isVisible" : "0",
+                                                "type" : "Other",
+                                                "value" : null,
+                                                "isEnabled" : "1",
+                                                "isAccessible" : "0",
+                                                "isNativeAccessibilityElement" : "0",
+                                                "isFocused" : "0",
+                                                "name" : null,
+                                                "rect" : {
+                                                  "y" : 0,
+                                                  "x" : 0,
+                                                  "width" : 402,
+                                                  "height" : 874
+                                                }
+                                              }
+                                            ],
+                                            "isAccessible" : "0",
+                                            "isNativeAccessibilityElement" : "0",
+                                            "isFocused" : "0",
+                                            "name" : null,
+                                            "rect" : {
+                                              "y" : 0,
+                                              "x" : 0,
+                                              "width" : 402,
+                                              "height" : 874
+                                            }
+                                          }
+                                        ],
+                                        "isAccessible" : "0",
+                                        "isNativeAccessibilityElement" : "0",
+                                        "isFocused" : "0",
+                                        "name" : null,
+                                        "rect" : {
+                                          "y" : 0,
+                                          "x" : 0,
+                                          "width" : 402,
+                                          "height" : 874
+                                        }
+                                      }
+                                    ],
+                                    "isAccessible" : "0",
+                                    "isNativeAccessibilityElement" : "0",
+                                    "isFocused" : "0",
+                                    "name" : null,
+                                    "rect" : {
+                                      "y" : 0,
+                                      "x" : 0,
+                                      "width" : 402,
+                                      "height" : 874
+                                    }
+                                  }
+                                ],
+                                "isAccessible" : "0",
+                                "isNativeAccessibilityElement" : "0",
+                                "isFocused" : "0",
+                                "name" : null,
+                                "rect" : {
+                                  "y" : 0,
+                                  "x" : 0,
+                                  "width" : 402,
+                                  "height" : 874
+                                }
+                              },
+                              {
+                                "customActions" : null,
+                                "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                "label" : null,
+                                "rawIdentifier" : null,
+                                "traits" : "",
+                                "frame" : "{{0, 0}, {402, 874}}",
+                                "isVisible" : "1",
+                                "type" : "Other",
+                                "value" : null,
+                                "isEnabled" : "1",
+                                "children" : [
+                                  {
+                                    "customActions" : null,
+                                    "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                    "label" : null,
+                                    "rawIdentifier" : null,
+                                    "traits" : "",
+                                    "frame" : "{{0, 0}, {402, 874}}",
+                                    "isVisible" : "1",
+                                    "type" : "Other",
+                                    "value" : null,
+                                    "isEnabled" : "1",
+                                    "children" : [
+                                      {
+                                        "customActions" : null,
+                                        "nativeFrame" : "{{0, 0}, {402, 874}}",
+                                        "label" : null,
+                                        "rawIdentifier" : null,
+                                        "traits" : "",
+                                        "frame" : "{{0, 0}, {402, 874}}",
+                                        "isVisible" : "1",
+                                        "type" : "Other",
+                                        "value" : null,
+                                        "isEnabled" : "1",
+                                        "isAccessible" : "0",
+                                        "isNativeAccessibilityElement" : "0",
+                                        "isFocused" : "0",
+                                        "name" : null,
+                                        "rect" : {
+                                          "y" : 0,
+                                          "x" : 0,
+                                          "width" : 402,
+                                          "height" : 874
+                                        }
+                                      }
+                                    ],
+                                    "isAccessible" : "0",
+                                    "isNativeAccessibilityElement" : "0",
+                                    "isFocused" : "0",
+                                    "name" : null,
+                                    "rect" : {
+                                      "y" : 0,
+                                      "x" : 0,
+                                      "width" : 402,
+                                      "height" : 874
+                                    }
+                                  }
+                                ],
+                                "isAccessible" : "0",
+                                "isNativeAccessibilityElement" : "0",
+                                "isFocused" : "0",
+                                "name" : null,
+                                "rect" : {
+                                  "y" : 0,
+                                  "x" : 0,
+                                  "width" : 402,
+                                  "height" : 874
+                                }
+                              },
+                              {
+                                "customActions" : null,
+                                "nativeFrame" : "{{10, 786.66668701171875}, {382, 67.33331298828125}}",
+                                "label" : null,
+                                "rawIdentifier" : null,
+                                "traits" : "",
+                                "frame" : "{{10, 786}, {382, 68}}",
+                                "isVisible" : "1",
+                                "type" : "Other",
+                                "value" : null,
+                                "isEnabled" : "1",
+                                "children" : [
+                                  {
+                                    "customActions" : null,
+                                    "nativeFrame" : "{{10, 786.66668701171875}, {382, 48.33331298828125}}",
+                                    "label" : null,
+                                    "rawIdentifier" : null,
+                                    "traits" : "",
+                                    "frame" : "{{10, 786}, {382, 49}}",
+                                    "isVisible" : "1",
+                                    "type" : "Other",
+                                    "value" : null,
+                                    "isEnabled" : "1",
+                                    "children" : [
+                                      {
+                                        "customActions" : null,
+                                        "nativeFrame" : "{{10, 787.33335369825363}, {382, 48}}",
+                                        "label" : null,
+                                        "rawIdentifier" : null,
+                                        "traits" : "",
+                                        "frame" : "{{10, 787}, {382, 49}}",
+                                        "isVisible" : "1",
+                                        "type" : "Other",
+                                        "value" : null,
+                                        "isEnabled" : "1",
+                                        "children" : [
+                                          {
+                                            "customActions" : null,
+                                            "nativeFrame" : "{{10, 787.66668704152107}, {382, 48}}",
+                                            "label" : "!, Open debugger to view warnings.",
+                                            "rawIdentifier" : null,
+                                            "traits" : "",
+                                            "frame" : "{{10, 787}, {382, 49}}",
+                                            "isVisible" : "1",
+                                            "type" : "Other",
+                                            "value" : null,
+                                            "isEnabled" : "1",
+                                            "isAccessible" : "1",
+                                            "isNativeAccessibilityElement" : "1",
+                                            "isFocused" : "0",
+                                            "name" : "!, Open debugger to view warnings.",
+                                            "rect" : {
+                                              "y" : 787,
+                                              "x" : 10,
+                                              "width" : 382,
+                                              "height" : 49
+                                            }
+                                          }
+                                        ],
+                                        "isAccessible" : "0",
+                                        "isNativeAccessibilityElement" : "0",
+                                        "isFocused" : "0",
+                                        "name" : null,
+                                        "rect" : {
+                                          "y" : 787,
+                                          "x" : 10,
+                                          "width" : 382,
+                                          "height" : 49
+                                        }
+                                      }
+                                    ],
+                                    "isAccessible" : "0",
+                                    "isNativeAccessibilityElement" : "0",
+                                    "isFocused" : "0",
+                                    "name" : null,
+                                    "rect" : {
+                                      "y" : 786,
+                                      "x" : 10,
+                                      "width" : 382,
+                                      "height" : 49
+                                    }
+                                  }
+                                ],
+                                "isAccessible" : "0",
+                                "isNativeAccessibilityElement" : "0",
+                                "isFocused" : "0",
+                                "name" : null,
+                                "rect" : {
+                                  "y" : 786,
+                                  "x" : 10,
+                                  "width" : 382,
+                                  "height" : 68
+                                }
+                              }
+                            ],
+                            "isAccessible" : "0",
+                            "isNativeAccessibilityElement" : "0",
+                            "isFocused" : "0",
+                            "name" : null,
+                            "rect" : {
+                              "y" : 0,
+                              "x" : 0,
+                              "width" : 402,
+                              "height" : 874
+                            }
+                          }
+                        ],
+                        "isAccessible" : "0",
+                        "isNativeAccessibilityElement" : "0",
+                        "isFocused" : "0",
+                        "name" : null,
+                        "rect" : {
+                          "y" : 0,
+                          "x" : 0,
+                          "width" : 402,
+                          "height" : 874
+                        }
+                      }
+                    ],
+                    "isAccessible" : "0",
+                    "isNativeAccessibilityElement" : "0",
+                    "isFocused" : "0",
+                    "name" : null,
+                    "rect" : {
+                      "y" : 0,
+                      "x" : 0,
+                      "width" : 402,
+                      "height" : 874
+                    }
+                  }
+                ],
+                "isAccessible" : "0",
+                "isNativeAccessibilityElement" : "0",
+                "isFocused" : "0",
+                "name" : null,
+                "rect" : {
+                  "y" : 0,
+                  "x" : 0,
+                  "width" : 402,
+                  "height" : 874
+                }
+              }
+            ],
+            "isAccessible" : "0",
+            "isNativeAccessibilityElement" : "0",
+            "isFocused" : "0",
+            "name" : null,
+            "rect" : {
+              "y" : 0,
+              "x" : 0,
+              "width" : 402,
+              "height" : 874
+            }
+          }
+        ],
+        "isAccessible" : "0",
+        "isNativeAccessibilityElement" : "0",
+        "isFocused" : "0",
+        "name" : null,
+        "rect" : {
+          "y" : 0,
+          "x" : 0,
+          "width" : 402,
+          "height" : 874
+        }
+      }
+    ],
+    "isAccessible" : "0",
+    "isNativeAccessibilityElement" : "0",
+    "isFocused" : "0",
+    "name" : "MyPort",
+    "rect" : {
+      "y" : 0,
+      "x" : 0,
+      "width" : 402,
+      "height" : 874
+    }
+  },
+  "sessionId" : null
+}
