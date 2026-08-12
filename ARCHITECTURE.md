@@ -83,8 +83,8 @@ interface DeviceAdapter {
 - install/launch: `simctl install/launch/terminate`, `simctl get_app_container`, deep links via `simctl openurl`
 - input & UI tree: `simctl` cannot tap. Two options:
   - **idb** (`idb ui tap/swipe/text`, `idb ui describe-all` for the AX tree) — lighter, recommended default.
-  - **WebDriverAgent** fallback for cases where idb's AX output is insufficient.
-  - Design decision: hide this entirely behind the adapter so we can swap later.
+  - **WebDriverAgent** fallback for cases where idb's AX output is insufficient — **implemented 2026-08-12** (React Native host-view identifiers): config-driven via `app.ios.treeSource: idb (default) | wda` in `averi.yaml`; new modules `src/adapters/wda.ts` (WDA server lifecycle) and `src/adapters/wda-source.ts` (nested-tree normalization into the same `UiNode` shape).
+  - Design decision: hide this entirely behind the adapter so we can swap later. The abstraction held in practice: only `uiTree()` dispatches on the configured source; input and lifecycle stayed idb/simctl, and nothing above the adapter changed.
 
 **Normalized UI tree** is the key abstraction: `{role, label, identifier, value, rect, children}` identical on both platforms. Selectors like `id:login_pin_field`, `text:"Continue"`, `role:button label~"Pay.*"` resolve against it on either OS. This is what makes flow descriptors cross-platform.
 
@@ -235,6 +235,6 @@ Ships with the package (`averi` skill — copy into the app repo). SKILL.md teac
 ## 10. Risks
 
 - **Compose/SwiftUI semantics gaps** → AX tree may be sparse; mitigation: coordinate-tap fallback + a lint tool that reports missing `testTag`/`accessibilityIdentifier` (also a selling point: it pushes teams toward accessible apps).
-- **idb maintenance risk** (Meta's investment fluctuates) → adapter abstraction keeps WDA as swap-in.
+- **idb maintenance risk** (Meta's investment fluctuates) → adapter abstraction keeps WDA as swap-in. Exercised 2026-08-12: the WDA tree source landed behind `app.ios.treeSource` with only `uiTree()` dispatching — the swap-in path is proven for the tree read, not hypothetical.
 - **Overlap with mobile-mcp** → averi's value over raw taps is the flow-descriptor layer, cross-platform parity, and the maintained skill.
 - **Secrets in a banking context** → local-only processing, redaction, and keychain integration must be in v1, not later.

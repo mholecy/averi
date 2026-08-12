@@ -87,14 +87,29 @@ averi can only select what the accessibility tree exposes. Screens without ident
 
 Adding ids to every **new** feature screen as you build it is cheap; retrofitting an entire app is not. Make it part of the definition of done — it also improves real accessibility tooling.
 
-> **Known gap — React Native on iOS.** RN sets `testID` → `accessibilityIdentifier` on the *host view*,
-> but the accessibility *element* iOS publishes for static text (and plain containers) is a child that
-> carries no identifier — and `idb ui describe-all`, averi's iOS tree source, returns only accessibility
-> elements. Net effect: on RN apps, iOS `id:` selectors work **only on interactive elements**
-> (Pressable, TextInput); Android sees every `testID`. This is **not an RN bug** — the ids are on the
-> view, and XCTest-based drivers (Maestro) see them. Planned fix: an XCTest/WDA-backed tree source
-> behind the adapter ([docs/plans/ios-wda-tree-source.md](docs/plans/ios-wda-tree-source.md)). Until
-> then, key iOS automation on interactive ids, and pin the device language wherever `text:` fills in.
+> **Resolved (2026-08-12) — React Native on iOS.** RN sets `testID` → `accessibilityIdentifier` on the
+> *host view*, but the accessibility *element* iOS publishes for static text (and plain containers) is a
+> child that carries no identifier — and `idb ui describe-all`, averi's **default** iOS tree source,
+> returns only accessibility elements. On the RN repro screen (MyPort, iPhone 17 / iOS 26.5) idb saw
+> **6 elements, all `AXUniqueId: null`**. The fix is one line in `averi.yaml` —
+> `app.ios.treeSource: wda` — which routes only the iOS *tree read* through WebDriverAgent (16.1.7,
+> pinned devDependency `appium-webdriveragent`); taps, typing, and app lifecycle stay on idb/simctl.
+> WDA's `/source` reads the id off the host view, so `id:` resolves on static text **and** the plain
+> container — verified on-device end-to-end through the adapter on the repro screen
+> (`id:placeholder_screen` → container, `placeholder_title`/`placeholder_status` → text; idb control on
+> the same screen: 0 hits). Native projects need no change: the default stays `idb`, and the full
+> skeleton states regression (login registration + transactions_list) passed on-device with **both**
+> `treeSource: idb` and `wda` the same day, as did active WDA-backed navigation (tab taps + waits:
+> transactions_list, account_detail).
+>
+> `wda` stays **opt-in**: on the same deep screen (transactions list visible), idb `describe-all`
+> median 167 ms vs WDA `/source` median 322 ms (first call after start ~2.9 s) — ~2× slower per read,
+> so no `auto` promotion for now; these numbers are the basis for that deferred decision. Operational
+> notes: the first WDA build per Xcode version takes **minutes** (then cached in
+> `DerivedData/averi-wda`) — the server start announces it on stderr, and build/start failures name
+> the xcodebuild log. A simulator runs **one** XCTest UI-test session at a time: a WDA started by
+> another process/session is refused loudly, never silently adopted (`/status` carries no UDID, so
+> identity cannot be verified). Recovery: `pkill -f WebDriverAgentRunner` or reboot the simulator.
 
 ### Minimal `averi.yaml`
 
@@ -200,4 +215,4 @@ npm run build      # tsc → dist/
 npm run dev        # run the MCP server over stdio from source
 ```
 
-Layout: `src/adapters/` (adb, simctl/idb, one normalized tree) · `src/flow/` (yaml schema + engine) · `src/verify/` (asserts, baselines, crash scan) · `src/mcp/` (tool layer) · `skill/` · `docs/plans/`.
+Layout: `src/adapters/` (adb, simctl/idb, opt-in WDA tree source, one normalized tree) · `src/flow/` (yaml schema + engine) · `src/verify/` (asserts, baselines, crash scan) · `src/mcp/` (tool layer) · `skill/` · `docs/plans/`.

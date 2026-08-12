@@ -1,7 +1,9 @@
 # iOS tree source: XCTest/WDA fallback for identifiers idb cannot see
 
-Status: **phase 0 executed 2026-08-12 — `idb --nested` ruled out, WDA build-out is the path.**
-Implementation not started.
+Status: **implemented 2026-08-12.** Phases 1–4 done; `verify_both` symmetry on a real RN `id:`-only
+flow deferred to the RN project session (MyPort has no `averi.yaml` flows yet); latency measured
+(idb describe-all median 167 ms vs WDA /source median 322 ms on the deep screen, first call ~2.9 s)
+→ `wda` stays opt-in, no `auto` promotion for now.
 
 ## Problem
 
