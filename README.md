@@ -87,6 +87,15 @@ averi can only select what the accessibility tree exposes. Screens without ident
 
 Adding ids to every **new** feature screen as you build it is cheap; retrofitting an entire app is not. Make it part of the definition of done — it also improves real accessibility tooling.
 
+> **Known gap — React Native on iOS.** RN sets `testID` → `accessibilityIdentifier` on the *host view*,
+> but the accessibility *element* iOS publishes for static text (and plain containers) is a child that
+> carries no identifier — and `idb ui describe-all`, averi's iOS tree source, returns only accessibility
+> elements. Net effect: on RN apps, iOS `id:` selectors work **only on interactive elements**
+> (Pressable, TextInput); Android sees every `testID`. This is **not an RN bug** — the ids are on the
+> view, and XCTest-based drivers (Maestro) see them. Planned fix: an XCTest/WDA-backed tree source
+> behind the adapter ([docs/plans/ios-wda-tree-source.md](docs/plans/ios-wda-tree-source.md)). Until
+> then, key iOS automation on interactive ids, and pin the device language wherever `text:` fills in.
+
 ### Minimal `averi.yaml`
 
 ```yaml
