@@ -104,7 +104,11 @@ export class FlowEngine {
   private async ensureStateInner(name: string): Promise<void> {
     const state = this.cfg.states[name];
     if (!state) throw new Error(`Unknown state "${name}" — known: ${Object.keys(this.cfg.states).join(', ')}`);
-    if (await this.matches(state.detect, await this.adapter.uiTree())) {
+    // An unreadable tree is not "in this state" — and it must not throw
+    // either: right after a cold launch/reinstall (no window yet) is exactly
+    // when the reach flows are needed. waitFor below re-verifies by polling.
+    const tree = await this.adapter.uiTree().catch(() => undefined);
+    if (tree !== undefined && (await this.matches(state.detect, tree))) {
       this.log(`state ${name}`, 'already active');
       return;
     }
@@ -373,18 +377,42 @@ export class FlowEngine {
     );
   }
 
-  /** Poll the UI tree until fn returns a value; throws on timeout. */
+  /**
+   * Poll the UI tree until fn returns a value; throws on timeout. A failed
+   * tree READ is a poll miss, not a failure: right after launch (clearState
+   * especially, wider still on RN debug builds) the app has no window yet and
+   * uiautomator legitimately reports a null root node for a few seconds. The
+   * last read error rides along in the timeout message so a genuinely broken
+   * device (adb gone, emulator offline) stays diagnosable. Errors from `fn`
+   * itself (unknown state names etc.) still propagate immediately.
+   */
   private async pollUntil<T>(
     fn: (tree: UiNode) => Promise<T | undefined>,
     timeoutMs: number,
     what: string,
   ): Promise<T> {
     const deadline = Date.now() + timeoutMs;
+    let lastReadError: Error | undefined;
     for (;;) {
-      const result = await fn(await this.adapter.uiTree());
-      if (result !== undefined) return result;
+      const tree = await this.adapter.uiTree().then(
+        (t) => {
+          lastReadError = undefined;
+          return t;
+        },
+        (e: unknown) => {
+          lastReadError = e instanceof Error ? e : new Error(String(e));
+          return undefined;
+        },
+      );
+      if (tree !== undefined) {
+        const result = await fn(tree);
+        if (result !== undefined) return result;
+      }
       if (Date.now() >= deadline) {
-        throw new Error(`Timed out after ${timeoutMs}ms waiting for ${what}`);
+        throw new Error(
+          `Timed out after ${timeoutMs}ms waiting for ${what}` +
+            (lastReadError === undefined ? '' : `\n  (last UI tree read failed: ${lastReadError.message})`),
+        );
       }
       await new Promise((r) => setTimeout(r, this.pollMs));
     }
@@ -488,15 +516,30 @@ export async function scrollUntilVisible(
 
   const deadline = Date.now() + timeoutMs;
   let lastFound: UiNode[] = [];
+  let lastReadError: Error | undefined;
   for (let swipes = 0; ; swipes++) {
-    lastFound = target.find(await adapter.uiTree());
+    // A failed read is a miss, not a failure — mid-animation and right after
+    // launch the tree can be momentarily unproducible (null root node).
+    const tree = await adapter.uiTree().then(
+      (t) => {
+        lastReadError = undefined;
+        return t;
+      },
+      (e: unknown) => {
+        lastReadError = e instanceof Error ? e : new Error(String(e));
+        return undefined;
+      },
+    );
+    lastFound = tree === undefined ? [] : target.find(tree);
     if (lastFound.some((n) => intersectsViewport(n.rect, viewport))) return swipes;
     if (swipes >= maxSwipes || Date.now() >= deadline) {
       const why =
-        lastFound.length === 0
-          ? 'element never appeared in the tree'
-          : `element in tree but never intersected the ${viewport.width}x${viewport.height} viewport ` +
-            `(last rect ${JSON.stringify(lastFound[0].rect)})`;
+        lastReadError !== undefined
+          ? `last UI tree read failed: ${lastReadError.message}`
+          : lastFound.length === 0
+            ? 'element never appeared in the tree'
+            : `element in tree but never intersected the ${viewport.width}x${viewport.height} viewport ` +
+              `(last rect ${JSON.stringify(lastFound[0].rect)})`;
       const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
       throw new Error(`scroll_until ${target.describe} failed ${cause} — ${why}`);
     }

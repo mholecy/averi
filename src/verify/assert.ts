@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { z } from 'zod';
-import type { DeviceAdapter } from '../adapters/types.js';
+import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { elementAssertSchema, parseDuration, type ElementSpec } from '../flow/config.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 
@@ -83,8 +83,11 @@ export class Verifier {
     const description = `element ${describe(element)}${wants} exists`;
     const deadline = Date.now() + timeoutMs;
     let lastSeen: string | undefined;
+    let lastReadError: Error | undefined;
     for (;;) {
-      const found = findBySpec(await this.adapter.uiTree(), element);
+      const { tree, error: readError } = await this.tryReadTree();
+      lastReadError = readError;
+      const found = tree === undefined ? [] : findBySpec(tree, element);
       const matching = found.filter((n) => {
         const values = [n.label, n.value].filter((v): v is string => v !== null);
         if (text !== undefined) return values.includes(text);
@@ -101,12 +104,27 @@ export class Verifier {
       }
       if (Date.now() >= deadline) {
         const detail =
-          lastSeen !== undefined
-            ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${lastSeen}`
-            : `not found within ${timeoutMs}ms`;
+          lastReadError !== undefined
+            ? `not found within ${timeoutMs}ms (last UI tree read failed: ${lastReadError.message})`
+            : lastSeen !== undefined
+              ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${lastSeen}`
+              : `not found within ${timeoutMs}ms`;
         return { description, pass: false, detail };
       }
       await sleep(this.pollMs);
+    }
+  }
+
+  /**
+   * A failed tree read during a polling assert is a miss, not a failure —
+   * right after launch the device can be momentarily unable to produce one
+   * (uiautomator null root node). The error is kept for the timeout detail.
+   */
+  private async tryReadTree(): Promise<{ tree?: UiNode; error?: Error }> {
+    try {
+      return { tree: await this.adapter.uiTree() };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error(String(e)) };
     }
   }
 
@@ -120,14 +138,22 @@ export class Verifier {
     const viewport = await this.adapter.viewport();
     const deadline = Date.now() + timeoutMs;
     for (;;) {
-      const found = findBySpec(await this.adapter.uiTree(), element);
-      const visible = found.filter((n) => intersectsViewport(n.rect, viewport));
-      if (visible.length === 0) {
-        const detail = found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined;
-        return { description, pass: true, detail };
+      const { tree, error } = await this.tryReadTree();
+      // An unreadable tree is NOT evidence of absence — keep polling.
+      if (tree !== undefined) {
+        const found = findBySpec(tree, element);
+        const visible = found.filter((n) => intersectsViewport(n.rect, viewport));
+        if (visible.length === 0) {
+          const detail = found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined;
+          return { description, pass: true, detail };
+        }
       }
       if (Date.now() >= deadline) {
-        return { description, pass: false, detail: `still visible after ${timeoutMs}ms` };
+        const detail =
+          error !== undefined
+            ? `could not verify within ${timeoutMs}ms (last UI tree read failed: ${error.message})`
+            : `still visible after ${timeoutMs}ms`;
+        return { description, pass: false, detail };
       }
       await sleep(this.pollMs);
     }

@@ -104,6 +104,44 @@ describe('element asserts', () => {
   });
 });
 
+describe('transient UI-tree read failures', () => {
+  const NULL_ROOT = 'uiautomator dump returned no XML: ERROR: null root node returned by UiTestAutomationBridge.';
+
+  const failingTree = (fake: FakeAdapter, failures: number) => {
+    const orig = fake.uiTree.bind(fake);
+    let remaining = failures;
+    fake.uiTree = async () => {
+      if (remaining-- > 0) throw new Error(NULL_ROOT);
+      return orig();
+    };
+  };
+
+  it('an exists assert keeps polling through failed reads and passes once the tree is back', async () => {
+    const fake = dashboardFake();
+    failingTree(fake, 3);
+    const [result] = await new Verifier(fake, FAST).assertAll([{ element: { id: 'dashboard_root' } }]);
+    expect(result.pass).toBe(true);
+  });
+
+  it('a persistently unreadable tree fails on timeout with the read error in the detail', async () => {
+    const fake = dashboardFake();
+    failingTree(fake, Number.POSITIVE_INFINITY);
+    const [result] = await new Verifier(fake, FAST).assertAll([{ element: { id: 'dashboard_root' } }]);
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/last UI tree read failed: uiautomator dump returned no XML/);
+  });
+
+  it('an absent assert never treats an unreadable tree as proof of absence', async () => {
+    const fake = dashboardFake();
+    failingTree(fake, Number.POSITIVE_INFINITY);
+    const [result] = await new Verifier(fake, FAST).assertAll([
+      { element: { id: 'dashboard_root' }, absent: true },
+    ]);
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/could not verify.*last UI tree read failed/);
+  });
+});
+
 describe('screenshot baseline asserts', () => {
   let dir: string;
   beforeEach(async () => {

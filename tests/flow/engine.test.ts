@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine } from '../../src/flow/engine.js';
+import { FlowEngine, scrollUntilVisible } from '../../src/flow/engine.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
@@ -244,6 +244,75 @@ flows:
       { appId: 'md.bank.app', activity: '.ShareActivity', intent: { action: 'android.intent.action.SEND' } },
     ]);
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app/.MainActivity (state cleared)' });
+  });
+});
+
+describe('transient UI-tree read failures', () => {
+  // After launch (clearState especially) the app has no window for a few
+  // seconds and uiautomator reports "null root node" — a wait: whose whole
+  // purpose is polling must survive that, not die on its first read.
+  const NULL_ROOT = 'uiautomator dump returned no XML: ERROR: null root node returned by UiTestAutomationBridge.';
+
+  const failingTree = (fake: FakeAdapter, failures: number) => {
+    const orig = fake.uiTree.bind(fake);
+    let remaining = failures;
+    fake.uiTree = async () => {
+      if (remaining-- > 0) throw new Error(NULL_ROOT);
+      return orig();
+    };
+  };
+
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  home:
+    detect: { element: { id: dashboard_root } }
+    reach: [warm]
+flows:
+  warm:
+    steps:
+      - launch: { clearState: true }
+  smoke:
+    steps:
+      - launch: { clearState: true }
+      - wait: { element: { id: dashboard_root }, timeout: 300 }
+`);
+
+  it('a wait: keeps polling through reads that fail while the app has no window yet', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    failingTree(fake, 3);
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('smoke');
+    expect(trace).toContainEqual({ action: 'wait', detail: 'element id:"dashboard_root"' });
+  });
+
+  it('a persistent read failure still times out, and the message carries the underlying error', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    failingTree(fake, Number.POSITIVE_INFINITY);
+    await expect(new FlowEngine(cfg, fake, FAST).runFlow('smoke')).rejects.toThrow(
+      /Timed out after 300ms[\s\S]*last UI tree read failed: uiautomator dump returned no XML/,
+    );
+  });
+
+  it('ensure_state treats an unreadable detect probe as "not in state" and runs the reach flows', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    failingTree(fake, 1); // exactly the first probe fails — the cold-launch case
+    const trace = await new FlowEngine(cfg, fake, FAST).ensureState('home');
+    expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
+    expect(trace).toContainEqual({ action: 'state home', detail: 'reached' });
+  });
+
+  it('scroll_until reports the read failure instead of "element never appeared"', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    failingTree(fake, Number.POSITIVE_INFINITY);
+    await expect(
+      scrollUntilVisible(
+        fake,
+        { find: () => [], describe: 'id:below_fold' },
+        { maxSwipes: 2, timeout: 100 },
+        { settleMs: 1 },
+      ),
+    ).rejects.toThrow(/last UI tree read failed: uiautomator dump returned no XML/);
   });
 });
 
