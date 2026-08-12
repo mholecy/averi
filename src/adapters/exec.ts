@@ -22,6 +22,12 @@ export class ExecError extends Error {
     readonly exitCode: number | null,
     readonly stderr: string,
     readonly timedOut: boolean = false,
+    /**
+     * What the failed command printed to stdout. xcodebuild-style tools put
+     * their diagnostics THERE (stderr carries little more than the "BUILD
+     * FAILED" trailer) — callers that persist failure logs need both streams.
+     */
+    readonly stdout: Buffer = Buffer.alloc(0),
   ) {
     super(
       timedOut
@@ -53,7 +59,7 @@ export const exec: ExecFn = (cmd, args, opts = {}) =>
           const command = [cmd, ...args].join(' ');
           const timedOut = err.killed === true || err.signal === 'SIGKILL';
           const exitCode = typeof err.code === 'number' ? err.code : null;
-          reject(new ExecError(command, exitCode, stderrText || err.message, timedOut));
+          reject(new ExecError(command, exitCode, stderrText || err.message, timedOut, stdout));
         } else {
           resolve({ stdout, stderr: stderrText });
         }

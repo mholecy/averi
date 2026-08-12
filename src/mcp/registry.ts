@@ -89,6 +89,11 @@ export class AdapterRegistry {
       const stillBooted = (await this.probe(platform)).some(
         (d) => d.id === binding.deviceId && d.state === 'booted',
       );
+      // A select() may have rebound the platform while we awaited the probe.
+      // Acting on the CAPTURED binding would re-cache the evicted (already
+      // disposed) device's adapter — start over against the current binding.
+      // (select() always stores a fresh object, so identity detects it.)
+      if (this.bindings.get(platform) !== binding) return this.get(platform, opts);
       if (stillBooted) return this.adapterFor(platform, binding.deviceId, opts);
       if (binding.pinned) {
         throw new Error(
@@ -101,6 +106,9 @@ export class AdapterRegistry {
     }
 
     const booted = (await this.probe(platform)).filter((d) => d.state === 'booted');
+    // Same race on the unbound path: a select() that landed during this probe
+    // owns the binding now — honor it instead of auto-picking over it.
+    if (this.bindings.get(platform) !== undefined) return this.get(platform, opts);
     if (booted.length === 0) {
       throw new Error(
         platform === 'android'

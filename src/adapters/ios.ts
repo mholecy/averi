@@ -3,33 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
+import { IOS_ROLE_MAP } from './ios-role-map.js';
 import { WdaServer } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
 import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from './types.js';
-
-/** idb AX element `type` → normalized role. */
-const ROLE_MAP: Record<string, string> = {
-  Button: 'button',
-  StaticText: 'text',
-  TextField: 'textfield',
-  SecureTextField: 'textfield',
-  TextView: 'textfield',
-  Image: 'image',
-  Switch: 'switch',
-  Toggle: 'switch',
-  CheckBox: 'checkbox',
-  RadioButton: 'radiobutton',
-  Slider: 'slider',
-  ProgressIndicator: 'progress',
-  WebView: 'webview',
-  ScrollView: 'scrollable',
-  Table: 'scrollable',
-  CollectionView: 'scrollable',
-  Cell: 'container',
-  Window: 'container',
-  Other: 'container',
-};
 
 /**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input and
@@ -309,7 +287,7 @@ export function parseIdbDescribeAll(json: string): UiNode {
   const elements = JSON.parse(json) as IdbElement[];
   if (!Array.isArray(elements)) throw new Error('idb describe-all did not return an array');
   const children: UiNode[] = elements.map((el) => ({
-    role: ROLE_MAP[el.type ?? ''] ?? 'other',
+    role: IOS_ROLE_MAP[el.type ?? ''] ?? 'other',
     label: emptyToNull(el.AXLabel),
     identifier: emptyToNull(el.AXUniqueId),
     value: emptyToNull(el.AXValue),

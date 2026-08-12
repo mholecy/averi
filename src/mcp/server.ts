@@ -53,11 +53,14 @@ const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
 
 /**
  * treeSource for tree-reading tools that predate averi.yaml and must keep
- * working without one (ui_snapshot, tap, type_text, scroll_until): a missing
- * config file means default idb, but a present-and-invalid one still errors
- * loudly — see loadConfigIfPresent.
+ * working without one (ui_snapshot, tap, type_text, scroll_until, assert):
+ * a missing config file means default idb, but a present-and-invalid one
+ * still errors loudly — see loadConfigIfPresent. Android has no treeSource,
+ * so its legs skip the config load entirely: an invalid averi.yaml must not
+ * break android calls on these previously config-blind tools.
  */
-async function loadIosOpts(configPath?: string): Promise<AdapterOpts> {
+async function loadIosOpts(p: Platform, configPath?: string): Promise<AdapterOpts | undefined> {
+  if (p === 'android') return undefined;
   return iosOpts(await loadConfigIfPresent(resolve(configPath ?? 'averi.yaml')));
 }
 
@@ -234,7 +237,7 @@ registerTool(
     },
   },
   async ({ platform: p, filter, configPath: cp }) => {
-    const tree = await (await registry.get(p, await loadIosOpts(cp))).uiTree();
+    const tree = await (await registry.get(p, await loadIosOpts(p, cp))).uiTree();
     return text(filter ? findAll(tree, filter).map(stripChildren) : tree);
   },
 );
@@ -253,7 +256,7 @@ registerTool(
     },
   },
   async ({ platform: p, selector, x, y, configPath: cp }) => {
-    const adapter = await registry.get(p, await loadIosOpts(cp));
+    const adapter = await registry.get(p, await loadIosOpts(p, cp));
     if (selector !== undefined) {
       const note = await adapter.tapElement(selector);
       return text(`Tapped ${selector}${note ? ` (${note})` : ''}`);
@@ -297,7 +300,7 @@ registerTool(
     },
   },
   async ({ platform: p, text: value, selector, clear, configPath: cp }) => {
-    const adapter = await registry.get(p, await loadIosOpts(cp));
+    const adapter = await registry.get(p, await loadIosOpts(p, cp));
     if (selector === undefined) {
       if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
       await adapter.typeText(value);
@@ -333,7 +336,7 @@ registerTool(
     },
   },
   async ({ platform: p, selector, direction, maxSwipes, timeoutMs, configPath: cp }) => {
-    const adapter = await registry.get(p, await loadIosOpts(cp));
+    const adapter = await registry.get(p, await loadIosOpts(p, cp));
     const swipes = await scrollUntilVisible(
       adapter,
       { find: (tree) => findAll(tree, selector), describe: selector },
@@ -450,7 +453,7 @@ registerTool(
     const specs = parseAsserts(asserts);
     // Lenient load: assert works configless, but a broken averi.yaml (or a
     // wda treeSource it declares) must not be silently ignored here.
-    const verifier = new Verifier(await registry.get(p, await loadIosOpts(cp)), {
+    const verifier = new Verifier(await registry.get(p, await loadIosOpts(p, cp)), {
       baselineDir: resolve('.averi/baselines'),
     });
     const results = await verifier.assertAll(specs);

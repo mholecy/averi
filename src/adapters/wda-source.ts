@@ -1,3 +1,4 @@
+import { IOS_ROLE_MAP } from './ios-role-map.js';
 import type { UiNode } from './types.js';
 
 /**
@@ -12,28 +13,11 @@ import type { UiNode } from './types.js';
 /**
  * WDA element `type` → normalized role. Types arrive WITHOUT the
  * "XCUIElementType" prefix (measured: plain "StaticText", "Other", ...).
- * Mirrors ios.ts ROLE_MAP, plus structural types only the nested tree has.
+ * The shared iOS vocabulary (ios-role-map.ts) plus structural types only
+ * the nested tree has.
  */
 const ROLE_MAP: Record<string, string> = {
-  Button: 'button',
-  StaticText: 'text',
-  TextField: 'textfield',
-  SecureTextField: 'textfield',
-  TextView: 'textfield',
-  Image: 'image',
-  Switch: 'switch',
-  Toggle: 'switch',
-  CheckBox: 'checkbox',
-  RadioButton: 'radiobutton',
-  Slider: 'slider',
-  ProgressIndicator: 'progress',
-  WebView: 'webview',
-  ScrollView: 'scrollable',
-  Table: 'scrollable',
-  CollectionView: 'scrollable',
-  Cell: 'container',
-  Window: 'container',
-  Other: 'container',
+  ...IOS_ROLE_MAP,
   // Structural types that never appear in idb's flat AX list:
   Application: 'container',
   NavigationBar: 'container',

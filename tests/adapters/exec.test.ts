@@ -22,6 +22,14 @@ describe('exec', () => {
     });
   });
 
+  it('ExecError keeps what the command printed to STDOUT (xcodebuild puts diagnostics there)', async () => {
+    const err = await exec('sh', ['-c', 'echo "error: details on stdout"; echo trailer >&2; exit 65'])
+      .then(() => undefined, (e: unknown) => e as InstanceType<typeof ExecError>);
+    expect(err).toBeInstanceOf(ExecError);
+    expect(err?.stdout.toString('utf8')).toContain('error: details on stdout');
+    expect(err?.stderr).toContain('trailer');
+  });
+
   it('rejects with ExecError for a missing binary', async () => {
     await expect(exec('definitely-not-a-real-binary-xyz', [])).rejects.toBeInstanceOf(ExecError);
   });

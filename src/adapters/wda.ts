@@ -47,6 +47,7 @@ export interface WdaChild {
   pid?: number | undefined;
   kill(signal?: NodeJS.Signals): boolean;
   once(event: 'exit', listener: () => void): unknown;
+  once(event: 'error', listener: (err: Error) => void): unknown;
   unref(): void;
 }
 
@@ -59,28 +60,56 @@ export type SpawnFn = (
 const defaultSpawn: SpawnFn = (cmd, args, opts) => nodeSpawn(cmd, args, opts);
 
 /**
- * 8100 + FNV-1a(udid) % 100 — stable per UDID so parallel simulators get
- * distinct WDA ports without coordination. An explicit `port` opt wins.
+ * In-process port allocator: sequential from 8100, one port per UDID for the
+ * life of the process — two WdaServers in this process can NEVER share a port.
+ * (The previous 8100 + hash(udid) % 100 scheme collided at ~1% per pair, and a
+ * collision silently delivered the WRONG device's tree.) Servers left behind
+ * by OTHER processes cannot be solved by allocation; they are caught at probe
+ * time instead — see the not-ours check in doEnsureRunning.
  */
+const WDA_BASE_PORT = 8100;
+const portByUdid = new Map<string, number>();
+
+/** Same UDID → same port; distinct UDIDs → distinct ports (8100, 8101, ...). */
 export function wdaPortFor(udid: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < udid.length; i++) {
-    h ^= udid.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
+  let port = portByUdid.get(udid);
+  if (port === undefined) {
+    port = WDA_BASE_PORT + portByUdid.size;
+    portByUdid.set(udid, port);
   }
-  return 8100 + ((h >>> 0) % 100);
+  return port;
 }
 
-/** require.resolve is unavailable in ESM — createRequire bridges it. */
-function wdaProjectPath(): string {
-  const require = createRequire(import.meta.url);
-  const pkgJson = require.resolve('appium-webdriveragent/package.json');
+/** Test-only: forget all allocations so each test starts at 8100. */
+export function resetWdaPortAllocatorForTests(): void {
+  portByUdid.clear();
+}
+
+/**
+ * require.resolve is unavailable in ESM — createRequire bridges it. The
+ * resolve is preflighted with its own message because appium-webdriveragent
+ * is a devDependency: absent in production installs, and a bare resolve error
+ * wrapped as a "build failure" would send the user debugging xcodebuild.
+ */
+export function wdaProjectPath(
+  resolvePkg: (id: string) => string = createRequire(import.meta.url).resolve,
+): string {
+  let pkgJson: string;
+  try {
+    pkgJson = resolvePkg('appium-webdriveragent/package.json');
+  } catch (err) {
+    throw new Error(
+      'treeSource: wda requires the appium-webdriveragent package (a devDependency, ' +
+        'not present in production installs) — `npm i -D appium-webdriveragent@16.1.7`',
+      { cause: err },
+    );
+  }
   return join(dirname(pkgJson), 'WebDriverAgent.xcodeproj');
 }
 
 export interface WdaServerOptions {
   udid: string;
-  /** Explicit port; defaults to the per-UDID derivation (wdaPortFor). */
+  /** Explicit port; defaults to the per-UDID allocation (wdaPortFor). */
   port?: number;
   exec?: ExecFn;
   fetchFn?: FetchFn;
@@ -107,7 +136,16 @@ export class WdaServer {
   private inflight: Promise<void> | undefined;
   private child: WdaChild | undefined;
   private childExited = false;
+  private childError: Error | undefined;
   private exitHook: (() => void) | undefined;
+  /**
+   * Bumped by stop(). An in-flight doEnsureRunning captures the value at
+   * start and aborts at the next checkpoint when it changed — otherwise a
+   * stop() during the minutes-long first build would be followed by a spawn
+   * that leaks a WDA for a deselected device. A new ensureRunning() captures
+   * the NEW value, so a stopped server can be legitimately restarted.
+   */
+  private stopEpoch = 0;
 
   constructor(opts: WdaServerOptions) {
     this.udid = opts.udid;
@@ -147,9 +185,21 @@ export class WdaServer {
    */
   async source(): Promise<unknown> {
     await this.ensureRunning();
-    const res = await this.fetchFn(`${this.baseUrl()}/source?format=json`, {
-      signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS),
-    });
+    let res: Awaited<ReturnType<FetchFn>>;
+    try {
+      res = await this.fetchFn(`${this.baseUrl()}/source?format=json`, {
+        signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS),
+      });
+    } catch (err) {
+      // A bare "fetch failed"/"TimeoutError" names neither device nor server —
+      // keep the log-path contract even for connection-level failures.
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `WDA /source request failed on port ${this.port} (udid ${this.udid}): ${reason} — ` +
+          `the server may have died mid-session; xcodebuild log: ${this.logPath}`,
+        { cause: err },
+      );
+    }
     if (!res.ok) {
       throw new Error(
         `WDA /source failed: HTTP ${res.status} on port ${this.port} — xcodebuild log: ${this.logPath}`,
@@ -160,6 +210,7 @@ export class WdaServer {
 
   /** Tolerates not-running; unhooks the process-exit kill. */
   stop(): void {
+    this.stopEpoch++;
     if (this.exitHook) {
       process.removeListener('exit', this.exitHook);
       this.exitHook = undefined;
@@ -173,11 +224,40 @@ export class WdaServer {
   }
 
   private async doEnsureRunning(): Promise<void> {
-    if (await this.probeStatus()) return;
+    const epoch = this.stopEpoch;
+    const assertNotStopped = (): void => {
+      if (this.stopEpoch !== epoch) {
+        throw new Error(`WdaServer for ${this.udid} was stopped during startup`);
+      }
+    };
+    if (await this.probeStatus()) {
+      // Genuine WDA answering — but is it OURS? /status carries no UDID, so
+      // the bundle-id check above can never be an IDENTITY check: every real
+      // WDA passes it, including one serving a different simulator. Only a
+      // child spawned by THIS instance is known to target this.udid; anything
+      // else is adopted-at-your-peril, so fail loudly instead.
+      if (this.child !== undefined && !this.childExited) return;
+      throw new Error(
+        `A WebDriverAgent answers /status on port ${this.port}, but this session did not start it ` +
+          `(udid ${this.udid}). /status carries no UDID, so it cannot be verified as serving THIS ` +
+          `simulator — adopting it could silently deliver another device's UI tree. Likely a stale ` +
+          `WDA from a previous session (SIGTERM/SIGINT deaths skip the process-exit cleanup hook). ` +
+          'Recover: `pkill -f WebDriverAgentRunner`, or reboot the simulator, or pass an explicit `port`.',
+      );
+    }
+    assertNotStopped();
     let xctestrun = await this.findXctestrun();
+    assertNotStopped();
     if (!xctestrun) {
+      // Loud by design (plan, Risks): a silent multi-minute first build reads
+      // as a hang. stderr is the sanctioned channel (server.ts logs there too).
+      console.error(
+        `averi: first WDA build for this Xcode version — takes minutes, cached afterwards; log: ${this.logPath}`,
+      );
       await this.build();
+      assertNotStopped();
       xctestrun = await this.findXctestrun();
+      assertNotStopped();
       if (!xctestrun) {
         throw new Error(
           'xcodebuild build-for-testing succeeded but no ' +
@@ -186,13 +266,16 @@ export class WdaServer {
         );
       }
     }
-    await this.startChild(xctestrun);
-    await this.awaitReady();
+    const env = await detectXcodeEnv(this.exec);
+    assertNotStopped(); // last checkpoint before the spawn — nothing async in between
+    const child = this.startChild(xctestrun, env);
+    await this.awaitReady(epoch, child);
   }
 
   /**
-   * false = nothing listening (start it); true = WDA answered. Anything else
-   * on OUR port is a foreign server — fail loudly rather than talk to it.
+   * false = nothing listening (start it); true = something that looks like
+   * WDA answered (the caller decides whether it is OURS). Anything else on
+   * our port is a foreign server — fail loudly rather than talk to it.
    */
   private async probeStatus(): Promise<boolean> {
     let res: Awaited<ReturnType<FetchFn>>;
@@ -215,7 +298,7 @@ export class WdaServer {
     throw new Error(
       `Port ${this.port} answers /status but is not WebDriverAgent ` +
         `(${res.ok ? `productBundleIdentifier=${JSON.stringify(bundle ?? null)}` : `HTTP ${res.status}`}). ` +
-        `WDA ports are derived per UDID (8100 + hash(udid) % 100 → ${this.port} for ${this.udid}); ` +
+        `WDA ports are allocated per UDID starting at 8100 (${this.port} for ${this.udid}); ` +
         'free the port or pass an explicit `port`.',
     );
   }
@@ -247,25 +330,30 @@ export class WdaServer {
   }
 
   private async build(): Promise<void> {
+    const project = wdaProjectPath(); // preflight — its failure is a missing-package error, not a build failure
     const env = await detectXcodeEnv(this.exec);
     try {
-      await this.exec(
+      const { stdout, stderr } = await this.exec(
         'xcodebuild',
         [
           'build-for-testing',
-          '-project', wdaProjectPath(),
+          '-project', project,
           '-scheme', 'WebDriverAgentRunner',
           '-destination', `id=${this.udid}`,
           '-derivedDataPath', this.derivedDataPath,
         ],
         { timeoutMs: BUILD_TIMEOUT_MS, ...(env ? { env } : {}) },
       );
+      // Success writes the log too: the "no .xctestrun appeared" branch cites
+      // it, and a later start failure benefits from having the build tail.
+      this.writeBuildLog(stdout.toString('utf8'), stderr);
     } catch (err) {
-      const detail = err instanceof ExecError ? err.stderr || err.message : String(err);
-      try {
-        writeFileSync(this.logPath, detail);
-      } catch {
-        /* the message below still carries the path it would have been */
+      // xcodebuild puts the compile diagnostics on STDOUT — stderr usually
+      // carries little more than "** BUILD FAILED **". Persist both.
+      if (err instanceof ExecError) {
+        this.writeBuildLog(err.stdout.toString('utf8'), err.stderr || err.message);
+      } else {
+        this.writeBuildLog('', String(err));
       }
       const timedOut = err instanceof ExecError && err.timedOut;
       throw new Error(
@@ -276,8 +364,16 @@ export class WdaServer {
     }
   }
 
-  private async startChild(xctestrun: string): Promise<void> {
-    const developerEnv = await detectXcodeEnv(this.exec);
+  private writeBuildLog(stdout: string, stderr: string): void {
+    const body = stderr.trim() === '' ? stdout : `${stdout}\n--- stderr ---\n${stderr}`;
+    try {
+      writeFileSync(this.logPath, body);
+    } catch {
+      /* the failure message still carries the path it would have been */
+    }
+  }
+
+  private startChild(xctestrun: string, developerEnv: Record<string, string> | undefined): WdaChild {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       ...developerEnv,
@@ -300,35 +396,66 @@ export class WdaServer {
     }
     this.child = child;
     this.childExited = false;
+    this.childError = undefined;
+    // Identity guards: a killed child's LATE 'exit'/'error' must not poison
+    // the flags of a fresh child spawned by a retry.
     child.once('exit', () => {
-      this.childExited = true;
+      if (this.child === child) this.childExited = true;
+    });
+    // ENOENT and friends arrive as an 'error' EVENT, not a spawn throw — with
+    // no listener that is an uncaught exception that takes the MCP server
+    // down, and 'exit' never fires for a failed spawn.
+    child.once('error', (err) => {
+      if (this.child === child) {
+        this.childError = err;
+        this.childExited = true;
+      }
     });
     // unref keeps the MCP server free to exit; the exit hook kills the
-    // xcodebuild group on the way out so nothing leaks.
+    // xcodebuild group on the way out so nothing leaks. SIGTERM/SIGINT deaths
+    // skip 'exit' hooks, so a WDA can outlive the session — the next session
+    // then finds a WDA it did not spawn and fails LOUDLY (see doEnsureRunning)
+    // rather than adopting a server that may target another simulator; that
+    // error tells the user how to clean up (pkill / reboot the simulator).
     child.unref();
     if (!this.exitHook) {
       this.exitHook = () => this.killChild();
       process.once('exit', this.exitHook);
     }
+    return child;
   }
 
-  private async awaitReady(): Promise<void> {
-    const deadline = Date.now() + this.readyTimeoutMs;
-    while (Date.now() < deadline) {
-      if (this.childExited) {
-        throw new Error(
-          `xcodebuild test-without-building exited before WDA answered /status — ` +
-            `xcodebuild log: ${this.logPath}. ${FIRST_BUILD_NOTE}`,
-        );
+  private async awaitReady(epoch: number, myChild: WdaChild): Promise<void> {
+    try {
+      const deadline = Date.now() + this.readyTimeoutMs;
+      while (Date.now() < deadline) {
+        if (this.stopEpoch !== epoch) {
+          throw new Error(`WdaServer for ${this.udid} was stopped during startup`);
+        }
+        if (this.childExited) {
+          throw new Error(
+            this.childError
+              ? `xcodebuild test-without-building failed to start: ${this.childError.message} — ` +
+                `xcodebuild log: ${this.logPath}`
+              : `xcodebuild test-without-building exited before WDA answered /status — ` +
+                `xcodebuild log: ${this.logPath}. ${FIRST_BUILD_NOTE}`,
+          );
+        }
+        if (await this.probeStatus()) return;
+        await sleep(this.pollIntervalMs);
       }
-      if (await this.probeStatus()) return;
-      await sleep(this.pollIntervalMs);
+      throw new Error(
+        `WDA did not answer /status on port ${this.port} within ${Math.round(this.readyTimeoutMs / 1000)}s ` +
+          `— xcodebuild log: ${this.logPath}. First install on a fresh simulator is slow. ${FIRST_BUILD_NOTE}`,
+      );
+    } catch (err) {
+      // NO exit path may leak the child we just spawned — timeout, child
+      // death, cancellation, AND a probeStatus foreign-server throw all land
+      // here. Guarded by identity: stop() may already have killed ours and a
+      // newer attempt may own this.child by now.
+      if (this.child === myChild) this.killChild();
+      throw err;
     }
-    this.killChild();
-    throw new Error(
-      `WDA did not answer /status on port ${this.port} within ${Math.round(this.readyTimeoutMs / 1000)}s ` +
-        `— xcodebuild log: ${this.logPath}. First install on a fresh simulator is slow. ${FIRST_BUILD_NOTE}`,
-    );
   }
 
   private killChild(): void {

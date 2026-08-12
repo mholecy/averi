@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import { findOne } from '../../src/ui-tree/selectors.js';
+import { findAll, findOne, resolveOne } from '../../src/ui-tree/selectors.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
 const fixture = (name: string) =>
@@ -92,6 +92,17 @@ describe('parseWdaSource — native skeleton fixture', () => {
   it('maps the structural NavigationBar to container, keeping its identifier', () => {
     const nav = nodes.find((n) => n.identifier === '_TtGC7SwiftUI32NavigationStackHosting');
     expect(nav?.role).toBe('container');
+  });
+
+  it('resolveOne under WDA label propagation: the interactive Button wins over its label-carrying ancestor', () => {
+    // The nested tree surfaces what idb's flat list hid: an ancestor `Other`
+    // carries the same propagated label as its Button descendant. A text:
+    // selector matches both — resolveOne must disambiguate to the Button.
+    const matches = findAll(tree, 'text:"Password login"');
+    expect(matches.length).toBeGreaterThan(1); // the ambiguity is real in this fixture
+    const { node: target, note } = resolveOne(tree, 'text:"Password login"');
+    expect(target.role).toBe('button');
+    expect(note).toContain('picked the only interactive one');
   });
 });
 

@@ -3,14 +3,20 @@ import { AdapterRegistry, type AdapterOpts } from '../../src/mcp/registry.js';
 import type { Device, DeviceAdapter, Platform } from '../../src/adapters/types.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
-/** Factory whose device list is mutable mid-test (devices boot and vanish). */
-function makeRegistry(devices: Device[]) {
+/**
+ * Factory whose device list is mutable mid-test (devices boot and vanish).
+ * `onProbe` gates listDevices — lets a test freeze a probe mid-flight.
+ */
+function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
   const bound: string[] = [];
   const created: FakeAdapter[] = [];
   const factory = (platform: Platform, deviceId?: string, opts?: AdapterOpts): DeviceAdapter => {
     if (deviceId !== undefined) bound.push(opts?.treeSource === undefined ? deviceId : `${deviceId}+${opts.treeSource}`);
     const adapter = new FakeAdapter({}, 'none');
-    adapter.listDevices = async () => devices.filter((d) => d.platform === platform);
+    adapter.listDevices = async () => {
+      await onProbe?.();
+      return devices.filter((d) => d.platform === platform);
+    };
     if (deviceId !== undefined) created.push(adapter);
     return adapter;
   };
@@ -116,6 +122,35 @@ describe('AdapterRegistry', () => {
     await registry.select('ios', 'a');
     expect(adapter.disposed).toBe(0);
     expect(await registry.get('ios', { treeSource: 'wda' })).toBe(adapter);
+  });
+
+  it('get() racing select() re-reads the binding — never resurrects the evicted adapter', async () => {
+    // get() captures the binding, then awaits a probe; select() runs to
+    // completion during that await (evicts device a, rebinds to b). Without
+    // the post-await re-read, get() resumes against the STALE binding and
+    // re-caches a fresh adapter for the deselected device — a zombie that is
+    // never disposed and shadows the user's explicit selection.
+    let gate: Promise<void> | undefined;
+    const { registry, bound, created } = makeRegistry(
+      [device('a', 'booted', 'ios'), device('b', 'booted', 'ios')],
+      () => gate,
+    );
+    const first = (await registry.get('ios')) as FakeAdapter; // auto-binds a
+    expect(bound).toEqual(['a']);
+
+    let release!: () => void;
+    gate = new Promise((r) => { release = r; });
+    const racing = registry.get('ios'); // captures binding a, freezes on the probe
+    gate = undefined; // select()'s own probe must run through
+    await registry.select('ios', 'b'); // evicts + disposes a's adapter, binds b
+    expect(first.disposed).toBe(1);
+
+    release();
+    const resumed = (await racing) as FakeAdapter;
+    expect(resumed).not.toBe(first);
+    expect(bound).toEqual(['a', 'b']); // no second adapter for the deselected a
+    expect(resumed).toBe(await registry.get('ios')); // and it IS b's cached adapter
+    expect(created.filter((a) => a.disposed > 0)).toEqual([first]);
   });
 
   it('evicting a vanished auto-picked device disposes its adapters', async () => {
