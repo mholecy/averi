@@ -229,7 +229,8 @@ registerTool(
   'ui_snapshot',
   {
     description:
-      'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes.',
+      'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
+      'React Native on iOS: if `id:` finds nothing for static text/containers (identifier: null everywhere), that is the default idb tree source — set `app.ios.treeSource: wda` in averi.yaml and retry.',
     inputSchema: {
       platform,
       filter: z.string().optional().describe('Selector to filter nodes'),
