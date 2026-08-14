@@ -336,6 +336,65 @@ describe('compareTextParity — the occlusion guard', () => {
   });
 });
 
+describe('compareTextParity — regressions found in review', () => {
+  it('an id on a container AND its text child is read ONCE, not once per ancestor', () => {
+    // findBySpec returns ancestors and their matching descendants, so walking
+    // every match double-counted the leaf and reported
+    // 'Enter amount Enter amount' as a copy drift.
+    const nested = root(402, [
+      n({ role: 'container', identifier: 'amount', children: [text('amount', 'Enter amount')] }),
+    ]);
+    expect(renderedTextFromTree(nested, 'amount')).toEqual(['Enter amount']);
+  });
+
+  it('a platform whose tree carries no rendered copy is UNREAD, never compared as ""', () => {
+    // The normal iOS shape on the tree source. Comparing it as '' dispatched
+    // two confident phantom findings on every non-macOS host.
+    const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
+    const r = compareTextParity(c, {
+      android: { tree: root(1080, [text('cta', 'CONTINUE')]) },
+      ios: { tree: root(402, [n({ role: 'button', identifier: 'cta', label: 'Continue to summary' })]) },
+    });
+    expect(r.findings).toHaveLength(0);
+    expect(r.rows[0].verdict).toBe('OCCLUDED');
+    expect(r.occluded[0].covered.ios).toContain('exposes no rendered copy');
+    expect(r.pass).toBe(false);
+  });
+
+  it('the UNREAD guard tolerates textAllCaps: tree "Continue" vs rendered "CONTINUE"', () => {
+    // Android's AccessibilityNodeInfo reports the UNTRANSFORMED text, so a
+    // case-sensitive survival test failed every Material caps button.
+    const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
+    const r = compareTextParity(c, {
+      android: { tree: root(1080, [text('cta', 'Continue')]), ocr: ocrMap({ cta: [line('CONTINUE', 30)] }), pngWidth: 1080 },
+    });
+    expect(r.occluded).toHaveLength(0);
+    expect(r.rows[0].verdict).toBe('OK');
+  });
+
+  it('the UNREAD guard tolerates an ellipsized render', () => {
+    const c = contract([{ id: 'row', text_dynamic: true }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('row', 'Select credit account')]),
+        ocr: ocrMap({ row: [line('Select credit acc…', 30)] }),
+        pngWidth: 1080,
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+  });
+
+  it('clamps an anchor hanging off the png instead of measuring ink in a silently clipped crop', () => {
+    const c = contract([{ id: 'cta', text: 'X' }]);
+    const tree = root(402, [n({ identifier: 'cta', rect: { x: -10, y: 800, width: 100, height: 100 } })]);
+    // scale 3: raw region would be x -30 .. 270, y 2400 .. 2700 against a 2622-tall png.
+    expect(ocrRegionsFor(c, tree, 1206, 2622)).toEqual([{ id: 'cta', x: 0, y: 2400, w: 270, h: 222 }]);
+    // Nothing on screen at all → omitted, so it surfaces as an OCR-less row.
+    const off = root(402, [n({ identifier: 'cta', rect: { x: 0, y: 2000, width: 100, height: 100 } })]);
+    expect(ocrRegionsFor(c, off, 1206, 2622)).toEqual([]);
+  });
+});
+
 describe('compareTextParity — missing anchors and bad input', () => {
   it('an id absent from one tree is MISSING and fails the run', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
@@ -380,12 +439,12 @@ describe('ocrRegionsFor', () => {
   it('scales opted-in anchor rects into png pixels (live: android 1.000, ios 3.000)', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }, { id: 'other', w: 10 }]);
     const ios = root(402, [n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
-    expect(ocrRegionsFor(c, ios, 1206)).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
+    expect(ocrRegionsFor(c, ios, 1206, 2622)).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
   });
 
   it('returns nothing when the scale cannot be derived — never a bogus region', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
-    expect(ocrRegionsFor(c, root(402, [n({ identifier: 'cta' })]), 0)).toEqual([]);
+    expect(ocrRegionsFor(c, root(402, [n({ identifier: 'cta' })]), 0, 800)).toEqual([]);
   });
 });
 

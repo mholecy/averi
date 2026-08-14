@@ -277,7 +277,7 @@ async function runOcr(
       const { tree, shot } = run.value;
       try {
         const png = PNG.sync.read(shot);
-        const regions = ocrRegionsFor(contract, tree, png.width);
+        const regions = ocrRegionsFor(contract, tree, png.width, png.height);
         if (regions.length === 0) return;
         const results = await engine.recognize(shot, regions);
         ocrByPlatform.set(p, {

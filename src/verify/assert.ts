@@ -106,7 +106,7 @@ const colorAssert = z
  * `credit_select` exposes 'To account' while rendering 'Select credit account'.
  * Use the element assert for a11y-facing copy, this one for what the user sees.
  *
- * `maxHeightPct` additionally pins the rendered ink height in % of screen
+ * `heightPct` additionally pins the rendered ink height in % of screen
  * width — the type-size check. Single-line elements only: multi-line ink runs
  * do not compose into one meaningful height.
  */
@@ -337,7 +337,7 @@ export class Verifier {
         const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
         try {
           const png = PNG.sync.read(shot);
-          const region = ocrRegionForRect('element', found[0].rect, tree, png.width);
+          const region = ocrRegionForRect('element', found[0].rect, tree, png.width, png.height);
           if (region === undefined) {
             return { pass: false, detail: 'element rect or screen width is degenerate — cannot crop; failing closed' };
           }

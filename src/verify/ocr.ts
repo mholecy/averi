@@ -23,8 +23,8 @@ import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
  * - the rendered INK HEIGHT — Vision returns a bounding box per string, so the
  *   type-size check needs no separate binarize-and-count-rows pass. Normalized
  *   by screen width it reproduced both validation pairs: `CONTINUE` android
- *   2.96% vs ios 2.99% (1.0% apart → PASS) and the top-bar title 3.80% vs
- *   3.32% (14.5% apart → FAIL), the latter being the 22sp-vs-17pt drift that
+ *   2.96% vs ios 2.99% (0.74% apart → PASS) and the top-bar title 3.80% vs
+ *   3.32% (12.63% apart → FAIL), the latter being the 22sp-vs-17pt drift that
  *   shipped past every gate and was caught only by the owner's eye.
  *
  * Engine choice: Vision via `swiftc`, i.e. zero new dependencies — no brew, no
@@ -231,13 +231,20 @@ export class VisionOcr implements OcrEngine {
     if (existsSync(binary)) return binary;
 
     await mkdir(dir, { recursive: true });
-    const source = join(dir, `recognizer-${key}.swift`);
-    await writeFile(source, RECOGNIZER_SWIFT);
-    // Compile to a unique name, then rename: two averi processes building
-    // concurrently must never observe a half-written binary.
+    // BOTH the source and the binary are per-process until the compile is done.
+    // A shared source path is not merely untidy: a second averi process
+    // truncating and rewriting it mid-compile makes THIS process's swiftc fail
+    // with a spurious syntax error in a file that looks perfectly valid
+    // afterwards. Rename is the only step that publishes anything.
+    const source = `${binary}.${process.pid}.swift`;
     const staging = `${binary}.${process.pid}`;
-    await this.exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
-    await rename(staging, binary);
+    await writeFile(source, RECOGNIZER_SWIFT);
+    try {
+      await this.exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
+      await rename(staging, binary);
+    } finally {
+      await rm(source, { force: true });
+    }
     return binary;
   }
 }

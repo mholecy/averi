@@ -1,5 +1,5 @@
 import type { Platform, UiNode } from '../adapters/types.js';
-import { inferScreenWidth } from '../ui-tree/geometry.js';
+import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import type { LayoutAnchor, LayoutContract } from './layout-contract.js';
 import type { OcrLine, OcrRegion, OcrRegionResult } from './ocr.js';
@@ -148,6 +148,22 @@ export const normalizeText = (raw: string): string => raw.replace(/[\s  ]+/g,
  * its descendants; `label` of text nodes and `value` of fields; nothing else.
  */
 export function renderedTextFromTree(tree: UiNode, id: string): string[] {
+  const matches = findBySpec(tree, { id });
+  // `findBySpec` returns ancestors AND their matching descendants, so when an
+  // id sits on a container and again on the text node inside it — which is
+  // exactly what identifier propagation produces — walking every match would
+  // collect the leaf once per ancestor and report 'Enter amount Enter amount'
+  // as a copy drift. Walk only the OUTERMOST matches; their walk already
+  // reaches the rest.
+  const inner = new Set<UiNode>();
+  const markDescendants = (n: UiNode): void => {
+    for (const child of n.children) {
+      inner.add(child);
+      markDescendants(child);
+    }
+  };
+  for (const m of matches) markDescendants(m);
+
   const out: string[] = [];
   const walk = (n: UiNode): void => {
     if (n.role === 'text' && n.label !== null) out.push(n.label);
@@ -155,8 +171,33 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
     else if (n.role === 'textfield' && n.value !== null) out.push(n.value);
     n.children.forEach(walk);
   };
-  for (const node of findBySpec(tree, { id })) walk(node);
+  for (const node of matches) if (!inner.has(node)) walk(node);
   return out;
+}
+
+/**
+ * Did a tree string survive into the recognized reading? Used ONLY by the
+ * UNREAD guard, to ask "did this copy vanish", never to judge copy drift — so
+ * it is deliberately forgiving where the two sources differ for known,
+ * innocent reasons:
+ *
+ * - CASE. Android's accessibility tree reports the UNTRANSFORMED text, so a
+ *   Material button with `textAllCaps` exposes 'Continue' while rendering
+ *   'CONTINUE'. A case-sensitive test would mark every such button UNREAD and
+ *   fail the run.
+ * - TRUNCATION. An ellipsized TextView renders 'Select credit acc…' where the
+ *   tree holds the full string, so the reading is a PREFIX of the tree value.
+ *
+ * Drift comparison stays exact (`normalizeText` only collapses whitespace) —
+ * a real case change is a real finding, and this leniency must not leak there.
+ */
+function survivesIn(treeString: string, seen: string): boolean {
+  const want = treeString.toLowerCase();
+  const got = seen.toLowerCase();
+  if (got.includes(want)) return true;
+  // Ellipsized render: drop the ellipsis and accept a prefix of the tree value.
+  const head = got.replace(/[…\.]+$/, '').trim();
+  return head.length >= 3 && want.startsWith(head);
 }
 
 /**
@@ -182,47 +223,56 @@ function hasAccessibleName(tree: UiNode, id: string): boolean {
  * is testable without decoding anything.
  *
  * Unlike color sampling there is NO edge inset: an inset crop clips glyphs and
- * the recognizer then reads a different string. Rects are clamped to the png;
- * anchors fully outside it are omitted and surface as OCR-less rows.
+ * the recognizer then reads a different string. Rects ARE clamped to the png
+ * (see ocrRegionForRect); anchors fully outside it are omitted and surface as
+ * OCR-less rows.
  */
-export function ocrRegionsFor(contract: LayoutContract, tree: UiNode, pngWidth: number): OcrRegion[] {
-  const rects = new Map<string, UiNode['rect']>();
-  const walk = (n: UiNode): void => {
-    if (n.identifier !== null && n.identifier !== '' && !rects.has(n.identifier)) {
-      rects.set(n.identifier, n.rect);
-    }
-    n.children.forEach(walk);
-  };
-  walk(tree);
+export function ocrRegionsFor(
+  contract: LayoutContract,
+  tree: UiNode,
+  pngWidth: number,
+  pngHeight: number,
+): OcrRegion[] {
+  const rects = collectRects(tree);
   const regions: OcrRegion[] = [];
   for (const anchor of contract.anchors) {
     if (!wantsTextCheck(anchor)) continue;
     const rect = rects.get(anchor.id);
     if (rect === undefined) continue;
-    const region = ocrRegionForRect(anchor.id, rect, tree, pngWidth);
+    const region = ocrRegionForRect(anchor.id, rect, tree, pngWidth, pngHeight);
     if (region !== undefined) regions.push(region);
   }
   return regions;
 }
 
 /**
- * One rect scaled into png pixels. Returns undefined when the scale cannot be
- * derived or the region is degenerate — the caller must then report why, never
- * silently pass.
+ * One rect scaled into png pixels and CLAMPED to the image. Returns undefined
+ * when the scale cannot be derived or nothing of the rect is on-screen — the
+ * caller must then report why, never silently pass.
+ *
+ * Clamping is not cosmetic. iOS keeps off-viewport nodes in the tree with
+ * negative or oversized rects; handed one of those unclamped, `CGImage`
+ * silently intersects the crop, and the ink measured inside that clipped crop
+ * would be normalized as if it were the whole anchor — a phantom type-size
+ * delta built out of a partly off-screen element.
  */
 export function ocrRegionForRect(
   id: string,
   rect: UiNode['rect'],
   tree: UiNode,
   pngWidth: number,
+  pngHeight: number,
 ): OcrRegion | undefined {
   const { width } = inferScreenWidth(tree);
   if (width <= 0 || !Number.isFinite(pngWidth) || pngWidth <= 0) return undefined;
+  if (!Number.isFinite(pngHeight) || pngHeight <= 0) return undefined;
   const scale = pngWidth / width;
-  const w = Math.round(rect.width * scale);
-  const h = Math.round(rect.height * scale);
-  if (w <= 0 || h <= 0) return undefined;
-  return { id, x: Math.round(rect.x * scale), y: Math.round(rect.y * scale), w, h };
+  const x0 = Math.max(0, Math.round(rect.x * scale));
+  const y0 = Math.max(0, Math.round(rect.y * scale));
+  const x1 = Math.min(pngWidth, Math.round((rect.x + rect.width) * scale));
+  const y1 = Math.min(pngHeight, Math.round((rect.y + rect.height) * scale));
+  if (x1 - x0 <= 0 || y1 - y0 <= 0) return undefined;
+  return { id, x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 // ------------------------------------------------------- contract handling
@@ -310,7 +360,7 @@ function measure(
   if (measurement.ocr !== undefined && treeStrings.length > 0) {
     const seen = measurement.ocr;
     const substantial = treeStrings.map(normalizeText).filter((s) => s.length >= 2);
-    if (substantial.length > 0 && !substantial.some((s) => seen.includes(s))) {
+    if (substantial.length > 0 && !substantial.some((s) => survivesIn(s, seen))) {
       return {
         measurement,
         occluded:
@@ -382,24 +432,6 @@ export function compareTextParity(
       continue;
     }
 
-    // An occluded anchor is a CAPTURE problem, not a code problem — the same
-    // stance MISSING gets. Comparing it would dispatch a phantom copy drift to
-    // implementers, which is the one outcome this whole table exists to avoid.
-    if (Object.keys(covered).length > 0) {
-      occluded.push({ id, covered });
-      rows.push({
-        id,
-        source: 'ocr',
-        android: measured.android,
-        ios: measured.ios,
-        contract: expected,
-        dynamic,
-        verdict: 'OCCLUDED',
-        absent: anyAbsent ? absent : undefined,
-      });
-      continue;
-    }
-
     // Rule 4: one source for the whole row. OCR only when EVERY present
     // platform has it, so the two sides answer the same question.
     const present = platforms.filter((p) => measured[p] !== undefined);
@@ -415,6 +447,42 @@ export function compareTextParity(
       if (m === undefined) return undefined;
       return source === 'ocr' ? m.ocr : m.tree;
     };
+
+    // A platform that yielded NO string on the chosen source has not been read
+    // — it must never be compared as the empty string. On the tree source this
+    // is the normal iOS shape, not an anomaly: the header's own measurement is
+    // that a SwiftUI button's visible label is absent from the tree entirely,
+    // so `'' vs 'CONTINUE'` would dispatch a confident phantom drift on every
+    // non-macOS host, every missing toolchain and every per-region OCR error —
+    // precisely the fallback the run layer advertises as WEAKER evidence.
+    for (const p of present) {
+      // A reason already set by `measure` is the more specific one (it knows
+      // the tree DID carry copy) — never overwrite it with this generic case.
+      if (covered[p] !== undefined || seen(p) !== '') continue;
+      covered[p] =
+        source === 'tree'
+          ? 'the accessibility tree exposes no rendered copy for this anchor (on iOS a button or card ' +
+            'collapses into one authored a11y label) — the tree cannot answer what it renders; run with OCR'
+          : 'the recognizer read nothing in this rect and the tree offers no copy either — nothing to compare';
+    }
+
+    // An UNREAD anchor is a CAPTURE problem, not a code problem — the same
+    // stance MISSING gets. Comparing it would dispatch a phantom copy drift to
+    // implementers, which is the one outcome this whole table exists to avoid.
+    if (Object.keys(covered).length > 0) {
+      occluded.push({ id, covered });
+      rows.push({
+        id,
+        source,
+        android: measured.android,
+        ios: measured.ios,
+        contract: expected,
+        dynamic,
+        verdict: 'OCCLUDED',
+        absent: anyAbsent ? absent : undefined,
+      });
+      continue;
+    }
 
     const before = findings.length;
 
