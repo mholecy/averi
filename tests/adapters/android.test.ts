@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { tapElement } from '../../src/ui-tree/tap-element.js';
 import { AndroidAdapter, parseUiautomatorXml } from '../../src/adapters/android.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 
@@ -112,7 +113,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('tapElement resolves a selector and taps the rect center', async () => {
     const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).tapElement('id:pin_key_2');
+    await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:pin_key_2');
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 540 1350');
   });
 
@@ -202,5 +203,40 @@ describe('AndroidAdapter interactions', () => {
     const { fn, calls } = fakeExec({});
     await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).clearText(0);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('typeText pacing (measured anti-flake behaviour)', () => {
+  /**
+   * The 250ms per character and the 150ms settle after the cursor nudge are
+   * not arbitrary: bulk injection and unpaced per-char injection were both
+   * measured dropping characters on Compose fields (2026-08-05, 3-of-11 and
+   * 5-of-8 respectively). Setting either to 0 must fail, or the next person
+   * "simplifying" the delays gets a green suite and a flaky login.
+   */
+  it('waits 250ms after each character and 150ms after the commit nudge', async () => {
+    vi.useFakeTimers();
+    try {
+      const { fn, calls } = fakeExec({});
+      const waits: number[] = [];
+      const spy = vi.spyOn(global, 'setTimeout').mockImplementation(((cb: () => void, ms?: number) => {
+        waits.push(ms ?? 0);
+        cb();
+        return 0 as unknown as NodeJS.Timeout;
+      }) as typeof setTimeout);
+
+      await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('abc');
+      spy.mockRestore();
+
+      // Three characters paced at 250ms, then the DPAD nudge settle at 150ms.
+      expect(waits).toEqual([250, 250, 250, 150]);
+      // The nudge itself must still bracket that final wait.
+      expect(calls.slice(-2)).toEqual([
+        'adb -s emulator-5554 shell input keyevent 21',
+        'adb -s emulator-5554 shell input keyevent 22',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

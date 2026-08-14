@@ -3,7 +3,6 @@ import {
   loadConfigIfPresent,
   loadEnvBeside,
   parseConfig,
-  parseDuration,
   resolveCredentials,
 } from '../../src/flow/config.js';
 
@@ -168,19 +167,6 @@ states:
     expect(() =>
       parseConfig('app: {}\nstates:\n  s:\n    detect: { state: s, absent: true }\n'),
     ).toThrow(/absent is only valid together with element|Invalid averi\.yaml/);
-  });
-});
-
-describe('parseDuration', () => {
-  it('parses ms, s, m and passes numbers through', () => {
-    expect(parseDuration(250)).toBe(250);
-    expect(parseDuration('500ms')).toBe(500);
-    expect(parseDuration('15s')).toBe(15_000);
-    expect(parseDuration('2m')).toBe(120_000);
-  });
-
-  it('rejects garbage', () => {
-    expect(() => parseDuration('soon')).toThrow(/Invalid duration/);
   });
 });
 

@@ -13,7 +13,7 @@ import {
   scaledRegion,
   type ColorCapture,
 } from '../../src/verify/color-parity.js';
-import { parseRectContract, type RectContract } from '../../src/verify/rect-parity.js';
+import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 
 /**
  * Synthetic in-memory captures modeled on the live-validated 2026-08-14 run:
@@ -68,7 +68,7 @@ function img(width: number, height: number, bg = BG): PNG {
   return png;
 }
 
-const contract = (json: unknown): RectContract => parseRectContract(JSON.stringify(json));
+const contract = (json: unknown): LayoutContract => parseLayoutContract(JSON.stringify(json));
 
 /** One card per platform, same tree geometry, per-platform fill. */
 function capturePair(androidFill: string, iosFill: string): Record<'android' | 'ios', ColorCapture> {
@@ -85,7 +85,7 @@ function capturePair(androidFill: string, iosFill: string): Record<'android' | '
   };
 }
 
-const cardContract = (extra: Record<string, unknown> = {}): RectContract =>
+const cardContract = (extra: Record<string, unknown> = {}): LayoutContract =>
   contract({ screen: 'payment.form', anchors: [{ id: 'card', bg: WHITE, ...extra }] });
 
 describe('compareColorParity — the live-validated semantics', () => {

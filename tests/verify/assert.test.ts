@@ -412,3 +412,123 @@ describe('scanForCrashes', () => {
     expect(scanForCrashes(['all quiet', 'nothing to see'], 'ios')).toHaveLength(0);
   });
 });
+
+/**
+ * The four asserts share one polling primitive but deliberately DISAGREE on
+ * how a timeout is explained. Nothing pinned that disagreement, so collapsing
+ * the loops could have silently inverted it — these lock it down.
+ */
+describe('timeout-detail precedence (shared poll, per-assert wording)', () => {
+  /** Sees the element for the first read, then can no longer produce a tree. */
+  function seesThenBlinds(): FakeAdapter {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { dashboard: screen(el({ identifier: 'amount', role: 'text', value: 'WRONG' })) },
+      'dashboard',
+    );
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (reads++ > 0) throw new Error('null root node');
+      return real();
+    };
+    return fake;
+  }
+
+  it('an element assert prefers the READ ERROR — a tree it never read explains the miss', async () => {
+    const result = await new Verifier(seesThenBlinds(), FAST).assert({
+      element: { id: 'amount' },
+      text: '100.00',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('last UI tree read failed');
+    expect(result.detail).not.toContain('element found but');
+  });
+
+  it('a rect assert prefers the MEASUREMENT — it did read the tree, and the numbers are the finding', async () => {
+    const result = await new Verifier(seesThenBlinds(), FAST).assert({
+      element: { id: 'amount' },
+      rect: { x: 999, frameWidth: 393 },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('vs contract');
+    expect(result.detail).not.toContain('last UI tree read failed');
+  });
+
+  it('an unreadable tree is never evidence of absence', async () => {
+    const fake = seesThenBlinds();
+    fake.uiTree = async () => {
+      throw new Error('null root node');
+    };
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'gone' }, absent: true });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('could not verify');
+  });
+});
+
+describe('poll cadence and preconditions', () => {
+  it('a passing assert reads the tree exactly once — no wasted device round trip', async () => {
+    const fake = dashboardFake();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      reads++;
+      return real();
+    };
+    expect(await new Verifier(fake, FAST).assert({ element: { id: 'dashboard_root' } })).toMatchObject({
+      pass: true,
+    });
+    expect(reads).toBe(1);
+  });
+
+  it('absent reads the viewport once, and a viewport failure THROWS rather than passing', async () => {
+    const counted = dashboardFake();
+    let viewports = 0;
+    counted.viewport = async () => {
+      viewports++;
+      return { width: 1000, height: 2000 };
+    };
+    await new Verifier(counted, FAST).assert({ element: { id: 'dashboard_root' }, absent: true });
+    expect(viewports).toBe(1);
+
+    const broken = dashboardFake();
+    broken.viewport = async () => {
+      throw new Error('adb: device offline');
+    };
+    // Absence without a reference frame is meaningless — it must not come back
+    // as a tidy failing assert.
+    await expect(
+      new Verifier(broken, FAST).assert({ element: { id: 'nope' }, absent: true }),
+    ).rejects.toThrow(/device offline/);
+  });
+});
+
+describe('rect and color asserts report an unreadable tree at timeout', () => {
+  /** Never produces a tree — the `detail ?? notFound(readError)` branch. */
+  function blind() {
+    const fake = dashboardFake();
+    fake.uiTree = async () => {
+      throw new Error('null root node');
+    };
+    return fake;
+  }
+
+  it('a rect assert names the read failure when it never saw the element', async () => {
+    const result = await new Verifier(blind(), FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 24, frameWidth: 393 },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('not found within');
+    expect(result.detail).toContain('last UI tree read failed: null root node');
+  });
+
+  it('a color assert names the read failure too', async () => {
+    const result = await new Verifier(blind(), FAST).assert({
+      element: { id: 'card' },
+      color: { expected: '#FFFFFF' },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('last UI tree read failed: null root node');
+  });
+});

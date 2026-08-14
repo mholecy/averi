@@ -1,4 +1,5 @@
 import { IOS_ROLE_MAP } from './ios-role-map.js';
+import { attachFieldErrors, everyNode } from './field-errors.js';
 import type { UiNode } from './types.js';
 
 /**
@@ -59,7 +60,8 @@ export function parseWdaSource(json: string): UiNode {
  */
 export function parseWdaSourceValue(value: unknown): UiNode {
   const tree = toUiNode(unwrapEnvelope(value));
-  attachFieldErrors(tree);
+  // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
+  attachFieldErrors(everyNode(tree));
   return tree;
 }
 
@@ -95,35 +97,6 @@ function toUiNode(el: WdaElement): UiNode {
       : { x: 0, y: 0, width: 0, height: 0 },
     children: (el.children ?? []).map(toUiNode),
   };
-}
-
-/**
- * Pair validation messages with their inputs — same measured convention as
- * ios.ts attachFieldErrors (payment spike 2026-08-05): a field's title AND
- * its error label share the field's accessibilityIdentifier; title above,
- * error below, nearest one wins. On this NESTED tree the candidates are not
- * siblings (the field and its labels sit in different branches), but rects
- * are absolute, so collect textfields and text nodes across the whole tree
- * and pair by identifier + geometry.
- */
-function attachFieldErrors(root: UiNode): void {
-  const fields: UiNode[] = [];
-  const texts: UiNode[] = [];
-  const walk = (n: UiNode): void => {
-    if (n.role === 'textfield' && n.identifier !== null) fields.push(n);
-    else if (n.role === 'text' && n.identifier !== null && n.label !== null) texts.push(n);
-    n.children.forEach(walk);
-  };
-  walk(root);
-  for (const field of fields) {
-    const fieldBottom = field.rect.y + field.rect.height;
-    const below = texts.filter(
-      (t) => t.identifier === field.identifier && t.rect.y >= fieldBottom,
-    );
-    if (below.length === 0) continue;
-    below.sort((a, b) => a.rect.y - b.rect.y);
-    field.error = below[0].label!;
-  }
 }
 
 function emptyToNull(value: string | null | undefined): string | null {

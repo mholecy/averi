@@ -4,9 +4,12 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
-import { elementAssertSchema, elementSpecSchema, parseDuration, type ElementSpec } from '../flow/config.js';
-import { evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
-import { evaluateRectAssert, type RectExpectation } from './rect-parity.js';
+import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import { parseDuration } from '../util/duration.js';
+import { sleep } from '../util/sleep.js';
+import { elementAssertSchema } from './element-assert.js';
+import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
+import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 
 /**
@@ -64,7 +67,8 @@ const rectAssert = z
  * Single-element fill check (color-parity.ts): sample the element's region
  * from a screenshot and compare CIEDE2000 against `expected`. Hex only —
  * token names resolve in the superrepo layer, before the assert is written.
- * `deltaE` defaults to 8 and is compared DIRECTLY (no 1.5x contract slack:
+ * `deltaE` defaults to DEFAULT_TOLERANCE_DE (8) and is compared DIRECTLY —
+ * without the 1.5x CONTRACT_TOL_FACTOR slack the contract axis gets (
  * the caller chose the hex); the real 2026-08-13 bug measures dE00 10.19,
  * so the default catches it. `theme` is a declarative annotation naming the
  * theme the hex was authored for — averi does not switch device themes.
@@ -104,11 +108,49 @@ export interface AssertResult {
   detail?: string;
 }
 
+/**
+ * Where screenshot baselines live, relative to the project root. Kept relative
+ * (resolved by the caller) so the value is one string in one place while the
+ * cwd-at-access-time behaviour of the default stays exactly as it was.
+ */
+export const DEFAULT_BASELINE_DIR = '.averi/baselines';
+
 export interface VerifierOptions {
   baselineDir?: string;
   pollMs?: number;
   timeoutMs?: number;
 }
+
+/**
+ * What one poll round concluded. `undefined` (not this type) means "nothing to
+ * say, keep polling" — the element isn't there yet. `pass: true` stops the
+ * poll; `pass: false` carries a detail worth reporting IF the deadline is
+ * reached, without ending the poll: mid-animation geometry may legitimately be
+ * wrong for a frame, so only the state at timeout is the verdict.
+ */
+interface PollVerdict {
+  pass: boolean;
+  detail?: string;
+}
+
+interface PollSpec {
+  description: string;
+  timeoutMs: number;
+  /**
+   * Detail for the failing result at the deadline, from the last non-passing
+   * detail an evaluation produced and the last tree-read error. Each assert
+   * words this itself, and they deliberately ORDER the two differently: an
+   * element assert prefers the read error (a tree it never read explains the
+   * miss), a rect/color assert prefers the measurement (it did read the tree,
+   * and the numbers are the finding).
+   */
+  timeoutDetail: (last: { detail?: string; readError?: Error }) => string;
+}
+
+/** "not found within Nms", plus the last tree-read error when there was one. */
+const notFound = (timeoutMs: number, readError?: Error): string =>
+  `not found within ${timeoutMs}ms` +
+  (readError === undefined ? '' : ` (last UI tree read failed: ${readError.message})`);
 
 export class Verifier {
   private readonly baselineDir: string;
@@ -119,7 +161,7 @@ export class Verifier {
     private readonly adapter: DeviceAdapter,
     opts: VerifierOptions = {},
   ) {
-    this.baselineDir = opts.baselineDir ?? '.averi/baselines';
+    this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
     this.timeoutMs = opts.timeoutMs ?? 3_000;
   }
@@ -154,38 +196,37 @@ export class Verifier {
       : error !== undefined ? ` with error ${JSON.stringify(error)}`
       : '';
     const description = `element ${describe(element)}${wants} exists`;
-    const deadline = Date.now() + timeoutMs;
-    let lastSeen: string | undefined;
-    let lastReadError: Error | undefined;
-    for (;;) {
-      const { tree, error: readError } = await this.tryReadTree();
-      lastReadError = readError;
-      const found = tree === undefined ? [] : findBySpec(tree, element);
-      const matching = found.filter((n) => {
-        const values = [n.label, n.value].filter((v): v is string => v !== null);
-        if (text !== undefined) return values.includes(text);
-        if (match !== undefined) return values.some((v) => new RegExp(match).test(v));
-        if (error !== undefined) return n.error === error;
-        return true;
-      });
-      if (matching.length > 0) return { description, pass: true };
-      if (found.length > 0) {
-        lastSeen = found
-          .slice(0, 3)
-          .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
-          .join(', ');
-      }
-      if (Date.now() >= deadline) {
-        const detail =
-          lastReadError !== undefined
-            ? `not found within ${timeoutMs}ms (last UI tree read failed: ${lastReadError.message})`
-            : lastSeen !== undefined
-              ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${lastSeen}`
-              : `not found within ${timeoutMs}ms`;
-        return { description, pass: false, detail };
-      }
-      await sleep(this.pollMs);
-    }
+    const contentMatches = (n: UiNode): boolean => {
+      const values = [n.label, n.value].filter((v): v is string => v !== null);
+      if (text !== undefined) return values.includes(text);
+      if (match !== undefined) return values.some((v) => new RegExp(match).test(v));
+      if (error !== undefined) return n.error === error;
+      return true;
+    };
+    return this.poll(
+      (tree) => {
+        const found = findBySpec(tree, element);
+        if (found.some(contentMatches)) return { pass: true };
+        if (found.length === 0) return undefined;
+        // The element is there but says the wrong thing — worth reporting at
+        // the deadline, not worth ending the poll for.
+        return {
+          pass: false,
+          detail: found
+            .slice(0, 3)
+            .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
+            .join(', '),
+        };
+      },
+      {
+        description,
+        timeoutMs,
+        timeoutDetail: ({ detail, readError }) =>
+          readError !== undefined ? notFound(timeoutMs, readError)
+          : detail !== undefined ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
+          : notFound(timeoutMs),
+      },
+    );
   }
 
   /**
@@ -199,33 +240,20 @@ export class Verifier {
     expected: RectExpectation,
     timeoutMs: number,
   ): Promise<AssertResult> {
-    const tolerance = expected.tolerancePct ?? 2.0;
+    const tolerance = expected.tolerancePct ?? DEFAULT_TOLERANCE_PCT;
     const description = `element ${describe(element)} rect within ${tolerance}% of screen width (figma frame ${expected.frameWidth})`;
-    const deadline = Date.now() + timeoutMs;
-    let lastDetail: string | undefined;
-    let lastReadError: Error | undefined;
-    for (;;) {
-      const { tree, error: readError } = await this.tryReadTree();
-      lastReadError = readError;
-      if (tree !== undefined) {
+    return this.poll(
+      (tree) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
-        if (found.length > 0) {
-          const evaluated = evaluateRectAssert(found[0].rect, expected, tree);
-          if (evaluated.pass) return { description, pass: true, detail: evaluated.detail };
-          lastDetail = evaluated.detail;
-        }
-      }
-      if (Date.now() >= deadline) {
-        const detail =
-          lastDetail ??
-          (lastReadError !== undefined
-            ? `not found within ${timeoutMs}ms (last UI tree read failed: ${lastReadError.message})`
-            : `not found within ${timeoutMs}ms`);
-        return { description, pass: false, detail };
-      }
-      await sleep(this.pollMs);
-    }
+        return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, tree);
+      },
+      {
+        description,
+        timeoutMs,
+        timeoutDetail: ({ detail, readError }) => detail ?? notFound(timeoutMs, readError),
+      },
+    );
   }
 
   /**
@@ -241,41 +269,67 @@ export class Verifier {
     expectation: ColorExpectation,
     timeoutMs: number,
   ): Promise<AssertResult> {
-    const tol = expectation.deltaE ?? 8;
+    const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
     const expectedHex = normalizeHex(expectation.expected);
     const description =
       `element ${describe(element)} fill within dE00 ${tol} of ${expectedHex}` +
       (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
-    const deadline = Date.now() + timeoutMs;
-    let lastDetail: string | undefined;
-    let lastReadError: Error | undefined;
-    for (;;) {
-      const { tree, error: readError } = await this.tryReadTree();
-      lastReadError = readError;
-      if (tree !== undefined) {
+    return this.poll(
+      async (tree) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
-        if (found.length > 0) {
-          const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
-          try {
-            const png = PNG.sync.read(shot);
-            const evaluated = evaluateColorAssert(found[0].rect, expectation, tree, png);
-            if (evaluated.pass) return { description, pass: true, detail: evaluated.detail };
-            lastDetail = evaluated.detail;
-          } catch (e) {
-            // Fail closed on an undecodable screenshot, but keep polling —
-            // the capture may have raced a transition.
-            lastDetail = `screenshot PNG decode failed: ${e instanceof Error ? e.message : String(e)}`;
-          }
+        if (found.length === 0) return undefined;
+        const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
+        try {
+          const png = PNG.sync.read(shot);
+          return evaluateColorAssert(found[0].rect, expectation, tree, png);
+        } catch (e) {
+          // Fail closed on an undecodable screenshot, but keep polling —
+          // the capture may have raced a transition.
+          return { pass: false, detail: `screenshot PNG decode failed: ${e instanceof Error ? e.message : String(e)}` };
         }
+      },
+      {
+        description,
+        timeoutMs,
+        timeoutDetail: ({ detail, readError }) => detail ?? notFound(timeoutMs, readError),
+      },
+    );
+  }
+
+  /**
+   * The shape every polling assert shares (ARCHITECTURE.md §8, "waits, not
+   * sleeps"): read the tree, evaluate it, stop on a pass, otherwise remember
+   * what it said and retry until the deadline.
+   *
+   * A FAILED tree read is a miss, not a failure — right after launch the
+   * device can be momentarily unable to produce one (uiautomator "null root
+   * node") — so it never ends the poll and never counts as evidence; it is
+   * kept only to explain a timeout. Owning that rule in one place is the point
+   * of this method: it was written out four times, once per assert.
+   */
+  private async poll(
+    evaluate: (tree: UiNode) => Promise<PollVerdict | undefined> | PollVerdict | undefined,
+    spec: PollSpec,
+  ): Promise<AssertResult> {
+    const { description, timeoutMs } = spec;
+    const deadline = Date.now() + timeoutMs;
+    let detail: string | undefined;
+    let readError: Error | undefined;
+    for (;;) {
+      const read = await this.tryReadTree();
+      readError = read.error;
+      if (read.tree !== undefined) {
+        const verdict = await evaluate(read.tree);
+        if (verdict?.pass) return { description, pass: true, detail: verdict.detail };
+        // Only overwrite with something to say. An evaluation with nothing to
+        // report (element not present this round) must not ERASE what an
+        // earlier round saw — that is what makes "element found but content
+        // was: …" survive the element vanishing again before the deadline.
+        if (verdict?.detail !== undefined) detail = verdict.detail;
       }
       if (Date.now() >= deadline) {
-        const detail =
-          lastDetail ??
-          (lastReadError !== undefined
-            ? `not found within ${timeoutMs}ms (last UI tree read failed: ${lastReadError.message})`
-            : `not found within ${timeoutMs}ms`);
-        return { description, pass: false, detail };
+        return { description, pass: false, detail: spec.timeoutDetail({ detail, readError }) };
       }
       await sleep(this.pollMs);
     }
@@ -301,28 +355,31 @@ export class Verifier {
    */
   private async assertAbsent(element: ElementSpec, timeoutMs: number): Promise<AssertResult> {
     const description = `element ${describe(element)} is absent`;
+    // Read before polling: a viewport that cannot be read is an error, not a
+    // failed assert — absence is meaningless without a reference frame.
     const viewport = await this.adapter.viewport();
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const { tree, error } = await this.tryReadTree();
-      // An unreadable tree is NOT evidence of absence — keep polling.
-      if (tree !== undefined) {
+    return this.poll(
+      (tree) => {
         const found = findBySpec(tree, element);
         const visible = found.filter((n) => intersectsViewport(n.rect, viewport));
-        if (visible.length === 0) {
-          const detail = found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined;
-          return { description, pass: true, detail };
-        }
-      }
-      if (Date.now() >= deadline) {
-        const detail =
-          error !== undefined
-            ? `could not verify within ${timeoutMs}ms (last UI tree read failed: ${error.message})`
-            : `still visible after ${timeoutMs}ms`;
-        return { description, pass: false, detail };
-      }
-      await sleep(this.pollMs);
-    }
+        if (visible.length > 0) return undefined;
+        return {
+          pass: true,
+          detail:
+            found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined,
+        };
+      },
+      {
+        description,
+        timeoutMs,
+        // An unreadable tree is NOT evidence of absence — it is why we could
+        // not tell, so it outranks "still visible".
+        timeoutDetail: ({ readError }) =>
+          readError !== undefined
+            ? `could not verify within ${timeoutMs}ms (last UI tree read failed: ${readError.message})`
+            : `still visible after ${timeoutMs}ms`,
+      },
+    );
   }
 
   private async assertScreenshot(name: string, threshold: number): Promise<AssertResult> {
@@ -431,11 +488,3 @@ export function scanForCrashes(lines: string[], platform: 'android' | 'ios'): st
   return excerpt;
 }
 
-function describe(spec: ElementSpec): string {
-  return Object.entries(spec)
-    .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `${k}:${JSON.stringify(v)}`)
-    .join(' ');
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

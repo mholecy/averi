@@ -503,6 +503,38 @@ flows:
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 2.50' });
   });
 
+  it('dismissKeyboard presses AFTER the text landed, never before', async () => {
+    const fake = formFake();
+    const order: string[] = [];
+    const typeText = fake.typeText.bind(fake);
+    fake.typeText = async (t: string) => {
+      order.push(`type:${t}`);
+      return typeText(t);
+    };
+    fake.pressKey = async (k) => {
+      order.push(`key:${k}`);
+    };
+
+    await new FlowEngine(
+      cfg('{ id: amount_input, value: "2.50", dismissKeyboard: true }'),
+      fake,
+      FAST,
+    ).runFlow('f');
+
+    // Dismissing first would close the keyboard the typing needs.
+    expect(order).toEqual(['type:2.50', 'key:back']);
+  });
+
+  it('dismissKeyboard is opt-in — no key press without it', async () => {
+    const fake = formFake();
+    const keys: string[] = [];
+    fake.pressKey = async (k) => {
+      keys.push(k);
+    };
+    await new FlowEngine(cfg('{ id: amount_input, value: "2.50" }'), fake, FAST).runFlow('f');
+    expect(keys).toEqual([]);
+  });
+
   it('clear: true deletes the existing value length before typing', async () => {
     const fake = formFake('2.50');
     await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
@@ -745,5 +777,39 @@ flows:
     await expect(
       new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow('type_username'),
     ).rejects.toThrow(/TEST_STARTERKIT_USER is not set .*environment "starterkit"/);
+  });
+});
+
+describe('branch arm selection', () => {
+  const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - branch:
+          - when: { element: { id: pin_keyboard } }
+            do: [ { tap: { id: pin_keyboard } } ]
+          - when: { element: { id: username_field } }
+            do: [ { tap: { id: username_field } } ]
+`);
+
+  it('takes the FIRST matching arm when several conditions hold', async () => {
+    resetLayout();
+    // Both arms' conditions are satisfiable on this screen — declaration order
+    // decides, which is how a flow author expresses precedence.
+    const fake = new FakeAdapter(
+      { both: screen(el({ identifier: 'pin_keyboard' }), el({ identifier: 'username_field' })) },
+      'both',
+    );
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('f');
+    expect(fake.taps).toEqual(['pin_keyboard']);
+    expect(trace).toContainEqual({ action: 'branch', detail: 'matched element id:"pin_keyboard"' });
+  });
+
+  it('falls through to a later arm when the earlier condition does not hold', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ fresh: screen(el({ identifier: 'username_field' })) }, 'fresh');
+    await new FlowEngine(cfg, fake, FAST).runFlow('f');
+    expect(fake.taps).toEqual(['username_field']);
   });
 });

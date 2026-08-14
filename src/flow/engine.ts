@@ -1,12 +1,13 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { describeElementSpec as describeSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { findBySpec, intersectsViewport, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
+import { parseDuration } from '../util/duration.js';
+import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
-  parseDuration,
   resolveCredentials,
   type AveriConfig,
   type Condition,
-  type ElementSpec,
   type ScrollUntilSpec,
   type Step,
 } from './config.js';
@@ -17,6 +18,12 @@ export interface TraceEntry {
   action: string;
   detail?: string;
 }
+
+/**
+ * The payload of one step kind, read off the Step union itself so a handler's
+ * parameter type can never drift from the schema it is fed by.
+ */
+type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
 
 export interface EngineOptions {
   /** Poll interval for waits; tests use a few ms. */
@@ -129,168 +136,172 @@ export class FlowEngine {
     this.log(`flow ${name}`, 'done');
   }
 
+  /**
+   * Dispatch one step to its handler.
+   *
+   * Deliberately a flat chain of one-line delegations rather than a
+   * Record<kind, handler> table: the Step union is discriminated by WHICH key
+   * is present, and `'x' in step` is exactly what narrows it. A keyed table
+   * would need a cast per entry and would give every handler an untyped
+   * payload — the vocabulary is the valuable part, so it stays type-checked.
+   */
   private async runStep(step: Step): Promise<void> {
-    if ('android' in step || 'ios' in step) {
-      const override = (step as { android?: Step; ios?: Step })[this.adapter.platform];
-      if (override) await this.runStep(override);
-      else this.log('skip', `no ${this.adapter.platform} variant for platform-specific step`);
-      return;
-    }
-    if ('launch' in step) {
-      const app = this.cfg.app[this.adapter.platform];
-      if (!app) throw new Error(`averi.yaml has no app.${this.adapter.platform} section`);
-      const appId = 'package' in app ? app.package : app.bundleId;
-      // Step-level activity wins over app.android.activity; neither applies on
-      // iOS unless the step names one — the adapter then rejects it loudly.
-      const activity =
-        step.launch.activity ??
-        (this.adapter.platform === 'android' ? this.cfg.app.android?.activity : undefined);
-      await this.adapter.launch(appId, {
-        clearState: step.launch.clearState,
-        activity,
-        intent: step.launch.intent,
-      });
-      this.log(
-        'launch',
-        appId +
-          (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
-          (step.launch.clearState ? ' (state cleared)' : ''),
-      );
-      return;
-    }
-    if ('tap' in step) {
-      await this.tapSpec(step.tap, this.tapTimeoutMs);
-      return;
-    }
-    if ('type' in step) {
-      const { value, secret } = this.resolveValue(step.type.value);
-      await this.adapter.typeText(value);
-      this.log('type', secret ? '***' : value);
-      return;
-    }
-    if ('type_pin' in step) {
-      const { value: raw } = this.resolveValue(step.type_pin.value);
-      // PIN/OTP inputs are numeric; formatting in the credential ("111-111-111")
-      // is display convention, not keystrokes.
-      const pin = raw.replace(/\D/g, '');
-      const rounds = step.type_pin.twice ? 2 : 1;
-      for (let round = 0; round < rounds; round++) {
-        if (step.type_pin.keypad) {
-          const { id_pattern, text_pattern } = step.type_pin.keypad;
-          for (const digit of pin) {
-            const spec: ElementSpec = id_pattern
-              ? { id: id_pattern.replace('{digit}', digit) }
-              : { text: text_pattern!.replace('{digit}', digit) };
-            await this.tapSpec(spec, this.tapTimeoutMs, true);
-          }
-        } else {
-          // One keystroke at a time: auto-advancing multi-box inputs (OTP
-          // fields) move focus per digit and silently drop bulk-typed text.
-          for (const digit of pin) {
-            await this.adapter.typeText(digit);
-            await new Promise((r) => setTimeout(r, this.pinKeyDelayMs));
-          }
-        }
-      }
-      this.log('type_pin', `${pin.length} digits${rounds === 2 ? ', twice' : ''}`);
-      return;
-    }
-    if ('swipe' in step) {
-      // Gesture direction (finger movement): swipe down at the top of a list
-      // rubber-bands harmlessly; swipe up reveals content further down.
-      const box = boundingBox(await this.adapter.uiTree());
-      const cx = Math.round(box.x + box.width / 2);
-      const cy = Math.round(box.y + box.height / 2);
-      const dx = Math.round(box.width * 0.3);
-      const dy = Math.round(box.height * 0.3);
-      const vectors = {
-        up: { from: { x: cx, y: cy + dy }, to: { x: cx, y: cy - dy } },
-        down: { from: { x: cx, y: cy - dy }, to: { x: cx, y: cy + dy } },
-        left: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
-        right: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
-      };
-      const { from, to } = vectors[step.swipe.direction];
-      const times = step.swipe.times ?? 1;
-      for (let i = 0; i < times; i++) await this.adapter.swipe(from, to);
-      this.log('swipe', `${step.swipe.direction}${times > 1 ? ` ×${times}` : ''}`);
-      return;
-    }
-    if ('scroll_until' in step) {
-      const { element, ...spec } = step.scroll_until;
-      const swipes = await scrollUntilVisible(
-        this.adapter,
-        { find: (tree) => findBySpec(tree, element), describe: describeSpec(element) },
-        spec,
-        { settleMs: this.pollMs },
-      );
-      this.log(
-        'scroll_until',
-        `${describeSpec(step.scroll_until.element)} visible after ${swipes} swipe${swipes === 1 ? '' : 's'}`,
-      );
-      return;
-    }
-    if ('fill' in step) {
-      const { value: rawValue, clear, dismissKeyboard, ...spec } = step.fill;
-      const { value, secret } = this.resolveValue(rawValue);
-      const node = await this.settledNode(spec, this.tapTimeoutMs);
-      const refetch = async () => {
-        const candidates = findBySpec(await this.adapter.uiTree(), spec).filter(
-          (n) => n.rect.width > 0 && n.rect.height > 0,
-        );
-        return candidates.length > 1 ? (preferInteractive(candidates)?.node ?? candidates[0]) : candidates[0];
-      };
-      await fillField(this.adapter, node, value, { clear, refetch, pollMs: this.pollMs });
-      if (dismissKeyboard) await this.adapter.pressKey(this.adapter.platform === 'android' ? 'back' : 'enter');
-      this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
-      return;
-    }
-    if ('assert' in step) {
-      const verifier = new Verifier(this.adapter, { pollMs: this.pollMs, timeoutMs: this.assertTimeoutMs });
-      const results = await verifier.assertAll(step.assert);
-      for (const r of results) this.log(r.pass ? 'assert PASS' : 'assert FAIL', r.description + (r.detail ? ` — ${r.detail}` : ''));
-      const failed = results.filter((r) => !r.pass);
-      if (failed.length > 0) {
-        throw new Error(
-          `${failed.length}/${results.length} flow asserts failed:\n` +
-            failed.map((r) => `  FAIL ${r.description}${r.detail ? ` — ${r.detail}` : ''}`).join('\n'),
-        );
-      }
-      return;
-    }
-    if ('wait' in step) {
-      const timeoutMs = step.wait.timeout !== undefined ? parseDuration(step.wait.timeout) : this.waitTimeoutMs;
-      const cond: Condition = step.wait.element ? { element: step.wait.element } : { state: step.wait.state };
-      await this.waitFor(cond, timeoutMs, describeCondition(cond));
-      this.log('wait', describeCondition(cond));
-      return;
-    }
-    if ('branch' in step) {
-      const arm = await this.pollUntil(
-        async (tree) => {
-          for (const [i, a] of step.branch.entries()) {
-            if (await this.matches(a.when, tree)) return { i, a };
-          }
-          return undefined;
-        },
-        this.waitTimeoutMs,
-        `any branch condition (${step.branch.map((a) => describeCondition(a.when)).join(' | ')})`,
-      );
-      this.log('branch', `matched ${describeCondition(arm.a.when)}`);
-      for (const s of arm.a.do) await this.runStep(s);
-      return;
-    }
-    if ('optional' in step) {
-      for (const s of step.optional) {
-        try {
-          if ('tap' in s) await this.tapSpec(s.tap, this.optionalTimeoutMs);
-          else await this.runStep(s);
-        } catch {
-          this.log('optional', `skipped ${'tap' in s ? describeSpec(s.tap) : 'step'} (not present)`);
-        }
-      }
-      return;
-    }
+    if ('android' in step || 'ios' in step) return this.runPlatformOverride(step);
+    if ('launch' in step) return this.runLaunch(step.launch);
+    if ('tap' in step) return this.tapSpec(step.tap, this.tapTimeoutMs);
+    if ('type' in step) return this.runType(step.type);
+    if ('type_pin' in step) return this.runTypePin(step.type_pin);
+    if ('swipe' in step) return this.runSwipe(step.swipe);
+    if ('scroll_until' in step) return this.runScrollUntil(step.scroll_until);
+    if ('fill' in step) return this.runFill(step.fill);
+    if ('assert' in step) return this.runAssert(step.assert);
+    if ('wait' in step) return this.runWait(step.wait);
+    if ('branch' in step) return this.runBranch(step.branch);
+    if ('optional' in step) return this.runOptional(step.optional);
     throw new Error(`Unhandled step: ${JSON.stringify(step)}`);
+  }
+
+  private async runPlatformOverride(step: Step): Promise<void> {
+    const override = (step as { android?: Step; ios?: Step })[this.adapter.platform];
+    if (override) await this.runStep(override);
+    else this.log('skip', `no ${this.adapter.platform} variant for platform-specific step`);
+  }
+
+  private async runLaunch(spec: StepPayload<'launch'>): Promise<void> {
+    const app = this.cfg.app[this.adapter.platform];
+    if (!app) throw new Error(`averi.yaml has no app.${this.adapter.platform} section`);
+    const appId = 'package' in app ? app.package : app.bundleId;
+    // Step-level activity wins over app.android.activity; neither applies on
+    // iOS unless the step names one — the adapter then rejects it loudly.
+    const activity =
+      spec.activity ??
+      (this.adapter.platform === 'android' ? this.cfg.app.android?.activity : undefined);
+    await this.adapter.launch(appId, {
+      clearState: spec.clearState,
+      activity,
+      intent: spec.intent,
+    });
+    this.log(
+      'launch',
+      appId +
+        (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
+        (spec.clearState ? ' (state cleared)' : ''),
+    );
+  }
+
+  private async runType(spec: StepPayload<'type'>): Promise<void> {
+    const { value, secret } = this.resolveValue(spec.value);
+    await this.adapter.typeText(value);
+    this.log('type', secret ? '***' : value);
+  }
+
+  private async runTypePin(spec: StepPayload<'type_pin'>): Promise<void> {
+    const { value: raw } = this.resolveValue(spec.value);
+    // PIN/OTP inputs are numeric; formatting in the credential ("111-111-111")
+    // is display convention, not keystrokes.
+    const pin = raw.replace(/\D/g, '');
+    const rounds = spec.twice ? 2 : 1;
+    for (let round = 0; round < rounds; round++) {
+      if (spec.keypad) {
+        const { id_pattern, text_pattern } = spec.keypad;
+        for (const digit of pin) {
+          const key: ElementSpec = id_pattern
+            ? { id: id_pattern.replace('{digit}', digit) }
+            : { text: text_pattern!.replace('{digit}', digit) };
+          await this.tapSpec(key, this.tapTimeoutMs, true);
+        }
+      } else {
+        // One keystroke at a time: auto-advancing multi-box inputs (OTP
+        // fields) move focus per digit and silently drop bulk-typed text.
+        for (const digit of pin) {
+          await this.adapter.typeText(digit);
+          await sleep(this.pinKeyDelayMs);
+        }
+      }
+    }
+    this.log('type_pin', `${pin.length} digits${rounds === 2 ? ', twice' : ''}`);
+  }
+
+  private async runSwipe(spec: StepPayload<'swipe'>): Promise<void> {
+    const { from, to } = swipeVector(boundingBox(await this.adapter.uiTree()), spec.direction, 'finger');
+    const times = spec.times ?? 1;
+    for (let i = 0; i < times; i++) await this.adapter.swipe(from, to);
+    this.log('swipe', `${spec.direction}${times > 1 ? ` ×${times}` : ''}`);
+  }
+
+  private async runScrollUntil(spec: ScrollUntilSpec): Promise<void> {
+    const { element, ...rest } = spec;
+    const swipes = await scrollUntilVisible(
+      this.adapter,
+      { find: (tree) => findBySpec(tree, element), describe: describeSpec(element) },
+      rest,
+      { settleMs: this.pollMs },
+    );
+    this.log(
+      'scroll_until',
+      `${describeSpec(element)} visible after ${swipes} swipe${swipes === 1 ? '' : 's'}`,
+    );
+  }
+
+  private async runFill(fill: StepPayload<'fill'>): Promise<void> {
+    const { value: rawValue, clear, dismissKeyboard, ...spec } = fill;
+    const { value, secret } = this.resolveValue(rawValue);
+    const node = await this.settledNode(spec, this.tapTimeoutMs);
+    const refetch = async () => {
+      const candidates = findBySpec(await this.adapter.uiTree(), spec).filter(
+        (n) => n.rect.width > 0 && n.rect.height > 0,
+      );
+      return candidates.length > 1 ? (preferInteractive(candidates)?.node ?? candidates[0]) : candidates[0];
+    };
+    await fillField(this.adapter, node, value, { clear, refetch, pollMs: this.pollMs });
+    if (dismissKeyboard) await this.adapter.pressKey(this.adapter.platform === 'android' ? 'back' : 'enter');
+    this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
+  }
+
+  private async runAssert(specs: StepPayload<'assert'>): Promise<void> {
+    const verifier = new Verifier(this.adapter, { pollMs: this.pollMs, timeoutMs: this.assertTimeoutMs });
+    const results = await verifier.assertAll(specs);
+    for (const r of results) this.log(r.pass ? 'assert PASS' : 'assert FAIL', r.description + (r.detail ? ` — ${r.detail}` : ''));
+    const failed = results.filter((r) => !r.pass);
+    if (failed.length > 0) {
+      throw new Error(
+        `${failed.length}/${results.length} flow asserts failed:\n` +
+          failed.map((r) => `  FAIL ${r.description}${r.detail ? ` — ${r.detail}` : ''}`).join('\n'),
+      );
+    }
+  }
+
+  private async runWait(spec: StepPayload<'wait'>): Promise<void> {
+    const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.waitTimeoutMs;
+    const cond: Condition = spec.element ? { element: spec.element } : { state: spec.state };
+    await this.waitFor(cond, timeoutMs, describeCondition(cond));
+    this.log('wait', describeCondition(cond));
+  }
+
+  private async runBranch(arms: StepPayload<'branch'>): Promise<void> {
+    const arm = await this.pollUntil(
+      async (tree) => {
+        for (const a of arms) {
+          if (await this.matches(a.when, tree)) return a;
+        }
+        return undefined;
+      },
+      this.waitTimeoutMs,
+      `any branch condition (${arms.map((a) => describeCondition(a.when)).join(' | ')})`,
+    );
+    this.log('branch', `matched ${describeCondition(arm.when)}`);
+    for (const s of arm.do) await this.runStep(s);
+  }
+
+  private async runOptional(steps: StepPayload<'optional'>): Promise<void> {
+    for (const s of steps) {
+      try {
+        if ('tap' in s) await this.tapSpec(s.tap, this.optionalTimeoutMs);
+        else await this.runStep(s);
+      } catch {
+        this.log('optional', `skipped ${'tap' in s ? describeSpec(s.tap) : 'step'} (not present)`);
+      }
+    }
   }
 
   /**
@@ -414,7 +425,7 @@ export class FlowEngine {
             (lastReadError === undefined ? '' : `\n  (last UI tree read failed: ${lastReadError.message})`),
         );
       }
-      await new Promise((r) => setTimeout(r, this.pollMs));
+      await sleep(this.pollMs);
     }
   }
 
@@ -501,18 +512,13 @@ export async function scrollUntilVisible(
   const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : 15_000;
   const settleMs = opts.settleMs ?? 400;
   const viewport = await adapter.viewport();
-
-  const cx = Math.round(viewport.width / 2);
-  const cy = Math.round(viewport.height / 2);
-  const dx = Math.round(viewport.width * 0.3);
-  const dy = Math.round(viewport.height * 0.3);
-  // Finger moves opposite to where the content lies: content below → finger up.
-  const vectors = {
-    down: { from: { x: cx, y: cy + dy }, to: { x: cx, y: cy - dy } },
-    up: { from: { x: cx, y: cy - dy }, to: { x: cx, y: cy + dy } },
-    right: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
-    left: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
-  } as const;
+  // `direction` here names where the CONTENT lies — the finger moves the other
+  // way (content below → finger up). See swipeVector.
+  const { from, to } = swipeVector(
+    { x: 0, y: 0, width: viewport.width, height: viewport.height },
+    direction,
+    'content',
+  );
 
   const deadline = Date.now() + timeoutMs;
   let lastFound: UiNode[] = [];
@@ -543,9 +549,8 @@ export async function scrollUntilVisible(
       const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
       throw new Error(`scroll_until ${target.describe} failed ${cause} — ${why}`);
     }
-    const { from, to } = vectors[direction];
     await adapter.swipe(from, to);
-    await new Promise((r) => setTimeout(r, settleMs));
+    await sleep(settleMs);
   }
 }
 
@@ -633,7 +638,37 @@ async function pollValue(
   return observed;
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The from/to points of a swipe across `box`, 30% of the box either side of
+ * centre.
+ *
+ * `mean` is why this exists once instead of twice: the two callers use the
+ * same four words for OPPOSITE gestures. A `swipe:` step names the FINGER's
+ * movement (swipe up = finger travels up, revealing content below). A
+ * `scroll_until:` names where the CONTENT lies (content below the fold is
+ * reached by a finger travelling up). As two separate tables they read as
+ * copies of each other, and the next person to correct one would have broken
+ * the other.
+ */
+export function swipeVector(
+  box: { x: number; y: number; width: number; height: number },
+  direction: 'up' | 'down' | 'left' | 'right',
+  mean: 'finger' | 'content',
+): { from: { x: number; y: number }; to: { x: number; y: number } } {
+  const cx = Math.round(box.x + box.width / 2);
+  const cy = Math.round(box.y + box.height / 2);
+  const dx = Math.round(box.width * 0.3);
+  const dy = Math.round(box.height * 0.3);
+  const finger = {
+    up: { from: { x: cx, y: cy + dy }, to: { x: cx, y: cy - dy } },
+    down: { from: { x: cx, y: cy - dy }, to: { x: cx, y: cy + dy } },
+    left: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
+    right: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
+  } as const;
+  const awayFrom = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
+  return mean === 'finger' ? finger[direction] : finger[awayFrom[direction]];
+}
 
 /** Screen area to swipe over: the root rect, or the union of children (iOS synthetic root is 0×0). */
 function boundingBox(root: UiNode): UiNode['rect'] {
@@ -645,13 +680,6 @@ function boundingBox(root: UiNode): UiNode['rect'] {
     maxY = Math.max(maxY, c.rect.y + c.rect.height);
   }
   return { x: 0, y: 0, width: maxX, height: maxY };
-}
-
-function describeSpec(spec: ElementSpec): string {
-  return Object.entries(spec)
-    .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `${k}:${JSON.stringify(v)}`)
-    .join(' ');
 }
 
 function describeCondition(cond: Condition): string {

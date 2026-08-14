@@ -6,6 +6,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
+import { sleep } from '../util/sleep.js';
 
 /**
  * WebDriverAgent lifecycle for one simulator (docs/plans/ios-wda-tree-source.md,
@@ -481,6 +482,3 @@ export class WdaServer {
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

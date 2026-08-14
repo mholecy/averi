@@ -1,5 +1,5 @@
 import type { Selector, UiNode } from '../adapters/types.js';
-import type { ElementSpec } from '../flow/config.js';
+import type { ElementSpec } from './element-spec.js';
 
 /**
  * Selector syntax (ARCHITECTURE.md §3): space-separated conditions, all must match.

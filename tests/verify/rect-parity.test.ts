@@ -4,11 +4,10 @@ import {
   compareRectParity,
   evaluateRectAssert,
   formatRectParity,
-  inferScreenWidth,
-  parseRectContract,
   rectParityVerdict,
-  type RectContract,
 } from '../../src/verify/rect-parity.js';
+import { inferScreenWidth } from '../../src/ui-tree/geometry.js';
+import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 
 /**
  * Synthetic fixtures modeled on the 2026 card run: figma frame 393,
@@ -36,7 +35,7 @@ const root = (width: number, height: number, children: UiNode[], x = 0): UiNode 
 const leaf = (id: string, x: number, y: number, w: number, h: number): UiNode =>
   n({ identifier: id, rect: { x, y, width: w, height: h } });
 
-const contract = (): RectContract => ({
+const contract = (): LayoutContract => ({
   screen: 'test.screen',
   tolerance_pct: 2.0,
   figma_frame_width: 393,
@@ -103,12 +102,12 @@ describe('compareRectParity — normalization and width inference', () => {
   it('single-platform + no normalizable frame width throws instead of a vacuous pass', () => {
     // No figma_frame_width, no anchor w → frameWidth 0 → with one platform
     // NOTHING would be compared; "WITHIN TOLERANCE" would be a lie.
-    const c: RectContract = { screen: 't', anchors: [{ id: 'header', x: 24 }] };
+    const c: LayoutContract = { screen: 't', anchors: [{ id: 'header', x: 24 }] };
     expect(() => compareRectParity(c, { android: androidTree() })).toThrow(/figma_frame_width/);
   });
 
   it('two-platform + no frame width still compares android-vs-ios (no throw)', () => {
-    const c: RectContract = { screen: 't', anchors: [{ id: 'pill', x: 24 }] };
+    const c: LayoutContract = { screen: 't', anchors: [{ id: 'pill', x: 24 }] };
     const android = root(1080, 2400, [leaf('pill', px(24), 300, px(345), px(60))]);
     const ios = root(393, 852, [leaf('pill', 44, 110, 345, 60)]); // x 11.2% vs android 6.1%
     const r = compareRectParity(c, { android, ios });
@@ -132,7 +131,7 @@ describe('compareRectParity — finding semantics', () => {
   });
 
   it('a 1.81-vs-1.60 aspect ratio FAILS at 2% tolerance even without contract h', () => {
-    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
+    const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
     const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]); // 948/524 = 1.809
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 345/216 = 1.597
     const r = compareRectParity(c, { android, ios });
@@ -169,7 +168,7 @@ describe('compareRectParity — finding semantics', () => {
   });
 
   it('omitted contract fields are compared platform-to-platform only', () => {
-    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'pill' }] };
+    const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'pill' }] };
     const android = root(1080, 2400, [leaf('pill', px(24), 300, px(345), px(60))]);
     const ios = root(393, 852, [leaf('pill', 44, 110, 345, 60)]); // x 11.2% vs android 6.1%
     const r = compareRectParity(c, { android, ios });
@@ -180,7 +179,7 @@ describe('compareRectParity — finding semantics', () => {
   });
 
   it('skips the aspect comparison when either ratio is degenerate (zero width or height)', () => {
-    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'divider' }] };
+    const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'divider' }] };
     const android = root(1080, 2400, [leaf('divider', px(24), 300, 0, px(60))]); // zero width → ratio 0
     const ios = root(393, 852, [leaf('divider', 24, 110, 345, 60)]);
     const r = compareRectParity(c, { android, ios });
@@ -200,7 +199,7 @@ describe('compareRectParity — finding semantics', () => {
 });
 
 describe('compareRectParity — missing anchors and duplicates', () => {
-  const threeAnchorContract = (): RectContract => ({
+  const threeAnchorContract = (): LayoutContract => ({
     screen: 't',
     figma_frame_width: 393,
     anchors: [
@@ -229,7 +228,7 @@ describe('compareRectParity — missing anchors and duplicates', () => {
   });
 
   it('first occurrence of a duplicated id wins', () => {
-    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
+    const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
     const android = root(1080, 2400, [
       leaf('card', px(24), 300, px(345), px(60)),
       leaf('card', 500, 900, 100, 100), // garbage duplicate must be ignored
@@ -301,9 +300,9 @@ describe('formatRectParity / rectParityVerdict', () => {
   });
 });
 
-describe('parseRectContract', () => {
-  it('accepts the documented format and IGNORES unknown per-anchor fields (bg, sample, _note)', () => {
-    const parsed = parseRectContract(
+describe('parseLayoutContract', () => {
+  it('accepts the documented format and carries per-anchor fields geometry never reads (bg, sample) plus unknown ones (_note)', () => {
+    const parsed = parseLayoutContract(
       JSON.stringify({
         _comment: 'x',
         screen: 's',
@@ -316,9 +315,9 @@ describe('parseRectContract', () => {
   });
 
   it('rejects a contract without anchors, an anchor without id, and invalid JSON — naming the source', () => {
-    expect(() => parseRectContract('{"screen":"s","anchors":[]}', 'c.json')).toThrow(/c\.json/);
-    expect(() => parseRectContract('{"anchors":[{"x":1}]}')).toThrow(/id/);
-    expect(() => parseRectContract('not json', 'c.json')).toThrow(/c\.json: not valid JSON/);
+    expect(() => parseLayoutContract('{"screen":"s","anchors":[]}', 'c.json')).toThrow(/c\.json/);
+    expect(() => parseLayoutContract('{"anchors":[{"x":1}]}')).toThrow(/id/);
+    expect(() => parseLayoutContract('not json', 'c.json')).toThrow(/c\.json: not valid JSON/);
   });
 });
 

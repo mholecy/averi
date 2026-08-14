@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { tapElement } from '../../src/ui-tree/tap-element.js';
 import { IosAdapter, parseIdbDescribeAll } from '../../src/adapters/ios.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 
@@ -110,7 +111,7 @@ describe('parseIdbDescribeAll', () => {
 describe('IosAdapter interactions', () => {
   it('tapElement resolves against the idb tree and taps the center', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).tapElement('id:login_button');
+    await tapElement(new IosAdapter({ udid: 'AAAA-1111', exec: fn }), 'id:login_button');
     expect(calls.at(-1)?.full).toBe('idb ui tap 196 724 --udid AAAA-1111');
   });
 
@@ -246,7 +247,7 @@ describe('IosAdapter treeSource: wda', () => {
     const adapter = new IosAdapter({
       udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
     });
-    await adapter.tapElement('id:home.header');
+    await tapElement(adapter, 'id:home.header');
     // WDA rects are points, same units as idb — center of the host view
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
   });

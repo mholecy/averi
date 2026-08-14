@@ -82,8 +82,6 @@ export interface DeviceAdapter {
   viewport(): Promise<{ width: number; height: number }>;
 
   tap(x: number, y: number): Promise<void>;
-  /** Returns a disambiguation note when the selector matched multiple nodes. */
-  tapElement(selector: Selector): Promise<string | undefined>;
   longPress(x: number, y: number, durationMs?: number): Promise<void>;
   swipe(
     from: { x: number; y: number },

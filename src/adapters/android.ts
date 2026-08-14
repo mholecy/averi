@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, type ExecFn } from './exec.js';
-import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
-import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from './types.js';
+import { sleep } from '../util/sleep.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -127,13 +127,6 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.adb(['shell', 'input', 'tap', String(x), String(y)]);
   }
 
-  async tapElement(selector: Selector): Promise<string | undefined> {
-    const { node, note } = resolveOne(await this.uiTree(), selector);
-    const point = tapPoint(node);
-    await this.tap(point.x, point.y);
-    return note;
-  }
-
   private viewportPromise: Promise<{ width: number; height: number }> | undefined;
 
   /** Screen size in device pixels — the units uiautomator bounds use. */
@@ -173,7 +166,7 @@ export class AndroidAdapter implements DeviceAdapter {
     for (const ch of text) {
       const escaped = ch.replace(/([\\"'`$&*()[\]{}|;<>?~#])/, '\\$1').replace(/ /, '%s');
       await this.adb(['shell', 'input', 'text', escaped]);
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
     }
     // Force the IME to COMMIT the final composing character: GBoard holds the
     // last injected char in a composition span for seconds, and a BACK or a
@@ -184,7 +177,7 @@ export class AndroidAdapter implements DeviceAdapter {
     // immediately).
     await this.adb(['shell', 'input', 'keyevent', '21']); // DPAD_LEFT
     await this.adb(['shell', 'input', 'keyevent', '22']); // DPAD_RIGHT
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await sleep(150);
   }
 
   async pressKey(key: Key): Promise<void> {

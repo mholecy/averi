@@ -6,24 +6,18 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
+import { tapElement } from '../ui-tree/tap-element.js';
 import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
-import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
-import { PNG } from 'pngjs';
+import { fillField, FlowEngine, scrollUntilVisible } from '../flow/engine.js';
 import {
   assertSpecSchema,
   captureStableScreenshot,
-  readTreeWithRetry,
-  scanForCrashes,
+  DEFAULT_BASELINE_DIR,
   Verifier,
-  type AssertResult,
 } from '../verify/assert.js';
-import {
-  compareColorParity,
-  contractHasColorAnchors,
-  formatColorParity,
-  type ColorCapture,
-} from '../verify/color-parity.js';
-import { compareRectParity, formatRectParity, parseRectContract } from '../verify/rect-parity.js';
+import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
+import { parseLayoutContract } from '../verify/layout-contract.js';
+import { appHealth, formatAsserts, formatTrace, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
@@ -270,7 +264,7 @@ registerTool(
   async ({ platform: p, selector, x, y, configPath: cp }) => {
     const adapter = await registry.get(p, await loadIosOpts(p, cp));
     if (selector !== undefined) {
-      const note = await adapter.tapElement(selector);
+      const note = await tapElement(adapter, selector);
       return text(`Tapped ${selector}${note ? ` (${note})` : ''}`);
     }
     if (x === undefined || y === undefined) {
@@ -370,33 +364,6 @@ registerTool(
   },
 );
 
-const formatTrace = (trace: TraceEntry[]) =>
-  trace.map((t) => (t.detail === undefined ? t.action : `${t.action}: ${t.detail}`)).join('\n');
-
-/**
- * appAlive check (ARCHITECTURE.md §8): is the app-under-test still running?
- * When it died, include a crash excerpt from recent logs so flows fail fast
- * with the reason, not just a blank screen.
- */
-async function appHealth(p: Platform, cfg: AveriConfig): Promise<string> {
-  const app = cfg.app[p];
-  if (!app) return '';
-  const appId = 'package' in app ? app.package : app.bundleId;
-  const adapter = await registry.get(p, iosOpts(cfg));
-  if (await adapter.isAppRunning(appId)) return '\nappAlive: true';
-  const lines = await adapter.logs(Date.now() - 60_000).catch(() => [] as string[]);
-  const crashes = scanForCrashes(lines, p).slice(0, 24);
-  return (
-    `\nappAlive: false — ${appId} is not running!` +
-    (crashes.length > 0 ? `\nCrash excerpt:\n${crashes.join('\n')}` : '\n(no crash signature in the last 60s of logs)')
-  );
-}
-
-const formatAsserts = (results: AssertResult[]) =>
-  results
-    .map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.description}${r.detail ? ` — ${r.detail}` : ''}`)
-    .join('\n');
-
 const assertsInput = z
   .array(z.unknown())
   .describe(
@@ -425,7 +392,7 @@ registerTool(
     const adapter = await registry.get(p, iosOpts(cfg));
     const engine = new FlowEngine(cfg, adapter, { environment: env });
     const trace = await engine.ensureState(state);
-    const health = await appHealth(p, cfg);
+    const health = await appHealth(adapter, cfg);
     const shot = await adapter.screenshot();
     return {
       content: [
@@ -450,9 +417,10 @@ registerTool(
   },
   async ({ platform: p, flow, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
-    const engine = new FlowEngine(cfg, await registry.get(p, iosOpts(cfg)), { environment: env });
+    const adapter = await registry.get(p, iosOpts(cfg));
+    const engine = new FlowEngine(cfg, adapter, { environment: env });
     const trace = await engine.runFlow(flow);
-    return text(formatTrace(trace) + (await appHealth(p, cfg)));
+    return text(formatTrace(trace) + (await appHealth(adapter, cfg)));
   },
 );
 
@@ -470,13 +438,12 @@ registerTool(
     const specs = parseAsserts(asserts);
     // Lenient load: assert works configless, but a broken averi.yaml (or a
     // wda treeSource it declares) must not be silently ignored here.
-    const verifier = new Verifier(await registry.get(p, await loadIosOpts(p, cp)), {
-      baselineDir: resolve('.averi/baselines'),
-    });
+    const adapter = await registry.get(p, await loadIosOpts(p, cp));
+    const verifier = new Verifier(adapter, { baselineDir: resolve(DEFAULT_BASELINE_DIR) });
     const results = await verifier.assertAll(specs);
     let health = '';
     try {
-      health = await appHealth(p, await loadProjectConfig(cp));
+      health = await appHealth(adapter, await loadProjectConfig(cp));
     } catch {
       // no averi.yaml → no app to health-check; asserts stand on their own
     }
@@ -505,7 +472,7 @@ registerTool(
         .string()
         .optional()
         .describe(
-          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default 8; vs-contract at 1.5x); anchors without bg are color-compared platform-to-platform only. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode.',
+          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default ' + DEFAULT_TOLERANCE_DE + '; vs-contract at ' + CONTRACT_TOL_FACTOR + 'x); anchors without bg are color-compared platform-to-platform only. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode.',
         ),
       configPath,
       environment,
@@ -513,130 +480,40 @@ registerTool(
   },
   async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
+    // Parsed before the contract is read: a malformed assert spec is the
+    // caller's most likely mistake, and it stays the error they see when both
+    // are wrong.
     const specs = parseAsserts(asserts ?? []);
-    const platforms = normalizePlatforms(requested);
     // Load up front: a typo'd contract path must not cost a full device run.
     const contract =
       contractPath === undefined
         ? undefined
-        : parseRectContract(await readFile(resolve(contractPath), 'utf8'), contractPath);
-
-    const runOne = async (p: Platform) => {
+        : parseLayoutContract(await readFile(resolve(contractPath), 'utf8'), contractPath);
+    const { sections, screenshots } = await runVerification(
+      {
+        platforms: normalizePlatforms(requested),
+        cfg,
+        specs,
+        state,
+        flow,
+        contract,
+        environment: env,
+        baselineDir: resolve(DEFAULT_BASELINE_DIR),
+      },
       // Only the ios leg has a treeSource; the registry normalizes it away
       // for android, so one opts expression serves both legs.
-      const adapter = await registry.get(p, iosOpts(cfg));
-      const engine = new FlowEngine(cfg, adapter, { environment: env });
-      const trace: TraceEntry[] = [];
-      if (state) trace.push(...(await engine.ensureState(state)));
-      if (flow) trace.push(...(await engine.runFlow(flow)));
-      const results = await new Verifier(adapter, { baselineDir: resolve('.averi/baselines') }).assertAll(specs);
-      // Grab the tree inside the leg, right at the screen the leg ended on —
-      // no extra device round-trip ordering issues after the legs settle.
-      // Bounded retry (the transient "null root node" read the polling
-      // asserts absorb), and a final failure must NOT reject the leg: that
-      // would discard the trace, assert results and screenshot of a
-      // minutes-long device run over the one optional extra read.
-      let tree: UiNode | undefined;
-      let treeError: string | undefined;
-      if (contract !== undefined) {
-        try {
-          tree = await readTreeWithRetry(adapter);
-        } catch (e) {
-          treeError = e instanceof Error ? e.message : String(e);
-        }
-      }
-      const shot = await adapter.screenshot();
-      const health = await appHealth(p, cfg);
-      return { trace, results, shot, health, tree, treeError };
+      (p) => registry.get(p, iosOpts(cfg)),
+    );
+    return {
+      content: [
+        { type: 'text' as const, text: sections.join('\n\n') },
+        ...screenshots.map((shot) => ({
+          type: 'image' as const,
+          data: shot.toString('base64'),
+          mimeType: 'image/png',
+        })),
+      ],
     };
-
-    const runs = await Promise.allSettled(platforms.map(runOne));
-
-    const sections: string[] = [];
-    const images: { type: 'image'; data: string; mimeType: string }[] = [];
-    platforms.forEach((p, i) => {
-      const run = runs[i];
-      if (run.status === 'rejected') {
-        sections.push(`## ${p}\nFAILED: ${run.reason instanceof Error ? run.reason.message : String(run.reason)}`);
-        return;
-      }
-      const { trace, results, shot, health } = run.value;
-      const failed = results.filter((r) => !r.pass).length;
-      const verdict = specs.length === 0 ? '' : failed === 0 ? `\nAll ${results.length} asserts passed` : `\n${failed}/${results.length} asserts FAILED`;
-      sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${health}`);
-      images.push({ type: 'image', data: shot.toString('base64'), mimeType: 'image/png' });
-    });
-
-    if (contract !== undefined) {
-      const trees: Partial<Record<Platform, UiNode>> = {};
-      const notes: string[] = [];
-      platforms.forEach((p, i) => {
-        const run = runs[i];
-        if (run.status === 'rejected') notes.push(`(${p} leg failed — compared without it)`);
-        else if (run.value.tree !== undefined) trees[p] = run.value.tree;
-        else notes.push(`(${p}: UI tree read failed — ${run.value.treeError ?? 'unknown'} — compared without it)`);
-      });
-      const note = notes.length > 0 ? notes.join('\n') + '\n' : '';
-      let body: string;
-      if (Object.keys(trees).length === 0) {
-        body = note + 'SKIPPED: no leg produced a UI tree.';
-      } else {
-        // A comparator error (e.g. a contract that cannot be normalized) must
-        // not reject the tool call and discard the per-platform sections.
-        try {
-          body = note + formatRectParity(compareRectParity(contract, trees));
-        } catch (e) {
-          body = note + `FAILED: ${e instanceof Error ? e.message : String(e)}`;
-        }
-      }
-      sections.push(`## rect parity\n${body}`);
-
-      // Color parity, only when the contract opts in (any anchor carrying
-      // bg / bg_dark / sample). Reuses each leg's tree AND its final
-      // screenshot bytes — the exact pixels already returned to the caller,
-      // never a second capture that could race a UI change.
-      if (contractHasColorAnchors(contract)) {
-        const captures: Partial<Record<Platform, ColorCapture>> = {};
-        const colorNotes: string[] = [];
-        platforms.forEach((p, i) => {
-          const run = runs[i];
-          if (run.status === 'rejected') {
-            colorNotes.push(`(${p} leg failed — compared without it)`);
-          } else if (run.value.tree === undefined) {
-            colorNotes.push(`(${p}: UI tree read failed — ${run.value.treeError ?? 'unknown'} — compared without it)`);
-          } else {
-            try {
-              captures[p] = { tree: run.value.tree, png: PNG.sync.read(run.value.shot) };
-            } catch (e) {
-              colorNotes.push(
-                `(${p}: screenshot PNG decode failed — ${e instanceof Error ? e.message : String(e)} — compared without it)`,
-              );
-            }
-          }
-        });
-        const colorNote = colorNotes.length > 0 ? colorNotes.join('\n') + '\n' : '';
-        let colorBody: string;
-        if (Object.keys(captures).length === 0) {
-          colorBody = colorNote + 'SKIPPED: no leg produced both a UI tree and a decodable screenshot.';
-        } else {
-          // Same containment rule as rect parity: a comparator error must
-          // not reject the tool call and discard the per-platform sections.
-          // No opts → theme is always 'light' — deliberate: verify exposes no
-          // theme input because averi cannot switch device themes, and
-          // sampling a light capture against bg_dark hexes would fake dark
-          // evidence. The comparator's theme option (and its tests) is the
-          // plumbing for the deferred dark-mode round.
-          try {
-            colorBody = colorNote + formatColorParity(compareColorParity(contract, captures));
-          } catch (e) {
-            colorBody = colorNote + `FAILED: ${e instanceof Error ? e.message : String(e)}`;
-          }
-        }
-        sections.push(`## color parity\n${colorBody}`);
-      }
-    }
-
-    return { content: [{ type: 'text' as const, text: sections.join('\n\n') }, ...images] };
   },
 );
 

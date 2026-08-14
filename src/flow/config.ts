@@ -3,15 +3,10 @@ import { dirname, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent } from '../adapters/types.js';
+import { elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import { elementAssertSchema, type ElementAssert } from '../verify/element-assert.js';
 
 /** Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4). */
-
-export interface ElementSpec {
-  id?: string;
-  text?: string;
-  role?: string;
-  label?: string;
-}
 
 export interface Condition {
   element?: ElementSpec;
@@ -20,21 +15,6 @@ export interface Condition {
   state?: string;
   any?: Condition[];
   all?: Condition[];
-}
-
-/**
- * Element assert, shared by the `assert` tool/step (verify/assert.ts builds
- * its schema from this): exists (default) / absent / text / match / error.
- * `absent` means gone from the tree OR outside the visible viewport — the
- * portable meaning of "disappeared" (iOS keeps off-screen nodes in its tree).
- */
-export interface ElementAssert {
-  element: ElementSpec;
-  absent?: boolean;
-  text?: string;
-  match?: string;
-  error?: string;
-  timeout?: string | number;
 }
 
 export interface FillSpec extends ElementSpec {
@@ -72,18 +52,6 @@ export type Step =
   | { optional: Step[] }
   | { android?: Step; ios?: Step };
 
-export const elementSpecSchema: z.ZodType<ElementSpec> = z
-  .object({
-    id: z.string().optional(),
-    text: z.string().optional(),
-    role: z.string().optional(),
-    label: z.string().optional(),
-  })
-  .strict()
-  .refine((s) => Object.values(s).some((v) => v !== undefined), {
-    message: 'element spec needs at least one of: id, text, role, label',
-  });
-
 const condition: z.ZodType<Condition> = z.lazy(() =>
   z
     .object({
@@ -103,21 +71,6 @@ const condition: z.ZodType<Condition> = z.lazy(() =>
 );
 
 const timeout = z.union([z.number(), z.string()]);
-
-export const elementAssertSchema: z.ZodType<ElementAssert> = z
-  .object({
-    element: elementSpecSchema,
-    absent: z.boolean().optional(),
-    text: z.string().optional(),
-    match: z.string().optional(),
-    error: z.string().optional(),
-    timeout: timeout.optional(),
-  })
-  .strict()
-  .refine(
-    (a) => !(a.absent && (a.text !== undefined || a.match !== undefined || a.error !== undefined)),
-    { message: 'absent cannot be combined with text/match/error' },
-  );
 
 /** Android-only `am start` parameters — see LaunchIntent in adapters/types.ts. */
 const launchIntent: z.ZodType<LaunchIntent> = z
@@ -452,13 +405,4 @@ function validateReferences(cfg: AveriConfig, source: string): void {
     }
     checkSteps(flow.steps, `flows.${name}`);
   }
-}
-
-/** "15s" | "500ms" | "2m" | number(ms) → ms */
-export function parseDuration(value: string | number): number {
-  if (typeof value === 'number') return value;
-  const m = value.match(/^(\d+(?:\.\d+)?)(ms|s|m)$/);
-  if (!m) throw new Error(`Invalid duration "${value}" — use e.g. 500ms, 15s, 2m`);
-  const n = Number(m[1]);
-  return m[2] === 'ms' ? n : m[2] === 's' ? n * 1000 : n * 60_000;
 }

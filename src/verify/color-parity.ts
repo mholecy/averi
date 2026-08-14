@@ -1,6 +1,8 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
-import { collectRects, inferScreenWidth, type RectContract } from './rect-parity.js';
+import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
+import type { LayoutAnchor, LayoutContract } from './layout-contract.js';
+import { headerWithRule, row as tableRow, type Column } from './table.js';
 
 /**
  * Deterministic color parity: sampled device fills vs the layout contract,
@@ -193,11 +195,11 @@ export function sampleDominant(
 // ------------------------------------------------------- contract handling
 
 /** Do the contract's anchors opt into color checks at all? */
-export function contractHasColorAnchors(contract: RectContract): boolean {
+export function contractHasColorAnchors(contract: LayoutContract): boolean {
   return contract.anchors.some((a) => a.bg !== undefined || a.bg_dark !== undefined || a.sample !== undefined);
 }
 
-function sampleModeOf(anchor: Record<string, unknown>, id: string): ColorSampleMode {
+function sampleModeOf(anchor: LayoutAnchor, id: string): ColorSampleMode {
   const mode = anchor.sample ?? 'dominant';
   if (mode !== 'dominant' && mode !== 'patches') {
     throw new Error(`color parity: anchor ${id}: unknown sample mode ${JSON.stringify(mode)} — "dominant" or "patches".`);
@@ -208,7 +210,7 @@ function sampleModeOf(anchor: Record<string, unknown>, id: string): ColorSampleM
 type ContractTarget = { kind: 'hex'; hex: string } | { kind: 'token'; token: string } | undefined;
 
 /** Resolved target for one anchor under one theme, or undefined (no bg declared). */
-function contractTargetOf(anchor: Record<string, unknown>, id: string, theme: ColorTheme): ContractTarget {
+function contractTargetOf(anchor: LayoutAnchor, id: string, theme: ColorTheme): ContractTarget {
   const key = theme === 'dark' ? 'bg_dark' : 'bg';
   const raw = anchor[key];
   if (raw === undefined) return undefined;
@@ -300,8 +302,75 @@ export interface ColorParityOptions {
 const SCALE_SANE_MIN = 0.5;
 const SCALE_SANE_MAX = 4.0;
 
+/**
+ * Per-platform scale and sanity, failing closed on anything degenerate: a
+ * 0-width root or a 0-width png would make every region empty and every
+ * comparison vacuous.
+ */
+function statsFor(platform: Platform, capture: ColorCapture): ColorPlatformStats {
+  const { tree, png } = capture;
+  const { width: rootWidth, reliable } = inferScreenWidth(tree);
+  if (rootWidth <= 0) {
+    throw new Error(`color parity: ${platform} tree has no usable width — cannot derive a png scale; failing closed.`);
+  }
+  if (!Number.isFinite(png.width) || png.width <= 0 || !Number.isFinite(png.height) || png.height <= 0) {
+    throw new Error(`color parity: ${platform} screenshot has degenerate dimensions ${png.width}x${png.height}; failing closed.`);
+  }
+  let translucent = false;
+  for (let o = 3; o < png.data.length; o += 4) {
+    if (png.data[o] < 255) {
+      translucent = true;
+      break;
+    }
+  }
+  return {
+    platform,
+    pngWidth: png.width,
+    pngHeight: png.height,
+    rootWidth,
+    scale: png.width / rootWidth,
+    reliable,
+    translucent,
+  };
+}
+
+/**
+ * One anchor's fill on one platform: locate its rect, scale it into png
+ * pixels, sample. Returns either the sample or the reason it is absent —
+ * never both — plus any caveats about how trustworthy the sample is.
+ */
+function sampleAnchor(
+  id: string,
+  platform: Platform,
+  rect: Rect | undefined,
+  capture: ColorCapture,
+  scale: number,
+  mode: ColorSampleMode,
+): { sample?: ColorSample; absent?: string; notes: string[] } {
+  const notes: string[] = [];
+  if (rect === undefined) return { absent: 'no id in tree', notes };
+  const got = scaledRegion(rect, scale, capture.png);
+  if (got === undefined) return { absent: 'rect outside png (off-screen)', notes };
+  if (got.clipped > 0.4) {
+    notes.push(
+      `${id} [${platform}]: clipped ${Math.round(got.clipped * 100)}% off-png — the remaining sliver's ` +
+        `dominant may be a neighbor's fill; scroll it fully on-screen and re-run to trust this row.`,
+    );
+  }
+  const regions = mode === 'patches' ? patchRegions(got.region) : [got.region];
+  const s = sampleDominant(capture.png, regions);
+  if (s === undefined) return { absent: 'empty sample region', notes };
+  if (s.share < 0.4) {
+    notes.push(
+      `${id} [${platform}]: dominant bucket covers only ${Math.round(s.share * 100)}% of the region — ` +
+        `busy content; consider sample: "patches" or a tighter anchor.`,
+    );
+  }
+  return { sample: { hex: rgbToHex(s.rgb), share: s.share }, notes };
+}
+
 export function compareColorParity(
-  contract: RectContract,
+  contract: LayoutContract,
   captures: Partial<Record<Platform, ColorCapture>>,
   opts: ColorParityOptions = {},
 ): ColorParityResult {
@@ -309,7 +378,7 @@ export function compareColorParity(
   if (platforms.length === 0) throw new Error('color parity: no platform capture provided');
   const theme = opts.theme ?? 'light';
 
-  const rawTol = opts.toleranceDe ?? (contract as Record<string, unknown>).tolerance_de ?? DEFAULT_TOLERANCE_DE;
+  const rawTol = opts.toleranceDe ?? contract.tolerance_de ?? DEFAULT_TOLERANCE_DE;
   if (typeof rawTol !== 'number' || !Number.isFinite(rawTol) || rawTol <= 0) {
     throw new Error(`color parity: tolerance_de must be a positive number, got ${JSON.stringify(rawTol)}`);
   }
@@ -323,25 +392,11 @@ export function compareColorParity(
   const scaleOf: Partial<Record<Platform, number>> = {};
   const rectsOf: Partial<Record<Platform, Map<string, Rect>>> = {};
   for (const p of platforms) {
-    const { tree, png } = captures[p] as ColorCapture;
-    const { width: rootWidth, reliable } = inferScreenWidth(tree);
-    if (rootWidth <= 0) {
-      throw new Error(`color parity: ${p} tree has no usable width — cannot derive a png scale; failing closed.`);
-    }
-    if (!Number.isFinite(png.width) || png.width <= 0 || !Number.isFinite(png.height) || png.height <= 0) {
-      throw new Error(`color parity: ${p} screenshot has degenerate dimensions ${png.width}x${png.height}; failing closed.`);
-    }
-    const scale = png.width / rootWidth;
-    let translucent = false;
-    for (let o = 3; o < png.data.length; o += 4) {
-      if (png.data[o] < 255) {
-        translucent = true;
-        break;
-      }
-    }
-    stats.push({ platform: p, pngWidth: png.width, pngHeight: png.height, rootWidth, scale, reliable, translucent });
-    scaleOf[p] = scale;
-    rectsOf[p] = collectRects(tree);
+    const capture = captures[p] as ColorCapture;
+    const platformStats = statsFor(p, capture);
+    stats.push(platformStats);
+    scaleOf[p] = platformStats.scale;
+    rectsOf[p] = collectRects(capture.tree);
   }
 
   const rows: ColorRow[] = [];
@@ -356,36 +411,17 @@ export function compareColorParity(
     const sampled: Partial<Record<Platform, ColorSample>> = {};
     const absent: Partial<Record<Platform, string>> = {};
     for (const p of platforms) {
-      const rect = rectsOf[p]?.get(id);
-      if (rect === undefined) {
-        absent[p] = 'no id in tree';
-        continue;
-      }
-      const cap = captures[p] as ColorCapture;
-      const got = scaledRegion(rect, scaleOf[p] as number, cap.png);
-      if (got === undefined) {
-        absent[p] = 'rect outside png (off-screen)';
-        continue;
-      }
-      if (got.clipped > 0.4) {
-        notes.push(
-          `${id} [${p}]: clipped ${Math.round(got.clipped * 100)}% off-png — the remaining sliver's ` +
-            `dominant may be a neighbor's fill; scroll it fully on-screen and re-run to trust this row.`,
-        );
-      }
-      const regions = mode === 'patches' ? patchRegions(got.region) : [got.region];
-      const s = sampleDominant(cap.png, regions);
-      if (s === undefined) {
-        absent[p] = 'empty sample region';
-        continue;
-      }
-      sampled[p] = { hex: rgbToHex(s.rgb), share: s.share };
-      if (s.share < 0.4) {
-        notes.push(
-          `${id} [${p}]: dominant bucket covers only ${Math.round(s.share * 100)}% of the region — ` +
-            `busy content; consider sample: "patches" or a tighter anchor.`,
-        );
-      }
+      const measured = sampleAnchor(
+        id,
+        p,
+        rectsOf[p]?.get(id),
+        captures[p] as ColorCapture,
+        scaleOf[p] as number,
+        mode,
+      );
+      notes.push(...measured.notes);
+      if (measured.sample === undefined) absent[p] = measured.absent as string;
+      else sampled[p] = measured.sample;
     }
 
     const anyAbsent = Object.keys(absent).length > 0;
@@ -515,20 +551,15 @@ export function formatColorParity(r: ColorParityResult): string {
   }
   lines.push('');
 
-  const header =
-    'anchor'.padEnd(38) +
-    ' ' +
-    'android'.padStart(9) +
-    ' ' +
-    'ios'.padStart(9) +
-    ' ' +
-    'dE(a,i)'.padStart(8) +
-    ' ' +
-    'dE(a,c)'.padStart(8) +
-    ' ' +
-    'dE(i,c)'.padStart(8) +
-    '  verdict';
-  lines.push(header, '-'.repeat(header.length));
+  const columns: Column[] = [
+    { title: 'anchor', width: 38, align: 'left' },
+    { title: 'android', width: 9 },
+    { title: 'ios', width: 9 },
+    { title: 'dE(a,i)', width: 8 },
+    { title: 'dE(a,c)', width: 8 },
+    { title: 'dE(i,c)', width: 8 },
+  ];
+  lines.push(...headerWithRule(columns, '  verdict'));
   for (const row of r.rows) {
     if (row.verdict === 'MISSING') {
       const where = Object.entries(row.absent ?? {})
@@ -539,18 +570,18 @@ export function formatColorParity(r: ColorParityResult): string {
       continue;
     }
     lines.push(
-      row.id.padEnd(38) +
-        ' ' +
-        (row.android?.hex ?? '—').padStart(9) +
-        ' ' +
-        (row.ios?.hex ?? '—').padStart(9) +
-        ' ' +
-        fde(row.deAi).padStart(8) +
-        ' ' +
-        fde(row.deAc).padStart(8) +
-        ' ' +
-        fde(row.deIc).padStart(8) +
+      tableRow(
+        columns,
+        [
+          row.id,
+          row.android?.hex ?? '—',
+          row.ios?.hex ?? '—',
+          fde(row.deAi),
+          fde(row.deAc),
+          fde(row.deIc),
+        ],
         `  ${row.verdict}`,
+      ),
     );
   }
   lines.push('');

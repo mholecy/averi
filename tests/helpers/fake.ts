@@ -1,4 +1,4 @@
-import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from '../../src/adapters/types.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from '../../src/adapters/types.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -120,7 +120,6 @@ export class FakeAdapter implements DeviceAdapter {
   async install(): Promise<void> {}
   async terminate(): Promise<void> {}
   async openDeepLink(): Promise<void> {}
-  async tapElement(_s: Selector): Promise<string | undefined> { return undefined; }
   async longPress(): Promise<void> {}
   async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
     this.swipes.push({ from, to });

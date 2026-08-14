@@ -1,5 +1,7 @@
-import { z } from 'zod';
 import type { Platform, UiNode } from '../adapters/types.js';
+import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
+import type { LayoutAnchor, LayoutContract } from './layout-contract.js';
+import { headerWithRule, row, type Column } from './table.js';
 
 /**
  * Deterministic rect parity: device geometry vs a layout contract, and vs the
@@ -33,78 +35,12 @@ import type { Platform, UiNode } from '../adapters/types.js';
 
 type Rect = UiNode['rect'];
 
-const anchorSchema = z
-  .object({
-    id: z.string().min(1),
-    x: z.number().optional(),
-    y: z.number().optional(),
-    w: z.number().optional(),
-    h: z.number().optional(),
-  })
-  // Unknown per-anchor fields (bg, bg_dark, sample, _note, ...) are IGNORED —
-  // a future color check will consume them; geometry must not reject them.
-  .passthrough();
-
-const contractSchema = z
-  .object({
-    screen: z.string().optional(),
-    tolerance_pct: z.number().positive().optional(),
-    figma_frame_width: z.number().positive().optional(),
-    anchors: z.array(anchorSchema).min(1),
-  })
-  .passthrough();
-
-export type RectContract = z.infer<typeof contractSchema>;
-export type RectAnchor = z.infer<typeof anchorSchema>;
-
-export function parseRectContract(jsonText: string, source = 'layout contract'): RectContract {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(jsonText);
-  } catch (e) {
-    throw new Error(`${source}: not valid JSON — ${e instanceof Error ? e.message : String(e)}`);
-  }
-  const result = contractSchema.safeParse(raw);
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
-    throw new Error(`${source}: ${issues}`);
-  }
-  return result.data;
-}
-
-export interface ScreenWidth {
-  width: number;
-  /**
-   * True when the widest rect starts at the left screen edge — that is the
-   * root/window node. When it starts inset, the tree was filtered and the
-   * width is a CONTENT width, which silently scales every delta.
-   */
-  reliable: boolean;
-}
-
-/** Screen width = widest rect in the whole tree (id-less root/window included). */
-export function inferScreenWidth(tree: UiNode): ScreenWidth {
-  let widest = tree.rect;
-  const walk = (n: UiNode): void => {
-    if (n.rect.x + n.rect.width > widest.x + widest.width) widest = n.rect;
-    n.children.forEach(walk);
-  };
-  walk(tree);
-  return { width: widest.x + widest.width, reliable: Math.abs(widest.x) < 1.0 };
-}
-
-/** {id → rect} for the FIRST occurrence of each identifier (pre-order). */
-export function collectRects(tree: UiNode): Map<string, Rect> {
-  const out = new Map<string, Rect>();
-  const walk = (n: UiNode): void => {
-    if (n.identifier !== null && n.identifier !== '' && !out.has(n.identifier)) {
-      out.set(n.identifier, n.rect);
-    }
-    n.children.forEach(walk);
-  };
-  walk(tree);
-  return out;
-}
+/**
+ * Max |delta| in % of screen width before a comparison is a finding. Shared by
+ * the whole-screen comparator and the single-element `rect` assert so the
+ * number a description PRINTS is always the number the check ENFORCES.
+ */
+export const DEFAULT_TOLERANCE_PCT = 2.0;
 
 export type RectField = 'x' | 'y' | 'w' | 'h' | 'gap' | 'aspect';
 export type RectComparison = 'android-vs-contract' | 'ios-vs-contract' | 'android-vs-ios';
@@ -159,7 +95,8 @@ export interface RectParityResult {
 
 export interface RectParityOptions {
   /**
-   * Overrides the contract's tolerance_pct (default 2.0). Intentionally
+   * Overrides the contract's tolerance_pct (default DEFAULT_TOLERANCE_PCT).
+   * Intentionally
    * test-facing only: `verify` deliberately exposes no override — the
    * tolerance belongs to the committed contract, not to the caller of a run.
    */
@@ -175,15 +112,170 @@ const FIELDS: { field: 'x' | 'y' | 'w' | 'h'; get: (r: Rect) => number }[] = [
   { field: 'h', get: (r) => r.height },
 ];
 
+/** Shared inputs for the per-anchor comparisons. */
+interface CompareContext {
+  platforms: readonly Platform[];
+  widthOf: Partial<Record<Platform, number>>;
+  frameWidth: number;
+  tolerancePct: number;
+}
+
+/** One anchor's contribution to the report: rows to print, findings to act on. */
+interface Comparison {
+  entries: RectEntry[];
+  findings: RectFinding[];
+}
+
+/** A finding, but only when the delta actually exceeds the tolerance. */
+const findingIfOver = (
+  ctx: CompareContext,
+  anchor: string,
+  field: RectField,
+  comparison: RectComparison,
+  delta: number | undefined,
+  values: { android?: number; ios?: number; contract?: number },
+): RectFinding[] =>
+  delta !== undefined && Math.abs(delta) > ctx.tolerancePct
+    ? [{ anchor, field, comparison, delta, ...values }]
+    : [];
+
+/**
+ * x/y/w/h for one anchor, each normalized to % of its own platform's screen
+ * width so two devices of different densities are comparable.
+ */
+function compareFields(
+  anchor: LayoutAnchor,
+  found: Partial<Record<Platform, Rect>>,
+  ctx: CompareContext,
+): Comparison {
+  const entries: RectEntry[] = [];
+  const findings: RectFinding[] = [];
+  const a = found.android;
+  const i = found.ios;
+  for (const { field, get } of FIELDS) {
+    const want = anchor[field];
+    const aRaw = a === undefined ? undefined : get(a);
+    const iRaw = i === undefined ? undefined : get(i);
+    const aVal = aRaw === undefined ? undefined : norm(aRaw, ctx.widthOf.android as number);
+    const iVal = iRaw === undefined ? undefined : norm(iRaw, ctx.widthOf.ios as number);
+    const cVal = want !== undefined && ctx.frameWidth > 0 ? norm(want, ctx.frameWidth) : undefined;
+    const dAc = aVal !== undefined && cVal !== undefined ? aVal - cVal : undefined;
+    const dIc = iVal !== undefined && cVal !== undefined ? iVal - cVal : undefined;
+    const dAi = aVal !== undefined && iVal !== undefined ? aVal - iVal : undefined;
+    entries.push({
+      kind: 'field',
+      anchor: anchor.id,
+      field,
+      contract: want,
+      android: aRaw,
+      ios: iRaw,
+      dAc,
+      dIc,
+      dAi,
+    });
+    // Absolute y is measured and shown but never a finding — see header.
+    if (field === 'y') continue;
+    const values = { android: aRaw, ios: iRaw, contract: want };
+    findings.push(
+      ...findingIfOver(ctx, anchor.id, field, 'android-vs-contract', dAc, values),
+      ...findingIfOver(ctx, anchor.id, field, 'ios-vs-contract', dIc, values),
+      ...findingIfOver(ctx, anchor.id, field, 'android-vs-ios', dAi, values),
+    );
+  }
+  return { entries, findings };
+}
+
+/**
+ * Gap from the previous anchor's bottom to this anchor's top — what the layout
+ * contract actually specifies, and aspect-independent (unlike absolute y).
+ */
+function compareGap(
+  anchor: LayoutAnchor,
+  found: Partial<Record<Platform, Rect>>,
+  prev: { anchor: LayoutAnchor; rects: Partial<Record<Platform, Rect>> },
+  ctx: CompareContext,
+): Comparison {
+  const gaps: Partial<Record<Platform, number>> = {};
+  for (const p of ctx.platforms) {
+    const cur = found[p] as Rect;
+    const before = prev.rects[p] as Rect;
+    gaps[p] = norm(cur.y - (before.y + before.height), ctx.widthOf[p] as number);
+  }
+  let cGap: number | undefined;
+  if (
+    anchor.y !== undefined &&
+    prev.anchor.y !== undefined &&
+    prev.anchor.h !== undefined &&
+    ctx.frameWidth > 0
+  ) {
+    cGap = norm(anchor.y - (prev.anchor.y + prev.anchor.h), ctx.frameWidth);
+  }
+  const dAc = gaps.android !== undefined && cGap !== undefined ? gaps.android - cGap : undefined;
+  const dIc = gaps.ios !== undefined && cGap !== undefined ? gaps.ios - cGap : undefined;
+  const dAi = gaps.android !== undefined && gaps.ios !== undefined ? gaps.android - gaps.ios : undefined;
+  const gapId = `${prev.anchor.id} -> ${anchor.id}`;
+  const values = {
+    android: gaps.android,
+    ios: gaps.ios,
+    contract: cGap === undefined ? undefined : Math.round(cGap * 100) / 100,
+  };
+  return {
+    entries: [
+      {
+        kind: 'field',
+        anchor: anchor.id,
+        field: 'gap',
+        contract: cGap,
+        android: gaps.android,
+        ios: gaps.ios,
+        dAc,
+        dIc,
+        dAi,
+      },
+    ],
+    findings: [
+      ...findingIfOver(ctx, gapId, 'gap', 'android-vs-contract', dAc, values),
+      ...findingIfOver(ctx, gapId, 'gap', 'ios-vs-contract', dIc, values),
+      ...findingIfOver(ctx, gapId, 'gap', 'android-vs-ios', dAi, values),
+    ],
+  };
+}
+
+/**
+ * Shape, android-vs-ios only: a same-margin, same-width element can still be
+ * the wrong shape.
+ */
+function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareContext): Comparison {
+  // Skip degenerate ratios (zero width OR height -> 0/NaN/Infinity), like the
+  // Python script's falsy-ratio skip: a zero-sized side is noise, not a shape.
+  const ratioOf = (r: Rect): number | undefined => {
+    const v = r.width / r.height;
+    return Number.isFinite(v) && v !== 0 ? v : undefined;
+  };
+  const aAspect = ratioOf(a);
+  const iAspect = ratioOf(i);
+  if (aAspect === undefined || iAspect === undefined) return { entries: [], findings: [] };
+  const spread = (Math.abs(aAspect - iAspect) / Math.max(aAspect, iAspect)) * 100;
+  const over = spread > ctx.tolerancePct;
+  return {
+    entries: [
+      { kind: 'field', anchor: anchor.id, field: 'aspect', android: aAspect, ios: iAspect, dAi: spread, aspectOver: over },
+    ],
+    findings: over
+      ? [{ anchor: anchor.id, field: 'aspect', comparison: 'android-vs-ios', delta: spread, android: aAspect, ios: iAspect }]
+      : [],
+  };
+}
+
 export function compareRectParity(
-  contract: RectContract,
+  contract: LayoutContract,
   trees: Partial<Record<Platform, UiNode>>,
   opts: RectParityOptions = {},
 ): RectParityResult {
   const platforms = (['android', 'ios'] as const).filter((p) => trees[p] !== undefined);
   if (platforms.length === 0) throw new Error('rect parity: no platform tree provided');
   const single = platforms.length === 1;
-  const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? 2.0;
+  const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
   const frameWidth =
     contract.figma_frame_width ?? Math.max(0, ...contract.anchors.map((a) => a.w ?? 0));
   // Single-platform + no frame width: contract values cannot be normalized
@@ -211,22 +303,15 @@ export function compareRectParity(
   const missing: { id: string; absentOn: Platform[] }[] = [];
   const skipped: string[] = [];
   const findings: RectFinding[] = [];
-
-  const addFinding = (
-    anchor: string,
-    field: RectField,
-    comparison: RectComparison,
-    delta: number | undefined,
-    values: { android?: number; ios?: number; contract?: number },
-  ): void => {
-    if (delta !== undefined && Math.abs(delta) > tolerancePct) {
-      findings.push({ anchor, field, comparison, delta, ...values });
-    }
+  const ctx: CompareContext = { platforms, widthOf, frameWidth, tolerancePct };
+  const collect = (c: Comparison): void => {
+    entries.push(...c.entries);
+    findings.push(...c.findings);
   };
 
   // Gap chain: previous anchor for gap-to-previous rows. MISSING resets it —
   // a gap measured across an unresolved anchor would be meaningless.
-  let prev: { anchor: RectAnchor; rects: Partial<Record<Platform, Rect>> } | null = null;
+  let prev: { anchor: LayoutAnchor; rects: Partial<Record<Platform, Rect>> } | null = null;
 
   for (const anchor of contract.anchors) {
     const found: Partial<Record<Platform, Rect>> = {};
@@ -253,117 +338,11 @@ export function compareRectParity(
       continue;
     }
 
+    collect(compareFields(anchor, found, ctx));
+    if (prev !== null) collect(compareGap(anchor, found, prev, ctx));
     const a = found.android;
     const i = found.ios;
-
-    for (const { field, get } of FIELDS) {
-      const want = anchor[field];
-      const aRaw = a === undefined ? undefined : get(a);
-      const iRaw = i === undefined ? undefined : get(i);
-      const aVal = aRaw === undefined ? undefined : norm(aRaw, widthOf.android as number);
-      const iVal = iRaw === undefined ? undefined : norm(iRaw, widthOf.ios as number);
-      const cVal = want !== undefined && frameWidth > 0 ? norm(want, frameWidth) : undefined;
-      const dAc = aVal !== undefined && cVal !== undefined ? aVal - cVal : undefined;
-      const dIc = iVal !== undefined && cVal !== undefined ? iVal - cVal : undefined;
-      const dAi = aVal !== undefined && iVal !== undefined ? aVal - iVal : undefined;
-      entries.push({
-        kind: 'field',
-        anchor: anchor.id,
-        field,
-        contract: want,
-        android: aRaw,
-        ios: iRaw,
-        dAc,
-        dIc,
-        dAi,
-      });
-      // Absolute y is measured and shown but never a finding — see header.
-      if (field === 'y') continue;
-      const values = { android: aRaw, ios: iRaw, contract: want };
-      addFinding(anchor.id, field, 'android-vs-contract', dAc, values);
-      addFinding(anchor.id, field, 'ios-vs-contract', dIc, values);
-      addFinding(anchor.id, field, 'android-vs-ios', dAi, values);
-    }
-
-    // Gap to the previous anchor (previous bottom → this top): what the
-    // layout contract actually specifies, and aspect-independent.
-    if (prev !== null) {
-      const gaps: Partial<Record<Platform, number>> = {};
-      for (const p of platforms) {
-        const cur = found[p] as Rect;
-        const before = prev.rects[p] as Rect;
-        gaps[p] = norm(cur.y - (before.y + before.height), widthOf[p] as number);
-      }
-      let cGap: number | undefined;
-      if (
-        anchor.y !== undefined &&
-        prev.anchor.y !== undefined &&
-        prev.anchor.h !== undefined &&
-        frameWidth > 0
-      ) {
-        cGap = norm(anchor.y - (prev.anchor.y + prev.anchor.h), frameWidth);
-      }
-      const dAc = gaps.android !== undefined && cGap !== undefined ? gaps.android - cGap : undefined;
-      const dIc = gaps.ios !== undefined && cGap !== undefined ? gaps.ios - cGap : undefined;
-      const dAi = gaps.android !== undefined && gaps.ios !== undefined ? gaps.android - gaps.ios : undefined;
-      entries.push({
-        kind: 'field',
-        anchor: anchor.id,
-        field: 'gap',
-        contract: cGap,
-        android: gaps.android,
-        ios: gaps.ios,
-        dAc,
-        dIc,
-        dAi,
-      });
-      const gapId = `${prev.anchor.id} -> ${anchor.id}`;
-      const values = {
-        android: gaps.android,
-        ios: gaps.ios,
-        contract: cGap === undefined ? undefined : Math.round(cGap * 100) / 100,
-      };
-      addFinding(gapId, 'gap', 'android-vs-contract', dAc, values);
-      addFinding(gapId, 'gap', 'ios-vs-contract', dIc, values);
-      addFinding(gapId, 'gap', 'android-vs-ios', dAi, values);
-    }
-
-    // Aspect ratio, android-vs-ios only: a same-margin, same-width element
-    // can still be the wrong shape.
-    if (a !== undefined && i !== undefined) {
-      // Skip degenerate ratios (zero width OR height → 0/NaN/Infinity), like
-      // the Python script's falsy-ratio skip: a zero-sized side is noise, not
-      // a shape to compare.
-      const ratioOf = (r: Rect): number | undefined => {
-        const v = r.width / r.height;
-        return Number.isFinite(v) && v !== 0 ? v : undefined;
-      };
-      const aAspect = ratioOf(a);
-      const iAspect = ratioOf(i);
-      if (aAspect !== undefined && iAspect !== undefined) {
-        const spread = (Math.abs(aAspect - iAspect) / Math.max(aAspect, iAspect)) * 100;
-        const over = spread > tolerancePct;
-        entries.push({
-          kind: 'field',
-          anchor: anchor.id,
-          field: 'aspect',
-          android: aAspect,
-          ios: iAspect,
-          dAi: spread,
-          aspectOver: over,
-        });
-        if (over) {
-          findings.push({
-            anchor: anchor.id,
-            field: 'aspect',
-            comparison: 'android-vs-ios',
-            delta: spread,
-            android: aAspect,
-            ios: iAspect,
-          });
-        }
-      }
-    }
+    if (a !== undefined && i !== undefined) collect(compareAspect(anchor, a, i, ctx));
 
     prev = { anchor, rects: found };
   }
@@ -429,14 +408,14 @@ export function formatRectParity(r: RectParityResult): string {
 
   const both = r.platforms.length === 2;
   const deltaTitles = both ? ['a-vs-c', 'i-vs-c', 'a-vs-i'] : r.platforms[0] === 'android' ? ['a-vs-c'] : ['i-vs-c'];
-  const header = [
-    'anchor'.padEnd(38),
-    'field'.padEnd(7),
-    'figma'.padStart(8),
-    ...r.platforms.map((p) => p.padStart(8)),
-    ...deltaTitles.map((t) => t.padStart(8)),
-  ].join(' ');
-  lines.push(header, '-'.repeat(header.length));
+  const columns: Column[] = [
+    { title: 'anchor', width: 38, align: 'left' },
+    { title: 'field', width: 7, align: 'left' },
+    { title: 'figma', width: 8 },
+    ...r.platforms.map((p) => ({ title: p, width: 8 })),
+    ...deltaTitles.map((t) => ({ title: t, width: 8 })),
+  ];
+  lines.push(...headerWithRule(columns));
 
   let lastAnchor: string | undefined;
   let lastWasField = false;
@@ -463,14 +442,19 @@ export function formatRectParity(r: RectParityResult): string {
           : both
             ? [fmtDelta(e.dAc), fmtDelta(e.dIc), fmtDelta(e.dAi)]
             : [fmtDelta(r.platforms[0] === 'android' ? e.dAc : e.dIc)];
-      const cells = [
-        anchorCell.padEnd(38),
-        (e.field === 'gap' ? 'gap^' : e.field).padEnd(7),
-        figmaCell.padStart(8),
-        ...r.platforms.map((p) => measured(e[p]).padStart(8)),
-        ...deltas.map((d) => d.padStart(8)),
-      ];
-      lines.push(cells.join(' ') + (e.aspectOver ? '  <-- ASPECT' : ''));
+      lines.push(
+        row(
+          columns,
+          [
+            anchorCell,
+            e.field === 'gap' ? 'gap^' : e.field,
+            figmaCell,
+            ...r.platforms.map((p) => measured(e[p])),
+            ...deltas,
+          ],
+          e.aspectOver ? '  <-- ASPECT' : '',
+        ),
+      );
       lastWasField = true;
     }
     lastAnchor = e.anchor;
@@ -523,7 +507,7 @@ export interface RectExpectation {
   h?: number;
   /** Width of the Figma frame the expected values were measured in. */
   frameWidth: number;
-  /** Max |delta| in % of screen width (default 2.0). */
+  /** Max |delta| in % of screen width (default DEFAULT_TOLERANCE_PCT). */
   tolerancePct?: number;
 }
 
@@ -538,7 +522,7 @@ export function evaluateRectAssert(
   expected: RectExpectation,
   tree: UiNode,
 ): { pass: boolean; detail: string } {
-  const tolerancePct = expected.tolerancePct ?? 2.0;
+  const tolerancePct = expected.tolerancePct ?? DEFAULT_TOLERANCE_PCT;
   const { width, reliable } = inferScreenWidth(tree);
   // Fail closed on a degenerate width: dividing by 0 would make every delta
   // NaN and NaN > tol is false — a silent vacuous PASS. This path is real:

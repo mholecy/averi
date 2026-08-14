@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { IOS_ROLE_MAP } from './ios-role-map.js';
+import { attachFieldErrors } from './field-errors.js';
 import { WdaServer } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
-import { resolveOne, tapPoint } from '../ui-tree/selectors.js';
-import type { Device, DeviceAdapter, Key, LaunchOptions, Selector, UiNode } from './types.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
 /**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input and
@@ -183,13 +183,6 @@ export class IosAdapter implements DeviceAdapter {
     await this.idbUi(['tap', String(x), String(y)]);
   }
 
-  async tapElement(selector: Selector): Promise<string | undefined> {
-    const { node, note } = resolveOne(await this.uiTree(), selector);
-    const point = tapPoint(node);
-    await this.tap(point.x, point.y);
-    return note;
-  }
-
   private viewportPromise: Promise<{ width: number; height: number }> | undefined;
 
   /** Screen size in POINTS — the units idb AX frames use. */
@@ -310,30 +303,6 @@ export function parseIdbDescribeAll(json: string): UiNode {
     rect: { x: 0, y: 0, width: 0, height: 0 },
     children,
   };
-}
-
-/**
- * Pair validation messages with their inputs (measured convention, payment
- * spike 2026-08-05): a field's title AND its error label share the field's
- * accessibilityIdentifier. The title sits above the field, the error below —
- * so a same-identifier text BELOW the input is its validation message.
- */
-function attachFieldErrors(nodes: UiNode[]): void {
-  for (const field of nodes) {
-    if (field.role !== 'textfield' || field.identifier === null) continue;
-    const fieldBottom = field.rect.y + field.rect.height;
-    const below = nodes.filter(
-      (n) =>
-        n !== field &&
-        n.role === 'text' &&
-        n.identifier === field.identifier &&
-        n.label !== null &&
-        n.rect.y >= fieldBottom,
-    );
-    if (below.length === 0) continue;
-    below.sort((a, b) => a.rect.y - b.rect.y);
-    field.error = below[0].label!;
-  }
 }
 
 function emptyToNull(value: string | null | undefined): string | null {
