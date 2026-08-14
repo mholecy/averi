@@ -278,6 +278,64 @@ describe('compareTextParity — the accessibility note', () => {
   });
 });
 
+describe('compareTextParity — the occlusion guard', () => {
+  it('flags an anchor whose tree text vanished from the reading (measured: the IME covering the CTA)', () => {
+    const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('cta', 'CONTINUE')]),
+        // What the recognizer saw through the keyboard drawn over the button.
+        ocr: ocrMap({ cta: [line('0', 30), line('.', 30)] }),
+        pngWidth: 1080,
+      },
+    });
+    expect(r.occluded).toHaveLength(1);
+    expect(r.rows[0].verdict).toBe('OCCLUDED');
+    expect(r.pass).toBe(false);
+    // The whole point: a covered anchor must NOT be dispatched as copy drift.
+    expect(r.findings).toHaveLength(0);
+    expect(formatTextParity(r)).toContain('NOT compared as drift');
+    // The cause is NOT asserted: the identical signal is produced by text at
+    // unreadable contrast, which is a finding rather than substrate.
+    expect(formatTextParity(r)).toContain('unreadable contrast');
+    expect(r.occluded[0].covered.android).toContain('cause not determined');
+  });
+
+  it('flags an empty reading over a tree that has text', () => {
+    const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
+    const r = compareTextParity(c, {
+      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: [] }), pngWidth: 1080 },
+    });
+    expect(r.occluded[0].covered.android).toContain('(nothing)');
+  });
+
+  it('stays quiet on a PARTIAL mismatch — OCR merges lines a tree keeps separate', () => {
+    // The measured android debit card: six separate text nodes, read back as
+    // one run. Requiring every string to survive would fire on every card.
+    const c = contract([{ id: 'debit', text_dynamic: true }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [n({ identifier: 'debit', children: [text(null, 'From:'), text(null, '1,121'), text(null, '.00')] })]),
+        ocr: ocrMap({ debit: [line('From: My Account CZK 1,121.00', 30)] }),
+        pngWidth: 1080,
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+  });
+
+  it('stays quiet when the tree carries no rendered text at all — the normal iOS button case', () => {
+    const c = contract([{ id: 'cta', text_dynamic: true }]);
+    const r = compareTextParity(c, {
+      ios: {
+        tree: root(402, [n({ role: 'button', identifier: 'cta', label: 'Continue to summary' })]),
+        ocr: ocrMap({ cta: [line('CONTINUE', 36)] }),
+        pngWidth: 1206,
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+  });
+});
+
 describe('compareTextParity — missing anchors and bad input', () => {
   it('an id absent from one tree is MISSING and fails the run', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);

@@ -95,7 +95,7 @@ export interface TextRow {
   /** Relative ink-height difference in %, when both platforms offered one. */
   sizeDelta?: number;
   dynamic: boolean;
-  verdict: 'OK' | 'FAIL' | 'MISSING' | '—';
+  verdict: 'OK' | 'FAIL' | 'MISSING' | 'OCCLUDED' | '—';
   absent?: Partial<Record<Platform, string>>;
 }
 
@@ -109,6 +109,8 @@ export interface TextParityResult {
   rows: TextRow[];
   findings: TextFinding[];
   missing: { id: string; absent: Partial<Record<Platform, string>> }[];
+  /** Anchors whose rect was covered in the capture — resolve before reading the row. */
+  occluded: { id: string; covered: Partial<Record<Platform, string>> }[];
   notes: string[];
   pass: boolean;
 }
@@ -273,7 +275,7 @@ function measure(
   anchor: LayoutAnchor,
   platform: Platform,
   capture: TextCapture,
-): { measurement?: TextMeasurement; absent?: string; note?: string } {
+): { measurement?: TextMeasurement; absent?: string; note?: string; occluded?: string } {
   const id = anchor.id;
   if (findBySpec(capture.tree, { id }).length === 0) return { absent: 'no id in tree' };
 
@@ -285,6 +287,40 @@ function measure(
     const lines = ocrResult.lines;
     measurement.ocr = normalizeText(lines.map((l) => l.text).join(' '));
     measurement.inkPct = inkPctOf(lines, capture.pngWidth ?? 0);
+  }
+
+  // Occlusion guard. The tree reports an element's LAYOUT rect; the screenshot
+  // shows whatever is drawn on top of it. Measured 2026-08-14: with the amount
+  // field focused, the IME covered the CTA, so the tree still placed
+  // `continue_button` at its layout position while OCR of that region read the
+  // keypad — a confident, wrong string that the comparator would otherwise have
+  // reported as copy drift.
+  //
+  // The test is deliberately narrow: flag only when the tree offers rendered
+  // strings and NONE of them survive in the reading. A partial mismatch is
+  // normal (OCR merges and reorders lines a tree keeps separate), so requiring
+  // total disappearance is what keeps this from firing on healthy anchors.
+  //
+  // The message names the CANDIDATE causes and does not pick one. Occlusion is
+  // the common case, but the identical signal is produced by text rendered at
+  // unreadable contrast — which is a REAL defect of exactly the kind this loop
+  // exists to catch, and must not be waved away as a capture problem. So the
+  // row is withheld from the copy-drift findings (comparing it would dispatch a
+  // phantom string diff) while still failing the run and demanding a look.
+  if (measurement.ocr !== undefined && treeStrings.length > 0) {
+    const seen = measurement.ocr;
+    const substantial = treeStrings.map(normalizeText).filter((s) => s.length >= 2);
+    if (substantial.length > 0 && !substantial.some((s) => seen.includes(s))) {
+      return {
+        measurement,
+        occluded:
+          `the tree renders ${JSON.stringify(substantial.join(' '))} but the screenshot region reads ` +
+          `${JSON.stringify(seen === '' ? '(nothing)' : seen)} — UNREAD, cause not determined. Either ` +
+          'something is drawn over the layout rect (a keyboard, sheet or dialog — the usual case), or ' +
+          'the text is rendered at a contrast the recognizer cannot resolve, which would be a real ' +
+          'defect. LOOK AT THE SCREENSHOT before dismissing this row',
+      };
+    }
   }
 
   // The a11y observation, worded narrowly: text is on screen, and NOTHING
@@ -317,6 +353,7 @@ export function compareTextParity(
   const rows: TextRow[] = [];
   const findings: TextFinding[] = [];
   const missing: { id: string; absent: Partial<Record<Platform, string>> }[] = [];
+  const occluded: { id: string; covered: Partial<Record<Platform, string>> }[] = [];
   const notes: string[] = [];
   let checkedCount = 0;
 
@@ -329,9 +366,11 @@ export function compareTextParity(
 
     const measured: Partial<Record<Platform, TextMeasurement>> = {};
     const absent: Partial<Record<Platform, string>> = {};
+    const covered: Partial<Record<Platform, string>> = {};
     for (const p of platforms) {
       const got = measure(anchor, p, captures[p] as TextCapture);
       if (got.note !== undefined) notes.push(got.note);
+      if (got.occluded !== undefined) covered[p] = got.occluded;
       if (got.measurement === undefined) absent[p] = got.absent as string;
       else measured[p] = got.measurement;
     }
@@ -340,6 +379,24 @@ export function compareTextParity(
     if (anyAbsent) missing.push({ id, absent });
     if (Object.keys(measured).length === 0) {
       rows.push({ id, source: 'tree', verdict: 'MISSING', absent, dynamic, contract: expected });
+      continue;
+    }
+
+    // An occluded anchor is a CAPTURE problem, not a code problem — the same
+    // stance MISSING gets. Comparing it would dispatch a phantom copy drift to
+    // implementers, which is the one outcome this whole table exists to avoid.
+    if (Object.keys(covered).length > 0) {
+      occluded.push({ id, covered });
+      rows.push({
+        id,
+        source: 'ocr',
+        android: measured.android,
+        ios: measured.ios,
+        contract: expected,
+        dynamic,
+        verdict: 'OCCLUDED',
+        absent: anyAbsent ? absent : undefined,
+      });
       continue;
     }
 
@@ -438,8 +495,9 @@ export function compareTextParity(
     rows,
     findings,
     missing,
+    occluded,
     notes,
-    pass: findings.length === 0 && missing.length === 0,
+    pass: findings.length === 0 && missing.length === 0 && occluded.length === 0,
   };
 }
 
@@ -457,6 +515,7 @@ export function textParityVerdict(r: TextParityResult): string {
   if (text > 0) bits.push(`${text} COPY DRIFT(S)`);
   if (size > 0) bits.push(`${size} TYPE SIZE DELTA(S) OVER ${r.sizeTolerancePct.toFixed(2)}%`);
   if (r.missing.length > 0) bits.push(`${r.missing.length} MISSING anchor(s)`);
+  if (r.occluded.length > 0) bits.push(`${r.occluded.length} OCCLUDED anchor(s)`);
   return `text parity: ${bits.join(' + ')}`;
 }
 
@@ -530,6 +589,23 @@ export function formatTextParity(r: TextParityResult): string {
       }
     }
     lines.push('');
+  }
+
+  if (r.occluded.length > 0) {
+    lines.push('UNREAD ANCHORS — the tree has copy the screenshot does not show; NOT compared as drift:');
+    for (const o of r.occluded) {
+      for (const [p, reason] of Object.entries(o.covered).sort(([a], [b]) => a.localeCompare(b))) {
+        lines.push(`  ${o.id}: ${p} — ${reason}`);
+      }
+    }
+    lines.push(
+      '  Usually an overlay: a focused field raises the IME over the bottom of the screen and the',
+      '  tree still reports the covered element at its layout rect — dismiss it and re-run.',
+      '  But the SAME signal means text rendered at unreadable contrast, which is a finding, not',
+      '  substrate. Open the returned screenshot and decide which one you are looking at before',
+      '  re-running; a row cleared by a re-run was an overlay, a row that persists was not.',
+      '',
+    );
   }
 
   if (r.findings.length > 0) {
