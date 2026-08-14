@@ -188,7 +188,7 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 | `ui_snapshot(platform, filter?)` | Normalized AX tree as JSON — cheap, text-based verification |
 | `tap / swipe / type_text / press_key` | Low-level escape hatch for ad-hoc exploration |
 | `assert(spec)` | Declarative check: element exists/absent, text matches, screenshot-diff vs. baseline < threshold |
-| `verify_both(state, flow?, asserts)` | Runs the same sequence on iOS **and** Android, returns paired screenshots + assert results |
+| `verify(platforms?, state?, flow?, asserts)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; legs always android-then-ios), returns per-platform screenshots + assert results |
 | `get_logs(platform, since)` | Crash/exception scan (logcat, os_log) |
 | `record_flow(name)` *(v2)* | Watch manual/agent interaction, emit a draft flow YAML |
 
@@ -209,7 +209,7 @@ Verification philosophy: three tiers, cheapest first — (1) AX-tree asserts (fa
 Ships with the package (`averi` skill — copy into the app repo). SKILL.md teaches the agent the workflow, not the plumbing:
 
 1. **Golden path**: build app → `install_app` → `ensure_state("logged_in")` → `run_flow`/low-level navigation to the changed screen → `screenshot` + `assert` → report with paired iOS/Android images.
-2. **Rules**: always `ensure_state` instead of manual login; prefer `ui_snapshot` asserts over screenshots for text checks; use `verify_both` before declaring a cross-platform task done; on unexpected screen, take screenshot + `ui_snapshot`, try `optional` dismissals, else surface to the human; never ask the user for credentials — if a `${VAR}` is missing, tell them which env var to set.
+2. **Rules**: always `ensure_state` instead of manual login; prefer `ui_snapshot` asserts over screenshots for text checks; use `verify` (default: both platforms) before declaring a cross-platform task done; on unexpected screen, take screenshot + `ui_snapshot`, try `optional` dismissals, else surface to the human; never ask the user for credentials — if a `${VAR}` is missing, tell them which env var to set.
 3. **Recipes**: "verify a UI change", "reproduce a bug report", "check a flow after refactor", "update `averi.yaml` when navigation changes" (the agent maintains the descriptor as part of feature work — self-healing config).
 4. Reference of tool signatures + `averi.yaml` schema.
 
@@ -228,7 +228,7 @@ Ships with the package (`averi` skill — copy into the app repo). SKILL.md teac
 
 1. **Weeks 1–3 — Adapter core**: adb + simctl/idb adapters, screenshot, tap/type/swipe, normalized `ui_snapshot`; MCP wiring; manual smoke test on your banking app.
 2. **Weeks 4–6 — Flow engine**: YAML schema, `ensure_state`, branch/optional/wait, secret injection; login works end-to-end on both platforms after reinstall.
-3. **Weeks 7–8 — Verification + skill**: `assert`, `verify_both`, log scan; write SKILL.md; dogfood with Claude Code on a real feature task.
+3. **Weeks 7–8 — Verification + skill**: `assert`, `verify`, log scan; write SKILL.md; dogfood with Claude Code on a real feature task.
 4. **Weeks 9–10 — Packaging**: npm package, docs site; pilot with 2–3 friendly teams.
 5. **v2**: `record_flow`, real devices, CI mode (GitHub Action).
 

@@ -8,6 +8,7 @@ import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
 import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
 const registry = new AdapterRegistry();
@@ -471,11 +472,16 @@ registerTool(
 );
 
 registerTool(
-  'verify_both',
+  'verify',
   {
     description:
-      'Cross-platform verification: run the same sequence on iOS AND Android — optional ensure_state, optional flow, then asserts — and return per-platform results plus paired screenshots (first image android, second ios). Use before declaring a cross-platform task done.',
+      'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done.',
     inputSchema: {
+      platforms: z
+        .array(platform)
+        .nonempty()
+        .optional()
+        .describe('Platforms to verify (default: both). Duplicates collapse; legs always run android-then-ios.'),
       state: z.string().optional().describe('State to ensure first (from averi.yaml)'),
       flow: z.string().optional().describe('Flow to run (from averi.yaml)'),
       asserts: assertsInput.optional(),
@@ -483,10 +489,10 @@ registerTool(
       environment,
     },
   },
-  async ({ state, flow, asserts, configPath: cp, environment: env }) => {
+  async ({ platforms: requested, state, flow, asserts, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
     const specs = parseAsserts(asserts ?? []);
-    const platforms: Platform[] = ['android', 'ios'];
+    const platforms = normalizePlatforms(requested);
 
     const runOne = async (p: Platform) => {
       // Only the ios leg has a treeSource; the registry normalizes it away

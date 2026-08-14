@@ -25,7 +25,7 @@ agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator /
 - **iOS**: **macOS only** (Apple ships simulators only with Xcode). Xcode, a booted simulator, and `idb`:
   `brew install idb-companion && pipx install fb-idb --python python3.13` (fb-idb breaks on 3.14).
   If `xcode-select -p` points at CommandLineTools, averi injects `DEVELOPER_DIR` itself — no sudo needed.
-- `verify_both` needs both platforms, hence a Mac. Everything else degrades per platform: on a Linux/Windows box you get the full Android toolset; iOS tools error only when called.
+- `verify`'s default (both platforms) needs a Mac. Everything else degrades per platform: on a Linux/Windows box you get the full Android toolset — including `verify` with `platforms: ["android"]`; iOS tools error only when called.
 
 ## Installation (in your app repo)
 
@@ -66,9 +66,9 @@ APP_USERNAME=...
 APP_PASSWORD=...
 ```
 
-3. The agent skill — copy `skill/SKILL.md` to `.claude/skills/averi/SKILL.md` (or your agent's equivalent) so the agent knows the golden path: build → install → `ensure_state` → navigate → assert → `verify_both`.
+3. The agent skill — copy `skill/SKILL.md` to `.claude/skills/averi/SKILL.md` (or your agent's equivalent) so the agent knows the golden path: build → install → `ensure_state` → navigate → assert → `verify`.
 
-Restart the agent session; it now has 17 `averi` tools (`list_devices`, `select_device`, `install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, `ui_snapshot`, `tap`, `swipe`, `type_text`, `press_key`, `ensure_state`, `run_flow`, `assert`, `verify_both`, `get_logs`). Notes: tools target the **first booted device** per platform unless you pin one with `select_device` (with a phone, an emulator, and a watch emulator all connected, pin it — the pick is otherwise arbitrary, and a pinned device going offline is an error, never a silent fallback); averi never builds your app — your normal build produces the `.apk`/`.app`, whose path in `averi.yaml` is what `install_app` installs; `verify_both` runs the same state/flow/asserts on **both platforms** and returns paired screenshots; screenshot baselines auto-create under `.averi/baselines/` on first use (delete one to re-baseline).
+Restart the agent session; it now has 17 `averi` tools (`list_devices`, `select_device`, `install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, `ui_snapshot`, `tap`, `swipe`, `type_text`, `press_key`, `ensure_state`, `run_flow`, `assert`, `verify`, `get_logs`). Notes: tools target the **first booted device** per platform unless you pin one with `select_device` (with a phone, an emulator, and a watch emulator all connected, pin it — the pick is otherwise arbitrary, and a pinned device going offline is an error, never a silent fallback); averi never builds your app — your normal build produces the `.apk`/`.app`, whose path in `averi.yaml` is what `install_app` installs; `verify` runs the same state/flow/asserts on the requested platforms (`platforms:` array, default **both**; legs always run android-then-ios) and returns per-platform screenshots; screenshot baselines auto-create under `.averi/baselines/` on first use (delete one to re-baseline).
 
 ## Let the agent write `averi.yaml` for you
 
@@ -175,7 +175,7 @@ defaultEnvironment: dev      # optional
 
 Selection, most specific first: the tool's `environment` argument → `$AVERI_ENV` (set it in
 `.env.averi`, so switching backend is one line in an already-gitignored file) → `defaultEnvironment:`
-→ base `credentials:` alone. Only `ensure_state`, `run_flow` and `verify_both` take the argument —
+→ base `credentials:` alone. Only `ensure_state`, `run_flow` and `verify` take the argument —
 they are the tools that run flows.
 
 `ensure_state`/`run_flow` print the active environment and which keys it overrode as the first trace

@@ -17,7 +17,7 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
    - `assert` with element specs — deterministic, no vision needed: `{"element":{"id":"amount"},"text":"100.00"}`, `{"element":{"id":"error_banner"},"absent":true}`, `{"element":{"id":"amount"},"error":"Required"}` (validation message paired to the input, where the platform exposes it — `absent` means gone from the tree OR outside the viewport, the same on both platforms)
    - `screenshot` — look at it yourself for layout/visual judgment.
    - `assert` with `{"screenshot":{"baseline":"name"}}` — pixel regression vs. stored baseline (auto-created on first run under `.averi/baselines/`).
-6. Cross-platform tasks: finish with `verify_both(state, flow?, asserts)` — same sequence on both platforms, paired screenshots. Do this before declaring the task done.
+6. Close with `verify(state, flow?, asserts)` — same sequence on the requested platforms, per-platform screenshots (legs always run android-then-ios). Defaults to **both** platforms: cross-platform tasks run that default before declaring the task done; single-platform work passes `platforms: ["android"]` or `["ios"]`.
 
 ## Rules
 
@@ -32,13 +32,13 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 - Watch `appAlive` in every flow/assert response. `appAlive: false` comes with a crash excerpt — report it with the log lines, don't retry blindly.
 - On an unexpected screen: `screenshot` + `ui_snapshot`, try the flow's `optional` dismissals by re-running `ensure_state`, and if still stuck, surface to the human with both artifacts.
 - **Never ask the user for credentials.** If a `${VAR}` is missing, the error names it — tell the user which env var to export, or to put `VAR=value` in a gitignored `.env.averi` next to averi.yaml (auto-loaded; real env vars take precedence). You never see credential values; traces show `***`.
-- **When one app targets several backends**, credentials live under `environments:` and you pick one with the `environment` argument on `ensure_state`/`run_flow`/`verify_both` (or `$AVERI_ENV`). Check the first trace line — it names the active environment. A login rejected as "user does not exist" right after a *correct-looking* username is usually the wrong environment, not a wrong credential: the bank rejects the login name one screen after it is typed.
+- **When one app targets several backends**, credentials live under `environments:` and you pick one with the `environment` argument on `ensure_state`/`run_flow`/`verify` (or `$AVERI_ENV`). Check the first trace line — it names the active environment. A login rejected as "user does not exist" right after a *correct-looking* username is usually the wrong environment, not a wrong credential: the bank rejects the login name one screen after it is typed.
 
 ## Recipes
 
 - **Reproduce a bug report**: `ensure_state` → `run_flow`/taps along the reported path → `screenshot` + `get_logs(platform, sinceSeconds, grep)` → compare with the report. Always pass `grep` (case-insensitive regex, e.g. `"okhttp|validation"`) — unfiltered pulls run to thousands of lines.
 - **Test form validation**: dirty-submit (tap submit on an invalid form), `assert` the error text or the field's `error` attribute, fix the field with `fill`/`type_text(clear)`, then assert the error `absent` — the disappearance check is portable. Flows can assert mid-way with an inline `assert:` step (a failing spec fails the flow with the diff in the trace).
-- **Check a flow after refactor**: `verify_both(state, flow, asserts)` with the flow's key asserts; baselines catch visual drift.
+- **Check a flow after refactor**: `verify(state, flow, asserts)` with the flow's key asserts (add `platforms:` when only one platform is in scope); baselines catch visual drift.
 - **Update `averi.yaml` when navigation changes**: if a flow times out because the UI changed, fix the descriptor as part of your change (it lives in the repo — treat it like code) and re-run. Keep selectors on stable `id:`s; add `optional:` steps for new interstitials.
 
 ## averi.yaml quick reference
