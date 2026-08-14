@@ -23,30 +23,51 @@ Coding agents (Claude Code, Cursor, etc.) can now write native mobile code, but 
 ## 2. High-level architecture
 
 ```
-┌────────────┐   MCP (stdio)   ┌──────────────────────────────┐
-│ Coding     │◄───────────────►│  averi MCP server (local)     │
-│ agent      │                 │  ┌─────────┐  ┌────────────┐ │
-│ + skill    │                 │  │ Flow    │  │ Verification│ │
-└────────────┘                 │  │ Engine  │  │ Engine      │ │
-                               │  └────┬────┘  └─────┬──────┘ │
-                               │  ┌────▼──────────────▼─────┐ │
-                               │  │ Device Adapter interface │ │
-                               │  └───┬─────────────────┬───┘ │
-                               │ ┌────▼─────┐   ┌───────▼───┐ │
-                               │ │ Android  │   │ iOS       │ │
-                               │ │ adapter  │   │ adapter   │ │
-                               │ │ (adb +   │   │ (simctl + │ │
-                               │ │ uiauto)  │   │ idb/WDA)  │ │
-                               │ └──────────┘   └───────────┘ │
-                               └──────────────────────────────┘
+┌────────────┐  MCP (stdio)  ┌──────────────────────────────────────┐
+│ Coding     │◄─────────────►│  averi MCP server (local)            │
+│ agent      │               │ ┌──────────────────────────────────┐ │
+│ + skill    │               │ │ MCP layer (mcp/) — tool schemas  │ │
+└────────────┘               │ └────────────────┬─────────────────┘ │
+                             │ ┌────────────────▼─────────────────┐ │
+                             │ │ Orchestration (run/)             │ │
+                             │ │ one run across per-platform legs │ │
+                             │ └────┬──────────────────┬──────────┘ │
+                             │ ┌────▼─────┐   ┌────────▼──────────┐ │
+                             │ │ Flow     │   │ Verification      │ │
+                             │ │ Engine   │   │ Engine            │ │
+                             │ │ (flow/)  │   │ (verify/)         │ │
+                             │ └────┬─────┘   └────────┬──────────┘ │
+                             │ ┌────▼──────────────────▼──────────┐ │
+                             │ │ UI tree (ui-tree/)               │ │
+                             │ │ selectors, geometry, tap targets │ │
+                             │ └────────────────┬─────────────────┘ │
+                             │ ┌────────────────▼─────────────────┐ │
+                             │ │ Device Adapter interface         │ │
+                             │ └───┬──────────────────────┬───────┘ │
+                             │ ┌───▼──────┐      ┌────────▼───────┐ │
+                             │ │ Android  │      │ iOS            │ │
+                             │ │ (adb +   │      │ (simctl +      │ │
+                             │ │ uiauto)  │      │ idb/WDA)       │ │
+                             │ └──────────┘      └────────────────┘ │
+                             └──────────────────────────────────────┘
 ```
 
 Clean separation of concerns:
 
-- **Device Adapter** — the only layer that knows platform commands. One interface, two implementations. Everything above is platform-agnostic.
-- **Flow Engine** — interprets `averi.yaml` descriptors (login, navigation recipes), maintains a state model of "where the app is".
-- **Verification Engine** — screenshots, accessibility-tree assertions, diffing.
-- **MCP layer** — thin; exposes tools, no logic.
+- **Device Adapter** (`adapters/`) — the only layer that knows platform commands. One interface, two implementations. Everything above is platform-agnostic.
+- **UI tree** (`ui-tree/`) — the normalized tree and everything asked OF it: selector resolution, `ElementSpec`, screen width, per-id rects, tap points. Knows no platform commands and no averi.yaml.
+- **Flow Engine** (`flow/`) — interprets `averi.yaml` descriptors (login, navigation recipes), maintains a state model of "where the app is".
+- **Verification Engine** (`verify/`) — asserts, the layout contract, rect/color parity, screenshot diffing.
+- **Orchestration** (`run/`) — composes the two engines into one `verify` run: per-platform legs, error containment, the parity tables. It is its own layer precisely because it needs BOTH engines and neither may depend on the other.
+- **MCP layer** (`mcp/`) — thin: tool schemas, descriptions, and one-line delegations. No logic.
+
+**The rule that keeps this honest: dependencies point one way only** — `mcp → run → flow → verify → ui-tree → adapters`, with `util/` a leaf. Nothing below a layer may import from above it. That is checkable in one command, and it is what makes each layer independently testable:
+
+```sh
+grep -rn "from '\.\./" src | sed "s|:.*from '\.\./|  ->  |"
+```
+
+The rule earned its keep: the platform layer once imported the selector layer (for a `tapElement` that contained no platform code), and `flow/config.ts` had become the de-facto home of vocabulary — `ElementSpec`, `ElementAssert`, `parseDuration` — that neither flow nor config owns. Both inversions were invisible until the arrows were drawn.
 
 Runs entirely locally on the dev machine (device access requires it); nothing talks to the cloud.
 
@@ -64,12 +85,18 @@ interface DeviceAdapter {
     terminate(bundleId): void
     screenshot(): Png
     uiTree(): UiNode                // normalized accessibility tree
-    tap(x, y) / tapElement(selector): void
+    tap(x, y): void
     longPress, swipe(direction|coords), typeText, pressKey(back/home/enter)
     setClipboard, openDeepLink(url)
     logs(since): string[]           // logcat / os_log for crash detection
 }
 ```
+
+Selector-based tapping is deliberately NOT on this interface: `tapElement(adapter,
+selector)` (`ui-tree/tap-element.ts`) resolves the selector against the normalized
+tree and calls `tap(x, y)`. Nothing in it is platform-specific, and both adapters
+had implemented it identically — which forced the platform layer to import the
+selector layer above it, inverting exactly the direction this section describes.
 
 **Android implementation** — pure `adb`:
 - screenshot: `adb exec-out screencap -p`
