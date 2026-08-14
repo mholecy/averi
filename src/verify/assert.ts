@@ -5,6 +5,7 @@ import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { elementAssertSchema, elementSpecSchema, parseDuration, type ElementSpec } from '../flow/config.js';
+import { evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 
@@ -59,12 +60,42 @@ const rectAssert = z
   })
   .strict();
 
-// rectAssert is listed FIRST: zod's union error heuristic surfaces one
-// branch's issues, and a `{element, rect}` input that fails the rect refine
-// must show "y alone can never fail", not elementAssert's "unrecognized key
-// 'rect'". Verified: the order does not change which inputs parse, nor the
-// error surfaced for element-assert mistakes (their refine still wins).
-export const assertSpecSchema = z.union([rectAssert, elementAssertSchema, screenshotAssert]);
+/**
+ * Single-element fill check (color-parity.ts): sample the element's region
+ * from a screenshot and compare CIEDE2000 against `expected`. Hex only —
+ * token names resolve in the superrepo layer, before the assert is written.
+ * `deltaE` defaults to 8 and is compared DIRECTLY (no 1.5x contract slack:
+ * the caller chose the hex); the real 2026-08-13 bug measures dE00 10.19,
+ * so the default catches it. `theme` is a declarative annotation naming the
+ * theme the hex was authored for — averi does not switch device themes.
+ */
+const colorAssert = z
+  .object({
+    element: elementSpecSchema,
+    color: z
+      .object({
+        expected: z
+          .string()
+          .regex(/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/, {
+            message:
+              'expected must be #RRGGBB or #RRGGBBAA (alpha is dropped) — token names resolve in the superrepo layer, put the resolved hex here',
+          }),
+        deltaE: z.number().positive().optional(),
+        sample: z.enum(['dominant', 'patches']).optional(),
+        theme: z.enum(['light', 'dark']).optional(),
+      })
+      .strict(),
+    timeout: z.union([z.number(), z.string()]).optional(),
+  })
+  .strict();
+
+// rectAssert and colorAssert are listed FIRST: zod's union error heuristic
+// surfaces one branch's issues, and a `{element, rect}` input that fails the
+// rect refine must show "y alone can never fail" (and a bad `{element,
+// color}` its hex-format message), not elementAssert's "unrecognized key".
+// Verified: the order does not change which inputs parse, nor the error
+// surfaced for element-assert mistakes (their refine still wins).
+export const assertSpecSchema = z.union([rectAssert, colorAssert, elementAssertSchema, screenshotAssert]);
 export type AssertSpec = z.infer<typeof assertSpecSchema>;
 
 export interface AssertResult {
@@ -105,6 +136,7 @@ export class Verifier {
     }
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.timeoutMs;
     if ('rect' in spec) return this.assertRect(spec.element, spec.rect, timeoutMs);
+    if ('color' in spec) return this.assertColor(spec.element, spec.color, timeoutMs);
     if (spec.absent) return this.assertAbsent(spec.element, timeoutMs);
     return this.assertElement(spec.element, spec.text, spec.match, spec.error, timeoutMs);
   }
@@ -194,6 +226,75 @@ export class Verifier {
       }
       await sleep(this.pollMs);
     }
+  }
+
+  /**
+   * Fill color vs an expected hex (color-parity.ts). Needs BOTH the tree
+   * (element rect + root width for the png scale) and a screenshot (pixels).
+   * Polls like the other asserts; each evaluation samples a freshly captured
+   * STABLE screenshot — the same two-identical-consecutive-captures wait the
+   * `screenshot` tool applies — so mid-animation frames are not the verdict,
+   * and the tree is re-read alongside so both come from the same state.
+   */
+  private async assertColor(
+    element: ElementSpec,
+    expectation: ColorExpectation,
+    timeoutMs: number,
+  ): Promise<AssertResult> {
+    const tol = expectation.deltaE ?? 8;
+    const expectedHex = normalizeHex(expectation.expected);
+    const description =
+      `element ${describe(element)} fill within dE00 ${tol} of ${expectedHex}` +
+      (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
+    const deadline = Date.now() + timeoutMs;
+    let lastDetail: string | undefined;
+    let lastReadError: Error | undefined;
+    for (;;) {
+      const { tree, error: readError } = await this.tryReadTree();
+      lastReadError = readError;
+      if (tree !== undefined) {
+        // First occurrence wins — the same duplicate-id rule as rect-parity.
+        const found = findBySpec(tree, element);
+        if (found.length > 0) {
+          const shot = await this.stableScreenshot();
+          try {
+            const png = PNG.sync.read(shot);
+            const evaluated = evaluateColorAssert(found[0].rect, expectation, tree, png);
+            if (evaluated.pass) return { description, pass: true, detail: evaluated.detail };
+            lastDetail = evaluated.detail;
+          } catch (e) {
+            // Fail closed on an undecodable screenshot, but keep polling —
+            // the capture may have raced a transition.
+            lastDetail = `screenshot PNG decode failed: ${e instanceof Error ? e.message : String(e)}`;
+          }
+        }
+      }
+      if (Date.now() >= deadline) {
+        const detail =
+          lastDetail ??
+          (lastReadError !== undefined
+            ? `not found within ${timeoutMs}ms (last UI tree read failed: ${lastReadError.message})`
+            : `not found within ${timeoutMs}ms`);
+        return { description, pass: false, detail };
+      }
+      await sleep(this.pollMs);
+    }
+  }
+
+  /**
+   * The `screenshot` tool's stability wait (two identical consecutive
+   * captures, bounded attempts) reused for pixel sampling, with the
+   * verifier's pollMs as the delay so tests stay fast.
+   */
+  private async stableScreenshot(attempts = 5): Promise<Buffer> {
+    let previous = await this.adapter.screenshot();
+    for (let i = 0; i < attempts; i++) {
+      await sleep(this.pollMs);
+      const current = await this.adapter.screenshot();
+      if (current.equals(previous)) return current;
+      previous = current;
+    }
+    return previous;
   }
 
   /**

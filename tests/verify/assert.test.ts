@@ -155,6 +155,80 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
   });
 });
 
+describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
+  // screen() root is 1000 wide at x=0 and the fake png is 1000 wide → scale 1.
+  const CARD = { x: 100, y: 200, width: 800, height: 100 };
+  const fill = (p: PNG, hex: string, rect = CARD): void => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let y = rect.y; y < rect.y + rect.height; y++) {
+      for (let x = rect.x; x < rect.x + rect.width; x++) {
+        const o = (y * p.width + x) << 2;
+        p.data[o] = r;
+        p.data[o + 1] = g;
+        p.data[o + 2] = b;
+        p.data[o + 3] = 255;
+      }
+    }
+  };
+  const cardFake = (hex: string) => {
+    resetLayout();
+    const fake = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: { ...CARD } })) }, 'detail');
+    fake.nextScreenshot = png(1000, 320, (p) => fill(p, hex));
+    return fake;
+  };
+
+  it('passes on a matching fill and reports the sampled hex, dE and scale', async () => {
+    const verifier = new Verifier(cardFake('#FDFDFD'), FAST);
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(result.description).toContain('fill within dE00 8 of #FDFDFD');
+    expect(result.detail).toContain('sampled #FDFDFD (dominant, 100% of region)');
+    expect(result.detail).toContain('scale 1.000');
+  });
+
+  it('the default deltaE (8) catches the real 2026-08-13 bug: #CFCFD3 where #FDFDFD was expected', async () => {
+    const verifier = new Verifier(cardFake('#CFCFD3'), FAST);
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/sampled #CFCFD3 .* dE00 10\.1[5-9] > 8/);
+  });
+
+  it('respects an explicit deltaE, drops #RRGGBBAA alpha, and names the theme annotation', async () => {
+    const verifier = new Verifier(cardFake('#CFCFD3'), FAST);
+    const loose = await verifier.assert({
+      element: { id: 'card' },
+      color: { expected: '#fdfdfd85', deltaE: 11, theme: 'light' },
+    });
+    expect(loose.pass).toBe(true);
+    expect(loose.description).toContain('dE00 11 of #FDFDFD (light theme)');
+  });
+
+  it('samples a STABLE screenshot (at least two captures compared) via adapter.screenshot()', async () => {
+    const fake = cardFake('#FDFDFD');
+    const verifier = new Verifier(fake, FAST);
+    await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(fake.screenshots.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('fails with a timeout detail when the element never appears (no screenshot burned)', async () => {
+    const fake = cardFake('#FDFDFD');
+    const verifier = new Verifier(fake, FAST);
+    const result = await verifier.assert({ element: { id: 'ghost' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('not found within');
+    expect(fake.screenshots).toHaveLength(0);
+  });
+
+  it('fails closed (with the decode error) when the screenshot is not decodable', async () => {
+    const fake = cardFake('#FDFDFD');
+    fake.nextScreenshot = Buffer.from('not a png');
+    const verifier = new Verifier(fake, FAST);
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('screenshot PNG decode failed');
+  });
+});
+
 describe('transient UI-tree read failures', () => {
   const NULL_ROOT = 'uiautomator dump returned no XML: ERROR: null root node returned by UiTestAutomationBridge.';
 
@@ -266,6 +340,34 @@ describe('assertSpecSchema', () => {
     expect(() => assertSpecSchema.parse({ element: { id: 'x' }, rect: { y: 180, frameWidth: 393 } })).toThrow(
       /y alone can never fail/,
     );
+  });
+
+  it('accepts the documented color shapes', () => {
+    expect(assertSpecSchema.parse({ element: { id: 'x' }, color: { expected: '#FDFDFD' } })).toBeDefined();
+    expect(
+      assertSpecSchema.parse({
+        element: { id: 'x' },
+        color: { expected: '#FDFDFD85', deltaE: 8, sample: 'patches', theme: 'dark' },
+      }),
+    ).toBeDefined();
+  });
+
+  it('color requires expected as hex — a token name surfaces the resolve-upstream message', () => {
+    // Zod's union heuristic surfaces regex/custom issues from the color
+    // branch (the messages worth reading), so a token name or short hex
+    // shows the fix, not elementAssert's "unrecognized key 'color'".
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, color: { expected: 'base.color1' } })).toThrow(
+      /token names resolve in the superrepo layer/,
+    );
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, color: { expected: '#FFF' } })).toThrow(
+      /#RRGGBB/,
+    );
+    // Structural misses still reject (zod falls back to a generic union error
+    // for pure invalid_type/enum issues — same behavior class as rect).
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, color: {} })).toThrow();
+    expect(() =>
+      assertSpecSchema.parse({ element: { id: 'x' }, color: { expected: '#FDFDFD', sample: 'average' } }),
+    ).toThrow();
   });
 });
 

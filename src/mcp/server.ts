@@ -8,7 +8,14 @@ import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
+import { PNG } from 'pngjs';
 import { assertSpecSchema, readTreeWithRetry, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import {
+  compareColorParity,
+  contractHasColorAnchors,
+  formatColorParity,
+  type ColorCapture,
+} from '../verify/color-parity.js';
 import { compareRectParity, formatRectParity, parseRectContract } from '../verify/rect-parity.js';
 import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
@@ -394,7 +401,8 @@ const assertsInput = z
   .describe(
     'Assert specs, e.g. [{"element":{"id":"transfer_form"}}, {"element":{"id":"error_banner"},"absent":true}, ' +
       '{"element":{"id":"amount"},"text":"100.00"}, {"screenshot":{"baseline":"transfers","threshold":0.01}}, ' +
-      '{"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}} (Figma-frame units; y measured but never fails)]',
+      '{"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}} (Figma-frame units; y measured but never fails), ' +
+      '{"element":{"id":"card"},"color":{"expected":"#FDFDFD","deltaE":8,"sample":"dominant"}} (fill vs hex, CIEDE2000)]',
   );
 
 const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
@@ -453,6 +461,7 @@ registerTool(
     description:
       'Run declarative checks against the current screen: element exists (default) / absent / text exact / match regex, ' +
       'rect geometry vs Figma-frame values ({"element":{...},"rect":{"x":24,"w":345,"frameWidth":393}} — deltas in % of screen width; y is measured but never fails), ' +
+      'fill color vs an expected hex ({"element":{...},"color":{"expected":"#FDFDFD","deltaE":8}} — CIEDE2000 over the element\'s sampled region; hex only, token names resolve upstream), ' +
       'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots.',
     inputSchema: { platform, asserts: assertsInput, configPath },
   },
@@ -481,7 +490,7 @@ registerTool(
   {
     description:
       'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
-      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity): numbers over impressions.',
+      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), and when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000): numbers over impressions.',
     inputSchema: {
       platforms: z
         .array(platform)
@@ -495,7 +504,7 @@ registerTool(
         .string()
         .optional()
         .describe(
-          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended.',
+          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default 8; vs-contract at 1.5x); anchors without bg are color-compared platform-to-platform only.',
         ),
       configPath,
       environment,
@@ -580,6 +589,45 @@ registerTool(
         }
       }
       sections.push(`## rect parity\n${body}`);
+
+      // Color parity, only when the contract opts in (any anchor carrying
+      // bg / bg_dark / sample). Reuses each leg's tree AND its final
+      // screenshot bytes — the exact pixels already returned to the caller,
+      // never a second capture that could race a UI change.
+      if (contractHasColorAnchors(contract)) {
+        const captures: Partial<Record<Platform, ColorCapture>> = {};
+        const colorNotes: string[] = [];
+        platforms.forEach((p, i) => {
+          const run = runs[i];
+          if (run.status === 'rejected') {
+            colorNotes.push(`(${p} leg failed — compared without it)`);
+          } else if (run.value.tree === undefined) {
+            colorNotes.push(`(${p}: UI tree read failed — ${run.value.treeError ?? 'unknown'} — compared without it)`);
+          } else {
+            try {
+              captures[p] = { tree: run.value.tree, png: PNG.sync.read(run.value.shot) };
+            } catch (e) {
+              colorNotes.push(
+                `(${p}: screenshot PNG decode failed — ${e instanceof Error ? e.message : String(e)} — compared without it)`,
+              );
+            }
+          }
+        });
+        const colorNote = colorNotes.length > 0 ? colorNotes.join('\n') + '\n' : '';
+        let colorBody: string;
+        if (Object.keys(captures).length === 0) {
+          colorBody = colorNote + 'SKIPPED: no leg produced both a UI tree and a decodable screenshot.';
+        } else {
+          // Same containment rule as rect parity: a comparator error must
+          // not reject the tool call and discard the per-platform sections.
+          try {
+            colorBody = colorNote + formatColorParity(compareColorParity(contract, captures));
+          } catch (e) {
+            colorBody = colorNote + `FAILED: ${e instanceof Error ? e.message : String(e)}`;
+          }
+        }
+        sections.push(`## color parity\n${colorBody}`);
+      }
     }
 
     return { content: [{ type: 'text' as const, text: sections.join('\n\n') }, ...images] };

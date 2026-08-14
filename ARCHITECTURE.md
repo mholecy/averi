@@ -187,8 +187,8 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 | `screenshot(platform, label?)` | PNG returned as MCP image content (agent's vision verifies it) |
 | `ui_snapshot(platform, filter?)` | Normalized AX tree as JSON — cheap, text-based verification |
 | `tap / swipe / type_text / press_key` | Low-level escape hatch for ad-hoc exploration |
-| `assert(spec)` | Declarative check: element exists/absent, text matches, rect geometry vs Figma-frame values (`rect` spec — deltas in % of screen width, `y` measured but never failed), screenshot-diff vs. baseline < threshold |
-| `verify(platforms?, state?, flow?, asserts, contract?)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; legs always android-then-ios), returns per-platform screenshots + assert results; `contract` (layout-contract JSON) appends a per-anchor `## rect parity` geometry table — numbers over impressions |
+| `assert(spec)` | Declarative check: element exists/absent, text matches, rect geometry vs Figma-frame values (`rect` spec — deltas in % of screen width, `y` measured but never failed), fill color vs an expected hex (`color` spec — CIEDE2000 over the element's sampled region, default dE 8; hex only, token names resolve upstream), screenshot-diff vs. baseline < threshold |
+| `verify(platforms?, state?, flow?, asserts, contract?)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; legs always android-then-ios), returns per-platform screenshots + assert results; `contract` (layout-contract JSON) appends a per-anchor `## rect parity` geometry table, and anchors carrying `bg`/`bg_dark`/`sample` add a `## color parity` table sampled from the legs' own screenshots (CIEDE2000: android-vs-ios primary at `tolerance_de` 8, vs-contract at 1.5×) — numbers over impressions |
 | `get_logs(platform, since)` | Crash/exception scan (logcat, os_log) |
 | `record_flow(name)` *(v2)* | Watch manual/agent interaction, emit a draft flow YAML |
 

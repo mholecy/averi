@@ -16,7 +16,7 @@ agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator /
 1. Both platforms' accessibility trees are normalized into one model, so one selector language (`id:`, `text:"…"`, `role:`) and often **one yaml** drives both OSes (per-platform step overrides where they differ).
 2. `ensure_state("logged_in")` checks the screen against the state's `detect:` element; if it doesn't match, it runs the state's `reach:` flow (e.g. `login`) and confirms. Idempotent — costs ~1 s when already there.
 3. Credential values never live in yaml — `${ENV_VAR}` references resolve from the environment, with a gitignored `.env.averi` next to averi.yaml auto-loaded (real env vars win, so CI injects secrets normally). Values are redacted (`***`) from every trace and error.
-4. Verification is tiered: element asserts (deterministic, cheap) → screenshots for the agent to look at → pixel-diff against stored baselines. Geometry is never eyeballed: a `rect` assert checks one element against Figma-frame values, and `verify` with a layout contract prints a per-anchor geometry table — numbers over impressions (see [Layout contracts](#layout-contracts--geometry-with-numbers)). Every flow response reports `appAlive` with a crash-log excerpt if the app died.
+4. Verification is tiered: element asserts (deterministic, cheap) → screenshots for the agent to look at → pixel-diff against stored baselines. Geometry and fills are never eyeballed: a `rect` assert checks one element against Figma-frame values, a `color` assert samples its fill against an expected hex (CIEDE2000), and `verify` with a layout contract prints per-anchor geometry and color tables — numbers over impressions (see [Layout contracts](#layout-contracts--geometry-with-numbers)). Every flow response reports `appAlive` with a crash-log excerpt if the app died.
 
 ## Requirements
 
@@ -235,6 +235,38 @@ consuming averi's own normalized UI tree). Two entry points, no new tool:
 
 Anchor ids are the elements' test identifiers (identical on both platforms — see the stable-ids
 section above); omitted fields are compared platform-to-platform only, never against the contract.
+
+**Color, same contract file** (a port of the superrepo's `color-parity.py`, live-validated on
+device 2026-08-14): anchors may additionally carry `bg` (expected fill, `#RRGGBB` or `#RRGGBBAA`
+— alpha dropped), `bg_dark` (dark-theme counterpart) and `sample` (`"dominant"`, the default —
+mode of the region after a 12% edge inset, reported as the winning bucket's mean — or
+`"patches"`: 4 corners + center, for busy centers). When any anchor opts in, `verify` samples
+each leg's final screenshot at the anchors' tree rects and appends a `## color parity` table next
+to `## rect parity`:
+
+```json
+{ "id": "payment.form.debit_select", "x": 24, "y": 106, "w": 345, "h": 129,
+  "bg": "#FDFDFD", "bg_dark": "#363644", "sample": "dominant" }
+```
+
+```
+anchor                                   android       ios  dE(a,i)  dE(a,c)  dE(i,c)  verdict
+payment.form.debit_select                #CFCFD3   #FDFDFD    10.19    10.19     0.00  FAIL
+```
+
+Deltas are CIEDE2000. Android-vs-ios is the **primary** axis (tolerance `tolerance_de`, default
+8); each platform vs the contract hex runs at 1.5× that — deliberately looser, because the app
+background is a gradient and translucent fills composite differently per y-position, so both
+devices drift off the contract hex together while staying close to each other. The calibration
+point is the real 2026-08-13 bug (`base.color4` grey vs `base.color1` white = dE00 10.19): over
+the primary axis, **under** the default contract axis — so a single-platform run at defaults
+misses it, and the output then suggests `tolerance_de: 6`. Hex only in contracts at this level;
+token names (`base.color1`) are skipped with a note — resolve them to hex in the layer that owns
+the token definitions. Anchors without `bg` are color-compared platform-to-platform only. The
+single-element form is a `color` assert: `{"element":{"id":"card"},"color":{"expected":"#FDFDFD",
+"deltaE":8,"sample":"dominant"}}` — compared directly against `deltaE` (no 1.5× slack: the caller
+chose the hex), so the default catches the 10.19 bug. Thin 1–2 px strokes are invisible to region
+sampling — borders stay with the screenshot judge.
 Screen width per platform is inferred from the widest rect in the whole tree (the id-less
 root/window node). **Reliability caveat:** when the widest rect starts inset, the inferred width is
 a content width and every delta is scaled wrong — the output says so explicitly. On iOS this

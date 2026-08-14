@@ -94,7 +94,7 @@ export function inferScreenWidth(tree: UiNode): ScreenWidth {
 }
 
 /** {id → rect} for the FIRST occurrence of each identifier (pre-order). */
-function collectRects(tree: UiNode): Map<string, Rect> {
+export function collectRects(tree: UiNode): Map<string, Rect> {
   const out = new Map<string, Rect>();
   const walk = (n: UiNode): void => {
     if (n.identifier !== null && n.identifier !== '' && !out.has(n.identifier)) {
