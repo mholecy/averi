@@ -1,0 +1,11 @@
+{
+  "//": "Typechecks the tests too. The base config is build-scoped (rootDir src, emits dist), so tests cannot simply be added to its include — they would land in the package output. This config emits nothing and exists purely so `npm run lint` catches a test that references a symbol src no longer exports.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false,
+    "types": ["node"]
+  },
+  "include": ["src", "tests"]
+}
