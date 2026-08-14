@@ -1,10 +1,18 @@
 {
-  "name": "@averi/mcp",
-  "version": "0.0.1",
+  "name": "averi",
+  "version": "0.1.0",
   "description": "MCP server for verifying mobile app changes on iOS Simulators and Android Emulators",
   "type": "module",
   "bin": {
-    "averi-mcp": "dist/mcp/server.js"
+    "averi": "dist/mcp/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mholecy/averi.git"
+  },
+  "homepage": "https://github.com/mholecy/averi#readme",
+  "bugs": {
+    "url": "https://github.com/mholecy/averi/issues"
   },
   "files": [
     "dist",

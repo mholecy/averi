@@ -226,7 +226,7 @@ Verification philosophy: three tiers, cheapest first — (1) AX-tree asserts (fa
 ## 6. Distribution & privacy
 
 - averi is **free**: no license key, no accounts, no feature gating.
-- Distribution: `npm i -g @averi/mcp` (or run from a clone with `npx tsx`).
+- Distribution: `npx -y averi` (or `npm i -g averi`; from a clone, `npx tsx`).
 - Zero telemetry. Everything runs locally; screenshots, UI trees and secrets never leave the machine — an easy compliance story for banking clients.
 
 ---

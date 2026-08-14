@@ -29,35 +29,30 @@ agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator /
 
 ## Installation (in your app repo)
 
-Until the npm package is published, clone and build averi once:
+averi is on npm, so there is nothing to clone or build — `npx` fetches it on first use.
 
-```bash
-git clone git@github.com:mholecy/native-app-verify.git ~/tools/averi
-cd ~/tools/averi && npm install && npm run build
-```
-
-(For a team, pin a tag/commit so everyone runs the same build.)
-
-Then set up three things in the **app repo root** (`averi.yaml` and `.env.averi` must sit in the directory the agent session runs from):
+Set up three things in the **app repo root** (`averi.yaml` and `.env.averi` must sit in the directory the agent session runs from):
 
 1. Register the MCP server — two ways, same result. Either way Claude Code runs the server with your **repo root as its working directory**, which is how averi finds the config below; no paths need configuring in averi itself.
 
-   **For yourself** (recommended while averi is unpublished — the command embeds a machine-specific path that shouldn't be committed):
+   **For yourself:**
 
    ```bash
-   claude mcp add averi -- node /absolute/path/to/averi/dist/mcp/server.js
+   claude mcp add averi -- npx -y averi
    # add --scope user to enable averi in all your projects at once
    ```
 
-   **For the whole team** — `.mcp.json` at the repo root, committed (teammates get a one-time approval prompt). Best once the npm package is published, when the command becomes portable (`"command": "npx", "args": ["-y", "averi-mcp"]`):
+   **For the whole team** — `.mcp.json` at the repo root, committed (teammates get a one-time approval prompt):
 
    ```json
    {
      "mcpServers": {
-       "averi": { "command": "node", "args": ["/absolute/path/to/averi/dist/mcp/server.js"] }
+       "averi": { "command": "npx", "args": ["-y", "averi"] }
      }
    }
    ```
+
+   For a team, pin the version (`averi@0.1.0`) so everyone runs the same build.
 
 2. `.gitignore` entry for `.env.averi`, then create that file with the test credentials your login flow needs. Variable names are yours to choose — they only have to match the `${...}` references in `averi.yaml`:
 
