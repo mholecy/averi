@@ -158,7 +158,11 @@ export interface RectParityResult {
 }
 
 export interface RectParityOptions {
-  /** Overrides the contract's tolerance_pct (default 2.0). */
+  /**
+   * Overrides the contract's tolerance_pct (default 2.0). Intentionally
+   * test-facing only: `verify` deliberately exposes no override — the
+   * tolerance belongs to the committed contract, not to the caller of a run.
+   */
   tolerancePct?: number;
 }
 
@@ -182,6 +186,17 @@ export function compareRectParity(
   const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? 2.0;
   const frameWidth =
     contract.figma_frame_width ?? Math.max(0, ...contract.anchors.map((a) => a.w ?? 0));
+  // Single-platform + no frame width: contract values cannot be normalized
+  // and there is no other platform, so NOTHING would actually be compared —
+  // a "WITHIN TOLERANCE" verdict would be a lie. Fail closed instead.
+  // (Two-platform runs proceed: android-vs-ios comparisons need no frame.)
+  if (single && frameWidth <= 0) {
+    throw new Error(
+      'rect parity: single-platform run with neither figma_frame_width nor any anchor w — ' +
+        'contract values cannot be normalized, so nothing would actually be compared. ' +
+        'Declare figma_frame_width in the contract.',
+    );
+  }
 
   const widths = platforms.map((p) => ({ platform: p, ...inferScreenWidth(trees[p] as UiNode) }));
   const widthOf: Partial<Record<Platform, number>> = {};
@@ -316,8 +331,15 @@ export function compareRectParity(
     // Aspect ratio, android-vs-ios only: a same-margin, same-width element
     // can still be the wrong shape.
     if (a !== undefined && i !== undefined) {
-      const aAspect = a.height !== 0 ? a.width / a.height : undefined;
-      const iAspect = i.height !== 0 ? i.width / i.height : undefined;
+      // Skip degenerate ratios (zero width OR height → 0/NaN/Infinity), like
+      // the Python script's falsy-ratio skip: a zero-sized side is noise, not
+      // a shape to compare.
+      const ratioOf = (r: Rect): number | undefined => {
+        const v = r.width / r.height;
+        return Number.isFinite(v) && v !== 0 ? v : undefined;
+      };
+      const aAspect = ratioOf(a);
+      const iAspect = ratioOf(i);
       if (aAspect !== undefined && iAspect !== undefined) {
         const spread = (Math.abs(aAspect - iAspect) / Math.max(aAspect, iAspect)) * 100;
         const over = spread > tolerancePct;
@@ -364,7 +386,11 @@ export function compareRectParity(
 /** One-line verdict — the number the caller quotes. */
 export function rectParityVerdict(r: RectParityResult): string {
   if (r.pass) {
-    return `rect parity: WITHIN TOLERANCE (${r.tolerancePct.toFixed(2)}%) on all ${r.anchorCount} anchor(s).`;
+    const scope =
+      r.skipped.length > 0
+        ? `on ${r.anchorCount - r.skipped.length} anchor(s) (${r.skipped.length} skipped)`
+        : `on all ${r.anchorCount} anchor(s)`;
+    return `rect parity: WITHIN TOLERANCE (${r.tolerancePct.toFixed(2)}%) ${scope}.`;
   }
   const bits: string[] = [];
   if (r.findings.length > 0) bits.push(`${r.findings.length} DELTA(S) OVER ${r.tolerancePct.toFixed(2)}%`);
@@ -393,9 +419,10 @@ export function formatRectParity(r: RectParityResult): string {
   const unreliable = r.widths.filter((w) => !w.reliable).map((w) => w.platform);
   if (unreliable.length > 0) {
     lines.push(
-      `  ! ${unreliable.join(' + ')}: the widest rect does not start at x=0, so this is a FILTERED tree and`,
-      '    the width above is a content width — every delta below is scaled wrong. Re-read the',
-      '    tree unfiltered before trusting any number here.',
+      `  ! ${unreliable.join(' + ')}: the widest rect does not start at x=0 — the width above is a`,
+      '    CONTENT width and every delta below is scaled wrong. Likely causes: the tree source',
+      '    surfaces no real window rect (iOS idb — prefer app.ios.treeSource: wda in averi.yaml),',
+      '    or the tree was filtered before it got here.',
     );
   }
   lines.push('');
@@ -513,6 +540,17 @@ export function evaluateRectAssert(
 ): { pass: boolean; detail: string } {
   const tolerancePct = expected.tolerancePct ?? 2.0;
   const { width, reliable } = inferScreenWidth(tree);
+  // Fail closed on a degenerate width: dividing by 0 would make every delta
+  // NaN and NaN > tol is false — a silent vacuous PASS. This path is real:
+  // idb's iOS synthetic root is 0×0 when elements carry no frames.
+  if (width <= 0) {
+    return {
+      pass: false,
+      detail:
+        'screen width could not be inferred (the widest rect in the tree is 0 wide — ' +
+        "idb on iOS can emit a 0×0 synthetic root when elements carry no frames); failing closed, geometry unchecked",
+    };
+  }
   const parts: string[] = [];
   let pass = true;
   const checks: { field: 'x' | 'y' | 'w' | 'h'; raw: number; want?: number }[] = [

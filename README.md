@@ -236,8 +236,11 @@ consuming averi's own normalized UI tree). Two entry points, no new tool:
 Anchor ids are the elements' test identifiers (identical on both platforms — see the stable-ids
 section above); omitted fields are compared platform-to-platform only, never against the contract.
 Screen width per platform is inferred from the widest rect in the whole tree (the id-less
-root/window node); when the widest rect starts inset the output warns that the tree was filtered
-and every delta is scaled wrong.
+root/window node). **Reliability caveat:** when the widest rect starts inset, the inferred width is
+a content width and every delta is scaled wrong — the output says so explicitly. On iOS this
+typically means the default idb tree source surfaced no real window rect (width came from the
+widest accessibility element): set `app.ios.treeSource: wda` in `averi.yaml`, whose tree carries a
+real window rect. Otherwise the tree was filtered before it reached the comparator.
 
 Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
 

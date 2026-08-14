@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
+import { assertSpecSchema, readTreeWithRetry, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { pollMs: 5, timeoutMs: 100 };
@@ -260,6 +260,35 @@ describe('assertSpecSchema', () => {
   it('rect requires frameWidth (no anchor-w fallback for a single anchor) and at least one field', () => {
     expect(() => assertSpecSchema.parse({ element: { id: 'x' }, rect: { x: 24 } })).toThrow();
     expect(() => assertSpecSchema.parse({ element: { id: 'x' }, rect: { frameWidth: 393 } })).toThrow();
+  });
+
+  it('rejects a y-only rect — it could never fail (y is measured but not a failure source)', () => {
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, rect: { y: 180, frameWidth: 393 } })).toThrow(
+      /y alone can never fail/,
+    );
+  });
+});
+
+describe('readTreeWithRetry', () => {
+  it('absorbs transient read failures (uiautomator null root) and returns the tree', async () => {
+    const fake = dashboardFake();
+    const orig = fake.uiTree.bind(fake);
+    let failures = 3;
+    fake.uiTree = async () => {
+      if (failures-- > 0) throw new Error('null root node returned by UiTestAutomationBridge');
+      return orig();
+    };
+    const tree = await readTreeWithRetry(fake, 5, 1);
+    expect(tree.children.length).toBeGreaterThan(0);
+    expect(failures).toBe(-1); // succeeded on the 4th attempt
+  });
+
+  it('throws after the last attempt, naming the attempt count and the underlying error', async () => {
+    const fake = dashboardFake();
+    fake.uiTree = async () => {
+      throw new Error('null root node');
+    };
+    await expect(readTreeWithRetry(fake, 3, 1)).rejects.toThrow(/after 3 attempts: null root node/);
   });
 });
 

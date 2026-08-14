@@ -8,7 +8,7 @@ import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
-import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import { assertSpecSchema, readTreeWithRetry, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
 import { compareRectParity, formatRectParity, parseRectContract } from '../verify/rect-parity.js';
 import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
@@ -522,10 +522,22 @@ registerTool(
       const results = await new Verifier(adapter, { baselineDir: resolve('.averi/baselines') }).assertAll(specs);
       // Grab the tree inside the leg, right at the screen the leg ended on —
       // no extra device round-trip ordering issues after the legs settle.
-      const tree = contract === undefined ? undefined : await adapter.uiTree();
+      // Bounded retry (the transient "null root node" read the polling
+      // asserts absorb), and a final failure must NOT reject the leg: that
+      // would discard the trace, assert results and screenshot of a
+      // minutes-long device run over the one optional extra read.
+      let tree: UiNode | undefined;
+      let treeError: string | undefined;
+      if (contract !== undefined) {
+        try {
+          tree = await readTreeWithRetry(adapter);
+        } catch (e) {
+          treeError = e instanceof Error ? e.message : String(e);
+        }
+      }
       const shot = await adapter.screenshot();
       const health = await appHealth(p, cfg);
-      return { trace, results, shot, health, tree };
+      return { trace, results, shot, health, tree, treeError };
     };
 
     const runs = await Promise.allSettled(platforms.map(runOne));
@@ -547,17 +559,26 @@ registerTool(
 
     if (contract !== undefined) {
       const trees: Partial<Record<Platform, UiNode>> = {};
-      const absent: Platform[] = [];
+      const notes: string[] = [];
       platforms.forEach((p, i) => {
         const run = runs[i];
-        if (run.status === 'fulfilled' && run.value.tree !== undefined) trees[p] = run.value.tree;
-        else absent.push(p);
+        if (run.status === 'rejected') notes.push(`(${p} leg failed — compared without it)`);
+        else if (run.value.tree !== undefined) trees[p] = run.value.tree;
+        else notes.push(`(${p}: UI tree read failed — ${run.value.treeError ?? 'unknown'} — compared without it)`);
       });
-      const note = absent.length > 0 ? `(${absent.join(' + ')} leg failed — compared without it)\n` : '';
-      const body =
-        Object.keys(trees).length === 0
-          ? 'SKIPPED: no leg produced a UI tree.'
-          : note + formatRectParity(compareRectParity(contract, trees));
+      const note = notes.length > 0 ? notes.join('\n') + '\n' : '';
+      let body: string;
+      if (Object.keys(trees).length === 0) {
+        body = note + 'SKIPPED: no leg produced a UI tree.';
+      } else {
+        // A comparator error (e.g. a contract that cannot be normalized) must
+        // not reject the tool call and discard the per-platform sections.
+        try {
+          body = note + formatRectParity(compareRectParity(contract, trees));
+        } catch (e) {
+          body = note + `FAILED: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
       sections.push(`## rect parity\n${body}`);
     }
 

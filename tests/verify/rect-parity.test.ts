@@ -88,7 +88,9 @@ describe('compareRectParity — normalization and width inference', () => {
       { android: filtered },
     );
     expect(r.widths[0].reliable).toBe(false);
-    expect(formatRectParity(r)).toContain('FILTERED');
+    const out = formatRectParity(r);
+    expect(out).toContain('CONTENT width');
+    expect(out).toContain('app.ios.treeSource: wda'); // names the real remediation
   });
 
   it('falls back to the widest anchor w when figma_frame_width is not declared', () => {
@@ -96,6 +98,23 @@ describe('compareRectParity — normalization and width inference', () => {
     delete c.figma_frame_width;
     const r = compareRectParity(c, { android: androidTree(), ios: iosTree() });
     expect(r.frameWidth).toBe(345);
+  });
+
+  it('single-platform + no normalizable frame width throws instead of a vacuous pass', () => {
+    // No figma_frame_width, no anchor w → frameWidth 0 → with one platform
+    // NOTHING would be compared; "WITHIN TOLERANCE" would be a lie.
+    const c: RectContract = { screen: 't', anchors: [{ id: 'header', x: 24 }] };
+    expect(() => compareRectParity(c, { android: androidTree() })).toThrow(/figma_frame_width/);
+  });
+
+  it('two-platform + no frame width still compares android-vs-ios (no throw)', () => {
+    const c: RectContract = { screen: 't', anchors: [{ id: 'pill', x: 24 }] };
+    const android = root(1080, 2400, [leaf('pill', px(24), 300, px(345), px(60))]);
+    const ios = root(393, 852, [leaf('pill', 44, 110, 345, 60)]); // x 11.2% vs android 6.1%
+    const r = compareRectParity(c, { android, ios });
+    expect(r.frameWidth).toBe(0);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ anchor: 'pill', field: 'x', comparison: 'android-vs-ios' });
   });
 });
 
@@ -158,6 +177,15 @@ describe('compareRectParity — finding semantics', () => {
     expect(r.findings[0]).toMatchObject({ anchor: 'pill', field: 'x', comparison: 'android-vs-ios' });
     expect(r.findings[0].contract).toBeUndefined();
     expect(r.findings.some((f) => f.comparison.includes('contract'))).toBe(false);
+  });
+
+  it('skips the aspect comparison when either ratio is degenerate (zero width or height)', () => {
+    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'divider' }] };
+    const android = root(1080, 2400, [leaf('divider', px(24), 300, 0, px(60))]); // zero width → ratio 0
+    const ios = root(393, 852, [leaf('divider', 24, 110, 345, 60)]);
+    const r = compareRectParity(c, { android, ios });
+    expect(r.entries.some((e) => e.kind === 'field' && e.field === 'aspect')).toBe(false);
+    expect(r.findings.every((f) => Number.isFinite(f.delta))).toBe(true);
   });
 
   it('respects contract tolerance_pct default (2.0) and the option override', () => {
@@ -227,6 +255,8 @@ describe('compareRectParity — single-platform mode', () => {
     expect(out).toContain('a-vs-c');
     expect(out).not.toContain('i-vs-c');
     expect(out).toContain('skipped — no contract fields');
+    // The verdict must not count skipped anchors as compared:
+    expect(rectParityVerdict(r)).toBe('rect parity: WITHIN TOLERANCE (2.00%) on 2 anchor(s) (1 skipped).');
   });
 
   it('single-platform findings never claim a cross-platform comparison', () => {
@@ -335,5 +365,17 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
       tree,
     );
     expect(detail).toContain('UNRELIABLE');
+  });
+
+  it('fails closed when the screen width cannot be inferred (all-zero rects, the idb 0x0 root)', () => {
+    const tree = n({ children: [leaf('card', 0, 0, 0, 0)] }); // every rect 0-sized
+    const { pass, detail } = evaluateRectAssert(
+      findAnchorRect(tree, 'card').rect,
+      { x: 24, frameWidth: 393 },
+      tree,
+    );
+    expect(pass).toBe(false);
+    expect(detail).toContain('screen width could not be inferred');
+    expect(detail).not.toContain('NaN'); // never a vacuous ΔNaN% pass
   });
 });

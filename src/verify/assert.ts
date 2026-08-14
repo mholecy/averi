@@ -47,14 +47,24 @@ const rectAssert = z
         tolerancePct: z.number().positive().optional(),
       })
       .strict()
-      .refine((r) => [r.x, r.y, r.w, r.h].some((v) => v !== undefined), {
-        message: 'rect needs at least one of: x, y, w, h',
+      // y alone is rejected because it would be a VACUOUS assert: y is
+      // measured and reported but never fails (absolute y drifts with device
+      // aspect ratio alone — verify-contract gap rows check vertical
+      // position), so a y-only rect could never fail once the element exists.
+      .refine((r) => [r.x, r.w, r.h].some((v) => v !== undefined), {
+        message:
+          "rect needs at least one of: x, w, h — y alone can never fail (y is measured but not a failure source; use verify's contract gap rows for vertical position)",
       }),
     timeout: z.union([z.number(), z.string()]).optional(),
   })
   .strict();
 
-export const assertSpecSchema = z.union([elementAssertSchema, rectAssert, screenshotAssert]);
+// rectAssert is listed FIRST: zod's union error heuristic surfaces one
+// branch's issues, and a `{element, rect}` input that fails the rect refine
+// must show "y alone can never fail", not elementAssert's "unrecognized key
+// 'rect'". Verified: the order does not change which inputs parse, nor the
+// error surfaced for element-assert mistakes (their refine still wins).
+export const assertSpecSchema = z.union([rectAssert, elementAssertSchema, screenshotAssert]);
 export type AssertSpec = z.infer<typeof assertSpecSchema>;
 
 export interface AssertResult {
@@ -262,6 +272,30 @@ export class Verifier {
       detail: `${pct}% of pixels differ`,
     };
   }
+}
+
+/**
+ * Bounded-retry tree read for one-shot consumers (verify's rect-parity leg):
+ * right after a flow settles, a device can transiently fail to produce a
+ * tree (uiautomator "null root node") — the same transient the polling
+ * asserts absorb via tryReadTree. Throws after the last attempt with the
+ * underlying error in the message.
+ */
+export async function readTreeWithRetry(
+  adapter: DeviceAdapter,
+  attempts = 5,
+  delayMs = 300,
+): Promise<UiNode> {
+  let lastError: Error | undefined;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await sleep(delayMs);
+    try {
+      return await adapter.uiTree();
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw new Error(`UI tree read failed after ${attempts} attempts: ${lastError?.message ?? 'unknown error'}`);
 }
 
 /** Crash signatures per platform, scanned over recent device logs. */
