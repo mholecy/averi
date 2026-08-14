@@ -278,10 +278,10 @@ widest accessibility element): set `app.ios.treeSource: wda` in `averi.yaml`, wh
 real window rect. Otherwise the tree was filtered before it reached the comparator.
 
 **Text and type size, same contract file** (live-validated on device 2026-08-14): anchors may carry
-`text` — the exact string the anchor RENDERS — or `text_dynamic: true` for amounts, balances and
-dates, whose locale formatting legitimately differs (`1,121.00` vs `1 121,00`) and which are
-therefore never literal-diffed. When any anchor opts in, `verify` reads the copy back **off the
-same screenshots** with the macOS Vision recognizer and appends a `## text parity` table:
+`text` — the exact string the anchor renders — or `text_dynamic: true` for amounts, balances and
+dates, whose locale formatting differs legitimately (`1,121.00` vs `1 121,00`). When any anchor opts
+in, `verify` reads the copy back off the same screenshots with the macOS Vision recognizer and
+appends a `## text parity` table:
 
 ```json
 { "id": "payment.form.amount_input", "text": "Enter amount" }
@@ -293,28 +293,24 @@ payment.form.amount_input    ocr   0.00      Enter amount    Enter amount      �
 payment.form.continue_button ocr   CONTINUE  CONTINUE        CONTINUE      0.74%  OK
 ```
 
-Why OCR and not the tree: **the accessibility tree is not a record of rendered copy.** On iOS
-SwiftUI collapses a card or button into one element whose `label` is an authored a11y summary —
-measured on the payment form, `credit_select` exposes `'To account'` while the screen reads
-`'Select credit account'`, and the visible `CONTINUE` is absent from the tree entirely. Tree-only
-comparison covered 2 of 7 anchors there. The tree is still used as the fallback when OCR cannot
-run (macOS-only, needs a Swift toolchain), and the table's `src` column always says which source a
-row came from — the two are never mixed across platforms.
+Why OCR rather than the tree: **the accessibility tree does not record rendered copy.** On iOS
+SwiftUI collapses a card or button into one element carrying an authored a11y label — measured on
+the payment form, `credit_select` exposes `'To account'` while the screen reads `'Select credit
+account'`, and the visible `CONTINUE` is missing from the tree entirely. Tree-only comparison
+covered 2 of 7 anchors there. The tree remains the fallback when the recognizer cannot run
+(macOS-only); the `src` column names the source per row, and the two are never mixed across
+platforms.
 
-The same call yields the **type-size** check for free: Vision returns a bounding box per string,
-i.e. the rendered ink height, compared android-vs-ios in % of screen width at `tolerance_size_pct`
-(default 10) and only where both strings are identical — different glyphs have different ink
-extents. Calibration: a matching `CONTINUE` reads 0.74% apart, while the real 22sp-vs-17pt top-bar
-title drift reads 12.63% apart. `text_dynamic` anchors are never size-checked either, since their
-strings legitimately differ.
+The same read yields the **type-size** check: Vision returns a bounding box per string, i.e. the
+rendered ink height, compared android-vs-ios in % of screen width at `tolerance_size_pct` (default
+10) and only where both strings match. Calibration: a matching `CONTINUE` reads 0.74% apart, the
+real 22sp-vs-17pt title drift 12.63%. `text_dynamic` anchors are never size-checked.
 
-Two rows are withheld from findings rather than reported as drift, because comparing them would
-dispatch a phantom: an anchor whose tree copy vanished entirely from the reading (something is
-drawn over its layout rect — an IME is the usual cause — **or** the text is rendered at a contrast
-the recognizer cannot resolve, which would be a real defect; the output says the cause is
-undetermined and tells you to look), and an anchor whose chosen source yields no string at all.
-Both still fail the run. The single-element form is an `ocr` assert:
-`{"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}}`.
+Two kinds of row are withheld from findings, because comparing them would dispatch a phantom: an
+anchor whose tree copy vanished from the reading (something covers its rect — usually the IME — or
+the text sits at a contrast the recognizer cannot resolve, which would be a real defect; the output
+says the cause is undetermined), and an anchor whose source yields no string at all. Both still fail
+the run. Single-element form: `{"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}}`.
 
 Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
 
