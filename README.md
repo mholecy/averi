@@ -16,7 +16,7 @@ agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator /
 1. Both platforms' accessibility trees are normalized into one model, so one selector language (`id:`, `text:"…"`, `role:`) and often **one yaml** drives both OSes (per-platform step overrides where they differ).
 2. `ensure_state("logged_in")` checks the screen against the state's `detect:` element; if it doesn't match, it runs the state's `reach:` flow (e.g. `login`) and confirms. Idempotent — costs ~1 s when already there.
 3. Credential values never live in yaml — `${ENV_VAR}` references resolve from the environment, with a gitignored `.env.averi` next to averi.yaml auto-loaded (real env vars win, so CI injects secrets normally). Values are redacted (`***`) from every trace and error.
-4. Verification is tiered: element asserts (deterministic, cheap) → screenshots for the agent to look at → pixel-diff against stored baselines. Every flow response reports `appAlive` with a crash-log excerpt if the app died.
+4. Verification is tiered: element asserts (deterministic, cheap) → screenshots for the agent to look at → pixel-diff against stored baselines. Geometry is never eyeballed: a `rect` assert checks one element against Figma-frame values, and `verify` with a layout contract prints a per-anchor geometry table — numbers over impressions (see [Layout contracts](#layout-contracts--geometry-with-numbers)). Every flow response reports `appAlive` with a crash-log excerpt if the app died.
 
 ## Requirements
 
@@ -203,6 +203,41 @@ flows:
 - **`fill`** clears opt-in only: typing APPENDS on both platforms, but dev flavors may pre-fill login fields that must survive. Fills are verified against a fresh accessibility tree when the field exposes its text — a clear-fill that lands wrong is wiped and retyped once; a no-clear fill never destroys existing content (it fails loudly instead). Android types one character per `input text` call: bulk injection races Compose's async state and drops most characters (measured 3 of 11 landing).
 - **Field errors**: `ui_snapshot` attaches `error` to an input when the platform exposes the association (iOS: a same-identifier text below the field — the SwiftUI convention when titles/errors share the field's `accessibilityIdentifier`); assert with `{ element: { id: amount_input }, error: "Required" }`.
 - **Tap disambiguation**: when a selector matches several nodes and exactly one is interactive (button/textfield/switch/…), `tap`/`fill` target that one and say so in the trace. Several interactive matches stay an error.
+
+### Layout contracts — geometry with numbers
+
+The screenshot judge cannot see a 46-vs-24pt margin or a 1.81-vs-1.60 aspect ratio — geometry is
+arithmetic, so averi checks it with numbers (a port of the convergence superrepo's `rect-parity.py`,
+consuming averi's own normalized UI tree). Two entry points, no new tool:
+
+- **One element** — a `rect` assert spec:
+  `{"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}}`. Expected values are
+  Figma-frame units; both sides are normalized to **% of screen width** before comparing (default
+  tolerance 2%). `y` is measured and reported but **never fails**: absolute y drifts between devices
+  with different aspect ratios from geometry alone.
+- **Whole screen** — `verify` with `contract: path/to/contract.json`: after the legs run, each leg's
+  UI tree is compared per anchor and a `## rect parity` table is appended — per-field deltas vs the
+  contract and android-vs-ios, **gap-to-previous-anchor** rows for vertical position (local,
+  aspect-independent — this is why absolute y never fails), aspect-ratio spread, and MISSING anchors
+  listed separately with their likely causes.
+
+```json
+{
+  "screen": "transactions.list",
+  "figma_frame_width": 393,
+  "tolerance_pct": 2.0,
+  "anchors": [
+    { "id": "transactions.list.pill_bar", "x": 24, "y": 247, "w": 345, "h": 32 },
+    { "id": "transactions.list.row_0", "x": 24, "w": 345 }
+  ]
+}
+```
+
+Anchor ids are the elements' test identifiers (identical on both platforms — see the stable-ids
+section above); omitted fields are compared platform-to-platform only, never against the contract.
+Screen width per platform is inferred from the widest rect in the whole tree (the id-less
+root/window node); when the widest rect starts inset the output warns that the tree was filtered
+and every delta is scaled wrong.
 
 Full schema and design: [ARCHITECTURE.md](ARCHITECTURE.md). Agent workflow, rules and recipes: [skill/SKILL.md](skill/SKILL.md).
 

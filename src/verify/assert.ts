@@ -4,7 +4,8 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
-import { elementAssertSchema, parseDuration, type ElementSpec } from '../flow/config.js';
+import { elementAssertSchema, elementSpecSchema, parseDuration, type ElementSpec } from '../flow/config.js';
+import { evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 
 /**
@@ -24,7 +25,36 @@ const screenshotAssert = z
   })
   .strict();
 
-export const assertSpecSchema = z.union([elementAssertSchema, screenshotAssert]);
+/**
+ * Single-element geometry check against Figma-frame values (rect-parity.ts).
+ * Expected values are in FIGMA-FRAME units; `frameWidth` is required because
+ * a single anchor offers no anchor-`w` fallback to normalize by. Both sides
+ * are normalized to % of screen width before comparing. `y` is measured and
+ * reported but never fails the assert: absolute y drifts between devices
+ * with different aspect ratios from geometry alone — whole-screen gap rows
+ * (verify's `contract`) are the vertical-position check.
+ */
+const rectAssert = z
+  .object({
+    element: elementSpecSchema,
+    rect: z
+      .object({
+        x: z.number().optional(),
+        y: z.number().optional(),
+        w: z.number().optional(),
+        h: z.number().optional(),
+        frameWidth: z.number().positive(),
+        tolerancePct: z.number().positive().optional(),
+      })
+      .strict()
+      .refine((r) => [r.x, r.y, r.w, r.h].some((v) => v !== undefined), {
+        message: 'rect needs at least one of: x, y, w, h',
+      }),
+    timeout: z.union([z.number(), z.string()]).optional(),
+  })
+  .strict();
+
+export const assertSpecSchema = z.union([elementAssertSchema, rectAssert, screenshotAssert]);
 export type AssertSpec = z.infer<typeof assertSpecSchema>;
 
 export interface AssertResult {
@@ -64,6 +94,7 @@ export class Verifier {
       return this.assertScreenshot(spec.screenshot.baseline, spec.screenshot.threshold ?? 0.01);
     }
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.timeoutMs;
+    if ('rect' in spec) return this.assertRect(spec.element, spec.rect, timeoutMs);
     if (spec.absent) return this.assertAbsent(spec.element, timeoutMs);
     return this.assertElement(spec.element, spec.text, spec.match, spec.error, timeoutMs);
   }
@@ -109,6 +140,46 @@ export class Verifier {
             : lastSeen !== undefined
               ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${lastSeen}`
               : `not found within ${timeoutMs}ms`;
+        return { description, pass: false, detail };
+      }
+      await sleep(this.pollMs);
+    }
+  }
+
+  /**
+   * Geometry vs Figma-frame values, in % of screen width (screen width =
+   * widest rect in the tree, same rule as the whole-screen comparator).
+   * Polls like the other asserts: mid-animation geometry may legitimately be
+   * off for a frame, so only the state at timeout is the verdict.
+   */
+  private async assertRect(
+    element: ElementSpec,
+    expected: RectExpectation,
+    timeoutMs: number,
+  ): Promise<AssertResult> {
+    const tolerance = expected.tolerancePct ?? 2.0;
+    const description = `element ${describe(element)} rect within ${tolerance}% of screen width (figma frame ${expected.frameWidth})`;
+    const deadline = Date.now() + timeoutMs;
+    let lastDetail: string | undefined;
+    let lastReadError: Error | undefined;
+    for (;;) {
+      const { tree, error: readError } = await this.tryReadTree();
+      lastReadError = readError;
+      if (tree !== undefined) {
+        // First occurrence wins — the same duplicate-id rule as rect-parity.
+        const found = findBySpec(tree, element);
+        if (found.length > 0) {
+          const evaluated = evaluateRectAssert(found[0].rect, expected, tree);
+          if (evaluated.pass) return { description, pass: true, detail: evaluated.detail };
+          lastDetail = evaluated.detail;
+        }
+      }
+      if (Date.now() >= deadline) {
+        const detail =
+          lastDetail ??
+          (lastReadError !== undefined
+            ? `not found within ${timeoutMs}ms (last UI tree read failed: ${lastReadError.message})`
+            : `not found within ${timeoutMs}ms`);
         return { description, pass: false, detail };
       }
       await sleep(this.pollMs);

@@ -1,0 +1,339 @@
+import { describe, expect, it } from 'vitest';
+import type { UiNode } from '../../src/adapters/types.js';
+import {
+  compareRectParity,
+  evaluateRectAssert,
+  formatRectParity,
+  inferScreenWidth,
+  parseRectContract,
+  rectParityVerdict,
+  type RectContract,
+} from '../../src/verify/rect-parity.js';
+
+/**
+ * Synthetic fixtures modeled on the 2026 card run: figma frame 393,
+ * android at 1080 px (scale ~2.748), ios at 393 pt (1:1). The real bugs the
+ * Python script caught — a 46-vs-24pt margin and a 1.81-vs-1.60 aspect —
+ * are ported as cases below and must FAIL at 2% tolerance.
+ */
+
+const S = 1080 / 393;
+const px = (v: number): number => Math.round(v * S);
+
+const n = (partial: Partial<UiNode>): UiNode => ({
+  role: 'other',
+  label: null,
+  identifier: null,
+  value: null,
+  rect: { x: 0, y: 0, width: 0, height: 0 },
+  children: [],
+  ...partial,
+});
+
+const root = (width: number, height: number, children: UiNode[], x = 0): UiNode =>
+  n({ role: 'container', rect: { x, y: 0, width, height }, children });
+
+const leaf = (id: string, x: number, y: number, w: number, h: number): UiNode =>
+  n({ identifier: id, rect: { x, y, width: w, height: h } });
+
+const contract = (): RectContract => ({
+  screen: 'test.screen',
+  tolerance_pct: 2.0,
+  figma_frame_width: 393,
+  anchors: [
+    { id: 'header', x: 24, y: 100, w: 345, h: 60 },
+    { id: 'card', x: 24, y: 180, w: 345, h: 129 },
+  ],
+});
+
+/** Pixel-perfect android tree: every anchor at the figma value scaled by 1080/393. */
+const androidTree = (): UiNode =>
+  root(1080, 2400, [
+    leaf('header', px(24), px(100), px(345), px(60)),
+    leaf('card', px(24), px(180), px(345), px(129)),
+  ]);
+
+const iosTree = (): UiNode =>
+  root(393, 852, [leaf('header', 24, 100, 345, 60), leaf('card', 24, 180, 345, 129)]);
+
+const findAnchorRect = (tree: UiNode, id: string): UiNode => {
+  const hit = tree.children.find((c) => c.identifier === id);
+  if (!hit) throw new Error(`fixture has no ${id}`);
+  return hit;
+};
+
+describe('compareRectParity — normalization and width inference', () => {
+  it('matched geometry across different screen widths passes (all deltas in % of width)', () => {
+    const r = compareRectParity(contract(), { android: androidTree(), ios: iosTree() });
+    expect(r.findings).toEqual([]);
+    expect(r.missing).toEqual([]);
+    expect(r.pass).toBe(true);
+    expect(r.tolerancePct).toBe(2.0);
+  });
+
+  it('screen width comes from the widest rect in the WHOLE tree, not from id-bearing nodes', () => {
+    // id-bearing nodes end at 66 + 948 = 1014 px; only the id-less root spans 1080.
+    const r = compareRectParity(contract(), { android: androidTree(), ios: iosTree() });
+    expect(r.widths).toEqual([
+      { platform: 'android', width: 1080, reliable: true },
+      { platform: 'ios', width: 393, reliable: true },
+    ]);
+    expect(inferScreenWidth(androidTree())).toEqual({ width: 1080, reliable: true });
+  });
+
+  it('flags a filtered tree (widest rect starts inset) as unreliable, with a warning in the output', () => {
+    const filtered = root(1000, 2400, [leaf('header', px(24), px(100), px(345), px(60))], 40);
+    const r = compareRectParity(
+      { screen: 't', figma_frame_width: 393, anchors: [{ id: 'header', x: 24 }] },
+      { android: filtered },
+    );
+    expect(r.widths[0].reliable).toBe(false);
+    expect(formatRectParity(r)).toContain('FILTERED');
+  });
+
+  it('falls back to the widest anchor w when figma_frame_width is not declared', () => {
+    const c = contract();
+    delete c.figma_frame_width;
+    const r = compareRectParity(c, { android: androidTree(), ios: iosTree() });
+    expect(r.frameWidth).toBe(345);
+  });
+});
+
+describe('compareRectParity — finding semantics', () => {
+  it('a 46-vs-24pt margin FAILS at 2% tolerance (the card-run bug)', () => {
+    const android = androidTree();
+    findAnchorRect(android, 'card').rect.x = px(46); // 46pt margin instead of 24
+    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    expect(r.pass).toBe(false);
+    const x = r.findings.filter((f) => f.anchor === 'card' && f.field === 'x');
+    expect(x.map((f) => f.comparison).sort()).toEqual(['android-vs-contract', 'android-vs-ios']);
+    for (const f of x) expect(f.delta).toBeCloseTo(5.6, 1);
+    expect(x[0].android).toBe(px(46)); // findings carry the measured numbers
+    expect(x[0].contract).toBe(24);
+  });
+
+  it('a 1.81-vs-1.60 aspect ratio FAILS at 2% tolerance even without contract h', () => {
+    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
+    const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]); // 948/524 = 1.809
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 345/216 = 1.597
+    const r = compareRectParity(c, { android, ios });
+    const aspect = r.findings.find((f) => f.field === 'aspect');
+    expect(aspect).toBeDefined();
+    expect(aspect).toMatchObject({ anchor: 'card', comparison: 'android-vs-ios' });
+    expect(aspect?.delta).toBeCloseTo(11.7, 1);
+    expect(formatRectParity(r)).toContain('<-- ASPECT');
+  });
+
+  it('absolute y is NEVER a finding source — both anchors shifted 10% stay a pass', () => {
+    const android = androidTree();
+    for (const id of ['header', 'card']) findAnchorRect(android, id).rect.y += 108; // 10% of 1080
+    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    expect(r.pass).toBe(true);
+    expect(r.findings).toEqual([]);
+    // ...but y is still measured and shown in the rows:
+    const yRow = r.entries.find((e) => e.kind === 'field' && e.anchor === 'header' && e.field === 'y');
+    expect(yRow?.kind === 'field' && yRow.dAc).toBeCloseTo(10.0, 1);
+  });
+
+  it('vertical position IS judged via gap-to-previous — one anchor shifted 5% is a gap finding', () => {
+    const android = androidTree();
+    findAnchorRect(android, 'card').rect.y += 54; // 5% of 1080
+    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    expect(r.pass).toBe(false);
+    expect(r.findings.some((f) => f.field === 'y')).toBe(false);
+    const gaps = r.findings.filter((f) => f.field === 'gap');
+    expect(gaps.map((f) => f.comparison).sort()).toEqual(['android-vs-contract', 'android-vs-ios']);
+    for (const f of gaps) {
+      expect(f.anchor).toBe('header -> card');
+      expect(f.delta).toBeCloseTo(5.0, 1);
+    }
+  });
+
+  it('omitted contract fields are compared platform-to-platform only', () => {
+    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'pill' }] };
+    const android = root(1080, 2400, [leaf('pill', px(24), 300, px(345), px(60))]);
+    const ios = root(393, 852, [leaf('pill', 44, 110, 345, 60)]); // x 11.2% vs android 6.1%
+    const r = compareRectParity(c, { android, ios });
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ anchor: 'pill', field: 'x', comparison: 'android-vs-ios' });
+    expect(r.findings[0].contract).toBeUndefined();
+    expect(r.findings.some((f) => f.comparison.includes('contract'))).toBe(false);
+  });
+
+  it('respects contract tolerance_pct default (2.0) and the option override', () => {
+    const c = contract();
+    delete c.tolerance_pct;
+    const android = androidTree();
+    findAnchorRect(android, 'card').rect.x = px(46);
+    expect(compareRectParity(c, { android, ios: iosTree() }).tolerancePct).toBe(2.0);
+    const loose = compareRectParity(c, { android, ios: iosTree() }, { tolerancePct: 10 });
+    expect(loose.pass).toBe(true); // 5.6% < 10%
+  });
+});
+
+describe('compareRectParity — missing anchors and duplicates', () => {
+  const threeAnchorContract = (): RectContract => ({
+    screen: 't',
+    figma_frame_width: 393,
+    anchors: [
+      { id: 'a', x: 24, y: 100, w: 345, h: 60 },
+      { id: 'b', x: 24, y: 180, w: 345, h: 60 },
+      { id: 'c', x: 24, y: 560, w: 345, h: 60 },
+    ],
+  });
+
+  it('a MISSING anchor fails the run separately and RESETS the gap chain', () => {
+    const android = root(1080, 2400, [
+      leaf('a', px(24), px(100), px(345), px(60)),
+      leaf('b', px(24), px(180), px(345), px(60)),
+      leaf('c', px(24), px(560) + 54, px(345), px(60)), // 5% off — would be a gap finding without the reset
+    ]);
+    const ios = root(393, 852, [leaf('a', 24, 100, 345, 60), leaf('c', 24, 560, 345, 60)]); // no b
+    const r = compareRectParity(threeAnchorContract(), { android, ios });
+    expect(r.missing).toEqual([{ id: 'b', absentOn: ['ios'] }]);
+    expect(r.pass).toBe(false);
+    expect(r.findings).toEqual([]); // missing is a failure but NOT a parity delta
+    expect(r.entries.filter((e) => e.kind === 'field' && e.field === 'gap')).toEqual([]);
+    const out = formatRectParity(r);
+    expect(out).toContain('MISSING on ios');
+    expect(out).toContain('MISSING ANCHORS — these are not parity findings yet');
+    expect(out).toContain('accessibility.md §2'); // the three-cause explanation
+  });
+
+  it('first occurrence of a duplicated id wins', () => {
+    const c: RectContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
+    const android = root(1080, 2400, [
+      leaf('card', px(24), 300, px(345), px(60)),
+      leaf('card', 500, 900, 100, 100), // garbage duplicate must be ignored
+    ]);
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 60)]);
+    expect(compareRectParity(c, { android, ios }).pass).toBe(true);
+  });
+});
+
+describe('compareRectParity — single-platform mode', () => {
+  it('compares platform-vs-contract only; anchors with no contract fields are skipped with a note', () => {
+    const c = contract();
+    c.anchors.push({ id: 'footer' });
+    const android = androidTree();
+    android.children.push(leaf('footer', 0, 2200, 1080, 100));
+    const r = compareRectParity(c, { android });
+    expect(r.platforms).toEqual(['android']);
+    expect(r.pass).toBe(true);
+    expect(r.skipped).toEqual(['footer']);
+    expect(r.entries.some((e) => e.kind === 'skipped' && e.anchor === 'footer')).toBe(true);
+    expect(r.entries.some((e) => e.kind === 'field' && e.field === 'aspect')).toBe(false);
+    const out = formatRectParity(r);
+    expect(out).toContain('a-vs-c');
+    expect(out).not.toContain('i-vs-c');
+    expect(out).toContain('skipped — no contract fields');
+  });
+
+  it('single-platform findings never claim a cross-platform comparison', () => {
+    const android = androidTree();
+    findAnchorRect(android, 'card').rect.x = px(46);
+    const r = compareRectParity(contract(), { android });
+    expect(r.pass).toBe(false);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ anchor: 'card', field: 'x', comparison: 'android-vs-contract' });
+  });
+});
+
+describe('formatRectParity / rectParityVerdict', () => {
+  it('renders the fixed-width table with gap^ and aspect rows and a pass verdict', () => {
+    const r = compareRectParity(contract(), { android: androidTree(), ios: iosTree() });
+    const out = formatRectParity(r);
+    expect(out).toContain('screen: test.screen   tolerance: 2.00% of screen width');
+    expect(out).toContain('widths: android 1080   ios 393   figma frame 393');
+    expect(out).toMatch(/anchor\s+field\s+figma\s+android\s+ios\s+a-vs-c\s+i-vs-c\s+a-vs-i/);
+    expect(out).toContain('gap^');
+    expect(out).toContain('aspect');
+    expect(out).toContain('rect parity: WITHIN TOLERANCE (2.00%) on all 2 anchor(s).');
+    expect(rectParityVerdict(r)).toBe('rect parity: WITHIN TOLERANCE (2.00%) on all 2 anchor(s).');
+  });
+
+  it('renders findings with their numbers and the dispatch-then-re-measure close', () => {
+    const android = androidTree();
+    findAnchorRect(android, 'card').rect.x = px(46);
+    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    const out = formatRectParity(r);
+    expect(out).toContain('2 DELTA(S) OVER 2.00% — each is a code-fix finding carrying its numbers:');
+    expect(out).toMatch(/card x: android-vs-contract \+5\.5\d% of width \(android 126\.0, ios 24\.0, contract 24\)/);
+    expect(out).toContain('Dispatch these to the implementers verbatim, then RE-MEASURE');
+    expect(rectParityVerdict(r)).toBe('rect parity: 2 DELTA(S) OVER 2.00%');
+  });
+
+  it('counts missing anchors in the verdict', () => {
+    const ios = iosTree();
+    ios.children.pop(); // drop card
+    const r = compareRectParity(contract(), { android: androidTree(), ios });
+    expect(rectParityVerdict(r)).toBe('rect parity: 1 MISSING anchor(s)');
+  });
+});
+
+describe('parseRectContract', () => {
+  it('accepts the documented format and IGNORES unknown per-anchor fields (bg, sample, _note)', () => {
+    const parsed = parseRectContract(
+      JSON.stringify({
+        _comment: 'x',
+        screen: 's',
+        figma_frame_width: 393,
+        tolerance_pct: 2.0,
+        anchors: [{ id: 'a', x: 24, w: 345, bg: '#fff', bg_dark: '#000', sample: [1, 2], _note: 'n' }],
+      }),
+    );
+    expect(parsed.anchors[0]).toMatchObject({ id: 'a', x: 24, w: 345 });
+  });
+
+  it('rejects a contract without anchors, an anchor without id, and invalid JSON — naming the source', () => {
+    expect(() => parseRectContract('{"screen":"s","anchors":[]}', 'c.json')).toThrow(/c\.json/);
+    expect(() => parseRectContract('{"anchors":[{"x":1}]}')).toThrow(/id/);
+    expect(() => parseRectContract('not json', 'c.json')).toThrow(/c\.json: not valid JSON/);
+  });
+});
+
+describe('evaluateRectAssert (the `rect` assert primitive)', () => {
+  it('passes on matching geometry and reports every delta as a number', () => {
+    const tree = androidTree();
+    const { pass, detail } = evaluateRectAssert(
+      findAnchorRect(tree, 'card').rect,
+      { x: 24, y: 180, w: 345, h: 129, frameWidth: 393 },
+      tree,
+    );
+    expect(pass).toBe(true);
+    expect(detail).toMatch(/x 66\.0 vs contract 24 → Δ[+-]0\.0\d%/);
+    expect(detail).toContain('screen width 1080');
+  });
+
+  it('fails on an over-tolerance w/h and marks the offending field OVER', () => {
+    const tree = androidTree();
+    const { pass, detail } = evaluateRectAssert(
+      findAnchorRect(tree, 'card').rect,
+      { h: 100, frameWidth: 393 }, // measured 32.9% vs 25.4% → +7.4%
+      tree,
+    );
+    expect(pass).toBe(false);
+    expect(detail).toMatch(/h .* OVER/);
+  });
+
+  it('y is measured and reported but never fails', () => {
+    const tree = androidTree();
+    const { pass, detail } = evaluateRectAssert(
+      findAnchorRect(tree, 'card').rect,
+      { x: 24, y: 1, frameWidth: 393 }, // y wildly off
+      tree,
+    );
+    expect(pass).toBe(true);
+    expect(detail).toContain('(measured only, never fails)');
+  });
+
+  it('flags an unreliable (filtered) screen width in the detail', () => {
+    const tree = root(1000, 2400, [leaf('card', 100, 200, 800, 100)], 40);
+    const { detail } = evaluateRectAssert(
+      findAnchorRect(tree, 'card').rect,
+      { x: 24, frameWidth: 393 },
+      tree,
+    );
+    expect(detail).toContain('UNRELIABLE');
+  });
+});

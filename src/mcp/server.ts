@@ -2,12 +2,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
 import { assertSpecSchema, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import { compareRectParity, formatRectParity, parseRectContract } from '../verify/rect-parity.js';
 import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
@@ -391,7 +393,8 @@ const assertsInput = z
   .array(z.unknown())
   .describe(
     'Assert specs, e.g. [{"element":{"id":"transfer_form"}}, {"element":{"id":"error_banner"},"absent":true}, ' +
-      '{"element":{"id":"amount"},"text":"100.00"}, {"screenshot":{"baseline":"transfers","threshold":0.01}}]',
+      '{"element":{"id":"amount"},"text":"100.00"}, {"screenshot":{"baseline":"transfers","threshold":0.01}}, ' +
+      '{"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}} (Figma-frame units; y measured but never fails)]',
   );
 
 const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
@@ -448,7 +451,9 @@ registerTool(
   'assert',
   {
     description:
-      'Run declarative checks against the current screen: element exists (default) / absent / text exact / match regex, and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots.',
+      'Run declarative checks against the current screen: element exists (default) / absent / text exact / match regex, ' +
+      'rect geometry vs Figma-frame values ({"element":{...},"rect":{"x":24,"w":345,"frameWidth":393}} — deltas in % of screen width; y is measured but never fails), ' +
+      'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots.',
     inputSchema: { platform, asserts: assertsInput, configPath },
   },
   async ({ platform: p, asserts, configPath: cp }) => {
@@ -475,7 +480,8 @@ registerTool(
   'verify',
   {
     description:
-      'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done.',
+      'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
+      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity): numbers over impressions.',
     inputSchema: {
       platforms: z
         .array(platform)
@@ -485,14 +491,25 @@ registerTool(
       state: z.string().optional().describe('State to ensure first (from averi.yaml)'),
       flow: z.string().optional().describe('Flow to run (from averi.yaml)'),
       asserts: assertsInput.optional(),
+      contract: z
+        .string()
+        .optional()
+        .describe(
+          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended.',
+        ),
       configPath,
       environment,
     },
   },
-  async ({ platforms: requested, state, flow, asserts, configPath: cp, environment: env }) => {
+  async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: env }) => {
     const cfg = await loadProjectConfig(cp);
     const specs = parseAsserts(asserts ?? []);
     const platforms = normalizePlatforms(requested);
+    // Load up front: a typo'd contract path must not cost a full device run.
+    const contract =
+      contractPath === undefined
+        ? undefined
+        : parseRectContract(await readFile(resolve(contractPath), 'utf8'), contractPath);
 
     const runOne = async (p: Platform) => {
       // Only the ios leg has a treeSource; the registry normalizes it away
@@ -503,9 +520,12 @@ registerTool(
       if (state) trace.push(...(await engine.ensureState(state)));
       if (flow) trace.push(...(await engine.runFlow(flow)));
       const results = await new Verifier(adapter, { baselineDir: resolve('.averi/baselines') }).assertAll(specs);
+      // Grab the tree inside the leg, right at the screen the leg ended on —
+      // no extra device round-trip ordering issues after the legs settle.
+      const tree = contract === undefined ? undefined : await adapter.uiTree();
       const shot = await adapter.screenshot();
       const health = await appHealth(p, cfg);
-      return { trace, results, shot, health };
+      return { trace, results, shot, health, tree };
     };
 
     const runs = await Promise.allSettled(platforms.map(runOne));
@@ -524,6 +544,22 @@ registerTool(
       sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${health}`);
       images.push({ type: 'image', data: shot.toString('base64'), mimeType: 'image/png' });
     });
+
+    if (contract !== undefined) {
+      const trees: Partial<Record<Platform, UiNode>> = {};
+      const absent: Platform[] = [];
+      platforms.forEach((p, i) => {
+        const run = runs[i];
+        if (run.status === 'fulfilled' && run.value.tree !== undefined) trees[p] = run.value.tree;
+        else absent.push(p);
+      });
+      const note = absent.length > 0 ? `(${absent.join(' + ')} leg failed — compared without it)\n` : '';
+      const body =
+        Object.keys(trees).length === 0
+          ? 'SKIPPED: no leg produced a UI tree.'
+          : note + formatRectParity(compareRectParity(contract, trees));
+      sections.push(`## rect parity\n${body}`);
+    }
 
     return { content: [{ type: 'text' as const, text: sections.join('\n\n') }, ...images] };
   },

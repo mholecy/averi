@@ -104,6 +104,57 @@ describe('element asserts', () => {
   });
 });
 
+describe('rect asserts (geometry vs Figma-frame values)', () => {
+  // screen() root is 1000 wide at x=0 → screen width 1000; frameWidth 500
+  // makes the card's expected values exactly half the measured pixels.
+  const cardFake = () => {
+    resetLayout();
+    return new FakeAdapter(
+      {
+        detail: screen(node({ identifier: 'card', rect: { x: 100, y: 200, width: 800, height: 100 } })),
+      },
+      'detail',
+    );
+  };
+
+  it('passes when x/w/h match in % of screen width, with the deltas in the detail', async () => {
+    const verifier = new Verifier(cardFake(), FAST);
+    const result = await verifier.assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 50, frameWidth: 500 },
+    });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('screen width 1000');
+  });
+
+  it('fails on an over-tolerance h and reports the measured numbers', async () => {
+    const verifier = new Verifier(cardFake(), FAST);
+    const result = await verifier.assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 70, frameWidth: 500 }, // 14% expected vs 10% measured → -4%
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/h .* OVER/);
+  });
+
+  it('y is measured and reported but never fails the assert', async () => {
+    const verifier = new Verifier(cardFake(), FAST);
+    const result = await verifier.assert({
+      element: { id: 'card' },
+      rect: { x: 50, y: 10, w: 400, frameWidth: 500 }, // y expected 2% vs measured 20%
+    });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('(measured only, never fails)');
+  });
+
+  it('fails with a timeout detail when the element never appears', async () => {
+    const verifier = new Verifier(cardFake(), FAST);
+    const result = await verifier.assert({ element: { id: 'ghost' }, rect: { x: 1, frameWidth: 500 } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('not found within');
+  });
+});
+
 describe('transient UI-tree read failures', () => {
   const NULL_ROOT = 'uiautomator dump returned no XML: ERROR: null root node returned by UiTestAutomationBridge.';
 
@@ -198,6 +249,17 @@ describe('assertSpecSchema', () => {
     expect(assertSpecSchema.parse({ element: { id: 'x' } })).toBeDefined();
     expect(assertSpecSchema.parse({ element: { id: 'x' }, error: 'Required' })).toBeDefined();
     expect(assertSpecSchema.parse({ screenshot: { baseline: 'home', threshold: 0.02 } })).toBeDefined();
+    expect(
+      assertSpecSchema.parse({
+        element: { id: 'x' },
+        rect: { x: 24, y: 106, w: 345, h: 129, frameWidth: 393, tolerancePct: 2.0 },
+      }),
+    ).toBeDefined();
+  });
+
+  it('rect requires frameWidth (no anchor-w fallback for a single anchor) and at least one field', () => {
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, rect: { x: 24 } })).toThrow();
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, rect: { frameWidth: 393 } })).toThrow();
   });
 });
 
