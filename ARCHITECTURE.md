@@ -57,7 +57,7 @@ Clean separation of concerns:
 - **Device Adapter** (`adapters/`) — the only layer that knows platform commands. One interface, two implementations. Everything above is platform-agnostic.
 - **UI tree** (`ui-tree/`) — the normalized tree and everything asked OF it: selector resolution, `ElementSpec`, screen width, per-id rects, tap points. Knows no platform commands and no averi.yaml.
 - **Flow Engine** (`flow/`) — interprets `averi.yaml` descriptors (login, navigation recipes), maintains a state model of "where the app is".
-- **Verification Engine** (`verify/`) — asserts, the layout contract, rect/color parity, screenshot diffing.
+- **Verification Engine** (`verify/`) — asserts, the layout contract, rect/color/text parity, OCR, screenshot diffing.
 - **Orchestration** (`run/`) — composes the two engines into one `verify` run: per-platform legs, error containment, the parity tables. It is its own layer precisely because it needs BOTH engines and neither may depend on the other.
 - **MCP layer** (`mcp/`) — thin: tool schemas, descriptions, and one-line delegations. No logic.
 
@@ -215,7 +215,7 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 | `ui_snapshot(platform, filter?)` | Normalized AX tree as JSON — cheap, text-based verification |
 | `tap / swipe / type_text / press_key` | Low-level escape hatch for ad-hoc exploration |
 | `assert(spec)` | Declarative check: element exists/absent, text matches, rect geometry vs Figma-frame values (`rect` spec — deltas in % of screen width, `y` measured but never failed), fill color vs an expected hex (`color` spec — CIEDE2000 over the element's sampled region, default dE 8; hex only, token names resolve upstream), screenshot-diff vs. baseline < threshold |
-| `verify(platforms?, state?, flow?, asserts, contract?)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; legs always android-then-ios), returns per-platform screenshots + assert results; `contract` (layout-contract JSON) appends a per-anchor `## rect parity` geometry table, and anchors carrying `bg`/`bg_dark`/`sample` add a `## color parity` table sampled from the legs' own screenshots (CIEDE2000: android-vs-ios primary at `tolerance_de` 8, vs-contract at 1.5×) — numbers over impressions |
+| `verify(platforms?, state?, flow?, asserts, contract?)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; legs always android-then-ios), returns per-platform screenshots + assert results; `contract` (layout-contract JSON) appends a per-anchor `## rect parity` geometry table, anchors carrying `bg`/`bg_dark`/`sample` add a `## color parity` table sampled from the legs' own screenshots (CIEDE2000: android-vs-ios primary at `tolerance_de` 8, vs-contract at 1.5×), and anchors carrying `text`/`text_dynamic` add a `## text parity` table reading the RENDERED copy and ink height back off those same screenshots with OCR (`tolerance_size_pct` 10) — numbers over impressions |
 | `get_logs(platform, since)` | Crash/exception scan (logcat, os_log) |
 | `record_flow(name)` *(v2)* | Watch manual/agent interaction, emit a draft flow YAML |
 

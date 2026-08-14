@@ -4,6 +4,7 @@ import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.j
 import { parseConfig } from '../../src/flow/config.js';
 import { appHealth, runVerification } from '../../src/run/verify.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
+import type { OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 
 /**
@@ -161,6 +162,84 @@ describe('color parity opt-in', () => {
     const color = out.sections.find((s) => s.startsWith('## color parity'));
     expect(color).toContain('screenshot PNG decode failed');
     expect(color).toContain('SKIPPED: no leg produced both a UI tree and a decodable screenshot.');
+  });
+});
+
+describe('text parity opt-in', () => {
+  /** Stands in for the Swift recognizer; the real one needs a toolchain. */
+  const engine = (byId: Record<string, string>, h = 10): OcrEngine => ({
+    recognize: async (_png, regions) =>
+      regions.map((r) => ({
+        id: r.id,
+        lines: byId[r.id] === undefined ? [] : [{ text: byId[r.id], confidence: 1, x: 0, y: 0, w: 10, h }],
+      })),
+  });
+
+  it('is appended only when an anchor declares text or text_dynamic', async () => {
+    const withText = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', text: 'Hello' }]),
+        ocrEngine: engine({ card: 'Hello' }),
+      }),
+      async () => fake('android'),
+    );
+    expect(withText.sections.some((s) => s.startsWith('## text parity'))).toBe(true);
+
+    const withoutText = await runVerification(
+      request({ platforms: ['android'], contract: contract([{ id: 'card', x: 10, w: 40 }]) }),
+      async () => fake('android'),
+    );
+    expect(withoutText.sections.some((s) => s.startsWith('## text parity'))).toBe(false);
+  });
+
+  it('compares the RENDERED copy: OCR sees text the tree does not carry', async () => {
+    // The measured iOS shape — a node with no label at all — still yields a
+    // row, because the recognizer read the screen rather than the tree.
+    const out = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+        ocrEngine: engine({ card: 'PROCEED' }),
+      }),
+      async () => fake('android'),
+    );
+    const text = out.sections.find((s) => s.startsWith('## text parity'));
+    expect(text).toContain('PROCEED');
+    expect(text).toContain('COPY DRIFT');
+  });
+
+  it('a recognizer failure degrades to tree evidence with a note, never sinking the run', async () => {
+    const failing: OcrEngine = { recognize: async () => { throw new Error('swiftc not found'); } };
+    const out = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+        ocrEngine: failing,
+      }),
+      async () => fake('android'),
+    );
+    const text = out.sections.find((s) => s.startsWith('## text parity'));
+    expect(text).toContain('OCR failed — swiftc not found');
+    // The table still stands, and the assert results survived.
+    expect(text).toContain('text parity:');
+    expect(out.screenshots).toHaveLength(1);
+  });
+
+  it('notes an undecodable screenshot instead of throwing out of the OCR pass', async () => {
+    const adapter = fake('android');
+    adapter.nextScreenshot = Buffer.from('not a png');
+    const out = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+        ocrEngine: engine({ card: 'CONTINUE' }),
+      }),
+      async () => adapter,
+    );
+    const text = out.sections.find((s) => s.startsWith('## text parity'));
+    expect(text).toContain('OCR failed');
+    expect(text).toContain('text parity:');
   });
 });
 

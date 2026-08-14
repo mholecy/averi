@@ -16,6 +16,7 @@ import {
   Verifier,
 } from '../verify/assert.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
+import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { parseLayoutContract } from '../verify/layout-contract.js';
 import { appHealth, formatAsserts, formatTrace, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
@@ -370,7 +371,10 @@ const assertsInput = z
     'Assert specs, e.g. [{"element":{"id":"transfer_form"}}, {"element":{"id":"error_banner"},"absent":true}, ' +
       '{"element":{"id":"amount"},"text":"100.00"}, {"screenshot":{"baseline":"transfers","threshold":0.01}}, ' +
       '{"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}} (Figma-frame units; y measured but never fails), ' +
-      '{"element":{"id":"card"},"color":{"expected":"#FDFDFD","deltaE":8,"sample":"dominant"}} (fill vs hex, CIEDE2000)]',
+      '{"element":{"id":"card"},"color":{"expected":"#FDFDFD","deltaE":8,"sample":"dominant"}} (fill vs hex, CIEDE2000), ' +
+      '{"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}} (what the element RENDERS, read back from the screenshot — ' +
+      'not the same question as "text", which reads the accessibility tree: on iOS a button\'s visible label is often absent from the tree ' +
+      'entirely; heightPct pins rendered ink height in % of screen width, single-line elements only; macOS-only)]',
   );
 
 const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
@@ -431,6 +435,7 @@ registerTool(
       'Run declarative checks against the current screen: element exists (default) / absent / text exact / match regex, ' +
       'rect geometry vs Figma-frame values ({"element":{...},"rect":{"x":24,"w":345,"frameWidth":393}} — deltas in % of screen width; y is measured but never fails), ' +
       'fill color vs an expected hex ({"element":{...},"color":{"expected":"#FDFDFD","deltaE":8}} — CIEDE2000 over the element\'s sampled region; hex only, token names resolve upstream), ' +
+      'rendered text read back off the screenshot ({"element":{...},"ocr":{"text":"CONTINUE","heightPct":2.96}} — what the user SEES, which the tree often does not carry: on iOS SwiftUI collapses a button into one node whose label is an authored a11y summary, so the visible string is absent; heightPct is rendered ink height in % of screen width, the type-size check, single-line only; macOS-only, fails closed elsewhere), ' +
       'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots.',
     inputSchema: { platform, asserts: assertsInput, configPath },
   },
@@ -458,7 +463,7 @@ registerTool(
   {
     description:
       'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
-      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), and when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000; ALWAYS the light axis — bg values — since averi cannot switch device themes; bg_dark anchors wait for the dark-mode round): numbers over impressions.',
+      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000; ALWAYS the light axis — bg values — since averi cannot switch device themes; bg_dark anchors wait for the dark-mode round), and when anchors carry text/text_dynamic a ## text parity table compares the RENDERED copy and type size (OCR off the same screenshots; macOS-only, falls back to the tree with a note): numbers over impressions.',
     inputSchema: {
       platforms: z
         .array(platform)
@@ -472,7 +477,8 @@ registerTool(
         .string()
         .optional()
         .describe(
-          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default ' + DEFAULT_TOLERANCE_DE + '; vs-contract at ' + CONTRACT_TOL_FACTOR + 'x); anchors without bg are color-compared platform-to-platform only. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode.',
+          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?,text?,text_dynamic?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default ' + DEFAULT_TOLERANCE_DE + '; vs-contract at ' + CONTRACT_TOL_FACTOR + 'x); anchors without bg are color-compared platform-to-platform only. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode. ' +
+            'Anchors with text (the exact rendered string) or text_dynamic (true for amounts/dates, whose locale formatting legitimately differs) get a "## text parity" table: the copy is read back off the legs\' screenshots with OCR — what the user SEES, since on iOS the tree carries authored a11y summaries rather than rendered copy — and compared android-vs-ios and vs the contract, plus rendered ink height as the type-size check (tolerance_size_pct, default ' + DEFAULT_SIZE_TOLERANCE_PCT + '%, compared only where both strings match). OCR is macOS-only; elsewhere the table falls back to tree evidence and says so.',
         ),
       configPath,
       environment,

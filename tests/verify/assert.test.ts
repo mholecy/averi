@@ -155,6 +155,73 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
   });
 });
 
+describe('ocr asserts (what the element RENDERS)', () => {
+  const CARD = { x: 100, y: 200, width: 800, height: 100 };
+  /** Stands in for the Swift recognizer; the real one needs a toolchain. */
+  const engine = (text: string | undefined, h = 30) => ({
+    recognize: async (_png: Buffer, regions: { id: string }[]) =>
+      regions.map((r) => ({
+        id: r.id,
+        lines: text === undefined ? [] : [{ text, confidence: 1, x: 0, y: 0, w: 200, h }],
+      })),
+  });
+  const cardFake = () => {
+    resetLayout();
+    const fake = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: { ...CARD } })) }, 'detail');
+    fake.nextScreenshot = png(1000, 320);
+    return fake;
+  };
+
+  it('passes on the rendered string and says what it read', async () => {
+    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(true);
+    expect(result.description).toContain('renders text "CONTINUE"');
+    expect(result.detail).toContain('read "CONTINUE"');
+  });
+
+  it('fails on drift and quotes both sides', async () => {
+    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('0.00') });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'Enter amount' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('read "0.00"');
+    expect(result.detail).toContain('vs expected "Enter amount"');
+  });
+
+  it('checks rendered ink height in % of screen width (screen 1000 wide, png 1000 → 30px = 3.00%)', async () => {
+    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE', 30) });
+    const ok = await verifier.assert({ element: { id: 'card' }, ocr: { heightPct: 3.0 } });
+    expect(ok.pass).toBe(true);
+    expect(ok.detail).toContain('ink height 3.00% of width');
+
+    const tooBig = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE', 41) });
+    const bad = await tooBig.assert({ element: { id: 'card' }, ocr: { heightPct: 3.0 } });
+    expect(bad.pass).toBe(false);
+  });
+
+  it('fails closed when the recognizer read nothing — unread is not verified-as-empty', async () => {
+    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine(undefined) });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('failing closed');
+  });
+
+  it('fails closed when the recognizer itself throws, naming the reason', async () => {
+    const engineThrows = { recognize: async () => { throw new Error('swiftc not found'); } };
+    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engineThrows });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('swiftc not found');
+  });
+
+  it('a missing element times out like every other assert', async () => {
+    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'ghost' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('not found within');
+  });
+});
+
 describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
   // screen() root is 1000 wide at x=0 and the fake png is 1000 wide → scale 1.
   const CARD = { x: 100, y: 200, width: 800, height: 100 };
@@ -350,6 +417,18 @@ describe('assertSpecSchema', () => {
         color: { expected: '#FDFDFD85', deltaE: 8, sample: 'patches', theme: 'dark' },
       }),
     ).toBeDefined();
+  });
+
+  it('accepts the documented ocr shapes and rejects the vacuous ones', () => {
+    expect(assertSpecSchema.parse({ element: { id: 'x' }, ocr: { text: 'CONTINUE' } })).toBeDefined();
+    expect(
+      assertSpecSchema.parse({ element: { id: 'x' }, ocr: { match: '^\\d+$', heightPct: 3.8, tolerancePct: 5 } }),
+    ).toBeDefined();
+    // An empty ocr spec could never fail, and text+match is two questions.
+    expect(() => assertSpecSchema.parse({ element: { id: 'x' }, ocr: {} })).toThrow(/at least one of/);
+    expect(() =>
+      assertSpecSchema.parse({ element: { id: 'x' }, ocr: { text: 'a', match: 'a' } }),
+    ).toThrow(/text OR match/);
   });
 
   it('color requires expected as hex — a token name surfaces the resolve-upstream message', () => {

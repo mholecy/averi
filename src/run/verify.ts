@@ -16,7 +16,15 @@ import {
   type ColorCapture,
 } from '../verify/color-parity.js';
 import type { LayoutContract } from '../verify/layout-contract.js';
+import { ocrUnavailableReason, VisionOcr, type OcrEngine, type OcrRegionResult } from '../verify/ocr.js';
 import { compareRectParity, formatRectParity } from '../verify/rect-parity.js';
+import {
+  compareTextParity,
+  contractHasTextAnchors,
+  formatTextParity,
+  ocrRegionsFor,
+  type TextCapture,
+} from '../verify/text-parity.js';
 
 /**
  * The `verify` tool's orchestration: run the same sequence on each requested
@@ -41,6 +49,8 @@ export interface VerificationRequest {
   contract?: LayoutContract;
   environment?: string;
   baselineDir: string;
+  /** Test seam: the OCR recognizer behind the text-parity table. */
+  ocrEngine?: OcrEngine;
 }
 
 export interface VerificationOutput {
@@ -168,6 +178,41 @@ export async function runVerification(
         ),
       );
     }
+
+    // Text parity, only when the contract opts in (any anchor carrying
+    // text / text_dynamic). Runs the recognizer FIRST, on the bytes each leg
+    // already returned, then compares — OCR touches no device, so it costs no
+    // extra capture and cannot race a UI change.
+    //
+    // OCR is macOS-only and needs a Swift toolchain. When it cannot run, the
+    // comparison falls back to the accessibility tree and SAYS SO: on iOS the
+    // tree carries authored a11y summaries rather than rendered copy, so a
+    // silent fallback would quietly weaken the check it claims to perform.
+    if (contractHasTextAnchors(contract)) {
+      const { ocrByPlatform, notes: ocrNotes } = await runOcr(
+        contract,
+        platforms,
+        runs,
+        req.ocrEngine,
+      );
+      sections.push(
+        paritySection(
+          'text parity',
+          platforms,
+          runs,
+          (leg, p): Contribution<TextCapture> => {
+            if (leg.tree === undefined) {
+              return { note: `(${p}: UI tree read failed — ${leg.treeError ?? 'unknown'} — compared without it)` };
+            }
+            const got = ocrByPlatform.get(p);
+            return { value: { tree: leg.tree, ocr: got?.ocr, pngWidth: got?.pngWidth } };
+          },
+          'SKIPPED: no leg produced a UI tree.',
+          (captures) => formatTextParity(compareTextParity(contract, captures)),
+          ocrNotes,
+        ),
+      );
+    }
   }
 
   return { sections, screenshots };
@@ -194,6 +239,61 @@ const captureOf = (leg: VerificationLeg, p: Platform): Contribution<ColorCapture
   }
 };
 
+/** What one platform's OCR pass produced, plus the reasons any of it is absent. */
+interface OcrPass {
+  ocrByPlatform: Map<Platform, { ocr: Map<string, OcrRegionResult>; pngWidth: number }>;
+  notes: string[];
+}
+
+/**
+ * Recognize the contract's text anchors on each leg's own screenshot bytes.
+ *
+ * Every failure here degrades to a NOTE rather than an exception: an
+ * unavailable toolchain, an undecodable png or a recognizer crash must leave
+ * the text table standing on tree evidence, clearly labelled as such, instead
+ * of taking down a device run that took minutes.
+ */
+async function runOcr(
+  contract: LayoutContract,
+  platforms: Platform[],
+  runs: PromiseSettledResult<VerificationLeg>[],
+  engineOverride: OcrEngine | undefined,
+): Promise<OcrPass> {
+  const ocrByPlatform: OcrPass['ocrByPlatform'] = new Map();
+  const notes: string[] = [];
+  const unavailable = engineOverride === undefined ? ocrUnavailableReason() : undefined;
+  if (unavailable !== undefined) {
+    notes.push(
+      `(OCR unavailable — ${unavailable}. Compared from the accessibility tree only, which on iOS ` +
+        'reads authored a11y labels rather than rendered copy.)',
+    );
+    return { ocrByPlatform, notes };
+  }
+  const engine = engineOverride ?? new VisionOcr();
+  await Promise.all(
+    platforms.map(async (p, i) => {
+      const run = runs[i];
+      if (run.status === 'rejected' || run.value.tree === undefined) return;
+      const { tree, shot } = run.value;
+      try {
+        const png = PNG.sync.read(shot);
+        const regions = ocrRegionsFor(contract, tree, png.width);
+        if (regions.length === 0) return;
+        const results = await engine.recognize(shot, regions);
+        ocrByPlatform.set(p, {
+          ocr: new Map(results.map((r) => [r.id, r])),
+          pngWidth: png.width,
+        });
+      } catch (e) {
+        notes.push(
+          `(${p}: OCR failed — ${e instanceof Error ? e.message : String(e)} — that platform compared from the tree.)`,
+        );
+      }
+    }),
+  );
+  return { ocrByPlatform, notes };
+}
+
 /**
  * Every parity table has the same shape: collect one artifact per leg, note
  * the legs that cannot contribute, skip when none can, and CONTAIN any
@@ -208,9 +308,11 @@ function paritySection<T>(
   collect: (leg: VerificationLeg, platform: Platform) => Contribution<T>,
   emptyMessage: string,
   format: (collected: Partial<Record<Platform, T>>) => string,
+  /** Notes gathered before collection — e.g. why OCR could not run. */
+  extraNotes: string[] = [],
 ): string {
   const collected: Partial<Record<Platform, T>> = {};
-  const notes: string[] = [];
+  const notes: string[] = [...extraNotes];
   platforms.forEach((p, i) => {
     const run = runs[i];
     if (run.status === 'rejected') {

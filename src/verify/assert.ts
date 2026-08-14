@@ -9,7 +9,9 @@ import { parseDuration } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
 import { elementAssertSchema } from './element-assert.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
+import { ocrUnavailableReason, VisionOcr, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
+import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 
 /**
@@ -93,13 +95,51 @@ const colorAssert = z
   })
   .strict();
 
-// rectAssert and colorAssert are listed FIRST: zod's union error heuristic
+/**
+ * Single-element RENDERED-text check (text-parity.ts): crop the element's rect
+ * out of a screenshot and read it back with the OCR recognizer.
+ *
+ * This is not a slower `{element, text}` — it answers a different question.
+ * The element assert reads the accessibility tree, i.e. what assistive
+ * technology is TOLD; measured 2026-08-14, that is not what the screen shows:
+ * on iOS the visible 'CONTINUE' is absent from the tree entirely and
+ * `credit_select` exposes 'To account' while rendering 'Select credit account'.
+ * Use the element assert for a11y-facing copy, this one for what the user sees.
+ *
+ * `maxHeightPct` additionally pins the rendered ink height in % of screen
+ * width — the type-size check. Single-line elements only: multi-line ink runs
+ * do not compose into one meaningful height.
+ */
+const ocrAssert = z
+  .object({
+    element: elementSpecSchema,
+    ocr: z
+      .object({
+        text: z.string().optional(),
+        match: z.string().optional(),
+        /** Ink height in % of screen width, e.g. 3.8 — see text-parity.ts. */
+        heightPct: z.number().positive().optional(),
+        /** Relative tolerance for heightPct, in % (default 10). */
+        tolerancePct: z.number().positive().optional(),
+      })
+      .strict()
+      .refine((o) => o.text !== undefined || o.match !== undefined || o.heightPct !== undefined, {
+        message: 'ocr needs at least one of: text, match, heightPct — an empty ocr spec could never fail',
+      })
+      .refine((o) => !(o.text !== undefined && o.match !== undefined), {
+        message: 'ocr takes text OR match, not both',
+      }),
+    timeout: z.union([z.number(), z.string()]).optional(),
+  })
+  .strict();
+
+// rectAssert, colorAssert and ocrAssert are listed FIRST: zod's union error heuristic
 // surfaces one branch's issues, and a `{element, rect}` input that fails the
 // rect refine must show "y alone can never fail" (and a bad `{element,
 // color}` its hex-format message), not elementAssert's "unrecognized key".
 // Verified: the order does not change which inputs parse, nor the error
 // surfaced for element-assert mistakes (their refine still wins).
-export const assertSpecSchema = z.union([rectAssert, colorAssert, elementAssertSchema, screenshotAssert]);
+export const assertSpecSchema = z.union([rectAssert, colorAssert, ocrAssert, elementAssertSchema, screenshotAssert]);
 export type AssertSpec = z.infer<typeof assertSpecSchema>;
 
 export interface AssertResult {
@@ -119,6 +159,8 @@ export interface VerifierOptions {
   baselineDir?: string;
   pollMs?: number;
   timeoutMs?: number;
+  /** Test seam: the recognizer behind the `ocr` assert. */
+  ocrEngine?: OcrEngine;
 }
 
 /**
@@ -156,6 +198,8 @@ export class Verifier {
   private readonly baselineDir: string;
   private readonly pollMs: number;
   private readonly timeoutMs: number;
+  /** Built on first `ocr` assert so non-OCR runs never probe for a toolchain. */
+  private ocr: OcrEngine | undefined;
 
   constructor(
     private readonly adapter: DeviceAdapter,
@@ -164,6 +208,7 @@ export class Verifier {
     this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
     this.timeoutMs = opts.timeoutMs ?? 3_000;
+    this.ocr = opts.ocrEngine;
   }
 
   async assertAll(specs: AssertSpec[]): Promise<AssertResult[]> {
@@ -179,6 +224,7 @@ export class Verifier {
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.timeoutMs;
     if ('rect' in spec) return this.assertRect(spec.element, spec.rect, timeoutMs);
     if ('color' in spec) return this.assertColor(spec.element, spec.color, timeoutMs);
+    if ('ocr' in spec) return this.assertOcr(spec.element, spec.ocr, timeoutMs);
     if (spec.absent) return this.assertAbsent(spec.element, timeoutMs);
     return this.assertElement(spec.element, spec.text, spec.match, spec.error, timeoutMs);
   }
@@ -247,6 +293,62 @@ export class Verifier {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
         return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, tree);
+      },
+      {
+        description,
+        timeoutMs,
+        timeoutDetail: ({ detail, readError }) => detail ?? notFound(timeoutMs, readError),
+      },
+    );
+  }
+
+  /**
+   * Rendered text vs what the screen actually shows (text-parity.ts). Needs
+   * BOTH the tree (element rect + root width for the png scale) and a
+   * screenshot (pixels), and polls on a freshly captured STABLE screenshot for
+   * the same reason the color assert does.
+   *
+   * Unavailable OCR fails the assert with the reason rather than skipping it:
+   * a check the caller asked for and did not get must never read as a pass.
+   */
+  private async assertOcr(
+    element: ElementSpec,
+    expectation: OcrExpectation,
+    timeoutMs: number,
+  ): Promise<AssertResult> {
+    const wants = [
+      expectation.text !== undefined ? `text ${JSON.stringify(expectation.text)}` : undefined,
+      expectation.match !== undefined ? `matching /${expectation.match}/` : undefined,
+      expectation.heightPct !== undefined ? `ink height ${expectation.heightPct}% of width` : undefined,
+    ].filter((v): v is string => v !== undefined);
+    const description = `element ${describe(element)} renders ${wants.join(' and ')}`;
+    const unavailable = this.ocr === undefined ? ocrUnavailableReason() : undefined;
+    if (unavailable !== undefined) {
+      return { description, pass: false, detail: `${unavailable}; failing closed, rendered text unchecked` };
+    }
+    const engine = (this.ocr ??= new VisionOcr());
+    return this.poll(
+      async (tree) => {
+        // First occurrence wins — the same duplicate-id rule as rect-parity.
+        // (The whole-screen text table deliberately does the opposite; here
+        // the caller named ONE element and gets that element's rect.)
+        const found = findBySpec(tree, element);
+        if (found.length === 0) return undefined;
+        const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
+        try {
+          const png = PNG.sync.read(shot);
+          const region = ocrRegionForRect('element', found[0].rect, tree, png.width);
+          if (region === undefined) {
+            return { pass: false, detail: 'element rect or screen width is degenerate — cannot crop; failing closed' };
+          }
+          const [result] = await engine.recognize(shot, [region]);
+          if (result?.error !== undefined) return { pass: false, detail: result.error };
+          return evaluateOcrAssert(expectation, result?.lines ?? [], png.width);
+        } catch (e) {
+          // Keep polling — the capture may have raced a transition — but stay
+          // failed so a deadline reached this way reports the reason.
+          return { pass: false, detail: `OCR failed: ${e instanceof Error ? e.message : String(e)}` };
+        }
       },
       {
         description,

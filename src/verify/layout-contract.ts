@@ -4,9 +4,11 @@ import { z } from 'zod';
  * The layout contract: a screen's anchors in Figma-frame units, checked into
  * the app repo and passed to `verify` via `contract:`. ONE contract feeds every
  * parity dimension — rect-parity.ts reads the geometry fields, color-parity.ts
- * reads the fill fields — so it is owned here rather than by either consumer.
+ * reads the fill fields, text-parity.ts reads the copy fields — so it is owned
+ * here rather than by any one consumer.
  *
- * `bg` / `bg_dark` / `sample` are declared but deliberately typed `unknown`:
+ * `bg` / `bg_dark` / `sample` / `text` / `text_dynamic` are declared but
+ * deliberately typed `unknown`:
  * the contract is hand-written JSON, and the actionable diagnosis for a bad
  * value ("'#white-ish' is neither #RRGGBB(AA) nor a <hue>.<colorN> token
  * name", "unknown sample mode") belongs to the comparator that knows what the
@@ -33,6 +35,23 @@ const anchorSchema = z
     bg_dark: z.unknown().optional(),
     /** Sampling strategy: 'dominant' (default) or 'patches'. */
     sample: z.unknown().optional(),
+    // Copy (text-parity.ts) — validated by the comparator, see header.
+    /**
+     * The exact string this anchor RENDERS, asserted on both platforms.
+     * Declaring it (or `text_dynamic`) is what opts an anchor into the text
+     * check at all. Placeholder copy must be asserted in the EMPTY state:
+     * measured 2026-08-14, iOS drops the placeholder node once the field is
+     * filled, so the same assert after a fill step finds nothing to compare.
+     */
+    text: z.unknown().optional(),
+    /**
+     * True for amounts, balances and dates: values whose formatting
+     * legitimately differs per locale (`1,121.00` vs `1 121,00`) and whose node
+     * granularity differs too (Android splits the balance across two nodes
+     * where iOS renders one). Literal comparison — and with it the size check,
+     * which needs identical strings — is skipped for these.
+     */
+    text_dynamic: z.unknown().optional(),
   })
   .passthrough();
 
@@ -42,6 +61,12 @@ const contractSchema = z
     tolerance_pct: z.number().positive().optional(),
     /** Max CIEDE2000 on the android-vs-ios axis; vs-contract runs at 1.5x. */
     tolerance_de: z.unknown().optional(),
+    /**
+     * Max relative ink-height difference in %, android-vs-ios (default 10).
+     * Measured basis: a matching pair reads 0.74% apart, the known 22sp-vs-17pt
+     * title drift reads 12.63% apart.
+     */
+    tolerance_size_pct: z.unknown().optional(),
     figma_frame_width: z.number().positive().optional(),
     anchors: z.array(anchorSchema).min(1),
   })
