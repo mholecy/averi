@@ -256,7 +256,7 @@ export class Verifier {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
         if (found.length > 0) {
-          const shot = await this.stableScreenshot();
+          const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
           try {
             const png = PNG.sync.read(shot);
             const evaluated = evaluateColorAssert(found[0].rect, expectation, tree, png);
@@ -279,22 +279,6 @@ export class Verifier {
       }
       await sleep(this.pollMs);
     }
-  }
-
-  /**
-   * The `screenshot` tool's stability wait (two identical consecutive
-   * captures, bounded attempts) reused for pixel sampling, with the
-   * verifier's pollMs as the delay so tests stay fast.
-   */
-  private async stableScreenshot(attempts = 5): Promise<Buffer> {
-    let previous = await this.adapter.screenshot();
-    for (let i = 0; i < attempts; i++) {
-      await sleep(this.pollMs);
-      const current = await this.adapter.screenshot();
-      if (current.equals(previous)) return current;
-      previous = current;
-    }
-    return previous;
   }
 
   /**
@@ -373,6 +357,29 @@ export class Verifier {
       detail: `${pct}% of pixels differ`,
     };
   }
+}
+
+/**
+ * THE stability wait for screenshots — two identical consecutive captures,
+ * bounded attempts — shared by the `screenshot` MCP tool (5 attempts, 300ms)
+ * and the color assert (5 attempts, the verifier's pollMs, so tests stay
+ * fast). Keep it single: each call costs 2 to attempts+1 device captures,
+ * and the color assert already pays that PER POLL ITERATION — do not add
+ * more callers casually, and never inside a tight loop.
+ */
+export async function captureStableScreenshot(
+  adapter: Pick<DeviceAdapter, 'screenshot'>,
+  attempts = 5,
+  delayMs = 300,
+): Promise<Buffer> {
+  let previous = await adapter.screenshot();
+  for (let i = 0; i < attempts; i++) {
+    await sleep(delayMs);
+    const current = await adapter.screenshot();
+    if (current.equals(previous)) return current;
+    previous = current;
+  }
+  return previous;
 }
 
 /**

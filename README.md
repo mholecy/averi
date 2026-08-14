@@ -238,7 +238,10 @@ section above); omitted fields are compared platform-to-platform only, never aga
 
 **Color, same contract file** (a port of the superrepo's `color-parity.py`, live-validated on
 device 2026-08-14): anchors may additionally carry `bg` (expected fill, `#RRGGBB` or `#RRGGBBAA`
-— alpha dropped), `bg_dark` (dark-theme counterpart) and `sample` (`"dominant"`, the default —
+— alpha dropped), `bg_dark` (the dark-theme counterpart — **carried, not yet exercised**:
+`verify` always runs the light axis, because averi cannot switch device themes and sampling a
+light capture against dark hexes would fake evidence; `bg_dark` waits for the dark-mode round,
+which needs a theme input plus a device actually captured in dark mode) and `sample` (`"dominant"`, the default —
 mode of the region after a 12% edge inset, reported as the winning bucket's mean — or
 `"patches"`: 4 corners + center, for busy centers). When any anchor opts in, `verify` samples
 each leg's final screenshot at the anchors' tree rects and appends a `## color parity` table next

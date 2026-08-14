@@ -92,6 +92,11 @@ export function scaledRegion(
   scale: number,
   img: RgbaImage,
 ): { region: Region; clipped: number } | undefined {
+  // Known deviation from the Python port: Math.round rounds half UP where
+  // Python's round() is banker's (half to even), so a bound whose scaled
+  // product lands exactly on .5 can shift 1px. Accepted deliberately: the
+  // 12% edge inset swallows any single-pixel edge, and the fixture tests pin
+  // THIS behavior — do not "fix" it to banker's without re-pinning them.
   const x0 = Math.round(rect.x * scale);
   const y0 = Math.round(rect.y * scale);
   const x1 = Math.round((rect.x + rect.width) * scale);

@@ -9,7 +9,14 @@ import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible, type TraceEntry } from '../flow/engine.js';
 import { PNG } from 'pngjs';
-import { assertSpecSchema, readTreeWithRetry, scanForCrashes, Verifier, type AssertResult } from '../verify/assert.js';
+import {
+  assertSpecSchema,
+  captureStableScreenshot,
+  readTreeWithRetry,
+  scanForCrashes,
+  Verifier,
+  type AssertResult,
+} from '../verify/assert.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -222,15 +229,9 @@ registerTool(
   },
   async ({ platform: p }) => {
     const adapter = await registry.get(p);
-    let previous = await adapter.screenshot();
-    for (let i = 0; i < STABILITY_ATTEMPTS; i++) {
-      await new Promise((r) => setTimeout(r, STABILITY_DELAY_MS));
-      const current = await adapter.screenshot();
-      if (current.equals(previous)) break;
-      previous = current;
-    }
+    const shot = await captureStableScreenshot(adapter, STABILITY_ATTEMPTS, STABILITY_DELAY_MS);
     return {
-      content: [{ type: 'image' as const, data: previous.toString('base64'), mimeType: 'image/png' }],
+      content: [{ type: 'image' as const, data: shot.toString('base64'), mimeType: 'image/png' }],
     };
   },
 );
@@ -490,7 +491,7 @@ registerTool(
   {
     description:
       'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
-      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), and when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000): numbers over impressions.',
+      'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), and when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000; ALWAYS the light axis — bg values — since averi cannot switch device themes; bg_dark anchors wait for the dark-mode round): numbers over impressions.',
     inputSchema: {
       platforms: z
         .array(platform)
@@ -504,7 +505,7 @@ registerTool(
         .string()
         .optional()
         .describe(
-          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default 8; vs-contract at 1.5x); anchors without bg are color-compared platform-to-platform only.',
+          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default 8; vs-contract at 1.5x); anchors without bg are color-compared platform-to-platform only. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode.',
         ),
       configPath,
       environment,
@@ -620,6 +621,11 @@ registerTool(
         } else {
           // Same containment rule as rect parity: a comparator error must
           // not reject the tool call and discard the per-platform sections.
+          // No opts → theme is always 'light' — deliberate: verify exposes no
+          // theme input because averi cannot switch device themes, and
+          // sampling a light capture against bg_dark hexes would fake dark
+          // evidence. The comparator's theme option (and its tests) is the
+          // plumbing for the deferred dark-mode round.
           try {
             colorBody = colorNote + formatColorParity(compareColorParity(contract, captures));
           } catch (e) {
