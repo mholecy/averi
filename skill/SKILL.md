@@ -17,7 +17,7 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
    - `assert` with element specs — deterministic, no vision needed: `{"element":{"id":"amount"},"text":"100.00"}`, `{"element":{"id":"error_banner"},"absent":true}`, `{"element":{"id":"amount"},"error":"Required"}` (validation message paired to the input, where the platform exposes it — `absent` means gone from the tree OR outside the viewport, the same on both platforms)
    - `screenshot` — look at it yourself for layout/visual judgment.
    - `assert` with `{"screenshot":{"baseline":"name"}}` — pixel regression vs. stored baseline (auto-created on first run under `.averi/baselines/`).
-6. Close with `verify(state, flow?, asserts)` — same sequence on the requested platforms, per-platform screenshots (legs always run android-then-ios). Defaults to **both** platforms: cross-platform tasks run that default before declaring the task done; single-platform work passes `platforms: ["android"]` or `["ios"]`.
+6. Close with `verify(platforms?, state?, flow?, asserts)` — same sequence on the requested platforms, per-platform screenshots (legs always run android-then-ios). Defaults to **both** platforms: cross-platform tasks run that default before declaring the task done; single-platform work passes `platforms: ["android"]` or `["ios"]`.
 
 ## Rules
 
