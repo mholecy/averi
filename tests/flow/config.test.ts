@@ -1,5 +1,9 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  loadConfig,
   loadConfigIfPresent,
   loadEnvBeside,
   parseConfig,
@@ -238,9 +242,6 @@ describe('loadConfigIfPresent', () => {
   });
 
   it('parses a present file and STILL throws on an invalid one', async () => {
-    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const dir = await mkdtemp(join(tmpdir(), 'averi-cfg-'));
     try {
       const path = join(dir, 'averi.yaml');
@@ -252,6 +253,68 @@ describe('loadConfigIfPresent', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * The regression these cover: with the server running one directory above the
+ * app repo, `apk: android/app/build/...` resolved against THAT directory and
+ * install_app failed. Passing configPath found the file and changed nothing
+ * about the paths inside it.
+ */
+describe('build paths resolve against averi.yaml, not the working directory', () => {
+  const withConfig = async (yaml: string, run: (path: string) => Promise<void>) => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-paths-'));
+    try {
+      const path = join(dir, 'averi.yaml');
+      await writeFile(path, yaml);
+      await run(path);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('makes a relative apk / .app absolute against the config directory', async () => {
+    await withConfig(
+      'app:\n' +
+        '  android: { package: md.bank.app, apk: android/build/app.apk }\n' +
+        '  ios: { bundleId: md.bank.app, app: ios/build/App.app }\n',
+      async (path) => {
+        const cfg = await loadConfig(path);
+        expect(cfg.app.android?.apk).toBe(join(dirname(path), 'android/build/app.apk'));
+        expect(cfg.app.ios?.app).toBe(join(dirname(path), 'ios/build/App.app'));
+      },
+    );
+  });
+
+  it('leaves an absolute path untouched', async () => {
+    await withConfig('app:\n  android: { package: md.bank.app, apk: /builds/app.apk }\n', async (path) => {
+      expect((await loadConfig(path)).app.android?.apk).toBe('/builds/app.apk');
+    });
+  });
+
+  it('resolves against the config even when cwd is elsewhere — the nested-repo case', async () => {
+    await withConfig('app:\n  android: { package: md.bank.app, apk: build/app.apk }\n', async (path) => {
+      const cwdBefore = process.cwd();
+      process.chdir(tmpdir());
+      try {
+        expect((await loadConfig(path)).app.android?.apk).toBe(join(dirname(path), 'build/app.apk'));
+      } finally {
+        process.chdir(cwdBefore);
+      }
+    });
+  });
+
+  it('applies to the lenient loader too — configless tools must not see raw relative paths', async () => {
+    await withConfig('app:\n  ios: { bundleId: md.bank.app, app: build/App.app }\n', async (path) => {
+      expect((await loadConfigIfPresent(path))?.app.ios?.app).toBe(join(dirname(path), 'build/App.app'));
+    });
+  });
+
+  it('leaves a config without build paths alone', async () => {
+    await withConfig('app:\n  android: { package: md.bank.app }\n', async (path) => {
+      expect((await loadConfig(path)).app.android).toEqual({ package: 'md.bank.app' });
+    });
   });
 });
 

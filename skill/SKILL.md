@@ -51,8 +51,11 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 
 ## averi.yaml quick reference
 
+Not in the directory the config lives in? Pass `configPath:` — paths *inside* the yaml resolve against the yaml, so nothing else needs adjusting.
+
 ```yaml
 app:
+  # build paths are relative to THIS FILE (absolute ones pass through)
   android: { package: com.example.dev, apk: path/to.apk }
   ios:     { bundleId: com.example.dev, app: path/to.app }
 credentials:          # env refs only — values never live in YAML

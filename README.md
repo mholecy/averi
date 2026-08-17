@@ -31,9 +31,11 @@ agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator /
 
 averi is on npm, so there is nothing to clone or build — `npx` fetches it on first use.
 
-Set up three things in the **app repo root** (`averi.yaml` and `.env.averi` must sit in the directory the agent session runs from):
+Set up three things in the **app repo root** (`averi.yaml` and `.env.averi` sit next to each other there):
 
 1. Register the MCP server — two ways, same result. Either way Claude Code runs the server with your **repo root as its working directory**, which is how averi finds the config below; no paths need configuring in averi itself.
+
+   Session runs somewhere else — a nested repo, a monorepo root? Pass `configPath: app/averi.yaml` on the tool calls. Everything the config points at (build paths, `.env.averi`, `.averi/baselines/`) resolves against **the config file**, not the working directory, so the yaml stays byte-identical whether the app repo stands alone or sits inside another.
 
    **For yourself:**
 

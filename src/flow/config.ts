@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent } from '../adapters/types.js';
@@ -260,8 +260,39 @@ export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfi
   return result.data;
 }
 
+/**
+ * Build paths in averi.yaml are written relative to the CONFIG FILE, not to the
+ * process working directory, and are returned absolute.
+ *
+ * The two coincide when the session runs from the app repo and diverge the
+ * moment it does not — nested repos, monorepos, a `configPath:` pointing into a
+ * subdirectory. Resolving against cwd turned `apk: android/app/build/...` into
+ * `<outer-root>/android/app/build/...` and install_app failed, while passing
+ * `configPath` fixed only the lookup of the file itself, never the paths inside
+ * it. Config-relative keeps averi.yaml portable: it stays correct in the app
+ * repo standing alone and when that repo is nested inside another.
+ *
+ * Absolute paths pass through untouched.
+ */
+export function resolveBuildPaths(cfg: AveriConfig, configPath: string): AveriConfig {
+  const dir = dirname(resolve(configPath));
+  const app = { ...cfg.app };
+  if (app.android?.apk !== undefined) {
+    app.android = { ...app.android, apk: resolve(dir, app.android.apk) };
+  }
+  if (app.ios?.app !== undefined) {
+    app.ios = { ...app.ios, app: resolve(dir, app.ios.app) };
+  }
+  return { ...cfg, app };
+}
+
+/** The directory averi.yaml lives in — the project root every other project-relative path hangs off. */
+export function configDir(configPath: string): string {
+  return dirname(resolve(configPath));
+}
+
 export async function loadConfig(path: string): Promise<AveriConfig> {
-  return parseConfig(await readFile(path, 'utf8'), path);
+  return resolveBuildPaths(parseConfig(await readFile(path, 'utf8'), path), path);
 }
 
 /**
@@ -278,7 +309,7 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  return parseConfig(raw, path);
+  return resolveBuildPaths(parseConfig(raw, path), path);
 }
 
 export interface ResolvedCredentials {

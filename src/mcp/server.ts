@@ -7,7 +7,13 @@ import { resolve } from 'node:path';
 import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { tapElement } from '../ui-tree/tap-element.js';
-import { loadConfig, loadConfigIfPresent, loadEnvBeside, type AveriConfig } from '../flow/config.js';
+import {
+  configDir,
+  loadConfig,
+  loadConfigIfPresent,
+  loadEnvBeside,
+  type AveriConfig,
+} from '../flow/config.js';
 import { fillField, FlowEngine, scrollUntilVisible } from '../flow/engine.js';
 import {
   assertSpecSchema,
@@ -33,7 +39,9 @@ const platform = z.enum(['android', 'ios']).describe('Target platform');
 const configPath = z
   .string()
   .optional()
-  .describe('Path to averi.yaml (default: ./averi.yaml in the server working directory)');
+  .describe(
+    'Path to averi.yaml (default: ./averi.yaml in the server working directory). Paths INSIDE it — the build paths, .env.averi, .averi/baselines/ — resolve against the file, so a config in a subdirectory needs nothing else.',
+  );
 
 const environment = z
   .string()
@@ -44,11 +52,23 @@ const environment = z
 
 /**
  * All project configuration lives with the project, not with averi: averi.yaml
- * resolves against the server cwd (the project root when launched from
- * .mcp.json) and credential values auto-load from a sibling .env.averi.
+ * is looked up against the server cwd (the project root when launched from
+ * .mcp.json) unless the caller points elsewhere, and credential values
+ * auto-load from a sibling .env.averi.
  */
+const configPathOf = (configPath?: string) => resolve(configPath ?? 'averi.yaml');
+
+/**
+ * Baselines belong to the project, so they hang off averi.yaml like every other
+ * project-relative path — `.averi/baselines/` beside the config, not beside
+ * whatever directory the server happens to run in. Configless callers (assert
+ * works without averi.yaml) keep the cwd-relative default.
+ */
+const baselineDirOf = (configPath?: string) =>
+  resolve(configDir(configPathOf(configPath)), DEFAULT_BASELINE_DIR);
+
 async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
-  const path = resolve(configPath ?? 'averi.yaml');
+  const path = configPathOf(configPath);
   const applied = await loadEnvBeside(path);
   if (applied.length > 0) console.error(`averi: loaded ${applied.join(', ')} from .env.averi`);
   return loadConfig(path);
@@ -73,7 +93,7 @@ const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
  */
 async function loadIosOpts(p: Platform, configPath?: string): Promise<AdapterOpts | undefined> {
   if (p === 'android') return undefined;
-  return iosOpts(await loadConfigIfPresent(resolve(configPath ?? 'averi.yaml')));
+  return iosOpts(await loadConfigIfPresent(configPathOf(configPath)));
 }
 
 const text = (value: unknown) => ({
@@ -121,7 +141,7 @@ registerTool(
   'install_app',
   {
     description:
-      'Install an app build (.apk / .app bundle) on the booted device. Omit path to use the build path from averi.yaml (app.android.apk / app.ios.app).',
+      'Install an app build (.apk / .app bundle) on the booted device. Omit path to use the build path from averi.yaml (app.android.apk / app.ios.app), which is resolved relative to averi.yaml itself — no need to pre-absolutize it when the config sits in a subdirectory.',
     inputSchema: {
       platform,
       path: z.string().optional().describe('Path to .apk (android) or .app (ios)'),
@@ -444,7 +464,7 @@ registerTool(
     // Lenient load: assert works configless, but a broken averi.yaml (or a
     // wda treeSource it declares) must not be silently ignored here.
     const adapter = await registry.get(p, await loadIosOpts(p, cp));
-    const verifier = new Verifier(adapter, { baselineDir: resolve(DEFAULT_BASELINE_DIR) });
+    const verifier = new Verifier(adapter, { baselineDir: baselineDirOf(cp) });
     const results = await verifier.assertAll(specs);
     let health = '';
     try {
@@ -504,7 +524,7 @@ registerTool(
         flow,
         contract,
         environment: env,
-        baselineDir: resolve(DEFAULT_BASELINE_DIR),
+        baselineDir: baselineDirOf(cp),
       },
       // Only the ios leg has a treeSource; the registry normalizes it away
       // for android, so one opts expression serves both legs.

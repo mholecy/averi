@@ -119,7 +119,7 @@ selector layer above it, inverting exactly the direction this section describes.
 
 ## 4. Flow descriptors (`averi.yaml`)
 
-Checked into the app repo. Describes app states and how to reach them. Example for a PIN-login banking app:
+Checked into the app repo. Describes app states and how to reach them. Every path it contains — the build paths below, the sibling `.env.averi`, the `.averi/baselines/` directory — resolves relative to **the descriptor's own location**, so the file is portable across working directories (nested repos, monorepos) and absolute paths stay untouched. Example for a PIN-login banking app:
 
 ```yaml
 app:
