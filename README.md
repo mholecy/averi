@@ -26,11 +26,16 @@ Prefer to do it by hand, or setting up for a whole team (committed `.mcp.json`)?
 
 ## What is averi
 
-```
-agent ──MCP──▶ averi server ──adb / simctl+idb──▶ emulator / simulator
-                    │
-                    ├── averi.yaml   (in YOUR repo: states, flows, selectors)
-                    └── .env.averi   (in YOUR repo, gitignored: credential values)
+```mermaid
+flowchart LR
+    A(["AI agent"]) -- MCP --> S["averi server"]
+    S -- "adb / simctl + idb" --> D["emulator / simulator"]
+    subgraph R["your app repo"]
+        Y["averi.yaml<br/>states, flows, selectors"]
+        E[".env.averi — gitignored<br/>credential values"]
+    end
+    S -. reads .-> Y
+    S -. reads .-> E
 ```
 
 Your agent changes mobile code all day but can't see whether the app actually works. averi closes that loop: after a change, the agent builds the app, installs it, drives it to the changed screen, and verifies — on both platforms, on real simulators.
