@@ -47,7 +47,7 @@ Three ideas make that reliable:
 
 ```mermaid
 flowchart LR
-    A["ensure_state(&quot;logged_in&quot;)"] --> B{"screen matches<br/>state's detect:?"}
+    A["ensure_state('logged_in')"] --> B{"screen matches<br/>the state's detect condition?"}
     B -- yes --> C(["done — ~1 s"])
     B -- no --> D["run the state's<br/>reach: flow, e.g. login"]
     D --> E{"detect: matches now?"}
