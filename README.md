@@ -100,7 +100,9 @@ averi can only select what the accessibility tree exposes. Give new screens test
 
 ## Requirements
 
-Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb`. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
+Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
+
+On a Linux/Windows box you get the full Android toolset — pass `platforms: ["android"]` to `verify` (its default runs both platforms; iOS tools error only when called). OCR-backed checks (`ocr` asserts, text/type-size parity) use the macOS Vision framework and fall back to the accessibility tree elsewhere. Windows is untested — reports welcome.
 
 ## Documentation
 

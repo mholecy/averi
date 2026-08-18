@@ -12,6 +12,9 @@ and a gitignored `.env.averi` with test credentials.
 Follow the steps **in order**. Every step ends with a **Check** — run it and do not move on until
 it passes. Do not declare setup complete until the final verification in step 6 passes.
 
+Shell commands in this guide are POSIX (macOS/Linux/WSL). On native Windows, translate them to
+PowerShell equivalents (note `curl` there is an alias for `Invoke-WebRequest` — use `curl.exe`).
+
 ---
 
 ## Step 0 — Prerequisites
@@ -42,6 +45,13 @@ idb list-targets        # iOS: runs without error
 Only verify the platforms the project targets. If a tool is missing, tell the user the exact
 install command from above — don't skip the platform silently.
 
+> **Non-macOS hosts (Linux/Windows):** the full Android toolset works; iOS tools error only
+> when called. Bake two things into the setup: always pass `platforms: ["android"]` to
+> `verify` (its default runs **both** platforms, so the iOS leg would error), and know that
+> OCR-backed checks — `ocr` asserts and the text/type-size parity tables — use the macOS
+> Vision framework: off-macOS they fall back to the accessibility tree or fail closed.
+> Windows is **untested** — if something breaks, please report it on GitHub.
+
 ---
 
 ## Step 1 — Register the MCP server
@@ -66,6 +76,10 @@ approval prompt). Pin the version so everyone runs the same build:
   }
 }
 ```
+
+> **Native Windows:** `npx` is `npx.cmd`, which MCP clients cannot spawn directly — wrap it in
+> `cmd /c`: register with `claude mcp add averi -- cmd /c npx -y averi`, or in `.mcp.json` use
+> `{ "command": "cmd", "args": ["/c", "npx", "-y", "averi"] }`. WSL needs no wrapper.
 
 Either way the agent session runs the server with the **repo root as its working directory** —
 that's how averi finds `averi.yaml`. No paths need configuring in averi itself.
