@@ -79,6 +79,24 @@ flows:
       - wait: { state: logged_in, timeout: 20s }
 ```
 
-Steps: `launch`, `tap`, `type`, `type_pin` (`twice:` for set+confirm; `keypad:` takes `id_pattern` or — for keypads without resource-ids, common in Compose — `text_pattern: "{digit}"`), `fill` (element spec + `value`, opt-in `clear`), `swipe` (`direction`, `times`), `scroll_until` (`element`, optional `direction`/`maxSwipes`/`timeout` — swipe until visible), `assert` (inline element asserts; a failure fails the flow), `wait` (element/state), `branch` (first matching `when` wins), `optional` (absence is fine), and per-platform overrides (`android:`/`ios:` on one step).
+Steps: `launch`, `tap` (element spec + optional `timeout:` overriding the default find-and-settle budget), `type`, `type_pin` (`twice:` for set+confirm; `keypad:` takes `id_pattern` or — for keypads without resource-ids, common in Compose — `text_pattern: "{digit}"`), `fill` (element spec + `value`, opt-in `clear`), `swipe` (`direction`, `times`), `scroll_until` (`element`, optional `direction`/`maxSwipes`/`timeout` — swipe until visible), `assert` (inline element asserts; a failure fails the flow), `wait` (element/state), `branch` (first matching `when` wins), `optional` (absence is fine), and per-platform overrides (`android:`/`ios:` on one step).
+
+An `optional:` tap gives the element a short window (~1.5s of polling) to be present, then skips. An interstitial gated on a network round-trip (a post-login biometric offer, a server-driven promo) can take far longer than that to exist at all — put `timeout:` on the tap to widen its presence window: `optional: [ { tap: { text: "Not now", timeout: 10s } } ]`. Mind the cost: the full window is burned every run where the interstitial never shows. When the screen that appears INSTEAD is detectable, prefer a state with `any:` over both outcomes plus `branch:` — it exits immediately whichever one arrives:
+
+```yaml
+states:
+  post_login_gate:
+    detect:
+      any:
+        - element: { text: "Not now" }   # the interstitial
+        - state: logged_in               # or it never showed
+# in the flow:
+      - wait: { state: post_login_gate, timeout: 30s }
+      - branch:
+          - when: { element: { text: "Not now" } }
+            do: [ { tap: { text: "Not now" } } ]
+          - when: { state: logged_in }   # fallback arm — a branch with NO matching arm
+            do: []                       # times out and FAILS the flow, so cover both
+```
 
 State `detect:` conditions take `element`/`state`/`any`/`all`, and an element condition accepts `absent: true` — "row visible AND card face gone" is expressible, which disambiguates screens that embed the same reused list.

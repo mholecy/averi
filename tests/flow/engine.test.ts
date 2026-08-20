@@ -270,6 +270,63 @@ flows:
     expect(reads).toBe(1);
     expect(trace.some((t) => t.action === 'optional' && t.detail?.includes('skipped'))).toBe(true);
   });
+
+  // A network-gated interstitial can take far longer than optionalTimeoutMs
+  // to exist at all. `timeout:` on the tap widens the presence window; without
+  // it the same late element is (correctly, per the default budget) skipped.
+  it('optional tap timeout: widens the presence window for a late interstitial', async () => {
+    const lateFake = () => {
+      const fake = new FakeAdapter(buildScreens(), 'promo', (id, self) => {
+        if (id === 'promo_close') self.current = 'dashboard';
+      });
+      // Anchor the appear-deadline to the FIRST read, not construction, and
+      // keep it 10x the default budget: the "defaulted" half below relies on
+      // the presence poll's deadline (~50ms) firing before the element exists,
+      // so the margin must absorb CI event-loop stalls between setup and poll.
+      let appearAt: number | undefined;
+      const realRead = fake.uiTree.bind(fake);
+      fake.uiTree = async () => {
+        appearAt ??= Date.now() + FAST.optionalTimeoutMs * 10;
+        return Date.now() < appearAt ? screen() : realRead();
+      };
+      return fake;
+    };
+    const flow = (tap: string) => parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  dismiss:
+    steps:
+      - optional:
+          - tap: ${tap}
+`);
+
+    const overridden = lateFake();
+    await new FlowEngine(flow('{ id: promo_close, timeout: 2s }'), overridden, FAST).runFlow('dismiss');
+    expect(overridden.taps).toEqual(['promo_close']);
+
+    const defaulted = lateFake();
+    const trace = await new FlowEngine(flow('{ id: promo_close }'), defaulted, FAST).runFlow('dismiss');
+    expect(defaulted.taps).toEqual([]);
+    expect(trace.some((t) => t.action === 'optional' && t.detail?.includes('skipped'))).toBe(true);
+  });
+
+  it('tap timeout: overrides the default tap budget for a slow-rendering element', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'promo');
+    const appearAt = Date.now() + FAST.tapTimeoutMs + 100;
+    const realRead = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (Date.now() < appearAt ? screen() : realRead());
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  slow:
+    steps:
+      - tap: { id: promo_close, timeout: 2s }
+`);
+    await new FlowEngine(cfg, fake, FAST).runFlow('slow');
+    expect(fake.taps).toEqual(['promo_close']);
+  });
 });
 
 describe('launch step', () => {

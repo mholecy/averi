@@ -113,6 +113,22 @@ flows:
     expect(cfg.flows.f.steps).toHaveLength(2);
   });
 
+  it('accepts tap with a timeout override, rejects tap with a timeout but no selector', () => {
+    const cfg = parseConfig(`
+app: {}
+flows:
+  f:
+    steps:
+      - tap: { text: "Not now", timeout: 10s }
+      - optional:
+          - tap: { id: promo_close, timeout: 500 }
+`);
+    expect(cfg.flows.f.steps).toHaveLength(2);
+    expect(() =>
+      parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - tap: { timeout: 10s }\n'),
+    ).toThrow(/Invalid averi\.yaml/);
+  });
+
   it('accepts fill with inline element spec + value/clear, rejects fill without a selector field', () => {
     const cfg = parseConfig(`
 app: {}

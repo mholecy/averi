@@ -24,6 +24,21 @@ export interface FillSpec extends ElementSpec {
   dismissKeyboard?: boolean;
 }
 
+export interface TapSpec extends ElementSpec {
+  /**
+   * Overrides the engine's tap budget (find + settle; default 5s) — for
+   * elements that render slowly enough that a `wait:` step used to have to
+   * babysit the tap. Inside `optional:` it overrides the PRESENCE-CHECK
+   * window (default 1.5s) instead: how long a maybe-interstitial gets to
+   * appear before the step is skipped as not-present. Note the cost: an
+   * optional tap burns this full window whenever the element never shows —
+   * when the alternative screen is detectable, a state with `any:` over both
+   * outcomes plus `branch:` exits immediately either way and stays the better
+   * idiom.
+   */
+  timeout?: string | number;
+}
+
 export interface ScrollUntilSpec {
   element: ElementSpec;
   /** Which way the CONTENT moves into view (down = reveal content below). */
@@ -34,7 +49,7 @@ export interface ScrollUntilSpec {
 
 export type Step =
   | { launch: { clearState?: boolean; activity?: string; intent?: LaunchIntent } }
-  | { tap: ElementSpec }
+  | { tap: TapSpec }
   | { type: { value: string } }
   | {
       type_pin: {
@@ -96,7 +111,22 @@ const step: z.ZodType<Step> = z.lazy(() =>
           .strict(),
       })
       .strict(),
-    z.object({ tap: elementSpecSchema }).strict(),
+    z
+      .object({
+        tap: z
+          .object({
+            id: z.string().optional(),
+            text: z.string().optional(),
+            role: z.string().optional(),
+            label: z.string().optional(),
+            timeout: timeout.optional(),
+          })
+          .strict()
+          .refine((t) => [t.id, t.text, t.role, t.label].some((v) => v !== undefined), {
+            message: 'tap needs at least one of: id, text, role, label',
+          }),
+      })
+      .strict(),
     z.object({ type: z.object({ value: z.string() }).strict() }).strict(),
     z
       .object({

@@ -10,6 +10,7 @@ import {
   type Condition,
   type ScrollUntilSpec,
   type Step,
+  type TapSpec,
 } from './config.js';
 
 export { findBySpec } from '../ui-tree/selectors.js';
@@ -148,7 +149,10 @@ export class FlowEngine {
   private async runStep(step: Step): Promise<void> {
     if ('android' in step || 'ios' in step) return this.runPlatformOverride(step);
     if ('launch' in step) return this.runLaunch(step.launch);
-    if ('tap' in step) return this.tapSpec(step.tap, this.tapTimeoutMs);
+    if ('tap' in step) {
+      const { spec, timeoutMs } = splitTapSpec(step.tap);
+      return this.tapSpec(spec, timeoutMs ?? this.tapTimeoutMs);
+    }
     if ('type' in step) return this.runType(step.type);
     if ('type_pin' in step) return this.runTypePin(step.type_pin);
     if ('swipe' in step) return this.runSwipe(step.swipe);
@@ -305,23 +309,34 @@ export class FlowEngine {
    * least one tree read before checking its deadline, and one sighting is
    * enough — after that the step is committed and taps with the normal tap
    * timeout, exactly as a non-optional tap would.
+   *
+   * A tap's own `timeout:` widens the presence window (an interstitial gated
+   * on a network round-trip can take far longer than the default to exist at
+   * all — measured 2026-08-20 on a login-gated biometric offer, present-but-
+   * late on 2 of 3 runs). The committed tap still uses the standard tap
+   * budget: the element is already sighted by then, so appearance latency is
+   * paid; only settling remains.
    */
   private async runOptional(steps: StepPayload<'optional'>): Promise<void> {
     for (const s of steps) {
+      // Split OUTSIDE the try: a malformed `timeout:` is a config error, not
+      // an absent element — it must fail the flow, never log as "skipped".
+      const tap = 'tap' in s ? splitTapSpec(s.tap) : undefined;
       try {
-        if ('tap' in s) {
+        if (tap) {
           await this.pollUntil(
             async (tree) =>
-              findBySpec(tree, s.tap).some((n) => n.rect.width > 0 && n.rect.height > 0) || undefined,
-            this.optionalTimeoutMs,
-            `optional element ${describeSpec(s.tap)}`,
+              findBySpec(tree, tap.spec).some((n) => n.rect.width > 0 && n.rect.height > 0) ||
+              undefined,
+            tap.timeoutMs ?? this.optionalTimeoutMs,
+            `optional element ${describeSpec(tap.spec)}`,
           );
-          await this.tapSpec(s.tap, this.tapTimeoutMs);
+          await this.tapSpec(tap.spec, this.tapTimeoutMs);
         } else {
           await this.runStep(s);
         }
       } catch {
-        this.log('optional', `skipped ${'tap' in s ? describeSpec(s.tap) : 'step'} (not present)`);
+        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (not present)`);
       }
     }
   }
@@ -710,4 +725,15 @@ function describeCondition(cond: Condition): string {
   if (cond.any) return `any(${cond.any.map(describeCondition).join(', ')})`;
   if (cond.all) return `all(${cond.all.map(describeCondition).join(', ')})`;
   return '(empty)';
+}
+
+/**
+ * A tap step's `timeout:` is step configuration, not selector vocabulary —
+ * strip it before the spec reaches findBySpec/describeSpec (it would match
+ * nothing and leak into traces). Returns the pure ElementSpec plus the parsed
+ * override, if any.
+ */
+function splitTapSpec(tap: TapSpec): { spec: ElementSpec; timeoutMs: number | undefined } {
+  const { timeout, ...spec } = tap;
+  return { spec, timeoutMs: timeout !== undefined ? parseDuration(timeout) : undefined };
 }
