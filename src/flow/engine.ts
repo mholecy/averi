@@ -293,11 +293,33 @@ export class FlowEngine {
     for (const s of arm.do) await this.runStep(s);
   }
 
+  /**
+   * The optional budget bounds the PRESENCE CHECK only, never the tap. The
+   * tap path (settledNode) needs the element's rect identical in two
+   * consecutive tree reads, and on Android one uiautomator dump alone runs
+   * 1-3s — feeding tapSpec the tight optional budget meant the deadline was
+   * spent before a second read could happen, so optional taps NEVER landed on
+   * a device with realistic dump latency and were silently logged as "not
+   * present" (measured 2026-08-19/20, two independent apps, 100% repro). The
+   * presence poll below is immune to that: pollUntil always completes at
+   * least one tree read before checking its deadline, and one sighting is
+   * enough — after that the step is committed and taps with the normal tap
+   * timeout, exactly as a non-optional tap would.
+   */
   private async runOptional(steps: StepPayload<'optional'>): Promise<void> {
     for (const s of steps) {
       try {
-        if ('tap' in s) await this.tapSpec(s.tap, this.optionalTimeoutMs);
-        else await this.runStep(s);
+        if ('tap' in s) {
+          await this.pollUntil(
+            async (tree) =>
+              findBySpec(tree, s.tap).some((n) => n.rect.width > 0 && n.rect.height > 0) || undefined,
+            this.optionalTimeoutMs,
+            `optional element ${describeSpec(s.tap)}`,
+          );
+          await this.tapSpec(s.tap, this.tapTimeoutMs);
+        } else {
+          await this.runStep(s);
+        }
       } catch {
         this.log('optional', `skipped ${'tap' in s ? describeSpec(s.tap) : 'step'} (not present)`);
       }

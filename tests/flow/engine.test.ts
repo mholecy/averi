@@ -218,6 +218,58 @@ flows:
     await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
     expect(fake.taps).toContain('promo_close');
   });
+
+  // Regression: on a real Android device one uiautomator dump runs 1-3s —
+  // longer than the whole optional budget. The instant FakeAdapter above can
+  // never catch that, so this one makes each tree read outlast
+  // optionalTimeoutMs: the presence check must still succeed (pollUntil
+  // completes at least one read before checking its deadline) and the tap
+  // must then run on the full tap timeout, not the optional budget.
+  it('optional tap lands even when one tree read outlasts the optional budget', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'promo', (id, self) => {
+      if (id === 'promo_close') self.current = 'dashboard';
+    });
+    const slowRead = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      await new Promise((r) => setTimeout(r, FAST.optionalTimeoutMs + 20));
+      return slowRead();
+    };
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  dismiss:
+    steps:
+      - optional:
+          - tap: { id: promo_close }
+`);
+    await new FlowEngine(cfg, fake, FAST).runFlow('dismiss');
+    expect(fake.taps).toEqual(['promo_close']);
+  });
+
+  it('optional tap on an absent element skips after a single slow tree read', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    let reads = 0;
+    const slowRead = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      reads++;
+      await new Promise((r) => setTimeout(r, FAST.optionalTimeoutMs + 20));
+      return slowRead();
+    };
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  dismiss:
+    steps:
+      - optional:
+          - tap: { id: promo_close }
+`);
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('dismiss');
+    expect(fake.taps).toEqual([]);
+    expect(reads).toBe(1);
+    expect(trace.some((t) => t.action === 'optional' && t.detail?.includes('skipped'))).toBe(true);
+  });
 });
 
 describe('launch step', () => {
