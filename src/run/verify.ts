@@ -230,9 +230,7 @@ export async function runVerification(
           platforms,
           runs,
           (leg, p): Contribution<TextCapture> => {
-            if (leg.tree === undefined) {
-              return { note: `(${p}: UI tree read failed — ${leg.treeError ?? 'unknown'} — compared without it)` };
-            }
+            if (leg.tree === undefined) return { note: noTreeNote(leg, p) };
             const got = ocrByPlatform.get(p);
             return { value: { tree: leg.tree, ocr: got?.ocr, pngWidth: got?.pngWidth } };
           },
@@ -250,15 +248,20 @@ export async function runVerification(
 /** Either the artifact this leg contributes, or why it cannot contribute one. */
 type Contribution<T> = { value: T } | { note: string };
 
+/**
+ * Every parity dimension opens the same way — no tree, no contribution — and
+ * all three said so in the same words. One owner, because the words are the
+ * point: a dimension that dropped a leg SILENTLY would print a one-platform
+ * table that looks like a completed comparison.
+ */
+const noTreeNote = (leg: VerificationLeg, p: Platform): string =>
+  `(${p}: UI tree read failed — ${leg.treeError ?? 'unknown'} — compared without it)`;
+
 const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> =>
-  leg.tree !== undefined
-    ? { value: leg.tree }
-    : { note: `(${p}: UI tree read failed — ${leg.treeError ?? 'unknown'} — compared without it)` };
+  leg.tree !== undefined ? { value: leg.tree } : { note: noTreeNote(leg, p) };
 
 const captureOf = (leg: VerificationLeg, p: Platform): Contribution<ColorCapture> => {
-  if (leg.tree === undefined) {
-    return { note: `(${p}: UI tree read failed — ${leg.treeError ?? 'unknown'} — compared without it)` };
-  }
+  if (leg.tree === undefined) return { note: noTreeNote(leg, p) };
   try {
     return { value: { tree: leg.tree, png: PNG.sync.read(leg.shot) } };
   } catch (e) {

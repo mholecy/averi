@@ -1,7 +1,7 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import type { LayoutAnchor, LayoutContract } from './layout-contract.js';
+import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import type { OcrLine, OcrRegion, OcrRegionResult } from './ocr.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -394,11 +394,10 @@ export function compareTextParity(
   const platforms = (['android', 'ios'] as const).filter((p) => captures[p] !== undefined);
   if (platforms.length === 0) throw new Error('text parity: no platform capture provided');
 
-  const rawTol = opts.sizeTolerancePct ?? contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT;
-  if (typeof rawTol !== 'number' || !Number.isFinite(rawTol) || rawTol <= 0) {
-    throw new Error(`text parity: tolerance_size_pct must be a positive number, got ${JSON.stringify(rawTol)}`);
-  }
-  const sizeTolerancePct = rawTol;
+  const sizeTolerancePct = positiveTolerance(
+    opts.sizeTolerancePct ?? contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT,
+    'text parity: tolerance_size_pct',
+  );
 
   const rows: TextRow[] = [];
   const findings: TextFinding[] = [];

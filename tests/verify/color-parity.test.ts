@@ -5,6 +5,7 @@ import {
   compareColorParity,
   colorParityVerdict,
   contractHasColorAnchors,
+  DEFAULT_TOLERANCE_DE,
   evaluateColorAssert,
   formatColorParity,
   normalizeHex,
@@ -296,6 +297,30 @@ describe('compareColorParity — single-platform runs', () => {
     expect(r.pass).toBe(false);
     expect(r.findings[0]).toMatchObject({ comparison: 'android-vs-contract' });
     expect(formatColorParity(r)).not.toContain('consider tolerance_de: 6'); // hint only when tol > 6
+  });
+
+  // The message names the comparator AND the field the author typed — the
+  // reason layout-contract leaves these fields `unknown` instead of typing
+  // them at load time. A shared validator must not flatten that to a generic
+  // one; these strings are the contract with the person editing the JSON.
+  it.each([['8'], [0], [-1]])('a contract tolerance_de of %j is rejected by name', (tolerance_de) => {
+    const c = contract({ screen: 's', tolerance_de, anchors: [{ id: 'card', bg: WHITE }] });
+    expect(() => compareColorParity(c, { android: capturePair(WHITE, WHITE).android })).toThrow(
+      `color parity: tolerance_de must be a positive number, got ${JSON.stringify(tolerance_de)}`,
+    );
+  });
+
+  // NaN cannot reach here through a contract — that is JSON, `NaN` serializes
+  // to `null`, and `null ?? DEFAULT` takes the default. It IS reachable from
+  // the programmatic override, which is where the finite check earns its keep.
+  it('a NaN tolerance override is rejected, and a null in the JSON just defaults', () => {
+    const c = contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE }] });
+    const captures = { android: capturePair(WHITE, WHITE).android };
+    expect(() => compareColorParity(c, captures, { toleranceDe: Number.NaN })).toThrow(
+      'color parity: tolerance_de must be a positive number, got null',
+    );
+    const nulled = contract({ screen: 's', tolerance_de: null, anchors: [{ id: 'card', bg: WHITE }] });
+    expect(compareColorParity(nulled, captures).toleranceDe).toBe(DEFAULT_TOLERANCE_DE);
   });
 
   it('an anchor with no usable target on a single-platform run is noted, verdict "—"', () => {

@@ -75,6 +75,23 @@ const contractSchema = z
 export type LayoutContract = z.infer<typeof contractSchema>;
 export type LayoutAnchor = z.infer<typeof anchorSchema>;
 
+/**
+ * Validate one of the `tolerance_*` fields the schema deliberately leaves
+ * `unknown` (see header). The caller passes what to CALL it — 'color parity:
+ * tolerance_de', 'text parity: tolerance_size_pct' — so the message still
+ * names the comparator and the field the author actually typed, which is the
+ * whole reason these are not typed at load time; only the rule itself (a
+ * finite number above zero, never NaN, never a string that looks numeric) is
+ * shared. A tolerance that silently defaulted instead of throwing would make
+ * every row in the table pass for the wrong reason.
+ */
+export function positiveTolerance(raw: unknown, what: string): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+    throw new Error(`${what} must be a positive number, got ${JSON.stringify(raw)}`);
+  }
+  return raw;
+}
+
 export function parseLayoutContract(jsonText: string, source = 'layout contract'): LayoutContract {
   let raw: unknown;
   try {

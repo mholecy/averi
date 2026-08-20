@@ -396,6 +396,17 @@ describe('compareTextParity — regressions found in review', () => {
 });
 
 describe('compareTextParity — missing anchors and bad input', () => {
+  // Shares a validator with color parity's tolerance_de, so what needs pinning
+  // is that the message still names THIS comparator and THIS field — that
+  // specificity is why layout-contract leaves the tolerances `unknown` rather
+  // than typing them at load time.
+  it.each([['10'], [0], [-1]])('a contract tolerance_size_pct of %j is rejected by name', (tol) => {
+    const c = contract([{ id: 'cta', text: 'CONTINUE' }], { tolerance_size_pct: tol });
+    expect(() =>
+      compareTextParity(c, { android: { tree: root(1080, [text('cta', 'CONTINUE')]) } }),
+    ).toThrow(`text parity: tolerance_size_pct must be a positive number, got ${JSON.stringify(tol)}`);
+  });
+
   it('an id absent from one tree is MISSING and fails the run', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {

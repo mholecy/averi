@@ -1,7 +1,7 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
-import type { LayoutAnchor, LayoutContract } from './layout-contract.js';
+import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
 /**
@@ -378,11 +378,10 @@ export function compareColorParity(
   if (platforms.length === 0) throw new Error('color parity: no platform capture provided');
   const theme = opts.theme ?? 'light';
 
-  const rawTol = opts.toleranceDe ?? contract.tolerance_de ?? DEFAULT_TOLERANCE_DE;
-  if (typeof rawTol !== 'number' || !Number.isFinite(rawTol) || rawTol <= 0) {
-    throw new Error(`color parity: tolerance_de must be a positive number, got ${JSON.stringify(rawTol)}`);
-  }
-  const tol = rawTol;
+  const tol = positiveTolerance(
+    opts.toleranceDe ?? contract.tolerance_de ?? DEFAULT_TOLERANCE_DE,
+    'color parity: tolerance_de',
+  );
   const ctol = tol * CONTRACT_TOL_FACTOR;
 
   // Per-platform stats + scale — failing closed on anything degenerate: a
