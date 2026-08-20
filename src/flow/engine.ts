@@ -1,5 +1,6 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec as describeSpec, type ElementSpec } from '../ui-tree/element-spec.js';
+import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { findBySpec, intersectsViewport, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { parseDuration } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
@@ -427,12 +428,10 @@ export class FlowEngine {
 
   /**
    * Poll the UI tree until fn returns a value; throws on timeout. A failed
-   * tree READ is a poll miss, not a failure: right after launch (clearState
-   * especially, wider still on RN debug builds) the app has no window yet and
-   * uiautomator legitimately reports a null root node for a few seconds. The
-   * last read error rides along in the timeout message so a genuinely broken
-   * device (adb gone, emulator offline) stays diagnosable. Errors from `fn`
-   * itself (unknown state names etc.) still propagate immediately.
+   * tree READ is a poll miss, not a failure (readTreeOrError owns that rule);
+   * the last read error rides along in the timeout message so a genuinely
+   * broken device stays diagnosable. Errors from `fn` itself (unknown state
+   * names etc.) still propagate immediately.
    */
   private async pollUntil<T>(
     fn: (tree: UiNode) => Promise<T | undefined>,
@@ -442,16 +441,8 @@ export class FlowEngine {
     const deadline = Date.now() + timeoutMs;
     let lastReadError: Error | undefined;
     for (;;) {
-      const tree = await this.adapter.uiTree().then(
-        (t) => {
-          lastReadError = undefined;
-          return t;
-        },
-        (e: unknown) => {
-          lastReadError = e instanceof Error ? e : new Error(String(e));
-          return undefined;
-        },
-      );
+      const { tree, error } = await readTreeOrError(this.adapter);
+      lastReadError = error;
       if (tree !== undefined) {
         const result = await fn(tree);
         if (result !== undefined) return result;
@@ -561,18 +552,9 @@ export async function scrollUntilVisible(
   let lastFound: UiNode[] = [];
   let lastReadError: Error | undefined;
   for (let swipes = 0; ; swipes++) {
-    // A failed read is a miss, not a failure — mid-animation and right after
-    // launch the tree can be momentarily unproducible (null root node).
-    const tree = await adapter.uiTree().then(
-      (t) => {
-        lastReadError = undefined;
-        return t;
-      },
-      (e: unknown) => {
-        lastReadError = e instanceof Error ? e : new Error(String(e));
-        return undefined;
-      },
-    );
+    // A failed read is a miss, not a failure — see readTreeOrError.
+    const { tree, error } = await readTreeOrError(adapter);
+    lastReadError = error;
     lastFound = tree === undefined ? [] : target.find(tree);
     if (lastFound.some((n) => intersectsViewport(n.rect, viewport))) return swipes;
     if (swipes >= maxSwipes || Date.now() >= deadline) {

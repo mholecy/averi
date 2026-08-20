@@ -5,6 +5,7 @@ import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
 import { elementAssertSchema } from './element-assert.js';
@@ -419,7 +420,7 @@ export class Verifier {
     let detail: string | undefined;
     let readError: Error | undefined;
     for (;;) {
-      const read = await this.tryReadTree();
+      const read = await readTreeOrError(this.adapter);
       readError = read.error;
       if (read.tree !== undefined) {
         const verdict = await evaluate(read.tree);
@@ -434,19 +435,6 @@ export class Verifier {
         return { description, pass: false, detail: spec.timeoutDetail({ detail, readError }) };
       }
       await sleep(this.pollMs);
-    }
-  }
-
-  /**
-   * A failed tree read during a polling assert is a miss, not a failure —
-   * right after launch the device can be momentarily unable to produce one
-   * (uiautomator null root node). The error is kept for the timeout detail.
-   */
-  private async tryReadTree(): Promise<{ tree?: UiNode; error?: Error }> {
-    try {
-      return { tree: await this.adapter.uiTree() };
-    } catch (e) {
-      return { error: e instanceof Error ? e : new Error(String(e)) };
     }
   }
 
@@ -545,7 +533,7 @@ export async function captureStableScreenshot(
  * Bounded-retry tree read for one-shot consumers (verify's rect-parity leg):
  * right after a flow settles, a device can transiently fail to produce a
  * tree (uiautomator "null root node") — the same transient the polling
- * asserts absorb via tryReadTree. Throws after the last attempt with the
+ * asserts absorb via readTreeOrError. Throws after the last attempt with the
  * underlying error in the message.
  */
 export async function readTreeWithRetry(

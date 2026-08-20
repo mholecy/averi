@@ -2,7 +2,12 @@ import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { appHealth, runVerification } from '../../src/run/verify.js';
+import {
+  appHealth,
+  assertSummary,
+  formatLogExcerpt,
+  runVerification,
+} from '../../src/run/verify.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
 import type { OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
@@ -438,5 +443,47 @@ describe('color parity per-leg notes', () => {
     expect(color).toContain('null root node');
     // One leg still produced a capture, so the table is compared, not skipped.
     expect(color).not.toContain('SKIPPED');
+  });
+});
+
+describe('assertSummary', () => {
+  it('reads the same for the assert tool and a verify leg', () => {
+    const pass = { description: 'a', pass: true };
+    const fail = { description: 'b', pass: false };
+    expect(assertSummary([pass, pass])).toBe('All 2 asserts passed');
+    expect(assertSummary([pass, fail])).toBe('1/2 asserts FAILED');
+    // Vacuously true, and the callers decide whether to print it at all.
+    expect(assertSummary([])).toBe('All 0 asserts passed');
+  });
+});
+
+describe('formatLogExcerpt', () => {
+  const lines = (n: number, prefix = 'line'): string[] =>
+    Array.from({ length: n }, (_, i) => `${prefix} ${i}`);
+
+  it('passes short unfiltered output through with no header', () => {
+    expect(formatLogExcerpt(['a', 'b'], undefined)).toBe('a\nb');
+  });
+
+  // The counting is the point: a grep that matched nothing must SAY so, or it
+  // reads exactly like a quiet device.
+  it('reports what the grep matched, including nothing', () => {
+    const out = formatLogExcerpt(['ERROR boom', 'info ok'], 'error');
+    expect(out).toBe('[grep /error/i matched 1 of 2 lines]\nERROR boom');
+    expect(formatLogExcerpt(['info ok'], 'crash')).toBe('[grep /crash/i matched 0 of 1 lines]');
+  });
+
+  it('keeps the TAIL when truncating and admits it', () => {
+    const out = formatLogExcerpt(lines(5), undefined, 2).split('\n');
+    expect(out[0]).toBe('[truncated: showing last 2 of 5 lines]');
+    expect(out.slice(1)).toEqual(['line 3', 'line 4']);
+  });
+
+  it('counts against the filtered set, not the raw one', () => {
+    const out = formatLogExcerpt([...lines(3, 'keep'), ...lines(50, 'drop')], 'keep', 2);
+    expect(out).toContain('[grep /keep/i matched 3 of 53 lines]');
+    expect(out).toContain('[truncated: showing last 2 of 3 lines]');
+    expect(out).toContain('keep 2');
+    expect(out).not.toContain('drop');
   });
 });

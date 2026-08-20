@@ -24,7 +24,14 @@ import {
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { parseLayoutContract } from '../verify/layout-contract.js';
-import { appHealth, formatAsserts, formatTrace, runVerification } from '../run/verify.js';
+import {
+  appHealth,
+  assertSummary,
+  formatAsserts,
+  formatLogExcerpt,
+  formatTrace,
+  runVerification,
+} from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
@@ -472,9 +479,7 @@ registerTool(
     } catch {
       // no averi.yaml → no app to health-check; asserts stand on their own
     }
-    const failed = results.filter((r) => !r.pass).length;
-    const summary = failed === 0 ? `All ${results.length} asserts passed` : `${failed}/${results.length} asserts FAILED`;
-    return text(`${summary}\n${formatAsserts(results)}${health}`);
+    return text(`${assertSummary(results)}\n${formatAsserts(results)}${health}`);
   },
 );
 
@@ -556,13 +561,7 @@ registerTool(
   },
   async ({ platform: p, sinceSeconds, grep }) => {
     const all = await (await registry.get(p)).logs(Date.now() - sinceSeconds * 1000);
-    const lines = grep === undefined ? all : all.filter((l) => new RegExp(grep, 'i').test(l));
-    const MAX_LINES = 2000;
-    const tail = lines.slice(-MAX_LINES);
-    const header: string[] = [];
-    if (grep !== undefined) header.push(`[grep /${grep}/i matched ${lines.length} of ${all.length} lines]`);
-    if (lines.length > tail.length) header.push(`[truncated: showing last ${MAX_LINES} of ${lines.length} lines]`);
-    return text([...header, ...tail].join('\n'));
+    return text(formatLogExcerpt(all, grep));
   },
 );
 

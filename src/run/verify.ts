@@ -96,6 +96,39 @@ export const formatAsserts = (results: AssertResult[]): string =>
     .map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.description}${r.detail ? ` — ${r.detail}` : ''}`)
     .join('\n');
 
+/**
+ * The one-line verdict over a set of asserts. It lives beside formatAsserts
+ * for the reason describeElementSpec has one owner: this is user-facing
+ * wording that appears in BOTH the single-platform `assert` tool and every leg
+ * of a `verify` report, and two tools describing the same failure differently
+ * is the drift this prevents.
+ */
+export const assertSummary = (results: AssertResult[]): string => {
+  const failed = results.filter((r) => !r.pass).length;
+  return failed === 0
+    ? `All ${results.length} asserts passed`
+    : `${failed}/${results.length} asserts FAILED`;
+};
+
+/**
+ * Device-log excerpt: filter to a regex, keep the tail, and say what that did.
+ * Pure — it takes the lines rather than the device — because the COUNTING is
+ * the part that misleads when it is wrong: a grep that silently matched
+ * nothing reads exactly like a quiet device, and a truncated pull that does
+ * not admit it reads like the whole story. Worth a test; untestable inside a
+ * tool handler.
+ */
+export function formatLogExcerpt(all: string[], grep: string | undefined, maxLines = 2000): string {
+  const lines = grep === undefined ? all : all.filter((l) => new RegExp(grep, 'i').test(l));
+  const tail = lines.slice(-maxLines);
+  const header: string[] = [];
+  if (grep !== undefined) header.push(`[grep /${grep}/i matched ${lines.length} of ${all.length} lines]`);
+  if (lines.length > tail.length) {
+    header.push(`[truncated: showing last ${maxLines} of ${lines.length} lines]`);
+  }
+  return [...header, ...tail].join('\n');
+}
+
 export async function runVerification(
   req: VerificationRequest,
   resolveAdapter: (platform: Platform) => Promise<DeviceAdapter>,
@@ -140,11 +173,7 @@ export async function runVerification(
       return;
     }
     const { trace, results, shot, health } = run.value;
-    const failed = results.filter((r) => !r.pass).length;
-    const verdict =
-      specs.length === 0 ? ''
-      : failed === 0 ? `\nAll ${results.length} asserts passed`
-      : `\n${failed}/${results.length} asserts FAILED`;
+    const verdict = specs.length === 0 ? '' : `\n${assertSummary(results)}`;
     sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${health}`);
     screenshots.push(shot);
   });

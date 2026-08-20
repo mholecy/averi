@@ -3,7 +3,12 @@ import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent } from '../adapters/types.js';
-import { elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import {
+  elementSpecObject,
+  elementSpecSchema,
+  hasSelector,
+  type ElementSpec,
+} from '../ui-tree/element-spec.js';
 import { elementAssertSchema, type ElementAssert } from '../verify/element-assert.js';
 
 /** Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4). */
@@ -113,18 +118,9 @@ const step: z.ZodType<Step> = z.lazy(() =>
       .strict(),
     z
       .object({
-        tap: z
-          .object({
-            id: z.string().optional(),
-            text: z.string().optional(),
-            role: z.string().optional(),
-            label: z.string().optional(),
-            timeout: timeout.optional(),
-          })
-          .strict()
-          .refine((t) => [t.id, t.text, t.role, t.label].some((v) => v !== undefined), {
-            message: 'tap needs at least one of: id, text, role, label',
-          }),
+        tap: elementSpecObject
+          .extend({ timeout: timeout.optional() })
+          .refine(hasSelector, { message: 'tap needs at least one of: id, text, role, label' }),
       })
       .strict(),
     z.object({ type: z.object({ value: z.string() }).strict() }).strict(),
@@ -172,20 +168,13 @@ const step: z.ZodType<Step> = z.lazy(() =>
       .strict(),
     z
       .object({
-        fill: z
-          .object({
-            id: z.string().optional(),
-            text: z.string().optional(),
-            role: z.string().optional(),
-            label: z.string().optional(),
+        fill: elementSpecObject
+          .extend({
             value: z.string(),
             clear: z.boolean().optional(),
             dismissKeyboard: z.boolean().optional(),
           })
-          .strict()
-          .refine((f) => [f.id, f.text, f.role, f.label].some((v) => v !== undefined), {
-            message: 'fill needs at least one of: id, text, role, label',
-          }),
+          .refine(hasSelector, { message: 'fill needs at least one of: id, text, role, label' }),
       })
       .strict(),
     z.object({ assert: z.array(elementAssertSchema).min(1) }).strict(),
