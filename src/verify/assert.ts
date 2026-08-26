@@ -14,6 +14,7 @@ import { ocrUnavailableReason, VisionOcr, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
+import { containsTextHint, flattenTree } from '../ui-tree/text-hint.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5). Three tiers, cheapest first:
@@ -250,9 +251,23 @@ export class Verifier {
       if (error !== undefined) return n.error === error;
       return true;
     };
+    // Which literal string was expected to be SOMEONE's whole label — the only
+    // kind of miss a containment hint explains. A `match` is already a regex
+    // (containment is what it does), and an `error` assert is about a
+    // different field entirely: hinting about its selector text there would
+    // explain a failure that did not happen.
+    const exactText =
+      text ?? (match === undefined && error === undefined ? (element.text ?? element.label) : undefined);
+    // What the verdict is really about, captured for the deadline where poll
+    // no longer has a tree. The hint is scoped to the nodes the SPEC matched
+    // whenever it matched any — an id-addressed assert must not be explained
+    // by an unrelated node elsewhere on screen — and widens to the whole tree
+    // only when the spec found nothing to talk about.
+    let hintScope: UiNode[] | undefined;
     return this.poll(
       (tree) => {
         const found = findBySpec(tree, element);
+        hintScope = found.length > 0 ? found : flattenTree(tree);
         if (found.some(contentMatches)) return { pass: true };
         if (found.length === 0) return undefined;
         // The element is there but says the wrong thing — worth reporting at
@@ -268,10 +283,18 @@ export class Verifier {
       {
         description,
         timeoutMs,
-        timeoutDetail: ({ detail, readError }) =>
-          readError !== undefined ? notFound(timeoutMs, readError)
-          : detail !== undefined ? `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
-          : notFound(timeoutMs),
+        timeoutDetail: ({ detail, readError }) => {
+          if (readError !== undefined) return notFound(timeoutMs, readError);
+          const base =
+            detail !== undefined ?
+              `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
+            : notFound(timeoutMs);
+          const hint =
+            exactText === undefined || hintScope === undefined ?
+              undefined
+            : containsTextHint(hintScope, exactText);
+          return hint === undefined ? base : `${base}\n  ${hint}`;
+        },
       },
     );
   }

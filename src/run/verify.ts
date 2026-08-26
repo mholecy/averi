@@ -1,7 +1,7 @@
 import { PNG } from 'pngjs';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
-import { FlowEngine, type TraceEntry } from '../flow/engine.js';
+import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import {
   readTreeWithRetry,
   scanForCrashes,
@@ -88,8 +88,10 @@ export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promi
   );
 }
 
-export const formatTrace = (trace: TraceEntry[]): string =>
-  trace.map((t) => (t.detail === undefined ? t.action : `${t.action}: ${t.detail}`)).join('\n');
+// Re-exported, not defined: a failing flow now renders its own trace into the
+// error message, so the formatter moved to the engine (flow/engine.ts) to stay
+// importable from there. This name is the one the MCP layer and the tests use.
+export { formatTrace };
 
 export const formatAsserts = (results: AssertResult[]): string =>
   results

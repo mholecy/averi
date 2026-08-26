@@ -104,6 +104,145 @@ describe('element asserts', () => {
   });
 });
 
+describe('exact-text misses hint at a combined accessibility element', () => {
+  // Measured 2026-08-26: the same assert passed on Android and failed on iOS,
+  // because iOS `.accessibilityElement(children: .combine)` collapses a tile's
+  // two Texts into one label. Nothing EQUALS the expected string, so the
+  // failure reads as a missing feature until someone dumps the tree.
+  function combinedTileFake() {
+    resetLayout();
+    return new FakeAdapter(
+      {
+        filters: screen(
+          el({
+            role: 'button',
+            identifier: 'transactions.filter.type_tile',
+            label: 'Select transaction type, 1 of 13 selected',
+          }),
+        ),
+      },
+      'filters',
+    );
+  }
+
+  it('names the containing node and the portable form when a spec-level text finds nothing', async () => {
+    const result = await new Verifier(combinedTileFake(), FAST).assert({
+      element: { text: '1 of 13 selected' },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('no node has this exact text');
+    expect(result.detail).toContain('id=transactions.filter.type_tile');
+    expect(result.detail).toContain('Select transaction type, 1 of 13 selected');
+    expect(result.detail).toContain('use match:');
+  });
+
+  it('hints the same way when the element was found but its content was longer', async () => {
+    const result = await new Verifier(combinedTileFake(), FAST).assert({
+      element: { id: 'transactions.filter.type_tile' },
+      text: '1 of 13 selected',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('element found but content was');
+    expect(result.detail).toContain('no node has this exact text');
+  });
+
+  it('escapes regex punctuation in the suggested match, so the hint can be pasted as-is', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { total: screen(el({ role: 'text', label: 'Total (incl. fees): 1,250.00 MDL' })) },
+      'total',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { text: '1,250.00 MDL' } });
+    expect(result.detail).toContain('use match: "1,250\\\\.00 MDL"');
+  });
+
+  it('stays quiet for a substring INSIDE a token — a value bug is not a combined element', async () => {
+    // The dangerous shape: "9.99" occurs in "19.99", so plain containment
+    // would blame iOS element combining for a real price bug AND recommend an
+    // unanchored match: "9\\.99" that PASSES against "19.99" — turning a
+    // correctly failing assert into a wrongly passing one.
+    resetLayout();
+    const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'price', label: '19.99' })) }, 'p');
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'price' }, text: '9.99' });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('element found but content was: "19.99"');
+    expect(result.detail).not.toContain('CONTAIN it');
+  });
+
+  it('stays quiet for an off-by-one that merely shares a suffix', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { t: screen(el({ role: 'text', identifier: 'count', label: '11 of 13 selected' })) },
+      't',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'count' }, text: '1 of 13 selected' });
+    expect(result.detail).not.toContain('CONTAIN it');
+  });
+
+  it('does not explain an id-addressed miss with an unrelated node elsewhere on screen', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        s: screen(
+          el({ role: 'text', identifier: 'header', label: 'Filters, 1 of 13 selected' }),
+          el({ role: 'text', identifier: 'footer', label: 'Nothing here' }),
+        ),
+      },
+      's',
+    );
+    // The spec matched `footer`, so `header` is not an explanation for it.
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'footer' },
+      text: '1 of 13 selected',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).not.toContain('CONTAIN it');
+  });
+
+  it.each([
+    ['$9.99', 'a currency prefix'],
+    ['9.99%', 'a format suffix'],
+  ])('stays quiet for %s (%s) — the advice would wave the regression through', async (label) => {
+    resetLayout();
+    const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'v', label })) }, 'p');
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'v' }, text: '9.99' });
+    expect(result.pass).toBe(false);
+    expect(result.detail).not.toContain('CONTAIN it');
+  });
+
+  it('still hints for the separators a combined label actually joins on', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        p: screen(
+          el({ role: 'text', identifier: 'dash', label: 'Filters – 1 of 13 selected' }),
+          el({ role: 'text', identifier: 'space', label: 'Filters 1 of 13 selected' }),
+        ),
+      },
+      'p',
+    );
+    const verifier = new Verifier(fake, FAST);
+    for (const id of ['dash', 'space']) {
+      const result = await verifier.assert({ element: { id }, text: '1 of 13 selected' });
+      expect(result.detail).toContain('CONTAIN it');
+    }
+  });
+
+  it('stays quiet when the string is genuinely absent — no hint to invent', async () => {
+    const result = await new Verifier(dashboardFake(), FAST).assert({ element: { text: 'Nowhere' } });
+    expect(result.detail).toBe('not found within 100ms');
+  });
+
+  it('does not hint for a failing `match` — a regex already asks the containment question', async () => {
+    const result = await new Verifier(combinedTileFake(), FAST).assert({
+      element: { id: 'transactions.filter.type_tile' },
+      match: '^99 of',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).not.toContain('no node has this exact text');
+  });
+});
+
 describe('rect asserts (geometry vs Figma-frame values)', () => {
   // screen() root is 1000 wide at x=0 → screen width 1000; frameWidth 500
   // makes the card's expected values exactly half the measured pixels.

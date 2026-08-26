@@ -54,13 +54,17 @@ Three ideas make that reliable:
 flowchart LR
     A["ensure_state('logged_in')"] --> B{"screen matches<br/>the state's detect condition?"}
     B -- yes --> C(["done — ~1 s"])
-    B -- no --> D["run the state's<br/>reach: flow, e.g. login"]
+    B -- no --> D["run the next<br/>reach: flow, e.g. login"]
     D --> E{"detect: matches now?"}
     E -- yes --> C
-    E -- no --> F(["fail with trace + screenshot"])
+    E -- no --> G{"another reach: flow?"}
+    G -- yes --> D
+    G -- no --> F(["fail — error carries the trace"])
 ```
 
 Idempotent — the agent calls it freely; it costs ~1 second when the app is already there.
+
+`reach:` is a ladder, so order it cheapest-first: `detect` is re-checked after every flow and the rest are skipped once it matches. `reach: [dismiss_post_login_prompts, login]` reads as "try the cheap idempotent dismissal; fall back to a full login only if that did not get us there" — and that is what it does, including when the cheap flow *fails* (its `tap:` times out because the interstitial was not there). A failed rung escalates to the next one and is reported in the trace as `⚠ reach <flow>`; only the last rung's failure fails the call.
 
 ### The yaml is code
 

@@ -350,6 +350,25 @@ export interface ResolvedCredentials {
  * on 2026-08-06 — the wrong login name is rejected by the bank one screen AFTER
  * it is typed, so an environment mix-up presents as a credentials problem.
  */
+/**
+ * A mistake in the config or the environment, as opposed to the app not being
+ * on the screen a flow expected: an undeclared credential, an unset `${VAR}`,
+ * a name that does not resolve.
+ *
+ * The distinction is load-bearing for `ensure_state`'s reach ladder, which
+ * escalates past a rung that fails. Escalation is right when the cheap flow
+ * simply did not fit the screen — and wrong for these, which the next flow
+ * cannot fix and will usually hit too: escalating a typo'd credential into a
+ * `launch { clearState: true }` login wipes app state to re-run a step that
+ * was never going to work. These abort the ladder instead.
+ */
+export class SetupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SetupError';
+  }
+}
+
 export function resolveCredentials(cfg: AveriConfig, requested?: string): ResolvedCredentials {
   const name = requested ?? process.env.AVERI_ENV ?? cfg.defaultEnvironment;
   const base = cfg.credentials ?? {};
@@ -362,7 +381,7 @@ export function resolveCredentials(cfg: AveriConfig, requested?: string): Resolv
       requested !== undefined ? 'requested'
       : process.env.AVERI_ENV !== undefined ? 'AVERI_ENV'
       : 'defaultEnvironment';
-    throw new Error(
+    throw new SetupError(
       `Unknown environment "${name}" (from ${source}) — known: ${known.join(', ') || '(none declared)'}`,
     );
   }

@@ -552,16 +552,22 @@ registerTool(
   'get_logs',
   {
     description:
-      'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions. grep filters to lines matching a case-insensitive regex (e.g. "tpm|validation") — prefer it, unfiltered pulls run to thousands of lines.',
+      'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions. grep filters to lines matching a case-insensitive regex (e.g. "tpm|validation") — prefer it, unfiltered pulls run to thousands of lines. Only the LAST maxLines matching lines come back (the tail is where the failure is); the header reports how many the grep matched against how many are shown, so raise it deliberately rather than by default.',
     inputSchema: {
       platform,
       sinceSeconds: z.number().default(60).describe('How far back to read'),
       grep: z.string().optional().describe('Case-insensitive regex; only matching lines are returned'),
+      maxLines: z
+        .number()
+        .int()
+        .positive()
+        .default(400)
+        .describe('Keep only the last N matching lines (default 400). A grep alone is not a budget — a broad one matched 2,002 lines / 483k characters in one measured session.'),
     },
   },
-  async ({ platform: p, sinceSeconds, grep }) => {
+  async ({ platform: p, sinceSeconds, grep, maxLines }) => {
     const all = await (await registry.get(p)).logs(Date.now() - sinceSeconds * 1000);
-    return text(formatLogExcerpt(all, grep));
+    return text(formatLogExcerpt(all, grep, maxLines));
   },
 );
 

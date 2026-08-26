@@ -7,6 +7,7 @@ import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
   resolveCredentials,
+  SetupError,
   type AveriConfig,
   type Condition,
   type ScrollUntilSpec,
@@ -22,10 +23,52 @@ export interface TraceEntry {
 }
 
 /**
+ * The one rendering of a trace. It lives here, beside the TraceEntry it
+ * renders, because a FAILING flow now carries its own trace in the error
+ * message (FlowError) — so the formatter has to be reachable from the engine
+ * itself, not from the run layer that imports the engine.
+ */
+export const formatTrace = (trace: TraceEntry[]): string =>
+  trace.map((t) => (t.detail === undefined ? t.action : `${t.action}: ${t.detail}`)).join('\n');
+
+/**
+ * A flow failure that carries the steps that DID run.
+ *
+ * A successful run returns its trace; a failing one used to return nothing but
+ * the final message ("Timed out after 20000ms waiting for state logged_in") —
+ * which is exactly when the trace is worth most. It is the only way to see
+ * which reach flows ran, how far each got, and, with `clearState` in the mix,
+ * what the attempt already cost. The trace is appended to `message` (MCP
+ * surfaces only the message) and kept structured on `trace` for callers that
+ * want the entries.
+ */
+export class FlowError extends Error {
+  constructor(
+    message: string,
+    readonly trace: TraceEntry[],
+  ) {
+    super(message);
+    this.name = 'FlowError';
+  }
+}
+
+/**
  * The payload of one step kind, read off the Step union itself so a handler's
  * parameter type can never drift from the schema it is fed by.
  */
 type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
+
+/**
+ * How many `launch { clearState: true }` steps this server process has run.
+ * Module-scoped so it spans the tool calls of one session (each call builds a
+ * fresh FlowEngine); `resetClearStateCount` exists for tests, which must not
+ * inherit each other's count.
+ */
+let clearStateCount = 0;
+
+export const resetClearStateCount = (): void => {
+  clearStateCount = 0;
+};
 
 export interface EngineOptions {
   /** Poll interval for waits; tests use a few ms. */
@@ -34,6 +77,8 @@ export interface EngineOptions {
   waitTimeoutMs?: number;
   ensureTimeoutMs?: number;
   optionalTimeoutMs?: number;
+  /** Grace window for the detect re-check between two reach flows (see `detects`). */
+  reachRecheckMs?: number;
   /** Default timeout for inline `assert:` steps (each spec can override). */
   assertTimeoutMs?: number;
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
@@ -58,6 +103,7 @@ export class FlowEngine {
   private readonly waitTimeoutMs: number;
   private readonly ensureTimeoutMs: number;
   private readonly optionalTimeoutMs: number;
+  private readonly reachRecheckMs: number;
   private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
   private readonly credentials: Record<string, string>;
@@ -79,6 +125,7 @@ export class FlowEngine {
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
     this.ensureTimeoutMs = opts.ensureTimeoutMs ?? 20_000;
     this.optionalTimeoutMs = opts.optionalTimeoutMs ?? 1_500;
+    this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
   }
@@ -112,26 +159,86 @@ export class FlowEngine {
 
   private async ensureStateInner(name: string): Promise<void> {
     const state = this.cfg.states[name];
-    if (!state) throw new Error(`Unknown state "${name}" — known: ${Object.keys(this.cfg.states).join(', ')}`);
-    // An unreadable tree is not "in this state" — and it must not throw
-    // either: right after a cold launch/reinstall (no window yet) is exactly
-    // when the reach flows are needed. waitFor below re-verifies by polling.
-    const tree = await this.adapter.uiTree().catch(() => undefined);
-    if (tree !== undefined && (await this.matches(state.detect, tree))) {
+    if (!state) throw new SetupError(`Unknown state "${name}" — known: ${Object.keys(this.cfg.states).join(', ')}`);
+    if (await this.detects(state.detect, 0)) {
       this.log(`state ${name}`, 'already active');
       return;
     }
     if (!state.reach || state.reach.length === 0) {
-      throw new Error(`Not in state "${name}" and it has no reach flows`);
+      throw new SetupError(`Not in state "${name}" and it has no reach flows`);
     }
-    for (const flow of state.reach) await this.runFlowInner(flow);
+    // Re-detect after EVERY reach flow, not only after the last one. A reach
+    // list reads as an escalation ladder — "dismiss the post-login prompt;
+    // failing that, log in" — but running every rung unconditionally makes a
+    // cheap prelude powerless to protect a destructive flow behind it: the
+    // 2026-08-26 finding is a `launch { clearState: true }` login that burned
+    // a device registration on a session that was already alive, because a
+    // post-login interstitial defeated `detect` for one probe. Short-circuit
+    // gives "try cheap, escalate only if it did not work" — and is a no-op for
+    // the single-entry reach lists that are the overwhelming majority.
+    for (const [i, flow] of state.reach.entries()) {
+      const last = i === state.reach.length - 1;
+      // A rung that THROWS must escalate too, not abort the ladder. "Try the
+      // cheap one, fall back to login" has to hold for the way a cheap flow
+      // actually fails — a `tap:` that times out because the interstitial was
+      // not there — or the prelude only works on the runs that did not need
+      // it. The failure is never swallowed: it goes in the trace, so a broken
+      // prelude stays visible instead of being read as a slow login.
+      let failed = false;
+      try {
+        await this.runFlowInner(flow);
+      } catch (e) {
+        // A setup mistake is not something the next rung can fix — and the
+        // next rung is the destructive one. Measured: a prelude naming an
+        // undeclared credential escalated into a `clearState: true` login,
+        // wiping app state to re-run a step that could never have worked.
+        if (last || e instanceof SetupError) throw e;
+        failed = true;
+        const why = (e instanceof Error ? e.message : String(e)).split('\n')[0];
+        this.log(`⚠ reach ${flow}`, `failed, escalating to ${state.reach[i + 1]} — ${why}`);
+      }
+      // Only a rung that completed and has something after it earns a grace
+      // window: the last one falls through to waitFor below (a far more
+      // generous one), and a rung that threw is not a screen still settling.
+      // So this adds no latency to the single-entry case.
+      const grace = last || failed ? 0 : this.reachRecheckMs;
+      // Checked even after a failure: the flow may have reached the state
+      // before dying on a later step, and escalating THERE is the exact
+      // destructive escalation this loop exists to prevent.
+      if (await this.detects(state.detect, grace)) {
+        this.log(`state ${name}`, `reached after ${flow}`);
+        return;
+      }
+    }
     await this.waitFor({ state: name }, this.ensureTimeoutMs, `state ${name} after reach flows`);
     this.log(`state ${name}`, 'reached');
   }
 
+  /**
+   * Is `detect` satisfied, within a grace window? `graceMs: 0` is a single
+   * probe — the entry check, which must be cheap, and the check after the last
+   * reach flow, which has the ensureState wait right behind it. A rung with
+   * another rung after it polls for a moment instead: a flow that just tapped
+   * its way home may need one to land, and a false miss THERE is not merely
+   * slow, it escalates to the next, possibly destructive, flow.
+   *
+   * An unreadable tree is not "in this state", and must not throw either:
+   * right after a cold launch/reinstall (no window yet) is exactly when the
+   * reach flows are needed.
+   */
+  private async detects(cond: Condition, graceMs: number): Promise<boolean> {
+    const deadline = Date.now() + graceMs;
+    for (;;) {
+      const tree = await this.adapter.uiTree().catch(() => undefined);
+      if (tree !== undefined && (await this.matches(cond, tree))) return true;
+      if (Date.now() >= deadline) return false;
+      await sleep(this.pollMs);
+    }
+  }
+
   private async runFlowInner(name: string): Promise<void> {
     const flow = this.cfg.flows[name];
-    if (!flow) throw new Error(`Unknown flow "${name}" — known: ${Object.keys(this.cfg.flows).join(', ')}`);
+    if (!flow) throw new SetupError(`Unknown flow "${name}" — known: ${Object.keys(this.cfg.flows).join(', ')}`);
     if (flow.requires) await this.ensureStateInner(flow.requires);
     this.log(`flow ${name}`, 'start');
     for (const step of flow.steps) await this.runStep(step);
@@ -174,7 +281,7 @@ export class FlowEngine {
 
   private async runLaunch(spec: StepPayload<'launch'>): Promise<void> {
     const app = this.cfg.app[this.adapter.platform];
-    if (!app) throw new Error(`averi.yaml has no app.${this.adapter.platform} section`);
+    if (!app) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
     const appId = 'package' in app ? app.package : app.bundleId;
     // Step-level activity wins over app.android.activity; neither applies on
     // iOS unless the step names one — the adapter then rejects it loudly.
@@ -192,6 +299,22 @@ export class FlowEngine {
         (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
         (spec.clearState ? ' (state cleared)' : ''),
     );
+    // The cost of a wipe is invisible at the moment it is paid, and nothing in
+    // the trace said so. The line states the MECHANISM and leaves the price to
+    // the reader: what it costs is app-specific, and averi drives any app. Be
+    // precise about the mechanism too — this deletes the app's data container
+    // (iOS) / runs `pm clear` (Android); it does not clear the iOS keychain,
+    // whatever a re-registration afterwards may suggest. The running count is
+    // process-wide on purpose: the MCP server process IS the session, and
+    // "3rd this session" is what makes a finite resource budgetable.
+    if (spec.clearState) {
+      clearStateCount++;
+      this.log(
+        '⚠ clearState',
+        'app state wiped (data container deleted) — anything the app persisted, ' +
+          `a device registration included, is gone (${clearStateCount} this session)`,
+      );
+    }
   }
 
   private async runType(spec: StepPayload<'type'>): Promise<void> {
@@ -404,7 +527,7 @@ export class FlowEngine {
     }
     if (cond.state) {
       const state = this.cfg.states[cond.state];
-      if (!state) throw new Error(`Unknown state "${cond.state}"`);
+      if (!state) throw new SetupError(`Unknown state "${cond.state}"`);
       return this.matches(state.detect, tree);
     }
     if (cond.any) {
@@ -470,7 +593,7 @@ export class FlowEngine {
           this.environment === undefined ?
             'declare it under credentials:'
           : `declare it under credentials: or environments.${this.environment}.credentials`;
-        throw new Error(`Unknown credential "$${key}" — ${where}`);
+        throw new SetupError(`Unknown credential "$${key}" — ${where}`);
       }
       const value = this.expandEnv(template, key);
       this.secrets.add(value);
@@ -493,7 +616,7 @@ export class FlowEngine {
             ` (needed for credential "${credential}"` +
             `${this.environment === undefined ? '' : ` in environment "${this.environment}"`})`
           : '';
-        throw new Error(
+        throw new SetupError(
           `Environment variable ${name} is not set${forWhom} — set it in .env.averi beside averi.yaml, or export it, and retry`,
         );
       }
@@ -513,12 +636,21 @@ export class FlowEngine {
     return out;
   }
 
-  /** All errors leave the engine redacted. */
+  /** All errors leave the engine redacted, and carrying the partial trace. */
   private async guard<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn();
     } catch (e) {
-      throw new Error(this.redact(e instanceof Error ? e.message : String(e)));
+      const message = this.redact(e instanceof Error ? e.message : String(e));
+      const trace = [...this.trace];
+      // The environment line alone is not a step — do not dress it up as one.
+      const steps = trace.filter((t) => !t.action.startsWith('environment '));
+      throw new FlowError(
+        steps.length === 0 ? message : (
+          `${message}\n\nSteps that ran before the failure:\n${formatTrace(trace)}`
+        ),
+        trace,
+      );
     }
   }
 }

@@ -155,7 +155,7 @@ states:
       any:
         - element: { id: dashboard_root }
         - element: { text: "Accounts" }
-    reach: [login]                # flows that get us there
+    reach: [login]                # flows that get us there, cheapest first
 
 flows:
   login:
@@ -193,6 +193,8 @@ flows:
 Design points:
 
 - **State detection before action.** `ensure_state` first checks `detect`; login runs only when needed. Handles the "reinstall wipes the session" case automatically, and is idempotent.
+- **`reach:` is an escalation ladder, not a script.** `detect` is re-checked after *each* flow in the list and the rest are skipped once it is satisfied, so `reach: [dismiss_post_login_prompts, login]` means "try the cheap idempotent one; escalate only if it did not work". "Did not work" covers both ways a rung can fail to deliver: completing without reaching the state, and *throwing* — a cheap prelude typically fails by timing out on a `tap:` for an interstitial that was not there, and aborting the ladder on that would leave the prelude working only on the runs that did not need it. A thrown rung is never swallowed: it is logged as `⚠ reach <flow>` with the reason, and the last rung's failure still fails the call. This is load-bearing, not a nicety: before it, listing a cheap flow ahead of a destructive one *guaranteed* the destructive one also ran — a `launch { clearState: true }` login burning a device registration on a session that was already alive, because one post-login interstitial defeated `detect` for a single probe (2026-08-26). Order the list cheapest-first.
+- **Failures carry their trace.** A flow that throws attaches the steps that already ran to the error message (`FlowError`). A bare "Timed out after 20000ms waiting for state logged_in" cannot tell you which reach flow ran, how far it got, or what it cost; the trace can, and it exists either way.
 - **`branch` + `optional`** absorb the two realities of real apps: different login paths (fresh vs. returning) and random interstitials (rating prompts, promos, biometric sheets).
 - **Secrets** are referenced (`${ENV}` or `keychain:` URIs), never stored. Server redacts them from logs and from anything echoed back to the agent — the agent never sees the actual PIN, it just calls the flow.
 - Platform overrides per step where needed: `ios: { tap: {...} }`.
@@ -216,7 +218,7 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 | `tap / swipe / type_text / press_key` | Low-level escape hatch for ad-hoc exploration |
 | `assert(spec)` | Declarative check: element exists/absent, text matches, rect geometry vs Figma-frame values (`rect` spec — deltas in % of screen width, `y` measured but never failed), fill color vs an expected hex (`color` spec — CIEDE2000 over the element's sampled region, default dE 8; hex only, token names resolve upstream), screenshot-diff vs. baseline < threshold |
 | `verify(platforms?, state?, flow?, asserts, contract?)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; legs always android-then-ios), returns per-platform screenshots + assert results; `contract` (layout-contract JSON) appends a per-anchor `## rect parity` geometry table, anchors carrying `bg`/`bg_dark`/`sample` add a `## color parity` table sampled from the legs' own screenshots (CIEDE2000: android-vs-ios primary at `tolerance_de` 8, vs-contract at 1.5×), and anchors carrying `text`/`text_dynamic` add a `## text parity` table reading the RENDERED copy and ink height back off those same screenshots with OCR (`tolerance_size_pct` 10) — numbers over impressions |
-| `get_logs(platform, since)` | Crash/exception scan (logcat, os_log) |
+| `get_logs(platform, since, grep?, maxLines?)` | Crash/exception scan (logcat, os_log). Returns the last `maxLines` matching lines (default 400), headed by how many the grep matched and how many are shown — a `grep` alone is not a token budget |
 | `record_flow(name)` *(v2)* | Watch manual/agent interaction, emit a draft flow YAML |
 
 Verification philosophy: three tiers, cheapest first — (1) AX-tree asserts (fast, deterministic), (2) screenshot to the agent's own vision (semantic judgment), (3) pixel-diff vs. stored baseline (regression). The tool provides all three; the skill teaches when to use which.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, scrollUntilVisible } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, resetClearStateCount, scrollUntilVisible } from '../../src/flow/engine.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
@@ -74,6 +74,7 @@ function buildScreens() {
 }
 
 beforeEach(() => {
+  resetClearStateCount();
   process.env.TEST_USER = 'alice@bank.md';
   process.env.TEST_PASSWORD = 'hunter2secret';
   process.env.TEST_PIN = '1234';
@@ -104,7 +105,7 @@ describe('ensureState', () => {
     });
     const trace = await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
     expect(fake.taps).toEqual(['pin_key_1', 'pin_key_2', 'pin_key_3', 'pin_key_4']);
-    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached' });
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
   });
 
   it('fresh install: full login branch with PIN set + confirm', async () => {
@@ -329,6 +330,257 @@ flows:
   });
 });
 
+describe('reach: is an escalation ladder, not a script', () => {
+  // The 2026-08-26 finding: a cheap, idempotent prelude cannot protect a
+  // destructive flow behind it if every rung runs unconditionally.
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+
+  const screens = () => {
+    resetLayout();
+    return {
+      biometrics_prompt: screen(el({ role: 'button', identifier: 'not_now' })),
+      dashboard: screen(el({ identifier: 'dashboard_root' })),
+    };
+  };
+
+  it('stops at the first reach flow that satisfies detect — the destructive one never runs', async () => {
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
+      if (id === 'not_now') self.current = 'dashboard';
+    });
+    const trace = await new FlowEngine(cfg, fake, FAST).ensureState('logged_in');
+    expect(fake.taps).toEqual(['not_now']);
+    expect(fake.launches).toEqual([]); // no clearState → no burned device registration
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after dismiss_prompt' });
+  });
+
+  it('escalates to the next flow when the cheap one did not get there', async () => {
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt'); // tapping changes nothing
+    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
+    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
+    expect(fake.taps).toEqual(['not_now']);
+    expect(fake.launches).toEqual([
+      { appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined },
+    ]);
+  });
+
+  it('escalates when the cheap flow THROWS, and says so in the trace', async () => {
+    // The everyday shape: the prelude taps an interstitial that is not there,
+    // so its `tap:` times out. Aborting the ladder here would mean the prelude
+    // only works on the runs that did not need it.
+    const noPrompt = { ...screens(), biometrics_prompt: screen(el({ identifier: 'something_else' })) };
+    const fake = new FakeAdapter(noPrompt, 'biometrics_prompt');
+    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
+    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
+    // it did not stop at the failed rung — login ran
+    expect(fake.launches).toEqual([
+      { appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined },
+    ]);
+  });
+
+  it('does not swallow the failed rung — the trace names it and the escalation', async () => {
+    const noPrompt = { ...screens(), biometrics_prompt: screen(el({ identifier: 'something_else' })) };
+    const fake = new FakeAdapter(noPrompt, 'biometrics_prompt');
+    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
+    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const entry = (error as FlowError).trace.find((t) => t.action.startsWith('\u26a0 reach'));
+    expect(entry?.action).toBe('\u26a0 reach dismiss_prompt');
+    expect(entry?.detail).toMatch(/failed, escalating to login — /);
+  });
+
+  it('a rung that threw AFTER reaching the state does not escalate', async () => {
+    // The trap the escalation could re-open: the prelude gets home and then
+    // dies on a later step. Escalating there runs the destructive flow on a
+    // session that is already fine — the original finding, one level deeper.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+      - tap: { id: never_there }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
+      if (id === 'not_now') self.current = 'dashboard';
+    });
+    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    expect(fake.launches).toEqual([]);
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after dismiss_prompt' });
+  });
+
+  it('a CONFIG mistake in a rung aborts the ladder — it must not buy a wipe', async () => {
+    // Escalation is for "the cheap flow did not fit the screen". An undeclared
+    // credential is not that: the destructive flow cannot fix it and usually
+    // hits it too, so escalating would wipe app state to re-run a step that
+    // could never have worked. Measured before this rule: it did exactly that.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [prelude, login]
+flows:
+  prelude:
+    steps:
+      - type: { value: $nonexistent }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt');
+    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
+    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Unknown credential "\$nonexistent"/);
+    expect(fake.launches).toEqual([]);
+  });
+
+  it('an unset environment variable aborts the ladder for the same reason', async () => {
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+credentials:
+  token: "\${AVERI_TEST_MISSING_VAR}"
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [prelude, login]
+flows:
+  prelude:
+    steps:
+      - type: { value: $token }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt');
+    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
+    await expect(engine.ensureState('logged_in')).rejects.toThrow(/AVERI_TEST_MISSING_VAR is not set/);
+    expect(fake.launches).toEqual([]);
+  });
+
+  it('gives the between-flows detect a grace window instead of one probe', async () => {
+    // The screen lands two polls after the flow returns: a single probe would
+    // miss it and escalate straight into the destructive flow.
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
+      if (id !== 'not_now') return;
+      let probes = 0;
+      const orig = self.uiTree.bind(self);
+      self.uiTree = async () => {
+        if (++probes > 2) self.current = 'dashboard';
+        return orig();
+      };
+    });
+    const trace = await new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 200 }).ensureState('logged_in');
+    expect(fake.launches).toEqual([]);
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after dismiss_prompt' });
+  });
+});
+
+describe('a failing flow carries its trace', () => {
+  it('appends the steps that ran to the error message, and keeps them structured', async () => {
+    // The PIN keypad accepts the taps but the app never advances — the shape
+    // of the finding: a timeout whose message alone says nothing about how far
+    // the reach flow got.
+    const fake = new FakeAdapter(buildScreens(), 'pin_login');
+    const engine = new FlowEngine(CONFIG, fake, FAST);
+    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FlowError);
+    const { message, trace } = error as FlowError;
+    expect(message).toMatch(/Timed out after \d+ms waiting for state logged_in/);
+    expect(message).toMatch(/Steps that ran before the failure:/);
+    expect(message).toMatch(/flow login: start/);
+    expect(message).toMatch(/type_pin/);
+    expect(trace).toContainEqual({ action: 'flow login', detail: 'start' });
+  });
+
+  it('redacts credentials in the attached trace, exactly as on the success path', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    const error = await new FlowEngine(CONFIG, fake, FAST).runFlow('login').catch((e: unknown) => e);
+    expect((error as Error).message).not.toContain('hunter2secret');
+    expect((error as Error).message).toContain('type: ***');
+  });
+
+  it('does not dress the environment line up as a step when nothing else ran', async () => {
+    // Needs a config that actually LOGS an environment line, or the filter it
+    // is testing is never reached and the assertion holds for the wrong reason.
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+defaultEnvironment: staging
+environments:
+  staging: { credentials: { username: "\${TEST_USER}" } }
+flows:
+  noop:
+    steps:
+      - launch: {}
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const error = await new FlowEngine(cfg, fake, FAST).runFlow('nope').catch((e: unknown) => e);
+    // the environment line WAS logged — the filter is what keeps it out
+    expect((error as FlowError).trace).toEqual([
+      { action: 'environment staging', detail: 'overrides: username' },
+    ]);
+    expect((error as Error).message).toMatch(/^Unknown flow "nope"/);
+    expect((error as Error).message).not.toContain('Steps that ran');
+  });
+});
+
+describe('clearState announces its cost', () => {
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  cold:
+    steps:
+      - launch: { clearState: true }
+  warm:
+    steps:
+      - launch: { clearState: false }
+`);
+
+  it('warns on the wipe and counts them across the session', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const engine = new FlowEngine(cfg, fake, FAST);
+    const first = await engine.runFlow('cold');
+    expect(first).toContainEqual({
+      action: '\u26a0 clearState',
+      detail:
+        'app state wiped (data container deleted) — anything the app persisted, ' +
+        'a device registration included, is gone (1 this session)',
+    });
+    // A second tool call is a fresh engine; the count is the SESSION's, which
+    // is the only scale at which a finite resource can be budgeted.
+    const second = await new FlowEngine(cfg, fake, FAST).runFlow('cold');
+    expect(second.at(-2)?.detail).toContain('(2 this session)');
+  });
+
+  it('stays silent when the launch preserves state', async () => {
+    const trace = await new FlowEngine(cfg, new FakeAdapter(buildScreens(), 'dashboard'), FAST).runFlow('warm');
+    expect(trace.some((t) => t.action.includes('clearState'))).toBe(false);
+  });
+});
+
 describe('launch step', () => {
   it('defaults to app.android.activity; a step-level activity + intent wins', async () => {
     const cfg = parseConfig(`
@@ -408,7 +660,7 @@ flows:
     failingTree(fake, 1); // exactly the first probe fails — the cold-launch case
     const trace = await new FlowEngine(cfg, fake, FAST).ensureState('home');
     expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
-    expect(trace).toContainEqual({ action: 'state home', detail: 'reached' });
+    expect(trace).toContainEqual({ action: 'state home', detail: 'reached after warm' });
   });
 
   it('scroll_until reports the read failure instead of "element never appeared"', async () => {
