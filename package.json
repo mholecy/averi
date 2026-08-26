@@ -1,6 +1,6 @@
 {
   "name": "averi",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "MCP server for verifying mobile app changes on iOS Simulators and Android Emulators",
   "type": "module",
   "bin": {
