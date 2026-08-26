@@ -33,11 +33,12 @@ import {
   runVerification,
 } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
+import { packageVersion } from '../util/version.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
 const registry = new AdapterRegistry();
 
-const server = new McpServer({ name: 'averi', version: '0.0.1' });
+const server = new McpServer({ name: 'averi', version: await packageVersion() });
 
 const registerTool: typeof server.registerTool = server.registerTool.bind(server);
 
