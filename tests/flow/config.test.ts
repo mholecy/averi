@@ -89,6 +89,28 @@ flows:
     ).toThrow(/unknown flow "nope"/);
   });
 
+  it('rejects unknown references nested inside branch arms and optional', () => {
+    // The nested walk is shared with the engine's destructiveness check
+    // (`childSteps`); a container kind dropped from it silently stops being
+    // validated here, which is the half that fails quietly.
+    expect(() =>
+      parseConfig(
+        'app: {}\nflows:\n  f:\n    steps:\n      - optional:\n' +
+          '          - branch:\n              - when: { element: { id: x } }\n' +
+          '                do: [ { wait: { state: nope } } ]\n',
+      ),
+    ).toThrow(/unknown state "nope"/);
+  });
+
+  it('validates branch conditions nested inside a platform override', () => {
+    expect(() =>
+      parseConfig(
+        'app: {}\nflows:\n  f:\n    steps:\n      - android:\n' +
+          '          branch:\n            - when: { state: nope }\n              do: [ { swipe: { direction: up } } ]\n',
+      ),
+    ).toThrow(/unknown state "nope"/);
+  });
+
   it('rejects waits on unknown states', () => {
     expect(() =>
       parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - wait: { state: nope }\n'),

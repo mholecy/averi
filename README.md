@@ -59,12 +59,17 @@ flowchart LR
     E -- yes --> C
     E -- no --> G{"another reach: flow?"}
     G -- yes --> D
-    G -- no --> F(["fail — error carries the trace"])
+    G -- no --> H["re-run the repeatable<br/>rungs once (recovery)"]
+    H --> I{"detect: matches now?"}
+    I -- yes --> C
+    I -- no --> F(["fail — error carries the trace"])
 ```
 
 Idempotent — the agent calls it freely; it costs ~1 second when the app is already there.
 
 `reach:` is a ladder, so order it cheapest-first: `detect` is re-checked after every flow and the rest are skipped once it matches. `reach: [dismiss_post_login_prompts, login]` reads as "try the cheap idempotent dismissal; fall back to a full login only if that did not get us there" — and that is what it does, including when the cheap flow *fails* (its `tap:` times out because the interstitial was not there). A failed rung escalates to the next one and is reported in the trace as `⚠ reach <flow>`; only the last rung's failure fails the call.
+
+The ladder also runs backwards once, at the end. The last rung's own aftermath can produce a screen that an *earlier* rung exists to clear — a login completes, then a network-gated biometrics interstitial arrives too late for that login's `optional:` windows — and a forward-only ladder would fail there while an immediately repeated call succeeded. So when the final wait times out, averi re-runs the earlier rungs **once** (`↻ recovery` in the trace) and re-checks. Only rungs it can prove are repeatable take part: a `launch { clearState: true }` anywhere in a flow, or reachable through its `requires:`, or a flow marked `destructive: true`, is never re-run: the recovery pass adds no wipes to what the ladder already spent. If the state is still not reached, the call fails with the original timeout.
 
 ### The yaml is code
 

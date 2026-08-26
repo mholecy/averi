@@ -258,7 +258,26 @@ const configSchema = z
       .default({}),
     flows: z
       .record(
-        z.object({ requires: z.string().optional(), steps: z.array(step).min(1) }).strict(),
+        z
+          .object({
+            requires: z.string().optional(),
+            /**
+             * Marks a flow as unrepeatable, which keeps it out of the reach
+             * ladder's recovery pass (`flowIsDestructive`, below). It is
+             * already inferred from `launch { clearState: true }`;
+             * the flag is for the kinds a static walk cannot see — a flow that
+             * taps through "log out", consumes a one-shot SMS code, or deletes
+             * something server-side is just as unrepeatable as a wipe.
+             *
+             * `true` is the only accepted value: the flag can only ADD to what
+             * the engine infers, never subtract. `destructive: false` on a
+             * flow that wipes would read like an override and silently be
+             * none, so it is rejected at parse time instead.
+             */
+            destructive: z.literal(true).optional(),
+            steps: z.array(step).min(1),
+          })
+          .strict(),
       )
       .default({}),
   })
@@ -428,6 +447,97 @@ export async function loadEnvBeside(configPath: string): Promise<string[]> {
 }
 
 /** Cross-reference checks zod can't express: state/flow names must exist. */
+/**
+ * The steps nested inside a step, or `undefined` if this kind holds none.
+ *
+ * The single place that knows which kinds are containers. Three walks over
+ * Step depend on that: the engine's dispatcher, the reference check below, and
+ * `stepsAreDestructive`. The dispatcher must stay hand-written — it is a
+ * discriminated switch with a different return per kind, and it throws on an
+ * unhandled one — but the two recursive walks are pure structure, and having
+ * them re-derive the nesting independently is how a container kind added later
+ * gets covered in one of them and silently skipped in the other.
+ */
+export function childSteps(step: Step): Step[] | undefined {
+  if ('android' in step || 'ios' in step) {
+    const o = step as { android?: Step; ios?: Step };
+    return [o.android, o.ios].filter((v): v is Step => v !== undefined);
+  }
+  if ('branch' in step) return step.branch.flatMap((arm) => arm.do);
+  if ('optional' in step) return step.optional;
+  return undefined;
+}
+
+/**
+ * Does this flow do something a second run cannot undo? The mechanical answer
+ * is `launch { clearState: true }` anywhere in its steps — the wipe that burns
+ * a device registration — and `destructive: true` covers what a static walk
+ * cannot see.
+ *
+ * It lives here rather than in the engine because it is a property of the
+ * DESCRIPTOR, not of a run: a pure function of AveriConfig, in the same class
+ * as `validateReferences` and reading the same schema. The engine owns the
+ * mechanism (re-run a rung, re-check detect); this owns the policy (which
+ * rungs may be re-run at all).
+ *
+ * It is deliberately conservative: an unknown flow, or a `requires` cycle,
+ * counts as destructive. The only thing it gates is whether a rung may be
+ * re-run in the recovery pass, so "cannot prove it is safe" must land on the
+ * side of not re-running it — that is exactly the pre-recovery behaviour,
+ * which is merely slower, not more expensive.
+ *
+ * `requires` is followed because it pulls in a whole other reach ladder: a
+ * one-step prelude that requires a state whose only way in is a `clearState`
+ * login is not a cheap flow, however cheap its own steps read.
+ */
+export function flowIsDestructive(
+  cfg: AveriConfig,
+  name: string,
+  stack: Set<string> = new Set(),
+): boolean {
+  const flow = cfg.flows[name];
+  if (flow === undefined || stack.has(`flow:${name}`)) return true;
+  if (flow.destructive === true) return true;
+  const next = new Set(stack).add(`flow:${name}`);
+  if (flow.requires !== undefined && stateReachIsDestructive(cfg, flow.requires, next)) return true;
+  return stepsAreDestructive(flow.steps);
+}
+
+function stateReachIsDestructive(cfg: AveriConfig, name: string, stack: Set<string>): boolean {
+  if (stack.has(`state:${name}`)) return true;
+  const next = new Set(stack).add(`state:${name}`);
+  return (cfg.states[name]?.reach ?? []).some((flow) => flowIsDestructive(cfg, flow, next));
+}
+
+/**
+ * A wipe hidden in a branch arm still wipes. Note which way the fallthrough
+ * points: containers recurse through `childSteps`, every SAFE leaf is named,
+ * and anything left over is destructive. This is the one walk over Step whose
+ * default is load-bearing — the dispatcher throws on an unhandled kind (loud)
+ * and `checkSteps` merely skips one (a missed reference check), but a silent
+ * skip HERE would call a `clearState` nested inside a later step kind safe to
+ * repeat, and the recovery pass would run the wipe twice. So a kind added to
+ * Step without a case here costs a skipped recovery — slower, exactly the
+ * pre-2026-08-26 behaviour — never a wipe.
+ */
+function stepsAreDestructive(steps: Step[]): boolean {
+  return steps.some((step) => {
+    if ('launch' in step) return step.launch.clearState === true;
+    const children = childSteps(step);
+    if (children !== undefined) return stepsAreDestructive(children);
+    return !(
+      'tap' in step ||
+      'type' in step ||
+      'type_pin' in step ||
+      'swipe' in step ||
+      'scroll_until' in step ||
+      'fill' in step ||
+      'assert' in step ||
+      'wait' in step
+    );
+  });
+}
+
 function validateReferences(cfg: AveriConfig, source: string): void {
   const fail = (msg: string) => {
     throw new Error(`Invalid ${source}: ${msg}`);
@@ -443,17 +553,12 @@ function validateReferences(cfg: AveriConfig, source: string): void {
       if ('wait' in s && s.wait.state !== undefined && !(s.wait.state in cfg.states)) {
         fail(`${where} waits for unknown state "${s.wait.state}"`);
       }
-      if ('branch' in s) {
-        s.branch.forEach((arm) => {
-          checkCondition(arm.when, where);
-          checkSteps(arm.do, where);
-        });
-      }
-      if ('optional' in s) checkSteps(s.optional, where);
-      if ('android' in s || 'ios' in s) {
-        const o = s as { android?: Step; ios?: Step };
-        checkSteps([o.android, o.ios].filter((v): v is Step => v !== undefined), where);
-      }
+      // Branch arms carry a condition of their own; the nested STEPS of every
+      // container kind come from the shared walker, so this cannot drift from
+      // `stepsAreDestructive`.
+      if ('branch' in s) s.branch.forEach((arm) => checkCondition(arm.when, where));
+      const children = childSteps(s);
+      if (children !== undefined) checkSteps(children, where);
     }
   };
   if (cfg.defaultEnvironment !== undefined && !(cfg.defaultEnvironment in (cfg.environments ?? {}))) {
