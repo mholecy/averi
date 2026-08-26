@@ -37,8 +37,13 @@ const n = (partial: Partial<UiNode>): UiNode => ({
   ...partial,
 });
 
-const root = (width: number, children: UiNode[]): UiNode =>
-  n({ role: 'container', rect: { x: 0, y: 0, width, height: width * 2 }, children });
+/**
+ * Height defaults to a REAL phone aspect (402x874pt / 1080x2348px, 2.174),
+ * not a round 2x: the png scale is now cross-checked against the window's
+ * own aspect, so a fictional root would fail closed for the right reason.
+ */
+const root = (width: number, children: UiNode[], height = Math.round(width * 2.174)): UiNode =>
+  n({ role: 'container', rect: { x: 0, y: 0, width, height }, children });
 
 const text = (id: string | null, label: string, rect = { x: 0, y: 0, width: 100, height: 20 }): UiNode =>
   n({ role: 'text', identifier: id, label, rect });
@@ -453,9 +458,26 @@ describe('ocrRegionsFor', () => {
     expect(ocrRegionsFor(c, ios, 1206, 2622)).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
   });
 
-  it('returns nothing when the scale cannot be derived — never a bogus region', () => {
+  it('THROWS when the scale cannot be derived — an empty list would read as "no text anchors"', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
-    expect(ocrRegionsFor(c, root(402, [n({ identifier: 'cta' })]), 0, 800)).toEqual([]);
+    expect(() => ocrRegionsFor(c, root(402, [n({ identifier: 'cta' })]), 0, 800)).toThrow(
+      /degenerate dimensions 0x800/,
+    );
+  });
+
+  it('THROWS rather than cropping by a width an off-viewport node inflated (2026-08-26)', () => {
+    // The measured shape: a modal sheet up, iOS keeping a sibling parked one
+    // screen to the right. Scaling by 804 would crop at 45% of the height.
+    const c = contract([{ id: 'cta', text: 'APPLY' }]);
+    const sheet = root(402, [
+      n({ identifier: 'cta', rect: { x: 208, y: 791, width: 176, height: 44 } }),
+      n({ rect: { x: 402, y: 0, width: 402, height: 874 } }),
+    ]);
+    expect(ocrRegionsFor(c, sheet, 1206, 2622)).toEqual([{ id: 'cta', x: 624, y: 2373, w: 528, h: 132 }]);
+
+    // Same tree with the window itself inflated — no root to fall back on.
+    const broken = root(804, [n({ identifier: 'cta', rect: { x: 208, y: 791, width: 176, height: 44 } })], 874);
+    expect(() => ocrRegionsFor(c, broken, 1206, 2622)).toThrow(/do not describe the same screen/);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
-import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
+import { collectRects } from '../ui-tree/geometry.js';
+import { pngScale } from './scale.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -239,8 +240,6 @@ export interface ColorPlatformStats {
   pngHeight: number;
   rootWidth: number;
   scale: number;
-  /** False when the widest rect starts inset — filtered tree, content width. */
-  reliable: boolean;
   /** Any alpha < 255 in the png — alpha is ignored, RGB used as stored. */
   translucent: boolean;
 }
@@ -309,12 +308,9 @@ const SCALE_SANE_MAX = 4.0;
  */
 function statsFor(platform: Platform, capture: ColorCapture): ColorPlatformStats {
   const { tree, png } = capture;
-  const { width: rootWidth, reliable } = inferScreenWidth(tree);
-  if (rootWidth <= 0) {
-    throw new Error(`color parity: ${platform} tree has no usable width — cannot derive a png scale; failing closed.`);
-  }
-  if (!Number.isFinite(png.width) || png.width <= 0 || !Number.isFinite(png.height) || png.height <= 0) {
-    throw new Error(`color parity: ${platform} screenshot has degenerate dimensions ${png.width}x${png.height}; failing closed.`);
+  const scaled = pngScale(tree, png.width, png.height);
+  if (scaled.error !== undefined) {
+    throw new Error(`color parity: ${platform}: ${scaled.error}; failing closed.`);
   }
   let translucent = false;
   for (let o = 3; o < png.data.length; o += 4) {
@@ -327,9 +323,8 @@ function statsFor(platform: Platform, capture: ColorCapture): ColorPlatformStats
     platform,
     pngWidth: png.width,
     pngHeight: png.height,
-    rootWidth,
-    scale: png.width / rootWidth,
-    reliable,
+    rootWidth: scaled.width,
+    scale: scaled.scale,
     translucent,
   };
 }
@@ -544,7 +539,6 @@ export function formatColorParity(r: ColorParityResult): string {
     if (s.scale < SCALE_SANE_MIN || s.scale > SCALE_SANE_MAX) {
       line += `   ! scale outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`;
     }
-    if (!s.reliable) line += '   ! FILTERED tree (widest rect not at x=0) — scale may be a content width';
     if (s.translucent) line += '   ! alpha<255 pixels present — alpha ignored, RGB used as stored';
     lines.push(line);
   }
@@ -651,19 +645,11 @@ export function evaluateColorAssert(
   png: RgbaImage,
 ): { pass: boolean; detail: string } {
   const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
-  const { width, reliable } = inferScreenWidth(tree);
-  if (width <= 0) {
-    return {
-      pass: false,
-      detail:
-        'screen width could not be inferred (the widest rect in the tree is 0 wide) — ' +
-        'cannot derive the png scale; failing closed, color unchecked',
-    };
+  const scaled = pngScale(tree, png.width, png.height);
+  if (scaled.error !== undefined) {
+    return { pass: false, detail: `${scaled.error}; failing closed, color unchecked` };
   }
-  if (!Number.isFinite(png.width) || png.width <= 0) {
-    return { pass: false, detail: `screenshot has degenerate width ${png.width}; failing closed, color unchecked` };
-  }
-  const scale = png.width / width;
+  const scale = scaled.scale;
   const got = scaledRegion(rect, scale, png);
   if (got === undefined) {
     return {
@@ -688,7 +674,6 @@ export function evaluateColorAssert(
   if (s.share < 0.4) {
     notes.push(`dominant bucket covers only ${Math.round(s.share * 100)}% of the region — busy content; consider sample: "patches"`);
   }
-  if (!reliable) notes.push('screen width UNRELIABLE (widest rect starts inset — filtered tree?)');
   if (scale < SCALE_SANE_MIN || scale > SCALE_SANE_MAX) {
     notes.push(`scale ${scale.toFixed(3)} outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`);
   }

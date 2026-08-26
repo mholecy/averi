@@ -335,7 +335,7 @@ describe('compareColorParity — failing closed', () => {
   it('throws on a tree with no usable width (never a vacuous pass)', () => {
     const captures = capturePair(WHITE, WHITE);
     captures.android.tree = n({ children: [n({ identifier: 'card' })] }); // all rects 0-sized
-    expect(() => compareColorParity(cardContract(), captures)).toThrow(/no usable width/);
+    expect(() => compareColorParity(cardContract(), captures)).toThrow(/width could not be inferred/);
   });
 
   it('throws on a degenerate screenshot and on an invalid tolerance_de', () => {
@@ -347,14 +347,20 @@ describe('compareColorParity — failing closed', () => {
     expect(() => compareColorParity(cardContract(), {})).toThrow(/no platform capture/);
   });
 
-  it('flags an insane scale and a filtered tree in the stats line', () => {
+  it('flags an insane scale in the stats line', () => {
     const captures = capturePair(WHITE, WHITE);
     // png 200 wide but root claims 25 → scale 8, outside [0.5, 4].
-    captures.android.tree = root(25, 400, [leaf('card', 2, 2, 12, 8)], 5);
+    captures.android.tree = root(25, 400, [leaf('card', 2, 2, 12, 8)]);
     const r = compareColorParity(cardContract(), captures);
-    const out = formatColorParity(r);
-    expect(out).toContain('! scale outside [0.5, 4]');
-    expect(out).toContain('! FILTERED tree');
+    expect(formatColorParity(r)).toContain('! scale outside [0.5, 4]');
+  });
+
+  it('throws on a filtered tree rather than scaling by a content width', () => {
+    // Root inset at x=5 → not a window, and the widest rect is inset too, so
+    // the width is the CONTENT width. It used to be a note on a passing table.
+    const captures = capturePair(WHITE, WHITE);
+    captures.android.tree = root(25, 400, [leaf('card', 2, 2, 12, 8)], 5);
+    expect(() => compareColorParity(cardContract(), captures)).toThrow(/CONTENT width/);
   });
 
   it('notes alpha<255 pixels (alpha ignored, RGB used as stored)', () => {

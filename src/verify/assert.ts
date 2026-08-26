@@ -361,9 +361,9 @@ export class Verifier {
         const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
         try {
           const png = PNG.sync.read(shot);
-          const region = ocrRegionForRect('element', found[0].rect, tree, png.width, png.height);
+          const { region, error } = ocrRegionForRect('element', found[0].rect, tree, png.width, png.height);
           if (region === undefined) {
-            return { pass: false, detail: 'element rect or screen width is degenerate — cannot crop; failing closed' };
+            return { pass: false, detail: `${error}; failing closed, rendered text unchecked` };
           }
           const [result] = await engine.recognize(shot, [region]);
           if (result?.error !== undefined) return { pass: false, detail: result.error };

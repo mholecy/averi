@@ -1,5 +1,6 @@
 import type { Platform, UiNode } from '../adapters/types.js';
-import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
+import { collectRects } from '../ui-tree/geometry.js';
+import { pngScale } from './scale.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import type { OcrLine, OcrRegion, OcrRegionResult } from './ocr.js';
@@ -226,6 +227,11 @@ function hasAccessibleName(tree: UiNode, id: string): boolean {
  * the recognizer then reads a different string. Rects ARE clamped to the png
  * (see ocrRegionForRect); anchors fully outside it are omitted and surface as
  * OCR-less rows.
+ *
+ * THROWS when the SCALE itself is unusable — that is a whole-capture fault,
+ * not a per-anchor one, so returning an empty list would read to the caller as
+ * "this screen has no text anchors" and quietly drop the entire text table.
+ * run/verify.ts contains the throw as a per-platform note.
  */
 export function ocrRegionsFor(
   contract: LayoutContract,
@@ -233,22 +239,25 @@ export function ocrRegionsFor(
   pngWidth: number,
   pngHeight: number,
 ): OcrRegion[] {
+  const scaled = pngScale(tree, pngWidth, pngHeight);
+  if (scaled.error !== undefined) throw new Error(`text parity: ${scaled.error}; failing closed`);
   const rects = collectRects(tree);
   const regions: OcrRegion[] = [];
   for (const anchor of contract.anchors) {
     if (!wantsTextCheck(anchor)) continue;
     const rect = rects.get(anchor.id);
     if (rect === undefined) continue;
-    const region = ocrRegionForRect(anchor.id, rect, tree, pngWidth, pngHeight);
+    const region = regionForRect(anchor.id, rect, scaled.scale, pngWidth, pngHeight);
     if (region !== undefined) regions.push(region);
   }
   return regions;
 }
 
 /**
- * One rect scaled into png pixels and CLAMPED to the image. Returns undefined
- * when the scale cannot be derived or nothing of the rect is on-screen — the
- * caller must then report why, never silently pass.
+ * One rect scaled into png pixels and CLAMPED to the image, or the reason
+ * there is no region — the caller must report that reason, never silently
+ * pass. Discriminated so `{}` cannot type-check: a caller that reads `error`
+ * after a failed `region` check always has a string, never "undefined".
  *
  * Clamping is not cosmetic. iOS keeps off-viewport nodes in the tree with
  * negative or oversized rects; handed one of those unclamped, `CGImage`
@@ -262,11 +271,23 @@ export function ocrRegionForRect(
   tree: UiNode,
   pngWidth: number,
   pngHeight: number,
+): { region: OcrRegion; error?: undefined } | { region?: undefined; error: string } {
+  const scaled = pngScale(tree, pngWidth, pngHeight);
+  if (scaled.error !== undefined) return { error: scaled.error };
+  const region = regionForRect(id, rect, scaled.scale, pngWidth, pngHeight);
+  return region === undefined
+    ? { error: `element rect ${rect.x},${rect.y} ${rect.width}x${rect.height} scaled by ${scaled.scale.toFixed(3)} leaves nothing on-screen` }
+    : { region };
+}
+
+/** The scaled-and-clamped crop itself, shared by both callers above. */
+function regionForRect(
+  id: string,
+  rect: UiNode['rect'],
+  scale: number,
+  pngWidth: number,
+  pngHeight: number,
 ): OcrRegion | undefined {
-  const { width } = inferScreenWidth(tree);
-  if (width <= 0 || !Number.isFinite(pngWidth) || pngWidth <= 0) return undefined;
-  if (!Number.isFinite(pngHeight) || pngHeight <= 0) return undefined;
-  const scale = pngWidth / width;
   const x0 = Math.max(0, Math.round(rect.x * scale));
   const y0 = Math.max(0, Math.round(rect.y * scale));
   const x1 = Math.min(pngWidth, Math.round((rect.x + rect.width) * scale));
