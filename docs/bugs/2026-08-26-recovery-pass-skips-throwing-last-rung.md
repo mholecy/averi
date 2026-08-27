@@ -87,9 +87,11 @@ load-bearing), the detect re-check, the `SetupError` abort, the destructiveness 
 the throw path, the original error surviving the salvage, and (added after review) the ORDER of the
 two probes.
 
-Mutation-tested: reverting the fix fails 3, dropping the salvage detect fails 1, dropping the
-destructiveness filter fails 5 (4 pre-existing + the new throw-path one), dropping the `SetupError`
-exemption fails 3. Full suite 492/492, lint and typecheck clean.
+Mutation-tested — counts re-measured 2026-08-27, AFTER the order test below was added, because
+adding it moved two of them: reverting the fix fails 4, dropping the salvage detect fails 2,
+dropping the destructiveness filter fails 5 (4 pre-existing + the new throw-path one), dropping the
+`SetupError` exemption fails 3, swapping the two probes fails the order test and nothing else. Six
+new tests; the suite went 487 → 493 at commit `0b430e9`. Lint and typecheck clean.
 
 Docs corrected where they described the pass as arming on the final wait: README.md, ARCHITECTURE.md
 §4, skill/SKILL.md.
@@ -137,3 +139,34 @@ crashes to the launcher would now report `reached`, where 0.5.0 failed loudly. T
 existing post-failure re-check semantics, which every non-last rung already has; the fix widens the
 exposure to one more path rather than creating it. Narrowing it is a decision about what `absent:`
 means in a `detect`, not about this fix.
+
+## Third review round (2026-08-27) — the response invalidated its own evidence
+
+A third Fable 5 agent reviewed the changes made in response to the first two rounds. The engine came
+back clean: `headline()` is byte-equivalent at both sites and no other first-line munging in `src/`
+was left behind, the `lateInterstitial` hoist is self-resetting with no shared state, the rewritten
+test comment is true, nothing from either earlier round was silently dropped, and the order test
+pins exactly the order — the swapped mutant fails it and only it, and no mutation could be
+constructed that it claims to catch but does not.
+
+What it caught is this repo's signature third-round defect wearing a new face: **the review response
+invalidated the evidence the review response was reported with.** Adding the order test changed two
+of the five mutation-kill counts (3 → 4, 1 → 2) and the suite total, and the pre-response numbers
+shipped anyway — in this document and in the commit message. Re-measured and corrected above. The
+commit message of `0b430e9` still carries them, plus a "was 492" baseline that names a mid-session
+working state rather than the parent commit (487): not worth rewriting history a release now sits
+on, but wrong in the record, and noted here instead.
+
+The lesson generalises past this fix: a mutation count is a measurement of a test suite at an
+instant, so any later test invalidates every count taken before it. Re-measure after the last test
+lands, not after the last source change.
+
+Also acted on: `recoveryPass`'s doc comment still promised the caller "the original timeout" though
+this change gave it a second caller for which the original is a throw (`attempt()`'s doc had been
+updated for exactly that duality, its neighbour missed); README's widened clause claimed the
+recovery pass always runs before a last-rung failure fails the call, which a `SetupError` does not;
+ARCHITECTURE's "exactly one recovery pass" is zero when every earlier rung is destructive or the
+pass is already spent. And `⚠ salvage <flow>` had become a trace token no doc explained — the
+architecture round's fix for the same word was to strike it from ARCHITECTURE.md prose while this
+round's relabel put it into the trace — so SKILL.md now names the `⚠ recovery` / `⚠ salvage`
+diagnostic family and says outright that they are never the reason a call failed.

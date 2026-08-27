@@ -303,8 +303,9 @@ export class FlowEngine {
    * nothing stops a `clearState` login from sitting at index 0 of three.
    *
    * Returns whether the state was reached; on false the caller throws the
-   * original timeout, so a genuinely stuck run fails exactly as it did before,
-   * with the attempted re-pass visible in the trace.
+   * error that armed the pass — the final wait's timeout, or the last rung's
+   * own throw — so a genuinely stuck run fails exactly as it did before, with
+   * the attempted re-pass visible in the trace.
    */
   private async recoveryPass(
     name: string,
