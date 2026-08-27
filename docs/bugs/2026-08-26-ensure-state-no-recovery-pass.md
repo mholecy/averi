@@ -115,3 +115,50 @@ in tests/flow/config.test.ts instead. Docs updated in README.md, ARCHITECTURE.md
 all described the ladder as forward-only. A third round caught that SKILL.md then overclaimed
 "at most one wipe per failing call" — false, since a rung's `requires:` chain can wipe on top of
 the last rung; the honest invariant is that the recovery pass adds none.
+
+## Verified on device against 0.5.0 (2026-08-26, later the same day) — the fix does NOT cover the production shape
+
+Re-ran the original scenario (Android emulator, `pm clear`, one `ensure_state("transaction_filter")`)
+on a fresh 0.5.0 server. Same failure as pre-fix, and **no `↻ recovery` line in the trace.** Reason,
+visible in the trace: the timeout is thrown by the `login` flow's OWN trailing step
+`wait: { state: logged_in, timeout: 20s }` — i.e. the LAST rung THROWS. `ensureStateInner` rethrows a
+throwing last rung (`if (last || e instanceof SetupError) throw e`) before ever reaching the final
+`waitFor`, which is the only place the recovery pass arms. This is the exact shape the review already
+met as the "vacuous test" (its last rung threw, so the recovery never ran) — the test was fixed, the
+engine path was not. Real-world configs commonly end a login flow with a state wait as its success
+criterion, so the shipped fix misses the very case that motivated it.
+
+Follow-up fix shape: when the LAST rung throws (not a `SetupError`), run the same bounded recovery
+pass before rethrowing — by construction it adds no wipes, so it is safe on any throw; keep the
+original error as the reported failure if recovery does not reach the state.
+
+Meanwhile the skeleton repo adopted the config mitigation (widened
+`optional: [ { tap: { text: "MAYBE LATER", timeout: 15s } } ]` inside `login`, before its trailing
+wait) and one wiped-state `ensure_state` call now converges end to end — measured 22:30, trace shows
+the tap firing inside `login`. So the skeleton no longer exercises the engine gap; the regression
+shape for it lives in this report.
+
+## Recovery pass POSITIVELY verified on device (2026-08-26, synthetic probe)
+
+The interstitial would no longer trigger naturally (its appearance is device-conditioned — it did
+not show on a factory-fresh AVD, only on the long-lived one), so the pass was probed with a
+synthetic ladder on the real app, zero registration cost: state `probe_recovery` (detect = the type
+sheet's save button), `reach: [probe_open_types, probe_open_filter]` where rung 1 needs the filter
+sheet that only rung 2 opens. One `ensure_state` call, trace:
+
+```
+⚠ reach probe_open_types: failed, escalating to probe_open_filter
+flow probe_open_filter: done                     ← last rung COMPLETED, state not reached
+↻ recovery probe_recovery: timed out — re-running probe_open_types once (a late screen may need clearing)
+flow probe_open_types: ... done
+state probe_recovery: reached after recovery probe_open_types
+```
+
+So the verdict splits cleanly: **the recovery pass works as shipped for its covered shape**
+(last rung completes; the ladder's final wait times out) — and **the one remaining gap is the
+last-rung-THROWS shape** (a trailing `wait:` inside the flow, the section above), which is what
+real login flows tend to end with. Fix that path and the original incident class is fully closed.
+
+**Closed** in `docs/bugs/2026-08-26-recovery-pass-skips-throwing-last-rung.md`: the throw path now
+runs the same bounded pass (plus the last rung's own `detect` re-check, which the rethrow also
+skipped). The incident class is fully covered.

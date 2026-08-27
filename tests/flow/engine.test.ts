@@ -499,6 +499,25 @@ flows:
   });
 });
 
+/** Screens where the interstitial exists only AFTER the destructive rung ran. */
+const lateInterstitial = () => {
+  resetLayout();
+  const screens = {
+    logged_out: screen(el({ identifier: 'login_button' })),
+    interstitial: screen(el({ role: 'button', identifier: 'not_now' })),
+    dashboard: screen(el({ identifier: 'dashboard_root' })),
+  };
+  const fake = new FakeAdapter(screens, 'logged_out', (id, self) => {
+    if (id === 'not_now') self.current = 'dashboard';
+  });
+  const launch = fake.launch.bind(fake);
+  fake.launch = async (appId, opts) => {
+    await launch(appId, opts);
+    fake.current = 'interstitial';
+  };
+  return fake;
+};
+
 describe('the ladder gets one recovery pass, over the repeatable rungs only', () => {
   // The mirror of the escalation finding, measured the same day: `login` ends,
   // the biometrics interstitial arrives a network round-trip later — after
@@ -522,25 +541,6 @@ flows:
       - launch: { clearState: true }
 `);
 
-  /** Screens where the interstitial exists only AFTER the destructive rung ran. */
-  const lateInterstitial = () => {
-    resetLayout();
-    const screens = {
-      logged_out: screen(el({ identifier: 'login_button' })),
-      interstitial: screen(el({ role: 'button', identifier: 'not_now' })),
-      dashboard: screen(el({ identifier: 'dashboard_root' })),
-    };
-    const fake = new FakeAdapter(screens, 'logged_out', (id, self) => {
-      if (id === 'not_now') self.current = 'dashboard';
-    });
-    const launch = fake.launch.bind(fake);
-    fake.launch = async (appId, opts) => {
-      await launch(appId, opts);
-      fake.current = 'interstitial';
-    };
-    return fake;
-  };
-
   it('converges in ONE call, and the destructive rung still runs exactly once', async () => {
     const fake = lateInterstitial();
     const trace = await new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
@@ -555,9 +555,9 @@ flows:
   it('never re-runs a destructive rung, even when it is not last', async () => {
     // "Non-last" is a convention about cheap preludes, not an invariant: a
     // clearState login can sit at index 0. Re-running it is a second wipe.
-    // The last rung uses `optional:` deliberately — a rung that THROWS is
-    // rethrown by the ladder and never reaches the final wait, so the recovery
-    // pass would not run at all and this test would prove nothing.
+    // The last rung uses `optional:` so it COMPLETES and the pass arms in the
+    // final wait's catch. The throwing-last-rung path reaches the same filter
+    // by its own route, and has its own case in the describe below.
     const cfg2 = parseConfig(`
 app:
   android: { package: md.bank.app }
@@ -806,6 +806,215 @@ flows:
     const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
     const trace = (error as FlowError).trace;
     expect(trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false);
+    expect(fake.launches).toHaveLength(1);
+  });
+});
+
+describe('the last rung THROWING gets the same two chances as any other rung', () => {
+  // The gap 0.5.0 shipped with, measured on device against it: the recovery
+  // pass armed only in the final wait's catch, and a throwing last rung was
+  // rethrown before ever reaching that wait. Real configs walk straight into
+  // it — a login flow's success criterion is spelled as the flow's OWN
+  // trailing `wait: { state: ... }`, so a late interstitial makes the rung
+  // throw rather than the ladder time out. Same incident, no `↻ recovery`.
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+  login:
+    steps:
+      - launch: { clearState: true }
+      - wait: { state: logged_in, timeout: 100ms }
+`);
+
+  it('converges in ONE call, and the destructive rung still runs exactly once', async () => {
+    // The previously-VACUOUS shape, now as the positive case: this is the test
+    // the 0.5.0 review found proved nothing, because the throw path skipped
+    // the pass entirely and it passed with the destructiveness filter deleted.
+    const fake = lateInterstitial();
+    const trace = await new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    expect(fake.launches).toHaveLength(1); // one wipe, not two
+    expect(fake.taps).toEqual(['not_now']); // rung 1 re-ran, after the last rung threw
+    expect(trace.find((t) => t.action === '↻ recovery logged_in')?.detail).toMatch(
+      /^login failed — re-running dismiss_prompt once/,
+    );
+    expect(trace.at(-1)).toEqual({
+      action: 'state logged_in',
+      detail: 'reached after recovery dismiss_prompt',
+    });
+  });
+
+  it('re-checks detect for the throwing rung before anything else', async () => {
+    // The smaller half of the same rethrow: the ladder re-checks `detect`
+    // after a rung that failed, because a flow can REACH the state and then
+    // die on a later step — and the last rung alone jumped over that check.
+    // Single-rung on purpose: the recovery pass has nothing to run here, so
+    // only the detect can make this pass.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login]
+flows:
+  login:
+    steps:
+      - launch: { clearState: false }
+      - tap: { id: never_there }
+`);
+    resetLayout();
+    const fake = new FakeAdapter(
+      { out: screen(el({ identifier: 'login_button' })), dashboard: screen(el({ identifier: 'dashboard_root' })) },
+      'out',
+    );
+    const launch = fake.launch.bind(fake);
+    fake.launch = async (appId, opts) => {
+      await launch(appId, opts);
+      fake.current = 'dashboard'; // the state IS reached when the trailing tap dies
+    };
+    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    expect(trace.find((t) => t.action === '⚠ reach login')?.detail).toMatch(/never_there/);
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
+  });
+
+  it('checks detect BEFORE re-running anything — the order is load-bearing', async () => {
+    // The two probes are not commutative, and getting them backwards is worse
+    // than doing nothing: the state can already be on screen when the rung
+    // dies, and a recovery rung is a real tap on a real device. Here the
+    // dashboard carries its own `not_now` banner, so a pass that runs first
+    // taps a LIVE screen and navigates off the very state that was reached —
+    // turning a success into a failure, and spending the one recovery pass to
+    // do it. Swapping the two lines in salvageThrowingLastRung survives every
+    // other test in this file.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+  login:
+    steps:
+      - launch: { clearState: false }
+      - wait: { element: { id: never_there }, timeout: 100ms }
+`);
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        logged_out: screen(el({ identifier: 'login_button' })),
+        // the banner sits ON the dashboard, and dismissing it navigates away
+        dashboard: screen(el({ identifier: 'dashboard_root' }), el({ role: 'button', identifier: 'not_now' })),
+        elsewhere: screen(el({ identifier: 'some_other_screen' })),
+      },
+      'logged_out',
+      (id, self) => {
+        if (id === 'not_now') self.current = 'elsewhere';
+      },
+    );
+    const launch = fake.launch.bind(fake);
+    fake.launch = async (appId, opts) => {
+      await launch(appId, opts);
+      fake.current = 'dashboard'; // reached, and then the rung dies on its next step
+    };
+    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
+    expect(fake.taps).toEqual([]); // nothing was touched on the live screen
+    expect(trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false); // pass still unspent
+  });
+
+  it('keeps the SetupError abort: a config mistake still buys no recovery', async () => {
+    // The ladder exempts SetupError because re-running flows cannot fix a
+    // broken descriptor. Salvage must inherit that exactly — an undeclared
+    // credential in the last rung is not something rung 1 can clear.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+  login:
+    steps:
+      - type: { value: $nonexistent }
+`);
+    const fake = lateInterstitial();
+    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
+    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/Unknown credential "\$nonexistent"/);
+    expect((error as FlowError).trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false);
+  });
+
+  it('never re-runs a destructive rung, even when the LAST rung is what threw', async () => {
+    // The filter is what makes the pass safe on a throw at all: "non-last" is
+    // a convention about cheap preludes, and a clearState login can sit at
+    // index 0. Without it this run wipes twice.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login, settle]
+flows:
+  login:
+    steps:
+      - launch: { clearState: true }
+  settle:
+    steps:
+      - wait: { state: logged_in, timeout: 100ms }
+`);
+    const fake = lateInterstitial();
+    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
+    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/waiting for state logged_in/);
+    const trace = (error as FlowError).trace;
+    expect(trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false);
+    expect(fake.launches).toHaveLength(1); // the wipe was never repeated
+  });
+
+  it('reports the failing rung, not whatever the salvage tripped over', async () => {
+    // The caller must see why the login failed. The last-ditch re-run is
+    // diagnostics and lives in the trace.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: never_there }
+  login:
+    steps:
+      - launch: { clearState: true }
+      - wait: { element: { id: nothing_like_this }, timeout: 100ms }
+`);
+    const fake = lateInterstitial();
+    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
+    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const headline = (error as Error).message.split('\n')[0];
+    expect(headline).toMatch(/nothing_like_this/); // the last rung's own failure
+    expect(headline).not.toMatch(/never_there/); // not the salvage's
+    const trace = (error as FlowError).trace;
+    expect(trace.find((t) => t.action === '⚠ recovery dismiss_prompt')?.detail).toMatch(/never_there/);
     expect(fake.launches).toHaveLength(1);
   });
 });

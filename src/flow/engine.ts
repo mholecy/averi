@@ -92,6 +92,13 @@ export interface EngineOptions {
 }
 
 /**
+ * First line only: a trace entry is a headline, and the rest of a FlowError's
+ * message is the trace it already carries — repeating it inside itself reads
+ * as a second failure.
+ */
+const headline = (e: unknown): string => (e instanceof Error ? e.message : String(e)).split('\n')[0];
+
+/**
  * Interprets averi.yaml flows against a DeviceAdapter. Every action polls for
  * its precondition (waits, not sleeps). Credential values are resolved lazily
  * from env and redacted from traces and errors — the caller never sees them.
@@ -197,9 +204,18 @@ export class FlowEngine {
         // next rung is the destructive one. Measured: a prelude naming an
         // undeclared credential escalated into a `clearState: true` login,
         // wiping app state to re-run a step that could never have worked.
-        if (last || e instanceof SetupError) throw e;
+        if (e instanceof SetupError) throw e;
+        const why = headline(e);
+        // A throwing LAST rung is not the end of the ladder's obligations, it
+        // is only the end of what the ladder can escalate to. Hand it to
+        // salvage, which owes the caller the same two chances the loop gives
+        // every other rung, then rethrow the ORIGINAL error.
+        if (last) {
+          this.log(`⚠ reach ${flow}`, `failed — ${why}`);
+          if (await this.salvageThrowingLastRung(name, state, flow)) return;
+          throw e;
+        }
         failed = true;
-        const why = (e instanceof Error ? e.message : String(e)).split('\n')[0];
         this.log(`⚠ reach ${flow}`, `failed, escalating to ${state.reach[i + 1]} — ${why}`);
       }
       // Only a rung that completed and has something after it earns a grace
@@ -232,10 +248,46 @@ export class FlowEngine {
       // recoveryPass logs the rung that got there, so there is no second
       // "reached" line here. A SetupError is exempt for the same reason the
       // ladder exempts it: re-running flows cannot fix a broken descriptor.
-      if (e instanceof SetupError || !(await this.recoveryPass(name, state))) throw e;
+      if (e instanceof SetupError || !(await this.recoveryPass(name, state, 'timed out'))) throw e;
       return;
     }
     this.log(`state ${name}`, 'reached');
+  }
+
+  /**
+   * The last rung threw, so the ladder has nothing left to escalate to — but
+   * a throw is a verdict about the FLOW, not about the state, and the rethrow
+   * used to jump over both checks every other rung gets.
+   *
+   * The detect first: a rung can reach the state and then die on a later step,
+   * which is exactly why the ladder re-checks after a failed rung instead of
+   * escalating blind. The last rung alone never got that check.
+   *
+   * Then the recovery pass, for the shape that motivated it in the first
+   * place. Real configs spell a login flow's success criterion as the flow's
+   * own trailing `wait: { state: ... }`, so a late interstitial makes the LAST
+   * RUNG THROW rather than the ladder's final wait time out — and that wait
+   * was the only place the pass armed. Measured on device against 0.5.0: the
+   * original incident failed exactly as it had pre-fix, with no `↻ recovery`
+   * line in the trace. The pass is safe here for the same reason it is safe on
+   * a timeout: it re-runs only provably repeatable rungs, so by construction
+   * it adds no wipes, whatever made the rung throw.
+   *
+   * Returns whether the state was reached; on false the caller rethrows the
+   * ORIGINAL error, with the salvage visible in the trace either way.
+   */
+  private async salvageThrowingLastRung(
+    name: string,
+    state: AveriConfig['states'][string],
+    flow: string,
+  ): Promise<boolean> {
+    // No grace, for the reason the ladder gives: a rung that threw is not a
+    // screen still settling.
+    if ((await this.attempt(`salvage ${flow}`, () => this.detects(state.detect, 0))) === true) {
+      this.log(`state ${name}`, `reached after ${flow}`);
+      return true;
+    }
+    return this.recoveryPass(name, state, `${flow} failed`);
   }
 
   /**
@@ -254,7 +306,11 @@ export class FlowEngine {
    * original timeout, so a genuinely stuck run fails exactly as it did before,
    * with the attempted re-pass visible in the trace.
    */
-  private async recoveryPass(name: string, state: AveriConfig['states'][string]): Promise<boolean> {
+  private async recoveryPass(
+    name: string,
+    state: AveriConfig['states'][string],
+    why: string,
+  ): Promise<boolean> {
     // Per tool call, not per state: `requires` can nest ensureState inside a
     // reach flow, and one bounded retry for the whole call is the honest read
     // of "at most once" — nesting must not multiply it.
@@ -265,7 +321,7 @@ export class FlowEngine {
     this.recoveryUsed = true;
     this.log(
       `↻ recovery ${name}`,
-      `timed out — re-running ${rungs.join(', ')} once (a late screen may need clearing)`,
+      `${why} — re-running ${rungs.join(', ')} once (a late screen may need clearing)`,
     );
     for (const flow of rungs) {
       // Nothing in this loop escalates or throws: the ladder is already spent
@@ -273,11 +329,13 @@ export class FlowEngine {
       // rethrows untouched. A rung that fails again — or an adapter that dies
       // during the re-check — is diagnostics, not a decision, and must not
       // become the error the user sees in place of the real one.
-      await this.attempt(flow, () => this.runFlowInner(flow));
+      await this.attempt(`recovery ${flow}`, () => this.runFlowInner(flow));
       // Separate attempt, so the detect still runs after a rung that threw:
       // it may have reached the state before dying on a later step, exactly as
       // in the ladder above.
-      const reached = await this.attempt(flow, () => this.detects(state.detect, this.reachRecheckMs));
+      const reached = await this.attempt(`recovery ${flow}`, () =>
+        this.detects(state.detect, this.reachRecheckMs),
+      );
       if (reached === true) {
         this.log(`state ${name}`, `reached after recovery ${flow}`);
         return true;
@@ -286,13 +344,18 @@ export class FlowEngine {
     return false;
   }
 
-  /** Run one recovery step, turning any failure into a trace line. */
-  private async attempt<T>(flow: string, fn: () => Promise<T>): Promise<T | undefined> {
+  /**
+   * Run one probe that must not change the verdict, turning any failure into a
+   * trace line. Once the ladder is spent the error the caller sees is already
+   * decided — the original timeout, or the last rung's own throw — and
+   * neither a rung that fails again nor an adapter that dies mid-probe may
+   * take its place.
+   */
+  private async attempt<T>(label: string, fn: () => Promise<T>): Promise<T | undefined> {
     try {
       return await fn();
     } catch (e) {
-      const why = (e instanceof Error ? e.message : String(e)).split('\n')[0];
-      this.log(`⚠ recovery ${flow}`, `failed — ${why}`);
+      this.log(`⚠ ${label}`, `failed — ${headline(e)}`);
       return undefined;
     }
   }
