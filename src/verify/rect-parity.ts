@@ -1,6 +1,6 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
-import type { LayoutAnchor, LayoutContract } from './layout-contract.js';
+import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row, type Column } from './table.js';
 
 /**
@@ -71,9 +71,11 @@ export type RectEntry =
       ios?: number;
       dAc?: number;
       dIc?: number;
-      /** For aspect this is the spread in % (always >= 0). */
+      /** For aspect this is the spread in % (always >= 0); absent on opt-out. */
       dAi?: number;
       aspectOver?: boolean;
+      /** aspect: false — ratios measured and printed, but never compared. */
+      aspectOptOut?: boolean;
     }
   | { kind: 'missing'; anchor: string; absentOn: Platform[] }
   | { kind: 'skipped'; anchor: string };
@@ -81,6 +83,13 @@ export type RectEntry =
 export interface RectParityResult {
   screen: string;
   tolerancePct: number;
+  /**
+   * The threshold the `aspect` row is actually judged at. Carried separately
+   * because this file's header rule — the number a description PRINTS is
+   * always the number the check ENFORCES — cannot be kept otherwise once the
+   * two can differ.
+   */
+  aspectTolerancePct: number;
   frameWidth: number;
   platforms: Platform[];
   anchorCount: number;
@@ -117,7 +126,10 @@ interface CompareContext {
   platforms: readonly Platform[];
   widthOf: Partial<Record<Platform, number>>;
   frameWidth: number;
+  /** Deltas in % of screen width. */
   tolerancePct: number;
+  /** Spread of a RATIO in %, a different quantity — see tolerance_aspect_pct. */
+  aspectTolerancePct: number;
 }
 
 /** One anchor's contribution to the report: rows to print, findings to act on. */
@@ -244,6 +256,20 @@ function compareGap(
 /**
  * Shape, android-vs-ios only: a same-margin, same-width element can still be
  * the wrong shape.
+ *
+ * Two things this deliberately does NOT do, both measured 2026-08-27:
+ *
+ * It does not skip when the contract omits `w`/`h`. That was the obvious fix
+ * for the false positives below and it is wrong — the row's whole value is
+ * catching a shape bug on an anchor whose height nobody pinned (the
+ * 1.81-vs-1.60 card in the tests). Omission means "not pinned", never "not
+ * comparable". `aspect: false` is how an author says the second one.
+ *
+ * It does not normalize the rects by platform width first. That reads like it
+ * would divide the device-width difference out, and it cannot: scaling both
+ * sides by the same W leaves (w/W)/(h/W) = w/h unchanged. The 393-vs-402
+ * sensitivity is real and the only honest answers are the opt-out and a
+ * tolerance the author sets with a measurement behind it.
  */
 function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareContext): Comparison {
   // Skip degenerate ratios (zero width OR height -> 0/NaN/Infinity), like the
@@ -255,8 +281,20 @@ function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareConte
   const aAspect = ratioOf(a);
   const iAspect = ratioOf(i);
   if (aAspect === undefined || iAspect === undefined) return { entries: [], findings: [] };
+  // The author has diagnosed this element's height as derived differently per
+  // platform. The ratios are still measured and printed — a drift in them is
+  // worth a reader's eye — but no spread: two incomparable ratios have no
+  // meaningful distance, and printing one would invite treating it as a delta.
+  if (anchor.aspect === false) {
+    return {
+      entries: [
+        { kind: 'field', anchor: anchor.id, field: 'aspect', android: aAspect, ios: iAspect, aspectOptOut: true },
+      ],
+      findings: [],
+    };
+  }
   const spread = (Math.abs(aAspect - iAspect) / Math.max(aAspect, iAspect)) * 100;
-  const over = spread > ctx.tolerancePct;
+  const over = spread > ctx.aspectTolerancePct;
   return {
     entries: [
       { kind: 'field', anchor: anchor.id, field: 'aspect', android: aAspect, ios: iAspect, dAi: spread, aspectOver: over },
@@ -276,6 +314,14 @@ export function compareRectParity(
   if (platforms.length === 0) throw new Error('rect parity: no platform tree provided');
   const single = platforms.length === 1;
   const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
+  // Defaults to tolerancePct, so an untouched contract behaves exactly as
+  // before. `opts.tolerancePct` deliberately does NOT flow into it: the option
+  // is the test-facing width override, and silently widening the shape check
+  // with it would be the same units confusion this field exists to end.
+  const aspectTolerancePct =
+    contract.tolerance_aspect_pct === undefined
+      ? tolerancePct
+      : positiveTolerance(contract.tolerance_aspect_pct, 'rect parity: tolerance_aspect_pct');
   const frameWidth =
     contract.figma_frame_width ?? Math.max(0, ...contract.anchors.map((a) => a.w ?? 0));
   // Single-platform + no frame width: contract values cannot be normalized
@@ -303,7 +349,7 @@ export function compareRectParity(
   const missing: { id: string; absentOn: Platform[] }[] = [];
   const skipped: string[] = [];
   const findings: RectFinding[] = [];
-  const ctx: CompareContext = { platforms, widthOf, frameWidth, tolerancePct };
+  const ctx: CompareContext = { platforms, widthOf, frameWidth, tolerancePct, aspectTolerancePct };
   const collect = (c: Comparison): void => {
     entries.push(...c.entries);
     findings.push(...c.findings);
@@ -350,6 +396,7 @@ export function compareRectParity(
   return {
     screen: contract.screen ?? '(unnamed)',
     tolerancePct,
+    aspectTolerancePct,
     frameWidth,
     platforms: [...platforms],
     anchorCount: contract.anchors.length,
@@ -362,6 +409,55 @@ export function compareRectParity(
   };
 }
 
+/**
+ * The threshold(s) in force, named so that what is PRINTED is what was
+ * ENFORCED (file header). While `tolerance_aspect_pct` is unset the two are
+ * equal and one number covers both — which keeps every pre-existing report
+ * byte-identical. Once they differ, a single number would be a lie about one
+ * of the two, so both are named, and `fields` lets a caller quote just the
+ * threshold its own findings were judged at.
+ */
+function thresholdLabel(r: RectParityResult, fields: RectField[]): string {
+  const width = `${r.tolerancePct.toFixed(2)}%`;
+  const aspect = `${r.aspectTolerancePct.toFixed(2)}%`;
+  if (!aspectThresholdLive(r)) return width;
+  const hasAspect = fields.includes('aspect');
+  const hasWidth = fields.some((f) => f !== 'aspect');
+  if (hasAspect && !hasWidth) return `${aspect} ratio spread`;
+  // Two thresholds are genuinely live, so a bare number is ambiguous even when
+  // only one of them judged the findings being summarised: it names its own
+  // quantity.
+  if (!hasAspect) return `${width} of width`;
+  return `${width} of width / ${aspect} ratio spread`;
+}
+
+/**
+ * Is there a SECOND threshold to talk about at all? False when the two
+ * tolerances agree, and false when no aspect row was judged in this run — a
+ * single-platform leg, or a contract whose every anchor opted out. Shared by
+ * the labels and the table header so the two can never disagree about how many
+ * numbers this report is quoting.
+ */
+function aspectThresholdLive(r: RectParityResult): boolean {
+  return r.aspectTolerancePct !== r.tolerancePct && judgedFields(r).includes('aspect');
+}
+
+/**
+ * The fields an actual comparison was performed on — i.e. whose thresholds are
+ * genuinely in force. A threshold that judged NOTHING must not be announced:
+ * a single-platform leg runs no aspect comparison at all, and an `aspect:
+ * false` row is measured and printed but never judged, so quoting the aspect
+ * tolerance in either case describes a check that did not happen.
+ */
+function judgedFields(r: RectParityResult): RectField[] {
+  const out = new Set<RectField>();
+  for (const e of r.entries) {
+    if (e.kind !== 'field' || (e.field === 'aspect' && e.aspectOptOut === true)) continue;
+    if (e.dAc !== undefined || e.dIc !== undefined || e.dAi !== undefined) out.add(e.field);
+  }
+  return [...out];
+}
+
 /** One-line verdict — the number the caller quotes. */
 export function rectParityVerdict(r: RectParityResult): string {
   if (r.pass) {
@@ -369,10 +465,12 @@ export function rectParityVerdict(r: RectParityResult): string {
       r.skipped.length > 0
         ? `on ${r.anchorCount - r.skipped.length} anchor(s) (${r.skipped.length} skipped)`
         : `on all ${r.anchorCount} anchor(s)`;
-    return `rect parity: WITHIN TOLERANCE (${r.tolerancePct.toFixed(2)}%) ${scope}.`;
+    return `rect parity: WITHIN TOLERANCE (${thresholdLabel(r, judgedFields(r))}) ${scope}.`;
   }
   const bits: string[] = [];
-  if (r.findings.length > 0) bits.push(`${r.findings.length} DELTA(S) OVER ${r.tolerancePct.toFixed(2)}%`);
+  if (r.findings.length > 0) {
+    bits.push(`${r.findings.length} DELTA(S) OVER ${thresholdLabel(r, r.findings.map((f) => f.field))}`);
+  }
   if (r.missing.length > 0) bits.push(`${r.missing.length} MISSING anchor(s)`);
   return `rect parity: ${bits.join(' + ')}`;
 }
@@ -391,7 +489,10 @@ const fmtDelta = (v: number | undefined): string =>
  */
 export function formatRectParity(r: RectParityResult): string {
   const lines: string[] = [];
-  lines.push(`screen: ${r.screen}   tolerance: ${r.tolerancePct.toFixed(2)}% of screen width`);
+  lines.push(
+    `screen: ${r.screen}   tolerance: ${r.tolerancePct.toFixed(2)}% of screen width` +
+      (aspectThresholdLive(r) ? `   aspect: ${r.aspectTolerancePct.toFixed(2)}% ratio spread` : ''),
+  );
   lines.push(
     `widths: ${r.widths.map((w) => `${w.platform} ${g(w.width)}`).join('   ')}   figma frame ${g(r.frameWidth)}`,
   );
@@ -438,7 +539,7 @@ export function formatRectParity(r: RectParityResult): string {
         e.contract === undefined ? '' : e.field === 'gap' ? `${e.contract.toFixed(2)}%` : g(e.contract);
       const deltas =
         e.field === 'aspect'
-          ? (both ? ['—', '—', `${(e.dAi as number).toFixed(2)}%`] : [])
+          ? (both ? ['—', '—', e.aspectOptOut ? 'opt-out' : `${(e.dAi as number).toFixed(2)}%`] : [])
           : both
             ? [fmtDelta(e.dAc), fmtDelta(e.dIc), fmtDelta(e.dAi)]
             : [fmtDelta(r.platforms[0] === 'android' ? e.dAc : e.dIc)];
@@ -474,7 +575,8 @@ export function formatRectParity(r: RectParityResult): string {
 
   if (r.findings.length > 0) {
     lines.push(
-      `${r.findings.length} DELTA(S) OVER ${r.tolerancePct.toFixed(2)}% — each is a code-fix finding carrying its numbers:`,
+      `${r.findings.length} DELTA(S) OVER ${thresholdLabel(r, r.findings.map((f) => f.field))} — ` +
+        'each is a code-fix finding carrying its numbers:',
     );
     for (const f of r.findings) {
       const unit = f.field === 'aspect' ? '%' : '% of width';

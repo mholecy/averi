@@ -144,6 +144,171 @@ describe('compareRectParity — finding semantics', () => {
     expect(formatRectParity(r)).toContain('<-- ASPECT');
   });
 
+  // ---- the 2026-08-27 finding: the derived aspect row fired on correct code,
+  // and omitting `h` — the only tool a contract author had — did not reach it.
+
+  it('aspect: false silences the shape row for an anchor whose height the platforms derive differently', () => {
+    // Measured: Android's a11y touch-target floor inflates the section header's
+    // node box to 48dp; iOS pads out and back in, so its box stays 44pt. The
+    // contract omits `h` for that reason, and the aspect row failed anyway at
+    // +10.73% against code that was correct.
+    const anchors = [{ id: 'section', x: 24, w: 345, aspect: false }];
+    const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors };
+    const android = root(1080, 2400, [leaf('section', px(24), 300, px(345), 132)]); // 948/132 = 7.182
+    const ios = root(402, 852, [leaf('section', 24, 110, 354, 44)]); //             354/44  = 8.045
+    const r = compareRectParity(c, { android, ios });
+    expect(r.findings.filter((f) => f.field === 'aspect')).toEqual([]);
+    // The ratios are still measured and printed — "diff the numbers, not the
+    // verdict" — but there is no spread: incomparable ratios have no distance.
+    const aspectRow = r.entries.find((e) => e.kind === 'field' && e.field === 'aspect');
+    expect(aspectRow).toMatchObject({ android: 948 / 132, ios: 354 / 44, aspectOptOut: true });
+    expect(aspectRow?.kind === 'field' && aspectRow.dAi).toBeUndefined();
+    const out = formatRectParity(r);
+    expect(out).toContain('7.182');
+    expect(out).toContain('8.045');
+    expect(out).toContain('opt-out');
+    expect(out).not.toContain('<-- ASPECT');
+  });
+
+  it('THE NEGATIVE HALF: omitting h alone does NOT silence it — the 1.81-vs-1.60 bug still fails', () => {
+    // The distinction the opt-out exists to draw. Omission means "I did not pin
+    // this side"; only `aspect: false` means "I diagnosed it as incomparable".
+    // A fix that conflated them would disable the check rather than narrow it.
+    const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
+    const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]);
+    const r = compareRectParity(c, { android, ios });
+    expect(r.findings.find((f) => f.field === 'aspect')?.delta).toBeCloseTo(11.7, 1);
+  });
+
+  it('aspect: true is not an opt-out — only an explicit false is', () => {
+    const c: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      anchors: [{ id: 'card', x: 24, w: 345, aspect: true }],
+    };
+    const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]);
+    expect(compareRectParity(c, { android, ios }).findings.some((f) => f.field === 'aspect')).toBe(true);
+  });
+
+  it('tolerance_aspect_pct is a SEPARATE threshold and defaults to tolerance_pct', () => {
+    const anchors = [{ id: 'card', x: 24, w: 345 }];
+    const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 11.71% spread
+    // Default: unchanged behaviour, the shape bug still fails at 2%.
+    const dflt: LayoutContract = { screen: 't', figma_frame_width: 393, anchors };
+    expect(compareRectParity(dflt, { android, ios }).findings.some((f) => f.field === 'aspect')).toBe(true);
+    // Widening only the aspect knob leaves the width tolerance where it was.
+    const loose: LayoutContract = { ...dflt, tolerance_aspect_pct: 15 };
+    const r = compareRectParity(loose, { android, ios });
+    expect(r.findings.some((f) => f.field === 'aspect')).toBe(false);
+    expect(r.tolerancePct).toBe(2.0);
+  });
+
+  it('PRINTS the threshold it ENFORCED — a differing aspect tolerance appears everywhere', () => {
+    // The file's own rule: the number a description prints is always the number
+    // the check enforces. Once aspect can be judged at a different threshold, a
+    // single printed number is a lie about one of the two.
+    const c: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      tolerance_aspect_pct: 15,
+      anchors: [{ id: 'card', x: 24, w: 345 }],
+    };
+    const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 11.71% spread, under 15
+    const r = compareRectParity(c, { android, ios });
+    expect(r.aspectTolerancePct).toBe(15);
+    expect(formatRectParity(r)).toContain('aspect: 15.00% ratio spread');
+    // An aspect-only finding quotes the aspect threshold, never the width one.
+    // The measured section-header shape: x, w and h all within tolerance, only
+    // the derived ratio over — so a headline naming 2.00% would name a
+    // threshold that judged nothing here.
+    const only: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      tolerance_aspect_pct: 5,
+      anchors: [{ id: 'section', x: 24, w: 345 }],
+    };
+    const a2 = root(1080, 2400, [leaf('section', px(24), 300, 948, 132)]);
+    const i2 = root(402, 852, [leaf('section', 24, 110, 354, 44)]); // 10.73% spread
+    const aspectOnly = compareRectParity(only, { android: a2, ios: i2 });
+    expect(aspectOnly.findings.map((f) => f.field)).toEqual(['aspect']);
+    expect(rectParityVerdict(aspectOnly)).toContain('OVER 5.00% ratio spread');
+    expect(rectParityVerdict(aspectOnly)).not.toContain('2.00%');
+    expect(formatRectParity(aspectOnly)).toContain('OVER 5.00% ratio spread');
+  });
+
+  it('names BOTH thresholds when findings were judged at each', () => {
+    const c: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      tolerance_aspect_pct: 5,
+      anchors: [{ id: 'card', x: 24, w: 345 }],
+    };
+    const android = root(1080, 2400, [leaf('card', px(46), 300, px(345), 524)]); // x is 5.6% off
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // aspect 11.71% off
+    const v = rectParityVerdict(compareRectParity(c, { android, ios }));
+    expect(v).toContain('2.00% of width / 5.00% ratio spread');
+  });
+
+  it('stays on ONE number while the two tolerances agree — existing reports are unchanged', () => {
+    const c = contract();
+    const r = compareRectParity(c, { android: androidTree(), ios: iosTree() });
+    expect(r.aspectTolerancePct).toBe(r.tolerancePct);
+    expect(formatRectParity(r)).not.toContain('ratio spread');
+    expect(rectParityVerdict(r)).toContain('WITHIN TOLERANCE (2.00%)');
+  });
+
+  it('does NOT announce an aspect tolerance that judged nothing', () => {
+    // A threshold quoted in a report is a claim that it was applied. Every
+    // anchor here is opted out, so the aspect tolerance is vacuous — naming it
+    // would describe a check that did not happen.
+    const c: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      tolerance_aspect_pct: 15,
+      anchors: [{ id: 'section', x: 24, w: 345, aspect: false }],
+    };
+    const android = root(1080, 2400, [leaf('section', px(24), 300, 948, 132)]);
+    const ios = root(402, 852, [leaf('section', 24, 110, 354, 44)]);
+    const r = compareRectParity(c, { android, ios });
+    expect(r.pass).toBe(true);
+    expect(formatRectParity(r)).not.toContain('15.00%');
+    expect(rectParityVerdict(r)).toBe('rect parity: WITHIN TOLERANCE (2.00%) on all 1 anchor(s).');
+  });
+
+  it('qualifies the width number once a second threshold is in play', () => {
+    // With two thresholds live, a bare "OVER 2.00%" leaves the reader to guess
+    // which quantity it bounds.
+    const c: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      tolerance_aspect_pct: 15,
+      anchors: [{ id: 'card', x: 24, w: 345 }],
+    };
+    const android = root(1080, 2400, [leaf('card', px(46), 300, px(345), 524)]); // x off by 5.6%
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 524 / (1080 / 393))]); // aspect matches
+    const v = rectParityVerdict(compareRectParity(c, { android, ios }));
+    // The aspect row WAS judged here (it simply passed), so two thresholds are
+    // live and the width number says which quantity it bounds.
+    expect(v).toContain('OVER 2.00% of width');
+    expect(v).not.toContain('ratio spread');
+  });
+
+  it('rejects a tolerance_aspect_pct that is not a positive number, naming the field', () => {
+    const c: LayoutContract = {
+      screen: 't',
+      figma_frame_width: 393,
+      tolerance_aspect_pct: 0,
+      anchors: [{ id: 'card', x: 24, w: 345 }],
+    };
+    const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
+    const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]);
+    expect(() => compareRectParity(c, { android, ios })).toThrow(/tolerance_aspect_pct/);
+  });
+
   it('absolute y is NEVER a finding source — both anchors shifted 10% stay a pass', () => {
     const android = androidTree();
     for (const id of ['header', 'card']) findAnchorRect(android, id).rect.y += 108; // 10% of 1080

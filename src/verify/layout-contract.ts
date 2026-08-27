@@ -52,6 +52,26 @@ const anchorSchema = z
      * which needs identical strings — is skipped for these.
      */
     text_dynamic: z.unknown().optional(),
+    /**
+     * Opt this anchor OUT of the derived shape (`aspect`) comparison.
+     *
+     * Omitting `w`/`h` deliberately does NOT do this, and must not: the aspect
+     * row exists precisely to catch a shape bug on an anchor whose height the
+     * contract never pinned (the 1.81-vs-1.60 card, ported as a regression
+     * test). Omission says "I did not pin this side"; it cannot say "the two
+     * platforms derive this side by different mechanisms and I have diagnosed
+     * that" — and only the second is a reason to stop comparing.
+     *
+     * The row still prints both measured ratios, marked `opt-out`; only the
+     * comparison stops. A drift in the printed numbers stays visible.
+     *
+     * Set it where that diagnosis exists, with the reason next to it. Measured
+     * 2026-08-27: Android's a11y touch-target floor inflates a section header's
+     * node box to 48 while iOS pads out and back in, leaving 44 — a 10.73%
+     * aspect spread against correct code, one point below the 11.71% of the
+     * real bug above, so no tolerance can separate them.
+     */
+    aspect: z.boolean().optional(),
   })
   .passthrough();
 
@@ -67,6 +87,21 @@ const contractSchema = z
      * title drift reads 12.63% apart.
      */
     tolerance_size_pct: z.unknown().optional(),
+    /**
+     * Max spread in % for the derived `aspect` row, android-vs-ios. Separate
+     * from `tolerance_pct` because they are DIFFERENT QUANTITIES that used to
+     * share one threshold: `tolerance_pct` is a delta in % of screen width,
+     * while an aspect spread is a relative % of a ratio. Nothing converts one
+     * into the other, and the confusion is worst on high-ratio elements, where
+     * the short side dominates and a 1 px measurement difference reads as
+     * several percent.
+     *
+     * Defaults to `tolerance_pct`, i.e. exactly the historical behaviour — a
+     * looser default would have to clear 10.73% to silence the measured false
+     * positives, which is above the 11.71% of a real bug this check caught.
+     * Loosen it per contract, with the measurement that justifies it.
+     */
+    tolerance_aspect_pct: z.unknown().optional(),
     figma_frame_width: z.number().positive().optional(),
     anchors: z.array(anchorSchema).min(1),
   })
