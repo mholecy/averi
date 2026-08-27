@@ -10,6 +10,7 @@ import {
   normalizeText,
   ocrRegionsFor,
   renderedTextFromTree,
+  survivesIn,
   textParityVerdict,
   type TextCapture,
 } from '../../src/verify/text-parity.js';
@@ -328,6 +329,49 @@ describe('compareTextParity — the occlusion guard', () => {
     expect(r.occluded).toHaveLength(0);
   });
 
+  it('a COMBINED a11y label is READ, not OCCLUDED — the joining comma is never rendered', () => {
+    // Measured 2026-08-27 on user_settings.overview: accessibility.md §8 requires
+    // a multi-part row to expose ONE combined '{label}, {value}' node. The comma
+    // exists only in the label, so a literal containment test marked every such
+    // row UNREAD — and OCCLUDED WITHHOLDS the row from copy drift, silently
+    // suppressing the very check the guard exists to protect.
+    const c = contract([{ id: 'profile_row_6', text_dynamic: true }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('profile_row_6', 'Phone, +123 456 789 1')]),
+        ocr: ocrMap({ profile_row_6: [line('Phone +123 456 789 1', 30)] }),
+        pngWidth: 1080,
+      },
+      ios: {
+        tree: root(402, [text('profile_row_6', 'Phone, +123 456 789 1')]),
+        ocr: ocrMap({ profile_row_6: [line('Phone +123 456 789 1', 30)] }),
+        pngWidth: 1206,
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+    expect(r.rows[0].verdict).not.toBe('OCCLUDED');
+    // ...and the row stays subject to copy comparison rather than withheld.
+    expect(formatTextParity(r)).not.toContain('NOT compared as drift');
+  });
+
+  it('a product row whose toggle state is in the label is COMPARED, not withheld', () => {
+    // The device shape that kept finding 3 open: ', visible' names a toggle
+    // GRAPHIC, so that part can never be read — and while the whole joined
+    // string had to survive, the row was withheld from copy drift, which is
+    // the exact harm this guard was supposed to prevent.
+    const c = contract([{ id: 'product_row_4', text_dynamic: true }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('product_row_4', 'My Account, * 5433, visible')]),
+        ocr: ocrMap({ product_row_4: [line('My Account *5433', 30)] }),
+        pngWidth: 1080,
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+    expect(r.rows[0].verdict).not.toBe('OCCLUDED');
+    expect(formatTextParity(r)).not.toContain('NOT compared as drift');
+  });
+
   it('stays quiet when the tree carries no rendered text at all — the normal iOS button case', () => {
     const c = contract([{ id: 'cta', text_dynamic: true }]);
     const r = compareTextParity(c, {
@@ -534,5 +578,75 @@ describe('formatTextParity', () => {
     expect(out).toContain('TEXT FINDING(S)');
     // The dispatch advice must keep copy drift a SPEC question first.
     expect(out).toContain('SPEC question');
+  });
+});
+
+describe('survivesIn — the UNREAD guard predicate', () => {
+  // The four cases the 2026-08-27 report pins as acceptance. The last two
+  // matter as much as the first two: the guard's narrowness is deliberate, and
+  // a fix measured only by "the false positive stopped" cannot distinguish
+  // itself from disabling the check.
+  it.each([
+    // The three product rows measured ON DEVICE 2026-08-27. Each fails the
+    // whole-string test for a reason no separator rule reaches: ', visible'
+    // describes a toggle GRAPHIC that renders no text at all, and OCR edits
+    // the remaining parts — dropping the space in '* 5433', and inserting a
+    // '€' it recognised from the leading currency avatar (an image).
+    ['My Account, 5304826947468842, visible', 'My Account € 5304826947468842', true],
+    ['My Account, * 5433, visible', 'My Account *5433', true],
+    ['My Account CZK, * 5434, visible', 'My Account CZK *5434', true],
+    // The row the punctuation fix already closed — regression guard.
+    ['Phone, +123 456 789 1', 'Phone +123 456 789 1', true],
+    ['Full name, Arthur Dent', 'Full name Arthur Dent', true],
+    ['CONTINUE', '', false],
+    ['Enter amount', '0.00', false],
+  ])('survivesIn(%j, %j) === %s', (tree, seen, want) => {
+    expect(survivesIn(tree as string, seen as string)).toBe(want);
+  });
+
+  it('a combined label whose region read NOTHING is still UNREAD', () => {
+    // The real occlusion case must survive the parts rule: no part can be found
+    // in an empty reading, so a dialog over the row still reports honestly.
+    expect(survivesIn('My Account, * 5433, visible', '')).toBe(false);
+  });
+
+  it('a combined label none of whose parts appear is still UNREAD', () => {
+    expect(survivesIn('My Account, * 5433, visible', 'Totally different copy')).toBe(false);
+  });
+
+  it('does not let a 1-2 character part vouch for the whole row', () => {
+    // 'Kč' is two characters and turns up in half the amounts on screen; a part
+    // that short is coincidence, not evidence the region was read.
+    expect(survivesIn('Kč, 1 121,00', 'Kč')).toBe(false);
+  });
+
+  it('DOES let a 3-character part vouch — the floor is pinned from both sides', () => {
+    // The other half of the bound. Without this, MIN_PART_LENGTH could drift
+    // up to 6 and every test would stay green while the guard silently
+    // over-narrowed — this directory records that failure class three times.
+    expect(survivesIn('Balance, CZK', 'Total CZK 1 121,00')).toBe(true);
+  });
+
+  it('ACCEPTED COST: a dialog over the value is read when the label part is legible', () => {
+    // Pinned as a limitation, not as a virtue. The parts rule cannot see
+    // PARTIAL occlusion of a combined row, and on a text_dynamic anchor no
+    // string comparison follows — so this shape now passes silently where it
+    // used to fail loudly. Accepted because a WHOLLY covered region still has
+    // no survivor (the test below), because the same blindness always existed
+    // for the two-node spelling of this row, and because the false positive it
+    // replaces suppressed the copy check on every combined row.
+    expect(survivesIn('Notifications, On', 'Allow notifications from this app?')).toBe(true);
+    // The bound that makes it acceptable: cover the whole region and the guard
+    // still fires.
+    expect(survivesIn('Notifications, On', '')).toBe(false);
+  });
+
+  it('still catches a real substitution that punctuation cannot explain', () => {
+    expect(survivesIn('Phone, +123 456 789 1', 'Email, a@b.example')).toBe(false);
+  });
+
+  it('keeps the case and truncation leniencies it already had', () => {
+    expect(survivesIn('Continue', 'CONTINUE')).toBe(true);
+    expect(survivesIn('Select credit account', 'Select credit acc…')).toBe(true);
   });
 });

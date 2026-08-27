@@ -188,17 +188,115 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  *   fail the run.
  * - TRUNCATION. An ellipsized TextView renders 'Select credit acc…' where the
  *   tree holds the full string, so the reading is a PREFIX of the tree value.
+ * - JOINING PUNCTUATION. A COMBINED accessibility label — the shape
+ *   accessibility.md §8 requires for a multi-part row ('{label}, {value}', one
+ *   node, not two) — is built by joining its parts with ', '. That separator is
+ *   BY CONSTRUCTION never rendered, so a literal containment test marks every
+ *   combined row UNREAD. Measured 2026-08-27 on `user_settings.overview`: the
+ *   tree holds 'Phone, +123 456 789 1' and the screenshot reads
+ *   'Phone +123 456 789 1' on BOTH platforms. The comma is the only difference.
+ * - A COMBINED LABEL IS A JOIN, SO ITS PARTS ARE WHAT SURVIVE, not the whole.
+ *   Dropping the separator fixed only the rows whose parts happen to render
+ *   contiguously. Measured on device 2026-08-27, three product rows still
+ *   vanished, for two reasons no separator rule can reach:
+ *     · A part is NEVER RENDERED. ', visible' states the position of a toggle
+ *       GRAPHIC; there is no text on screen for OCR to read, at any contrast.
+ *       accessibility.md §8 REQUIRES the switch state in the label, so this is
+ *       the mandated shape, not a defect.
+ *     · OCR edits the remaining parts. It read '*5433' where the tree holds
+ *       '* 5433', and on product_row_0 it INSERTED a '€' recognised from the
+ *       leading currency avatar — an image, not text.
+ *   So the joined string can never be a substring of the reading, and demanding
+ *   that it be one contradicts this guard's own stated intent: "a partial
+ *   mismatch is normal (OCR merges and reorders lines a tree keeps separate)".
+ *   ANY substantial part surviving means the region was read — which is the
+ *   only question this guard asks. It does not mean the copy is right; that is
+ *   the drift table's job, and a part-read anchor now reaches it instead of
+ *   being silently withheld.
  *
  * Drift comparison stays exact (`normalizeText` only collapses whitespace) —
  * a real case change is a real finding, and this leniency must not leak there.
+ * It cannot: `survivesIn` has exactly one src caller, the UNREAD guard in
+ * `measure`.
+ *
+ * WHAT THE PARTS RULE COSTS, recorded where the next reader will reach for it.
+ * A part surviving answers only "was this region read at all". It cannot see a
+ * dialog covering a combined row's VALUE while the leading label part stays
+ * legible inside the anchor's region: pre-change that was OCCLUDED and failed
+ * the run, and it is now reported as read. On a `text_dynamic` anchor — which
+ * all four measured shapes are — no string comparison follows, so for that
+ * class the honest trade is "false alarm that failed the run" → "no check, run
+ * passes", NOT "now compared as drift". Accepted deliberately: a wholly covered
+ * region still has no survivor and still reports OCCLUDED, the same blindness
+ * has always existed for the two-node spelling of the same row (the caller is
+ * itself a `.some()` over tree strings), and the systematic false positive it
+ * replaces suppressed the copy check on EVERY combined row.
  */
-function survivesIn(treeString: string, seen: string): boolean {
-  const want = treeString.toLowerCase();
-  const got = seen.toLowerCase();
+
+/**
+ * The forgiving form the UNREAD guard compares on: case folded, joining
+ * punctuation dropped, whitespace collapsed. NEVER used for the reported
+ * strings — a row's message must keep both sides verbatim so the reader sees
+ * the real difference, and never for drift, which stays exact.
+ */
+const looseForm = (s: string): string =>
+  s.toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** The whole-string test: containment, or a prefix of an ellipsized render. */
+function survivesWhole(treeString: string, got: string): boolean {
+  const want = looseForm(treeString);
+  if (want === '') return false;
   if (got.includes(want)) return true;
   // Ellipsized render: drop the ellipsis and accept a prefix of the tree value.
   const head = got.replace(/[…\.]+$/, '').trim();
   return head.length >= 3 && want.startsWith(head);
+}
+
+/**
+ * How a combined label joins its parts. This is a PLATFORM fact averi measured
+ * for itself, not a consumer's house style: iOS
+ * `.accessibilityElement(children: .combine)` merges children with ', '
+ * whatever the app does — the tile recorded in skill/SKILL.md arrives as
+ * 'Select transaction type, 1 of 13 selected'. The consuming repo's
+ * accessibility.md §8 requiring the same shape corroborates it; it is not the
+ * authority for it.
+ *
+ * Split on the RAW string, before `looseForm` drops the commas it is made of.
+ * The trailing SPACE is load-bearing: it keeps a locale-formatted '1,121.00'
+ * from splitting. A locale whose system separator is not ', ' (Arabic '، ',
+ * CJK '、') simply never enters the parts rule and degrades to the pre-change
+ * behaviour — a noisy false positive, never a new false negative, which is the
+ * safe direction to fail.
+ */
+const COMBINED_SEPARATOR = ', ';
+
+/**
+ * A part short enough to match by accident carries no evidence that the region
+ * was read. The value is not derived from the data — 'CZK' at 3 would match as
+ * loosely as 'Kč' at 2 — it is deliberately the SAME floor the ellipsis
+ * fallback in `survivesWhole` already uses, so the file has one notion of "too
+ * short to mean anything" rather than two. Pinned from BOTH sides: a 2-char
+ * part must not vouch, a 3-char part must.
+ */
+const MIN_PART_LENGTH = 3;
+
+/**
+ * Did a tree string survive into the reading? See the block above for the full
+ * rationale and the cost the parts rule accepts. Exported for the acceptance
+ * pins the bug report states at this level; the sole src caller is the UNREAD
+ * guard in `measure`.
+ */
+export function survivesIn(treeString: string, seen: string): boolean {
+  const got = looseForm(seen);
+  if (survivesWhole(treeString, got)) return true;
+  // Only a genuinely JOINED label gets the parts rule. A single-part string
+  // has already had its one chance above, so the negative half — 'CONTINUE'
+  // against nothing, 'Enter amount' against '0.00' — is untouched by this.
+  const parts = treeString.split(COMBINED_SEPARATOR);
+  if (parts.length < 2) return false;
+  return parts.some(
+    (part) => looseForm(part).length >= MIN_PART_LENGTH && survivesWhole(part, got),
+  );
 }
 
 /**
