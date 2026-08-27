@@ -96,9 +96,10 @@ new tests; the suite went 487 → 493 at commit `0b430e9`. Lint and typecheck cl
 Docs corrected where they described the pass as arming on the final wait: README.md, ARCHITECTURE.md
 §4, skill/SKILL.md.
 
-Not re-verified on device — the skeleton repo no longer exercises this gap (its login flows gate on
-a post-PIN `any:` state since superrepo `cc62ee7`, confirmed present), so the regression tests are
-the standing evidence, as this report's own notes anticipated.
+Not re-verified on device *at the time of the fix* — the skeleton repo no longer exercises this gap
+(its login flows gate on a post-PIN `any:` state since superrepo `cc62ee7`, confirmed present), so
+the regression tests were the standing evidence, as this report's own notes anticipated. Both halves
+were verified on device the next day, with synthetic ladders — see "Verified on device" below.
 
 ## Reviewed independently (2026-08-27) by two Fable 5 agents, correctness and architecture
 
