@@ -162,3 +162,10 @@ real login flows tend to end with. Fix that path and the original incident class
 **Closed** in `docs/bugs/2026-08-26-recovery-pass-skips-throwing-last-rung.md`: the throw path now
 runs the same bounded pass (plus the last rung's own `detect` re-check, which the rethrow also
 skipped). The incident class is fully covered.
+
+## CLOSED (2026-08-27, averi 0.6.0)
+
+The remaining throw-path gap was fixed in 0.6.0 and verified on device — both salvage halves, with
+traces, in `2026-08-26-recovery-pass-skips-throwing-last-rung.md` §"Verified on device". Together
+with the 0.5.0 recovery pass (positively probed on device 2026-08-26), the incident class this
+report opened is fully closed: one `ensure_state` call now converges in every measured shape.

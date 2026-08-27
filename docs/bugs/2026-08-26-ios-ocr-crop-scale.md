@@ -165,3 +165,10 @@ section asked for), with the tree as a cross-check, so both holes above are shut
 device answers; a rootless tree that must still be trusted alone now fails closed rather than
 scaling silently. **The interim advice — "OCR asserts on iOS sheet screens fail closed, use tree
 `text` asserts there" — no longer applies.**
+
+## CLOSED (2026-08-27, averi 0.6.0)
+
+The out-of-tree screen size landed in 0.6.0 and the acceptance run PASSED on device — the exact
+asserts that read "Magnetic" pre-0.5.0 and failed closed on 0.5.0 now read the rendered strings on
+both platforms. Evidence and traces in
+`2026-08-26-png-scale-needs-out-of-tree-screen-size.md` §"Acceptance run".

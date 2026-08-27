@@ -170,3 +170,30 @@ pass is already spent. And `⚠ salvage <flow>` had become a trace token no doc 
 architecture round's fix for the same word was to strike it from ARCHITECTURE.md prose while this
 round's relabel put it into the trace — so SKILL.md now names the `⚠ recovery` / `⚠ salvage`
 diagnostic family and says outright that they are never the reason a call failed.
+
+## Verified on device (2026-08-27, averi 0.6.0) — both salvage halves PASSED
+
+The skeleton's production config no longer exercises the gap (post-PIN gate), so both halves were
+probed with temporary synthetic ladders on the real app (Android emulator, logged in, zero
+registration cost):
+
+1. **Recovery after a throwing last rung** — `reach: [probe_open_types, probe_open_filter_throw]`,
+   the last rung opens the filter sheet then throws on a deliberately absent element:
+
+   ```
+   ⚠ reach probe_open_filter_throw: failed — Timed out ... no.such.element.on.purpose
+   ↻ recovery probe_salvage_recovery: probe_open_filter_throw failed — re-running probe_open_types once
+   state probe_salvage_recovery: reached after recovery probe_open_types
+   ```
+
+   One call converged; the new "<flow> failed" trace wording is what shipped.
+
+2. **Salvage detect re-check** — single-rung reach whose rung reaches the state (filter sheet open)
+   then throws: `state probe_salvage_detect: reached after probe_open_filter_throw`. On 0.5.0 this
+   failed (the throw was rethrown above the detect check).
+
+Bonus, unplanned: during an unrelated iOS login failure the same day, the salvage armed on a REAL
+throwing last rung (`↻ recovery logged_in: login failed — re-running dismiss_post_login_prompts
+once`) — it could not converge because the app had crashed to the springboard (a foreign TEST-env
+binary had been installed on the sim by another session), but arming on the throw path is exactly
+the fixed behaviour. This report is CLOSED.

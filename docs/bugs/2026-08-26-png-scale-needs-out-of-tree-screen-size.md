@@ -199,3 +199,17 @@ identical to the iOS sheet class (a window-sized node starting exactly at the wi
 so the tree reads it as a sheet and scales by the pane. 0.5.0 refused that shape, but only by
 accident — it refused the sheet class too. The device screen resolves it and says the tree
 disagreed.
+## Acceptance run — PASSED on device (2026-08-27, averi 0.6.0)
+
+The §Acceptance asserts ran against 0.6.0 on the real devices, via a full cross-platform
+`verify(state: transaction_filter)`:
+
+```
+## android:  PASS clear_button renders "CLEAR FILTER" — read "CLEAR FILTER"
+             PASS apply_button renders "APPLY" — read "APPLY"
+## ios:      PASS clear_button renders "CLEAR FILTER" — read "CLEAR FILTER"
+             PASS apply_button renders "APPLY" — read "APPLY"
+```
+
+iPhone 17 sim, `treeSource: wda`, filter sheet up — the exact tree shape that read "Magnetic"
+pre-0.5.0 and failed closed on 0.5.0 now reads the rendered strings. This report is CLOSED.
