@@ -169,3 +169,33 @@ screen size was supplied and was unusable.
 Known and left open, pinned in `tests/verify/scale.test.ts`: a partial capture whose aspect
 matches the device rotated is indistinguishable from a rotation. Production captures are always
 full-screen, so nothing generates that input today.
+
+## Third round (2026-08-27) — the same class, twice more, and where it actually stops
+
+The round-2 replacement was verified in turn, and two of its rules had the same defect in new
+clothes. Both confirmed by execution, both fixed:
+
+- **The contradiction test was applied to the ROOT window, not just to a guessed one.** A root rect
+  IS the window — but horizontally scrollable content straddles the screen edge (a carousel's next
+  card, a list cell mid-swipe, whose full frame iOS reports), so every root-bearing tree with such
+  a child started failing closed. This was the worst regression of the whole change: it hit the
+  ORDINARY case, on both the scale path and rect parity, and 0.5.0 handled all of them correctly.
+  The window leg is now reported, and only a guessed (child-leg) window faces the test.
+- **The shape gate closed screen-shaped junk and opened bar-shaped junk.** A bar is no longer
+  crowned as a window — but a bar that is never a candidate still reaches the walk, and the walk
+  granted `reliable` to any origin-anchored maximum with no cross-check at all. Pixel-scale junk
+  `{0,0,804,150}` in a point tree read as an 804pt screen and scaled 1.5 in silence: hole 1, third
+  appearance, one gate over. The walk now requires a SCREEN-SHAPED rect to corroborate its maximum
+  when the tree contains one — a real status bar is corroborated by the window beneath it, junk is
+  not — and keeps the old, weaker answer for trees with nothing screen-shaped in them at all.
+
+The structural lesson, which is why this is the round it stops: every previous fix moved the guess
+to a different rule while leaving ONE path that answered confidently without a cross-check. The
+walk was that path all along. It now either has a witness or says it has none, so a refusal cannot
+drain into a quiet answer — which was the mechanism behind all three recurrences.
+
+A fourth hole is named and pinned rather than closed: a left|right split screen is geometrically
+identical to the iOS sheet class (a window-sized node starting exactly at the window's right edge),
+so the tree reads it as a sheet and scales by the pane. 0.5.0 refused that shape, but only by
+accident — it refused the sheet class too. The device screen resolves it and says the tree
+disagreed.

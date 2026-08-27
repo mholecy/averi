@@ -94,15 +94,16 @@ const MAX_SCREEN_ASPECT = 3;
 export function inferScreenSize(tree: UiNode): ScreenSize {
   const window = windowRect(tree);
   if (window !== undefined) {
-    // A window contradicted by the layout inside it is not a window we can
-    // measure against — say so instead of picking a side. Refusing this way
-    // rather than falling back to the walk is deliberate: the walk answers
-    // with the same ambiguity minus the axis check that would have caught it
-    // (found in review 2026-08-27, where the fallback re-hid hole 1).
-    const settled = !overhangs(tree, window);
+    // Only a GUESSED window faces the contradiction test. A root rect is the
+    // window by construction — asking whether its own layout overflows it
+    // refuses ordinary screens, because horizontally scrollable content
+    // straddles the edge (a carousel's next card, a list cell mid-swipe) and
+    // iOS reports its full frame. Review 2026-08-27 caught exactly that: every
+    // root-bearing tree with a straddling child had started failing closed.
+    const settled = window.leg === 'root' || !overhangs(tree, window.rect);
     return {
-      width: window.width,
-      height: window.height,
+      width: window.rect.width,
+      height: window.rect.height,
       reliable: settled,
       trustworthyHeight: settled,
     };
@@ -111,7 +112,7 @@ export function inferScreenSize(tree: UiNode): ScreenSize {
   return {
     width: walked.width,
     height: walked.height,
-    reliable: walked.startsAtOrigin,
+    reliable: walked.reliable,
     trustworthyHeight: false,
   };
 }
@@ -119,8 +120,12 @@ export function inferScreenSize(tree: UiNode): ScreenSize {
 interface Extent {
   width: number;
   height: number;
-  /** False when the widest ON-LAYOUT rect starts inset — a CONTENT width. */
-  startsAtOrigin: boolean;
+  /**
+   * False when the width cannot be believed: the widest ON-LAYOUT rect starts
+   * inset (a CONTENT width), or a screen-shaped rect in the same tree reaches
+   * materially less far than a bar-shaped one does (see walkExtent).
+   */
+  reliable: boolean;
 }
 
 /**
@@ -140,18 +145,36 @@ interface Extent {
 function walkExtent(tree: UiNode): Extent {
   let widest: Rect = { x: 0, y: 0, width: 0, height: 0 };
   let tallest: Rect = widest;
+  /** The widest extent reached by anything SHAPED like a screen, if anything is. */
+  let screenShaped = 0;
+  let sawScreenShaped = false;
   const walk = (n: UiNode): void => {
     if (onLayout(n.rect)) {
       if (n.rect.x + n.rect.width > widest.x + widest.width) widest = n.rect;
       if (n.rect.y + n.rect.height > tallest.y + tallest.height) tallest = n.rect;
+      if (isScreenShaped(n.rect) && n.rect.width > 0) {
+        sawScreenShaped = true;
+        screenShaped = Math.max(screenShaped, n.rect.x + n.rect.width);
+      }
     }
     n.children.forEach(walk);
   };
   walk(tree);
+  const width = widest.x + widest.width;
+  // The shape gate above keeps a BAR from being crowned as a window — but a
+  // bar that is never a candidate still lands here, and this path grants
+  // `reliable` to any origin-anchored maximum with no cross-check. That is how
+  // hole 1 kept coming back (review 2026-08-27, third round): pixel-scale junk
+  // {0,0,804,150} in a point tree read as an 804pt screen at scale 1.5, in
+  // silence. So a screen-shaped rect must corroborate the maximum when the
+  // tree has one at all — a real status bar is corroborated by the window
+  // below it, junk is not. A tree with nothing screen-shaped in it (a filtered
+  // list of rows) keeps the old, weaker answer rather than losing the width.
+  const corroborated = !sawScreenShaped || screenShaped * MAX_OVERHANG >= width;
   return {
-    width: widest.x + widest.width,
+    width,
     height: tallest.y + tallest.height,
-    startsAtOrigin: Math.abs(widest.x) < ORIGIN_SLACK,
+    reliable: Math.abs(widest.x) < ORIGIN_SLACK && corroborated,
   };
 }
 
@@ -202,18 +225,19 @@ function overhangs(tree: UiNode, window: Rect): boolean {
  * and a tall scroll container out of the running. Among what is left the
  * WIDEST wins, ties break on height: a too-large candidate stays visible to
  * the axis check in verify/scale.ts, which fails closed on it, where silently
- * preferring a narrower sibling would scale by a content width. The root
- * itself skips both tests — it is the window by construction, and an oversized
- * child inside it is exactly what must NOT be asked about.
+ * preferring a narrower sibling would scale by a content width. The root skips
+ * the shape test — it is the window by construction — and the caller skips the
+ * contradiction test for it too, which is why the leg is reported.
  */
-function windowRect(tree: UiNode): Rect | undefined {
-  if (isWindow(tree.rect)) return tree.rect;
+function windowRect(tree: UiNode): { rect: Rect; leg: 'root' | 'child' } | undefined {
+  if (isWindow(tree.rect)) return { rect: tree.rect, leg: 'root' };
   if (tree.rect.width > 0 && tree.rect.height > 0) return undefined;
   const candidates = tree.children.map((c) => c.rect).filter((r) => isWindow(r) && isScreenShaped(r));
   if (candidates.length === 0) return undefined;
-  return candidates.reduce((champion, r) =>
+  const best = candidates.reduce((champion, r) =>
     r.width > champion.width || (r.width === champion.width && r.height > champion.height) ? r : champion,
   );
+  return { rect: best, leg: 'child' };
 }
 
 /** Screen width alone, for the callers that never touch a screenshot. */

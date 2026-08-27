@@ -41,14 +41,59 @@ describe('inferScreenSize', () => {
     });
   });
 
+  // Both of these assert the WHOLE answer on purpose. Asserting `.width` alone
+  // let a later change turn "ignored" into "refused" without a test noticing
+  // (caught in review 2026-08-27): the width was still 402, but `reliable` had
+  // gone false and every png scale on the shape failed closed.
   it('ignores an off-viewport sibling parked at x = screen width', () => {
     const tree = treeWith(node({ x: 402, y: 0, width: 402, height: 874 }));
-    expect(inferScreenSize(tree).width).toBe(402);
+    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true });
   });
 
   it('ignores an oversized node anchored at x=0 — the variant `reliable` cannot see', () => {
     const tree = treeWith(node({ x: 0, y: 0, width: 804, height: 874 }));
-    expect(inferScreenSize(tree).width).toBe(402);
+    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true });
+  });
+
+  /**
+   * A ROOT is the window by construction, so its own layout may straddle the
+   * edge: horizontally scrollable content does exactly that, and iOS reports
+   * the full frame of a partly visible cell. Round 3 briefly applied the
+   * child-leg contradiction test here too and refused every such screen.
+   */
+  it('lets a root keep its window when content straddles the edge (carousel, list cell mid-swipe)', () => {
+    const tree = treeWith(node({ x: 364, y: 200, width: 340, height: 300 }));
+    expect(inferScreenSize(tree)).toMatchObject({ width: 402, reliable: true });
+  });
+
+  /**
+   * The shape gate keeps a bar from being CROWNED, but a bar that is never a
+   * candidate still reaches the walk — which used to hand `reliable` to any
+   * origin-anchored maximum. Pixel-scale junk in a point tree then read as an
+   * 804pt screen, in silence: hole 1, third appearance.
+   */
+  it('refuses a walked width that the tree\'s own screen-shaped rects contradict', () => {
+    const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
+      node({ x: 0, y: 0, width: 804, height: 150 }),
+      node({ x: 16, y: 60, width: 370, height: 800 }),
+    ]);
+    expect(inferScreenSize(tree)).toMatchObject({ width: 804, reliable: false });
+  });
+
+  it('…but a REAL status bar is corroborated by the window below it', () => {
+    const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
+      node({ x: 0, y: 0, width: 1080, height: 80 }),
+      node({ x: 0, y: 80, width: 1080, height: 2200 }),
+    ]);
+    expect(inferScreenSize(tree)).toMatchObject({ width: 1080, reliable: true });
+  });
+
+  it('keeps the weaker answer when NOTHING in the tree is screen-shaped (a flat list of rows)', () => {
+    const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
+      node({ x: 0, y: 0, width: 402, height: 44 }),
+      node({ x: 0, y: 44, width: 402, height: 44 }),
+    ]);
+    expect(inferScreenSize(tree)).toMatchObject({ width: 402, reliable: true });
   });
 
   it('ignores tall scroll content when the root supplies the height', () => {

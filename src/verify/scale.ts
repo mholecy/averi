@@ -53,7 +53,7 @@ export type PngScale =
  * unusable (a 0 or NaN size), the exact case worth admitting to.
  */
 const TREE_SCALED =
-  'scaled from the UI tree — no usable device screen size, so an off-layout node could still inflate it';
+  'scaled from the UI tree — no usable device screen size, so a node that is not the window could still inflate it';
 
 /**
  * How closely the ROTATED orientation may fit before a refused swap is called
@@ -103,8 +103,10 @@ export type { DeviceScreen };
  *   resolved. That is the one way this change can break a run that used to
  *   produce output, and it takes an iOS box with no working idb to reach.
  * - hole 2 is unfalsifiable from a tree alone and stays pinned in
- *   tests/verify/scale.test.ts, alongside a third: a partial capture whose
- *   aspect matches the device rotated cannot be told from a rotation.
+ *   tests/verify/scale.test.ts, alongside two more: a partial capture whose
+ *   aspect matches the device rotated cannot be told from a rotation, and a
+ *   left|right split screen is geometrically identical to the sheet class the
+ *   window leg exists to read.
  */
 export function pngScale(
   tree: UiNode,
@@ -129,9 +131,9 @@ export function pngScale(
   if (!size.reliable) {
     return {
       error:
-        `screen width ${size.width} is a CONTENT width, not the window width — either the widest ` +
-        'rect starts inset (filtered tree?) or the layout inside the only window-shaped node ' +
-        'reaches well past it, and the tree cannot say which of the two is the screen',
+        `screen width ${size.width} is a CONTENT width, not the window width — the widest rect ` +
+        'starts inset (filtered tree?), or the tree\'s own screen-shaped rects contradict it, and ' +
+        'nothing in the tree can say which reading is the screen',
     };
   }
   const scale = pngWidth / size.width;

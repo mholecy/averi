@@ -2,8 +2,8 @@
 
 **Fixes** `docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md`
 (follow-up to `docs/bugs/2026-08-26-ios-ocr-crop-scale.md`, shipped in 0.5.0).
-**Status:** IMPLEMENTED 2026-08-27 (phases 1–4), reviewed and corrected twice the same day
-(§10, §11),
+**Status:** IMPLEMENTED 2026-08-27 (phases 1–4), reviewed and corrected three times the same day
+(§10, §11, §12),
 device acceptance still owed. Phase 5 was
 examined and deliberately dropped — see the note at the end of §3.4. The plan is kept as written,
 with a §9 recording where the build diverged from it.
@@ -305,3 +305,22 @@ on the candidate itself (a screen is not 13:1) and a contradiction test on the l
 neither of which consults a global extent that off-layout nodes poison. The shape test closed a
 defect from round 2's own review for free — a tall scroll container was winning the height
 tie-break and making a landscape tree read as portrait.
+
+---
+
+## 12. Third round
+
+The round-2 rules were verified and two of them carried the same defect forward (details in the
+bug doc). What is worth keeping from three recurrences of one bug class:
+
+**The defect was never in the rule that got rewritten.** Each round replaced the rule that had
+just failed — root-wins, then widest-wins, then containment, then shape-plus-contradiction — while
+the actual mechanism sat one layer down: the widest-rect walk answered `reliable: true` for any
+origin-anchored maximum, with nothing to check it against. Every guard that could only REFUSE
+drained into that path, so each fix converted a loud wrong answer into a quiet one somewhere else.
+The walk now needs a screen-shaped witness for its maximum or admits it has none.
+
+**A rule written for guesses must not be applied to facts.** The contradiction test was right for
+a child the code picked out of a list and wrong for a root the platform handed it. Applying it
+uniformly looked like consistency and was a regression on the ordinary case — the one shape nobody
+had a test for, because it had always just worked.

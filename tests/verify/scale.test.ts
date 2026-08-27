@@ -146,6 +146,28 @@ describe('pngScale — the holes, and what the device screen does to them', () =
     expect(pngScale(IOS, 1206, 555, { width: 402, height: 874 })).toMatchObject({ width: 874 });
   });
 
+  /**
+   * A FOURTH hole, named in review 2026-08-27 and left open with its eyes
+   * open. A left|right split screen — two window-sized panes, the second
+   * starting exactly at the first's right edge — is BYTE-IDENTICAL in geometry
+   * to the iOS sheet class, where the node at x=screenWidth is off-viewport
+   * junk that must be ignored. The tree cannot tell them apart, so it reads
+   * the measured case: 2208x1840 of two 1104-wide panes scales by 2.0 (a
+   * full-screen reading would be 1.0). 0.5.0 refused this shape, which was
+   * accidental rather than principled — it refused the sheet class too.
+   * The device screen resolves it, and says the tree disagreed.
+   */
+  it('does NOT catch a left|right split screen on the tree path', () => {
+    const split = node({ x: 0, y: 0, width: 0, height: 0 }, [
+      node({ x: 0, y: 0, width: 1104, height: 1840 }),
+      node({ x: 1104, y: 0, width: 1104, height: 1840 }),
+    ]);
+    expect(pngScale(split, 2208, 1840)).toMatchObject({ scale: 2, width: 1104 });
+    const withDevice = pngScale(split, 2208, 1840, { width: 2208, height: 1840 });
+    expect(withDevice).toMatchObject({ scale: 1, width: 2208 });
+    expect(withDevice.note).toMatch(/the tree reads 1104 — 50\.0% apart/);
+  });
+
   it('the device screen scales an iPad split-view pane by the SCREEN and says the two disagree', () => {
     const pane = node({ x: 0, y: 0, width: 507, height: 834 });
     const got = pngScale(pane, 2224, 1668, { width: 1112, height: 834 });
