@@ -379,6 +379,34 @@ flows:
     ]);
   });
 
+  it('WARNS before running a destructive rung, not after the wipe', async () => {
+    // The 2026-08-27 finding: an inactivity timeout made the ladder escalate
+    // CORRECTLY into a wipe that destroyed a still-valid device registration.
+    // The engine cannot tell "log in from scratch" from "re-authenticate an
+    // already-registered device" — only the config can — so the fix is to
+    // announce the cost while a human watching the run can still interrupt.
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt');
+    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
+    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const trace = (error as FlowError).trace;
+    const warned = trace.findIndex((t) => t.detail?.includes('this rung is DESTRUCTIVE') === true);
+    const wiped = trace.findIndex((t) => t.detail?.includes('app state wiped') === true);
+    expect(warned).toBeGreaterThanOrEqual(0);
+    expect(wiped).toBeGreaterThanOrEqual(0);
+    expect(warned).toBeLessThan(wiped); // pre-flight, not post-hoc
+    // ...and it names the cure, which lives in the config, not the engine.
+    expect(trace[warned].detail).toMatch(/non-destructive rung declared BEFORE this one/);
+  });
+
+  it('stays SILENT about destructiveness on a rung that does not wipe', async () => {
+    // The negative half: warning on every rung would train the reader to skip it.
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
+      if (id === 'not_now') self.current = 'dashboard';
+    });
+    const trace = await new FlowEngine(cfg, fake, FAST).ensureState('logged_in');
+    expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
+  });
+
   it('escalates when the cheap flow THROWS, and says so in the trace', async () => {
     // The everyday shape: the prelude taps an interstitial that is not there,
     // so its `tap:` times out. Aborting the ladder here would mean the prelude
@@ -1306,12 +1334,12 @@ flows:
 `);
 
   /** Fake whose target starts below the fold and moves up per swipe. */
-  function scrollingFake(startY: number, perSwipe = 600) {
+  function scrollingFake(startY: number, perSwipe = 600, height = 40) {
     resetLayout();
     const target = node({
       role: 'button',
       identifier: 'submit_button',
-      rect: { x: 0, y: startY, width: 100, height: 40 },
+      rect: { x: 0, y: startY, width: 100, height },
     });
     const form = screen(el({ identifier: 'form_root' }), target);
     class ScrollingFake extends FakeAdapter {
@@ -1329,14 +1357,93 @@ flows:
     expect(fake.swipes).toHaveLength(2);
     // content below → finger moves up
     expect(fake.swipes[0].to.y).toBeLessThan(fake.swipes[0].from.y);
-    expect(trace).toContainEqual({ action: 'scroll_until', detail: 'id:"submit_button" visible after 2 swipes' });
+    expect(trace).toContainEqual({
+      action: 'scroll_until',
+      detail: 'id:"submit_button" fully visible after 2 swipes',
+    });
   });
 
   it('passes with 0 swipes when the element is already visible (fast path)', async () => {
     const fake = scrollingFake(500);
     const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
     expect(fake.swipes).toHaveLength(0);
-    expect(trace).toContainEqual({ action: 'scroll_until', detail: 'id:"submit_button" visible after 0 swipes' });
+    expect(trace).toContainEqual({
+      action: 'scroll_until',
+      detail: 'id:"submit_button" fully visible after 0 swipes',
+    });
+  });
+
+  // ---- the 2026-08-27 finding: "visible" meant INTERSECTS, and said so to nobody.
+  // A row clipped by the floating bottom-nav bar stopped the loop, reported a
+  // bare "visible", and the next rect assert measured the CLIPPED box — sending
+  // the investigation at the app's row-height logic, which was correct.
+
+  const cfgFully = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  to_submit:
+    steps:
+      - scroll_until: { element: { id: submit_button }, maxSwipes: 4, timeout: 2s, fully: true }
+`);
+
+  it('reports the CLIPPED fraction instead of a bare "visible" when the element straddles an edge', async () => {
+    // 40px tall, stopping at y=1980 in a 1000x2000 viewport → half of it below the fold.
+    const fake = scrollingFake(2580);
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    const row = trace.find((t) => t.action.endsWith('scroll_until'));
+    expect(row?.detail).toContain('CLIPPED at bottom');
+    expect(row?.detail).toContain('50% of it is in the viewport');
+    // The caller is told what it costs them, in the terms of their next call.
+    expect(row?.detail).toContain('will measure the CLIPPED box');
+    // ...and the row is marked, so it is visible in a long trace.
+    expect(row?.action).toBe('⚠ scroll_until');
+  });
+
+  it('fully: true keeps swiping past a clipped stop until the element is entirely inside', async () => {
+    const fake = scrollingFake(2580);
+    const trace = await new FlowEngine(cfgFully, fake, FAST).runFlow('to_submit');
+    expect(fake.swipes).toHaveLength(2); // the default would have stopped at 1
+    expect(trace).toContainEqual({
+      action: 'scroll_until',
+      detail: 'id:"submit_button" fully visible after 2 swipes',
+    });
+  });
+
+  it('fully: true names the real defect when the content is exhausted and the element STAYS clipped', async () => {
+    // The measured shape: a scroll container with no clearance for an overlay.
+    // No amount of swiping can reveal the last row, so more swipes is the wrong
+    // diagnosis and the message must say which one is right.
+    const fake = scrollingFake(1980, 0); // clipped at bottom, swipes move nothing
+    await expect(new FlowEngine(cfgFully, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+      /CLIPPED at bottom, 50% of it is in the viewport, and the content is exhausted/,
+    );
+    await expect(new FlowEngine(cfgFully, scrollingFake(1980, 0), FAST).runFlow('to_submit')).rejects.toThrow(
+      /cannot be fully revealed — that is a layout defect/,
+    );
+  });
+
+  it('never rounds a clipped element up to a reassuring 100%', async () => {
+    // A sub-pixel clip is still a clip: the line exists to say something is
+    // missing, so "CLIPPED at bottom, 100% of it is in the viewport" would
+    // contradict itself in the one place a reader is looking for the shortfall.
+    //
+    // The element must be TALL enough for the clamp to be reachable: at 400 px
+    // high with 399 inside, the fraction is 99.75% and rounds to 100. A 40 px
+    // element tops out at 97.5% and would pass this test with the clamp
+    // deleted — a pin that cannot fail cannot distinguish itself from no check.
+    const fake = scrollingFake(1601, 600, 400); // 399 of 400 px inside → 99.75%
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    const row = trace.find((t) => t.action.endsWith('scroll_until'));
+    expect(row?.detail).toContain('CLIPPED at bottom');
+    expect(row?.detail).toContain('99% of it is in the viewport');
+    expect(row?.detail).not.toContain('100% of it is in the viewport');
+  });
+
+  it('the NEGATIVE half: a genuinely off-screen element still fails as before', async () => {
+    const fake = scrollingFake(50_000, 10);
+    await expect(new FlowEngine(cfgFully, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+      /never intersected the 1000x2000 viewport/,
+    );
   });
 
   it('fails after maxSwipes with a diagnosis of the last tree', async () => {

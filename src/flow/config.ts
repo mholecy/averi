@@ -49,6 +49,13 @@ export interface ScrollUntilSpec {
   /** Which way the CONTENT moves into view (down = reveal content below). */
   direction?: 'up' | 'down' | 'left' | 'right';
   maxSwipes?: number;
+  /**
+   * Require the element ENTIRELY inside the viewport, not merely overlapping
+   * it. Default false, which is the historical stop condition — one pixel of
+   * overlap satisfies it. Set this whenever the next step measures the element
+   * (a rect assert, a screenshot): a clipped rect measures the clipped box.
+   */
+  fully?: boolean;
   timeout?: string | number;
 }
 
@@ -161,6 +168,7 @@ const step: z.ZodType<Step> = z.lazy(() =>
             element: elementSpecSchema,
             direction: z.enum(['up', 'down', 'left', 'right']).optional(),
             maxSwipes: z.number().int().min(1).optional(),
+            fully: z.boolean().optional(),
             timeout: timeout.optional(),
           })
           .strict(),

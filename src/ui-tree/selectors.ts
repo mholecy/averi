@@ -150,6 +150,48 @@ export function intersectsViewport(
   return w > 0 && h > 0;
 }
 
+/**
+ * How much of the rect actually lies inside the viewport, as a fraction of its
+ * own area (0 = fully outside, 1 = fully inside).
+ *
+ * The companion to `intersectsViewport`, which answers only "any overlap at
+ * all". That predicate is the right stop condition for a scroll, but it is the
+ * WRONG thing to report: measured 2026-08-27, a row clipped by the floating
+ * bottom-nav bar intersected by 87% of its height, `scroll_until` reported a
+ * bare "visible", and the next assert measured the CLIPPED rect — reading
+ * h 143 against a pinned 60 and pointing the investigation at the app's
+ * row-height logic, which was correct. A caller who is told the fraction can
+ * see the clipping; a caller told "visible" cannot.
+ */
+export function visibleFractionInViewport(
+  rect: UiNode['rect'],
+  viewport: { width: number; height: number },
+): number {
+  if (rect.width <= 0 || rect.height <= 0) return 0;
+  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
+  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
+  if (w <= 0 || h <= 0) return 0;
+  return (w * h) / (rect.width * rect.height);
+}
+
+/**
+ * Which viewport edges the rect extends past, in the order a reader scans.
+ * Named rather than counted because the edge IS the diagnosis: 'bottom' with
+ * the content exhausted is a missing-clearance bug, 'top' is a sticky header
+ * overlapping, and the two want different fixes.
+ */
+export function clippedEdges(
+  rect: UiNode['rect'],
+  viewport: { width: number; height: number },
+): ('top' | 'bottom' | 'left' | 'right')[] {
+  const out: ('top' | 'bottom' | 'left' | 'right')[] = [];
+  if (rect.y < 0) out.push('top');
+  if (rect.y + rect.height > viewport.height) out.push('bottom');
+  if (rect.x < 0) out.push('left');
+  if (rect.x + rect.width > viewport.width) out.push('right');
+  return out;
+}
+
 /** Center of the node's rect — where taps land. */
 export function tapPoint(node: UiNode): { x: number; y: number } {
   return {

@@ -14,7 +14,7 @@ import {
   loadEnvBeside,
   type AveriConfig,
 } from '../flow/config.js';
-import { fillField, FlowEngine, scrollUntilVisible } from '../flow/engine.js';
+import { describeScrollResult, fillField, FlowEngine, scrollUntilVisible } from '../flow/engine.js';
 import {
   assertSpecSchema,
   captureStableScreenshot,
@@ -360,24 +360,30 @@ registerTool(
   'scroll_until',
   {
     description:
-      'Swipe until the element is visible in the viewport — the portable way to reach content below the fold (no coordinates). direction = where the content lies (down = below the current view).',
+      'Swipe until the element is visible in the viewport — the portable way to reach content below the fold (no coordinates). direction = where the content lies (down = below the current view). ' +
+      'By default "visible" means INTERSECTS the viewport, so the element may still be clipped at an edge; a clipped stop says which edges clip it and what fraction is on screen, a clean one says "fully visible". ' +
+      'Pass fully: true when the next step MEASURES the element (a rect assert, a screenshot) — a clipped rect measures the clipped box, and fully: true fails loudly instead, naming the shortfall.',
     inputSchema: {
       platform,
       selector: z.string().describe('Element to scroll into view, e.g. \'id:submit_button\''),
       direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Default down'),
       maxSwipes: z.number().int().min(1).optional().describe('Default 6'),
+      fully: z
+        .boolean()
+        .optional()
+        .describe('Require the element ENTIRELY inside the viewport, not just overlapping. Default false'),
       timeoutMs: z.number().optional().describe('Default 15000'),
       configPath,
     },
   },
-  async ({ platform: p, selector, direction, maxSwipes, timeoutMs, configPath: cp }) => {
+  async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, configPath: cp }) => {
     const adapter = await registry.get(p, await loadIosOpts(p, cp));
-    const swipes = await scrollUntilVisible(
+    const result = await scrollUntilVisible(
       adapter,
       { find: (tree) => findAll(tree, selector), describe: selector },
-      { direction, maxSwipes, timeout: timeoutMs },
+      { direction, maxSwipes, fully, timeout: timeoutMs },
     );
-    return text(`Element ${selector} visible after ${swipes} swipe${swipes === 1 ? '' : 's'}`);
+    return text(`Element ${selector} ${describeScrollResult(result)}`);
   },
 );
 
@@ -503,7 +509,7 @@ registerTool(
         .string()
         .optional()
         .describe(
-          'Path to a layout-contract JSON ({screen, tolerance_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,bg?,bg_dark?,sample?,text?,text_dynamic?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default ' + DEFAULT_TOLERANCE_DE + '; vs-contract at ' + CONTRACT_TOL_FACTOR + 'x); anchors without bg are color-compared platform-to-platform only. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode. ' +
+          'Path to a layout-contract JSON ({screen, tolerance_pct, tolerance_aspect_pct, figma_frame_width, anchors:[{id,x?,y?,w?,h?,aspect?,bg?,bg_dark?,sample?,text?,text_dynamic?}]}, Figma-frame units) — after the legs, geometry is compared per anchor in % of screen width and a "## rect parity" table is appended. Anchors with bg (hex; #RRGGBBAA alpha dropped) additionally get their fills sampled from the legs\' screenshots into a "## color parity" table (dE(a,i) primary at tolerance_de, default ' + DEFAULT_TOLERANCE_DE + '; vs-contract at ' + CONTRACT_TOL_FACTOR + 'x); anchors without bg are color-compared platform-to-platform only. A derived `aspect` row also compares each anchor\'s SHAPE android-vs-ios; omitting w/h does not disable it (omission means "not pinned", and the row\'s value is catching shape bugs on unpinned sides) — set `aspect: false` on an anchor whose height the two platforms genuinely derive by different mechanisms (e.g. Android\'s a11y touch-target floor inflating a node box to 48 where iOS reports 44), and put the reason beside it. `tolerance_aspect_pct` is its own threshold because a ratio spread is not a %-of-screen-width delta; it defaults to tolerance_pct. The color check always runs the LIGHT axis (bg): bg_dark is carried in the contract for the deferred dark-mode round, which needs a theme input AND a device actually captured in dark mode. ' +
             'Anchors with text (the exact rendered string) or text_dynamic (true for amounts/dates, whose locale formatting legitimately differs) get a "## text parity" table: the copy is read back off the legs\' screenshots with OCR — what the user SEES, since on iOS the tree carries authored a11y summaries rather than rendered copy — and compared android-vs-ios and vs the contract, plus rendered ink height as the type-size check (tolerance_size_pct, default ' + DEFAULT_SIZE_TOLERANCE_PCT + '%, compared only where both strings match). OCR is macOS-only; elsewhere the table falls back to tree evidence and says so.',
         ),
       configPath,
