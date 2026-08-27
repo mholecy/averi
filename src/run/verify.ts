@@ -68,6 +68,12 @@ interface VerificationLeg {
   health: string;
   tree?: UiNode;
   treeError?: string;
+  /**
+   * The device's screen size, in tree units — what the png scale is derived
+   * from when it is here (verify/scale.ts). Absent when the device would not
+   * say; the tables then scale off the tree and say so.
+   */
+  screen?: { width: number; height: number };
 }
 
 /**
@@ -160,8 +166,12 @@ export async function runVerification(
       }
     }
     const shot = await adapter.screenshot();
+    // The out-of-tree screen size, memoized inside the adapter and therefore
+    // usually already paid for. A failure here is NOT a leg failure: it costs
+    // the pixel tables their best scale, not their evidence.
+    const screen = await adapter.viewport().catch(() => undefined);
     const health = await appHealth(adapter, cfg);
-    return { trace, results, shot, health, tree, treeError };
+    return { trace, results, shot, health, tree, treeError, screen };
   };
 
   const runs = await Promise.allSettled(platforms.map(runOne));
@@ -265,7 +275,7 @@ const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> =>
 const captureOf = (leg: VerificationLeg, p: Platform): Contribution<ColorCapture> => {
   if (leg.tree === undefined) return { note: noTreeNote(leg, p) };
   try {
-    return { value: { tree: leg.tree, png: PNG.sync.read(leg.shot) } };
+    return { value: { tree: leg.tree, png: PNG.sync.read(leg.shot), screen: leg.screen } };
   } catch (e) {
     return {
       note: `(${p}: screenshot PNG decode failed — ${e instanceof Error ? e.message : String(e)} — compared without it)`,
@@ -311,13 +321,18 @@ async function runOcr(
       const { tree, shot } = run.value;
       try {
         const png = PNG.sync.read(shot);
-        const regions = ocrRegionsFor(contract, tree, png.width, png.height);
+        const { regions, note } = ocrRegionsFor(contract, tree, png.width, png.height, run.value.screen);
+        // Nothing scaled, nothing to caveat.
         if (regions.length === 0) return;
         const results = await engine.recognize(shot, regions);
         ocrByPlatform.set(p, {
           ocr: new Map(results.map((r) => [r.id, r])),
           pngWidth: png.width,
         });
+        // After the recognizer, so a leg that ends up compared from the tree
+        // carries THAT reason alone rather than a caveat about regions it
+        // never used.
+        if (note !== undefined) notes.push(`(${p}: ${note})`);
       } catch (e) {
         notes.push(
           `(${p}: OCR failed — ${e instanceof Error ? e.message : String(e)} — that platform compared from the tree.)`,

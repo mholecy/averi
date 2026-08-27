@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import {
   compareRectParity,
@@ -376,5 +378,35 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
     expect(pass).toBe(false);
     expect(detail).toContain('screen width could not be inferred');
     expect(detail).not.toContain('NaN'); // never a vacuous ΔNaN% pass
+  });
+});
+
+/**
+ * Rect parity keeps deriving its denominator from the TREE — `% of screen
+ * width` is compared against a Figma FRAME, i.e. the app's canvas, which under
+ * split view is the window and not the device screen
+ * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). But it
+ * shares `inferScreenWidth` with the png scale, so the geometry hardening
+ * moved its numbers, and review 2026-08-27 rightly asked for that in a test
+ * rather than in prose: on an iOS sheet the width was 804 with an UNRELIABLE
+ * banner, and it is now the window's own 402.
+ */
+describe('rect parity on the iOS filter-sheet shape', () => {
+  it('normalizes by the window (402), not by the scrims\' extent (804)', async () => {
+    const tree = parseWdaSourceValue(
+      JSON.parse(await readFile(new URL('../fixtures/wda-source-filter-sheet.json', import.meta.url), 'utf8')),
+    );
+    expect(inferScreenWidth(tree)).toEqual({ width: 402, reliable: true });
+
+    // apply_button x=208 of a 402pt screen is 51.7%; against 804 it read 25.9%
+    // and a contract authored at ~52% would have hard-FAILED on a correct app.
+    const { pass, detail } = evaluateRectAssert(
+      { x: 208, y: 791, width: 176, height: 44 },
+      { x: 208, w: 176, frameWidth: 402 },
+      tree,
+    );
+    expect(pass).toBe(true);
+    expect(detail).toContain('screen width 402');
+    expect(detail).not.toContain('UNRELIABLE');
   });
 });

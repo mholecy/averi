@@ -319,6 +319,70 @@ describe('ocr asserts (what the element RENDERS)', () => {
     expect(result.detail).toContain('read "CONTINUE"');
   });
 
+  /**
+   * The 2026-08-26 follow-up: the crop is scaled by the DEVICE screen, not by
+   * whatever the tree's widest rect happens to be
+   * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). The
+   * tree here is the shape that fails closed in 0.5.0 — a rect-less root over
+   * an inset, oversized node, with an off-screen scrim for company — and the
+   * assert now reads the element anyway.
+   */
+  const sheetFake = () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        detail: {
+          role: 'container',
+          label: null,
+          identifier: null,
+          value: null,
+          rect: { x: 0, y: 0, width: 0, height: 0 },
+          children: [
+            node({ identifier: 'card', rect: { ...CARD } }),
+            node({ identifier: 'wide', rect: { x: 16, y: 0, width: 1400, height: 2000 } }),
+            node({ identifier: 'scrim', rect: { x: -1000, y: -2000, width: 3000, height: 6000 } }),
+          ],
+        },
+      },
+      'detail',
+    );
+    fake.nextScreenshot = png(1000, 320);
+    // Asked for explicitly: this tree has no root rect to derive it from, which
+    // is the whole point of the case.
+    fake.viewportSize = { width: 1000, height: 2000 };
+    return fake;
+  };
+
+  it('scales the crop by the device screen, so a tree that cannot describe one no longer fails closed', async () => {
+    const verifier = new Verifier(sheetFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(true);
+    // The tree disagrees with the device, and the assert says which it used.
+    expect(result.detail).toMatch(/1000x2000 DEVICE screen; the tree reads 1416 \(content width\)/);
+  });
+
+  it('…and the same tree WITHOUT a device screen still fails closed, as 0.5.0 does', async () => {
+    const fake = sheetFake();
+    fake.viewport = async () => {
+      throw new Error('idb describe: no such device');
+    };
+    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/CONTENT width.*failing closed, rendered text unchecked/);
+  });
+
+  it('still reads the tree when the device will not report a screen — a failed read is not a failed assert', async () => {
+    const fake = cardFake();
+    fake.viewport = async () => {
+      throw new Error('idb describe: no such device');
+    };
+    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('read "CONTINUE"');
+  });
+
   it('fails on drift and quotes both sides', async () => {
     const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('0.00') });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'Enter amount' } });
@@ -407,6 +471,22 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     });
     expect(loose.pass).toBe(true);
     expect(loose.description).toContain('dE00 11 of #FDFDFD (light theme)');
+  });
+
+  it('reads the device screen ONCE per Verifier, however many pixel asserts run', async () => {
+    const fake = cardFake('#FDFDFD');
+    let viewports = 0;
+    fake.viewport = async () => {
+      viewports++;
+      return { width: 1000, height: 2000 };
+    };
+    const verifier = new Verifier(fake, FAST);
+    await verifier.assertAll([
+      { element: { id: 'card' }, color: { expected: '#FDFDFD' } },
+      { element: { id: 'card' }, color: { expected: '#FDFDFD' } },
+      { element: { id: 'card' }, absent: true, timeout: '10ms' },
+    ]);
+    expect(viewports).toBe(1);
   });
 
   it('samples a STABLE screenshot (at least two captures compared) via adapter.screenshot()', async () => {

@@ -1,6 +1,6 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { collectRects } from '../ui-tree/geometry.js';
-import { pngScale } from './scale.js';
+import { pngScale, type DeviceScreen } from './scale.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import type { OcrLine, OcrRegion, OcrRegionResult } from './ocr.js';
@@ -228,6 +228,10 @@ function hasAccessibleName(tree: UiNode, id: string): boolean {
  * (see ocrRegionForRect); anchors fully outside it are omitted and surface as
  * OCR-less rows.
  *
+ * Returns the scale's own caveat alongside the regions — the device and the
+ * tree disagreeing is a whole-capture fact, so the table says it once per
+ * platform rather than once per anchor (run/verify.ts pushes it).
+ *
  * THROWS when the SCALE itself is unusable — that is a whole-capture fault,
  * not a per-anchor one, so returning an empty list would read to the caller as
  * "this screen has no text anchors" and quietly drop the entire text table.
@@ -238,8 +242,9 @@ export function ocrRegionsFor(
   tree: UiNode,
   pngWidth: number,
   pngHeight: number,
-): OcrRegion[] {
-  const scaled = pngScale(tree, pngWidth, pngHeight);
+  screen?: DeviceScreen,
+): { regions: OcrRegion[]; note?: string } {
+  const scaled = pngScale(tree, pngWidth, pngHeight, screen);
   if (scaled.error !== undefined) throw new Error(`text parity: ${scaled.error}; failing closed`);
   const rects = collectRects(tree);
   const regions: OcrRegion[] = [];
@@ -250,7 +255,7 @@ export function ocrRegionsFor(
     const region = regionForRect(anchor.id, rect, scaled.scale, pngWidth, pngHeight);
     if (region !== undefined) regions.push(region);
   }
-  return regions;
+  return { regions, note: scaled.note };
 }
 
 /**
@@ -271,13 +276,14 @@ export function ocrRegionForRect(
   tree: UiNode,
   pngWidth: number,
   pngHeight: number,
-): { region: OcrRegion; error?: undefined } | { region?: undefined; error: string } {
-  const scaled = pngScale(tree, pngWidth, pngHeight);
+  screen?: DeviceScreen,
+): { region: OcrRegion; note?: string; error?: undefined } | { region?: undefined; note?: undefined; error: string } {
+  const scaled = pngScale(tree, pngWidth, pngHeight, screen);
   if (scaled.error !== undefined) return { error: scaled.error };
   const region = regionForRect(id, rect, scaled.scale, pngWidth, pngHeight);
   return region === undefined
     ? { error: `element rect ${rect.x},${rect.y} ${rect.width}x${rect.height} scaled by ${scaled.scale.toFixed(3)} leaves nothing on-screen` }
-    : { region };
+    : { region, note: scaled.note };
 }
 
 /** The scaled-and-clamped crop itself, shared by both callers above. */

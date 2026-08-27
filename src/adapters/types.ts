@@ -14,6 +14,16 @@ export interface Device {
   state: 'booted' | 'offline';
 }
 
+/**
+ * Screen size in the platform's own tree units — see `DeviceAdapter.viewport`,
+ * which is the one place that reads it. Named here rather than in verify/ so
+ * the reading and every use of it share a definition.
+ */
+export interface DeviceScreen {
+  width: number;
+  height: number;
+}
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, ...
@@ -77,9 +87,13 @@ export interface DeviceAdapter {
 
   /**
    * Visible screen size in the SAME units as uiTree rects (Android: pixels,
-   * iOS: points) — the reference frame for viewport-visibility checks.
+   * iOS: points) — the reference frame for viewport-visibility checks, and the
+   * only measurement of the screen that does not come from the tree, which is
+   * what the png scale is derived from (verify/scale.ts). Those units are
+   * load-bearing: verify/ divides png pixels by this width, so a platform that
+   * started reporting the other unit would move every crop.
    */
-  viewport(): Promise<{ width: number; height: number }>;
+  viewport(): Promise<DeviceScreen>;
 
   tap(x: number, y: number): Promise<void>;
   longPress(x: number, y: number, durationMs?: number): Promise<void>;

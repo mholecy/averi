@@ -41,6 +41,8 @@ function fake(platform: Platform): FakeAdapter {
   // `platform` is readonly for callers; the fake needs to stand in for both.
   (adapter as unknown as { platform: Platform }).platform = platform;
   adapter.nextScreenshot = whitePng();
+  // viewport() is left to derive from SCREEN (100x200), which is also the png
+  // size — i.e. scale 1. See the note on FakeAdapter.viewportSize.
   return adapter;
 }
 
@@ -167,6 +169,83 @@ describe('color parity opt-in', () => {
     const color = out.sections.find((s) => s.startsWith('## color parity'));
     expect(color).toContain('screenshot PNG decode failed');
     expect(color).toContain('SKIPPED: no leg produced both a UI tree and a decodable screenshot.');
+  });
+});
+
+describe('the device screen behind the pixel tables', () => {
+  /**
+   * Both pixel dimensions scale by the device's own screen size now
+   * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). A leg
+   * that could not read one still produces its tables — from the tree, saying
+   * so, because a table scaled off the tree is the reading both 2026-08-26
+   * bugs were about and looks exactly like a good one.
+   */
+  const blindFake = (): FakeAdapter => {
+    const adapter = fake('android');
+    adapter.viewport = async () => {
+      throw new Error('adb: device offline');
+    };
+    return adapter;
+  };
+
+  it('says so in the color table when the device screen could not be read', async () => {
+    const out = await runVerification(
+      request({ platforms: ['android'], contract: contract([{ id: 'card', x: 10, w: 40, bg: '#FFFFFF' }]) }),
+      async () => blindFake(),
+    );
+    const color = out.sections.find((s) => s.startsWith('## color parity'));
+    expect(color).toContain('scaled from the UI tree — no usable device screen size');
+  });
+
+  it('says so in the text table too, and the run survives it', async () => {
+    const out = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+        ocrEngine: {
+          recognize: async (_png, regions) =>
+            regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 10, h: 10 }] })),
+        },
+      }),
+      async () => blindFake(),
+    );
+    const text = out.sections.find((s) => s.startsWith('## text parity'));
+    expect(text).toContain('scaled from the UI tree — no usable device screen size');
+    expect(text).toContain('CONTINUE');
+  });
+
+  /**
+   * Review 2026-08-27 caught the text table dropping this note while the color
+   * table printed it — and a comment in text-parity.ts claiming the run layer
+   * said it. A split-view leg scaled by the device while the tree read half
+   * the width, and only one of two tables admitted it.
+   */
+  it('carries the device-vs-tree disagreement into the text table, not just the color one', async () => {
+    const adapter = fake('android');
+    adapter.viewportSize = { width: 200, height: 400 }; // twice the tree's 100x200, same aspect
+    const out = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+        ocrEngine: {
+          recognize: async (_png, regions) =>
+            regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 10, h: 10 }] })),
+        },
+      }),
+      async () => adapter,
+    );
+    const text = out.sections.find((s) => s.startsWith('## text parity'));
+    expect(text).toMatch(/android: scaled by the 200x400 DEVICE screen; the tree reads 100/);
+  });
+
+  it('a leg WITH a device screen says nothing — the note is for the degraded path only', async () => {
+    const out = await runVerification(
+      request({ platforms: ['android'], contract: contract([{ id: 'card', x: 10, w: 40, bg: '#FFFFFF' }]) }),
+      async () => fake('android'),
+    );
+    const color = out.sections.find((s) => s.startsWith('## color parity'));
+    expect(color).not.toContain('unavailable');
+    expect(color).toContain('scale 1.000');
   });
 });
 

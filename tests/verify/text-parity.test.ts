@@ -393,10 +393,10 @@ describe('compareTextParity — regressions found in review', () => {
     const c = contract([{ id: 'cta', text: 'X' }]);
     const tree = root(402, [n({ identifier: 'cta', rect: { x: -10, y: 800, width: 100, height: 100 } })]);
     // scale 3: raw region would be x -30 .. 270, y 2400 .. 2700 against a 2622-tall png.
-    expect(ocrRegionsFor(c, tree, 1206, 2622)).toEqual([{ id: 'cta', x: 0, y: 2400, w: 270, h: 222 }]);
+    expect(ocrRegionsFor(c, tree, 1206, 2622).regions).toEqual([{ id: 'cta', x: 0, y: 2400, w: 270, h: 222 }]);
     // Nothing on screen at all → omitted, so it surfaces as an OCR-less row.
     const off = root(402, [n({ identifier: 'cta', rect: { x: 0, y: 2000, width: 100, height: 100 } })]);
-    expect(ocrRegionsFor(c, off, 1206, 2622)).toEqual([]);
+    expect(ocrRegionsFor(c, off, 1206, 2622).regions).toEqual([]);
   });
 });
 
@@ -455,7 +455,7 @@ describe('ocrRegionsFor', () => {
   it('scales opted-in anchor rects into png pixels (live: android 1.000, ios 3.000)', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }, { id: 'other', w: 10 }]);
     const ios = root(402, [n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
-    expect(ocrRegionsFor(c, ios, 1206, 2622)).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
+    expect(ocrRegionsFor(c, ios, 1206, 2622).regions).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
   });
 
   it('THROWS when the scale cannot be derived — an empty list would read as "no text anchors"', () => {
@@ -473,7 +473,7 @@ describe('ocrRegionsFor', () => {
       n({ identifier: 'cta', rect: { x: 208, y: 791, width: 176, height: 44 } }),
       n({ rect: { x: 402, y: 0, width: 402, height: 874 } }),
     ]);
-    expect(ocrRegionsFor(c, sheet, 1206, 2622)).toEqual([{ id: 'cta', x: 624, y: 2373, w: 528, h: 132 }]);
+    expect(ocrRegionsFor(c, sheet, 1206, 2622).regions).toEqual([{ id: 'cta', x: 624, y: 2373, w: 528, h: 132 }]);
 
     // Same tree with the window itself inflated — no root to fall back on.
     const broken = root(804, [n({ identifier: 'cta', rect: { x: 208, y: 791, width: 176, height: 44 } })], 874);

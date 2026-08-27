@@ -133,3 +133,35 @@ the follow-up; this change is not it.
 **Still open:** on-device confirmation. The fix removes the failure class for root-bearing trees
 (WDA, single-root uiautomator), but nobody has yet dumped the real WDA tree with the sheet up,
 so which node inflated the width is still unknown.
+
+## On-device confirmation (2026-08-26, later the same day) — the inflating node is named
+
+Dumped the real WDA tree with the filter sheet up (iPhone 17, 402×874 pt). The "Still open" question
+is answered:
+
+- The width inflators are **two `PopoverDismissRegion` nodes** with rect
+  `{x: -402, y: -874, w: 1206, h: 2622}` — a **pixel-scale rect inside an otherwise point-scale
+  tree** (1206 = 3×402, 2622 = 3×874), origin off-screen. The widest-rect walk reads their extent as
+  x∈[-402, 804] → inferred width 804 with an inset start → `reliable: false`.
+- The origin-anchored Application window IS in the tree — node label "Skeleton Internal",
+  `{0, 0, 402, 874}` — but as a **child of the normalizer's synthetic 0×0 root**, so the fix's
+  root-rect leg does not see it and falls through to the walk.
+- 0.5.0 behaves as designed on this tree: the OCR assert now **fails closed** with
+  "screen width 804 is a CONTENT width, not the window width" instead of silently reading the band at
+  ~45 % height. Confirmed live, both filter buttons.
+
+Follow-ups this suggests, cheapest first: (1) when the root is the synthetic 0×0 container, take an
+origin-anchored full-screen CHILD (the WDA `Application` node) as the window rect; (2) exclude
+overlay hit-regions with off-screen origins (`PopoverDismissRegion`) from the widest-rect walk;
+(3) the durable fix stays the out-of-tree screen size (`simctl` metrics / WDA `/window/size`).
+Until one lands, OCR asserts on iOS sheet screens fail closed — use tree `text` asserts there
+(labels carry the rendered casing).
+
+## Known holes 1 and 2: closed (2026-08-27)
+
+The follow-up shipped — see `docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md`.
+The scale now comes from `DeviceAdapter.viewport()` (the `simctl`/`idb`/`wm size` reading this
+section asked for), with the tree as a cross-check, so both holes above are shut whenever the
+device answers; a rootless tree that must still be trusted alone now fails closed rather than
+scaling silently. **The interim advice — "OCR asserts on iOS sheet screens fail closed, use tree
+`text` asserts there" — no longer applies.**

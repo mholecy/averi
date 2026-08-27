@@ -86,10 +86,20 @@ export class FakeAdapter implements DeviceAdapter {
     }
   }
 
-  viewportSize = { width: 1000, height: 2000 };
+  /**
+   * Overrides what the "device" reports as its screen. Leave it unset and the
+   * fake derives the size from the screen it is currently showing, so it
+   * cannot contradict its own tree — production code now COMPARES the two
+   * (verify/scale.ts), and a fake that disagreed with itself would quietly
+   * make every test exercise the mismatch note instead of the table under
+   * test. A test that wants a mismatch must ask for one.
+   */
+  viewportSize: { width: number; height: number } | undefined;
 
   async viewport(): Promise<{ width: number; height: number }> {
-    return this.viewportSize;
+    if (this.viewportSize !== undefined) return this.viewportSize;
+    const { width, height } = this.screens[this.current].rect;
+    return { width, height };
   }
 
   async launch(appId: string, opts: LaunchOptions = {}): Promise<void> {

@@ -1,0 +1,70 @@
+{
+  "_comment": [
+    "RECONSTRUCTED, not a captured dump — the shape measured on device 2026-08-26 (iPhone 17,",
+    "402x874pt, skeleton Internal, transaction filter sheet up), trimmed to the nodes that decide",
+    "the png scale. Replace it with the real /source bytes on the next device round; the numbers",
+    "here are the ones the bug report names.",
+    "Two things make it the regression case: the root carries NO rect (the parser zero-fills it, so",
+    "the root-rect leg cannot use it), and the two PopoverDismissRegion nodes carry a PIXEL-scale",
+    "rect at a negative origin inside an otherwise point-scale tree.",
+    "See docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md"
+  ],
+  "value": {
+    "type": "Other",
+    "rawIdentifier": null,
+    "label": null,
+    "value": null,
+    "children": [
+      {
+        "type": "Application",
+        "rawIdentifier": null,
+        "label": "Skeleton Internal",
+        "value": null,
+        "rect": { "x": 0, "y": 0, "width": 402, "height": 874 },
+        "children": [
+          {
+            "type": "Other",
+            "rawIdentifier": null,
+            "label": "PopoverDismissRegion",
+            "value": null,
+            "rect": { "x": -402, "y": -874, "width": 1206, "height": 2622 },
+            "children": []
+          },
+          {
+            "type": "Other",
+            "rawIdentifier": null,
+            "label": "PopoverDismissRegion",
+            "value": null,
+            "rect": { "x": -402, "y": -874, "width": 1206, "height": 2622 },
+            "children": []
+          },
+          {
+            "type": "Other",
+            "rawIdentifier": null,
+            "label": null,
+            "value": null,
+            "rect": { "x": 0, "y": 154, "width": 402, "height": 720 },
+            "children": [
+              {
+                "type": "Button",
+                "rawIdentifier": "transactions.filter.clear_button",
+                "label": "Clear filter",
+                "value": null,
+                "rect": { "x": 18, "y": 791, "width": 178, "height": 45 },
+                "children": []
+              },
+              {
+                "type": "Button",
+                "rawIdentifier": "transactions.filter.apply_button",
+                "label": "Apply",
+                "value": null,
+                "rect": { "x": 208, "y": 791, "width": 176, "height": 44 },
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

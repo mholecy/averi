@@ -1,7 +1,7 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects } from '../ui-tree/geometry.js';
-import { pngScale } from './scale.js';
+import { pngScale, type DeviceScreen } from './scale.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -232,6 +232,12 @@ function contractTargetOf(anchor: LayoutAnchor, id: string, theme: ColorTheme): 
 export interface ColorCapture {
   tree: UiNode;
   png: RgbaImage;
+  /**
+   * Screen size read from the device, in tree units. Optional because a leg
+   * whose read failed must still produce a table — one scaled off the tree,
+   * with `ColorPlatformStats.note` saying so.
+   */
+  screen?: DeviceScreen;
 }
 
 export interface ColorPlatformStats {
@@ -242,6 +248,8 @@ export interface ColorPlatformStats {
   scale: number;
   /** Any alpha < 255 in the png — alpha is ignored, RGB used as stored. */
   translucent: boolean;
+  /** How the scale was derived, when that is worth saying (see pngScale). */
+  note?: string;
 }
 
 export interface ColorSample {
@@ -307,8 +315,8 @@ const SCALE_SANE_MAX = 4.0;
  * comparison vacuous.
  */
 function statsFor(platform: Platform, capture: ColorCapture): ColorPlatformStats {
-  const { tree, png } = capture;
-  const scaled = pngScale(tree, png.width, png.height);
+  const { tree, png, screen } = capture;
+  const scaled = pngScale(tree, png.width, png.height, screen);
   if (scaled.error !== undefined) {
     throw new Error(`color parity: ${platform}: ${scaled.error}; failing closed.`);
   }
@@ -326,6 +334,10 @@ function statsFor(platform: Platform, capture: ColorCapture): ColorPlatformStats
     rootWidth: scaled.width,
     scale: scaled.scale,
     translucent,
+    // Which screen size the scale came from, whenever that is worth reading:
+    // a table quietly scaled off the tree is exactly the 2026-08-26 failure,
+    // and it looks like a good one. One owner for the wording: verify/scale.ts.
+    note: scaled.note,
   };
 }
 
@@ -540,6 +552,7 @@ export function formatColorParity(r: ColorParityResult): string {
       line += `   ! scale outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`;
     }
     if (s.translucent) line += '   ! alpha<255 pixels present — alpha ignored, RGB used as stored';
+    if (s.note !== undefined) line += `   ! ${s.note}`;
     lines.push(line);
   }
   lines.push('');
@@ -643,9 +656,10 @@ export function evaluateColorAssert(
   expectation: ColorExpectation,
   tree: UiNode,
   png: RgbaImage,
+  screen?: DeviceScreen,
 ): { pass: boolean; detail: string } {
   const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
-  const scaled = pngScale(tree, png.width, png.height);
+  const scaled = pngScale(tree, png.width, png.height, screen);
   if (scaled.error !== undefined) {
     return { pass: false, detail: `${scaled.error}; failing closed, color unchecked` };
   }
@@ -677,6 +691,7 @@ export function evaluateColorAssert(
   if (scale < SCALE_SANE_MIN || scale > SCALE_SANE_MAX) {
     notes.push(`scale ${scale.toFixed(3)} outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`);
   }
+  if (scaled.note !== undefined) notes.push(scaled.note);
   return {
     pass,
     detail:
