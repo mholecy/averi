@@ -165,3 +165,52 @@ describe('AdapterRegistry', () => {
     expect(next).not.toBe(orphan);
   });
 });
+
+describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
+  it('disposes every cached adapter, drops bindings, and WAITS for async disposals', async () => {
+    const { registry, created } = makeRegistry([device('phone'), device('sim', 'booted', 'ios')]);
+    await registry.get('android');
+    await registry.get('ios', { treeSource: 'wda' });
+    expect(created).toHaveLength(2);
+    // An async dispose (the iOS wda variant shuts its WdaServer down) must be
+    // awaited, or process.exit would race the kill and orphan the WDA.
+    let stopped = false;
+    created[1].onDispose = () =>
+      new Promise<void>((resolve) => setTimeout(() => { stopped = true; resolve(); }, 20));
+    await registry.shutdown();
+    expect(created[0].disposed).toBe(1);
+    expect(created[1].disposed).toBe(1);
+    expect(stopped).toBe(true);
+    expect(registry.boundId('android')).toBeUndefined();
+    expect(registry.boundId('ios')).toBeUndefined();
+  });
+
+  it('tolerates a dispose that throws or rejects — the other adapters are still disposed', async () => {
+    const { registry, created } = makeRegistry([device('a'), device('b', 'booted', 'ios')]);
+    await registry.get('android');
+    await registry.get('ios');
+    created[0].dispose = () => { throw new Error('boom'); };
+    created[1].onDispose = () => Promise.reject(new Error('later boom'));
+    await expect(registry.shutdown()).resolves.toBeUndefined();
+    expect(created[1].disposed).toBe(1);
+  });
+
+  it('a get() parked on a probe when shutdown ran cannot cache a fresh adapter afterwards', async () => {
+    // Otherwise the in-flight tool call would create — and on iOS/wda spawn —
+    // exactly the server the shutdown just stopped, into a registry nobody
+    // disposes again (review 2026-09-18).
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let gated = true;
+    const { registry, created } = makeRegistry([device('sim', 'booted', 'ios')], async () => { if (gated) await gate; });
+    const inflight = registry.get('ios', { treeSource: 'wda' });
+    await new Promise((r) => setTimeout(r, 5)); // let it park on the probe
+    gated = false;
+    await registry.shutdown();
+    release();
+    await expect(inflight).rejects.toThrow(/shutting down/);
+    expect(created.filter((a) => a.disposed === 0)).toHaveLength(0);
+    await expect(registry.get('ios')).rejects.toThrow(/shutting down/);
+    await expect(registry.select('ios', 'sim')).rejects.toThrow(/shutting down/);
+  });
+});

@@ -19,7 +19,7 @@ export class IosAdapter implements DeviceAdapter {
   private readonly exec: ExecFn;
   private readonly udid: string | undefined;
   private readonly treeSource: 'idb' | 'wda';
-  private readonly wdaServerFactory: (udid: string) => Pick<WdaServer, 'source' | 'stop'>;
+  private readonly wdaServerFactory: (udid: string) => Pick<WdaServer, 'source' | 'shutdown'>;
 
   constructor(
     opts: {
@@ -34,7 +34,7 @@ export class IosAdapter implements DeviceAdapter {
        */
       treeSource?: 'idb' | 'wda';
       /** Test seam, mirrors the injectable exec. */
-      wdaServerFactory?: (udid: string) => Pick<WdaServer, 'source' | 'stop'>;
+      wdaServerFactory?: (udid: string) => Pick<WdaServer, 'source' | 'shutdown'>;
     } = {},
   ) {
     this.udid = opts.udid;
@@ -102,22 +102,25 @@ export class IosAdapter implements DeviceAdapter {
    * (WdaServer.source() runs ensureRunning itself). WdaServer needs a
    * concrete UDID — 'booted' is a simctl-only alias — hence resolveTarget.
    */
-  private wdaServerPromise: Promise<Pick<WdaServer, 'source' | 'stop'>> | undefined;
+  private wdaServerPromise: Promise<Pick<WdaServer, 'source' | 'shutdown'>> | undefined;
 
-  private wdaServer(): Promise<Pick<WdaServer, 'source' | 'stop'>> {
+  private wdaServer(): Promise<Pick<WdaServer, 'source' | 'shutdown'>> {
     this.wdaServerPromise ??= this.resolveTarget().then((udid) => this.wdaServerFactory(udid));
     return this.wdaServerPromise;
   }
 
   /**
-   * Stop the WdaServer if one was started; no-op otherwise (and always a
+   * Shut the WdaServer down if one was started; no-op otherwise (and always a
    * no-op on the idb path). Chained through the promise so a dispose racing
-   * the lazy start still stops the server instead of leaking it.
+   * the lazy start still shuts the server down instead of leaking it.
    */
-  dispose(): void {
+  dispose(): Promise<void> {
     const pending = this.wdaServerPromise;
     this.wdaServerPromise = undefined;
-    pending?.then((server) => server.stop()).catch(() => undefined);
+    // Returned, not fire-and-forget: the process shutdown awaits it, and the
+    // WDA shutdown is the part that takes time (it polls until the port is
+    // quiet) — docs/bugs/2026-09-18-wda-orphan-after-server-restart.md.
+    return pending ? pending.then((server) => server.shutdown()).catch(() => undefined) : Promise.resolve();
   }
 
   // --- simctl-backed lifecycle ---

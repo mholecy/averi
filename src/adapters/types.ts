@@ -127,9 +127,12 @@ export interface DeviceAdapter {
 
   /**
    * Release device-bound resources the adapter lazily started (today: the
-   * iOS WdaServer). Optional and idempotent — the registry calls it when it
-   * evicts an adapter, so a rebind to another device cannot leak an orphan
-   * server driving the old one.
+   * iOS WdaServer). Optional and idempotent. Two callers: the registry when it
+   * evicts an adapter (a rebind must not leak a server driving the old
+   * device), and the process shutdown, which AWAITS it — so a returned promise
+   * must resolve when the resource is actually released, not when the release
+   * was queued. It may reject; both callers swallow the rejection, since the
+   * adapter is gone either way.
    */
-  dispose?(): void;
+  dispose?(): void | Promise<void>;
 }

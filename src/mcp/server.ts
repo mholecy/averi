@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { AdapterRegistry, type AdapterOpts } from './registry.js';
+import { installShutdownHandlers } from './lifecycle.js';
 import { findAll, resolveOne } from '../ui-tree/selectors.js';
 import { tapElement } from '../ui-tree/tap-element.js';
 import {
@@ -584,6 +585,12 @@ function stripChildren(node: UiNode): Omit<UiNode, 'children'> {
   const { children: _children, ...rest } = node;
   return rest;
 }
+
+// Installed before connect — but module init above (the tool registrations,
+// the version read) still runs ~100 ms with no handler; a signal there kills
+// the process the default way, harmlessly, since no adapter exists yet
+// (measured 2026-09-18: handled from ~110 ms). mcp/lifecycle.ts has the policy.
+installShutdownHandlers({ dispose: () => registry.shutdown(), close: () => server.close() });
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

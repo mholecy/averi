@@ -335,6 +335,13 @@ one happens by itself.
   `xcrun simctl spawn <udid> defaults write -g AppleKeyboards -array "en_US@sw=QWERTY;hw=US"`.
 - **WDA refuses to start** — a simulator runs one XCTest UI-test session at a time; another
   process's WDA is refused loudly. Recovery: `pkill -f WebDriverAgentRunner` or reboot the simulator.
+- **Right after an upgrade or an `/mcp` reconnect: `A WebDriverAgent answers /status on port 8100, but this
+  session did not start it`** — the previous server was still busy (a tool call in flight) when the host closed
+  it, so it missed the stdin close and took the host's SIGTERM, and before 0.8.1 nothing then stopped its
+  WebDriverAgent; the new server (correctly) refuses to adopt a server it cannot prove serves this simulator. From
+  0.8.1 the server stops its WebDriverAgent on SIGTERM/SIGINT/SIGHUP, waits for the port to go quiet and kills the
+  listener if xcodebuild's teardown did not. An older server, a SIGKILL, or a second signal during that wait still
+  leave one behind: `pkill -f WebDriverAgentRunner` before the first iOS call.
 - **A `${VAR}` is missing** — the error names the credential (and environment) that needed it;
   add the variable to `.env.averi`. Never ask the user for the value itself.
 - **Flow times out after a UI change** — fix the descriptor as part of the change; it's code.

@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { execFileSync, spawn } from 'node:child_process';
+import { createConnection } from 'node:net';
 import { mkdir, mkdtemp, readFile, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -573,6 +575,212 @@ describe('WdaServer.source', () => {
     expect(err?.message).toContain(server.logPath);
     server.stop();
   });
+});
+
+describe('WdaServer.shutdown — the process-shutdown form of stop()', () => {
+  // The group kill reaches xcodebuild, not the WebDriverAgentRunner under
+  // launchd_sim (measured 2026-09-18): shutdown() must wait for the PORT to
+  // go quiet and, failing that, kill the listener on our port itself.
+  async function started(statusAlive: () => boolean, lsofOut: string, killed: number[]) {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch((url) => {
+      if (url.endsWith('/status')) {
+        if (spawner.spawns.length === 0) return 'refused';
+        return statusAlive() ? { status: 200, body: WDA_STATUS } : 'refused';
+      }
+      return { status: 200, body: { value: { type: 'Application' } } };
+    });
+    const execCalls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      execCalls.push([cmd, ...args].join(' '));
+      if (cmd === 'lsof') {
+        if (lsofOut === '') throw new ExecError('lsof', 1, 'Command failed: lsof\n');
+        return { stdout: Buffer.from(lsofOut), stderr: '' };
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec, fetchFn: fetcher.fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, pollIntervalMs: 5, killProcess: (pid) => { killed.push(pid); },
+    });
+    await server.ensureRunning();
+    return { server, spawner, execCalls };
+  }
+
+  it('when xcodebuild\'s teardown takes the runner down, shutdown() returns once /status stops answering — no lsof', async () => {
+    const killed: number[] = [];
+    let alive = true;
+    const { server, spawner, execCalls } = await started(() => alive, '', killed);
+    setTimeout(() => { alive = false; }, 30); // the runner goes away shortly after the SIGTERM
+    const t0 = Date.now();
+    await server.shutdown();
+    expect(Date.now() - t0).toBeLessThan(900);
+    expect(spawner.kills).toEqual(['SIGTERM']);
+    expect(execCalls.some((c) => c.startsWith('lsof'))).toBe(false);
+    expect(killed).toEqual([]);
+  });
+
+  it('when the runner keeps answering past the budget, shutdown() SIGKILLs whatever listens on our port', async () => {
+    const killed: number[] = [];
+    const { server, execCalls } = await started(() => true, '66260\n66261\n', killed);
+    await server.shutdown();
+    expect(execCalls.filter((c) => c.startsWith('lsof'))).toEqual([`lsof -t -n -P -sTCP:LISTEN -i tcp:${server.port}`]);
+    expect(killed).toEqual([66260, 66261]);
+  }, 5_000);
+
+  it('never SIGKILLs its own process even if lsof lists it (the client end of our own probes)', async () => {
+    const killed: number[] = [];
+    const { server } = await started(() => true, `${process.pid}\n66260\n`, killed);
+    await server.shutdown();
+    expect(killed).toEqual([66260]);
+  }, 5_000);
+
+  it('a WEDGED listener (probe times out) is not "quiet": shutdown() waits, then kills it', async () => {
+    // The state a shutdown mid-/source most often meets; the first cut read any
+    // fetch failure as a free port and returned in 1 ms (review 2026-09-18).
+    const killed: number[] = [];
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    let wedged = false;
+    const fn: FetchFn = async (url) => {
+      if (url.endsWith('/status')) {
+        if (spawner.spawns.length === 0) throw new Error('ECONNREFUSED');
+        if (wedged) throw new Error('TimeoutError: The operation was aborted due to timeout');
+        return { ok: true, status: 200, json: async () => WDA_STATUS };
+      }
+      return { ok: true, status: 200, json: async () => ({ value: { type: 'Application' } }) };
+    };
+    const execCalls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      execCalls.push([cmd, ...args].join(' '));
+      return { stdout: Buffer.from(cmd === 'lsof' ? '66260\n' : ''), stderr: '' };
+    };
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec, fetchFn: fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5,
+      killProcess: (pid) => { killed.push(pid); },
+    });
+    await server.ensureRunning();
+    wedged = true;
+    const t0 = Date.now();
+    await server.shutdown();
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(500); // it waited for the teardown's chance
+    expect(execCalls.some((c) => c.startsWith('lsof'))).toBe(true);
+    expect(killed).toEqual([66260]);
+  }, 5_000);
+
+  it('the whole escalation fits the lifecycle budget: shutdown() completes well under 1.5 s', async () => {
+    const killed: number[] = [];
+    const { server } = await started(() => true, '66260\n', killed);
+    const t0 = Date.now();
+    await server.shutdown();
+    expect(Date.now() - t0).toBeLessThan(1_200);
+  }, 5_000);
+
+  it('after shutdown() the server is terminal — ensureRunning refuses instead of respawning', async () => {
+    const killed: number[] = [];
+    let alive = true;
+    const { server, spawner } = await started(() => alive, '', killed);
+    setTimeout(() => { alive = false; }, 10);
+    await server.shutdown();
+    await expect(server.ensureRunning()).rejects.toThrow(/has been shut down/);
+    expect(spawner.spawns).toHaveLength(1);
+  });
+
+  it('a listener that vanished between the last probe and lsof (lsof exits 1) is not an error', async () => {
+    const killed: number[] = [];
+    const { server } = await started(() => true, '', killed);
+    await expect(server.shutdown()).resolves.toBeUndefined();
+    expect(killed).toEqual([]);
+  }, 5_000);
+
+  it('shutdown() on a server that never started sends nothing and probes nothing', async () => {
+    const fetcher = fakeFetch(() => 'refused');
+    const server = new WdaServer({ udid: 'AAAA-1111', fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn });
+    await server.shutdown();
+    expect(fetcher.urls).toEqual([]);
+  });
+});
+
+describe('WdaServer.shutdown — real lsof (integration)', () => {
+  // No fake can see what lsof lists: the round-2 BLOCKER (averi SIGKILLing
+  // itself) was invisible to every faked-exec test. Real lsof, a child process
+  // that listens, and a connection from THIS process as the client end.
+  const hasLsof = (() => {
+    try {
+      execFileSync('which', ['lsof'], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  it.skipIf(!hasLsof)('kills only the LISTENER on the port — never the client end, never this process', async () => {
+    // A plain node, not vitest's: the worker's NODE_OPTIONS carry loaders the
+    // one-liner must not inherit.
+    const listener = spawn(
+      process.execPath,
+      [
+        '-e',
+        "const s=require('net').createServer(c=>{}).listen(0,'127.0.0.1',()=>{process.stdout.write(String(s.address().port)+'\\n')});setInterval(()=>{},1000)",
+      ],
+      { env: { ...process.env, NODE_OPTIONS: '' }, stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    try {
+      let stderr = '';
+      listener.stderr.on('data', (d) => { stderr += String(d); });
+      const port = await new Promise<number>((resolve, reject) => {
+        listener.stdout.once('data', (d) => resolve(Number(String(d).trim())));
+        listener.once('error', reject);
+        listener.once('exit', (code) => reject(new Error(`listener exited ${code} before reporting a port: ${stderr}`)));
+        setTimeout(() => reject(new Error(`listener did not report a port: ${stderr}`)), 5_000);
+      });
+      // Two client ends of the same port: THIS process (like our own /status
+      // probes) and a SEPARATE process — the second is what proves the LISTEN
+      // filter on its own, since the self-pid belt would hide the first.
+      const client = createConnection({ port, host: '127.0.0.1' });
+      await new Promise<void>((r) => client.once('connect', () => r()));
+      const otherClient = spawn(
+        process.execPath,
+        ['-e', `require('net').createConnection({port:${port},host:'127.0.0.1'},()=>{process.stdout.write('c\\n')});setInterval(()=>{},1000)`],
+        { env: { ...process.env, NODE_OPTIONS: '' }, stdio: ['ignore', 'pipe', 'ignore'] },
+      );
+      try {
+        await new Promise<void>((resolve, reject) => {
+          otherClient.stdout.once('data', () => resolve());
+          setTimeout(() => reject(new Error('other client did not connect')), 5_000);
+        });
+        // Through shutdown(), not the private helper: the bare listener accepts
+        // and never replies, so the REAL fetch times out → portState() 'held' →
+        // the loop waits its 600 ms → the real lsof → killProcess. One test, two
+        // proofs: a genuinely wedged socket is escalated, and only the listener
+        // is targeted. `hadChild` needs a (fake) spawned child, hence the
+        // ensureRunning() with a fake spawn and a status fake that answers.
+        const killed: number[] = [];
+        // REAL exec (the real lsof) and REAL fetch (a real timeout against the
+        // mute listener) — only killProcess is a seam.
+        const server = new WdaServer({ udid: 'REAL-LSOF', port, killProcess: (pid) => { killed.push(pid); } });
+        // Deliberate private reach (a rename is caught only at runtime): give the
+        // server a child so `hadChild` is true, exactly as a started server has.
+        (server as unknown as { child: unknown }).child = {
+          pid: undefined, kill: () => true, once: () => undefined, unref: () => undefined,
+        };
+        const t0 = Date.now();
+        await server.shutdown();
+        const took = Date.now() - t0;
+        expect(took).toBeGreaterThanOrEqual(500); // it waited for the teardown's chance (wedged, not refused)
+        expect(took).toBeLessThan(1_400); // and stayed inside the lifecycle budget
+        expect(killed).toEqual([listener.pid]);
+        expect(killed).not.toContain(process.pid);
+        expect(killed).not.toContain(otherClient.pid);
+      } finally {
+        otherClient.kill('SIGKILL');
+        client.destroy();
+      }
+    } finally {
+      listener.kill('SIGKILL');
+    }
+  }, 15_000);
 });
 
 describe('WdaServer.stop', () => {

@@ -206,9 +206,16 @@ describe('IosAdapter treeSource: wda', () => {
       state.udids.push(udid);
       return {
         source: async () => WDA_ENVELOPE,
-        stop: () => {
-          state.stops++;
-        },
+        // Resolves on a MACROTASK, so `await adapter.dispose()` observes the
+        // stop only if dispose really returned this chain — a fire-and-forget
+        // dispose would pass on microtask ordering alone (review 2026-09-18).
+        shutdown: () =>
+          new Promise<void>((resolve) =>
+            setTimeout(() => {
+              state.stops++;
+              resolve();
+            }, 5),
+          ),
       };
     };
     return { state, factory };
@@ -262,9 +269,10 @@ describe('IosAdapter treeSource: wda', () => {
     await tick();
     expect(state.stops).toBe(0);
     await adapter.uiTree();
-    adapter.dispose();
-    adapter.dispose();
-    await tick();
+    await adapter.dispose(); // resolves only once the WDA shutdown has run — the process shutdown awaits this
+    expect(state.stops).toBe(1);
+    await adapter.dispose(); // idempotent: the server promise was already released
+    await new Promise((r) => setTimeout(r, 10));
     expect(state.stops).toBe(1);
   });
 

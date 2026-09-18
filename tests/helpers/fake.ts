@@ -124,9 +124,12 @@ export class FakeAdapter implements DeviceAdapter {
   }
 
   disposed = 0;
+  /** When set, dispose() returns this — models an adapter whose release is asynchronous (the iOS wda variant). */
+  onDispose: (() => Promise<void>) | undefined;
 
-  dispose(): void {
+  dispose(): void | Promise<void> {
     this.disposed++;
+    return this.onDispose?.();
   }
 
   // Unused by tests:

@@ -31,6 +31,18 @@ const SOURCE_TIMEOUT_MS = 30_000;
 /** Post-build: the first app-install on the simulator dominates this. */
 const READY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 500;
+/**
+ * shutdown()'s phases must ADD UP to less than mcp/lifecycle.ts's
+ * SHUTDOWN_BUDGET_MS (1 500), or the budget cuts off the one step that frees
+ * the port: wait ≤ 600, plus one straggling probe that may START just before
+ * the deadline (≤ 150), + lsof ≤ 300 + the kills ≈ 1 050 < 1 500 — measured
+ * 694–833 ms against real sockets; the earlier 1 000 + 2 000 sizing measured
+ * 1 030–1 134 ms, i.e. over budget (review 2026-09-18).
+ */
+const SHUTDOWN_GONE_MS = 600;
+const SHUTDOWN_POLL_MS = 100;
+const SHUTDOWN_PROBE_MS = 150;
+const SHUTDOWN_LSOF_MS = 300;
 
 const FIRST_BUILD_NOTE =
   'Note: the first WDA build per Xcode version takes minutes (cached in DerivedData afterwards).';
@@ -120,6 +132,8 @@ export interface WdaServerOptions {
   /** Test knobs — readiness polling. */
   readyTimeoutMs?: number;
   pollIntervalMs?: number;
+  /** Seam for shutdown()'s last resort — production is process.kill. */
+  killProcess?: (pid: number, signal: NodeJS.Signals) => void;
 }
 
 export class WdaServer {
@@ -133,8 +147,11 @@ export class WdaServer {
   private readonly derivedDataPath: string;
   private readonly readyTimeoutMs: number;
   private readonly pollIntervalMs: number;
+  private readonly killProcess: (pid: number, signal: NodeJS.Signals) => void;
 
   private inflight: Promise<void> | undefined;
+  /** Set by shutdown(): terminal — unlike stop(), no restart may follow. */
+  private shutDown = false;
   private child: WdaChild | undefined;
   private childExited = false;
   private childError: Error | undefined;
@@ -159,6 +176,7 @@ export class WdaServer {
       join(homedir(), 'Library', 'Developer', 'Xcode', 'DerivedData', 'averi-wda');
     this.readyTimeoutMs = opts.readyTimeoutMs ?? READY_TIMEOUT_MS;
     this.pollIntervalMs = opts.pollIntervalMs ?? POLL_INTERVAL_MS;
+    this.killProcess = opts.killProcess ?? ((pid, signal) => process.kill(pid, signal));
     this.logPath = join(tmpdir(), `averi-wda-${opts.udid}.log`);
   }
 
@@ -168,6 +186,9 @@ export class WdaServer {
    * re-verify /status cheaply (self-healing if the server died meanwhile).
    */
   ensureRunning(): Promise<void> {
+    if (this.shutDown) {
+      return Promise.reject(new Error(`WdaServer for ${this.udid} has been shut down — the process is exiting`));
+    }
     if (!this.inflight) {
       const p = this.doEnsureRunning();
       const clear = () => {
@@ -242,7 +263,108 @@ export class WdaServer {
     return res.json();
   }
 
-  /** Tolerates not-running; unhooks the process-exit kill. */
+  /**
+   * The process-shutdown form of stop(): stop, then WAIT until the port is
+   * genuinely free, and if xcodebuild's own teardown did not take the runner
+   * with it within the budget, SIGKILL whatever still LISTENS on our port.
+   * Needed because the group kill in killChild reaches only xcodebuild: the
+   * WebDriverAgentRunner is a child of launchd_sim inside the simulator, in its
+   * own process group (measured 2026-09-18), so "signal sent" and "port free"
+   * are two different facts and the next session cares only about the second.
+   *
+   * "Free" means the connection is REFUSED. A probe that times out or resets
+   * is a listener that is wedged, not gone — the state a shutdown mid-/source
+   * most often meets — so it keeps waiting and then escalates; reading it as
+   * quiet returned in 1 ms and left the runner up (review 2026-09-18).
+   *
+   * Killing by port is safe only because of `hadChild`: this runs solely when
+   * WE spawned onto the port, and doEnsureRunning refused to spawn if anything
+   * foreign already held it — so the listener is ours or its remains. The
+   * per-UDID port is NOT the reason: wdaPortFor allocates per PROCESS, so the
+   * same port can mean another simulator in another process.
+   */
+  async shutdown(): Promise<void> {
+    this.shutDown = true;
+    const hadChild = this.child !== undefined; // read BEFORE stop(), which clears this.child
+    this.stop();
+    if (!hadChild) return;
+    const deadline = Date.now() + SHUTDOWN_GONE_MS;
+    while (Date.now() < deadline) {
+      if ((await this.portState()) === 'refused') return;
+      if (Date.now() + SHUTDOWN_POLL_MS >= deadline) break; // no sleep we would not use
+      await sleep(SHUTDOWN_POLL_MS);
+    }
+    await this.killListener();
+  }
+
+  /**
+   * refused = nothing listens; answering = something replied; held = anything
+   * else. The rule is conservative on purpose: whatever is not PROVABLY refused
+   * is treated as a listener still there (a wedged runner times out; a reset
+   * or an unclassifiable error is not evidence of a free port), and we would
+   * rather wait 600 ms and kill than leave a runner up. `answering` is not
+   * checked for the WDA bundle id: a foreign process binding OUR port inside
+   * the ≤ 600 ms window after our own runner died would be killed — accepted,
+   * since we only ever get here on a port we spawned onto. The message
+   * fallback covers fetch implementations and fakes that do not wrap the
+   * socket error in `cause`.
+   */
+  private async portState(): Promise<'refused' | 'answering' | 'held'> {
+    try {
+      await this.fetchFn(`${this.baseUrl()}/status`, { signal: AbortSignal.timeout(SHUTDOWN_PROBE_MS) });
+      return 'answering';
+    } catch (err) {
+      // undici wraps the socket error: `TypeError: fetch failed` with cause.code.
+      const code = (err as { cause?: { code?: string } }).cause?.code ?? (err instanceof Error ? err.message : '');
+      return /ECONNREFUSED/.test(code) ? 'refused' : 'held';
+    }
+  }
+
+  /**
+   * Last resort: SIGKILL every process that LISTENS on our port. `-sTCP:LISTEN`
+   * is load-bearing — a bare `lsof -t -i tcp:<port>` also lists the CLIENT end,
+   * which after the probes above is this very process: the first cut SIGKILLed
+   * averi itself, before the runner (review 2026-09-18, measured with the real
+   * lsof). `-n -P` skip host/port name lookups, the usual reason lsof takes
+   * seconds. Our own pid is filtered as a second belt.
+   */
+  private async killListener(): Promise<void> {
+    let pids: number[];
+    try {
+      // `-i` must be immediately followed by its address: with other flags in
+      // between, `tcp:<port>` becomes a FILE name and lsof exits 1 (measured).
+      const { stdout } = await this.exec('lsof', ['-t', '-n', '-P', '-sTCP:LISTEN', '-i', `tcp:${this.port}`], {
+        timeoutMs: SHUTDOWN_LSOF_MS,
+      });
+      pids = stdout
+        .toString('utf8')
+        .split('\n')
+        .map((l) => Number(l.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0 && n !== process.pid);
+    } catch (e) {
+      // lsof exits 1 when nothing listens — nothing to kill. Anything else
+      // (no lsof, a timeout) means we could NOT clear the port: say so, since
+      // the next session will meet the refusal and needs to know why.
+      if (!(e instanceof ExecError && e.exitCode === 1 && !e.timedOut)) {
+        console.error(`averi: could not list the listener on port ${this.port} (${e instanceof Error ? e.message.split('\n')[0] : String(e)}) — a WebDriverAgent may be left behind; \`pkill -f WebDriverAgentRunner\` before the next iOS call`);
+      }
+      return;
+    }
+    for (const pid of pids) {
+      try {
+        this.killProcess(pid, 'SIGKILL');
+      } catch {
+        /* already gone */
+      }
+    }
+  }
+
+  /**
+   * Sync teardown: signal and unhook, without waiting. The restart path
+   * (sourceAttempt) and the process 'exit' hook need this form — neither can
+   * await. Anything that CAN await calls shutdown(), which also verifies the
+   * port went free. Tolerates not-running.
+   */
   stop(): void {
     this.stopEpoch++;
     if (this.exitHook) {
@@ -275,7 +397,9 @@ export class WdaServer {
         `A WebDriverAgent answers /status on port ${this.port}, but this session did not start it ` +
           `(udid ${this.udid}). /status carries no UDID, so it cannot be verified as serving THIS ` +
           `simulator — adopting it could silently deliver another device's UI tree. Likely a stale ` +
-          `WDA from a previous session (SIGTERM/SIGINT deaths skip the process-exit cleanup hook). ` +
+          `WDA from a previous session: a server that was still busy when the host closed it took a SIGTERM, and ` +
+          `before 0.8.1 nothing then stopped its WebDriverAgent (0.8.1 stops it and waits for the port to go quiet; ` +
+          `a SIGKILL, or a second signal during that wait, still leaves it). ` +
           'Recover: `pkill -f WebDriverAgentRunner`, or reboot the simulator, or pass an explicit `port`.',
       );
     }
@@ -307,9 +431,12 @@ export class WdaServer {
   }
 
   /**
-   * false = nothing listening (start it); true = something that looks like
-   * WDA answered (the caller decides whether it is OURS). Anything else on
-   * our port is a foreign server — fail loudly rather than talk to it.
+   * false = nothing listening OR a listener that did not answer within 1 s —
+   * the readiness loop treats both as "not up yet", deliberately; true =
+   * something that looks like WDA answered (the caller decides whether it is
+   * OURS). Anything else on our port is a foreign server — fail loudly rather
+   * than talk to it. When a caller must tell "free" from "wedged" apart (the
+   * teardown does), it uses portState() instead.
    */
   private async probeStatus(): Promise<boolean> {
     let res: Awaited<ReturnType<FetchFn>>;
@@ -415,8 +542,11 @@ export class WdaServer {
       TEST_RUNNER_USE_PORT: String(this.port),
     };
     // exec.ts is execFile-with-kill-timeout — wrong for a long-running server,
-    // hence raw spawn. detached: xcodebuild leads its own process group so
-    // stop() can take the spawned test runner down with it.
+    // hence raw spawn. detached: xcodebuild leads its own process group, which
+    // killChild signals as a whole — that reaches xcodebuild and any helper it
+    // keeps in its group, NOT the WebDriverAgentRunner in the simulator (a
+    // launchd_sim child, its own group; measured 2026-09-18): the runner ends
+    // through xcodebuild's test-session teardown, and shutdown() verifies that.
     const fd = openSync(this.logPath, 'w');
     let child: WdaChild;
     try {
@@ -445,12 +575,12 @@ export class WdaServer {
         this.childExited = true;
       }
     });
-    // unref keeps the MCP server free to exit; the exit hook kills the
-    // xcodebuild group on the way out so nothing leaks. SIGTERM/SIGINT deaths
-    // skip 'exit' hooks, so a WDA can outlive the session — the next session
-    // then finds a WDA it did not spawn and fails LOUDLY (see doEnsureRunning)
-    // rather than adopting a server that may target another simulator; that
-    // error tells the user how to clean up (pkill / reboot the simulator).
+    // unref keeps the MCP server free to exit. Two hooks cover the child:
+    // mcp/lifecycle.ts disposes the registry on SIGTERM/SIGINT/SIGHUP (Node
+    // runs no 'exit' hook for a signal) and its process.exit then fires THIS
+    // 'exit' hook as the backstop for anything dispose did not reach. Only a
+    // SIGKILL runs neither; doEnsureRunning's refusal is what the next session
+    // meets then (docs/bugs/2026-09-18-wda-orphan-after-server-restart.md).
     child.unref();
     if (!this.exitHook) {
       this.exitHook = () => this.killChild();
@@ -496,20 +626,23 @@ export class WdaServer {
     const child = this.child;
     this.child = undefined;
     if (!child) return;
+    // Both kills only while the child is known alive: once it is reaped its
+    // PID is free for reuse, and -pid would then signal a stranger's group.
     if (!this.childExited) {
       try {
         child.kill('SIGTERM');
       } catch {
         /* already gone */
       }
-    }
-    // detached made xcodebuild a group leader — signal the group so the test
-    // runner it spawned dies too.
-    if (child.pid !== undefined) {
-      try {
-        process.kill(-child.pid, 'SIGTERM');
-      } catch {
-        /* group already gone */
+      // detached made xcodebuild a group leader — this reaches its group
+      // (xcodebuild itself; helpers it keeps there), not the runner in the
+      // simulator — see startChild and shutdown().
+      if (child.pid !== undefined) {
+        try {
+          process.kill(-child.pid, 'SIGTERM');
+        } catch {
+          /* group already gone */
+        }
       }
     }
   }
