@@ -1,5 +1,6 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
-import { describeElementSpec as describeSpec, type ElementSpec } from '../ui-tree/element-spec.js';
+import { describeElementSpec as describeSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
+import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import {
   clippedEdges,
@@ -115,6 +116,10 @@ export class FlowEngine {
   /** One recovery pass per tool call, across nested `requires` (see `recoveryPass`). */
   private recoveryUsed = false;
   private secrets = new Set<string>();
+  /** >0 while inside an `optional` block, whose failures are swallowed by design (see runStep). */
+  private swallowDepth = 0;
+  /** Errors that already produced a ✗ trace line — one per failure, however deep it propagates (see runStep). */
+  private readonly loggedFailures = new WeakSet<object>();
   private readonly pollMs: number;
   private readonly tapTimeoutMs: number;
   private readonly waitTimeoutMs: number;
@@ -421,6 +426,31 @@ export class FlowEngine {
     this.log(`flow ${name}`, 'done');
   }
 
+  /** Run one step; if it fails, name it in the trace — unless an enclosing `optional` will swallow it. */
+  private async runStep(step: Step): Promise<void> {
+    try {
+      await this.dispatchStep(step);
+    } catch (e) {
+      // Steps log only once they SUCCEED, so a failing flow's trace used to end
+      // on the step BEFORE the culprit (measured 2026-09-17: the last line read
+      // `fill: id:"login_username" = ***` while the PASSWORD fill was failing,
+      // and the first hypothesis went after username resolution). Name it —
+      // unless an enclosing `optional` is about to swallow it: a ✗ beside an
+      // `optional: skipped` line would be two verdicts on one failure. Inside a
+      // reach ladder the ✗ stays: `⚠ reach <flow>` says the rung failed, this
+      // line says on WHICH step.
+      // One ✗ per failure: the innermost step logs it; the enclosing `branch` /
+      // platform-override / nested-flow steps that rethrow the SAME error add
+      // only a vaguer label (review 2026-09-18).
+      const seen = typeof e === 'object' && e !== null && this.loggedFailures.has(e);
+      if (this.swallowDepth === 0 && !seen) {
+        this.log(`✗ ${stepSummary(step, this.adapter.platform)}`, `failed — ${headline(e)}`);
+        if (typeof e === 'object' && e !== null) this.loggedFailures.add(e);
+      }
+      throw e;
+    }
+  }
+
   /**
    * Dispatch one step to its handler.
    *
@@ -430,7 +460,7 @@ export class FlowEngine {
    * would need a cast per entry and would give every handler an untyped
    * payload — the vocabulary is the valuable part, so it stays type-checked.
    */
-  private async runStep(step: Step): Promise<void> {
+  private async dispatchStep(step: Step): Promise<void> {
     if ('android' in step || 'ios' in step) return this.runPlatformOverride(step);
     if ('launch' in step) return this.runLaunch(step.launch);
     if ('tap' in step) {
@@ -451,7 +481,7 @@ export class FlowEngine {
 
   private async runPlatformOverride(step: Step): Promise<void> {
     const override = (step as { android?: Step; ios?: Step })[this.adapter.platform];
-    if (override) await this.runStep(override);
+    if (override) await this.dispatchStep(override); // the ✗ line is the outer step's (it names the variant)
     else this.log('skip', `no ${this.adapter.platform} variant for platform-specific step`);
   }
 
@@ -557,7 +587,8 @@ export class FlowEngine {
       );
       return candidates.length > 1 ? (preferInteractive(candidates)?.node ?? candidates[0]) : candidates[0];
     };
-    await fillField(this.adapter, node, value, { clear, refetch, pollMs: this.pollMs });
+    const warning = await fillField(this.adapter, node, value, { clear, refetch, pollMs: this.pollMs });
+    if (warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${warning}`);
     if (dismissKeyboard) await this.adapter.pressKey(this.adapter.platform === 'android' ? 'back' : 'enter');
     this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
   }
@@ -618,6 +649,15 @@ export class FlowEngine {
    * paid; only settling remains.
    */
   private async runOptional(steps: StepPayload<'optional'>): Promise<void> {
+    this.swallowDepth++;
+    try {
+      await this.runOptionalSteps(steps);
+    } finally {
+      this.swallowDepth--;
+    }
+  }
+
+  private async runOptionalSteps(steps: StepPayload<'optional'>): Promise<void> {
     for (const s of steps) {
       // Split OUTSIDE the try: a malformed `timeout:` is a config error, not
       // an absent element — it must fail the flow, never log as "skipped".
@@ -633,7 +673,7 @@ export class FlowEngine {
           );
           await this.tapSpec(tap.spec, this.tapTimeoutMs);
         } else {
-          await this.runStep(s);
+          await this.runStep(s); // swallowDepth > 0: no ✗ line, the failure is logged as skipped below
         }
       } catch {
         this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (not present)`);
@@ -801,7 +841,7 @@ export class FlowEngine {
   }
 
   private log(action: string, detail?: string): void {
-    this.trace.push({ action, detail: detail === undefined ? undefined : this.redact(detail) });
+    this.trace.push({ action: this.redact(action), detail: detail === undefined ? undefined : this.redact(detail) });
   }
 
   private redact(text: string): string {
@@ -1000,8 +1040,11 @@ const rectsEqual = (a: UiNode['rect'], b: UiNode['rect']): boolean =>
  * - type without clear: the typed value must appear IN the field (contiguous
  *   insert at the cursor); no destructive retry — clear stays opt-in, so a
  *   mismatch throws instead of corrupting content the field came with.
- * Fields that never expose text (masked/password) verify as best-effort.
+ * Fields that never expose text (masked/password) verify as best-effort;
+ * fields that expose BULLETS verify by length (see `landed`).
  * Errors carry LENGTHS only, never content — values may be credentials.
+ * Returns a warning for the caller's trace when the fill is legal but
+ * suspicious (a masked field that already held text and `clear` is off).
  */
 export async function fillField(
   adapter: DeviceAdapter,
@@ -1012,7 +1055,7 @@ export async function fillField(
     refetch?: () => Promise<UiNode | undefined>;
     pollMs?: number;
   } = {},
-): Promise<void> {
+): Promise<string | undefined> {
   const { clear, refetch } = opts;
   const pollMs = opts.pollMs ?? 400;
   const point = tapPoint(node);
@@ -1020,6 +1063,26 @@ export async function fillField(
   await sleep(350); // focus + keyboard
 
   let current: UiNode | undefined = node;
+  let preLen = node.value?.length ?? 0; // what the field holds when typing starts (see `landed`)
+  let note: string | undefined;
+  if (!clear && refetch && (preLen === 0 || isMaskedValue(current?.value ?? ''))) {
+    // The pre-tap read is stale for exactly the fields the length rule cares
+    // about: Android autofill POPULATES a password field on focus, and a
+    // re-entry screen CLEARS one on focus (review 2026-09-18 measured both as
+    // false failures against a pre-tap `preLen`). Re-read after focus. Plain
+    // fields with content skip this — `includes` never uses preLen.
+    const focused = await refetch();
+    if (focused !== undefined) {
+      current = focused;
+      preLen = focused.value?.length ?? 0;
+    }
+    if (preLen > 0 && isMaskedValue(current?.value ?? '')) {
+      // The length rule cannot see content: a password typed onto an
+      // autofilled one reads as a perfect append (finportal 2026-09-17:
+      // backend `invalid_grant`). Say so where the trace is read.
+      note = `masked field already held ${preLen} characters and clear is not set — typing APPENDS; pass clear: true to replace`;
+    }
+  }
   if (clear) {
     for (let attempt = 0; ; attempt++) {
       const existing = current?.value?.length ?? 0;
@@ -1036,21 +1099,43 @@ export async function fillField(
   }
 
   await adapter.typeText(value);
-  if (!refetch || value === '') return;
+  if (!refetch || value === '') return note;
 
-  const landed = (observed: string) => (clear ? observed === value : observed.includes(value));
+  // A masked (secure) field shows one bullet per character to uiautomator and
+  // WDA alike, so its content can never EQUAL the value — measured 2026-09-17
+  // (finportal login): `typed 16 characters but the field shows 16` on both
+  // platforms, for a fill that had landed. Its LENGTH still says whether every
+  // keystroke arrived, which is the check that matters on a loaded emulator
+  // (dropped characters there surfaced as a backend `invalid_grant`), so a
+  // bullets-only read-back is compared by count, never by content. The rule
+  // detects the SHORT direction only — dropped keystrokes; without `clear` the
+  // field must show at least what it held after focus plus what was typed. It
+  // cannot tell a correct append from typing onto an autofilled password (both
+  // read `held + typed`); that case is the `note` above, not a failure.
+  const landed = (observed: string) =>
+    isMaskedValue(observed)
+      ? clear
+        ? observed.length === value.length
+        : observed.length >= preLen + value.length
+      : clear
+        ? observed === value
+        : observed.includes(value);
   let observed = await pollValue(refetch, landed, pollMs);
-  if (observed === undefined || landed(observed)) return; // undefined: field withholds its text
+  if (observed === undefined || landed(observed)) return note; // undefined: field withholds its text
   if (clear) {
     await adapter.clearText(observed.length);
     await adapter.typeText(value);
     observed = await pollValue(refetch, landed, pollMs);
-    if (observed === undefined || landed(observed)) return;
+    if (observed === undefined || landed(observed)) return note;
   }
   throw new Error(
-    `fill: typed ${value.length} characters but the field shows ${observed.length} (content withheld from this error)`,
+    `fill: typed ${value.length} characters but the field shows ${observed.length} ` +
+      (isMaskedValue(observed)
+        ? `(masked field — compared by length${clear ? '' : `; it held ${preLen} after focus`})`
+        : '(content withheld from this error)'),
   );
 }
+
 
 /** Poll the field until its exposed value satisfies `ok`; returns the last observation. */
 async function pollValue(
@@ -1110,6 +1195,36 @@ function boundingBox(root: UiNode): UiNode['rect'] {
     maxY = Math.max(maxY, c.rect.y + c.rect.height);
   }
   return { x: 0, y: 0, width: maxX, height: maxY };
+}
+
+/**
+ * `kind target` for the ✗ trace line — WHICH step failed, never its value
+ * (a `type:` payload may be a credential; `fill:`/`type_pin:` values are not
+ * printed either — the successful-step lines already redact them).
+ */
+export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
+  const s = step as Record<string, unknown>;
+  if ('android' in s || 'ios' in s) {
+    const variant = s[platform] as Step | undefined;
+    return variant === undefined ? `${platform} variant (none declared)` : stepSummary(variant, platform);
+  }
+  const kind = Object.keys(s)[0] ?? 'step';
+  const payload = s[kind];
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) return kind;
+  const p = payload as Record<string, unknown>;
+  // The selector half is rendered by the one owner of that vocabulary
+  // (describeElementSpec) and selected by the one owner of the field list
+  // (selectorOnly) — `value`, `clear`, `timeout` never reach the line, so a
+  // `fill`'s credential cannot either. `type`/`type_pin` carry no selector and
+  // print the bare kind.
+  const specSource = kind === 'wait' || kind === 'scroll_until' ? p.element : kind === 'tap' || kind === 'fill' ? p : undefined;
+  if (specSource !== null && typeof specSource === 'object') {
+    const described = describeSpec(selectorOnly(specSource as Record<string, unknown>));
+    if (described !== '') return `${kind} ${described}`;
+  }
+  if (kind === 'wait' && typeof p.state === 'string') return `wait state:${JSON.stringify(p.state)}`;
+  if (kind === 'swipe' && typeof p.direction === 'string') return `swipe ${p.direction}`;
+  return kind;
 }
 
 function describeCondition(cond: Condition): string {

@@ -272,7 +272,7 @@ registerTool(
     },
   },
   async ({ platform: p, filter, configPath: cp }) => {
-    const tree = await (await registry.get(p, await loadIosOpts(p, cp))).uiTree();
+    const tree = await (await registry.get(p, await loadIosOpts(p, cp))).uiTree({ settle: true });
     return text(filter ? findAll(tree, filter).map(stripChildren) : tree);
   },
 );
@@ -281,10 +281,11 @@ registerTool(
   'tap',
   {
     description:
-      'Tap an element by selector (preferred: \'id:login_button\', \'text:"Continue"\', \'role:button label~"Pay.*"\') or by x/y coordinates.',
+      'Tap an element by selector (preferred: \'id:login_button\', \'text:"Continue"\', \'role:button label~"Pay.*"\') or by x/y coordinates. ' +
+      'Selector values containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex) — an unquoted text:Sign in fails at "in".',
     inputSchema: {
       platform,
-      selector: z.string().optional(),
+      selector: z.string().optional().describe('Element to tap, e.g. \'id:login_button\' or \'text:"Sign in"\' (quote values with spaces)'),
       x: z.number().optional(),
       y: z.number().optional(),
       configPath,
@@ -293,7 +294,7 @@ registerTool(
   async ({ platform: p, selector, x, y, configPath: cp }) => {
     const adapter = await registry.get(p, await loadIosOpts(p, cp));
     if (selector !== undefined) {
-      const note = await tapElement(adapter, selector);
+      const note = await tapElement(adapter, selector, { settle: true });
       return text(`Tapped ${selector}${note ? ` (${note})` : ''}`);
     }
     if (x === undefined || y === undefined) {
@@ -341,17 +342,18 @@ registerTool(
       await adapter.typeText(value);
       return text(`Typed ${value.length} characters`);
     }
-    const { node, note } = resolveOne(await adapter.uiTree(), selector);
+    const { node, note } = resolveOne(await adapter.uiTree({ settle: true }), selector);
     const refetch = async () => {
       try {
-        return resolveOne(await adapter.uiTree(), selector).node;
+        return resolveOne(await adapter.uiTree(), selector).node; // a poller (fillField's pollValue): no settle
       } catch {
         return undefined;
       }
     };
-    await fillField(adapter, node, value, { clear, refetch });
+    const warning = await fillField(adapter, node, value, { clear, refetch });
     return text(
-      `Filled ${selector} (${value.length} characters${clear ? ', cleared first' : ''})${note ? ` (${note})` : ''}`,
+      `Filled ${selector} (${value.length} characters${clear ? ', cleared first' : ''})${note ? ` (${note})` : ''}` +
+        (warning ? `\n⚠ ${warning}` : ''),
     );
   },
 );

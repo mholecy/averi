@@ -86,6 +86,9 @@ export class IosAdapter implements DeviceAdapter {
     return this.idb(['ui', ...args]);
   }
 
+  // `settle` (DeviceAdapter.uiTree) is accepted and ignored here on purpose:
+  // neither idb nor WDA has uiautomator's "no window yet" transient — a
+  // launching app simply appears in the next read.
   async uiTree(): Promise<UiNode> {
     if (this.treeSource === 'wda') {
       return parseWdaSourceValue(await (await this.wdaServer()).source());

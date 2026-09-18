@@ -85,7 +85,23 @@ export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promi
   const app = cfg.app[adapter.platform];
   if (!app) return '';
   const appId = 'package' in app ? app.package : app.bundleId;
-  if (await adapter.isAppRunning(appId)) return '\nappAlive: true';
+  let running: boolean;
+  try {
+    running = await adapter.isAppRunning(appId);
+  } catch (e) {
+    // The question could not be ASKED — a device under load or unreachable is
+    // not a dead app, and saying `false` here sends the caller after a crash
+    // that never happened (measured 2026-09-17, finportal b4).
+    const why = (e instanceof Error ? e.message : String(e)).split('\n')[0];
+    const check = adapter.platform === 'android'
+      ? 'check `adb devices` and host load'
+      : 'check `xcrun simctl list devices booted` and host load (reboot the simulator if it does not answer)';
+    return (
+      `\nappAlive: unknown — could not ask the device whether ${appId} runs (${why}); ` +
+      `the device is unreachable or under load. NOT evidence that the app died — ${check}, then retry.`
+    );
+  }
+  if (running) return '\nappAlive: true';
   const lines = await adapter.logs(Date.now() - 60_000).catch(() => [] as string[]);
   const crashes = scanForCrashes(lines, adapter.platform).slice(0, 24);
   return (

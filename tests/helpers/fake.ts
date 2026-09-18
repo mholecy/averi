@@ -48,7 +48,11 @@ export class FakeAdapter implements DeviceAdapter {
   }
 
   async uiTree(): Promise<UiNode> {
-    return this.screens[this.current];
+    // A SNAPSHOT, as both real adapters return (each read parses a fresh object
+    // graph). Handing out the live screen let a node mutated by a later fake
+    // `tap` rewrite what an earlier read "saw", which made the clear-on-focus
+    // fill test unable to fail (review 2026-09-18, round 3).
+    return structuredClone(this.screens[this.current]);
   }
 
   async tap(x: number, y: number): Promise<void> {
@@ -61,7 +65,7 @@ export class FakeAdapter implements DeviceAdapter {
       const inside = x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
       return inside && n.identifier ? n : undefined;
     };
-    const target = hit(await this.uiTree());
+    const target = hit(this.screens[this.current]); // the LIVE node: typeText/clearText must mutate the real field
     if (!target?.identifier) throw new Error(`FakeAdapter: nothing tappable at (${x},${y})`);
     this.taps.push(target.identifier);
     this.focused = target.role === 'textfield' ? target : undefined;

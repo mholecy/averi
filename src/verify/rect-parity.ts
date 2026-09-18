@@ -91,6 +91,8 @@ export interface RectParityResult {
    */
   aspectTolerancePct: number;
   frameWidth: number;
+  /** false when frameWidth was inferred from the widest anchor `w` — then it is not a frame. */
+  frameWidthDeclared: boolean;
   platforms: Platform[];
   anchorCount: number;
   widths: { platform: Platform; width: number; reliable: boolean }[];
@@ -398,6 +400,7 @@ export function compareRectParity(
     tolerancePct,
     aspectTolerancePct,
     frameWidth,
+    frameWidthDeclared: contract.figma_frame_width !== undefined,
     platforms: [...platforms],
     anchorCount: contract.anchors.length,
     widths,
@@ -478,6 +481,9 @@ export function rectParityVerdict(r: RectParityResult): string {
 /** Python-%g-ish number: no trailing zeros, 6 significant digits. */
 const g = (v: number): string => String(Number(v.toPrecision(6)));
 
+/** |device width / figma frame width − 1| above this prints the width-bias note. */
+const WIDTH_BIAS_NOTE_PCT = 5;
+
 const fmtDelta = (v: number | undefined): string =>
   v === undefined ? '  —' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
 
@@ -494,7 +500,8 @@ export function formatRectParity(r: RectParityResult): string {
       (aspectThresholdLive(r) ? `   aspect: ${r.aspectTolerancePct.toFixed(2)}% ratio spread` : ''),
   );
   lines.push(
-    `widths: ${r.widths.map((w) => `${w.platform} ${g(w.width)}`).join('   ')}   figma frame ${g(r.frameWidth)}`,
+    `widths: ${r.widths.map((w) => `${w.platform} ${g(w.width)}`).join('   ')}   figma frame ${g(r.frameWidth)}` +
+      (r.frameWidthDeclared ? '' : ' (inferred from the widest anchor w — declare figma_frame_width)'),
   );
   const unreliable = r.widths.filter((w) => !w.reliable).map((w) => w.platform);
   if (unreliable.length > 0) {
@@ -504,6 +511,33 @@ export function formatRectParity(r: RectParityResult): string {
       '    surfaces no real window rect (iOS idb — prefer app.ios.treeSource: wda in averi.yaml),',
       '    or the tree was filtered before it got here.',
     );
+  }
+  // iOS reports points, the same unit as the Figma frame, so the two widths
+  // compare directly (Android reports pixels — density, not bias — so it gets
+  // no such line). Measured 2026-09-17 (finportal, iPhone 17 at 402 pt against a
+  // 375 pt frame): every aspect row +2.5–2.8 %, a type size 10.45 % — fixed
+  // heights over fluid widths change SHAPE, and equal pt read as a different %
+  // of width. Those rows are device geometry, not drift; say so once, up here.
+  // Only a DECLARED figma_frame_width is a frame; the inferred fallback is the
+  // widest anchor and would make this line assert a bias that is not there.
+  const ios = r.widths.find((w) => w.platform === 'ios' && w.reliable);
+  if (r.frameWidthDeclared && r.frameWidth > 0 && ios !== undefined && ios.width > 0) {
+    const biasPct = (ios.width / r.frameWidth - 1) * 100;
+    if (Math.abs(biasPct) > WIDTH_BIAS_NOTE_PCT) {
+      lines.push(
+        `  ! ios ${g(ios.width)} pt vs figma frame ${g(r.frameWidth)} pt (${biasPct > 0 ? '+' : ''}${biasPct.toFixed(1)}%): ` +
+          'fixed-height, fluid-width controls change shape on this',
+        '    device and equal point sizes read as a different % of width — aspect and type-size rows on ios are',
+        '    WIDTH-BIASED, not drift. Tolerate them in the contract with the reason inline (tolerance_aspect_pct,',
+        '    text parity tolerance_size_pct); do not fix code for them.',
+      );
+      if (r.platforms.includes('android')) {
+        lines.push(
+          '    android cannot be judged this way (uiautomator reports pixels; the density is unknown here) —',
+          '    its rows carry the same bias against the frame, unmarked.',
+        );
+      }
+    }
   }
   lines.push('');
 

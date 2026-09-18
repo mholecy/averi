@@ -285,6 +285,35 @@ describe('compareTextParity — the accessibility note', () => {
 });
 
 describe('compareTextParity — the occlusion guard', () => {
+  // Measured 2026-09-18 (finportal, Slovak copy): OCR read `Prihlásiť sa` as
+  // `Prihlásit sa`, `Späť` as `Spät` — every such row was OCCLUDED while correct
+  // on the screenshot. The guard folds diacritics; the reported strings do not.
+  it('a reading that lost its diacritics is READ, not OCCLUDED', () => {
+    const c = contract([{ id: 'cta', text: 'Prihlásiť sa' }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('cta', 'Prihlásiť sa')]),
+        ocr: ocrMap({ cta: [line('Prihlásit sa', 30)] }),
+        pngWidth: 1080,
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+    // Not OCCLUDED — and not a phantom copy-drift FAIL either (review 2026-09-18):
+    // the row is OK with a note; the reported strings stay verbatim.
+    expect(r.rows[0].verdict).toBe('OK');
+    expect(r.findings).toEqual([]);
+    expect(r.notes.some((n) => /diacritics/.test(n))).toBe(true);
+    expect(r.rows[0].android?.ocr).toBe('Prihlásit sa');
+  });
+
+  it('a TREE reading that differs only in diacritics is still drift — the tree carries marks faithfully', () => {
+    const c = contract([{ id: 'cta', text: 'Prihlásiť sa' }]);
+    const r = compareTextParity(c, {
+      android: { tree: root(1080, [text('cta', 'Prihlásit sa')]), pngWidth: 1080 },
+    });
+    expect(r.rows[0].verdict).toBe('FAIL');
+  });
+
   it('flags an anchor whose tree text vanished from the reading (measured: the IME covering the CTA)', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {

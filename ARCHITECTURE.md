@@ -84,7 +84,7 @@ interface DeviceAdapter {
     launch(bundleId, clearState?): void
     terminate(bundleId): void
     screenshot(): Png
-    uiTree(): UiNode                // normalized accessibility tree
+    uiTree(opts?: {settle?}): UiNode // normalized accessibility tree; `settle` = one-shot caller may wait out a "no window yet" transient (Android only; iOS ignores it)
     tap(x, y): void
     longPress, swipe(direction|coords), typeText, pressKey(back/home/enter)
     setClipboard, openDeepLink(url)
@@ -250,7 +250,7 @@ Ships with the package (`averi` skill — copy into the app repo). SKILL.md teac
 - **Waits, not sleeps**: every action polls the AX tree for the expected postcondition (configurable timeout); screen-stability heuristic (two identical consecutive screenshots) before `screenshot` returns.
 - **Login edge cases**: wrong-PIN lockout protection (max 1 auto-retry, then stop and report — never brute-force a real backend), OTP steps supported via `prompt_human` step type or a test-backend hook (`otp: { source: "http://localhost:9090/last-otp" }`).
 - **Determinism aids**: `clearState` per launch, `simctl status_bar override` / adb demo mode for clean screenshots, fixed locale/timezone options.
-- **Crash detection**: every tool response includes `appAlive: bool`; flows fail fast with the relevant log excerpt.
+- **Crash detection**: every tool response includes `appAlive: true | false | unknown` — `unknown` when the device could not be ASKED (adb/simctl timeout under load, device offline), which is deliberately not `false` (2026-09-18); flows fail fast with the relevant log excerpt.
 
 ---
 

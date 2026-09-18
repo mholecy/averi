@@ -239,8 +239,16 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  * strings — a row's message must keep both sides verbatim so the reader sees
  * the real difference, and never for drift, which stays exact.
  */
+/** Strip combining marks only (NFD, then U+0300–U+036F): `ť` → `t`, case and spacing untouched. */
+const foldMarks = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 const looseForm = (s: string): string =>
-  s.toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Diacritics folded: the recognizer reads Slovak `Prihlásiť sa` as
+  // `Prihlásit sa` and `Späť` as `Spät` (measured 2026-09-18, finportal) —
+  // every such row was OCCLUDED while correct on the screenshot. The
+  // reported strings stay verbatim; the drift comparison forgives the same
+  // marks-only difference for OCR readings (see `ocrDroppedMarks`).
+  foldMarks(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The whole-string test: containment, or a prefix of an ellipsized render. */
 function survivesWhole(treeString: string, got: string): boolean {
@@ -613,25 +621,40 @@ export function compareTextParity(
     if (!dynamic) {
       const a = seen('android');
       const i = seen('ios');
+      // Drift stays exact — except that a recognizer reading loses combining
+      // marks (`Prihlásiť` → `Prihlásit`, measured 2026-09-18), and once the
+      // occlusion guard forgives that (looseForm) the row would land HERE as a
+      // copy-drift finding for text that is correct on screen (review
+      // 2026-09-18). OCR-only, marks-only differences are a note, never a
+      // finding; the tree carries diacritics faithfully, so `tree` stays exact.
+      const ocrDroppedMarks = (x: string, y: string): boolean =>
+        source === 'ocr' && x !== y && foldMarks(x) === foldMarks(y);
       if (a !== undefined && i !== undefined && a !== i) {
-        findings.push({
-          anchor: id,
-          field: 'text',
-          comparison: 'android-vs-ios',
-          detail: `android ${JSON.stringify(a)}, ios ${JSON.stringify(i)} (from ${source})`,
-        });
+        if (ocrDroppedMarks(a, i)) {
+          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in diacritics (a recognizer reading, which drops combining marks) — not drift.`);
+        } else {
+          findings.push({
+            anchor: id,
+            field: 'text',
+            comparison: 'android-vs-ios',
+            detail: `android ${JSON.stringify(a)}, ios ${JSON.stringify(i)} (from ${source})`,
+          });
+        }
       }
       if (expected !== undefined) {
         for (const p of present) {
           const got = seen(p) as string;
-          if (got !== expected) {
-            findings.push({
-              anchor: id,
-              field: 'text',
-              comparison: p === 'android' ? 'android-vs-contract' : 'ios-vs-contract',
-              detail: `${p} ${JSON.stringify(got)}, contract ${JSON.stringify(expected)} (from ${source})`,
-            });
+          if (got === expected) continue;
+          if (ocrDroppedMarks(got, expected)) {
+            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — they differ only in diacritics, which the recognizer drops; not drift.`);
+            continue;
           }
+          findings.push({
+            anchor: id,
+            field: 'text',
+            comparison: p === 'android' ? 'android-vs-contract' : 'ios-vs-contract',
+            detail: `${p} ${JSON.stringify(got)}, contract ${JSON.stringify(expected)} (from ${source})`,
+          });
         }
       }
     }

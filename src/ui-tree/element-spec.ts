@@ -43,10 +43,27 @@ export const elementSpecObject = z
  * as a selector, and the value-based form silently accepted them.
  */
 export const hasSelector = (spec: ElementSpec): boolean =>
-  spec.id !== undefined ||
-  spec.text !== undefined ||
-  spec.role !== undefined ||
-  spec.label !== undefined;
+  SELECTOR_FIELDS.some((f) => spec[f] !== undefined);
+
+/**
+ * The selector fields, DERIVED from the schema — the one list a field must be
+ * on to arrive from averi.yaml at all. Every place that needs "just the
+ * selector half" of an extended step payload (`fill` with its `value`, `tap`
+ * with its `timeout`) goes through `selectorOnly` instead of destructuring the
+ * four names again. Adding a field to `elementSpecObject` without adding it to
+ * `ElementSpec` fails to compile (the indexed access below), and vice versa
+ * `hasSelector` and every trace line pick the new field up with no edit —
+ * a `satisfies` on a literal list only checked the listed names were keys, not
+ * that every key was listed (architecture review 2026-09-18).
+ */
+export const SELECTOR_FIELDS = Object.keys(elementSpecObject.shape) as (keyof typeof elementSpecObject.shape)[];
+
+/** The selector half of an extended payload — never `value`, `clear`, `timeout`. */
+export const selectorOnly = (payload: Record<string, unknown>): ElementSpec => {
+  const spec: ElementSpec = {};
+  for (const f of SELECTOR_FIELDS) if (typeof payload[f] === 'string') spec[f] = payload[f] as string;
+  return spec;
+};
 
 export const elementSpecSchema: z.ZodType<ElementSpec> = elementSpecObject.refine(hasSelector, {
   message: 'element spec needs at least one of: id, text, role, label',

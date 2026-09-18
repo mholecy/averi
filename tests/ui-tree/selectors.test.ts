@@ -55,6 +55,25 @@ describe('parseSelector', () => {
 
   it('rejects unknown fields and garbage', () => {
     expect(() => parseSelector('bogus:x')).toThrow(/Invalid selector/);
+    // The quoting rule is prescribed ONLY when spaces are the defect — an unknown
+    // field or garbage gets the field list, not a lecture about quoting.
+    expect(() => parseSelector('bogus:x')).not.toThrow(/double-quoted/);
+    expect(() => parseSelector('@@@')).not.toThrow(/double-quoted/);
+    expect(() => parseSelector('text:a bogus:x')).not.toThrow(/double-quoted/);
+    // Measured 2026-09-17: `text:SIGN IN` failed at "IN" and the caller read the
+    // second word, not the rule — the error must state the quoting rule and the fix.
+    expect(() => parseSelector('text:SIGN IN')).toThrow(
+      /Invalid selector at "IN".*must be double-quoted.*did you mean text:"SIGN IN"\?/s,
+    );
+    expect(() => parseSelector('label~Pay now please')).toThrow(/did you mean label~"Pay now please"\?/);
+    expect(() => parseSelector('role:button text:Sign in now')).toThrow(/did you mean text:"Sign in now"\?/);
+    expect(() => parseSelector('text:Sign in role:button')).toThrow(/did you mean text:"Sign in"\?/); // stops at the next condition
+    // The grammar has no escape inside "…": say so instead of suggesting a string it would reject.
+    expect(() => parseSelector('text:a" b')).toThrow(/cannot express; match a distinctive part of it with text~/);
+    expect(() => parseSelector('text:a" b')).not.toThrow(/did you mean/);
+    expect(() => parseSelector('text:a bogus:x')).not.toThrow(/did you mean/);
+    // The quoted exact form was always valid — a3's "correct form is the regex" was wrong.
+    expect(parseSelector('text:"SIGN IN"')).toEqual([{ field: 'text', op: 'eq', value: 'SIGN IN' }]);
     expect(() => parseSelector('')).toThrow(/Empty selector/);
   });
 });

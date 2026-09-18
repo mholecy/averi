@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/ui-tree/tap-element.js';
 import { AndroidAdapter, parseUiautomatorXml } from '../../src/adapters/android.js';
-import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
+import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
+import { execErrorLikeExec } from '../helpers/exec-error.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -109,6 +110,149 @@ describe('AndroidAdapter interactions', () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
     const tree = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree();
     expect(tree.children).toHaveLength(3);
+  });
+
+  // Measured 2026-09-17 (mp-native run 5): an emulator dying underneath answered
+  // `Killed`, then `` (empty), while adb exited 0 — the message named uiautomator
+  // and three calls went at the tool before `adb` said `device offline`.
+  describe('uiTree with no XML names the DEVICE state, not the automation tool', () => {
+    /** Scripted exec: uiautomator answers in order; get-state is a value or a thrown ExecError. */
+    function scripted(dumps: string[], getState: string | ExecError) {
+      const calls: string[] = [];
+      let i = 0;
+      const fn: ExecFn = async (cmd, args): Promise<ExecResult> => {
+        const full = [cmd, ...args].join(' ');
+        calls.push(full);
+        if (full.includes('uiautomator dump')) {
+          return { stdout: Buffer.from(dumps[Math.min(i++, dumps.length - 1)]), stderr: '' };
+        }
+        if (full.endsWith('get-state')) {
+          if (getState instanceof ExecError) throw getState;
+          return { stdout: Buffer.from(`${getState}\n`), stderr: '' };
+        }
+        return { stdout: Buffer.alloc(0), stderr: '' };
+      };
+      return { fn, calls };
+    }
+    const offline = new ExecError('adb -s emulator-5554 get-state', 1, 'error: device offline\n');
+
+    it('offline device: leads with adb get-state, keeps the dump text as evidence', async () => {
+      const { fn, calls } = scripted(['Killed'], offline);
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /device emulator-5554 is not reachable: adb get-state says "device offline".*uiautomator dump returned no XML: Killed/s,
+      );
+      expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(1); // no retry on Killed
+      expect(calls.at(-1)).toBe('adb -s emulator-5554 get-state');
+    });
+
+    it('empty dump on an offline device is the same diagnosis', async () => {
+      const { fn } = scripted([''], offline);
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /is not reachable: adb get-state says "device offline"/,
+      );
+    });
+
+    it('null root node with settle: retries once, then succeeds silently', async () => {
+      const { fn, calls } = scripted(
+        ['ERROR: null root node returned by UiTestAutomationBridge.', UIAUTOMATOR_XML],
+        'device',
+      );
+      const tree = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree({ settle: true });
+      expect(tree.children).toHaveLength(3);
+      expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
+      expect(calls.some((c) => c.endsWith('get-state'))).toBe(false);
+    }, 10_000);
+
+    it('null root node twice on a reachable device with settle: classified as settling', async () => {
+      const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree({ settle: true })).rejects.toThrow(
+        /device emulator-5554 is still settling.*retried once/s,
+      );
+      expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
+    }, 10_000);
+
+    it('null root node WITHOUT settle (a poller): one dump, no hidden retry, still classified', async () => {
+      const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /is still settling.*read once/s,
+      );
+      expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(1);
+    });
+
+    it('a dump TIMEOUT on a reachable device is "reachable but SLOW", not a bare "Command timed out"', async () => {
+      const calls: string[] = [];
+      const fn: ExecFn = async (cmd, args) => {
+        const full = [cmd, ...args].join(' ');
+        calls.push(full);
+        if (full.includes('uiautomator dump')) throw new ExecError(full, null, '', true);
+        return { stdout: Buffer.from('device\n'), stderr: '' };
+      };
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /device emulator-5554 is reachable but SLOW: uiautomator dump timed out after 15 s/,
+      );
+      expect(calls.at(-1)).toBe('adb -s emulator-5554 get-state');
+    });
+
+    it('adb itself failing on the dump (device not found, exit 255) is diagnosed as unreachable, with the cause kept', async () => {
+      const fn: ExecFn = async (cmd, args) => {
+        const full = [cmd, ...args].join(' ');
+        throw new ExecError(full, full.includes('get-state') ? 1 : 255, "error: device 'emulator-5554' not found");
+      };
+      const err = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree().then(() => undefined, (e: Error) => e);
+      expect(err?.message).toMatch(/device emulator-5554 is not reachable: adb get-state says "device 'emulator-5554' not found"/);
+      expect(err?.message).toContain('adb could not run uiautomator dump');
+      expect(err?.cause).toBeInstanceOf(ExecError);
+    });
+
+    it('several devices and no serial: prescribes select_device, not adb kill-server', async () => {
+      const fn: ExecFn = async (cmd, args) => {
+        const full = [cmd, ...args].join(' ');
+        if (full.includes('uiautomator dump')) return { stdout: Buffer.from('Killed'), stderr: '' };
+        throw new ExecError(full, 1, 'adb: more than one device/emulator');
+      };
+      await expect(new AndroidAdapter({ exec: fn }).uiTree()).rejects.toThrow(/select_device/);
+    });
+
+    it('Killed on a reachable device: the dump died on the guest, device still named', async () => {
+      const { fn } = scripted(['Killed'], 'device');
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /returned no XML: Killed — adb get-state says "device", so the dump itself died on the guest/,
+      );
+    });
+  });
+
+  describe('isAppRunning distinguishes "no process" from "could not ask"', () => {
+    // Fixtures are built the way exec.ts builds them (tests/helpers/exec-error.ts):
+    // a real ExecError never has a blank stderr.
+    const realShape = execErrorLikeExec;
+    const throwing = (err: ExecError): ExecFn => async () => { throw err; };
+
+    it('asks with `pidof <pkg> || true` and reads NOT running from an empty stdout, exit 0', async () => {
+      const { fn, calls } = fakeExec({});
+      expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('md.bank.app')).toBe(false);
+      expect(calls).toEqual(['adb -s e shell pidof md.bank.app || true']);
+    });
+    it('a pid on stdout is running', async () => {
+      const { fn } = fakeExec({ 'adb -s e shell pidof': '22698\n' });
+      expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('md.bank.app')).toBe(true);
+    });
+    it('a non-zero exit shaped like exec.ts emits it propagates — it is the transport, not the app', async () => {
+      const fn = throwing(realShape('adb -s e shell pidof x || true', 1, ''));
+      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/Command failed/);
+    });
+    it('a timeout propagates (device under load is not a dead app)', async () => {
+      const fn = throwing(realShape('adb -s e shell pidof x || true', null, '', true));
+      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/timed out/);
+    });
+    it('an adb-level error propagates (offline device is not a dead app)', async () => {
+      const fn = throwing(realShape('adb -s e shell pidof x || true', 1, 'error: device offline'));
+      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/device offline/);
+    });
+    it('rejects a package name that could escape the shell', async () => {
+      const { fn, calls } = fakeExec({});
+      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x; rm -rf /')).rejects.toThrow(/invalid Android package name/);
+      expect(calls).toEqual([]);
+    });
   });
 
   it('tapElement resolves a selector and taps the rect center', async () => {

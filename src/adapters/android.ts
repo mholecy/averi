@@ -1,9 +1,14 @@
 import { XMLParser } from 'fast-xml-parser';
-import { exec as defaultExec, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { sleep } from '../util/sleep.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
+
+/** uiautomator's "the app has no window yet" status — a transient, not a failure. */
+const NULL_ROOT_RE = /null root node/i;
+const NULL_ROOT_RETRY_MS = 1_000;
+const DUMP_TIMEOUT_MS = 15_000;
 
 /** android.widget.* class (last segment) → normalized role. */
 const ROLE_MAP: Record<string, string> = {
@@ -114,13 +119,99 @@ export class AndroidAdapter implements DeviceAdapter {
     return stdout;
   }
 
-  async uiTree(): Promise<UiNode> {
+  async uiTree(opts: { settle?: boolean } = {}): Promise<UiNode> {
     // Dump to stdout; uiautomator appends a status line after the XML.
-    const { stdout } = await this.adb(['exec-out', 'uiautomator', 'dump', '/dev/tty'], 15_000);
-    const raw = stdout.toString('utf8');
-    const xmlEnd = raw.lastIndexOf('>');
-    if (xmlEnd === -1) throw new Error(`uiautomator dump returned no XML: ${raw.slice(0, 200)}`);
-    return parseUiautomatorXml(raw.slice(0, xmlEnd + 1));
+    for (let attempt = 0; ; attempt++) {
+      let raw: string;
+      try {
+        raw = (await this.adb(['exec-out', 'uiautomator', 'dump', '/dev/tty'], DUMP_TIMEOUT_MS)).stdout.toString('utf8');
+      } catch (e) {
+        // adb itself failing is the OTHER offline shape (exit 255, "device
+        // '<id>' not found" / "device offline"); a dump that never returns is
+        // the loaded-host shape (measured 2026-09-17, finportal: 11.4 s at
+        // load avg 28). Diagnose both like a dump that returned nothing, so the
+        // caller never has to read a bare adb error (review 2026-09-18).
+        if (e instanceof ExecError) {
+          const last = e.stderr.trim().split('\n').pop() ?? '';
+          throw new Error(await this.diagnoseDumpFailure(e.timedOut ? 'timeout' : 'exec-error', last, false), { cause: e });
+        }
+        throw e;
+      }
+      const xmlEnd = raw.lastIndexOf('>');
+      if (xmlEnd !== -1) return parseUiautomatorXml(raw.slice(0, xmlEnd + 1));
+      const status = raw.trim().slice(0, 200);
+      // "null root node" is uiautomator saying the app has no window to dump YET
+      // (cold launch, ~2-3 s; mid-animation). The one-shot MCP tools opt into a
+      // single bounded retry with `settle`; pollers do NOT —
+      // their own poll interval already is the retry, and a hidden extra
+      // second per miss would only shrink the number of probes their deadline
+      // affords (review 2026-09-18).
+      if (opts.settle && NULL_ROOT_RE.test(status) && attempt === 0) {
+        await sleep(NULL_ROOT_RETRY_MS);
+        continue;
+      }
+      throw new Error(await this.diagnoseDumpFailure('no-xml', status, opts.settle === true));
+    }
+  }
+
+  /**
+   * Turn a dump that produced no XML into a diagnosis the caller can act on.
+   *
+   * The dump's own text names the automation tool, never the device:
+   * measured 2026-09-17 (mp-native run 5), an emulator dying underneath
+   * answered `Killed`, then an empty string, then `null root node` — and adb
+   * itself still exited 0 each time, so the ExecError path never fired. Three
+   * calls were spent on uiautomator hypotheses before `adb shell wm size`
+   * said `device offline`. `adb get-state` is that one-line discriminator,
+   * so run it HERE, after the failure, and lead with what it says. (Spends up
+   * to 5 s of device time — hence "diagnose", not "explain".)
+   */
+  private async diagnoseDumpFailure(
+    kind: 'no-xml' | 'timeout' | 'exec-error',
+    status: string,
+    retried: boolean,
+  ): Promise<string> {
+    const dump = kind === 'timeout'
+      ? `uiautomator dump timed out after ${DUMP_TIMEOUT_MS / 1000} s`
+      : kind === 'exec-error'
+        ? `adb could not run uiautomator dump: ${status}`
+        : `uiautomator dump returned no XML: ${status}`;
+    const id = this.serial ?? 'the default adb device';
+    let state: string;
+    try {
+      state = (await this.adb(['get-state'], 5_000)).stdout.toString('utf8').trim();
+    } catch (e) {
+      // `adb get-state` on an offline/missing device exits 1 with
+      // "error: device offline" / "error: device '<id>' not found" on stderr.
+      state = e instanceof ExecError
+        ? (e.stderr.trim().replace(/^(Command failed:.*\n)?\s*(error|adb):\s*/s, '') || `exit ${e.exitCode}`)
+        : String(e);
+    }
+    if (/more than one device/i.test(state)) {
+      return `several Android devices are attached and none is selected — \`list_devices\` then ` +
+        `\`select_device\` before reading a tree (adb: "${state}"). (${dump})`;
+    }
+    if (state !== 'device') {
+      return `device ${id} is not reachable: adb get-state says "${state || 'unknown'}" — ` +
+        `recover the device (wait for \`adb devices\` to read \`device\`; \`adb kill-server && adb start-server\` ` +
+        `if it does not) before reading its tree. Not an averi or uiautomator fault. (${dump})`;
+    }
+    if (kind === 'exec-error') {
+      return `${dump} — yet adb get-state says "device"; adb itself failed, not the app. Re-check \`adb devices\` and retry once.`;
+    }
+    if (kind === 'timeout') {
+      return `device ${id} is reachable but SLOW: ${dump} while adb get-state says "device" — the host or ` +
+        `emulator is under load (measured 2026-09-17: an 11.4 s dump at load avg 28). Not a dead app and not a ` +
+        `code defect; ease the load (builds, other emulators) and retry.`;
+    }
+    if (NULL_ROOT_RE.test(status)) {
+      return `device ${id} is still settling: uiautomator has no window to dump yet ` +
+        `(cold launch or animation; ${retried ? `retried once after ${NULL_ROOT_RETRY_MS} ms` : 'read once'}). ` +
+        `Wait for the screen (\`screenshot\` waits for stability) and retry. (${dump})`;
+    }
+    return `${dump} — adb get-state says "device", so the dump itself died on the guest ` +
+      `(hung or memory-pressured emulator: "Killed" / empty output). Re-check \`adb devices\` and retry; ` +
+      `if it repeats, the emulator, not the app, needs attention.`;
   }
 
   async tap(x: number, y: number): Promise<void> {
@@ -201,13 +292,17 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async isAppRunning(packageName: string): Promise<boolean> {
-    // pidof exits non-zero when no process matches
-    try {
-      const { stdout } = await this.adb(['shell', 'pidof', packageName]);
-      return stdout.toString('utf8').trim() !== '';
-    } catch {
-      return false;
-    }
+    // `|| true` makes the device shell exit 0 whether or not a process matched,
+    // so an EMPTY stdout is the one "not running" signal and any ExecError is
+    // the TRANSPORT failing — adb timing out under host load, the device
+    // offline — i.e. a question that could not be asked, never a dead app
+    // (measured 2026-09-17, finportal: a timed-out adb call here became
+    // `appAlive: false` for an app alive on the expected screen). The exit code
+    // cannot carry that distinction: exec.ts substitutes err.message when
+    // stderr is empty, so ExecError.stderr is never blank (review 2026-09-18).
+    if (!/^[A-Za-z0-9_.]+$/.test(packageName)) throw new Error(`invalid Android package name: ${packageName}`);
+    const { stdout } = await this.adb(['shell', `pidof ${packageName} || true`]);
+    return stdout.toString('utf8').trim() !== '';
   }
 
   async logs(sinceMs: number): Promise<string[]> {

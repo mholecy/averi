@@ -82,6 +82,41 @@ describe('compareRectParity — normalization and width inference', () => {
     expect(inferScreenWidth(androidTree())).toEqual({ width: 1080, reliable: true });
   });
 
+  // Measured 2026-09-17 (finportal): iPhone 17 (402 pt) against a 375 pt Figma
+  // frame — 13 deltas over 2 %, all aspect/type-size, none a defect.
+  it('names an iOS device wider than the Figma frame by >5% as WIDTH BIAS, once, above the table', () => {
+    const r = compareRectParity(
+      { screen: 't', figma_frame_width: 375, anchors: [{ id: 'header', x: 24 }] },
+      { ios: root(402, 874, [leaf('header', 24, 100, 354, 60)]) },
+    );
+    const out = formatRectParity(r);
+    expect(out).toContain('ios 402 pt vs figma frame 375 pt (+7.2%)');
+    expect(out).toContain('WIDTH-BIASED, not drift');
+  });
+
+  it('prints NO width-bias note when figma_frame_width was inferred from anchor w — that is not a frame', () => {
+    const r = compareRectParity(
+      { screen: 't', anchors: [{ id: 'header', x: 24, w: 327 }] },
+      { android: androidTree(), ios: root(402, 874, [leaf('header', 24, 100, 354, 60)]) },
+    );
+    expect(r.frameWidthDeclared).toBe(false);
+    expect(formatRectParity(r)).not.toContain('WIDTH-BIASED');
+    expect(formatRectParity(r)).toContain('inferred from the widest anchor');
+  });
+
+  it('with android in the run, the width-bias note says android cannot be judged the same way', () => {
+    const r = compareRectParity(
+      { screen: 't', figma_frame_width: 375, anchors: [{ id: 'header', x: 24 }] },
+      { android: androidTree(), ios: root(402, 874, [leaf('header', 24, 100, 354, 60)]) },
+    );
+    expect(formatRectParity(r)).toContain('android cannot be judged this way');
+  });
+
+  it('prints no width-bias note when the device matches the frame', () => {
+    const out = formatRectParity(compareRectParity(contract(), { android: androidTree(), ios: iosTree() }));
+    expect(out).not.toContain('WIDTH-BIASED');
+  });
+
   it('flags a filtered tree (widest rect starts inset) as unreliable, with a warning in the output', () => {
     const filtered = root(1000, 2400, [leaf('header', px(24), px(100), px(345), px(60))], 40);
     const r = compareRectParity(

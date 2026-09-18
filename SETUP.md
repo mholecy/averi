@@ -328,6 +328,11 @@ one happens by itself.
 - **`idb` install fails** — fb-idb requires Python ≤ 3.13: `pipx install fb-idb --python python3.13`.
 - **Launch opens LeakCanary instead of the app** — set `app.android.activity` (see step 4 skeleton).
 - **iOS `id:` selectors find nothing on a React Native app** — `app.ios.treeSource: wda` (step 4).
+- **iOS typing lands the wrong characters (`y`↔`z`, `ý` for a digit), or `fill` on a PLAIN field reports fewer
+  characters than typed** — HID typing follows the simulator's hardware keyboard layout, which follows the Mac's
+  input source unless pinned (measured 2026-09-17 with a Slovak host layout; it read as an averi typing bug for
+  40 minutes). Pin it once per simulator and reboot it:
+  `xcrun simctl spawn <udid> defaults write -g AppleKeyboards -array "en_US@sw=QWERTY;hw=US"`.
 - **WDA refuses to start** — a simulator runs one XCTest UI-test session at a time; another
   process's WDA is refused loudly. Recovery: `pkill -f WebDriverAgentRunner` or reboot the simulator.
 - **A `${VAR}` is missing** — the error names the credential (and environment) that needed it;

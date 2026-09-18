@@ -35,7 +35,7 @@ export function parseSelector(selector: Selector): Condition[] {
     if (!match) {
       throw new Error(
         `Invalid selector at "${input.slice(pos)}" — expected field:value or field~"regex" ` +
-          `(fields: id, text, role, label, value)`,
+          `(fields: id, text, role, label, value)${unquotedSpaceHint(conditions, input.slice(pos))}`,
       );
     }
     conditions.push({
@@ -47,6 +47,35 @@ export function parseSelector(selector: Selector): Condition[] {
     while (input[pos] === ' ') pos++;
   }
   return conditions;
+}
+
+/**
+ * `text:SIGN IN` parses `text:SIGN` and then fails at `IN` — the error would
+ * name the second word, not the rule (measured 2026-09-17: three dead device
+ * calls before the caller guessed the quoting). Spell out the rule and the
+ * probable fix — but ONLY when spaces are the defect: for `bogus:x` the true
+ * diagnosis is the field list, and a lecture about quoting would steer past it.
+ */
+function unquotedSpaceHint(parsed: Condition[], rest: string): string {
+  const last = parsed.at(-1);
+  if (!last || /^\S+[:~]/.test(rest)) return ''; // the rest is itself a (mis-spelled?) condition
+  const rule = '. A value containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex)';
+  const op = last.op === 're' ? '~' : ':';
+  // Take the leftover words up to the next condition, so the suggestion is
+  // the whole value and copy-pasteable (JSON.stringify escapes embedded quotes).
+  const words: string[] = [];
+  for (const w of rest.split(' ')) {
+    if (/^\S+[:~]/.test(w)) break;
+    words.push(w);
+  }
+  const whole = `${last.value} ${words.join(' ')}`;
+  // The grammar has no escape inside "…" (CONDITION_RE: "([^"]*)"), so a value
+  // with a double quote cannot be written at all — say that instead of
+  // suggesting a string the parser would reject (review 2026-09-18).
+  if (whole.includes('"')) {
+    return `${rule} — the value contains a double quote, which this grammar cannot express; match a distinctive part of it with ${last.field}~"…" instead`;
+  }
+  return `${rule} — did you mean ${last.field}${op}${JSON.stringify(whole)}?`;
 }
 
 function fieldValues(node: UiNode, field: Field): (string | null)[] {

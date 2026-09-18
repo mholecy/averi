@@ -14,8 +14,11 @@ import { resolveOne, tapPoint } from './selectors.js';
 export async function tapElement(
   adapter: DeviceAdapter,
   selector: Selector,
+  opts: { settle?: boolean } = {},
 ): Promise<string | undefined> {
-  const { node, note } = resolveOne(await adapter.uiTree(), selector);
+  // `settle` is the CALLER's knowledge (one-shot tool vs poller) — passed
+  // through, never decided here, so a future poller can reuse this helper.
+  const { node, note } = resolveOne(await adapter.uiTree({ settle: opts.settle }), selector);
   const point = tapPoint(node);
   await adapter.tap(point.x, point.y);
   return note;

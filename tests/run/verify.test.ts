@@ -332,6 +332,20 @@ describe('appHealth', () => {
     expect(await appHealth(fake('android'), CFG)).toBe('\nappAlive: true');
   });
 
+  // Measured 2026-09-17 (finportal, host load avg 28): a timed-out `adb shell pidof`
+  // read as `appAlive: false` for an app that was alive on the expected screen.
+  it('reports UNKNOWN, never dead, when the device cannot be asked', async () => {
+    const loaded = fake('android');
+    loaded.isAppRunning = async () => {
+      throw new Error('Command timed out: adb -s emulator-5554 shell pidof com.example.app');
+    };
+    const health = await appHealth(loaded, CFG);
+    expect(health).toContain('appAlive: unknown');
+    expect(health).toContain('Command timed out');
+    expect(health).toContain('NOT evidence that the app died');
+    expect(health).not.toContain('appAlive: false');
+  });
+
   it('reports a dead app with a crash excerpt from the logs', async () => {
     const dead = fake('android');
     dead.appRunning = false;

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, resetClearStateCount, scrollUntilVisible } from '../../src/flow/engine.js';
+import { parseConfig, type Step } from '../../src/flow/config.js';
+import { FlowEngine, FlowError, resetClearStateCount, scrollUntilVisible, stepSummary } from '../../src/flow/engine.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
@@ -1578,6 +1578,166 @@ flows:
       new FlowEngine(cfg('{ id: amount_input, value: "12.34" }'), fake, FAST).runFlow('f'),
     ).rejects.toThrow(/typed 5 characters but the field shows 4/);
     expect(fake.deletes).toEqual([]); // clear stays opt-in even during verification
+  });
+
+  // Measured 2026-09-17 (finportal login, both platforms): a password field reads
+  // back as bullets, so `observed === value` could never pass — "typed 16
+  // characters but the field shows 16" for a fill that had landed.
+  it('a MASKED field (bullets read-back) is verified by LENGTH, so a password fill passes', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length);
+    };
+    await new FlowEngine(cfg('{ id: amount_input, value: "s3cret-passw0rd!", clear: true }'), fake, FAST).runFlow('f');
+    expect(fake.typed).toEqual(['s3cret-passw0rd!']);
+    expect(fake.deletes).toEqual([]); // nothing to clear, nothing retyped
+  });
+
+  it('a masked field that DROPPED characters still fails, and says the comparison was by length', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length - 1);
+    };
+    await expect(
+      new FlowEngine(cfg('{ id: amount_input, value: "12345" }'), fake, FAST).runFlow('f'),
+    ).rejects.toThrow(/typed 5 characters but the field shows 4 \(masked field — compared by length; it held 0 after focus\)/);
+  });
+
+  const appendBullets = (fake: ReturnType<typeof formFake>, drop = 0) => {
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length - drop);
+    };
+  };
+
+  it('dropped keystrokes are caught even on a PRE-FILLED masked field (length must reach held + typed)', async () => {
+    const fake = formFake('•'.repeat(20));
+    appendBullets(fake, 4); // the emulator swallowed 4 of 16
+    await expect(
+      new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f'),
+    ).rejects.toThrow(/typed 16 characters but the field shows 32 \(masked field — compared by length; it held 20 after focus\)/);
+  });
+
+  it('typing onto a pre-filled masked field without clear is a legal APPEND — it passes, with a ⚠ fill warning', async () => {
+    // The length rule cannot see content, so it cannot tell this from a correct
+    // fill (finportal 2026-09-17: the backend said invalid_grant). The trace says it.
+    const fake = formFake('•'.repeat(20));
+    appendBullets(fake);
+    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f');
+    expect(fake.focused?.value).toHaveLength(36);
+    expect(trace).toContainEqual({
+      action: '⚠ fill',
+      detail: 'id:"amount_input": masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
+    });
+  });
+
+  // Review 2026-09-18: the pre-tap read is stale for both shapes below, and a
+  // `preLen` taken from it failed two correct fills.
+  it('autofill that POPULATES a masked field on focus does not fail the fill (pre-fill re-read after focus)', async () => {
+    const fake = formFake(null);
+    const origTap = fake.tap.bind(fake);
+    fake.tap = async (x: number, y: number) => {
+      await origTap(x, y);
+      if (fake.focused) fake.focused.value = '•'.repeat(20); // autofill on focus
+    };
+    appendBullets(fake);
+    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f');
+    expect(fake.focused?.value).toHaveLength(36);
+    expect(trace.some((t) => t.action === '⚠ fill')).toBe(true); // and the append is still named
+  });
+
+  it('a re-entry screen that CLEARS the masked field on focus does not fail the fill', async () => {
+    const fake = formFake('•'.repeat(20));
+    const origTap = fake.tap.bind(fake);
+    fake.tap = async (x: number, y: number) => {
+      await origTap(x, y);
+      if (fake.focused) fake.focused.value = null; // wrong-PIN re-entry clears on focus
+    };
+    appendBullets(fake);
+    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f');
+    expect(fake.focused?.value).toHaveLength(16);
+    expect(trace.some((t) => t.action === '⚠ fill')).toBe(false); // nothing was held after focus
+  });
+
+  // Measured 2026-09-17 (finportal): steps logged only on success, so the trace
+  // ended on `fill: id:"login_username"` while the PASSWORD fill was failing.
+  it('the FAILING step is named in the trace with a ✗ line (steps used to log only on success)', async () => {
+    const fake = formFake('9.99');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+    };
+    await expect(
+      new FlowEngine(cfg('{ id: amount_input, value: "12.34" }'), fake, FAST).runFlow('f'),
+    ).rejects.toThrow(/✗ fill id:"amount_input".*failed — fill: typed 5 characters/s);
+  });
+
+  it('a failure inside a bare `branch` logs exactly ONE ✗ — the innermost step, not the branch too', async () => {
+    const fake = formFake('9.99');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+    };
+    const c = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - branch:
+          - when: { element: { id: amount_input } }
+            do:
+              - fill: { id: amount_input, value: "12.34" }
+`);
+    const err = await new FlowEngine(c, fake, FAST).runFlow('f').then(() => undefined, (e: Error) => e);
+    const crosses = (err?.message ?? '').split('\n').filter((l) => l.includes('✗'));
+    expect(crosses).toHaveLength(1);
+    expect(crosses[0]).toContain('✗ fill id:"amount_input"');
+  });
+
+  it('a failure swallowed by `optional` — even through a `branch` — logs `skipped`, never ✗', async () => {
+    const fake = formFake('9.99');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+    };
+    const c = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - optional:
+          - branch:
+              - when: { element: { id: amount_input } }
+                do:
+                  - fill: { id: amount_input, value: "12.34" }
+`);
+    const trace = await new FlowEngine(c, fake, FAST).runFlow('f');
+    expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
+    expect(trace).toContainEqual({ action: 'optional', detail: 'skipped step (not present)' });
+  });
+
+  describe('stepSummary — the ✗ line names the step and its selector, never a value', () => {
+    const cases: [Step, string][] = [
+      [{ tap: { id: 'pay', timeout: '5s' } }, 'tap id:"pay"'],
+      [{ tap: { role: 'button', label: 'Pay' } }, 'tap role:"button" label:"Pay"'],
+      [{ fill: { id: 'pw', value: 'hunter2', clear: true } }, 'fill id:"pw"'],
+      [{ fill: { role: 'textfield', value: 'hunter2' } }, 'fill role:"textfield"'],
+      [{ wait: { element: { id: 'home' }, timeout: '20s' } }, 'wait id:"home"'],
+      [{ wait: { state: 'logged_in' } }, 'wait state:"logged_in"'],
+      [{ scroll_until: { element: { id: 'row_9' } } }, 'scroll_until id:"row_9"'],
+      [{ type: { value: 'hunter2' } }, 'type'],
+      [{ type_pin: { value: '1234' } }, 'type_pin'],
+      [{ swipe: { direction: 'up' } }, 'swipe up'],
+      [{ launch: {} }, 'launch'],
+      [{ ios: { tap: { id: 'ios_only' } } }, 'tap id:"ios_only"'],
+    ];
+    for (const [step, want] of cases) {
+      it(`${JSON.stringify(step)} → ${want}`, () => {
+        const got = stepSummary(step, 'ios');
+        expect(got).toBe(want);
+        expect(got).not.toContain('hunter2');
+        expect(got).not.toContain('1234');
+      });
+    }
   });
 
   it('redacts credential values in the fill trace', async () => {

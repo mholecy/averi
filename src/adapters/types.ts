@@ -83,7 +83,12 @@ export interface DeviceAdapter {
   openDeepLink(url: string): Promise<void>;
 
   screenshot(): Promise<Buffer>; // PNG bytes
-  uiTree(): Promise<UiNode>;
+  /**
+   * `settle`: a one-shot caller (an MCP tool, not a poller) may ask for one
+   * bounded retry when the device answers "no window yet" right after a launch.
+   * Pollers leave it off — their interval already is the retry.
+   */
+  uiTree(opts?: { settle?: boolean }): Promise<UiNode>;
 
   /**
    * Visible screen size in the SAME units as uiTree rects (Android: pixels,

@@ -219,7 +219,9 @@ const configSchema = z
       .object({
         android: z
           .object({
-            package: z.string(),
+            package: z
+              .string()
+              .regex(/^[A-Za-z0-9_.]+$/, 'app.android.package must be a package name (letters, digits, dot, underscore)'),
             apk: z.string().optional(),
             /**
              * Entry activity for launches (".MainActivity" or fully-qualified).

@@ -185,6 +185,10 @@ export class WdaServer {
    * callers unwrap `.value` (parseWdaSource, Phase 2).
    */
   async source(): Promise<unknown> {
+    return this.sourceAttempt(false);
+  }
+
+  private async sourceAttempt(restarted: boolean): Promise<unknown> {
     await this.ensureRunning();
     let res: Awaited<ReturnType<FetchFn>>;
     try {
@@ -195,9 +199,38 @@ export class WdaServer {
       // A bare "fetch failed"/"TimeoutError" names neither device nor server —
       // keep the log-path contract even for connection-level failures.
       const reason = err instanceof Error ? err.message : String(err);
+      // Two failures share this catch and want opposite remedies. A server
+      // that still answers /status is ALIVE: /source on a deep tree is the
+      // known WDA weakness (SOURCE_TIMEOUT_MS), and killing it would trade a
+      // slow read for a lost session and a false "still does not answer"
+      // (review 2026-09-18). A server that answers nothing is dead or gone —
+      // measured 2026-09-18 (finportal, overnight idle): `pkill -f
+      // WebDriverAgentRunner` + retry was the manual cure. Apply that cure
+      // once, here: the child is OURS (adoption is refused in doEnsureRunning),
+      // so killing it costs nobody else a server.
+      // Two probes: STATUS_PROBE_TIMEOUT_MS is 1 s, and the loaded host this
+      // path exists for can make a healthy WDA miss one — a single miss must
+      // not turn a slow server into a killed one.
+      const alive = (await this.probeStatus().catch(() => false)) || (await this.probeStatus().catch(() => false));
+      if (alive) {
+        throw new Error(
+          `WDA on port ${this.port} (udid ${this.udid}) answered /status but GET /source did not complete ` +
+            `(${reason}) — a deep tree (the known WDA weakness; budget ${SOURCE_TIMEOUT_MS / 1000} s) or a wedged ` +
+            'server. Read a narrower screen and retry; if it repeats, `pkill -f WebDriverAgentRunner`; ' +
+            `xcodebuild log: ${this.logPath}`,
+          { cause: err },
+        );
+      }
+      if (!restarted) {
+        console.error(
+          `averi: WDA on port ${this.port} (udid ${this.udid}) stopped answering (${reason}) — restarting it once`,
+        );
+        this.stop();
+        return this.sourceAttempt(true);
+      }
       throw new Error(
         `WDA /source request failed on port ${this.port} (udid ${this.udid}): ${reason} — ` +
-          `the server may have died mid-session; xcodebuild log: ${this.logPath}`,
+          `the server was restarted once and still does not answer; xcodebuild log: ${this.logPath}`,
         { cause: err },
       );
     }

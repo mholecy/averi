@@ -441,3 +441,15 @@ describe('resolveCredentials', () => {
     );
   });
 });
+
+describe('app.android.package format', () => {
+  it('rejects a package name that is not a package name — before any adb command could interpolate it', () => {
+    expect(() =>
+      parseConfig(`
+app:
+  android: { package: "md.bank.app; rm -rf /" }
+flows: {}
+`),
+    ).toThrow(/app\.android\.package must be a package name/);
+  });
+});

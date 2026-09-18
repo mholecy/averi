@@ -165,6 +165,78 @@ describe('WdaServer.ensureRunning', () => {
     server.stop();
   });
 
+  // Measured 2026-09-18 (finportal): the WDA died overnight; `/source` failed with
+  // "may have died mid-session" and `pkill -f WebDriverAgentRunner` + retry was
+  // the manual cure. source() now applies that cure once, on our own child.
+  it('a DEAD server (nothing answers /status either): restart once (kill + respawn), then read again', async () => {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    let sourceCalls = 0;
+    let deadSince = -1; // the spawn count at which the server died; a newer spawn is alive again
+    const fetcher = fakeFetch((url) => {
+      const alive = spawner.spawns.length > 0 && spawner.spawns.length > deadSince;
+      if (url.endsWith('/status')) return alive ? { status: 200, body: WDA_STATUS } : 'refused';
+      sourceCalls++;
+      if (sourceCalls === 1) {
+        deadSince = spawner.spawns.length; // the process died: /source AND /status refuse from here on
+        return 'refused';
+      }
+      return { status: 200, body: { value: { type: 'Application' } } };
+    });
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, pollIntervalMs: 5,
+    });
+    const body = await server.source();
+    expect(body).toEqual({ value: { type: 'Application' } });
+    expect(spawner.spawns).toHaveLength(2);
+    expect(spawner.kills).toEqual(['SIGTERM']);
+    expect(sourceCalls).toBe(2);
+    server.stop();
+  });
+
+  it('a server that dies again after the one restart fails naming the restart, not a third spawn', async () => {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    let deadSince = -1;
+    const fetcher = fakeFetch((url) => {
+      const alive = spawner.spawns.length > 0 && spawner.spawns.length > deadSince;
+      if (url.endsWith('/status')) return alive ? { status: 200, body: WDA_STATUS } : 'refused';
+      deadSince = spawner.spawns.length; // every /source kills it
+      return 'refused';
+    });
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, pollIntervalMs: 5,
+    });
+    await expect(server.source()).rejects.toThrow(/restarted once and still does not answer/);
+    expect(spawner.spawns).toHaveLength(2);
+    server.stop();
+  });
+
+  // A /source that times out on a deep tree is the documented WDA weakness — the
+  // server is alive (answers /status). Killing it would lose the session and then
+  // report "still does not answer", which is false (review 2026-09-18).
+  it('a /source TIMEOUT on a server that still answers /status is NOT a restart', async () => {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fn: FetchFn = async (url) => {
+      if (url.endsWith('/status')) {
+        if (spawner.spawns.length === 0) throw new Error('ECONNREFUSED');
+        return { ok: true, status: 200, json: async () => WDA_STATUS };
+      }
+      throw new Error('TimeoutError: The operation was aborted due to timeout');
+    };
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, pollIntervalMs: 5,
+    });
+    await expect(server.source()).rejects.toThrow(/answered \/status but GET \/source did not complete.*deep tree/s);
+    expect(spawner.spawns).toHaveLength(1);
+    expect(spawner.kills).toEqual([]);
+    server.stop();
+  });
+
   it('single-flight: concurrent callers share one attempt (one spawn)', async () => {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
@@ -492,7 +564,7 @@ describe('WdaServer.source', () => {
     server.stop();
   });
 
-  it('a network-level /source failure names the udid, port, and log path — never a bare "fetch failed"', async () => {
+  it('a /source failure while /status still answers (no restart) names the udid, port, and log path — never a bare "fetch failed"', async () => {
     const { server } = await readySetup(() => 'refused');
     const err = await server.source().then(() => undefined, (e: Error) => e);
     expect(err?.message).toContain('ECONNREFUSED');
