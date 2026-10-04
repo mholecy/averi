@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   appBuildPath,
   iosTreeSourceFor,
-  defaultLaunchActivity,
+  resolveLaunchActivity,
+  launchConsultsConfigActivity,
   loadConfig,
   loadConfigIfPresent,
   loadEnvBeside,
@@ -457,7 +458,7 @@ flows: {}
   });
 });
 
-describe('defaultLaunchActivity — the one launch-activity fallback (flow launch step and launch_app)', () => {
+describe('resolveLaunchActivity — the one launch-activity fallback (flow launch step and launch_app)', () => {
   const cfg = parseConfig(`
 app:
   android: { package: md.bank.app, activity: .MainActivity }
@@ -465,21 +466,42 @@ app:
 `);
 
   it("android, the config's own package → its activity", () => {
-    expect(defaultLaunchActivity(cfg, { platform: 'android', appId: 'md.bank.app' })).toBe('.MainActivity');
+    expect(resolveLaunchActivity(cfg, { platform: 'android', appId: 'md.bank.app' })).toBe('.MainActivity');
   });
 
   it('another package → none: the config describes a different app', () => {
-    expect(defaultLaunchActivity(cfg, { platform: 'android', appId: 'com.other.app' })).toBeUndefined();
+    expect(resolveLaunchActivity(cfg, { platform: 'android', appId: 'com.other.app' })).toBeUndefined();
   });
 
   it('ios → none, even when the bundle id equals the android package', () => {
-    expect(defaultLaunchActivity(cfg, { platform: 'ios', appId: 'md.bank.app' })).toBeUndefined();
+    expect(resolveLaunchActivity(cfg, { platform: 'ios', appId: 'md.bank.app' })).toBeUndefined();
   });
 
   it('no config, no android section, or no activity configured → none', () => {
-    expect(defaultLaunchActivity(undefined, { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
-    expect(defaultLaunchActivity(parseConfig('app:\n  ios: { bundleId: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
-    expect(defaultLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+    expect(resolveLaunchActivity(undefined, { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+    expect(resolveLaunchActivity(parseConfig('app:\n  ios: { bundleId: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+    expect(resolveLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+  });
+
+  // 2026-10-03: WHEN the fallback applies is this rule's too, for both callers.
+  const SEND = { action: 'android.intent.action.SEND' };
+  const entry = { platform: 'android' as const, appId: 'md.bank.app' };
+
+  it('a named activity is returned as given, with or without an intent, on either platform', () => {
+    expect(resolveLaunchActivity(cfg, { ...entry, activity: '.ShareActivity' })).toBe('.ShareActivity');
+    expect(resolveLaunchActivity(cfg, { ...entry, activity: '.ShareActivity', intent: SEND })).toBe('.ShareActivity');
+    expect(resolveLaunchActivity(cfg, { ...entry, platform: 'ios', activity: '.X' })).toBe('.X');
+  });
+
+  it('an intent and no activity → none: the config activity is not forced onto the intent', () => {
+    expect(resolveLaunchActivity(cfg, { ...entry, intent: SEND })).toBeUndefined();
+  });
+
+  it('launchConsultsConfigActivity: android with neither an activity nor an intent, and nothing else', () => {
+    expect(launchConsultsConfigActivity({ platform: 'android' })).toBe(true);
+    expect(launchConsultsConfigActivity({ platform: 'android', intent: SEND })).toBe(false);
+    expect(launchConsultsConfigActivity({ platform: 'android', activity: '.X' })).toBe(false);
+    expect(launchConsultsConfigActivity({ platform: 'ios' })).toBe(false);
   });
 });
 

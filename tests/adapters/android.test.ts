@@ -317,6 +317,159 @@ describe('AndroidAdapter interactions', () => {
     );
   });
 
+  // 2026-10-03: an intent without an activity is scoped to the package, and
+  // an `am start` that says it started nothing is an error. argv, not the
+  // joined string: `-p` and its value are two arguments to adb.
+  describe('launch — an intent without an activity, and am start failures', () => {
+    const SEND = { action: 'android.intent.action.SEND', mimeType: 'text/plain' };
+    type Answer = { stdout?: string; stderr?: string } | Error;
+    /** Records argv; `am start` (and, if given, `pm clear`) answers with the given streams, or throws the given error. */
+    const amAnswers = (answer: Answer = {}, pmClear: Answer = {}) => {
+      const argvs: string[][] = [];
+      const fn: ExecFn = async (_cmd, args) => {
+        argvs.push(args);
+        const reply = args.includes('am') ? answer : args.includes('pm') ? pmClear : {};
+        if (reply instanceof Error) throw reply;
+        return { stdout: Buffer.from(reply.stdout ?? ''), stderr: reply.stderr ?? '' };
+      };
+      return { adapter: new AndroidAdapter({ serial: 'e', exec: fn }), argvs };
+    };
+    const UNRESOLVED =
+      'Error: Activity not started, unable to resolve Intent { act=android.intent.action.SEND typ=text/plain flg=0x10000000 pkg=md.bank.app }';
+
+    it('an intent and no activity → am start -p <package>: the intent stays inside the app', async () => {
+      const { adapter, argvs } = amAnswers();
+      await adapter.launch('md.bank.app', { intent: { ...SEND, data: 'bank://pay', categories: ['c.D'], extras: { k: 'v' } } });
+      expect(argvs).toEqual([
+        ['-s', 'e', 'shell', 'am', 'start', '-p', 'md.bank.app', '-a', 'android.intent.action.SEND',
+          '-d', 'bank://pay', '-t', 'text/plain', '-c', 'c.D', '--es', 'k', 'v'],
+      ]);
+    });
+
+    it('an intent WITH an activity → -n names the component, and there is no -p beside it', async () => {
+      const { adapter, argvs } = amAnswers();
+      await adapter.launch('md.bank.app', { activity: '.ShareActivity', intent: SEND });
+      expect(argvs).toEqual([
+        ['-s', 'e', 'shell', 'am', 'start', '-n', 'md.bank.app/.ShareActivity', '-a', 'android.intent.action.SEND', '-t', 'text/plain'],
+      ]);
+    });
+
+    it('an activity alone → -n only; neither → the monkey launcher pick, no am start', async () => {
+      const { adapter, argvs } = amAnswers();
+      await adapter.launch('md.bank.app', { activity: '.MainActivity' });
+      await adapter.launch('md.bank.app');
+      expect(argvs).toEqual([
+        ['-s', 'e', 'shell', 'am', 'start', '-n', 'md.bank.app/.MainActivity'],
+        ['-s', 'e', 'shell', 'monkey', '-p', 'md.bank.app', '-c', 'android.intent.category.LAUNCHER', '1'],
+      ]);
+    });
+
+    const noActivityStarted = (said: string) =>
+      'Android started no activity in md.bank.app for this intent (action android.intent.action.SEND, mime type text/plain) — ' +
+      "an intent without an activity is delivered within the app's package. Either no exported activity there " +
+      'declares a matching <intent-filter> (with category DEFAULT), or the one that does refused the launch ' +
+      "(not exported / permission — am's message below says which). Fix the action/mime type or the manifest, " +
+      `or name the activity explicitly: \`activity:\` on the launch step / launch_app. am start said: ${said}`;
+    const messageOf = (launching: Promise<void>) => launching.then(() => 'resolved', (e: Error) => e.message);
+
+    it.each([
+      ['on stderr', { stdout: 'Starting: Intent { act=android.intent.action.SEND }\n', stderr: `${UNRESOLVED}\n` }],
+      ['folded into stdout', { stdout: `Starting: Intent { act=android.intent.action.SEND }\n${UNRESOLVED}\n` }],
+      ['with a non-zero exit', execErrorLikeExec('adb -s e shell am start', 1, `${UNRESOLVED}\n`)],
+    ])('"unable to resolve Intent" %s → throws: nothing started in the package, and how to recover', async (_where, answer) => {
+      const { adapter } = amAnswers(answer);
+      expect(await messageOf(adapter.launch('md.bank.app', { intent: SEND }))).toBe(noActivityStarted(UNRESOLVED));
+    });
+
+    // The activity EXISTS here and refused: the message must not say none
+    // handles the intent. am prints no `Error` line for it, only the exception.
+    it('a refused launch (SecurityException, exit 255) → throws the same message, quoting the exception line', async () => {
+      const DENIAL =
+        'java.lang.SecurityException: Permission Denial: starting Intent { act=android.intent.action.SEND typ=text/plain pkg=md.bank.app ' +
+        'cmp=md.bank.app/.ShareActivity } from null (pid=4242, uid=2000) not exported from uid 10190';
+      const { adapter } = amAnswers(
+        execErrorLikeExec(
+          'adb -s e shell am start',
+          255,
+          `\nException occurred while executing 'start':\n${DENIAL}\n\tat com.android.server.wm.ActivityStarter.execute(ActivityStarter.java:1)\n`,
+        ),
+      );
+      expect(await messageOf(adapter.launch('md.bank.app', { intent: SEND }))).toBe(noActivityStarted(DENIAL));
+    });
+
+    it('an explicit activity that does not exist → throws, naming the component and both of am\'s lines', async () => {
+      const { adapter } = amAnswers({
+        stdout: 'Starting: Intent { cmp=md.bank.app/.Missing }\n',
+        stderr: 'Error type 3\nError: Activity class {md.bank.app/md.bank.app.Missing} does not exist.\n',
+      });
+      expect(await messageOf(adapter.launch('md.bank.app', { activity: '.Missing' }))).toBe(
+        "Could not start md.bank.app/.Missing — check the activity name (the launch's `activity`, or " +
+          'app.android.activity in averi.yaml), that the activity is exported, and that md.bank.app is installed. ' +
+          'am start said: Error type 3 / Error: Activity class {md.bank.app/md.bank.app.Missing} does not exist.',
+      );
+    });
+
+    it("a full other.pkg/Activity component → the message names THAT package as the one to install", async () => {
+      const { adapter } = amAnswers({ stderr: 'Error type 3\n' });
+      expect(await messageOf(adapter.launch('md.bank.app', { activity: 'com.other/.Entry' }))).toBe(
+        "Could not start com.other/.Entry — check the activity name (the launch's `activity`, or " +
+          'app.android.activity in averi.yaml), that the activity is exported, and that com.other is installed. ' +
+          'am start said: Error type 3',
+      );
+    });
+
+    // What a SUCCESSFUL am start may print. Every row is a launch that
+    // happened; failing one would break the hottest path in the tool.
+    it.each([
+      ['"Error" mid-line in the echoed intent data', 'Starting: Intent { act=android.intent.action.VIEW dat=app://x/Error/y pkg=md.bank.app }\n'],
+      ['a component named .ErrorActivity', 'Starting: Intent { cmp=md.bank.app/.ErrorActivity }\n'],
+      ['"Errors: none"', 'Starting: Intent { pkg=md.bank.app }\nErrors: none\n'],
+      ['a lowercase "error:" line that is not am\'s', 'Starting: Intent { pkg=md.bank.app }\nerror: could not set locale, continuing\n'],
+      ['a java.lang class mid-line', 'Starting: Intent { dat=app://x/java.lang.IllegalStateException pkg=md.bank.app }\n'],
+      // The narrowing, as a decision (2026-10-03): am's diagnoses start in
+      // column 0, and an "Exception in thread" line at exit 0 is left alone —
+      // see AM_ERROR_LINE_RE for why that is acceptable.
+      ['an indented "Error:" line', 'Starting: Intent { pkg=md.bank.app }\n  Error: something\n'],
+      ['an "Exception in thread" line at exit 0', 'Exception in thread "main" java.lang.IllegalArgumentException: Unknown option: --bogus\n'],
+    ])('a launch that printed %s resolves, on either stream', async (_what, printed) => {
+      await expect(amAnswers({ stdout: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toBeUndefined();
+      await expect(amAnswers({ stderr: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toBeUndefined();
+    });
+
+    it('a timed-out am start passes through as the timeout, whatever it had printed', async () => {
+      const timedOut = execErrorLikeExec('adb -s e shell am start', null, `${UNRESOLVED}\n`, true);
+      await expect(amAnswers(timedOut).adapter.launch('md.bank.app', { intent: SEND })).rejects.toBe(timedOut);
+    });
+
+    it.each([
+      ['a non-zero exit', execErrorLikeExec('adb -s e shell pm clear md.bank.app', 1, 'Error: java.lang.SecurityException: PID 4242 does not have permission\n')],
+    ])('pm clear is not am start: %s with an Error line is passed through, and nothing is launched', async (_how, failure) => {
+      const { adapter, argvs } = amAnswers({}, failure);
+      await expect(adapter.launch('md.bank.app', { clearState: true, intent: SEND })).rejects.toBe(failure);
+      expect(argvs).toEqual([['-s', 'e', 'shell', 'pm', 'clear', 'md.bank.app']]);
+    });
+
+    it('pm clear printing an Error line with exit 0 does not fail the launch here (its output is not am\'s)', async () => {
+      const { adapter, argvs } = amAnswers({}, { stdout: 'Error: something pm said\n' });
+      await expect(adapter.launch('md.bank.app', { clearState: true, intent: SEND })).resolves.toBeUndefined();
+      expect(argvs).toHaveLength(2);
+    });
+
+    it('a Warning is not a failure: a warm launch that only fronts the task resolves', async () => {
+      const { adapter } = amAnswers({
+        stdout: 'Starting: Intent { cmp=md.bank.app/.MainActivity }\n',
+        stderr: 'Warning: Activity not started, its current task has been brought to the front\n',
+      });
+      await expect(adapter.launch('md.bank.app', { activity: '.MainActivity' })).resolves.toBeUndefined();
+    });
+
+    it('an adb failure that is not am\'s diagnosis passes through as it is', async () => {
+      const offline = execErrorLikeExec('adb -s e shell am start', 255, "adb: device 'e' not found\n");
+      const { adapter } = amAnswers(offline);
+      await expect(adapter.launch('md.bank.app', { intent: SEND })).rejects.toBe(offline);
+    });
+  });
+
   it('setClipboard reports unsupported', async () => {
     await expect(new AndroidAdapter().setClipboard('x')).rejects.toThrow(/not supported/);
   });

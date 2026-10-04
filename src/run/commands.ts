@@ -1,11 +1,13 @@
 import { resolve } from 'node:path';
-import type { DeviceAdapter, LaunchIntent, Platform } from '../adapters/types.js';
+import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import {
   configDir,
-  defaultLaunchActivity,
+  resolveLaunchActivity,
+  launchConsultsConfigActivity,
   loadProjectConfig,
   projectConfigPath,
   type AveriConfig,
+  type LaunchEntry,
 } from '../flow/config.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
@@ -121,27 +123,26 @@ export async function runAsserts({ adapter, specs, baselineDir, configPath }: As
   return `${assertSummary(results)}\n${formatAsserts(results)}${health}`;
 }
 
-export interface LaunchCall {
-  platform: Platform;
-  appId: string;
-  activity?: string;
-  intent?: LaunchIntent;
+export interface LaunchCall extends LaunchEntry {
   configPath?: string;
 }
 
 /**
- * The activity a `launch_app` call starts: the one it names, else — on
- * android, and only when the call names neither an activity nor an intent —
- * averi.yaml's, by flow/config.ts#defaultLaunchActivity (the rule the flow
- * engine's launch step shares; WHEN each consults it differs, see that doc).
+ * The activity a `launch_app` call starts — flow/config.ts#resolveLaunchActivity,
+ * the rule the flow engine's launch step shares, WHEN included (2026-10-03:
+ * the named activity, else averi.yaml's, and that only when the call names
+ * neither an activity nor an intent; an intent alone goes to the adapter
+ * without an activity and is delivered within the app's package). What this
+ * function adds is where the tool's config comes from.
  *
  * Two things here are kept exactly as they were in the handler:
  *
- * - The `platform === 'android'` half of the guard is redundant for the
- *   answer — the rule returns undefined off android. What it still does is
- *   skip the averi.yaml and .env.averi load, and its stderr line, on an ios
- *   launch. Pinned by that side effect, in tests/run/commands.test.ts only:
- *   an ios call beside a .env.averi leaves the variable unset.
+ * - averi.yaml and .env.averi are loaded — with the stderr line that says so
+ *   — only when the fallback can apply (`launchConsultsConfigActivity`, the
+ *   rule's own "when", asked before there is a config to hand it). So an ios
+ *   launch, or one that names an activity or an intent, loads nothing.
+ *   Pinned by that side effect, in tests/run/commands.test.ts only: an ios
+ *   call beside a .env.averi leaves the variable unset.
  * - The catch is a catch-ALL: a missing averi.yaml and a present-but-invalid
  *   one both mean "no activity", and the launch goes ahead on the adapter's
  *   own fallback (pinned at both levels: tests/run/commands.test.ts and
@@ -153,8 +154,8 @@ export interface LaunchCall {
  *   runAsserts above.
  */
 export async function launchActivityFor(call: LaunchCall): Promise<string | undefined> {
-  const { platform, appId, activity, intent, configPath } = call;
-  if (platform !== 'android' || activity !== undefined || intent !== undefined) return activity;
-  const cfg = await loadProjectConfig(configPath).catch(() => undefined);
-  return defaultLaunchActivity(cfg, { platform, appId });
+  const cfg = launchConsultsConfigActivity(call)
+    ? await loadProjectConfig(call.configPath).catch(() => undefined)
+    : undefined;
+  return resolveLaunchActivity(cfg, call);
 }

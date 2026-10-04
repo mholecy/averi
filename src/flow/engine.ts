@@ -12,7 +12,7 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
-  defaultLaunchActivity,
+  resolveLaunchActivity,
   flowIsDestructive,
   resolveCredentials,
   SetupError,
@@ -518,10 +518,18 @@ export class FlowEngine {
     const app = this.cfg.app[this.adapter.platform];
     if (!app) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
     const appId = 'package' in app ? app.package : app.bundleId;
-    // Step-level activity wins over app.android.activity; neither applies on
-    // iOS unless the step names one — the adapter then rejects it loudly.
-    // The fallback rule itself is flow/config.ts's (shared with launch_app).
-    const activity = spec.activity ?? defaultLaunchActivity(this.cfg, { platform: this.adapter.platform, appId });
+    // Step-level activity wins over app.android.activity, which applies only
+    // when the step names neither an activity nor an intent (2026-10-03: an
+    // intent alone is delivered within the package, not forced onto the
+    // config's launcher activity). On iOS neither applies unless the step
+    // names one — the adapter then rejects it loudly. The rule, its "when"
+    // included, is flow/config.ts's (shared with launch_app).
+    const activity = resolveLaunchActivity(this.cfg, {
+      platform: this.adapter.platform,
+      appId,
+      activity: spec.activity,
+      intent: spec.intent,
+    });
     await this.adapter.launch(appId, {
       clearState: spec.clearState,
       activity,

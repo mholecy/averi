@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { sleep } from '../util/sleep.js';
-import { zeroRect, type Device, type DeviceAdapter, type Key, type LaunchOptions, type Rect, type UiNode } from './types.js';
+import { zeroRect, type Device, type DeviceAdapter, type Key, type LaunchIntent, type LaunchOptions, type Rect, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -9,6 +9,42 @@ const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 const NULL_ROOT_RE = /null root node/i;
 const NULL_ROOT_RETRY_MS = 1_000;
 const DUMP_TIMEOUT_MS = 15_000;
+
+/**
+ * A line of `am start` output that means the activity was not started: am's
+ * own `Error: …` / `Error type N`, or an uncaught Java exception. See amStart.
+ *
+ * Each part is load-bearing, and pinned (tests/adapters/android.test.ts):
+ * - anchored at the line start, with no leading whitespace allowed (am's own
+ *   diagnoses start in column 0; the indented lines are stack frames). A
+ *   SUCCESSFUL launch echoes the intent
+ *   ("Starting: Intent { dat=app://x/Error/y cmp=pkg/.ErrorActivity }"), and
+ *   user data or a class name containing "Error" mid-line is not a failure;
+ * - `\b` after Error: "Errors: none" is not am's `Error`;
+ * - case-sensitive, deliberately: am capitalises its own diagnoses, and a
+ *   lowercase "error: …" on a launch that exited 0 is somebody else's line
+ *   (a shell wrapper, the app's own stdout) — not grounds to fail a launch;
+ * - the exception branch: a refused launch ("java.lang.SecurityException:
+ *   Permission Denial … not exported from uid …") has no `Error` line at all.
+ *
+ * Deliberately NOT matched, and pinned as such: the old-style prefixed form
+ * `Exception in thread "main" java.lang.…` at exit 0. Acceptable because an
+ * uncaught exception in am exits non-zero through adb shell v2 (API 24+),
+ * so it still fails loudly as the raw ExecError; only shell-v1 devices
+ * (Android 6 or older) could show it at exit 0.
+ */
+const AM_ERROR_LINE_RE = /^(?:Error\b|java\.lang\.\w+(?:Exception|Error)\b).*$/gm;
+
+/** The parts of an intent `am` resolves on, for an error a reader can act on. */
+function describeIntent(intent: LaunchIntent): string {
+  const parts = [
+    intent.action !== undefined && `action ${intent.action}`,
+    intent.data !== undefined && `data ${intent.data}`,
+    intent.mimeType !== undefined && `mime type ${intent.mimeType}`,
+    intent.categories?.length ? `categories ${intent.categories.join(', ')}` : false,
+  ].filter((part): part is string => typeof part === 'string');
+  return parts.length > 0 ? parts.join(', ') : 'no action, data or mime type given';
+}
 
 /** android.widget.* class (last segment) → normalized role. */
 const ROLE_MAP: Record<string, string> = {
@@ -89,13 +125,29 @@ export class AndroidAdapter implements DeviceAdapter {
       return;
     }
     const args = ['shell', 'am', 'start'];
+    let component: string | undefined;
     if (opts.activity !== undefined) {
       // ".MainActivity" and "com.foo.MainActivity" both resolve against the
       // package; a full "pkg/Activity" component passes through unchanged.
-      const component = opts.activity.includes('/')
-        ? opts.activity
-        : `${packageName}/${opts.activity}`;
+      component = opts.activity.includes('/') ? opts.activity : `${packageName}/${opts.activity}`;
       args.push('-n', component);
+    } else {
+      // An intent with no activity is SCOPED TO THE PACKAGE: `-p <package>`
+      // is parsed by Intent.parseCommandArgs (it calls setPackage) — the
+      // intent-spec parser `am start` shares with `am broadcast` etc.; it is
+      // NOT listed in `am help` on every Android version, which is why it is
+      // spelled out here. Android resolves it against this app's own intent
+      // filters, so it reaches whichever activity handles it — the share
+      // target, not the launcher. Decided 2026-10-03; before that this branch
+      // sent a bare implicit intent (`am start -a ACTION`), which the system
+      // may hand to ANOTHER app or answer with a chooser, and a test tool
+      // launching "the app" must not end up driving a different one.
+      // Never beside `-n`: an explicit component already names the package,
+      // and an activity given as a full "other.pkg/Activity" component would
+      // contradict a `-p` for this one. The rule for which activity a launch
+      // names (and when averi.yaml's applies) is flow/config.ts's
+      // resolveLaunchActivity; this is only how the result is said in `am`.
+      args.push('-p', packageName);
     }
     const intent = opts.intent ?? {};
     if (intent.action !== undefined) args.push('-a', intent.action);
@@ -103,7 +155,99 @@ export class AndroidAdapter implements DeviceAdapter {
     if (intent.mimeType !== undefined) args.push('-t', intent.mimeType);
     for (const category of intent.categories ?? []) args.push('-c', category);
     for (const [key, value] of Object.entries(intent.extras ?? {})) args.push('--es', key, value);
-    await this.adb(args);
+    await this.amStart(args, { packageName, component, intent: opts.intent });
+  }
+
+  /**
+   * `am start`, with its failures made loud (2026-10-03).
+   *
+   * `am start` reports a launch that did not happen in its OUTPUT and, on
+   * the Android versions this was written against, still exits 0:
+   *
+   *   Error: Activity not started, unable to resolve Intent { act=… pkg=… }
+   *   Error type 3
+   *   Error: Activity class {pkg/pkg.Missing} does not exist.
+   *
+   * `adb()` only rejects on a non-zero exit, so such a launch "succeeded",
+   * and the failure surfaced one step later as a wait that timed out on
+   * whatever screen happened to be up — far from its cause. With intents
+   * scoped to the package (see launch) "no activity handles this" became an
+   * ordinary outcome of a typo'd action or a missing intent filter, so it is
+   * diagnosed here.
+   *
+   * The check is one test for an `Error` line (or an uncaught Java exception,
+   * e.g. the SecurityException for a non-exported activity) on either
+   * stream — am writes them to stderr, older adb folds stderr into stdout —
+   * and it covers the explicit-activity launch too, which had the same
+   * silent failure (a misspelt `app.android.activity`): same check, so not
+   * left behind. `Warning:` lines are NOT failures ("Activity not started,
+   * its current task has been brought to the front" is a successful warm
+   * launch). A non-zero exit carrying the same lines gets the same message;
+   * any other adb failure passes through untouched.
+   *
+   * Not covered, deliberately: the `monkey` launch above ("No activities
+   * found to run, monkey aborted" is a different output and a different
+   * check), `pm clear`, and openDeepLink — monkey and openDeepLink have the
+   * same exits-0 shape and are a follow-up, not part of this change. A
+   * timed-out `am start` is passed through as the timeout it is, whatever it
+   * had printed by then.
+   *
+   * A deliberate exception, 2026-10-03: the two messages below name
+   * averi.yaml's `app.android.activity`, the flow step's `activity:` and the
+   * `launch_app` tool — the first error strings in adapters/ to speak config
+   * and tool vocabulary rather than platform only. Kept, because that advice
+   * is what makes the message recoverable: the reader's next move is in
+   * averi.yaml or in the call, not in adb. Rejected: a typed AmStartError
+   * thrown here and translated by the callers — there are two (run/ for
+   * launch_app, flow/ for the launch step), so one message would have two
+   * translation sites that must agree, which is the duplication this change
+   * exists to remove. The DETECTION is platform knowledge and stays here
+   * either way; no import crosses the layer — only words do.
+   */
+  private async amStart(
+    args: string[],
+    launch: { packageName: string; component?: string; intent?: LaunchIntent },
+  ): Promise<void> {
+    let output: string;
+    let cause: unknown;
+    try {
+      const { stdout, stderr } = await this.adb(args);
+      output = `${stdout.toString('utf8')}\n${stderr}`;
+    } catch (e) {
+      if (!(e instanceof ExecError) || e.timedOut) throw e;
+      output = `${e.stdout.toString('utf8')}\n${e.stderr}`;
+      cause = e;
+    }
+    const errors = output.match(AM_ERROR_LINE_RE);
+    if (errors === null) {
+      if (cause !== undefined) throw cause;
+      return;
+    }
+    const said = `am start said: ${errors.map((line) => line.trim()).join(' / ')}`;
+    const { packageName, component, intent } = launch;
+    if (component !== undefined) {
+      // The component's own package: an activity given as a full
+      // "other.pkg/Activity" names a package that is not `packageName`.
+      throw new Error(
+        `Could not start ${component} — check the activity name (the launch's \`activity\`, or ` +
+          `app.android.activity in averi.yaml), that the activity is exported, and that ` +
+          `${component.split('/')[0]} is installed. ${said}`,
+        { cause },
+      );
+    }
+    // True for every cause am reports, not only "unable to resolve": a
+    // matching activity may exist and have refused (SecurityException "not
+    // exported from uid", "you do not have permission to access it", "Not
+    // allowed to start activity"), so the message does not claim that none
+    // handles the intent — it says nothing started, and lets am's line decide.
+    throw new Error(
+      `Android started no activity in ${packageName} for this intent (${describeIntent(intent ?? {})}) — an ` +
+        `intent without an activity is delivered within the app's package. Either no exported activity there ` +
+        `declares a matching <intent-filter> (with category DEFAULT), or the one that does refused the launch ` +
+        `(not exported / permission — am's message below says which). Fix the action/mime type or the manifest, ` +
+        `or name the activity explicitly: \`activity:\` on the launch step / launch_app. ${said}`,
+      { cause },
+    );
   }
 
   async terminate(packageName: string): Promise<void> {

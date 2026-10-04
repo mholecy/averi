@@ -1167,11 +1167,12 @@ flows:
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app/.MainActivity (state cleared)' });
   });
 
-  // WHEN the fallback applies differs between a flow step and the launch_app
-  // tool, which skips it beside an intent. Pinned as it behaves today, not
-  // endorsed: see the open question in defaultLaunchActivity's doc
-  // (flow/config.ts) before changing either side.
-  it('a step with an intent and no activity still gets app.android.activity (unlike launch_app)', async () => {
+  // 2026-10-03, decided: app.android.activity applies only when the step
+  // names neither an activity nor an intent — the launch_app rule, now the
+  // one rule (flow/config.ts#resolveLaunchActivity). This test pinned the
+  // opposite until then. The adapter scopes the activity-less intent to the
+  // package (tests/adapters/android.test.ts).
+  it('a step with an intent and no activity launches with the intent alone — app.android.activity stays out of it', async () => {
     const cfg = parseConfig(`
 app:
   android: { package: md.bank.app, activity: .MainActivity }
@@ -1182,10 +1183,9 @@ flows:
           intent: { action: android.intent.action.SEND }
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    await new FlowEngine(cfg, fake, FAST).runFlow('share');
-    expect(fake.launches).toEqual([
-      { appId: 'md.bank.app', activity: '.MainActivity', intent: { action: 'android.intent.action.SEND' } },
-    ]);
+    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('share');
+    expect(fake.launches).toEqual([{ appId: 'md.bank.app', intent: { action: 'android.intent.action.SEND' } }]);
+    expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
   });
 });
 

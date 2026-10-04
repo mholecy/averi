@@ -345,10 +345,35 @@ describe('launch_app — the entry activity', () => {
     expect(launches[0].activity).toBe('.ShareActivity');
   });
 
-  it('an intent alone suppresses the fallback (the tool differs from a flow launch step here — pinned as it is)', async () => {
+  it('an intent alone suppresses the fallback: the launch carries the intent and no activity', async () => {
     const intent = { action: 'android.intent.action.SEND' };
     const { launches } = await launch({ appId: 'md.bank.app', intent });
     expect(launches).toEqual([{ appId: 'md.bank.app', clearState: undefined, activity: undefined, intent }]);
+  });
+
+  // 2026-10-03: one rule for both ways of launching. Until then a flow step
+  // put app.android.activity beside an intent and the tool did not; what is
+  // pinned is that the adapter cannot tell the two callers apart, in any of
+  // the four cases — not what either hands over (the tests above and
+  // tests/flow/engine.test.ts "launch step" own that).
+  it.each([
+    ['neither', {}, '.MainActivity'],
+    ['an activity', { activity: '.ShareActivity' }, '.ShareActivity'],
+    ['an intent', { intent: { action: 'android.intent.action.SEND', mimeType: 'text/plain' } }, undefined],
+    ['both', { activity: '.ShareActivity', intent: { action: 'android.intent.action.SEND' } }, '.ShareActivity'],
+  ])('a flow launch step and launch_app hand the adapter the same launch for %s', async (_name, entry, activity) => {
+    const configPath = await file(
+      'averi.yaml',
+      `app:\n  android: { package: md.bank.app, activity: .MainActivity }\nflows:\n  enter:\n    steps:\n      - launch: ${JSON.stringify(entry)}\n`,
+    );
+    const viaTool = await connect();
+    expect((await viaTool.call('launch_app', { platform: 'android', appId: 'md.bank.app', configPath, ...entry })).isError).toBe(false);
+    const viaFlow = await connect();
+    expect((await viaFlow.call('run_flow', { platform: 'android', flow: 'enter', configPath })).isError).toBe(false);
+
+    const [byTool] = viaTool.fakes.android!.launches;
+    expect(viaFlow.fakes.android!.launches).toEqual([byTool]);
+    expect(byTool).toEqual({ appId: 'md.bank.app', ...entry, activity });
   });
 
   it('ios never gets an activity from the config', async () => {

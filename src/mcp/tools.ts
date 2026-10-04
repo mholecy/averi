@@ -235,7 +235,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login). ' +
         'Android: activity pins the entry point — without it (and without app.android.activity in ' +
         'averi.yaml) the launcher activity is picked arbitrarily, which opens LeakCanary instead of the ' +
-        'app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND).',
+        'app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND); an intent ' +
+        "without an activity is delivered within the app's package (never to another app, and not to " +
+        'app.android.activity), and fails if no activity there handles it.',
       inputSchema: {
         platform,
         appId: z.string().describe('Android package name or iOS bundle id'),
@@ -243,10 +245,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         activity: z
           .string()
           .optional()
-          .describe('Android only: activity to start (".MainActivity" or fully-qualified). Defaults to app.android.activity from averi.yaml.'),
+          .describe('Android only: activity to start (".MainActivity" or fully-qualified). Defaults to app.android.activity from averi.yaml when no intent is given either.'),
         intent: launchIntentInput
           .optional()
-          .describe('Android only: am start parameters for custom entry points'),
+          .describe('Android only: am start parameters for custom entry points. Without activity, resolved within the package (am start -p).'),
         configPath,
       },
     },

@@ -241,7 +241,7 @@ describe('launchActivityFor — which activity a launch_app call starts', () => 
     expect(await launchActivityFor({ ...call, platform: 'ios', activity: '.X', configPath })).toBe('.X');
   });
 
-  it('an intent alone suppresses the fallback (a flow launch step differs here — see defaultLaunchActivity)', async () => {
+  it('an intent alone suppresses the fallback — the one rule, shared with a flow launch step (resolveLaunchActivity)', async () => {
     expect(
       await launchActivityFor({ ...call, intent: { action: 'android.intent.action.SEND' }, configPath: await validConfig() }),
     ).toBeUndefined();
@@ -266,6 +266,16 @@ describe('launchActivityFor — which activity a launch_app call starts', () => 
 
     it('an ios call does not load the project config: the variable stays unset', async () => {
       expect(await launchActivityFor({ ...call, platform: 'ios', configPath: await validConfig() })).toBeUndefined();
+      expect(process.env[VAR]).toBeUndefined();
+    });
+
+    // The load is skipped by the RULE's own "when", not by platform alone:
+    // an android call that names its entry point has no use for the config.
+    it.each([
+      ['an activity', { activity: '.ShareActivity' }, '.ShareActivity'],
+      ['an intent', { intent: { action: 'android.intent.action.SEND' } }, undefined],
+    ])('an android call naming %s does not load it either', async (_what, entry, activity) => {
+      expect(await launchActivityFor({ ...call, ...entry, configPath: await validConfig() })).toBe(activity);
       expect(process.env[VAR]).toBeUndefined();
     });
 

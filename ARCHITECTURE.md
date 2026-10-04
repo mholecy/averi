@@ -107,7 +107,7 @@ selector layer above it, inverting exactly the direction this section describes.
 - screenshot: `adb exec-out screencap -p`
 - UI tree: `adb shell uiautomator dump` (XML → normalized JSON). Fallback for Compose apps with poor semantics: coordinate taps from screenshots.
 - input: `adb shell input tap/swipe/text/keyevent`
-- install/launch: `adb install -r`, `adb shell am start` / `pm clear`
+- install/launch: `adb install -r`, `adb shell am start` / `pm clear`. A launch names its entry point one of three ways: nothing (`monkey -c LAUNCHER`), an activity (`am start -n pkg/activity`, with the intent if one is given), or an intent alone (`am start -p pkg -a …` — scoped to the package, Android resolves the activity; since 2026-10-03). `am start` output carrying an `Error` line is thrown, not swallowed (it exits 0).
 - logs: `adb logcat`
 
 **iOS implementation** — `xcrun simctl` + one helper:

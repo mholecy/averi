@@ -83,7 +83,12 @@ export interface LaunchOptions {
    * open LeakCanary instead of the app. iOS rejects it (single entry point).
    */
   activity?: string;
-  /** Android-only, see LaunchIntent. iOS rejects it — use openDeepLink. */
+  /**
+   * Android-only, see LaunchIntent. With `activity` it is sent to that
+   * component; without, it is scoped to the app's package (`am start -p`)
+   * and Android resolves the activity — a launch nothing in the package
+   * handles throws. iOS rejects it — use openDeepLink.
+   */
   intent?: LaunchIntent;
 }
 
