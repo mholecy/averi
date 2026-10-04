@@ -97,6 +97,14 @@ export interface DeviceAdapter {
    * what the png scale is derived from (verify/scale.ts). Those units are
    * load-bearing: verify/ divides png pixels by this width, so a platform that
    * started reporting the other unit would move every crop.
+   *
+   * MEMOIZED per adapter, success and failure alike — the panel does not
+   * change under a session — and that is part of the contract, not a detail:
+   * the layers above read it freely (per captured frame, per absent check)
+   * instead of caching it themselves. The Verifier and the FlowEngine each
+   * carried a memo of their own until 2026-10-02; both were pass-through
+   * over this one, and both are gone. An adapter that re-read the device on
+   * every call would make every pixel assert poll pay a shell-out.
    */
   viewport(): Promise<DeviceScreen>;
 

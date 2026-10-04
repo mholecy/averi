@@ -57,7 +57,7 @@ Clean separation of concerns:
 - **Device Adapter** (`adapters/`) — the only layer that knows platform commands. One interface, two implementations. Everything above is platform-agnostic.
 - **UI tree** (`ui-tree/`) — the normalized tree and everything asked OF it: selector resolution, `ElementSpec`, screen width, per-id rects, tap points. Knows no platform commands and no averi.yaml.
 - **Flow Engine** (`flow/`) — interprets `averi.yaml` descriptors (login, navigation recipes), maintains a state model of "where the app is".
-- **Verification Engine** (`verify/`) — asserts, the layout contract, rect/color/text parity, OCR, screenshot diffing.
+- **Verification Engine** (`verify/`) — asserts, the layout contract, rect/color/text parity, OCR, screenshot diffing. `verify/capture.ts` is the one owner of three facts every pixel reading rests on: that the frame is SETTLED (two identical consecutive captures, one budget for the `screenshot` and `ensure_state` tools, the color and ocr asserts, and each `verify` leg); the png scale — derived once per frame, from the device screen first, and carried as one value with one failure wording to the color and text comparators, which keep their own fallback policy (color fails closed, text drops to the tree with a note); and the rect→png crop, one mapping with the clipped fraction beside it (the inset is the color sampler's option). Before 2026-10-02 the wait had two owners, the legs took a bare screenshot, and the scale was derived at four call sites.
 - **Orchestration** (`run/`) — composes the two engines into one `verify` run: per-platform legs, error containment, the parity tables. It is its own layer precisely because it needs BOTH engines and neither may depend on the other.
 - **MCP layer** (`mcp/`) — thin: tool schemas, descriptions, and one-line delegations. No logic.
 
@@ -248,7 +248,7 @@ Ships with the package (`averi` skill — copy into the app repo). SKILL.md teac
 
 ## 8. Reliability details that make or break this
 
-- **Waits, not sleeps**: every action polls the AX tree for the expected postcondition (configurable timeout); screen-stability heuristic (two identical consecutive screenshots) before `screenshot` returns.
+- **Waits, not sleeps**: every action polls the AX tree for the expected postcondition (configurable timeout); screen-stability heuristic (two identical consecutive screenshots, up to 5 re-captures 300 ms apart) before any frame is measured or returned — owned by `verify/capture.ts`, applied by the `screenshot` and `ensure_state` tools, the color and ocr asserts, and the final frame of every `verify` leg, so a mid-animation frame is never the verdict (the legs took a bare screenshot until 2026-10-02). The same module derives the png scale once per settled frame.
 - **Login edge cases**: wrong-PIN lockout protection (max 1 auto-retry, then stop and report — never brute-force a real backend), OTP steps supported via `prompt_human` step type or a test-backend hook (`otp: { source: "http://localhost:9090/last-otp" }`).
 - **Determinism aids**: `clearState` per launch, `simctl status_bar override` / adb demo mode for clean screenshots, fixed locale/timezone options.
 - **Crash detection**: every tool response includes `appAlive: true | false | unknown` — `unknown` when the device could not be ASKED (adb/simctl timeout under load, device offline), which is deliberately not `false` (2026-09-18); flows fail fast with the relevant log excerpt.

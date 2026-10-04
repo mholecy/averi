@@ -154,6 +154,17 @@ describe('IosAdapter interactions', () => {
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
   });
 
+  // adapters/types.ts promises the memo covers failure too: the layers above
+  // read viewport() per captured frame and per absent check, and a device
+  // that will not answer must not be re-asked on every one of them.
+  it('viewport memoizes a FAILED read as well — one idb call, however many callers', async () => {
+    const { fn, calls } = fakeExec({ 'idb describe --json': JSON.stringify({}) });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    await expect(adapter.viewport()).rejects.toThrow(/no screen_dimensions/);
+    await expect(adapter.viewport()).rejects.toThrow(/no screen_dimensions/);
+    expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
+  });
+
   it('clearText sends backspaces then forward-deletes (position-independent)', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).clearText(3);

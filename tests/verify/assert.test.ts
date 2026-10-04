@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assertSpecSchema, readTreeWithRetry, scanForCrashes, Verifier } from '../../src/verify/assert.js';
+import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { pollMs: 5, timeoutMs: 100 };
@@ -383,6 +383,24 @@ describe('ocr asserts (what the element RENDERS)', () => {
     expect(result.detail).toContain('read "CONTINUE"');
   });
 
+  it('fails with a timeout detail when the element never appears (no screenshot burned)', async () => {
+    const fake = cardFake();
+    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'ghost' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('not found within');
+    expect(fake.screenshots).toHaveLength(0);
+  });
+
+  it('fails closed (with the decode error) when the screenshot is not decodable', async () => {
+    const fake = cardFake();
+    fake.nextScreenshot = Buffer.from('not a png');
+    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/screenshot PNG decode failed: .*; failing closed, rendered text unchecked/);
+  });
+
   it('fails on drift and quotes both sides', async () => {
     const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('0.00') });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'Enter amount' } });
@@ -471,22 +489,6 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     });
     expect(loose.pass).toBe(true);
     expect(loose.description).toContain('dE00 11 of #FDFDFD (light theme)');
-  });
-
-  it('reads the device screen ONCE per Verifier, however many pixel asserts run', async () => {
-    const fake = cardFake('#FDFDFD');
-    let viewports = 0;
-    fake.viewport = async () => {
-      viewports++;
-      return { width: 1000, height: 2000 };
-    };
-    const verifier = new Verifier(fake, FAST);
-    await verifier.assertAll([
-      { element: { id: 'card' }, color: { expected: '#FDFDFD' } },
-      { element: { id: 'card' }, color: { expected: '#FDFDFD' } },
-      { element: { id: 'card' }, absent: true, timeout: '10ms' },
-    ]);
-    expect(viewports).toBe(1);
   });
 
   it('samples a STABLE screenshot (at least two captures compared) via adapter.screenshot()', async () => {
@@ -666,29 +668,6 @@ describe('assertSpecSchema', () => {
     expect(() =>
       assertSpecSchema.parse({ element: { id: 'x' }, color: { expected: '#FDFDFD', sample: 'average' } }),
     ).toThrow();
-  });
-});
-
-describe('readTreeWithRetry', () => {
-  it('absorbs transient read failures (uiautomator null root) and returns the tree', async () => {
-    const fake = dashboardFake();
-    const orig = fake.uiTree.bind(fake);
-    let failures = 3;
-    fake.uiTree = async () => {
-      if (failures-- > 0) throw new Error('null root node returned by UiTestAutomationBridge');
-      return orig();
-    };
-    const tree = await readTreeWithRetry(fake, 5, 1);
-    expect(tree.children.length).toBeGreaterThan(0);
-    expect(failures).toBe(-1); // succeeded on the 4th attempt
-  });
-
-  it('throws after the last attempt, naming the attempt count and the underlying error', async () => {
-    const fake = dashboardFake();
-    fake.uiTree = async () => {
-      throw new Error('null root node');
-    };
-    await expect(readTreeWithRetry(fake, 3, 1)).rejects.toThrow(/after 3 attempts: null root node/);
   });
 });
 

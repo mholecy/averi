@@ -331,6 +331,17 @@ describe('AndroidAdapter interactions', () => {
     expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
   });
 
+  // adapters/types.ts promises the memo covers failure too: the layers above
+  // read viewport() per captured frame and per absent check, and a device
+  // that will not answer must not be re-asked on every one of them.
+  it('viewport memoizes a FAILED read as well — one shell-out, however many callers', async () => {
+    const { fn, calls } = fakeExec({ 'adb -s emulator-5554 shell wm size': 'error: device offline\n' });
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    await expect(adapter.viewport()).rejects.toThrow(/Cannot parse wm size output/);
+    await expect(adapter.viewport()).rejects.toThrow(/Cannot parse wm size output/);
+    expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
+  });
+
   it('clearText moves to end, then one keyevent per call (batches drop events in the IME queue)', async () => {
     const { fn, calls } = fakeExec({});
     await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).clearText(2);

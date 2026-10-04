@@ -725,20 +725,15 @@ export class FlowEngine {
     );
   }
 
-  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
-
-  private viewport(): Promise<{ width: number; height: number }> {
-    this.viewportPromise ??= this.adapter.viewport();
-    return this.viewportPromise;
-  }
-
   private async matches(cond: Condition, tree: UiNode): Promise<boolean> {
     if (cond.element) {
       const found = findBySpec(tree, cond.element);
       if (!cond.absent) return found.length > 0;
       // absent: gone from the tree OR nothing visibly on screen (iOS keeps
       // off-viewport nodes in its tree; Android prunes them — one meaning).
-      const viewport = await this.viewport();
+      // Memoized by the adapter (adapters/types.ts): one device read per
+      // adapter, however many conditions ask.
+      const viewport = await this.adapter.viewport();
       return !found.some((n) => intersectsViewport(n.rect, viewport));
     }
     if (cond.state) {

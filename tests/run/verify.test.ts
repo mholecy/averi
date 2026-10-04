@@ -51,6 +51,10 @@ const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => (
   cfg: CFG,
   specs: [],
   baselineDir: '/tmp/averi-test-baselines',
+  // The leg's final frame is captured SETTLED (verify/capture.ts); the fake
+  // never changes, so the wait resolves on its first re-capture — at 1 ms
+  // rather than the production 300 ms, 36 times over.
+  capture: { delayMs: 1 },
   ...over,
 });
 
@@ -80,6 +84,29 @@ describe('runVerification legs', () => {
     // Only the surviving leg contributes an image — the caller pairs images
     // with sections by order, so a placeholder would misalign them.
     expect(out.screenshots).toHaveLength(1);
+  });
+
+  /**
+   * Until 2026-10-02 the leg took a BARE screenshot after the asserts, so the
+   * frame returned to the caller — and fed to the color and text tables — could
+   * be a mid-animation one, the exact frame the color assert's own doc rules
+   * out as a verdict. The leg now waits for the frame to settle the way the
+   * `screenshot` tool does: two identical consecutive captures.
+   */
+  it('returns the SETTLED frame, not the first capture after the asserts', async () => {
+    const adapter = fake('android');
+    const settled = whitePng();
+    const moving = [Buffer.from('frame mid-animation 1'), Buffer.from('frame mid-animation 2'), settled, settled];
+    let i = 0;
+    adapter.screenshot = async () => {
+      const shot = moving[Math.min(i++, moving.length - 1)];
+      adapter.screenshots.push(shot);
+      return shot;
+    };
+    const out = await runVerification(request({ platforms: ['android'] }), async () => adapter);
+    expect(out.screenshots[0].equals(settled)).toBe(true);
+    // Two moving frames, then the settled one confirmed by a repeat.
+    expect(adapter.screenshots).toHaveLength(4);
   });
 
   it('surfaces a failing assert without throwing', async () => {
@@ -322,8 +349,41 @@ describe('text parity opt-in', () => {
       async () => adapter,
     );
     const text = out.sections.find((s) => s.startsWith('## text parity'));
-    expect(text).toContain('OCR failed');
+    // The frame's own reason, in the OCR note's words; the table still stands.
+    expect(text).toContain('(android: OCR failed — screenshot PNG decode failed: ');
+    expect(text).toContain('that platform compared from the tree.)');
     expect(text).toContain('text parity:');
+  });
+
+  /**
+   * The png scale is now derived inside the leg (verify/capture.ts) rather
+   * than inside the parity tables' containment. A tree the geometry walk
+   * cannot traverse used to be caught by paritySection; it must still cost
+   * only the tables, never the leg's trace, asserts and screenshot.
+   */
+  it('a tree the scale walk cannot traverse fails the tables, not the leg', async () => {
+    const adapter = fake('android');
+    // A rect-less root — not itself the window, so windowRect scans its
+    // children for one — with no `children` array to scan.
+    adapter.uiTree = async () => ({ ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] });
+    const out = await runVerification(
+      request({
+        platforms: ['android'],
+        contract: contract([{ id: 'card', x: 10, w: 40, bg: '#FFFFFF', text: 'CONTINUE' }]),
+        ocrEngine: engine({ card: 'CONTINUE' }),
+      }),
+      async () => adapter,
+    );
+    // The leg survived with its screenshot.
+    expect(out.sections[0]).toContain('## android');
+    expect(out.sections[0]).toContain('appAlive: true');
+    expect(out.screenshots).toHaveLength(1);
+    // The color table fails closed on the frame's one reason; the text table
+    // carries it as a note and stands on what is left.
+    const color = out.sections.find((s) => s.startsWith('## color parity'));
+    expect(color).toMatch(/FAILED: color parity: android: the png scale could not be derived from this tree/);
+    const text = out.sections.find((s) => s.startsWith('## text parity'));
+    expect(text).toContain('OCR failed — text parity: the png scale could not be derived from this tree');
   });
 });
 
@@ -470,17 +530,26 @@ describe('tree read is gated and ordered', () => {
   it('does not read the tree at all without a contract', async () => {
     const { adapter, ops } = tracked();
     await runVerification(request({ platforms: ['android'] }), async () => adapter);
-    expect(ops).toEqual(['screenshot']);
+    // Two captures — the settled frame is the one a repeat confirmed — and no tree.
+    expect(ops).toEqual(['screenshot', 'screenshot']);
   });
 
-  it('reads the tree BEFORE the screenshot so both describe the screen the leg ended on', async () => {
+  /**
+   * Until 2026-10-02 the leg read the tree and THEN took its screenshot. The
+   * captured frame inverts that: the png first, until it settles, then the
+   * tree. The settled png is the evidence the screen stopped moving, and
+   * uiautomator reports LIVE bounds during an animation — a tree read before
+   * the wait could carry mid-animation rects against a settled png, and every
+   * crop in the pixel tables would be off by the animation's remaining travel.
+   */
+  it('reads the tree AFTER the png has settled, so the tree describes the frame the wait found still', async () => {
     const { adapter, ops } = tracked();
     await runVerification(
       request({ platforms: ['android'], contract: contract([{ id: 'card', x: 10, w: 40 }]) }),
       async () => adapter,
     );
     expect(ops.indexOf('uiTree')).toBeGreaterThanOrEqual(0);
-    expect(ops.indexOf('uiTree')).toBeLessThan(ops.indexOf('screenshot'));
+    expect(ops.indexOf('uiTree')).toBeGreaterThan(ops.lastIndexOf('screenshot'));
   });
 });
 

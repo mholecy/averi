@@ -16,12 +16,8 @@ import {
   type AveriConfig,
 } from '../flow/config.js';
 import { describeScrollResult, fillField, FlowEngine, scrollUntilVisible } from '../flow/engine.js';
-import {
-  assertSpecSchema,
-  captureStableScreenshot,
-  DEFAULT_BASELINE_DIR,
-  Verifier,
-} from '../verify/assert.js';
+import { assertSpecSchema, DEFAULT_BASELINE_DIR, Verifier } from '../verify/assert.js';
+import { captureFrame } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { parseLayoutContract } from '../verify/layout-contract.js';
@@ -241,9 +237,6 @@ registerTool(
   },
 );
 
-const STABILITY_ATTEMPTS = 5;
-const STABILITY_DELAY_MS = 300;
-
 registerTool(
   'screenshot',
   {
@@ -252,8 +245,7 @@ registerTool(
     inputSchema: { platform },
   },
   async ({ platform: p }) => {
-    const adapter = await registry.get(p);
-    const shot = await captureStableScreenshot(adapter, STABILITY_ATTEMPTS, STABILITY_DELAY_MS);
+    const { shot } = await captureFrame(await registry.get(p));
     return {
       content: [{ type: 'image' as const, data: shot.toString('base64'), mimeType: 'image/png' }],
     };
@@ -420,7 +412,7 @@ registerTool(
   'ensure_state',
   {
     description:
-      'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. Returns the step trace and a final screenshot.',
+      'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.',
     inputSchema: {
       platform,
       state: z.string().describe('State name from averi.yaml'),
@@ -434,7 +426,7 @@ registerTool(
     const engine = new FlowEngine(cfg, adapter, { environment: env });
     const trace = await engine.ensureState(state);
     const health = await appHealth(adapter, cfg);
-    const shot = await adapter.screenshot();
+    const { shot } = await captureFrame(adapter);
     return {
       content: [
         { type: 'text' as const, text: formatTrace(trace) + health },

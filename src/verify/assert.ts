@@ -9,11 +9,11 @@ import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
 import { elementAssertSchema } from './element-assert.js';
+import { captureFrame } from './capture.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
-import type { DeviceScreen } from './scale.js';
 import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
 import { containsTextHint, flattenTree } from '../ui-tree/text-hint.js';
 
@@ -203,8 +203,6 @@ export class Verifier {
   private readonly timeoutMs: number;
   /** Built on first `ocr` assert so non-OCR runs never probe for a toolchain. */
   private ocr: OcrEngine | undefined;
-  /** One device read per Verifier — see viewportOnce(). */
-  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
 
   constructor(
     private readonly adapter: DeviceAdapter,
@@ -214,28 +212,6 @@ export class Verifier {
     this.pollMs = opts.pollMs ?? 300;
     this.timeoutMs = opts.timeoutMs ?? 3_000;
     this.ocr = opts.ocrEngine;
-  }
-
-  /**
-   * The device's own screen size, read at most ONCE per Verifier. Two asserts
-   * want it for different reasons and with opposite failure stances, so the
-   * memo holds the raw promise and each caller decides: `absent` needs a
-   * reference frame and must throw without one, the pixel asserts only want a
-   * better scale than the tree can give and must degrade to it.
-   */
-  private viewportOnce(): Promise<{ width: number; height: number }> {
-    this.viewportPromise ??= this.adapter.viewport();
-    return this.viewportPromise;
-  }
-
-  /**
-   * Screen size for the png scale, or undefined when the device will not say.
-   * Undefined is not a failure: it is the pre-0.6 behavior — scale from the
-   * tree — which still works for every root-bearing capture
-   * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md).
-   */
-  private screen(): Promise<DeviceScreen | undefined> {
-    return this.viewportOnce().catch(() => undefined);
   }
 
   async assertAll(specs: AssertSpec[]): Promise<AssertResult[]> {
@@ -353,9 +329,9 @@ export class Verifier {
 
   /**
    * Rendered text vs what the screen actually shows (text-parity.ts). Needs
-   * BOTH the tree (the element's rect) and a screenshot (pixels), plus the
-   * device's screen size to scale one into the other — read once, degrading to
-   * the tree's own width when the device will not say. Polls on a freshly
+   * BOTH the tree (the element's rect) and a screenshot (pixels), scaled
+   * together — the poll's tree is handed to the capture (verify/capture.ts),
+   * which settles the png and derives the one scale. Polls on a freshly
    * captured STABLE screenshot for the same reason the color assert does.
    *
    * Unavailable OCR fails the assert with the reason rather than skipping it:
@@ -377,7 +353,6 @@ export class Verifier {
       return { description, pass: false, detail: `${unavailable}; failing closed, rendered text unchecked` };
     }
     const engine = (this.ocr ??= new VisionOcr());
-    const screen = await this.screen();
     return this.poll(
       async (tree) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
@@ -385,18 +360,20 @@ export class Verifier {
         // the caller named ONE element and gets that element's rect.)
         const found = findBySpec(tree, element);
         if (found.length === 0) return undefined;
-        const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
+        const { shot, measured } = await captureFrame(this.adapter, { tree, delayMs: this.pollMs });
+        if (measured.error !== undefined) {
+          // Keep polling — the capture may have raced a transition — but stay
+          // failed so a deadline reached this way reports the reason.
+          return { pass: false, detail: `${measured.error}; failing closed, rendered text unchecked` };
+        }
         try {
-          const png = PNG.sync.read(shot);
-          const { region, note, error } = ocrRegionForRect(
-            'element', found[0].rect, tree, png.width, png.height, screen,
-          );
+          const { region, note, error } = ocrRegionForRect('element', found[0].rect, measured);
           if (region === undefined) {
             return { pass: false, detail: `${error}; failing closed, rendered text unchecked` };
           }
           const [result] = await engine.recognize(shot, [region]);
           if (result?.error !== undefined) return { pass: false, detail: result.error };
-          const verdict = evaluateOcrAssert(expectation, result?.lines ?? [], png.width);
+          const verdict = evaluateOcrAssert(expectation, result?.lines ?? [], measured.png.width);
           return note === undefined ? verdict : { ...verdict, detail: `${verdict.detail}; ${note}` };
         } catch (e) {
           // Keep polling — the capture may have raced a transition — but stay
@@ -414,8 +391,8 @@ export class Verifier {
 
   /**
    * Fill color vs an expected hex (color-parity.ts). Needs BOTH the tree
-   * (the element's rect) and a screenshot (pixels), scaled together by the
-   * device screen — the same derivation the `ocr` assert uses.
+   * (the element's rect) and a screenshot (pixels), scaled together — the
+   * same captured frame the `ocr` assert measures against.
    * Polls like the other asserts; each evaluation samples a freshly captured
    * STABLE screenshot — the same two-identical-consecutive-captures wait the
    * `screenshot` tool applies — so mid-animation frames are not the verdict,
@@ -431,21 +408,18 @@ export class Verifier {
     const description =
       `element ${describe(element)} fill within dE00 ${tol} of ${expectedHex}` +
       (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
-    const screen = await this.screen();
     return this.poll(
       async (tree) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
         if (found.length === 0) return undefined;
-        const shot = await captureStableScreenshot(this.adapter, 5, this.pollMs);
-        try {
-          const png = PNG.sync.read(shot);
-          return evaluateColorAssert(found[0].rect, expectation, tree, png, screen);
-        } catch (e) {
+        const { measured } = await captureFrame(this.adapter, { tree, delayMs: this.pollMs });
+        if (measured.error !== undefined) {
           // Fail closed on an undecodable screenshot, but keep polling —
           // the capture may have raced a transition.
-          return { pass: false, detail: `screenshot PNG decode failed: ${e instanceof Error ? e.message : String(e)}` };
+          return { pass: false, detail: `${measured.error}; failing closed, color unchecked` };
         }
+        return evaluateColorAssert(found[0].rect, expectation, measured);
       },
       {
         description,
@@ -502,7 +476,9 @@ export class Verifier {
     const description = `element ${describe(element)} is absent`;
     // Read before polling: a viewport that cannot be read is an error, not a
     // failed assert — absence is meaningless without a reference frame.
-    const viewport = await this.viewportOnce();
+    // (Memoized by the adapter — adapters/types.ts — so this is one device
+    // read per adapter, not per assert.)
+    const viewport = await this.adapter.viewport();
     return this.poll(
       (tree) => {
         const found = findBySpec(tree, element);
@@ -559,53 +535,6 @@ export class Verifier {
       detail: `${pct}% of pixels differ`,
     };
   }
-}
-
-/**
- * THE stability wait for screenshots — two identical consecutive captures,
- * bounded attempts — shared by the `screenshot` MCP tool (5 attempts, 300ms)
- * and the color assert (5 attempts, the verifier's pollMs, so tests stay
- * fast). Keep it single: each call costs 2 to attempts+1 device captures,
- * and the color assert already pays that PER POLL ITERATION — do not add
- * more callers casually, and never inside a tight loop.
- */
-export async function captureStableScreenshot(
-  adapter: Pick<DeviceAdapter, 'screenshot'>,
-  attempts = 5,
-  delayMs = 300,
-): Promise<Buffer> {
-  let previous = await adapter.screenshot();
-  for (let i = 0; i < attempts; i++) {
-    await sleep(delayMs);
-    const current = await adapter.screenshot();
-    if (current.equals(previous)) return current;
-    previous = current;
-  }
-  return previous;
-}
-
-/**
- * Bounded-retry tree read for one-shot consumers (verify's rect-parity leg):
- * right after a flow settles, a device can transiently fail to produce a
- * tree (uiautomator "null root node") — the same transient the polling
- * asserts absorb via readTreeOrError. Throws after the last attempt with the
- * underlying error in the message.
- */
-export async function readTreeWithRetry(
-  adapter: DeviceAdapter,
-  attempts = 5,
-  delayMs = 300,
-): Promise<UiNode> {
-  let lastError: Error | undefined;
-  for (let i = 0; i < attempts; i++) {
-    if (i > 0) await sleep(delayMs);
-    try {
-      return await adapter.uiTree();
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
-    }
-  }
-  throw new Error(`UI tree read failed after ${attempts} attempts: ${lastError?.message ?? 'unknown error'}`);
 }
 
 /** Crash signatures per platform, scanned over recent device logs. */

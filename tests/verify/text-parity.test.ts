@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
+import type { MeasuredFrame } from '../../src/verify/capture.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import type { OcrLine, OcrRegionResult } from '../../src/verify/ocr.js';
+import { pngScale } from '../../src/verify/scale.js';
 import {
   compareTextParity,
   contractHasTextAnchors,
@@ -50,6 +52,17 @@ const text = (id: string | null, label: string, rect = { x: 0, y: 0, width: 100,
   n({ role: 'text', identifier: id, label, rect });
 
 const line = (text: string, h: number): OcrLine => ({ text, confidence: 1, x: 0, y: 0, w: 100, h });
+
+/**
+ * What verify/capture.ts hands `ocrRegionsFor`: the tree, the png's size and
+ * the ONE scale derived for them. The pixels are never read here (the
+ * recognizer gets the raw bytes), so the image carries none.
+ */
+const frame = (tree: UiNode, pngWidth: number, pngHeight: number): MeasuredFrame => ({
+  tree,
+  png: { width: pngWidth, height: pngHeight, data: Buffer.alloc(0) },
+  scale: pngScale(tree, pngWidth, pngHeight),
+});
 
 const ocrMap = (entries: Record<string, OcrLine[] | { error: string }>): Map<string, OcrRegionResult> =>
   new Map(
@@ -466,10 +479,10 @@ describe('compareTextParity — regressions found in review', () => {
     const c = contract([{ id: 'cta', text: 'X' }]);
     const tree = root(402, [n({ identifier: 'cta', rect: { x: -10, y: 800, width: 100, height: 100 } })]);
     // scale 3: raw region would be x -30 .. 270, y 2400 .. 2700 against a 2622-tall png.
-    expect(ocrRegionsFor(c, tree, 1206, 2622).regions).toEqual([{ id: 'cta', x: 0, y: 2400, w: 270, h: 222 }]);
+    expect(ocrRegionsFor(c, frame(tree, 1206, 2622)).regions).toEqual([{ id: 'cta', x: 0, y: 2400, w: 270, h: 222 }]);
     // Nothing on screen at all → omitted, so it surfaces as an OCR-less row.
     const off = root(402, [n({ identifier: 'cta', rect: { x: 0, y: 2000, width: 100, height: 100 } })]);
-    expect(ocrRegionsFor(c, off, 1206, 2622).regions).toEqual([]);
+    expect(ocrRegionsFor(c, frame(off, 1206, 2622)).regions).toEqual([]);
   });
 });
 
@@ -528,12 +541,12 @@ describe('ocrRegionsFor', () => {
   it('scales opted-in anchor rects into png pixels (live: android 1.000, ios 3.000)', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }, { id: 'other', w: 10 }]);
     const ios = root(402, [n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
-    expect(ocrRegionsFor(c, ios, 1206, 2622).regions).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
+    expect(ocrRegionsFor(c, frame(ios, 1206, 2622)).regions).toEqual([{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]);
   });
 
   it('THROWS when the scale cannot be derived — an empty list would read as "no text anchors"', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
-    expect(() => ocrRegionsFor(c, root(402, [n({ identifier: 'cta' })]), 0, 800)).toThrow(
+    expect(() => ocrRegionsFor(c, frame(root(402, [n({ identifier: 'cta' })]), 0, 800))).toThrow(
       /degenerate dimensions 0x800/,
     );
   });
@@ -546,11 +559,11 @@ describe('ocrRegionsFor', () => {
       n({ identifier: 'cta', rect: { x: 208, y: 791, width: 176, height: 44 } }),
       n({ rect: { x: 402, y: 0, width: 402, height: 874 } }),
     ]);
-    expect(ocrRegionsFor(c, sheet, 1206, 2622).regions).toEqual([{ id: 'cta', x: 624, y: 2373, w: 528, h: 132 }]);
+    expect(ocrRegionsFor(c, frame(sheet, 1206, 2622)).regions).toEqual([{ id: 'cta', x: 624, y: 2373, w: 528, h: 132 }]);
 
     // Same tree with the window itself inflated — no root to fall back on.
     const broken = root(804, [n({ identifier: 'cta', rect: { x: 208, y: 791, width: 176, height: 44 } })], 874);
-    expect(() => ocrRegionsFor(c, broken, 1206, 2622)).toThrow(/do not describe the same screen/);
+    expect(() => ocrRegionsFor(c, frame(broken, 1206, 2622))).toThrow(/do not describe the same screen/);
   });
 });
 

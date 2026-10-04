@@ -1,20 +1,9 @@
-import { PNG } from 'pngjs';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
-import {
-  readTreeWithRetry,
-  scanForCrashes,
-  Verifier,
-  type AssertResult,
-  type AssertSpec,
-} from '../verify/assert.js';
-import {
-  compareColorParity,
-  contractHasColorAnchors,
-  formatColorParity,
-  type ColorCapture,
-} from '../verify/color-parity.js';
+import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
+import { captureFrame, type CaptureOptions, type Frame, type MeasuredFrame } from '../verify/capture.js';
+import { compareColorParity, contractHasColorAnchors, formatColorParity } from '../verify/color-parity.js';
 import type { LayoutContract } from '../verify/layout-contract.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine, type OcrRegionResult } from '../verify/ocr.js';
 import { compareRectParity, formatRectParity } from '../verify/rect-parity.js';
@@ -51,6 +40,13 @@ export interface VerificationRequest {
   baselineDir: string;
   /** Test seam: the OCR recognizer behind the text-parity table. */
   ocrEngine?: OcrEngine;
+  /**
+   * Test seam: the delay inside each leg's final-frame stability wait
+   * (verify/capture.ts). Production takes the default — the same wait the
+   * `screenshot` tool applies; a fake device that never changes would
+   * otherwise cost every leg test one real 300 ms sleep.
+   */
+  capture?: Pick<CaptureOptions, 'delayMs'>;
 }
 
 export interface VerificationOutput {
@@ -60,20 +56,17 @@ export interface VerificationOutput {
   screenshots: Buffer[];
 }
 
-/** What one platform's leg produced. Absent fields mean that part failed. */
+/** What one platform's leg produced. */
 interface VerificationLeg {
   trace: TraceEntry[];
   results: AssertResult[];
-  shot: Buffer;
-  health: string;
-  tree?: UiNode;
-  treeError?: string;
   /**
-   * The device's screen size, in tree units — what the png scale is derived
-   * from when it is here (verify/scale.ts). Absent when the device would not
-   * say; the tables then scale off the tree and say so.
+   * The settled frame the leg ended on — the png returned to the caller and,
+   * with a contract, the tree and the one scale the parity tables measure
+   * against. Absent parts carry their reason (verify/capture.ts).
    */
-  screen?: { width: number; height: number };
+  frame: Frame;
+  health: string;
 }
 
 /**
@@ -166,28 +159,18 @@ export async function runVerification(
     if (req.state) trace.push(...(await engine.ensureState(req.state)));
     if (req.flow) trace.push(...(await engine.runFlow(req.flow)));
     const results = await new Verifier(adapter, { baselineDir: req.baselineDir }).assertAll(specs);
-    // Grab the tree inside the leg, right at the screen the leg ended on —
-    // no extra device round-trip ordering issues after the legs settle.
-    // Bounded retry (the transient "null root node" read the polling
-    // asserts absorb), and a final failure must NOT reject the leg: that
-    // would discard the trace, assert results and screenshot of a
-    // minutes-long device run over the one optional extra read.
-    let tree: UiNode | undefined;
-    let treeError: string | undefined;
-    if (contract !== undefined) {
-      try {
-        tree = await readTreeWithRetry(adapter);
-      } catch (e) {
-        treeError = e instanceof Error ? e.message : String(e);
-      }
-    }
-    const shot = await adapter.screenshot();
-    // The out-of-tree screen size, memoized inside the adapter and therefore
-    // usually already paid for. A failure here is NOT a leg failure: it costs
-    // the pixel tables their best scale, not their evidence.
-    const screen = await adapter.viewport().catch(() => undefined);
+    // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
+    // a bare screenshot, so the color and text tables could be fed the one
+    // frame the color assert's own doc rules out: a mid-animation one. With a
+    // contract the tree is read beside it (bounded retry, the transient "null
+    // root node" the polling asserts absorb) and the png scale derived once;
+    // a failed tree read or device-screen read must NOT reject the leg — that
+    // would discard the trace, assert results and screenshot of a minutes-long
+    // device run over an optional extra read — so both land on the frame as
+    // reasons the tables quote.
+    const frame = await captureFrame(adapter, { ...req.capture, tree: contract === undefined ? undefined : true });
     const health = await appHealth(adapter, cfg);
-    return { trace, results, shot, health, tree, treeError, screen };
+    return { trace, results, frame, health };
   };
 
   const runs = await Promise.allSettled(platforms.map(runOne));
@@ -200,10 +183,10 @@ export async function runVerification(
       sections.push(`## ${p}\nFAILED: ${run.reason instanceof Error ? run.reason.message : String(run.reason)}`);
       return;
     }
-    const { trace, results, shot, health } = run.value;
+    const { trace, results, frame, health } = run.value;
     const verdict = specs.length === 0 ? '' : `\n${assertSummary(results)}`;
     sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${health}`);
-    screenshots.push(shot);
+    screenshots.push(frame.shot);
   });
 
   if (contract !== undefined) {
@@ -214,9 +197,9 @@ export async function runVerification(
     );
 
     // Color parity, only when the contract opts in (any anchor carrying
-    // bg / bg_dark / sample). Reuses each leg's tree AND its final
-    // screenshot bytes — the exact pixels already returned to the caller,
-    // never a second capture that could race a UI change.
+    // bg / bg_dark / sample). Reuses each leg's frame — the exact pixels
+    // already returned to the caller, the tree read beside them and the
+    // scale derived once — never a second capture that could race a UI change.
     //
     // No opts → theme is always 'light' — deliberate: verify exposes no
     // theme input because averi cannot switch device themes, and sampling a
@@ -229,7 +212,7 @@ export async function runVerification(
           'color parity',
           platforms,
           runs,
-          captureOf,
+          measuredOf,
           'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
           (captures) => formatColorParity(compareColorParity(contract, captures)),
         ),
@@ -258,9 +241,10 @@ export async function runVerification(
           platforms,
           runs,
           (leg, p): Contribution<TextCapture> => {
-            if (leg.tree === undefined) return { note: noTreeNote(leg, p) };
+            const m = leg.frame.measured;
+            if (m.tree === undefined) return { note: noTreeNote(p, m.error) };
             const got = ocrByPlatform.get(p);
-            return { value: { tree: leg.tree, ocr: got?.ocr, pngWidth: got?.pngWidth } };
+            return { value: { tree: m.tree, ocr: got?.ocr, pngWidth: got?.pngWidth } };
           },
           'SKIPPED: no leg produced a UI tree.',
           (captures) => formatTextParity(compareTextParity(contract, captures)),
@@ -282,21 +266,24 @@ type Contribution<T> = { value: T } | { note: string };
  * point: a dimension that dropped a leg SILENTLY would print a one-platform
  * table that looks like a completed comparison.
  */
-const noTreeNote = (leg: VerificationLeg, p: Platform): string =>
-  `(${p}: UI tree read failed — ${leg.treeError ?? 'unknown'} — compared without it)`;
+const noTreeNote = (p: Platform, reason: string): string =>
+  `(${p}: UI tree read failed — ${reason} — compared without it)`;
 
-const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> =>
-  leg.tree !== undefined ? { value: leg.tree } : { note: noTreeNote(leg, p) };
+const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
+  const m = leg.frame.measured;
+  return m.tree !== undefined ? { value: m.tree } : { note: noTreeNote(p, m.error) };
+};
 
-const captureOf = (leg: VerificationLeg, p: Platform): Contribution<ColorCapture> => {
-  if (leg.tree === undefined) return { note: noTreeNote(leg, p) };
-  try {
-    return { value: { tree: leg.tree, png: PNG.sync.read(leg.shot), screen: leg.screen } };
-  } catch (e) {
-    return {
-      note: `(${p}: screenshot PNG decode failed — ${e instanceof Error ? e.message : String(e)} — compared without it)`,
-    };
-  }
+/**
+ * The frame's measured half, or why there is none — the frame's own one
+ * sentence, which names the tree read when that is what failed and the png
+ * decode when the tree is here and the pixels are not.
+ */
+const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFrame> => {
+  const m = leg.frame.measured;
+  if (m.error === undefined) return { value: m };
+  if (m.tree === undefined) return { note: noTreeNote(p, m.error) };
+  return { note: `(${p}: ${m.error} — compared without it)` };
 };
 
 /** What one platform's OCR pass produced, plus the reasons any of it is absent. */
@@ -333,17 +320,23 @@ async function runOcr(
   await Promise.all(
     platforms.map(async (p, i) => {
       const run = runs[i];
-      if (run.status === 'rejected' || run.value.tree === undefined) return;
-      const { tree, shot } = run.value;
+      if (run.status === 'rejected') return;
+      const { frame } = run.value;
+      const m = frame.measured;
+      if (m.error !== undefined) {
+        // No tree: the text table says so itself (noTreeNote). A tree without
+        // pixels: that is an OCR failure in this table's terms, worded here.
+        if (m.tree !== undefined) notes.push(`(${p}: OCR failed — ${m.error} — that platform compared from the tree.)`);
+        return;
+      }
       try {
-        const png = PNG.sync.read(shot);
-        const { regions, note } = ocrRegionsFor(contract, tree, png.width, png.height, run.value.screen);
+        const { regions, note } = ocrRegionsFor(contract, m);
         // Nothing scaled, nothing to caveat.
         if (regions.length === 0) return;
-        const results = await engine.recognize(shot, regions);
+        const results = await engine.recognize(frame.shot, regions);
         ocrByPlatform.set(p, {
           ocr: new Map(results.map((r) => [r.id, r])),
-          pngWidth: png.width,
+          pngWidth: m.png.width,
         });
         // After the recognizer, so a leg that ends up compared from the tree
         // carries THAT reason alone rather than a caveat about regions it

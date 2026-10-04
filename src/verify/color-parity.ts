@@ -1,7 +1,7 @@
 import type { Platform, UiNode } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects } from '../ui-tree/geometry.js';
-import { pngScale, type DeviceScreen } from './scale.js';
+import { pngRegion, type MeasuredFrame, type PngRegion, type RgbaImage } from './capture.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -35,10 +35,10 @@ import { headerWithRule, row as tableRow, type Column } from './table.js';
  *   axis (8) but UNDER the default contract axis (12) — a single-platform run
  *   at defaults would MISS it, so the output says "consider tolerance_de 6"
  *   whenever only vs-contract comparisons apply.
- * - Scale is derived per platform at runtime: scale = png_width / tree root
- *   width (widest rect in the WHOLE tree, id-less root included). Never
- *   hardcoded 2x/3x. Degenerate width/scale is an explicit failure, never a
- *   vacuous pass.
+ * - Scale is derived per platform at runtime, ONCE per captured frame
+ *   (verify/capture.ts, verify/scale.ts): the device screen when it will
+ *   say, the tree when it will not. Never hardcoded 2x/3x. Degenerate
+ *   width/scale is an explicit failure, never a vacuous pass.
  * - An anchor PARTIALLY off-png is clamped and still sampled; when the clip
  *   removes >40% of the rect's area a note flags that the remaining sliver's
  *   dominant may be a neighbor's fill. Fully off-png → MISSING.
@@ -67,13 +67,8 @@ const TOKEN_RE = /^[a-z][a-z0-9]*\.color\d+$/;
 export type ColorTheme = 'light' | 'dark';
 export type ColorSampleMode = 'dominant' | 'patches';
 
-/** Decoded RGBA screenshot — pngjs's `PNG` satisfies this structurally. */
-export interface RgbaImage {
-  width: number;
-  height: number;
-  /** 8-bit RGBA, row-major (pngjs normalizes every PNG variant to this). */
-  data: Buffer | Uint8Array;
-}
+// The decoded image's shape is the captured frame's (verify/capture.ts).
+export type { RgbaImage };
 
 type Rect = UiNode['rect'];
 type Region = { x0: number; y0: number; x1: number; y1: number };
@@ -88,34 +83,40 @@ export const normalizeHex = (raw: string): string => raw.slice(0, 7).toUpperCase
  * undefined when the rect is (effectively) outside the png — off-screen in
  * this capture. A PARTIALLY off-png rect is clamped and still sampled; the
  * caller notes it when the clip removes a meaningful share of the area,
- * because a thin remaining sliver can sample a neighbor's fill.
+ * because a thin remaining sliver can sample a neighbor's fill. The mapping
+ * itself is the frame's (verify/capture.ts); the inset is this sampler's.
  */
-export function scaledRegion(
-  rect: Rect,
-  scale: number,
-  img: RgbaImage,
-): { region: Region; clipped: number } | undefined {
-  // Known deviation from the Python port: Math.round rounds half UP where
-  // Python's round() is banker's (half to even), so a bound whose scaled
-  // product lands exactly on .5 can shift 1px. Accepted deliberately: the
-  // 12% edge inset swallows any single-pixel edge, and the fixture tests pin
-  // THIS behavior — do not "fix" it to banker's without re-pinning them.
-  const x0 = Math.round(rect.x * scale);
-  const y0 = Math.round(rect.y * scale);
-  const x1 = Math.round((rect.x + rect.width) * scale);
-  const y1 = Math.round((rect.y + rect.height) * scale);
-  const cx0 = Math.max(x0, 0);
-  const cy0 = Math.max(y0, 0);
-  const cx1 = Math.min(x1, img.width);
-  const cy1 = Math.min(y1, img.height);
-  if (cx1 - cx0 < 1 || cy1 - cy0 < 1) return undefined;
-  const full = (x1 - x0) * (y1 - y0);
-  const clipped = full > 0 ? 1.0 - ((cx1 - cx0) * (cy1 - cy0)) / full : 0.0;
-  const iw = cx1 - cx0;
-  const ih = cy1 - cy0;
-  const ix = Math.min(Math.floor(iw * EDGE_INSET), Math.floor((iw - 1) / 2));
-  const iy = Math.min(Math.floor(ih * EDGE_INSET), Math.floor((ih - 1) / 2));
-  return { region: { x0: cx0 + ix, y0: cy0 + iy, x1: cx1 - ix, y1: cy1 - iy }, clipped };
+const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | undefined =>
+  pngRegion(rect, scale, img, EDGE_INSET);
+
+/**
+ * How much clipping, and how weak a mode, a sample can carry before its row
+ * needs a caveat. Both at 40%: a sliver under 60% of its rect may be a
+ * neighbour's fill; a dominant bucket under 40% is busy content.
+ */
+const CLIPPED_CAVEAT = 0.4;
+const SHARE_CAVEAT = 0.4;
+
+/**
+ * The caveats a sample carries, worded ONCE for the table row and the single
+ * -element assert — they were written twice and had already drifted apart
+ * (one told the reader how to recover, one did not).
+ */
+function sampleCaveats(region: PngRegion, sample: { share: number }): string[] {
+  const notes: string[] = [];
+  if (region.clipped > CLIPPED_CAVEAT) {
+    notes.push(
+      `clipped ${Math.round(region.clipped * 100)}% off-png — the remaining sliver's dominant may be ` +
+        `a neighbor's fill; scroll it fully on-screen and re-run to trust this row`,
+    );
+  }
+  if (sample.share < SHARE_CAVEAT) {
+    notes.push(
+      `dominant bucket covers only ${Math.round(sample.share * 100)}% of the region — busy content; ` +
+        `consider sample: "patches" or a tighter anchor`,
+    );
+  }
+  return notes;
 }
 
 /** 5 patches: 4 corners inset 15% + center, each ~9x9 (smaller if tiny). */
@@ -229,17 +230,6 @@ function contractTargetOf(anchor: LayoutAnchor, id: string, theme: ColorTheme): 
 
 // --------------------------------------------------------------- pipeline
 
-export interface ColorCapture {
-  tree: UiNode;
-  png: RgbaImage;
-  /**
-   * Screen size read from the device, in tree units. Optional because a leg
-   * whose read failed must still produce a table — one scaled off the tree,
-   * with `ColorPlatformStats.note` saying so.
-   */
-  screen?: DeviceScreen;
-}
-
 export interface ColorPlatformStats {
   platform: Platform;
   pngWidth: number;
@@ -312,11 +302,13 @@ const SCALE_SANE_MAX = 4.0;
 /**
  * Per-platform scale and sanity, failing closed on anything degenerate: a
  * 0-width root or a 0-width png would make every region empty and every
- * comparison vacuous.
+ * comparison vacuous. The scale is the frame's — derived once at capture —
+ * and this is where the color table's policy on a failed one lives: the
+ * WHOLE table fails, because a png nothing can be measured against is not a
+ * per-anchor problem.
  */
-function statsFor(platform: Platform, capture: ColorCapture): ColorPlatformStats {
-  const { tree, png, screen } = capture;
-  const scaled = pngScale(tree, png.width, png.height, screen);
+function statsFor(platform: Platform, capture: MeasuredFrame): ColorPlatformStats {
+  const { png, scale: scaled } = capture;
   if (scaled.error !== undefined) {
     throw new Error(`color parity: ${platform}: ${scaled.error}; failing closed.`);
   }
@@ -350,35 +342,23 @@ function sampleAnchor(
   id: string,
   platform: Platform,
   rect: Rect | undefined,
-  capture: ColorCapture,
+  capture: MeasuredFrame,
   scale: number,
   mode: ColorSampleMode,
 ): { sample?: ColorSample; absent?: string; notes: string[] } {
-  const notes: string[] = [];
-  if (rect === undefined) return { absent: 'no id in tree', notes };
-  const got = scaledRegion(rect, scale, capture.png);
-  if (got === undefined) return { absent: 'rect outside png (off-screen)', notes };
-  if (got.clipped > 0.4) {
-    notes.push(
-      `${id} [${platform}]: clipped ${Math.round(got.clipped * 100)}% off-png — the remaining sliver's ` +
-        `dominant may be a neighbor's fill; scroll it fully on-screen and re-run to trust this row.`,
-    );
-  }
-  const regions = mode === 'patches' ? patchRegions(got.region) : [got.region];
+  if (rect === undefined) return { absent: 'no id in tree', notes: [] };
+  const got = sampleRegion(rect, scale, capture.png);
+  if (got === undefined) return { absent: 'rect outside png (off-screen)', notes: [] };
+  const regions = mode === 'patches' ? patchRegions(got) : [got];
   const s = sampleDominant(capture.png, regions);
-  if (s === undefined) return { absent: 'empty sample region', notes };
-  if (s.share < 0.4) {
-    notes.push(
-      `${id} [${platform}]: dominant bucket covers only ${Math.round(s.share * 100)}% of the region — ` +
-        `busy content; consider sample: "patches" or a tighter anchor.`,
-    );
-  }
+  if (s === undefined) return { absent: 'empty sample region', notes: [] };
+  const notes = sampleCaveats(got, s).map((caveat) => `${id} [${platform}]: ${caveat}.`);
   return { sample: { hex: rgbToHex(s.rgb), share: s.share }, notes };
 }
 
 export function compareColorParity(
   contract: LayoutContract,
-  captures: Partial<Record<Platform, ColorCapture>>,
+  captures: Partial<Record<Platform, MeasuredFrame>>,
   opts: ColorParityOptions = {},
 ): ColorParityResult {
   const platforms = (['android', 'ios'] as const).filter((p) => captures[p] !== undefined);
@@ -398,7 +378,7 @@ export function compareColorParity(
   const scaleOf: Partial<Record<Platform, number>> = {};
   const rectsOf: Partial<Record<Platform, Map<string, Rect>>> = {};
   for (const p of platforms) {
-    const capture = captures[p] as ColorCapture;
+    const capture = captures[p] as MeasuredFrame;
     const platformStats = statsFor(p, capture);
     stats.push(platformStats);
     scaleOf[p] = platformStats.scale;
@@ -421,7 +401,7 @@ export function compareColorParity(
         id,
         p,
         rectsOf[p]?.get(id),
-        captures[p] as ColorCapture,
+        captures[p] as MeasuredFrame,
         scaleOf[p] as number,
         mode,
       );
@@ -647,24 +627,23 @@ export interface ColorExpectation {
 }
 
 /**
- * Single-element fill check: sample the element's region from the screenshot
- * and compare CIEDE2000 against the expected hex. Fails closed on degenerate
- * width/scale, an off-png rect, or an empty region — never a vacuous pass.
+ * Single-element fill check: sample the element's region from the captured
+ * frame and compare CIEDE2000 against the expected hex. Fails closed on a
+ * frame whose scale could not be derived, an off-png rect, or an empty
+ * region — never a vacuous pass.
  */
 export function evaluateColorAssert(
   rect: Rect,
   expectation: ColorExpectation,
-  tree: UiNode,
-  png: RgbaImage,
-  screen?: DeviceScreen,
+  frame: MeasuredFrame,
 ): { pass: boolean; detail: string } {
   const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
-  const scaled = pngScale(tree, png.width, png.height, screen);
+  const { png, scale: scaled } = frame;
   if (scaled.error !== undefined) {
     return { pass: false, detail: `${scaled.error}; failing closed, color unchecked` };
   }
   const scale = scaled.scale;
-  const got = scaledRegion(rect, scale, png);
+  const got = sampleRegion(rect, scale, png);
   if (got === undefined) {
     return {
       pass: false,
@@ -672,7 +651,7 @@ export function evaluateColorAssert(
     };
   }
   const mode: ColorSampleMode = expectation.sample ?? 'dominant';
-  const regions = mode === 'patches' ? patchRegions(got.region) : [got.region];
+  const regions = mode === 'patches' ? patchRegions(got) : [got];
   const s = sampleDominant(png, regions);
   if (s === undefined) {
     return { pass: false, detail: 'sample region is empty after inset/clamp; failing closed, color unchecked' };
@@ -681,13 +660,7 @@ export function evaluateColorAssert(
   const expectedHex = normalizeHex(expectation.expected);
   const de = deltaEHex(hex, expectedHex);
   const pass = de <= tol;
-  const notes: string[] = [];
-  if (got.clipped > 0.4) {
-    notes.push(`clipped ${Math.round(got.clipped * 100)}% off-png — the sampled sliver may be a neighbor's fill`);
-  }
-  if (s.share < 0.4) {
-    notes.push(`dominant bucket covers only ${Math.round(s.share * 100)}% of the region — busy content; consider sample: "patches"`);
-  }
+  const notes = sampleCaveats(got, s);
   if (scale < SCALE_SANE_MIN || scale > SCALE_SANE_MAX) {
     notes.push(`scale ${scale.toFixed(3)} outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`);
   }

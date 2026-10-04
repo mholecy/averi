@@ -1,6 +1,7 @@
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
-import type { UiNode } from '../../src/adapters/types.js';
+import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
+import type { MeasuredFrame, RgbaImage } from '../../src/verify/capture.js';
 import {
   compareColorParity,
   colorParityVerdict,
@@ -11,10 +12,9 @@ import {
   normalizeHex,
   patchRegions,
   sampleDominant,
-  scaledRegion,
-  type ColorCapture,
 } from '../../src/verify/color-parity.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
+import { pngScale } from '../../src/verify/scale.js';
 
 /**
  * Synthetic in-memory captures modeled on the live-validated 2026-08-14 run:
@@ -71,8 +71,15 @@ function img(width: number, height: number, bg = BG): PNG {
 
 const contract = (json: unknown): LayoutContract => parseLayoutContract(JSON.stringify(json));
 
+/** What verify/capture.ts hands the comparator: the tree, the png and the ONE scale derived for them. */
+const measured = (tree: UiNode, png: RgbaImage, screen?: DeviceScreen): MeasuredFrame => ({
+  tree,
+  png,
+  scale: pngScale(tree, png.width, png.height, screen),
+});
+
 /** One card per platform, same tree geometry, per-platform fill. */
-function capturePair(androidFill: string, iosFill: string): Record<'android' | 'ios', ColorCapture> {
+function capturePair(androidFill: string, iosFill: string): Record<'android' | 'ios', MeasuredFrame> {
   // android: 1:1 (root 200 px, png 200 px); ios: 2x (root 100 pt, png 200 px)
   const androidTree = root(200, 400, [leaf('card', 20, 20, 100, 60)]);
   const androidPng = img(200, 400);
@@ -81,8 +88,8 @@ function capturePair(androidFill: string, iosFill: string): Record<'android' | '
   const iosPng = img(200, 400);
   paint(iosPng, 20, 20, 100, 60, iosFill);
   return {
-    android: { tree: androidTree, png: androidPng },
-    ios: { tree: iosTree, png: iosPng },
+    android: measured(androidTree, androidPng),
+    ios: measured(iosTree, iosPng),
   };
 }
 
@@ -121,16 +128,16 @@ describe('compareColorParity — the live-validated semantics', () => {
   it('derives scale per platform from png width / tree root width (live: android 1.000, ios 3.000)', () => {
     // The measured 2026-08-14 payment-form values: android 1080 px root with
     // a 1080 px png; ios 402 pt root with a 1206 px png.
-    const captures: Record<'android' | 'ios', ColorCapture> = {
+    const captures: Record<'android' | 'ios', MeasuredFrame> = {
       android: (() => {
         const png = img(1080, 60);
         paint(png, 100, 10, 300, 40, WHITE);
-        return { tree: root(1080, 2400, [leaf('card', 100, 10, 300, 40)]), png };
+        return measured(root(1080, 2400, [leaf('card', 100, 10, 300, 40)]), png);
       })(),
       ios: (() => {
         const png = img(1206, 180);
         paint(png, 300, 30, 900, 120, WHITE);
-        return { tree: root(402, 874, [leaf('card', 100, 10, 300, 40)]), png };
+        return measured(root(402, 874, [leaf('card', 100, 10, 300, 40)]), png);
       })(),
     };
     const r = compareColorParity(cardContract(), captures);
@@ -216,10 +223,7 @@ describe('compareColorParity — themes', () => {
         const png = img(200, 400, '#121212');
         paint(png, 20, 20, 100, 60, '#363644');
         paint(png, 20, 100, 100, 40, '#363644');
-        return {
-          tree: root(200, 400, [leaf('card', 20, 20, 100, 60), leaf('pill', 20, 100, 100, 40)]),
-          png,
-        };
+        return measured(root(200, 400, [leaf('card', 20, 20, 100, 60), leaf('pill', 20, 100, 100, 40)]), png);
       })(),
     };
     const r = compareColorParity(c, captures, { theme: 'dark', toleranceDe: 6 });
@@ -332,15 +336,17 @@ describe('compareColorParity — single-platform runs', () => {
 });
 
 describe('compareColorParity — failing closed', () => {
+  // The scale is the FRAME's (derived once at capture), so a capture is built
+  // with the tree it is to be measured against — not patched after the fact.
   it('throws on a tree with no usable width (never a vacuous pass)', () => {
     const captures = capturePair(WHITE, WHITE);
-    captures.android.tree = n({ children: [n({ identifier: 'card' })] }); // all rects 0-sized
+    captures.android = measured(n({ children: [n({ identifier: 'card' })] }), captures.android.png); // all rects 0-sized
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/width could not be inferred/);
   });
 
   it('throws on a degenerate screenshot and on an invalid tolerance_de', () => {
     const captures = capturePair(WHITE, WHITE);
-    captures.android.png = { width: 0, height: 0, data: Buffer.alloc(0) };
+    captures.android = measured(captures.android.tree, { width: 0, height: 0, data: Buffer.alloc(0) });
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/degenerate dimensions/);
     const c = contract({ screen: 's', tolerance_de: -1, anchors: [{ id: 'card', bg: WHITE }] });
     expect(() => compareColorParity(c, capturePair(WHITE, WHITE))).toThrow(/tolerance_de/);
@@ -350,7 +356,7 @@ describe('compareColorParity — failing closed', () => {
   it('flags an insane scale in the stats line', () => {
     const captures = capturePair(WHITE, WHITE);
     // png 200 wide but root claims 25 → scale 8, outside [0.5, 4].
-    captures.android.tree = root(25, 400, [leaf('card', 2, 2, 12, 8)]);
+    captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)]), captures.android.png);
     const r = compareColorParity(cardContract(), captures);
     expect(formatColorParity(r)).toContain('! scale outside [0.5, 4]');
   });
@@ -359,7 +365,7 @@ describe('compareColorParity — failing closed', () => {
     // Root inset at x=5 → not a window, and the widest rect is inset too, so
     // the width is the CONTENT width. It used to be a note on a passing table.
     const captures = capturePair(WHITE, WHITE);
-    captures.android.tree = root(25, 400, [leaf('card', 2, 2, 12, 8)], 5);
+    captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)], 5), captures.android.png);
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/CONTENT width/);
   });
 
@@ -394,19 +400,7 @@ describe('contractHasColorAnchors', () => {
 });
 
 describe('sampling primitives', () => {
-  it('scaledRegion applies the 12% inset and reports the clipped fraction', () => {
-    const png = img(200, 200);
-    const got = scaledRegion({ x: 10, y: 10, width: 100, height: 50 }, 1, png);
-    expect(got).toBeDefined();
-    // inset: floor(100*0.12)=12 horizontally, floor(50*0.12)=6 vertically
-    expect(got?.region).toEqual({ x0: 22, y0: 16, x1: 98, y1: 54 });
-    expect(got?.clipped).toBe(0);
-    // fully off-png → undefined
-    expect(scaledRegion({ x: 0, y: 300, width: 10, height: 10 }, 1, png)).toBeUndefined();
-    // tiny region: inset never empties it
-    const tiny = scaledRegion({ x: 0, y: 0, width: 2, height: 2 }, 1, png);
-    expect(tiny?.region).toEqual({ x0: 0, y0: 0, x1: 2, y1: 2 });
-  });
+  // The rect → png mapping (with its 12% inset) is the frame's: tests/verify/capture.test.ts.
 
   it('patchRegions yields 5 patches inside the region', () => {
     const patches = patchRegions({ x0: 0, y0: 0, x1: 100, y1: 100 });
@@ -444,7 +438,7 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
   };
 
   it('passes on a matching fill and reports the numbers', () => {
-    const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, tree, shot(WHITE));
+    const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, measured(tree, shot(WHITE)));
     expect(pass).toBe(true);
     expect(detail).toContain('sampled #FDFDFD (dominant, 100% of region) vs expected #FDFDFD');
     expect(detail).toContain('dE00 0.00 ≤ 8');
@@ -452,29 +446,28 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
   });
 
   it('the default deltaE (8) CATCHES the real bug — 10.19 compared directly, no 1.5x slack', () => {
-    const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, tree, shot(GREY));
+    const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, measured(tree, shot(GREY)));
     expect(pass).toBe(false);
     expect(detail).toMatch(/sampled #CFCFD3 .* dE00 10\.1[5-9] > 8/);
   });
 
   it('respects an explicit deltaE and drops alpha from #RRGGBBAA', () => {
-    expect(evaluateColorAssert(rect, { expected: WHITE, deltaE: 11 }, tree, shot(GREY)).pass).toBe(true);
-    expect(evaluateColorAssert(rect, { expected: '#fdfdfd85' }, tree, shot(WHITE)).pass).toBe(true);
+    expect(evaluateColorAssert(rect, { expected: WHITE, deltaE: 11 }, measured(tree, shot(GREY))).pass).toBe(true);
+    expect(evaluateColorAssert(rect, { expected: '#fdfdfd85' }, measured(tree, shot(WHITE))).pass).toBe(true);
   });
 
   it('sample: "patches" survives a busy center', () => {
     const png = shot(WHITE);
     paint(png, 45, 35, 55, 32, '#3F3F50');
-    expect(evaluateColorAssert(rect, { expected: WHITE }, tree, png).pass).toBe(false);
-    expect(evaluateColorAssert(rect, { expected: WHITE, sample: 'patches' }, tree, png).pass).toBe(true);
+    expect(evaluateColorAssert(rect, { expected: WHITE }, measured(tree, png)).pass).toBe(false);
+    expect(evaluateColorAssert(rect, { expected: WHITE, sample: 'patches' }, measured(tree, png)).pass).toBe(true);
   });
 
   it('fails closed on an off-screen rect', () => {
     const { pass, detail } = evaluateColorAssert(
       { x: 20, y: 500, width: 100, height: 60 },
       { expected: WHITE },
-      tree,
-      shot(WHITE),
+      measured(tree, shot(WHITE)),
     );
     expect(pass).toBe(false);
     expect(detail).toContain('outside the screenshot');
@@ -483,7 +476,7 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
 
   it('fails closed when the screen width cannot be inferred (never a vacuous pass)', () => {
     const zeroTree = n({ children: [n({ identifier: 'card' })] });
-    const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, zeroTree, shot(WHITE));
+    const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, measured(zeroTree, shot(WHITE)));
     expect(pass).toBe(false);
     expect(detail).toContain('screen width could not be inferred');
     expect(detail).not.toContain('NaN');
@@ -493,9 +486,11 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
     const clippedRect = { x: 20, y: 376, width: 100, height: 60 }; // 60% below the png
     const png = img(200, 400);
     paint(png, 20, 376, 100, 24, WHITE);
-    const { pass, detail } = evaluateColorAssert(clippedRect, { expected: WHITE }, tree, png);
+    const { pass, detail } = evaluateColorAssert(clippedRect, { expected: WHITE }, measured(tree, png));
     expect(pass).toBe(true);
     expect(detail).toContain("may be a neighbor's fill");
+    // One wording for the table row and the assert — the recovery step is part of it.
+    expect(detail).toContain('scroll it fully on-screen and re-run');
   });
 });
 
