@@ -1,4 +1,5 @@
 import type { Device, DeviceAdapter, Key, KeyboardOracle, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from '../../src/adapters/types.js';
+import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -19,6 +20,15 @@ export const el = (partial: Partial<UiNode>): UiNode => {
   nextY += 20;
   return node({ rect: { x: 0, y: nextY, width: 100, height: 10 }, ...partial });
 };
+
+/**
+ * A decoded image of a given size whose pixels are never read: for fixtures
+ * that exercise the png SCALE or the crop (verify/capture.ts, the text
+ * table's regions) and never a colour. The empty buffer makes any pixel read
+ * an out-of-range index, so a test that starts reading pixels fails loudly
+ * instead of measuring zeros.
+ */
+export const sizeOnlyPng = (width: number, height: number): RgbaImage => ({ width, height, data: Buffer.alloc(0) });
 
 export const screen = (...children: UiNode[]): UiNode =>
   node({ role: 'container', rect: { x: 0, y: 0, width: 1000, height: 2000 }, children });

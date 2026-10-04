@@ -505,7 +505,19 @@ export class Verifier {
   private async assertScreenshot(name: string, threshold: number): Promise<AssertResult> {
     const description = `screenshot matches baseline "${name}" (threshold ${threshold * 100}%)`;
     const path = join(this.baselineDir, this.adapter.platform, `${name}.png`);
-    const current = await this.adapter.screenshot();
+    // The SETTLED frame (verify/capture.ts, png-only arm; same delay as the
+    // color and ocr asserts). Until 2026-10-04 this was the one pixel reading
+    // that took a bare screenshot, so a baseline diff could compare two
+    // mid-animation frames — the flakiest assert by construction. It now
+    // costs the stability budget where it cost one capture (captures, wait
+    // and failure chances: capture.ts, STABILITY_*). Whether the
+    // frame settled is not reported by the capture: a screen that never
+    // settles (spinner, caret) still yields its last frame, so a first run on
+    // such a screen stores it silently, as before — re-baseline any screenshot
+    // assert that was flaky under the bare read. Follow-up, not done here: a
+    // `settled: boolean` on the frame would let baseline creation refuse or
+    // mark an unsettled frame.
+    const { shot: current } = await captureFrame(this.adapter, { delayMs: this.pollMs });
 
     let baseline: Buffer;
     try {

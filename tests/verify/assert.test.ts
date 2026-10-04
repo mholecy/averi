@@ -631,6 +631,8 @@ describe('screenshot baseline asserts', () => {
     const first = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(first).toMatchObject({ pass: true, detail: expect.stringContaining('baseline created') });
     expect(await readFile(join(dir, 'android', 'dash.png'))).toBeDefined();
+    // The default threshold is 1% of pixels (0.01), and the description says so.
+    expect(first.description).toBe('screenshot matches baseline "dash" (threshold 1%)');
 
     const second = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(second).toMatchObject({ pass: true, detail: '0.00% of pixels differ' });
@@ -658,6 +660,44 @@ describe('screenshot baseline asserts', () => {
     fake.nextScreenshot = png(40, 50);
     const result = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(result).toMatchObject({ pass: false, detail: 'size mismatch: baseline 50x50, current 40x50' });
+  });
+
+  it('diffs and baselines the SETTLED frame, never the first capture (verify/capture.ts, since 2026-10-04)', async () => {
+    // A screen mid-animation: two different frames, then it holds still.
+    // Until 2026-10-04 this assert took one bare screenshot — the first,
+    // mid-animation one — so the baseline it wrote and the frame it later
+    // diffed were both coin tosses. It now goes through captureFrame's
+    // stability wait like every other pixel reading.
+    const movingA = png(50, 50, (p) => p.data.fill(0, 0, p.data.length / 4));
+    const movingB = png(50, 50, (p) => p.data.fill(0, 0, p.data.length / 2));
+    const settled = png(50, 50);
+    const fake = dashboardFake();
+    const frames = [movingA, movingB, settled, settled];
+    const capturedAt: number[] = [];
+    let i = 0;
+    fake.screenshot = async () => {
+      capturedAt.push(Date.now());
+      const shot = frames[Math.min(i++, frames.length - 1)];
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    const verifier = new Verifier(fake, { ...FAST, baselineDir: dir });
+    const first = await verifier.assert({ screenshot: { baseline: 'dash' } });
+    expect(first).toMatchObject({ pass: true, detail: expect.stringContaining('baseline created') });
+    // movingA, movingB, settled, settled — the capture that confirmed stability is the one stored.
+    expect(fake.screenshots).toHaveLength(4);
+    expect((await readFile(join(dir, 'android', 'dash.png'))).equals(settled)).toBe(true);
+    // The wait between captures is the Verifier's pollMs (FAST: 5 ms), not
+    // capture.ts's 300 ms default — otherwise every baseline assert in this
+    // file would pay a real 300 ms per capture. One bound over all three
+    // gaps (15 ms expected, a 900 ms floor at the default) so a loaded CI
+    // box cannot flake it while a wrong delay cannot pass it.
+    expect(capturedAt[capturedAt.length - 1] - capturedAt[0]).toBeLessThan(300);
+
+    // The same still screen on a rerun is a 0% diff against the settled baseline: two identical captures.
+    const second = await verifier.assert({ screenshot: { baseline: 'dash' } });
+    expect(second).toMatchObject({ pass: true, detail: '0.00% of pixels differ' });
+    expect(fake.screenshots).toHaveLength(6);
   });
 });
 

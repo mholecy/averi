@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { UiNode } from '../../src/adapters/types.js';
-import type { MeasuredFrame, Undecoded } from '../../src/verify/capture.js';
+import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
+import { measuredFrameFor, type MeasuredFrame, type Undecoded } from '../../src/verify/capture.js';
+import { sizeOnlyPng } from '../helpers/fake.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
-import { pngScale } from '../../src/verify/scale.js';
 import {
   compareTextParity,
   contractHasTextAnchors,
@@ -58,14 +58,13 @@ const line = (text: string, h: number): OcrLine => ({ text, confidence: 1, x: 0,
 
 /**
  * What verify/capture.ts hands `ocrRegionsFor`: the tree, the png's size and
- * the ONE scale derived for them. The pixels are never read here (the
- * recognizer gets the raw bytes), so the image carries none.
+ * the ONE scale derived for them — through capture's own derivation. The
+ * pixels are never read here (the recognizer gets the raw bytes), so the
+ * image carries none; no device screen is passed, so these fixtures exercise
+ * the tree fallback of the scale, as the comments on each test assume.
  */
-const frame = (tree: UiNode, pngWidth: number, pngHeight: number): MeasuredFrame => ({
-  tree,
-  png: { width: pngWidth, height: pngHeight, data: Buffer.alloc(0) },
-  scale: pngScale(tree, pngWidth, pngHeight),
-});
+const frame = (tree: UiNode, pngWidth: number, pngHeight: number, screen?: DeviceScreen): MeasuredFrame =>
+  measuredFrameFor(tree, sizeOnlyPng(pngWidth, pngHeight), screen);
 
 const ocrMap = (entries: Record<string, OcrLine[] | { error: string }>): Map<string, OcrRegionResult> =>
   new Map(
@@ -587,7 +586,7 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
   it('recognizes the opted-in anchors on the leg\'s own bytes, keyed by id, WITH the png width', async () => {
     const { engine, calls } = recording();
     // Scaled by the device screen, so the scale has no caveat of its own to carry.
-    const f: MeasuredFrame = { ...frame(ios, 1206, 2622), scale: pngScale(ios, 1206, 2622, { width: 402, height: 874 }) };
+    const f = frame(ios, 1206, 2622, { width: 402, height: 874 });
     const got = await measureTextLeg(c, 'ios', { shot, measured: f }, engine);
     expect(calls).toEqual([[{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]]);
     expect(got.notes).toEqual([]);
@@ -638,11 +637,7 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
     const tree = root(100, [n({ identifier: 'cta', rect: { x: 10, y: 10, width: 40, height: 10 } })], 200);
     // The device screen reads twice the tree — the whole-capture fact the
     // table says once (review 2026-08-27: the text table used to drop it).
-    const f: MeasuredFrame = {
-      tree,
-      png: { width: 200, height: 400, data: Buffer.alloc(0) },
-      scale: pngScale(tree, 200, 400, { width: 200, height: 400 }),
-    };
+    const f = frame(tree, 200, 400, { width: 200, height: 400 });
     const { note } = ocrRegionsFor(c, f);
     expect(note).toMatch(/DEVICE screen/);
     const got = await measureTextLeg(c, 'android', { shot, measured: f }, engine);

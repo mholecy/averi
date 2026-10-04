@@ -1,7 +1,7 @@
 import { PNG } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { captureFrame, pngRegion } from '../../src/verify/capture.js';
+import { captureFrame, measuredFrameFor, pngRegion } from '../../src/verify/capture.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 
 /**
@@ -200,6 +200,40 @@ describe('captureFrame — the one scale', () => {
     expect(got.shot.equals(png(1000, 2000))).toBe(true);
     expect(got.measured.tree).toBe(malformed);
     expect(got.measured.scale?.error).toMatch(/^the png scale could not be derived from this tree: .* — the tree is not well-formed; dump it with ui_snapshot and re-run/);
+  });
+});
+
+describe('measuredFrameFor — the pure tail captureFrame and the comparator fixtures share', () => {
+  const decode = (buf: Buffer) => PNG.sync.read(buf);
+
+  it('is exactly what captureFrame measures for the same tree, png and device screen', async () => {
+    const fake = device([png(1000, 2000)]);
+    fake.viewportSize = { width: 500, height: 1000 };
+    const got = await captureFrame(fake, { tree: SCREEN });
+    const direct = measuredFrameFor(SCREEN, decode(png(1000, 2000)), { width: 500, height: 1000 });
+    // Same tree by identity, same scale (value AND wording), same pixels —
+    // compared field by field: a deep-equal over two pngjs objects is slow
+    // and compares decoder internals nobody reads.
+    expect(got.measured.tree).toBe(SCREEN);
+    expect(got.measured.scale).toEqual(direct.scale);
+    expect(got.measured.scale).toMatchObject({ scale: 2, width: 500 });
+    expect(got.measured.png?.width).toBe(direct.png.width);
+    expect(got.measured.png?.height).toBe(direct.png.height);
+    expect(Buffer.from(got.measured.png!.data).equals(Buffer.from(direct.png.data))).toBe(true);
+  });
+
+  it('without a device screen it scales from the tree — the comparator fixtures\' default', () => {
+    const measured = measuredFrameFor(SCREEN, decode(png(1000, 2000)));
+    expect(measured.scale).toMatchObject({ scale: 1, width: 1000 });
+    expect(measured.scale.note).toMatch(/scaled from the UI tree/);
+  });
+
+  it('a tree the geometry walk cannot traverse fails the SCALE as a carried reason, never throws', () => {
+    const malformed = { ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] };
+    const measured = measuredFrameFor(malformed, decode(png(1000, 2000)));
+    expect(measured.tree).toBe(malformed);
+    expect(measured.png.width).toBe(1000);
+    expect(measured.scale.error).toMatch(/^the png scale could not be derived from this tree: .* — the tree is not well-formed/);
   });
 });
 

@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { pngScale, type PngScale } from './scale.js';
@@ -37,6 +37,14 @@ import { pngScale, type PngScale } from './scale.js';
  * scales from the tree on purpose (docs/bugs/2026-08-26-png-scale-needs-
  * out-of-tree-screen-size.md — its denominator is the app's canvas, not the
  * device screen).
+ *
+ * "Every pixel reading" holds since 2026-10-04: until then the screenshot
+ * baseline assert took a bare `adapter.screenshot()` — the one reader the
+ * 2026-10-02 change missed, so the frame it diffed and the baseline it wrote
+ * could both be mid-animation. It now takes the png-only arm of
+ * `captureFrame`. The pure tail (tree + png + screen → measured frame) is
+ * exported as `measuredFrameFor`, and the comparator tests build their
+ * fixtures with it rather than re-deriving the scale themselves.
  */
 
 /**
@@ -225,6 +233,27 @@ export async function captureFrame(
   // Memoized inside the adapter (adapters/types.ts), so this is a device read
   // once per adapter, not once per frame.
   const screen = await adapter.viewport().catch(() => undefined);
+  return { shot, measured: measuredFrameFor(tree, png, screen) };
+}
+
+/**
+ * The pure tail of `captureFrame`: a tree, a decoded png and (when the
+ * device would say) its screen become the ONE measured frame — the scale
+ * derived once, a throwing geometry walk carried as the scale's failure
+ * reason. `screen` undefined → the scale comes from the tree, with the
+ * scale's own note saying so (verify/scale.ts). Exported since 2026-10-04
+ * so the comparator tests build their fixtures through the same derivation
+ * production uses: until then
+ * color-parity.test.ts and text-parity.test.ts each re-spelled this line as
+ * `{ tree, png, scale: pngScale(tree, png.width, png.height, screen) }`, so
+ * a change to what the capture feeds the scale (the oriented screen, a
+ * caught throw) would have left the comparator tests green against fixtures
+ * built the old way — the shape of the 2026-08-26 ocr-crop-scale bug, which
+ * was a dropped field at the call site, not a wrong unit. The two failure
+ * arms (`Undecoded`, `Treeless`) are decided before this tail and need
+ * nothing from it.
+ */
+export function measuredFrameFor(tree: UiNode, png: RgbaImage, screen?: DeviceScreen): MeasuredFrame {
   let scale: PngScale;
   try {
     scale = pngScale(tree, png.width, png.height, screen);
@@ -239,7 +268,7 @@ export async function captureFrame(
         'dump it with ui_snapshot and re-run, and keep the dump if it repeats',
     };
   }
-  return { shot, measured: { tree, png, scale } };
+  return { tree, png, scale };
 }
 
 /**

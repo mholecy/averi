@@ -1,7 +1,8 @@
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
-import type { MeasuredFrame, RgbaImage } from '../../src/verify/capture.js';
+import { measuredFrameFor, type MeasuredFrame, type RgbaImage } from '../../src/verify/capture.js';
+import { sizeOnlyPng } from '../helpers/fake.js';
 import {
   compareColorParity,
   colorParityVerdict,
@@ -15,7 +16,6 @@ import {
   validateColorContract,
 } from '../../src/verify/color-parity.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
-import { pngScale } from '../../src/verify/scale.js';
 
 /**
  * Synthetic in-memory captures modeled on the live-validated 2026-08-14 run:
@@ -72,12 +72,8 @@ function img(width: number, height: number, bg = BG): PNG {
 
 const contract = (json: unknown): LayoutContract => parseLayoutContract(JSON.stringify(json));
 
-/** What verify/capture.ts hands the comparator: the tree, the png and the ONE scale derived for them. */
-const measured = (tree: UiNode, png: RgbaImage, screen?: DeviceScreen): MeasuredFrame => ({
-  tree,
-  png,
-  scale: pngScale(tree, png.width, png.height, screen),
-});
+/** What verify/capture.ts hands the comparator — built through capture's own derivation, not a re-spelling of it. */
+const measured = (tree: UiNode, png: RgbaImage, screen?: DeviceScreen): MeasuredFrame => measuredFrameFor(tree, png, screen);
 
 /** One card per platform, same tree geometry, per-platform fill. */
 function capturePair(androidFill: string, iosFill: string): Record<'android' | 'ios', MeasuredFrame> {
@@ -347,7 +343,7 @@ describe('compareColorParity — failing closed', () => {
 
   it('throws on a degenerate screenshot and on an invalid tolerance_de', () => {
     const captures = capturePair(WHITE, WHITE);
-    captures.android = measured(captures.android.tree, { width: 0, height: 0, data: Buffer.alloc(0) });
+    captures.android = measured(captures.android.tree, sizeOnlyPng(0, 0));
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/degenerate dimensions/);
     const c = contract({ screen: 's', tolerance_de: -1, anchors: [{ id: 'card', bg: WHITE }] });
     expect(() => compareColorParity(c, capturePair(WHITE, WHITE))).toThrow(/tolerance_de/);
