@@ -417,7 +417,43 @@ describe('verify', () => {
     expect(harness.factoryCalls).toEqual([]); // not even a device probe
   });
 
-  it('control for the above: without the contract the same call reaches both devices', async () => {
+  // 2026-10-03: a bad field VALUE is the same class of mistake as a typo'd
+  // path, and used to cost both legs before it surfaced as `FAILED:` in the
+  // color table. The handler only delegates; what an MCP client sees is pinned.
+  it('a contract with an invalid colour field is refused, naming the field, before any device is touched', async () => {
+    const android = home();
+    const ios = home();
+    const harness = await connect({ android, ios });
+    const contract = await file(
+      'layout-contract.json',
+      JSON.stringify({ screen: 'home', anchors: [{ id: 'home_root', x: 0, w: 100, bg: '#white' }] }),
+    );
+    const result = await harness.call('verify', { configPath: await file('averi.yaml', VALID_CONFIG), contract });
+    expect(result.isError).toBe(true);
+    // Names the file as the user passed it, like a parse error does.
+    expect(result.text).toContain(`the layout contract ${contract} has 1 invalid field`);
+    expect(result.text).toContain("color parity: anchor home_root: 'bg' value '#white' is neither #RRGGBB(AA) nor");
+    expect(result.text).toContain('Fix the contract and re-run; nothing was run on a device.');
+    expect(result.images).toEqual([]);
+    expect(harness.factoryCalls).toEqual([]); // not even a device probe
+    expect([android.screenshots.length, ios.screenshots.length]).toEqual([0, 0]);
+  });
+
+  it('control for the above: the same contract with the fill fixed reaches both devices', async () => {
+    const harness = await connect({ android: home(), ios: home() });
+    const result = await harness.call('verify', {
+      configPath: await file('averi.yaml', VALID_CONFIG),
+      contract: await file(
+        'layout-contract.json',
+        JSON.stringify({ screen: 'home', anchors: [{ id: 'home_root', x: 0, w: 100, bg: '#FFFFFF' }] }),
+      ),
+    });
+    expect(result.isError).toBe(false);
+    expect(result.text).toContain('## color parity');
+    expect(harness.bound().map((c) => c.platform).sort()).toEqual(['android', 'ios']);
+  });
+
+  it("control for the typo'd path: without the contract the same call reaches both devices", async () => {
     const harness = await connect({ android: home(), ios: home() });
     const result = await harness.call('verify', { configPath: await file('averi.yaml', VALID_CONFIG) });
     expect(result.isError).toBe(false);

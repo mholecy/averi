@@ -5,6 +5,7 @@ import { parseConfig } from '../../src/flow/config.js';
 import {
   appHealth,
   assertSummary,
+  contractProblems,
   formatLogExcerpt,
   runVerification,
 } from '../../src/run/verify.js';
@@ -179,6 +180,189 @@ describe('parity containment', () => {
     const rect = out.sections.find((s) => s.startsWith('## rect parity'));
     expect(rect).toContain('(android leg failed — compared without it)');
     expect(rect).not.toContain('SKIPPED');
+  });
+});
+
+/**
+ * 2026-10-03: the contract's field VALUES are checked before the legs. The
+ * schema leaves them `unknown` so the comparators word the diagnosis; until
+ * this, that diagnosis only surfaced as `FAILED:` in a table after both legs
+ * had run. Pinned here: the refusal happens before ANY adapter is resolved or
+ * touched, lists every problem by dimension, and asks only the dimensions
+ * whose table the contract would produce.
+ */
+describe('the contract is validated before the legs', () => {
+  /** An adapter seam that records being asked for anything at all. */
+  const untouched = () => {
+    const calls: string[] = [];
+    const adapter = new Proxy(fake('android'), {
+      get(target, prop, receiver) {
+        calls.push(`adapter.${String(prop)}`);
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const resolve = async (p: Platform) => {
+      calls.push(`resolveAdapter(${p})`);
+      return adapter;
+    };
+    return { calls, resolve };
+  };
+
+  it('a bad bg refuses before any adapter call, naming the problem, its dimension and the recovery', async () => {
+    const { calls, resolve } = untouched();
+    const bad = contract([{ id: 'card', x: 10, w: 40, bg: '#white' }]);
+    await expect(runVerification(request({ contract: bad, state: 'home', flow: 'pay' }), resolve)).rejects.toThrow(
+      'verify: the layout contract has 1 invalid field in the tables this run would produce — refused before the run:\n' +
+        "- color parity: anchor card: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name.\n" +
+        'Fix the contract and re-run; nothing was run on a device.',
+    );
+    expect(calls).toEqual([]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('control for the above: the same contract with the bg fixed resolves both adapters and runs', async () => {
+    const { calls, resolve } = untouched();
+    const out = await runVerification(request({ contract: contract([{ id: 'card', x: 10, w: 40, bg: '#FFFFFF' }]) }), resolve);
+    expect(calls).toContain('resolveAdapter(android)');
+    expect(calls).toContain('resolveAdapter(ios)');
+    expect(calls).toContain('adapter.screenshot');
+    expect(out.sections.some((s) => s.startsWith('## color parity'))).toBe(true);
+  });
+
+  it('lists ALL problems across dimensions in one refusal — one edit, not one run per typo', async () => {
+    const { calls, resolve } = untouched();
+    const bad: LayoutContract = {
+      screen: 's',
+      tolerance_aspect_pct: '15',
+      tolerance_size_pct: 0,
+      anchors: [
+        { id: 'card', bg: '#white', sample: 'fancy' },
+        { id: 'title', text: 42 },
+      ],
+    };
+    await expect(runVerification(request({ contract: bad }), resolve)).rejects.toThrow(
+      'verify: the layout contract has 5 invalid fields in the tables this run would produce — refused before the run:\n' +
+        '- rect parity: tolerance_aspect_pct must be a positive number, got "15"\n' +
+        '- color parity: anchor card: unknown sample mode "fancy" — "dominant" or "patches".\n' +
+        "- color parity: anchor card: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name.\n" +
+        '- text parity: tolerance_size_pct must be a positive number, got 0\n' +
+        "- text parity: anchor title: 'text' is 42 — must be the exact rendered string.\n" +
+        'Fix the contract and re-run; nothing was run on a device.',
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('names the contract file in the refusal when the caller said which one', async () => {
+    const { calls, resolve } = untouched();
+    const bad = contract([{ id: 'card', x: 10, w: 40, bg: '#white' }]);
+    await expect(
+      runVerification(request({ contract: bad, contractSource: 'contracts/home.layout.json' }), resolve),
+    ).rejects.toThrow(
+      'verify: the layout contract contracts/home.layout.json has 1 invalid field in the tables this run would produce — refused before the run:\n' +
+        "- color parity: anchor card: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name.\n" +
+        'Fix the contract and re-run; nothing was run on a device.',
+    );
+    expect(calls).toEqual([]);
+  });
+
+  // The refusal prints the comparators' messages untouched, so "naming the
+  // dimension per line" is an invariant of THEIR strings: every message a
+  // validator can produce opens with its table's title. One bad value per
+  // unknown-typed field, all three dimensions.
+  it('every problem line opens with the title of the table it belongs to', () => {
+    const everyField: LayoutContract = {
+      screen: 's',
+      tolerance_de: '6',
+      tolerance_size_pct: '10',
+      tolerance_aspect_pct: '15',
+      anchors: [
+        { id: 'a', bg: '#white', sample: 'fancy' },
+        { id: 'b', bg: 7 },
+        { id: 'c', text: 42, text_dynamic: 'yes' },
+      ],
+    };
+    const problems = contractProblems(everyField);
+    expect(problems.map((line) => line.split(': ')[0])).toEqual([
+      'rect parity',
+      'color parity',
+      'color parity',
+      'color parity',
+      'color parity',
+      'text parity',
+      'text parity',
+      'text parity',
+    ]);
+  });
+
+  // The schema header's decision, honoured: a field is only a reason to refuse
+  // if a table this contract PRODUCES would read it. No anchor opts into
+  // colour or text here, so neither tolerance is ever parsed — by the run or
+  // by the validation — and the run goes ahead exactly as it did before.
+  it('a geometry-only contract is never refused for a colour or text field', async () => {
+    const geometryOnly: LayoutContract = {
+      screen: 's',
+      tolerance_de: '6',
+      tolerance_size_pct: '10',
+      anchors: [{ id: 'card', x: 10, w: 40 }],
+    };
+    expect(contractProblems(geometryOnly)).toEqual([]);
+    const adapters = { android: fake('android'), ios: fake('ios') };
+    const out = await runVerification(request({ contract: geometryOnly }), async (p) => adapters[p]);
+    expect(out.sections.map((s) => s.split('\n')[0])).toEqual(['## android', '## ios', '## rect parity']);
+    expect(out.sections[2]).not.toContain('FAILED');
+    expect(out.screenshots).toHaveLength(2);
+  });
+
+  it('…and a text-only opt-in is not refused for a colour field, nor a colour-only one for a text field', () => {
+    const textOnly: LayoutContract = { screen: 's', tolerance_de: '6', anchors: [{ id: 'card', text: 'Hello' }] };
+    expect(contractProblems(textOnly)).toEqual([]);
+    const colorOnly: LayoutContract = { screen: 's', tolerance_size_pct: '10', anchors: [{ id: 'card', bg: '#FFFFFF' }] };
+    expect(contractProblems(colorOnly)).toEqual([]);
+    // Each IS refused for its own dimension's tolerance.
+    expect(contractProblems({ ...textOnly, tolerance_size_pct: '10' })).toEqual([
+      'text parity: tolerance_size_pct must be a positive number, got "10"',
+    ]);
+    expect(contractProblems({ ...colorOnly, tolerance_de: '6' })).toEqual([
+      'color parity: tolerance_de must be a positive number, got "6"',
+    ]);
+  });
+
+  // `verify` runs the light axis only; the comparator never parses bg_dark
+  // there, so a malformed one must not refuse a run whose table is fine.
+  it('a bad bg_dark does not refuse the run: the light axis never reads it', async () => {
+    const c = contract([{ id: 'card', x: 10, w: 40, bg: '#FFFFFF', bg_dark: '#white' }]);
+    const out = await runVerification(request({ platforms: ['android'], contract: c }), async () => fake('android'));
+    const color = out.sections.find((s) => s.startsWith('## color parity'));
+    expect(color).toBeDefined();
+    expect(color).not.toContain('FAILED');
+  });
+
+  it('a valid full contract (geometry, fill, copy, all three tolerances) has no problems and gets all three tables', async () => {
+    const full: LayoutContract = {
+      screen: 's',
+      figma_frame_width: 100,
+      tolerance_de: 6,
+      tolerance_size_pct: 12,
+      tolerance_aspect_pct: 15,
+      anchors: [{ id: 'card', x: 10, w: 40, bg: '#FFFFFF', sample: 'patches', text: 'Hello', text_dynamic: false }],
+    };
+    expect(contractProblems(full)).toEqual([]);
+    const adapters = { android: fake('android'), ios: fake('ios') };
+    const out = await runVerification(
+      request({
+        contract: full,
+        ocrEngine: { recognize: async (_png, regions) => regions.map((r) => ({ id: r.id, lines: [] })) },
+      }),
+      async (p) => adapters[p],
+    );
+    expect(out.sections.map((s) => s.split('\n')[0])).toEqual([
+      '## android',
+      '## ios',
+      '## rect parity',
+      '## color parity',
+      '## text parity',
+    ]);
+    for (const section of out.sections) expect(section).not.toContain('FAILED:');
   });
 });
 

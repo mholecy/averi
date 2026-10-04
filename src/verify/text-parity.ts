@@ -2,7 +2,7 @@ import type { Platform, Rect, UiNode } from '../adapters/types.js';
 import { collectRects } from '../ui-tree/geometry.js';
 import { pngRegion, type MeasuredFrame } from './capture.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
+import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import type { OcrLine, OcrRegion, OcrRegionResult } from './ocr.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -429,6 +429,40 @@ function isDynamic(anchor: LayoutAnchor): boolean {
   return raw;
 }
 
+/**
+ * The size tolerance in force: the test-facing override, else the contract's
+ * `tolerance_size_pct`, else the default — and never a non-number. Shared by
+ * the comparator and `validateTextContract`.
+ */
+function sizeTolerancePctOf(contract: LayoutContract, opts: TextParityOptions): number {
+  return positiveTolerance(
+    opts.sizeTolerancePct ?? contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT,
+    'text parity: tolerance_size_pct',
+  );
+}
+
+/**
+ * Every problem `compareTextParity` would raise about the CONTRACT's copy
+ * fields — no capture, no device — so run/verify.ts can refuse a run before
+ * its legs instead of reporting `FAILED:` after them (2026-10-03).
+ *
+ * One owner per rule: the list is produced by the same functions the
+ * comparator reads the fields with (`sizeTolerancePctOf`, `expectedTextOf`,
+ * `isDynamic`), over the same anchors (`wantsTextCheck`), so the messages are
+ * the read-time ones byte for byte. The only difference is that this lists
+ * EVERY problem where the comparator stops at the first. Unlike colour,
+ * nothing here depends on the device: the comparator parses both fields of
+ * every opted-in anchor before it measures anything.
+ */
+export function validateTextContract(contract: LayoutContract, opts: TextParityOptions = {}): string[] {
+  return problemsThrownBy('text parity: ', [
+    () => void sizeTolerancePctOf(contract, opts),
+    ...contract.anchors
+      .filter(wantsTextCheck)
+      .flatMap((anchor) => [() => void expectedTextOf(anchor), () => void isDynamic(anchor)]),
+  ]);
+}
+
 // --------------------------------------------------------------- pipeline
 
 /**
@@ -514,10 +548,7 @@ export function compareTextParity(
   const platforms = (['android', 'ios'] as const).filter((p) => captures[p] !== undefined);
   if (platforms.length === 0) throw new Error('text parity: no platform capture provided');
 
-  const sizeTolerancePct = positiveTolerance(
-    opts.sizeTolerancePct ?? contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT,
-    'text parity: tolerance_size_pct',
-  );
+  const sizeTolerancePct = sizeTolerancePctOf(contract, opts);
 
   const rows: TextRow[] = [];
   const findings: TextFinding[] = [];

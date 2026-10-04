@@ -4,16 +4,29 @@ import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
 import { captureFrame, type Frame, type MeasuredFrame, type Undecoded } from '../verify/capture.js';
-import { compareColorParity, contractHasColorAnchors, formatColorParity } from '../verify/color-parity.js';
+import {
+  compareColorParity,
+  contractHasColorAnchors,
+  formatColorParity,
+  validateColorContract,
+  type ColorParityOptions,
+} from '../verify/color-parity.js';
 import type { LayoutContract } from '../verify/layout-contract.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine, type OcrRegionResult } from '../verify/ocr.js';
-import { compareRectParity, formatRectParity } from '../verify/rect-parity.js';
+import {
+  compareRectParity,
+  formatRectParity,
+  validateRectContract,
+  type RectParityOptions,
+} from '../verify/rect-parity.js';
 import {
   compareTextParity,
   contractHasTextAnchors,
   formatTextParity,
   ocrRegionsFor,
+  validateTextContract,
   type TextCapture,
+  type TextParityOptions,
 } from '../verify/text-parity.js';
 
 /**
@@ -35,8 +48,17 @@ export interface VerificationRequest {
   specs: AssertSpec[];
   state?: string;
   flow?: string;
-  /** Parsed up front by the caller: a typo'd path must not cost a device run. */
+  /**
+   * Parsed up front by the caller: a typo'd path must not cost a device run.
+   * Its field VALUES are checked here, before the legs (contractProblems).
+   */
   contract?: LayoutContract;
+  /**
+   * What the user called the contract — the path they passed. Only quoted: a
+   * refusal that names the file is the one the author can act on, the way
+   * parseLayoutContract's own errors already do.
+   */
+  contractSource?: string;
   environment?: string;
   baselineDir: string;
   /** Test seam: the OCR recognizer behind the text-parity table. */
@@ -140,11 +162,143 @@ export function formatLogExcerpt(all: string[], grep: string | undefined, maxLin
   return [...header, ...tail].join('\n');
 }
 
+/**
+ * The parity dimensions a contract can add to a run: the table's title, the
+ * predicate deciding whether THIS contract produces it, the options its
+ * comparator runs under, and the comparator's own validator for the fields it
+ * will read.
+ *
+ * One owner for "is this table produced", on purpose: the same `produced` is
+ * asked twice per run — before the legs, to decide whose fields are validated,
+ * and after them, to decide which sections are appended. Two copies of the
+ * predicate could drift into the one bug this must not have: refusing a run
+ * over a field no table would ever have read (the geometry-only caller of
+ * layout-contract.ts's header), or running one whose table can only fail.
+ *
+ * One owner for the OPTIONS for the same reason (review 2026-10-03): the
+ * validator answers "what would the comparator raise" only if both are asked
+ * under the same options — the colour theme picks the contract key that is
+ * read. `options` is the ONE object handed to both `validate` (dimensionProblems)
+ * and the compare call below; a dark-mode round that set the theme for the
+ * comparator alone would let a bad `bg_dark` through validation and fail it
+ * after the legs, which is the cost this whole check exists to remove.
+ *
+ * The table holds FACTS only — title, produced, options, validate. Comparing
+ * and formatting stay hand-written per dimension below, on purpose: the three
+ * collect different artifacts and degrade differently, and the 2026-08-14
+ * review's decision stands — no generic reporting framework.
+ */
+interface ParityDimension<Options> {
+  title: string;
+  produced: (contract: LayoutContract) => boolean;
+  options: Options;
+  validate: (contract: LayoutContract, options: Options) => string[];
+}
+
+const DIMENSIONS: {
+  rect: ParityDimension<RectParityOptions>;
+  color: ParityDimension<ColorParityOptions>;
+  text: ParityDimension<TextParityOptions>;
+} = {
+  // Geometry is what a contract IS: the rect table exists whenever one does.
+  rect: {
+    title: 'rect parity',
+    produced: () => true,
+    options: {},
+    validate: validateRectContract,
+  },
+  // Opt-in: any anchor carrying bg / bg_dark / sample.
+  //
+  // Theme is always 'light' — deliberate: verify exposes no theme input
+  // because averi cannot switch device themes, and sampling a light capture
+  // against bg_dark hexes would fake dark evidence. The comparator's theme
+  // option (and its tests) is the plumbing for the deferred dark-mode round.
+  color: {
+    title: 'color parity',
+    produced: contractHasColorAnchors,
+    options: { theme: 'light' },
+    validate: validateColorContract,
+  },
+  // Opt-in: any anchor carrying text / text_dynamic.
+  text: {
+    title: 'text parity',
+    produced: contractHasTextAnchors,
+    options: {},
+    validate: validateTextContract,
+  },
+};
+
+/** One dimension's problems — none when this contract does not produce its table. */
+const dimensionProblems = <Options>(d: ParityDimension<Options>, contract: LayoutContract): string[] =>
+  d.produced(contract) ? d.validate(contract, d.options) : [];
+
+/**
+ * Every problem the run's own tables would raise about the contract's field
+ * values, one line each, named by dimension — empty when there is none.
+ *
+ * Why it exists (2026-10-03): the schema leaves bg / bg_dark / sample / text /
+ * text_dynamic and three tolerances `unknown` so the comparator that knows a
+ * field words its diagnosis. Until now that diagnosis was only reachable at
+ * READ time — after both legs — so `bg: "#white"` or `tolerance_de: "6"` cost
+ * minutes of device work to surface as a `FAILED:` section. The contract is in
+ * hand before any leg starts; so is the answer.
+ *
+ * A dimension is asked only if this contract would produce its table, so a
+ * contract with no colour anchors is never refused over `tolerance_de`.
+ *
+ * Each validator is handed its dimension's `options` — the same object the
+ * table below hands the comparator — so what is refused here is what would
+ * have failed there.
+ *
+ * The lines are the comparators' messages UNTOUCHED: each already opens with
+ * its dimension's title, which is what names the dimension per line (pinned
+ * in tests/run/verify.test.ts). Nothing is prefixed here, so a refusal line
+ * and the read-time `FAILED:` text for the same field cannot differ.
+ *
+ * Rejected alternatives: typing the fields in the schema (a generic zod
+ * message, and it rejects for callers that never read the field — see the
+ * layout-contract.ts header); validating in the MCP handler (orchestration
+ * owns "before the legs", and the handler stays a delegation); and dropping
+ * the read-time checks now that this runs first (they remain the comparators'
+ * own guard for every caller that is not this run, and paritySection's
+ * containment is unchanged).
+ */
+export function contractProblems(contract: LayoutContract): string[] {
+  return [
+    ...dimensionProblems(DIMENSIONS.rect, contract),
+    ...dimensionProblems(DIMENSIONS.color, contract),
+    ...dimensionProblems(DIMENSIONS.text, contract),
+  ];
+}
+
+/**
+ * The refusal for an invalid contract: ALL problems in one message, so the
+ * contract is fixed in one edit rather than one device run per typo, and the
+ * one thing the caller most needs to know about what it cost — nothing. It
+ * names the file when the caller said which one, as parseLayoutContract's
+ * errors do: "the layout contract" is no help to someone holding several.
+ */
+const contractRefusal = (problems: string[], source?: string): string =>
+  `verify: the layout contract${source === undefined ? '' : ` ${source}`} has ` +
+  `${problems.length} invalid field${problems.length === 1 ? '' : 's'} ` +
+  'in the tables this run would produce — refused before the run:\n' +
+  problems.map((problem) => `- ${problem}`).join('\n') +
+  '\nFix the contract and re-run; nothing was run on a device.';
+
 export async function runVerification(
   req: VerificationRequest,
   resolveAdapter: (platform: Platform) => Promise<DeviceAdapter>,
 ): Promise<VerificationOutput> {
   const { platforms, cfg, specs, contract } = req;
+
+  // Before any leg starts and before any adapter is resolved: a contract the
+  // tables can only answer with FAILED must not cost the device run first.
+  // It THROWS — unlike everything after the legs, which is contained — because
+  // there is nothing yet to throw away.
+  if (contract !== undefined) {
+    const problems = contractProblems(contract);
+    if (problems.length > 0) throw new Error(contractRefusal(problems, req.contractSource));
+  }
 
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);
@@ -184,31 +338,29 @@ export async function runVerification(
   });
 
   if (contract !== undefined) {
-    sections.push(
-      paritySection('rect parity', platforms, runs, treeOf, 'SKIPPED: no leg produced a UI tree.', (trees) =>
-        formatRectParity(compareRectParity(contract, trees)),
-      ),
-    );
+    if (DIMENSIONS.rect.produced(contract)) {
+      sections.push(
+        paritySection(DIMENSIONS.rect.title, platforms, runs, treeOf, 'SKIPPED: no leg produced a UI tree.', (trees) =>
+          formatRectParity(compareRectParity(contract, trees, DIMENSIONS.rect.options)),
+        ),
+      );
+    }
 
     // Color parity, only when the contract opts in (any anchor carrying
     // bg / bg_dark / sample). Reuses each leg's frame — the exact pixels
     // already returned to the caller, the tree read beside them and the
     // scale derived once — never a second capture that could race a UI change.
-    //
-    // No opts → theme is always 'light' — deliberate: verify exposes no
-    // theme input because averi cannot switch device themes, and sampling a
-    // light capture against bg_dark hexes would fake dark evidence. The
-    // comparator's theme option (and its tests) is the plumbing for the
-    // deferred dark-mode round.
-    if (contractHasColorAnchors(contract)) {
+    // The theme is the dimension's (DIMENSIONS.color.options), shared with the
+    // validation that ran before the legs.
+    if (DIMENSIONS.color.produced(contract)) {
       sections.push(
         paritySection(
-          'color parity',
+          DIMENSIONS.color.title,
           platforms,
           runs,
           measuredOf,
           'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
-          (captures) => formatColorParity(compareColorParity(contract, captures)),
+          (captures) => formatColorParity(compareColorParity(contract, captures, DIMENSIONS.color.options)),
         ),
       );
     }
@@ -222,7 +374,7 @@ export async function runVerification(
     // comparison falls back to the accessibility tree and SAYS SO: on iOS the
     // tree carries authored a11y summaries rather than rendered copy, so a
     // silent fallback would quietly weaken the check it claims to perform.
-    if (contractHasTextAnchors(contract)) {
+    if (DIMENSIONS.text.produced(contract)) {
       const { ocrByPlatform, notes: ocrNotes } = await runOcr(
         contract,
         platforms,
@@ -231,7 +383,7 @@ export async function runVerification(
       );
       sections.push(
         paritySection(
-          'text parity',
+          DIMENSIONS.text.title,
           platforms,
           runs,
           (leg, p): Contribution<TextCapture> => {
@@ -241,7 +393,7 @@ export async function runVerification(
             return { value: { tree: tree.value, ocr: got?.ocr, pngWidth: got?.pngWidth } };
           },
           'SKIPPED: no leg produced a UI tree.',
-          (captures) => formatTextParity(compareTextParity(contract, captures)),
+          (captures) => formatTextParity(compareTextParity(contract, captures, DIMENSIONS.text.options)),
           ocrNotes,
         ),
       );

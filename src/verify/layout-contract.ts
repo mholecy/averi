@@ -17,6 +17,17 @@ import { errorMessage } from '../util/error-message.js';
  * zod parse error at load time, and would reject a contract whose colour
  * fields are wrong even for a caller only asking for geometry.
  *
+ * 2026-10-03: the deferred diagnosis no longer waits for the device. It still
+ * belongs to the comparators — and it now ALSO runs before the legs, through
+ * the validator each one exports (`validateRectContract`,
+ * `validateColorContract`, `validateTextContract`): the comparator's own field
+ * parsing run over the contract alone, collected by `problemsThrownBy` below.
+ * run/verify.ts asks only the dimensions whose table this contract would
+ * produce, so the geometry-only caller above is still never rejected for a
+ * colour field, and refuses the run when any of them answers. Before that a
+ * `bg: "#white"` cost a full two-platform device run to discover. The schema
+ * is unchanged, and so is every other user of `parseLayoutContract`.
+ *
  * Both schemas stay `.passthrough()`: unknown fields (`_note`, future
  * dimensions) must survive a round trip, never be rejected.
  */
@@ -126,6 +137,40 @@ export function positiveTolerance(raw: unknown, what: string): number {
     throw new Error(`${what} must be a positive number, got ${JSON.stringify(raw)}`);
   }
   return raw;
+}
+
+/**
+ * The pure half of a comparator's field parsing, run without a capture: call
+ * each check, keep the message of every one that throws.
+ *
+ * It takes the comparator's OWN parsing functions as thunks rather than a
+ * second, declarative copy of their rules — so a validator built on it cannot
+ * disagree with the comparator about what is invalid or how to say it (the
+ * messages are the contract with the person editing the JSON; deletion test:
+ * remove this and each of the three validators grows its own try/catch loop).
+ * Where the comparator stops at its FIRST throw, this visits every check, so
+ * one refusal lists everything there is to fix in one edit.
+ *
+ * `prefix` is how a contract problem is told from a BUG (review 2026-10-03):
+ * every diagnosis a comparator words opens with its own name ('color parity:
+ * '), so only a throw whose message opens with it is collected; anything else
+ * — a TypeError inside a thunk — is rethrown. Catching everything would have
+ * reported a defect in averi as "your contract is invalid", sending the
+ * author to fix a file that is fine. The thunks return nothing on purpose:
+ * this reads what a check THROWS, never what it parsed.
+ */
+export function problemsThrownBy(prefix: string, checks: (() => void)[]): string[] {
+  const problems: string[] = [];
+  for (const check of checks) {
+    try {
+      check();
+    } catch (e) {
+      const message = errorMessage(e);
+      if (!message.startsWith(prefix)) throw e;
+      problems.push(message);
+    }
+  }
+  return problems;
 }
 
 export function parseLayoutContract(jsonText: string, source = 'layout contract'): LayoutContract {

@@ -3,7 +3,7 @@ import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects } from '../ui-tree/geometry.js';
 import { pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
-import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
+import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
 /**
@@ -226,6 +226,58 @@ function contractTargetOf(anchor: LayoutAnchor, id: string, theme: ColorTheme): 
   );
 }
 
+/**
+ * The theme a call runs under — light unless asked. One owner, because the
+ * theme decides which contract key is READ (`bg` or `bg_dark`), and the
+ * comparator and `validateColorContract` must never default differently.
+ */
+const themeOf = (opts: ColorParityOptions): ColorTheme => opts.theme ?? 'light';
+
+/**
+ * The primary-axis tolerance in force: the test-facing override, else the
+ * contract's `tolerance_de`, else the default — and never a non-number.
+ * Shared by the comparator and `validateColorContract`.
+ */
+function toleranceDeOf(contract: LayoutContract, opts: ColorParityOptions): number {
+  return positiveTolerance(
+    opts.toleranceDe ?? contract.tolerance_de ?? DEFAULT_TOLERANCE_DE,
+    'color parity: tolerance_de',
+  );
+}
+
+/**
+ * Every problem `compareColorParity` would raise about the CONTRACT's colour
+ * fields — no capture, no device — so run/verify.ts can refuse a run before
+ * its legs instead of reporting `FAILED:` after them (2026-10-03).
+ *
+ * One owner per rule: the list is produced by the same three functions the
+ * comparator reads the fields with (`toleranceDeOf`, `sampleModeOf`,
+ * `contractTargetOf`), so the messages are the read-time ones byte for byte.
+ * Rejected: a typed zod schema for these fields — a second copy of each rule,
+ * with zod's wording instead of the comparator's (layout-contract.ts header).
+ *
+ * Takes the comparator's options because the theme decides WHICH key is read:
+ * under 'light' (the only theme `verify` runs) a malformed `bg_dark` is never
+ * parsed by the comparator, so it is not a problem here either — reporting it
+ * would refuse a run whose table is entirely fine. It is one under 'dark'.
+ *
+ * Two deliberate differences from the read-time path, both in the direction
+ * of saying more: this lists EVERY problem where the comparator stops at the
+ * first, and it checks an anchor's target even when the anchor would turn out
+ * MISSING on the device (the comparator only parses the target of an anchor
+ * it sampled — a fact about the device, which this cannot know).
+ */
+export function validateColorContract(contract: LayoutContract, opts: ColorParityOptions = {}): string[] {
+  const theme = themeOf(opts);
+  return problemsThrownBy('color parity: ', [
+    () => void toleranceDeOf(contract, opts),
+    ...contract.anchors.flatMap((anchor) => [
+      () => void sampleModeOf(anchor, anchor.id),
+      () => void contractTargetOf(anchor, anchor.id, theme),
+    ]),
+  ]);
+}
+
 // --------------------------------------------------------------- pipeline
 
 export interface ColorPlatformStats {
@@ -361,12 +413,9 @@ export function compareColorParity(
 ): ColorParityResult {
   const platforms = (['android', 'ios'] as const).filter((p) => captures[p] !== undefined);
   if (platforms.length === 0) throw new Error('color parity: no platform capture provided');
-  const theme = opts.theme ?? 'light';
+  const theme = themeOf(opts);
 
-  const tol = positiveTolerance(
-    opts.toleranceDe ?? contract.tolerance_de ?? DEFAULT_TOLERANCE_DE,
-    'color parity: tolerance_de',
-  );
+  const tol = toleranceDeOf(contract, opts);
   const ctol = tol * CONTRACT_TOL_FACTOR;
 
   // Per-platform stats + scale — failing closed on anything degenerate: a

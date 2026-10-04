@@ -1,7 +1,7 @@
 import type { Platform, Rect, UiNode } from '../adapters/types.js';
 import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
 import { failClosed } from './fail-closed.js';
-import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
+import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row, type Column } from './table.js';
 
 /**
@@ -306,6 +306,55 @@ function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareConte
   };
 }
 
+/**
+ * The two thresholds in force, derived ONCE for the comparator and for
+ * `validateRectContract`, from the same contract and the same options.
+ *
+ * `tolerancePct`: the test-facing override, else the contract's (typed, so
+ * already a positive number), else the default. `aspectTolerancePct`: the
+ * contract's `tolerance_aspect_pct` when it declares one — never a non-number
+ * — else `tolerancePct`, so an untouched contract behaves exactly as before.
+ */
+function tolerancesOf(
+  contract: LayoutContract,
+  opts: RectParityOptions,
+): { tolerancePct: number; aspectTolerancePct: number } {
+  const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
+  const aspectTolerancePct =
+    contract.tolerance_aspect_pct === undefined
+      ? tolerancePct
+      : positiveTolerance(contract.tolerance_aspect_pct, 'rect parity: tolerance_aspect_pct');
+  return { tolerancePct, aspectTolerancePct };
+}
+
+/**
+ * Every problem `compareRectParity` would raise about the contract's fields
+ * ALONE — no tree, no device — so run/verify.ts can refuse a run before its
+ * legs instead of reporting `FAILED:` after them (2026-10-03).
+ *
+ * That is one field: `tolerance_aspect_pct`, the only geometry value the
+ * schema leaves `unknown` (x/y/w/h, `tolerance_pct`, `figma_frame_width` and
+ * `aspect` are typed, so `parseLayoutContract` already rejected them). It is
+ * parsed by the comparator's own `tolerancesOf`, under the comparator's own
+ * options — taken for the same reason the colour and text validators take
+ * theirs: a validator asked under different options than its comparator
+ * answers a different question. Today no option can change the ANSWER (the
+ * override only replaces the fallback, which is not validated — the option
+ * is trusted, test-facing input); deriving through the one shared function
+ * is what keeps that true if `tolerancesOf` ever grows a rule.
+ *
+ * Deliberately NOT lifted here: the "single-platform run with neither
+ * figma_frame_width nor any anchor w" refusal. It depends on how many legs
+ * produced a tree — a two-platform request becomes single when one leg fails —
+ * which is a fact about the run, not the contract; and a contract without a
+ * frame width is not invalid, it is merely unusable for THIS table on one
+ * platform, where the colour and text tables can still stand. That one stays
+ * contained in the rect section, as before.
+ */
+export function validateRectContract(contract: LayoutContract, opts: RectParityOptions = {}): string[] {
+  return problemsThrownBy('rect parity: ', [() => void tolerancesOf(contract, opts)]);
+}
+
 export function compareRectParity(
   contract: LayoutContract,
   trees: Partial<Record<Platform, UiNode>>,
@@ -314,15 +363,12 @@ export function compareRectParity(
   const platforms = (['android', 'ios'] as const).filter((p) => trees[p] !== undefined);
   if (platforms.length === 0) throw new Error('rect parity: no platform tree provided');
   const single = platforms.length === 1;
-  const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
-  // Defaults to tolerancePct, so an untouched contract behaves exactly as
-  // before. `opts.tolerancePct` deliberately does NOT flow into it: the option
-  // is the test-facing width override, and silently widening the shape check
-  // with it would be the same units confusion this field exists to end.
-  const aspectTolerancePct =
-    contract.tolerance_aspect_pct === undefined
-      ? tolerancePct
-      : positiveTolerance(contract.tolerance_aspect_pct, 'rect parity: tolerance_aspect_pct');
+  // The aspect threshold defaults to tolerancePct, so an untouched contract
+  // behaves exactly as before. `opts.tolerancePct` deliberately does NOT flow
+  // into it: the option is the test-facing width override, and silently
+  // widening the shape check with it would be the same units confusion this
+  // field exists to end.
+  const { tolerancePct, aspectTolerancePct } = tolerancesOf(contract, opts);
   const frameWidth =
     contract.figma_frame_width ?? Math.max(0, ...contract.anchors.map((a) => a.w ?? 0));
   // Single-platform + no frame width: contract values cannot be normalized

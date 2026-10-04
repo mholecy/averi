@@ -69,7 +69,10 @@ arithmetic, so averi checks it with numbers (a port of the convergence superrepo
   leg's UI tree is compared per anchor and a `## rect parity` table is appended — per-field
   deltas vs the contract and android-vs-ios, **gap-to-previous-anchor** rows for vertical
   position (local, aspect-independent — this is why absolute y never fails), aspect-ratio
-  spread, and MISSING anchors listed separately with their likely causes.
+  spread, and MISSING anchors listed separately with their likely causes. An invalid field
+  value in a table the run would produce (a bad `bg`, `sample`, `text`, `text_dynamic` or
+  `tolerance_*`) refuses the call **before any leg runs**, listing every such field — fix the
+  contract and re-run; nothing was run on a device.
 
 ```json
 {

@@ -14,6 +14,7 @@ import {
   renderedTextFromTree,
   survivesIn,
   textParityVerdict,
+  validateTextContract,
   type TextCapture,
 } from '../../src/verify/text-parity.js';
 
@@ -690,5 +691,80 @@ describe('survivesIn — the UNREAD guard predicate', () => {
   it('keeps the case and truncation leniencies it already had', () => {
     expect(survivesIn('Continue', 'CONTINUE')).toBe(true);
     expect(survivesIn('Select credit account', 'Select credit acc…')).toBe(true);
+  });
+});
+
+/** The message a call throws — the read-time half of a "one owner" comparison. */
+const thrownBy = (run: () => unknown): string => {
+  try {
+    run();
+  } catch (e) {
+    return (e as Error).message;
+  }
+  throw new Error('expected a throw');
+};
+
+/**
+ * The validator run/verify.ts asks BEFORE the legs (2026-10-03): the exact
+ * message per invalid field, nothing for a valid contract, and each message
+ * the very string the comparator throws for the same field at read time.
+ */
+describe('validateTextContract — the read-time diagnosis, without a capture', () => {
+  it('a valid contract (text, text_dynamic true and false, a tolerance, an anchor not opted in) has no problems', () => {
+    const c = contract(
+      [
+        { id: 'cta', text: 'CONTINUE' },
+        { id: 'amount', text_dynamic: true },
+        { id: 'title', text: 'Pay', text_dynamic: false },
+        { id: 'card', w: 100 },
+      ],
+      { tolerance_size_pct: 12 },
+    );
+    expect(validateTextContract(c)).toEqual([]);
+  });
+
+  it.each([[42], [null], [true], [['CONTINUE']], [{ en: 'CONTINUE' }]])('text: %j is not a string', (value) => {
+    expect(validateTextContract(contract([{ id: 'cta', text: value }]))).toEqual([
+      `text parity: anchor cta: 'text' is ${JSON.stringify(value)} — must be the exact rendered string.`,
+    ]);
+  });
+
+  it.each([['yes'], ['true'], [1], [null]])('text_dynamic: %j is not a boolean', (value) => {
+    expect(validateTextContract(contract([{ id: 'amount', text_dynamic: value }]))).toEqual([
+      `text parity: anchor amount: 'text_dynamic' is ${JSON.stringify(value)} — must be true or false.`,
+    ]);
+  });
+
+  it.each([['10'], [0], [-1], [false]])('tolerance_size_pct: %j is not a positive number', (tol) => {
+    expect(validateTextContract(contract([{ id: 'cta', text: 'CONTINUE' }], { tolerance_size_pct: tol }))).toEqual([
+      `text parity: tolerance_size_pct must be a positive number, got ${JSON.stringify(tol)}`,
+    ]);
+  });
+
+  it('lists EVERY problem, in contract order — both fields of one anchor included', () => {
+    const c = contract(
+      [
+        { id: 'a', text: 42, text_dynamic: 'yes' },
+        { id: 'b', text: 'fine' },
+        { id: 'c', text_dynamic: 0 },
+      ],
+      { tolerance_size_pct: '10' },
+    );
+    expect(validateTextContract(c)).toEqual([
+      'text parity: tolerance_size_pct must be a positive number, got "10"',
+      "text parity: anchor a: 'text' is 42 — must be the exact rendered string.",
+      "text parity: anchor a: 'text_dynamic' is \"yes\" — must be true or false.",
+      "text parity: anchor c: 'text_dynamic' is 0 — must be true or false.",
+    ]);
+  });
+
+  it.each([
+    ['text', [{ id: 'a', text: 42 }], {}],
+    ['text_dynamic', [{ id: 'a', text_dynamic: 'yes' }], {}],
+    ['tolerance_size_pct', [{ id: 'a', text: 'X' }], { tolerance_size_pct: '10' }],
+  ])('one owner — %s: the validation message === the read-time message', (_field, anchors, extra) => {
+    const c = contract(anchors, extra);
+    const readTime = thrownBy(() => compareTextParity(c, { android: { tree: root(1080, [text('a', 'X')]) } }));
+    expect(validateTextContract(c)).toEqual([readTime]);
   });
 });

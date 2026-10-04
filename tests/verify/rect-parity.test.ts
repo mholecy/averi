@@ -7,9 +7,10 @@ import {
   evaluateRectAssert,
   formatRectParity,
   rectParityVerdict,
+  validateRectContract,
 } from '../../src/verify/rect-parity.js';
 import { inferScreenWidth } from '../../src/ui-tree/geometry.js';
-import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
+import { parseLayoutContract, problemsThrownBy, type LayoutContract } from '../../src/verify/layout-contract.js';
 
 /**
  * Synthetic fixtures modeled on the 2026 card run: figma frame 393,
@@ -610,5 +611,109 @@ describe('rect parity on the iOS filter-sheet shape', () => {
     expect(pass).toBe(true);
     expect(detail).toContain('screen width 402');
     expect(detail).not.toContain('UNRELIABLE');
+  });
+});
+
+/** The message a call throws — the read-time half of a "one owner" comparison. */
+const thrownBy = (run: () => unknown): string => {
+  try {
+    run();
+  } catch (e) {
+    return (e as Error).message;
+  }
+  throw new Error('expected a throw');
+};
+
+/**
+ * The validator run/verify.ts asks BEFORE the legs (2026-10-03). Geometry has
+ * one field the schema leaves `unknown` — `tolerance_aspect_pct` — and the
+ * rest is typed, so this is the whole of it.
+ */
+describe('validateRectContract — the read-time diagnosis, without a tree', () => {
+  it('a valid contract has no problems, with and without a tolerance_aspect_pct', () => {
+    expect(validateRectContract(contract())).toEqual([]);
+    expect(validateRectContract({ ...contract(), tolerance_aspect_pct: 15 })).toEqual([]);
+  });
+
+  it.each([['15'], [0], [-1], [null], [true]])('tolerance_aspect_pct: %j is not a positive number', (tol) => {
+    expect(validateRectContract({ ...contract(), tolerance_aspect_pct: tol })).toEqual([
+      `rect parity: tolerance_aspect_pct must be a positive number, got ${JSON.stringify(tol)}`,
+    ]);
+  });
+
+  it('one owner — tolerance_aspect_pct: the validation message === the read-time message', () => {
+    const c: LayoutContract = { ...contract(), tolerance_aspect_pct: '15' };
+    const readTime = thrownBy(() => compareRectParity(c, { android: androidTree(), ios: iosTree() }));
+    expect(validateRectContract(c)).toEqual([readTime]);
+  });
+
+  // The validator takes the comparator's options so both derive the thresholds
+  // through one function. No option can change the ANSWER today — the override
+  // only replaces the fallback, which is never validated — so what is pinned is
+  // that the answer under an override is still the comparator's own, both ways.
+  it('under the comparator\'s options it still answers as the comparator does', () => {
+    const opts = { tolerancePct: 5 };
+    expect(validateRectContract(contract(), opts)).toEqual([]);
+    expect(() => compareRectParity(contract(), { android: androidTree(), ios: iosTree() }, opts)).not.toThrow();
+    const bad: LayoutContract = { ...contract(), tolerance_aspect_pct: 0 };
+    const readTime = thrownBy(() => compareRectParity(bad, { android: androidTree(), ios: iosTree() }, opts));
+    expect(validateRectContract(bad, opts)).toEqual([readTime]);
+  });
+
+  // The shared derivation, comparator side: an undeclared tolerance_aspect_pct
+  // takes the contract's tolerance_pct, not the default (2).
+  it('the aspect threshold the comparator reports falls back to the contract\'s tolerance_pct', () => {
+    const trees = { android: androidTree(), ios: iosTree() };
+    expect(compareRectParity({ ...contract(), tolerance_pct: 5 }, trees).aspectTolerancePct).toBe(5);
+    expect(compareRectParity({ ...contract(), tolerance_pct: 5, tolerance_aspect_pct: 15 }, trees).aspectTolerancePct).toBe(15);
+  });
+
+  // Deliberately not lifted: whether the run is single-platform is decided by
+  // which legs produced a tree, and a contract without a frame width is not
+  // invalid — only unusable for THIS table on one platform.
+  it('does NOT report the single-platform "no frame width" refusal — that one depends on the run', () => {
+    const c: LayoutContract = { screen: 't', anchors: [{ id: 'card' }] };
+    expect(validateRectContract(c)).toEqual([]);
+    expect(() => compareRectParity(c, { android: androidTree() })).toThrow(/figma_frame_width/);
+  });
+});
+
+/**
+ * What the three validators are built on. A contract problem is a throw whose
+ * message opens with the comparator's own name; anything else is a bug in
+ * averi and must not be reported to the author as "your contract is invalid".
+ */
+describe('problemsThrownBy — contract problems are collected, bugs propagate', () => {
+  const problem = (message: string) => (): void => {
+    throw new Error(message);
+  };
+
+  it('collects every throw that opens with the prefix, in order, and skips checks that pass', () => {
+    expect(
+      problemsThrownBy('rect parity: ', [
+        problem('rect parity: first'),
+        () => {},
+        problem('rect parity: second'),
+      ]),
+    ).toEqual(['rect parity: first', 'rect parity: second']);
+    expect(problemsThrownBy('rect parity: ', [])).toEqual([]);
+  });
+
+  it('rethrows a TypeError from inside a check — the very error, not a "problem"', () => {
+    const bug = new TypeError("Cannot read properties of undefined (reading 'id')");
+    expect(() =>
+      problemsThrownBy('rect parity: ', [
+        problem('rect parity: first'),
+        () => {
+          throw bug;
+        },
+      ]),
+    ).toThrow(bug);
+  });
+
+  it('rethrows an error worded for ANOTHER dimension: the prefix is the validator\'s own', () => {
+    expect(() => problemsThrownBy('rect parity: ', [problem('color parity: tolerance_de must be…')])).toThrow(
+      'color parity: tolerance_de must be…',
+    );
   });
 });

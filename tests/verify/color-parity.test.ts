@@ -12,6 +12,7 @@ import {
   normalizeHex,
   patchRegions,
   sampleDominant,
+  validateColorContract,
 } from '../../src/verify/color-parity.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { pngScale } from '../../src/verify/scale.js';
@@ -559,5 +560,121 @@ describe('normalizeHex', () => {
   it('uppercases and drops alpha', () => {
     expect(normalizeHex('#fdfdfd')).toBe('#FDFDFD');
     expect(normalizeHex('#f2f7ff85')).toBe('#F2F7FF');
+  });
+});
+
+/** The message a call throws — the read-time half of a "one owner" comparison. */
+const thrownBy = (run: () => unknown): string => {
+  try {
+    run();
+  } catch (e) {
+    return (e as Error).message;
+  }
+  throw new Error('expected a throw');
+};
+
+/**
+ * The validator run/verify.ts asks BEFORE the legs (2026-10-03). What is
+ * pinned: the exact message per invalid field, nothing for a valid contract,
+ * and — the one-owner tests — that each message is the very string the
+ * comparator throws for the same field at read time.
+ */
+describe('validateColorContract — the read-time diagnosis, without a capture', () => {
+  it('a valid contract (hex, hex+alpha, token, both sample modes, a tolerance) has no problems', () => {
+    const c = contract({
+      screen: 's',
+      tolerance_de: 6,
+      anchors: [
+        { id: 'a', bg: '#FDFDFD', bg_dark: '#363644', sample: 'patches' },
+        { id: 'b', bg: '#FDFDFD80', sample: 'dominant' },
+        { id: 'c', bg: 'base.color1' },
+        { id: 'd', x: 1, w: 2 },
+      ],
+    });
+    expect(validateColorContract(c)).toEqual([]);
+    expect(validateColorContract(c, { theme: 'dark' })).toEqual([]);
+  });
+
+  it.each([
+    ['a bad hex', '#white', "color parity: anchor card: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name."],
+    ['a short hex', '#FFF', "color parity: anchor card: 'bg' value '#FFF' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name."],
+    ['a bad token', 'Base.colour1', "color parity: anchor card: 'bg' value 'Base.colour1' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name."],
+    ['a non-string', 16777215, "color parity: anchor card: 'bg' is 16777215 — must be a '#RRGGBB(AA)' string or a <hue>.<colorN> token name."],
+    ['a null', null, "color parity: anchor card: 'bg' is null — must be a '#RRGGBB(AA)' string or a <hue>.<colorN> token name."],
+  ])('bg: %s is reported in the comparator\'s words', (_what, bg, message) => {
+    expect(validateColorContract(contract({ screen: 's', anchors: [{ id: 'card', bg }] }))).toEqual([message]);
+  });
+
+  it.each([
+    ['a bad hex', '#white', "color parity: anchor card: 'bg_dark' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name."],
+    ['a bad token', 'base.color', "color parity: anchor card: 'bg_dark' value 'base.color' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name."],
+    ['a non-string', true, "color parity: anchor card: 'bg_dark' is true — must be a '#RRGGBB(AA)' string or a <hue>.<colorN> token name."],
+  ])('bg_dark: %s is reported under the dark theme, the only one that reads it', (_what, bg_dark, message) => {
+    const c = contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE, bg_dark }] });
+    expect(validateColorContract(c, { theme: 'dark' })).toEqual([message]);
+  });
+
+  // The validator answers for the run it is asked about. `verify` only runs
+  // the light axis, where the comparator never parses bg_dark — so refusing
+  // over it would refuse a run whose table is entirely fine.
+  it('a bad bg_dark is NOT a problem under the light theme, exactly as the comparator does not raise it', () => {
+    const c = contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE, bg_dark: '#white' }] });
+    expect(validateColorContract(c)).toEqual([]);
+    expect(() => compareColorParity(c, capturePair(WHITE, WHITE))).not.toThrow();
+    // …and symmetrically, a bad bg is not one under dark.
+    const d = contract({ screen: 's', anchors: [{ id: 'card', bg: '#white', bg_dark: '#363644' }] });
+    expect(validateColorContract(d, { theme: 'dark' })).toEqual([]);
+    expect(validateColorContract(d)).toHaveLength(1);
+  });
+
+  it.each([['fancy'], [1], [true]])('sample: %j is an unknown mode', (sample) => {
+    expect(validateColorContract(contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE, sample }] }))).toEqual([
+      `color parity: anchor card: unknown sample mode ${JSON.stringify(sample)} — "dominant" or "patches".`,
+    ]);
+  });
+
+  it.each([['6'], [0], [-1], [true], [[8]]])('tolerance_de: %j is not a positive number', (tolerance_de) => {
+    const c = contract({ screen: 's', tolerance_de, anchors: [{ id: 'card', bg: WHITE }] });
+    expect(validateColorContract(c)).toEqual([
+      `color parity: tolerance_de must be a positive number, got ${JSON.stringify(tolerance_de)}`,
+    ]);
+  });
+
+  it('a null tolerance_de or sample defaults, as it does at read time — not a problem', () => {
+    const c = contract({ screen: 's', tolerance_de: null, anchors: [{ id: 'card', bg: WHITE, sample: null }] });
+    expect(validateColorContract(c)).toEqual([]);
+    expect(() => compareColorParity(c, capturePair(WHITE, WHITE))).not.toThrow();
+  });
+
+  it('lists EVERY problem, in contract order, where the comparator stops at its first', () => {
+    const c = contract({
+      screen: 's',
+      tolerance_de: '6',
+      anchors: [
+        { id: 'a', bg: '#white', sample: 'fancy' },
+        { id: 'b', bg: WHITE },
+        { id: 'c', bg: 7 },
+      ],
+    });
+    expect(validateColorContract(c)).toEqual([
+      'color parity: tolerance_de must be a positive number, got "6"',
+      'color parity: anchor a: unknown sample mode "fancy" — "dominant" or "patches".',
+      "color parity: anchor a: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name.",
+      "color parity: anchor c: 'bg' is 7 — must be a '#RRGGBB(AA)' string or a <hue>.<colorN> token name.",
+    ]);
+  });
+
+  // One owner: for each bad field alone, the validator's single message IS
+  // what the comparator throws for that contract once it has captures.
+  it.each([
+    ['bg', { anchors: [{ id: 'card', bg: '#white' }] }, {}],
+    ['bg (non-string)', { anchors: [{ id: 'card', bg: 12 }] }, {}],
+    ['bg_dark', { anchors: [{ id: 'card', bg_dark: 'nope' }] }, { theme: 'dark' as const }],
+    ['sample', { anchors: [{ id: 'card', bg: WHITE, sample: 'fancy' }] }, {}],
+    ['tolerance_de', { tolerance_de: '6', anchors: [{ id: 'card', bg: WHITE }] }, {}],
+  ])('one owner — %s: the validation message === the read-time message', (_field, json, opts) => {
+    const c = contract({ screen: 's', ...json });
+    const readTime = thrownBy(() => compareColorParity(c, capturePair(WHITE, WHITE), opts));
+    expect(validateColorContract(c, opts)).toEqual([readTime]);
   });
 });
