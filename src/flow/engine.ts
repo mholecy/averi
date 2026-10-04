@@ -12,6 +12,7 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
+  defaultLaunchActivity,
   flowIsDestructive,
   resolveCredentials,
   SetupError,
@@ -519,9 +520,8 @@ export class FlowEngine {
     const appId = 'package' in app ? app.package : app.bundleId;
     // Step-level activity wins over app.android.activity; neither applies on
     // iOS unless the step names one — the adapter then rejects it loudly.
-    const activity =
-      spec.activity ??
-      (this.adapter.platform === 'android' ? this.cfg.app.android?.activity : undefined);
+    // The fallback rule itself is flow/config.ts's (shared with launch_app).
+    const activity = spec.activity ?? defaultLaunchActivity(this.cfg, this.adapter.platform, appId);
     await this.adapter.launch(appId, {
       clearState: spec.clearState,
       activity,

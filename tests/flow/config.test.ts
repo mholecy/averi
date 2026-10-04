@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  defaultLaunchActivity,
   loadConfig,
   loadConfigIfPresent,
   loadEnvBeside,
@@ -451,5 +452,31 @@ app:
 flows: {}
 `),
     ).toThrow(/app\.android\.package must be a package name/);
+  });
+});
+
+describe('defaultLaunchActivity — the one launch-activity fallback (flow launch step and launch_app)', () => {
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app, activity: .MainActivity }
+  ios:     { bundleId: md.bank.app }
+`);
+
+  it("android, the config's own package → its activity", () => {
+    expect(defaultLaunchActivity(cfg, 'android', 'md.bank.app')).toBe('.MainActivity');
+  });
+
+  it('another package → none: the config describes a different app', () => {
+    expect(defaultLaunchActivity(cfg, 'android', 'com.other.app')).toBeUndefined();
+  });
+
+  it('ios → none, even when the bundle id equals the android package', () => {
+    expect(defaultLaunchActivity(cfg, 'ios', 'md.bank.app')).toBeUndefined();
+  });
+
+  it('no config, no android section, or no activity configured → none', () => {
+    expect(defaultLaunchActivity(undefined, 'android', 'md.bank.app')).toBeUndefined();
+    expect(defaultLaunchActivity(parseConfig('app:\n  ios: { bundleId: md.bank.app }\n'), 'android', 'md.bank.app')).toBeUndefined();
+    expect(defaultLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), 'android', 'md.bank.app')).toBeUndefined();
   });
 });

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
-import type { LaunchIntent } from '../adapters/types.js';
+import type { LaunchIntent, Platform } from '../adapters/types.js';
 import { IOS_TREE_SOURCE_KINDS } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
@@ -360,6 +360,48 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
     throw err;
   }
   return resolveBuildPaths(parseConfig(raw, path), path);
+}
+
+/**
+ * The entry activity a launch falls back to when the caller names none:
+ * averi.yaml's `app.android.activity`, and only for the very package the
+ * config describes. Not android, no config, another package, or no activity
+ * configured → `undefined`, and the adapter's own fallback applies (the
+ * `monkey -c LAUNCHER` pick documented on the schema field above).
+ *
+ * One owner since 2026-10-03. The rule was written twice — in the flow
+ * engine's `launch` step and in the MCP `launch_app` handler — and the
+ * handler's copy sat in a module no test could import (review 2026-08-14,
+ * S1). Both now call this. The engine's app id always IS the config's
+ * package, so the comparison is vacuous there; it is kept in the one place
+ * rather than split into "with check" and "without", because a second
+ * variant is how the two copies came to exist.
+ *
+ * What stays with each caller, deliberately, because the two differ and
+ * this step changes no behaviour: WHEN the fallback is consulted. A flow
+ * step consults it whenever the step names no activity, even beside an
+ * `intent`; `launch_app` consults it only when the call names neither an
+ * activity nor an intent. Whether that difference is intended is an open
+ * question recorded here, not settled.
+ *
+ * What the difference does on a device (review 2026-10-03): the Android
+ * adapter turns an activity into `am start -n <package>/<activity>`. So the
+ * flow rule sends, say, a SEND intent EXPLICITLY to the configured launcher
+ * activity — which may not be the activity that handles SEND — while the
+ * tool rule sends an IMPLICIT intent with no component, which the system may
+ * resolve to another app or to a chooser. Neither is clearly right; the
+ * owner's decision is pending. Both are pinned as they behave today
+ * (tests/flow/engine.test.ts "launch step", tests/mcp/tools.test.ts
+ * "launch_app"), so whichever way it is settled shows up as a failing test.
+ */
+export function defaultLaunchActivity(
+  cfg: AveriConfig | undefined,
+  platform: Platform,
+  appId: string,
+): string | undefined {
+  if (platform !== 'android') return undefined;
+  const android = cfg?.app.android;
+  return android?.package === appId ? android.activity : undefined;
 }
 
 export interface ResolvedCredentials {

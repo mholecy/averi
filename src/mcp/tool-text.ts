@@ -7,6 +7,12 @@
  * nodes was tapped) and the fill warning (a masked field that already held
  * text). A regression that dropped either would otherwise be invisible to
  * every test in the repo (review 2026-10-03).
+ *
+ * 2026-10-03, later the same day: the reason above no longer holds — the
+ * handlers moved to mcp/tools.ts, which is importable and tested through an
+ * in-memory transport. The functions stay here anyway: they are pure, and
+ * tool-text.test.ts pins every wording variant (note, warning, cleared)
+ * without building a server, a registry or a fake device to provoke each one.
  */
 
 import type { FillResult } from '../interact/fill.js';

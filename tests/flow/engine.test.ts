@@ -1166,6 +1166,27 @@ flows:
     ]);
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app/.MainActivity (state cleared)' });
   });
+
+  // WHEN the fallback applies differs between a flow step and the launch_app
+  // tool, which skips it beside an intent. Pinned as it behaves today, not
+  // endorsed: see the open question in defaultLaunchActivity's doc
+  // (flow/config.ts) before changing either side.
+  it('a step with an intent and no activity still gets app.android.activity (unlike launch_app)', async () => {
+    const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app, activity: .MainActivity }
+flows:
+  share:
+    steps:
+      - launch:
+          intent: { action: android.intent.action.SEND }
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    await new FlowEngine(cfg, fake, FAST).runFlow('share');
+    expect(fake.launches).toEqual([
+      { appId: 'md.bank.app', activity: '.MainActivity', intent: { action: 'android.intent.action.SEND' } },
+    ]);
+  });
 });
 
 describe('transient UI-tree read failures', () => {
