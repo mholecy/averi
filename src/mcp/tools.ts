@@ -1,36 +1,30 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import type { AdapterOpts, AdapterRegistry } from './registry.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { fillField } from '../interact/fill.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { tapElement } from '../interact/tap.js';
-import { fillText, tapText } from './tool-text.js';
+import { fillText, launchText, tapText } from './tool-text.js';
 import {
-  configDir,
-  defaultLaunchActivity,
-  loadConfig,
-  loadConfigIfPresent,
-  loadEnvBeside,
+  appBuildPath,
+  iosTreeSourceFor,
+  loadProjectConfig,
   type AveriConfig,
 } from '../flow/config.js';
-import { FlowEngine } from '../flow/engine.js';
-import { assertSpecSchema, DEFAULT_BASELINE_DIR, Verifier } from '../verify/assert.js';
+import { assertSpecSchema } from '../verify/assert.js';
 import { captureFrame } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
-import { parseLayoutContract } from '../verify/layout-contract.js';
 import {
-  appHealth,
-  assertSummary,
-  formatAsserts,
-  formatLogExcerpt,
-  formatTrace,
-  runVerification,
-} from '../run/verify.js';
+  baselineDirFor,
+  launchActivityFor,
+  runAsserts,
+  runEnsureState,
+  runNamedFlow,
+} from '../run/commands.js';
+import { formatLogExcerpt, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
@@ -62,8 +56,29 @@ import type { Platform, UiNode } from '../adapters/types.js';
  * real files read from disk — a test writes an averi.yaml into a temp dir and
  * passes `configPath`, as a user would. Rejected: a config-loader or
  * file-system parameter. It would be a second adapter at a seam that already
- * has a cheap real one, and the path-resolution rules (configPathOf,
- * baselineDirOf) are exactly what such a fake would skip.
+ * has a cheap real one, and the path-resolution rules (projectConfigPath,
+ * baselineDirFor) are exactly what such a fake would skip.
+ *
+ * What a handler holds, since 2026-10-03 (later the same day; the same list
+ * as ARCHITECTURE.md §2): its description and input schema, which includes
+ * parsing the assert specs; resolving the platform to an adapter through the
+ * registry, this layer's own state; the config answers it needs, asked of
+ * flow/config.ts (which build to install, which iOS tree source, where
+ * averi.yaml is) or of run/commands.ts (which activity, which baseline dir);
+ * one call into an adapter method, interact/ or run/; and the response —
+ * text through tool-text.ts or the callee, wrapped by `text`/`image` below.
+ * The sequences once written out here (ensure_state, run_flow, assert,
+ * launch_app's activity fallback, the contract file read) are below this
+ * layer.
+ *
+ * That is several statements, not one: this comment first said "ONE
+ * delegation" and overclaimed. `install_app` chooses between the given path
+ * and the config's; `assert` parses its specs, resolves the adapter and the
+ * baseline dir, then calls runAsserts; `verify` is the widest — it loads the
+ * config, parses the specs, then calls runVerification. Folding verify's
+ * config load into runVerification (a `configPath` and a
+ * `(cfg, platform) => adapter` resolver) is a deferred follow-up: it reshapes
+ * every run-level test's request for no behaviour gain.
  */
 
 const platform = z.enum(['android', 'ios']).describe('Target platform');
@@ -83,30 +98,6 @@ const environment = z
   );
 
 /**
- * All project configuration lives with the project, not with averi: averi.yaml
- * is looked up against the server cwd (the project root when launched from
- * .mcp.json) unless the caller points elsewhere, and credential values
- * auto-load from a sibling .env.averi.
- */
-const configPathOf = (configPath?: string) => resolve(configPath ?? 'averi.yaml');
-
-/**
- * Baselines belong to the project, so they hang off averi.yaml like every other
- * project-relative path — `.averi/baselines/` beside the config, not beside
- * whatever directory the server happens to run in. Configless callers (assert
- * works without averi.yaml) keep the cwd-relative default.
- */
-const baselineDirOf = (configPath?: string) =>
-  resolve(configDir(configPathOf(configPath)), DEFAULT_BASELINE_DIR);
-
-async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
-  const path = configPathOf(configPath);
-  const applied = await loadEnvBeside(path);
-  if (applied.length > 0) console.error(`averi: loaded ${applied.join(', ')} from .env.averi`);
-  return loadConfig(path);
-}
-
-/**
  * registry.get opts from a loaded config — plumbs app.ios.treeSource, the
  * tree-source kind, to the registry. Safe to pass for an android leg: the
  * registry resolves android to no kind and an omitted ios kind to the
@@ -117,22 +108,26 @@ const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
 });
 
 /**
- * treeSource for tree-reading tools that predate averi.yaml and must keep
- * working without one (ui_snapshot, tap, type_text, scroll_until, assert):
- * a missing config file means default idb, but a present-and-invalid one
- * still errors loudly — see loadConfigIfPresent. Android has no treeSource,
- * so its legs skip the config load entirely: an invalid averi.yaml must not
- * break android calls on these previously config-blind tools.
+ * registry.get opts for the tree-reading tools that work without averi.yaml.
+ * The policy — android never reads the config, ios fails loudly on an
+ * invalid one, a missing one means the default — is
+ * flow/config.ts#iosTreeSourceFor; this only wraps its answer.
  */
-async function loadIosOpts(p: Platform, configPath?: string): Promise<AdapterOpts | undefined> {
-  if (p === 'android') return undefined;
-  return iosOpts(await loadConfigIfPresent(configPathOf(configPath)));
-}
+const treeOpts = async (p: Platform, configPath?: string): Promise<AdapterOpts> => ({
+  treeSource: await iosTreeSourceFor(p, configPath),
+});
 
 const text = (value: unknown) => ({
   content: [
     { type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) },
   ],
+});
+
+/** A PNG as MCP image content — the one spelling of it for screenshot, ensure_state and verify. */
+const image = (shot: Buffer) => ({
+  type: 'image' as const,
+  data: shot.toString('base64'),
+  mimeType: 'image/png',
 });
 
 const launchIntentInput = z
@@ -227,14 +222,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, path, configPath: cp }) => {
-      let appPath = path;
-      if (appPath === undefined) {
-        const cfg = await loadProjectConfig(cp);
-        appPath = p === 'android' ? cfg.app.android?.apk : cfg.app.ios?.app;
-        if (appPath === undefined) {
-          throw new Error(`No path given and averi.yaml has no app.${p} build path`);
-        }
-      }
+      const appPath = path ?? appBuildPath(await loadProjectConfig(cp), p);
       await (await registry.get(p)).install(appPath);
       return text(`Installed ${appPath} on ${p}`);
     },
@@ -262,23 +250,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         configPath,
       },
     },
-    async ({ platform: p, appId, clearState, activity, intent, configPath: cp }) => {
-      if (p === 'android' && activity === undefined && intent === undefined) {
-        // No explicit entry point — fall back to averi.yaml's, when the project
-        // has one for this very package. No config, no match → monkey fallback.
-        // The rule is flow/config.ts's (shared with the engine's launch step);
-        // an unloadable config is "no config" here, as it always was.
-        // The `p === 'android'` half of the guard is redundant for the
-        // activity — the rule answers undefined off android. What it still
-        // does is skip the averi.yaml and .env.averi load, and its stderr
-        // line, on an ios launch (2026-10-03; deliberately untested).
-        const cfg = await loadProjectConfig(cp).catch(() => undefined);
-        activity = defaultLaunchActivity(cfg, p, appId);
-      }
+    async ({ platform: p, appId, clearState, activity: named, intent, configPath: cp }) => {
+      const activity = await launchActivityFor({ platform: p, appId, activity: named, intent, configPath: cp });
       await (await registry.get(p)).launch(appId, { clearState, activity, intent });
-      return text(
-        `Launched ${appId}${activity === undefined ? '' : `/${activity.split('/').pop()}`} on ${p}${clearState ? ' (state cleared)' : ''}`,
-      );
+      return text(launchText({ appId, platform: p, activity, clearState }));
     },
   );
 
@@ -315,9 +290,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p }) => {
       const { shot } = await captureFrame(await registry.get(p));
-      return {
-        content: [{ type: 'image' as const, data: shot.toString('base64'), mimeType: 'image/png' }],
-      };
+      return { content: [image(shot)] };
     },
   );
 
@@ -334,7 +307,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, filter, configPath: cp }) => {
-      const tree = await (await registry.get(p, await loadIosOpts(p, cp))).uiTree({ settle: true });
+      const tree = await (await registry.get(p, await treeOpts(p, cp))).uiTree({ settle: true });
       return text(filter ? findAll(tree, filter).map(stripChildren) : tree);
     },
   );
@@ -357,7 +330,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, selector, x, y, configPath: cp }) => {
-      const adapter = await registry.get(p, await loadIosOpts(p, cp));
+      const adapter = await registry.get(p, await treeOpts(p, cp));
       if (selector !== undefined) {
         const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse' });
         return text(tapText(selector, note));
@@ -404,7 +377,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, text: value, selector, clear, configPath: cp }) => {
-      const adapter = await registry.get(p, await loadIosOpts(p, cp));
+      const adapter = await registry.get(p, await treeOpts(p, cp));
       if (selector === undefined) {
         if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
         await adapter.typeText(value);
@@ -436,7 +409,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, configPath: cp }) => {
-      const adapter = await registry.get(p, await loadIosOpts(p, cp));
+      const adapter = await registry.get(p, await treeOpts(p, cp));
       const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs });
       return text(`Element ${selector} ${describeScrollResult(result)}`);
     },
@@ -467,18 +440,11 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, state, configPath: cp, environment: env }) => {
-      const cfg = await loadProjectConfig(cp);
-      const adapter = await registry.get(p, iosOpts(cfg));
-      const engine = new FlowEngine(cfg, adapter, { environment: env });
-      const trace = await engine.ensureState(state);
-      const health = await appHealth(adapter, cfg);
-      const { shot } = await captureFrame(adapter);
-      return {
-        content: [
-          { type: 'text' as const, text: formatTrace(trace) + health },
-          { type: 'image' as const, data: shot.toString('base64'), mimeType: 'image/png' },
-        ],
-      };
+      const { text: report, shot } = await runEnsureState(
+        { state, configPath: cp, environment: env },
+        (cfg) => registry.get(p, iosOpts(cfg)),
+      );
+      return { content: [...text(report).content, image(shot)] };
     },
   );
 
@@ -495,11 +461,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, flow, configPath: cp, environment: env }) => {
-      const cfg = await loadProjectConfig(cp);
-      const adapter = await registry.get(p, iosOpts(cfg));
-      const engine = new FlowEngine(cfg, adapter, { environment: env });
-      const trace = await engine.runFlow(flow);
-      return text(formatTrace(trace) + (await appHealth(adapter, cfg)));
+      return text(
+        await runNamedFlow({ flow, configPath: cp, environment: env }, (cfg) => registry.get(p, iosOpts(cfg))),
+      );
     },
   );
 
@@ -518,27 +482,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const specs = parseAsserts(asserts);
       // Lenient load: assert works configless, but a broken averi.yaml (or a
       // wda treeSource it declares) must not be silently ignored here.
-      const adapter = await registry.get(p, await loadIosOpts(p, cp));
-      const verifier = new Verifier(adapter, { baselineDir: baselineDirOf(cp) });
-      const results = await verifier.assertAll(specs);
-      let health = '';
-      try {
-        health = await appHealth(adapter, await loadProjectConfig(cp));
-      } catch {
-        // no averi.yaml → no app to health-check; asserts stand on their own
-        //
-        // 2026-10-03: this catch is BROADER than that sentence. It also drops
-        // the health line for a present-but-invalid averi.yaml on android
-        // (ios never gets here: loadIosOpts above already failed the call),
-        // and for anything appHealth itself throws. Pinned as it behaves
-        // today in tests/mcp/tools.test.ts, not changed: the step that made
-        // this handler testable changed no behaviour. The narrower
-        // alternative — silent only for a MISSING file (loadConfigIfPresent),
-        // loud for an invalid one — is the follow-up, and it is a
-        // user-visible change: an android `assert` that passes today beside
-        // a broken averi.yaml would start to fail.
-      }
-      return text(`${assertSummary(results)}\n${formatAsserts(results)}${health}`);
+      const adapter = await registry.get(p, await treeOpts(p, cp));
+      return text(await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), configPath: cp }));
     },
   );
 
@@ -574,13 +519,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // caller's most likely mistake, and it stays the error they see when both
       // are wrong.
       const specs = parseAsserts(asserts ?? []);
-      // Load up front: a typo'd contract path must not cost a full device run.
-      // (Nor must a bad field VALUE: runVerification checks those before its
-      // legs — orchestration owns that, see run/verify.ts#contractProblems.)
-      const contract =
-        contractPath === undefined
-          ? undefined
-          : parseLayoutContract(await readFile(resolve(contractPath), 'utf8'), contractPath);
+      // The contract goes down as the PATH: run/verify.ts reads, parses and
+      // validates it before it resolves any adapter, so a typo'd path or a bad
+      // field value never costs a device run — and the pre-flight has one owner.
       const { sections, screenshots } = await runVerification(
         {
           platforms: normalizePlatforms(requested),
@@ -588,25 +529,15 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           specs,
           state,
           flow,
-          contract,
-          contractSource: contractPath,
+          contractPath,
           environment: env,
-          baselineDir: baselineDirOf(cp),
+          baselineDir: baselineDirFor(cp),
         },
         // Only the ios leg has a treeSource; the registry normalizes it away
         // for android, so one opts expression serves both legs.
         (p) => registry.get(p, iosOpts(cfg)),
       );
-      return {
-        content: [
-          { type: 'text' as const, text: sections.join('\n\n') },
-          ...screenshots.map((shot) => ({
-            type: 'image' as const,
-            data: shot.toString('base64'),
-            mimeType: 'image/png',
-          })),
-        ],
-      };
+      return { content: [...text(sections.join('\n\n')).content, ...screenshots.map(image)] };
     },
   );
 

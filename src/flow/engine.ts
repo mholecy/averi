@@ -521,7 +521,7 @@ export class FlowEngine {
     // Step-level activity wins over app.android.activity; neither applies on
     // iOS unless the step names one — the adapter then rejects it loudly.
     // The fallback rule itself is flow/config.ts's (shared with launch_app).
-    const activity = spec.activity ?? defaultLaunchActivity(this.cfg, this.adapter.platform, appId);
+    const activity = spec.activity ?? defaultLaunchActivity(this.cfg, { platform: this.adapter.platform, appId });
     await this.adapter.launch(appId, {
       clearState: spec.clearState,
       activity,

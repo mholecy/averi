@@ -8,6 +8,7 @@ import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { TOOL_NAMES } from '../helpers/tool-names.js';
 
 /**
  * The MCP layer through its interface: every call here goes client →
@@ -61,8 +62,14 @@ const booted = (platform: Platform): Device => ({
  * hands out the test's fakes, connected to a real SDK client in memory.
  * `factoryCalls` records every adapter the registry asked for — probes
  * (no deviceId) included — which is how "no device was touched" is asserted.
+ *
+ * Without arguments both platforms get a `home()` device, returned as
+ * `fakes`; a test that needs a particular screen passes its own.
  */
-async function connect(fakes: Partial<Record<Platform, FakeAdapter>> = {}, version = '0.0.0-test') {
+async function connect(
+  fakes: Partial<Record<Platform, FakeAdapter>> = { android: home(), ios: home() },
+  version = '0.0.0-test',
+) {
   const factoryCalls: { platform: Platform; deviceId?: string; treeSource?: string }[] = [];
   const factory: AdapterFactory = (platform, deviceId, opts) => {
     factoryCalls.push({ platform, deviceId, treeSource: opts?.treeSource });
@@ -86,7 +93,7 @@ async function connect(fakes: Partial<Record<Platform, FakeAdapter>> = {}, versi
     await server.close();
   });
 
-  type Content = { type: string; text?: string; data?: string };
+  type Content = { type: string; text?: string; data?: string; mimeType?: string };
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     const result = await client.callTool({ name, arguments: args });
     const content = result.content as Content[];
@@ -94,11 +101,13 @@ async function connect(fakes: Partial<Record<Platform, FakeAdapter>> = {}, versi
       isError: result.isError === true,
       text: content.filter((c) => c.type === 'text').map((c) => c.text).join('\n'),
       images: content.filter((c) => c.type === 'image').map((c) => Buffer.from(c.data ?? '', 'base64')),
+      /** The content blocks IN ORDER, as `[type]` or `[type, mimeType]` — `text` and `images` above lose the order. */
+      shape: content.map((c) => (c.mimeType === undefined ? [c.type] : [c.type, c.mimeType])),
     };
   };
   /** The adapters the registry BOUND to a device (probes excluded), in order. */
   const bound = () => factoryCalls.filter((c) => c.deviceId !== undefined);
-  return { client, call, factoryCalls, bound };
+  return { client, call, factoryCalls, bound, fakes };
 }
 
 /** Writes a file into the test's temp dir and returns its absolute path. */
@@ -109,14 +118,26 @@ async function file(name: string, content: string): Promise<string> {
 }
 
 const missing = () => join(dir, 'no-such-averi.yaml');
+const validConfig = () => file('averi.yaml', VALID_CONFIG);
+const invalidConfig = () => file('averi.yaml', INVALID_CONFIG);
 
 const VALID_CONFIG = `
 app:
   android: { package: md.bank.app, activity: .MainActivity }
   ios:     { bundleId: md.bank.app }
+credentials:
+  username: plain-user
+environments:
+  staging:
+    credentials:
+      username: staging-user
 states:
   home:
     detect: { element: { id: home_root } }
+flows:
+  touch_home:
+    steps:
+      - tap: { id: home_root }
 `;
 
 /** Present, and not a config: `app` is required. */
@@ -152,26 +173,8 @@ describe('the server itself', () => {
   it('lists the 18 documented tools — the tool vocabulary', async () => {
     const { client } = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toEqual([
-      'list_devices',
-      'select_device',
-      'install_app',
-      'launch_app',
-      'terminate_app',
-      'open_deep_link',
-      'screenshot',
-      'ui_snapshot',
-      'tap',
-      'swipe',
-      'type_text',
-      'scroll_until',
-      'press_key',
-      'ensure_state',
-      'run_flow',
-      'assert',
-      'verify',
-      'get_logs',
-    ]);
+    expect(tools.map((t) => t.name)).toEqual([...TOOL_NAMES]);
+    expect(TOOL_NAMES).toHaveLength(18);
   });
 });
 
@@ -237,26 +240,92 @@ describe('screenshot and ensure_state return a SETTLED frame', () => {
     const result = await call('ensure_state', {
       platform: 'android',
       state: 'home',
-      configPath: await file('averi.yaml', VALID_CONFIG),
+      configPath: await validConfig(),
     });
     expect(result.isError).toBe(false);
     expect(result.text).toContain('appAlive: true');
     expect(result.images).toEqual([frame('c')]);
+    expect(result.shape).toEqual([['text'], ['image', 'image/png']]); // the report first, then the frame
     expect(fake.screenshots).toEqual([frame('a'), frame('b'), frame('c'), frame('c')]);
   });
 });
 
-describe('launch_app — the entry activity', () => {
-  const launch = async (args: Record<string, unknown>, platform: Platform = 'android') => {
-    const fake = home();
-    const { call } = await connect({ [platform]: fake });
-    const result = await call('launch_app', {
-      platform,
-      configPath: await file('averi.yaml', VALID_CONFIG),
-      ...args,
+describe('ensure_state and run_flow — the flow tools', () => {
+  it('run_flow: runs the named flow and returns its trace with the health line, as text only', async () => {
+    const { call, fakes } = await connect();
+    const result = await call('run_flow', { platform: 'android', flow: 'touch_home', configPath: await validConfig() });
+    expect(result.isError).toBe(false);
+    expect(fakes.android!.taps).toEqual(['home_root']);
+    expect(result.text).toContain('home_root');
+    expect(result.text).toMatch(/\nappAlive: true$/);
+    expect(result.text).not.toContain('environment');
+    expect(result.shape).toEqual([['text']]);
+  });
+
+  // verify takes `platforms`, the other two `platform`; each ignores the other's.
+  it.each(['run_flow', 'ensure_state', 'verify'])('%s: the `environment` argument reaches the engine — the trace opens with it', async (tool) => {
+    const { call } = await connect();
+    const result = await call(tool, {
+      platform: 'android',
+      platforms: ['android'],
+      flow: 'touch_home',
+      state: 'home',
+      environment: 'staging',
+      configPath: await validConfig(),
     });
     expect(result.isError).toBe(false);
-    return { launches: fake.launches, text: result.text };
+    expect(result.text).toContain('environment staging');
+  });
+});
+
+describe('install_app — which build', () => {
+  const installing = async (args: Record<string, unknown>) => {
+    const { call, fakes } = await connect();
+    const installed: string[] = [];
+    fakes.android!.install = async (path: string) => {
+      installed.push(path);
+    };
+    return { result: await call('install_app', { platform: 'android', ...args }), installed };
+  };
+
+  it('an explicit path is installed as given, and averi.yaml is never read — an INVALID one beside it is no error', async () => {
+    const { result, installed } = await installing({ path: '/builds/explicit.apk', configPath: await invalidConfig() });
+    expect(result.isError).toBe(false);
+    expect(installed).toEqual(['/builds/explicit.apk']);
+    expect(result.text).toBe('Installed /builds/explicit.apk on android');
+  });
+
+  it('an explicit path wins over the build averi.yaml names', async () => {
+    const configPath = await file('averi.yaml', 'app:\n  android: { package: md.bank.app, apk: build/app.apk }\n');
+    const { installed } = await installing({ path: '/builds/explicit.apk', configPath });
+    expect(installed).toEqual(['/builds/explicit.apk']);
+  });
+
+  it("no path → averi.yaml's build, resolved against the config's own directory", async () => {
+    const configPath = await file('averi.yaml', 'app:\n  android: { package: md.bank.app, apk: build/app.apk }\n');
+    const { result, installed } = await installing({ configPath });
+    expect(result.isError).toBe(false);
+    expect(installed).toEqual([join(dir, 'build', 'app.apk')]);
+    expect(result.text).toBe(`Installed ${join(dir, 'build', 'app.apk')} on android`);
+  });
+
+  it('no path and no build in averi.yaml → an error naming the missing key, nothing installed', async () => {
+    const { result, installed } = await installing({ configPath: await validConfig() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('No path given and averi.yaml has no app.android build path');
+    expect(installed).toEqual([]);
+  });
+});
+
+describe('launch_app — the entry activity', () => {
+  const launch = async (
+    args: Record<string, unknown>,
+    { platform = 'android', configPath }: { platform?: Platform; configPath?: string } = {},
+  ) => {
+    const { call, fakes } = await connect();
+    const result = await call('launch_app', { platform, configPath: configPath ?? (await validConfig()), ...args });
+    expect(result.isError).toBe(false);
+    return { launches: fakes[platform]!.launches, text: result.text };
   };
 
   it("android, no activity, averi.yaml describes this package → its activity, named in the response", async () => {
@@ -283,36 +352,35 @@ describe('launch_app — the entry activity', () => {
   });
 
   it('ios never gets an activity from the config', async () => {
-    const { launches } = await launch({ appId: 'md.bank.app' }, 'ios');
+    const { launches } = await launch({ appId: 'md.bank.app' }, { platform: 'ios' });
     expect(launches[0].activity).toBeUndefined();
   });
 
-  it('no averi.yaml, or an invalid one → launches without an activity instead of failing', async () => {
-    for (const configPath of [missing(), await file('broken.yaml', INVALID_CONFIG)]) {
-      const fake = home();
-      const { call } = await connect({ android: fake });
-      const result = await call('launch_app', { platform: 'android', appId: 'md.bank.app', configPath });
-      expect(result.isError).toBe(false);
-      expect(fake.launches[0].activity).toBeUndefined();
-    }
+  it.each([
+    ['no averi.yaml', async () => missing()],
+    ['an invalid averi.yaml', invalidConfig],
+  ])('%s → launches without an activity instead of failing', async (_name, configPath) => {
+    const { launches } = await launch({ appId: 'md.bank.app' }, { configPath: await configPath() });
+    expect(launches).toHaveLength(1);
+    expect(launches[0].activity).toBeUndefined();
   });
 });
 
 describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_until, assert)', () => {
   const snapshot = async (platform: Platform, configPath: string) => {
-    const harness = await connect({ [platform]: home() });
+    const harness = await connect();
     const result = await harness.call('ui_snapshot', { platform, filter: 'id:home_root', configPath });
     return { result, bound: harness.bound() };
   };
 
   it('android: a present-but-INVALID averi.yaml is not even read — the call works', async () => {
-    const { result } = await snapshot('android', await file('averi.yaml', INVALID_CONFIG));
+    const { result } = await snapshot('android', await invalidConfig());
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.text)).toMatchObject([{ identifier: 'home_root' }]);
   });
 
   it('ios: the same invalid averi.yaml fails the call loudly, naming the file, before a device is bound', async () => {
-    const configPath = await file('averi.yaml', INVALID_CONFIG);
+    const configPath = await invalidConfig();
     const { result, bound } = await snapshot('ios', configPath);
     expect(result.isError).toBe(true);
     expect(result.text).toContain(configPath);
@@ -326,9 +394,8 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     ['type_text', { selector: 'id:home_root', text: 'x' }],
     ['scroll_until', { selector: 'id:home_root' }],
   ])('ios: %s fails on the same invalid averi.yaml before a device is bound', async (tool, args) => {
-    const configPath = await file('averi.yaml', INVALID_CONFIG);
-    const fake = home();
-    const harness = await connect({ ios: fake });
+    const configPath = await invalidConfig();
+    const harness = await connect();
     const result = await harness.call(tool, { platform: 'ios', configPath, ...args });
     expect(result.isError).toBe(true);
     expect(result.text).toContain(configPath);
@@ -354,7 +421,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
 
 describe('assert — results always, health only with a loadable averi.yaml', () => {
   const run = async (configPath: string) => {
-    const { call } = await connect({ android: home() });
+    const { call } = await connect();
     return call('assert', { platform: 'android', asserts: [{ element: { id: 'home_root' } }], configPath });
   };
 
@@ -367,14 +434,14 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
 
   it('with averi.yaml → the same results with the health line appended', async () => {
     const bare = await run(missing());
-    const result = await run(await file('averi.yaml', VALID_CONFIG));
+    const result = await run(await validConfig());
     expect(result.isError).toBe(false);
     expect(result.text).toBe(`${bare.text}\nappAlive: true`);
   });
 
-  it('android + an INVALID averi.yaml → results, silently no health (current behaviour; see the dated note in the handler)', async () => {
+  it('android + an INVALID averi.yaml → results, silently no health (current behaviour; see the dated note in run/commands.ts#runAsserts)', async () => {
     const bare = await run(missing());
-    const result = await run(await file('averi.yaml', INVALID_CONFIG));
+    const result = await run(await invalidConfig());
     expect(result.isError).toBe(false);
     expect(result.text).toBe(bare.text);
   });
@@ -382,8 +449,8 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
 
 describe('scroll_until', () => {
   it('timeoutMs is plain milliseconds, passed through: the timeout error quotes it', async () => {
-    const fake = home();
-    const { call } = await connect({ android: fake });
+    const { call, fakes } = await connect();
+    const fake = fakes.android!;
     const result = await call('scroll_until', {
       platform: 'android',
       selector: 'id:never_there',
@@ -406,10 +473,10 @@ describe('scroll_until', () => {
 
 describe('verify', () => {
   it("a typo'd contract path fails before any device is touched", async () => {
-    const harness = await connect({ android: home(), ios: home() });
+    const harness = await connect();
     const contract = join(dir, 'no-such-contract.json');
     const result = await harness.call('verify', {
-      configPath: await file('averi.yaml', VALID_CONFIG),
+      configPath: await validConfig(),
       contract,
     });
     expect(result.isError).toBe(true);
@@ -421,14 +488,13 @@ describe('verify', () => {
   // path, and used to cost both legs before it surfaced as `FAILED:` in the
   // color table. The handler only delegates; what an MCP client sees is pinned.
   it('a contract with an invalid colour field is refused, naming the field, before any device is touched', async () => {
-    const android = home();
-    const ios = home();
-    const harness = await connect({ android, ios });
+    const harness = await connect();
+    const { android, ios } = harness.fakes;
     const contract = await file(
       'layout-contract.json',
       JSON.stringify({ screen: 'home', anchors: [{ id: 'home_root', x: 0, w: 100, bg: '#white' }] }),
     );
-    const result = await harness.call('verify', { configPath: await file('averi.yaml', VALID_CONFIG), contract });
+    const result = await harness.call('verify', { configPath: await validConfig(), contract });
     expect(result.isError).toBe(true);
     // Names the file as the user passed it, like a parse error does.
     expect(result.text).toContain(`the layout contract ${contract} has 1 invalid field`);
@@ -436,13 +502,13 @@ describe('verify', () => {
     expect(result.text).toContain('Fix the contract and re-run; nothing was run on a device.');
     expect(result.images).toEqual([]);
     expect(harness.factoryCalls).toEqual([]); // not even a device probe
-    expect([android.screenshots.length, ios.screenshots.length]).toEqual([0, 0]);
+    expect([android!.screenshots.length, ios!.screenshots.length]).toEqual([0, 0]);
   });
 
   it('control for the above: the same contract with the fill fixed reaches both devices', async () => {
-    const harness = await connect({ android: home(), ios: home() });
+    const harness = await connect();
     const result = await harness.call('verify', {
-      configPath: await file('averi.yaml', VALID_CONFIG),
+      configPath: await validConfig(),
       contract: await file(
         'layout-contract.json',
         JSON.stringify({ screen: 'home', anchors: [{ id: 'home_root', x: 0, w: 100, bg: '#FFFFFF' }] }),
@@ -454,9 +520,16 @@ describe('verify', () => {
   });
 
   it("control for the typo'd path: without the contract the same call reaches both devices", async () => {
-    const harness = await connect({ android: home(), ios: home() });
-    const result = await harness.call('verify', { configPath: await file('averi.yaml', VALID_CONFIG) });
+    const harness = await connect();
+    harness.fakes.android!.nextScreenshot = frame('android');
+    harness.fakes.ios!.nextScreenshot = frame('ios');
+    // Input order reversed on purpose: the tool description promises the
+    // legs — sections and images — android first regardless.
+    const result = await harness.call('verify', { platforms: ['ios', 'android'], configPath: await validConfig() });
     expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text'], ['image', 'image/png'], ['image', 'image/png']]);
+    expect(result.images).toEqual([frame('android'), frame('ios')]);
+    expect(result.text.indexOf('## android')).toBeLessThan(result.text.indexOf('## ios'));
     expect(harness.bound().map((c) => c.platform).sort()).toEqual(['android', 'ios']);
   });
 });

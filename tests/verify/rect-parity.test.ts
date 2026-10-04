@@ -399,6 +399,21 @@ describe('compareRectParity — finding semantics', () => {
     const loose = compareRectParity(c, { android, ios: iosTree() }, { tolerancePct: 10 });
     expect(loose.pass).toBe(true); // 5.6% < 10%
   });
+
+  // 2026-10-03: the option is the test-facing WIDTH override. The comparator's
+  // comment said it does not reach the shape threshold; the code let it,
+  // whenever the contract left tolerance_aspect_pct unset.
+  it('the tolerancePct option never becomes the aspect threshold: that falls back to the CONTRACT\'s tolerance_pct', () => {
+    const c = contract();
+    c.tolerance_pct = 5;
+    delete c.tolerance_aspect_pct;
+    const r = compareRectParity(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 });
+    expect(r.tolerancePct).toBe(50);
+    expect(r.aspectTolerancePct).toBe(5);
+    // … and to the default when the contract names neither.
+    delete c.tolerance_pct;
+    expect(compareRectParity(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 }).aspectTolerancePct).toBe(2.0);
+  });
 });
 
 describe('compareRectParity — missing anchors and duplicates', () => {

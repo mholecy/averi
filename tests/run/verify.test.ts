@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.js';
@@ -71,6 +74,8 @@ const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => (
 
 const contract = (anchors: LayoutContract['anchors']): LayoutContract => ({ screen: 's', anchors });
 
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 describe('runVerification legs', () => {
   it('reports both platforms in canonical order with one screenshot each', async () => {
     const adapters = { android: fake('android'), ios: fake('ios') };
@@ -120,6 +125,31 @@ describe('runVerification legs', () => {
     // production budget, 300 ms apart: the leg has no knob of its own.
     expect(adapter.screenshots).toHaveLength(4);
     expect(sleeps).toEqual([300, 300, 300]);
+  });
+
+  // The same gap the single-platform tools had (review 2026-10-03): nothing
+  // checked that the request's environment reaches the leg's engine.
+  it('runs each leg in the environment the request names: the trace opens with it; without one it names none', async () => {
+    const cfg = parseConfig(`
+app:
+  android: { package: com.example.app }
+credentials:
+  username: plain-user
+environments:
+  staging:
+    credentials:
+      username: staging-user
+flows:
+  touch_card:
+    steps:
+      - tap: { id: card }
+`);
+    const run = (environment?: string) =>
+      runVerification(request({ platforms: ['android'], cfg, flow: 'touch_card', environment }), async () => fake('android'));
+    const named = await run('staging');
+    expect(named.sections[0]).toContain('environment staging');
+    expect(named.sections[0]).toContain('overrides: username');
+    expect((await run()).sections[0]).not.toContain('environment');
   });
 
   it('surfaces a failing assert without throwing', async () => {
@@ -252,17 +282,127 @@ describe('the contract is validated before the legs', () => {
     expect(calls).toEqual([]);
   });
 
-  it('names the contract file in the refusal when the caller said which one', async () => {
-    const { calls, resolve } = untouched();
-    const bad = contract([{ id: 'card', x: 10, w: 40, bg: '#white' }]);
-    await expect(
-      runVerification(request({ contract: bad, contractSource: 'contracts/home.layout.json' }), resolve),
-    ).rejects.toThrow(
-      'verify: the layout contract contracts/home.layout.json has 1 invalid field in the tables this run would produce — refused before the run:\n' +
-        "- color parity: anchor card: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name.\n" +
-        'Fix the contract and re-run; nothing was run on a device.',
-    );
-    expect(calls).toEqual([]);
+  // 2026-10-03: the run reads the contract itself when handed a PATH, so the
+  // whole pre-flight — exists, parses, carries usable values — has one owner
+  // and happens before any adapter is resolved. The path is also the name the
+  // refusal quotes (it was a separate `contractSource` field before).
+  describe('given a contractPath, the run loads the file itself', () => {
+    const inTempDir = async <T>(run: (dir: string) => Promise<T>): Promise<T> => {
+      const dir = await mkdtemp(join(tmpdir(), 'averi-contract-'));
+      try {
+        return await run(dir);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    };
+
+    it('names the contract file in the refusal', async () => {
+      await inTempDir(async (dir) => {
+        const { calls, resolve } = untouched();
+        const contractPath = join(dir, 'home.layout.json');
+        await writeFile(contractPath, JSON.stringify(contract([{ id: 'card', x: 10, w: 40, bg: '#white' }])));
+        await expect(runVerification(request({ contractPath }), resolve)).rejects.toThrow(
+          `verify: the layout contract ${contractPath} has 1 invalid field in the tables this run would produce — refused before the run:\n` +
+            "- color parity: anchor card: 'bg' value '#white' is neither #RRGGBB(AA) nor a <hue>.<colorN> token name.\n" +
+            'Fix the contract and re-run; nothing was run on a device.',
+        );
+        expect(calls).toEqual([]);
+      });
+    });
+
+    it("a typo'd path fails before any adapter is resolved", async () => {
+      await inTempDir(async (dir) => {
+        const { calls, resolve } = untouched();
+        const contractPath = join(dir, 'no-such.layout.json');
+        const failure = await runVerification(request({ contractPath }), resolve).then(
+          () => undefined,
+          (e: Error) => e.message,
+        );
+        // Which argument, which file, the system's reason, how to recover, and
+        // that no device was touched — not a bare ENOENT.
+        expect(failure).toMatch(
+          new RegExp(`^verify: layout contract ${escapeRegExp(contractPath)} could not be read: `),
+        );
+        // Exact, and the path appears ONCE: Node's own message would repeat it.
+        expect(failure).toBe(
+          `verify: layout contract ${contractPath} could not be read: ENOENT (no such file) — ` +
+            'check `contractPath`, the path given for the layout contract (a relative one resolves against the ' +
+            "server's working directory, not against averi.yaml); nothing was run on a device.",
+        );
+        expect(calls).toEqual([]);
+      });
+    });
+
+    // The contract path resolves against the cwd — unlike baselines and build
+    // paths, which hang off averi.yaml's directory. Inherited, pinned as it is.
+    it('a relative path resolves against the working directory, and a miss says where it looked', async () => {
+      await inTempDir(async (dir) => {
+        const cwd = process.cwd();
+        process.chdir(dir);
+        try {
+          const here = process.cwd(); // the real path (tmpdir is a symlink on macOS)
+          await writeFile(join(here, 'home.layout.json'), JSON.stringify(contract([{ id: 'card', x: 10, w: 40 }])));
+          const adapters = { android: fake('android'), ios: fake('ios') };
+          const out = await runVerification(request({ contractPath: 'home.layout.json' }), async (p) => adapters[p]);
+          expect(out.sections.some((s) => s.includes('rect parity'))).toBe(true);
+
+          const { calls, resolve } = untouched();
+          await expect(runVerification(request({ contractPath: 'typo.layout.json' }), resolve)).rejects.toThrow(
+            `verify: layout contract typo.layout.json could not be read (resolved to ${join(here, 'typo.layout.json')}): ENOENT (no such file) — `,
+          );
+          expect(calls).toEqual([]);
+        } finally {
+          process.chdir(cwd);
+        }
+      });
+    });
+
+    it('a path that is a directory says so, by its code and in words', async () => {
+      await inTempDir(async (dir) => {
+        const { calls, resolve } = untouched();
+        await expect(runVerification(request({ contractPath: dir }), resolve)).rejects.toThrow(
+          `verify: layout contract ${dir} could not be read: EISDIR (it is a directory, not a file) — `,
+        );
+        expect(calls).toEqual([]);
+      });
+    });
+
+    it('a contract in memory AND a contractPath is refused, naming both — the types forbid it, a JS caller is told', async () => {
+      await inTempDir(async (dir) => {
+        const { calls, resolve } = untouched();
+        const c = contract([{ id: 'card', x: 10, w: 40 }]);
+        const contractPath = join(dir, 'home.layout.json');
+        await writeFile(contractPath, JSON.stringify(c));
+        const both = { ...request(), contract: c, contractPath } as unknown as Parameters<typeof runVerification>[0];
+        await expect(runVerification(both, resolve)).rejects.toThrow(
+          'verify: both `contract` and `contractPath` were given — pass one',
+        );
+        expect(calls).toEqual([]);
+      });
+    });
+
+    it('a file that is not a contract fails the same way, naming the path', async () => {
+      await inTempDir(async (dir) => {
+        const { calls, resolve } = untouched();
+        const contractPath = join(dir, 'broken.layout.json');
+        await writeFile(contractPath, '{ not json');
+        await expect(runVerification(request({ contractPath }), resolve)).rejects.toThrow(contractPath);
+        expect(calls).toEqual([]);
+      });
+    });
+
+    it('a valid file produces the same tables an in-memory contract does', async () => {
+      await inTempDir(async (dir) => {
+        const c = contract([{ id: 'card', x: 10, w: 40 }]);
+        const contractPath = join(dir, 'home.layout.json');
+        await writeFile(contractPath, JSON.stringify(c));
+        const adapters = { android: fake('android'), ios: fake('ios') };
+        const fromFile = await runVerification(request({ contractPath }), async (p) => adapters[p]);
+        const inMemory = await runVerification(request({ contract: c }), async (p) => adapters[p]);
+        expect(fromFile.sections.some((s) => s.includes('rect parity'))).toBe(true);
+        expect(fromFile.sections).toEqual(inMemory.sections);
+      });
+    });
   });
 
   // The refusal prints the comparators' messages untouched, so "naming the

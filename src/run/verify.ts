@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
@@ -11,7 +13,7 @@ import {
   validateColorContract,
   type ColorParityOptions,
 } from '../verify/color-parity.js';
-import type { LayoutContract } from '../verify/layout-contract.js';
+import { parseLayoutContract, type LayoutContract } from '../verify/layout-contract.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine, type OcrRegionResult } from '../verify/ocr.js';
 import {
   compareRectParity,
@@ -41,29 +43,41 @@ import {
  * was also the only code with no tests.
  */
 
-export interface VerificationRequest {
+interface VerificationRequestBase {
   /** Already normalized: deduped, canonical android-then-ios order. */
   platforms: Platform[];
   cfg: AveriConfig;
   specs: AssertSpec[];
   state?: string;
   flow?: string;
-  /**
-   * Parsed up front by the caller: a typo'd path must not cost a device run.
-   * Its field VALUES are checked here, before the legs (contractProblems).
-   */
-  contract?: LayoutContract;
-  /**
-   * What the user called the contract — the path they passed. Only quoted: a
-   * refusal that names the file is the one the author can act on, the way
-   * parseLayoutContract's own errors already do.
-   */
-  contractSource?: string;
   environment?: string;
   baselineDir: string;
   /** Test seam: the OCR recognizer behind the text-parity table. */
   ocrEngine?: OcrEngine;
 }
+
+/**
+ * The layout contract, one of two ways — never both, and the types say so
+ * rather than a documented precedence:
+ *
+ * - `contractPath`: the file the user named. The run reads, parses and
+ *   validates it itself, all before any adapter is resolved: a typo'd path, a
+ *   malformed file and a bad field value are the same class of mistake and
+ *   must not cost a device run. The path is also what a refusal quotes — a
+ *   message that names the file is the one its author can act on.
+ * - `contract`: one already in memory (the run-level tests; a caller that
+ *   built it). Validated the same way; a refusal cannot name a file.
+ *
+ * Until 2026-10-03 the MCP handler read and parsed the file and passed the
+ * result in with a separate `contractSource` beside it, while this module
+ * owned the validation: the pre-flight lived in two layers, and the name in
+ * the refusal was a second field that had to be kept in step with the first.
+ */
+type ContractInput =
+  | { contractPath?: string; contract?: never }
+  | { contract?: LayoutContract; contractPath?: never };
+
+export type VerificationRequest = VerificationRequestBase & ContractInput;
 
 export interface VerificationOutput {
   /** Markdown sections, in order; the caller joins them with a blank line. */
@@ -285,11 +299,78 @@ const contractRefusal = (problems: string[], source?: string): string =>
   problems.map((problem) => `- ${problem}`).join('\n') +
   '\nFix the contract and re-run; nothing was run on a device.';
 
+/**
+ * The contract file the request names, read and parsed.
+ *
+ * The path resolves against the process cwd, as it always has — NOT against
+ * averi.yaml's directory, which is where the baselines and the build paths
+ * hang (flow/config.ts). The asymmetry is inherited, and is why the read
+ * error prints the resolved path beside the one given: a relative contract
+ * path next to a `configPath` in another directory is the likely way to get
+ * this wrong.
+ *
+ * A read failure is wrapped (2026-10-03): the bare `ENOENT: no such file or
+ * directory, open '…'` said neither which argument it was about nor that no
+ * device had been touched. A file that reads but is not a contract keeps
+ * parseLayoutContract's own wording, which already names the source.
+ *
+ * `contract` beside `contractPath` is a type error, but a caller without the
+ * types would silently get the file; refused here instead, naming both.
+ *
+ * Both errors speak this module's vocabulary — `contractPath`, the request
+ * field — not the MCP tool's (`contract` is its argument name, and mcp/ is
+ * above run/). The read error still says in words what the field is, so an
+ * agent holding only the tool error knows which argument to fix.
+ */
+/**
+ * Why a file read failed, WITHOUT the path: Node's message ends in
+ * `, open '<path>'`, and the sentence around it has already named the file —
+ * printing it twice made the one line an agent has to act on harder to read.
+ * The system's code is kept (it is what a search finds); an error with no
+ * code keeps its whole message.
+ */
+const READ_FAILURES: Record<string, string> = {
+  ENOENT: 'no such file',
+  EISDIR: 'it is a directory, not a file',
+  EACCES: 'permission denied',
+};
+function readFailure(e: unknown): string {
+  const code = (e as NodeJS.ErrnoException | undefined)?.code;
+  if (typeof code !== 'string') return errorMessage(e);
+  return READ_FAILURES[code] === undefined ? code : `${code} (${READ_FAILURES[code]})`;
+}
+
+async function loadContract(req: VerificationRequest & { contractPath: string }): Promise<LayoutContract> {
+  const { contractPath } = req;
+  if ((req as { contract?: unknown }).contract !== undefined) {
+    throw new Error(
+      'verify: both `contract` and `contractPath` were given — pass one: the path of a contract file, ' +
+        'or a contract already in memory; nothing was run on a device.',
+    );
+  }
+  const resolved = resolve(contractPath);
+  let raw: string;
+  try {
+    raw = await readFile(resolved, 'utf8');
+  } catch (e) {
+    throw new Error(
+      `verify: layout contract ${contractPath} could not be read` +
+        `${resolved === contractPath ? '' : ` (resolved to ${resolved})`}: ${readFailure(e)} — ` +
+        'check `contractPath`, the path given for the layout contract (a relative one resolves against the ' +
+        'server\'s working directory, not against averi.yaml); nothing was run on a device.',
+    );
+  }
+  return parseLayoutContract(raw, contractPath);
+}
+
 export async function runVerification(
   req: VerificationRequest,
   resolveAdapter: (platform: Platform) => Promise<DeviceAdapter>,
 ): Promise<VerificationOutput> {
-  const { platforms, cfg, specs, contract } = req;
+  const { platforms, cfg, specs } = req;
+  // Read and parsed here, first: nothing below may touch a device before the
+  // contract is known to exist, to parse, and (next) to carry usable values.
+  const contract = req.contractPath === undefined ? req.contract : await loadContract({ ...req, contractPath: req.contractPath });
 
   // Before any leg starts and before any adapter is resolved: a contract the
   // tables can only answer with FAILED must not cost the device run first.
@@ -297,7 +378,7 @@ export async function runVerification(
   // there is nothing yet to throw away.
   if (contract !== undefined) {
     const problems = contractProblems(contract);
-    if (problems.length > 0) throw new Error(contractRefusal(problems, req.contractSource));
+    if (problems.length > 0) throw new Error(contractRefusal(problems, req.contractPath));
   }
 
   const runOne = async (p: Platform): Promise<VerificationLeg> => {

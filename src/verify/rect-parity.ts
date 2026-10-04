@@ -313,16 +313,26 @@ function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareConte
  * `tolerancePct`: the test-facing override, else the contract's (typed, so
  * already a positive number), else the default. `aspectTolerancePct`: the
  * contract's `tolerance_aspect_pct` when it declares one — never a non-number
- * — else `tolerancePct`, so an untouched contract behaves exactly as before.
+ * — else the CONTRACT's width tolerance (its `tolerance_pct`, else the
+ * default), so an untouched contract behaves exactly as before.
+ *
+ * `opts.tolerancePct` never reaches the aspect threshold. The comparator's
+ * comment has said so since 85e4dfb, but until 2026-10-03 the fallback here
+ * was the already-overridden `tolerancePct`, so the option DID flow in
+ * whenever the contract left `tolerance_aspect_pct` unset. Production was
+ * never affected — its only caller passes no rect options
+ * (run/verify.ts `DIMENSIONS.rect.options` is `{}`) — so this changed what a
+ * test passing the override sees, not any report.
  */
 function tolerancesOf(
   contract: LayoutContract,
   opts: RectParityOptions,
 ): { tolerancePct: number; aspectTolerancePct: number } {
-  const tolerancePct = opts.tolerancePct ?? contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
+  const contractTolerancePct = contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
+  const tolerancePct = opts.tolerancePct ?? contractTolerancePct;
   const aspectTolerancePct =
     contract.tolerance_aspect_pct === undefined
-      ? tolerancePct
+      ? contractTolerancePct
       : positiveTolerance(contract.tolerance_aspect_pct, 'rect parity: tolerance_aspect_pct');
   return { tolerancePct, aspectTolerancePct };
 }
@@ -363,8 +373,8 @@ export function compareRectParity(
   const platforms = (['android', 'ios'] as const).filter((p) => trees[p] !== undefined);
   if (platforms.length === 0) throw new Error('rect parity: no platform tree provided');
   const single = platforms.length === 1;
-  // The aspect threshold defaults to tolerancePct, so an untouched contract
-  // behaves exactly as before. `opts.tolerancePct` deliberately does NOT flow
+  // The aspect threshold defaults to the contract's width tolerance, so an
+  // untouched contract behaves exactly as before. `opts.tolerancePct` deliberately does NOT flow
   // into it: the option is the test-facing width override, and silently
   // widening the shape check with it would be the same units confusion this
   // field exists to end.

@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent, Platform } from '../adapters/types.js';
-import { IOS_TREE_SOURCE_KINDS } from '../adapters/ios-node.js';
+import { IOS_TREE_SOURCE_KINDS, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
   elementSpecSchema,
@@ -346,6 +346,63 @@ export async function loadConfig(path: string): Promise<AveriConfig> {
 }
 
 /**
+ * All project configuration lives with the project, not with averi: averi.yaml
+ * is looked up against the process cwd (the project root when the server is
+ * launched from .mcp.json) unless the caller points elsewhere. Here since
+ * 2026-10-03, with the two loaders below — it was mcp/tools.ts's, and the
+ * tool compositions in run/ need the same default.
+ */
+export const projectConfigPath = (configPath?: string): string => resolve(configPath ?? 'averi.yaml');
+
+/**
+ * The strict load every config-REQUIRING tool starts with: credential values
+ * auto-load from a sibling .env.averi first (said on stderr, since stdout is
+ * the MCP transport), then averi.yaml must exist and parse.
+ */
+export async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
+  const path = projectConfigPath(configPath);
+  const applied = await loadEnvBeside(path);
+  if (applied.length > 0) console.error(`averi: loaded ${applied.join(', ')} from .env.averi`);
+  return loadConfig(path);
+}
+
+/**
+ * The build to install when the caller names none: averi.yaml's, for the
+ * platform asked about (already resolved against the config's directory by
+ * loadConfig). The error is the `install_app` tool's wording, kept
+ * byte-identical when the lookup moved here from its handler (2026-10-03).
+ */
+export function appBuildPath(cfg: AveriConfig, platform: Platform): string {
+  const path = platform === 'android' ? cfg.app.android?.apk : cfg.app.ios?.app;
+  if (path === undefined) throw new Error(`No path given and averi.yaml has no app.${platform} build path`);
+  return path;
+}
+
+/**
+ * The iOS tree-source kind for tree-reading tools that predate averi.yaml and
+ * must keep working without one (ui_snapshot, tap, type_text, scroll_until,
+ * assert). A policy in three parts, each pinned (tests/flow/config.test.ts,
+ * and through the protocol in tests/mcp/tools.test.ts):
+ *
+ * - android never reads the config. It has no tree source, and an invalid
+ *   averi.yaml must not break android calls on these config-blind tools.
+ * - ios with NO averi.yaml → `undefined`: the registry's default (idb).
+ * - ios with a present-but-invalid averi.yaml throws — see loadConfigIfPresent.
+ *
+ * Returns the kind, not registry options: until 2026-10-03 this was
+ * `loadIosOpts` in the MCP layer, but which file is read and when its absence
+ * is tolerated is config policy; only the wrapping into the registry's
+ * options is the MCP layer's.
+ */
+export async function iosTreeSourceFor(
+  platform: Platform,
+  configPath?: string,
+): Promise<IosTreeSourceKind | undefined> {
+  if (platform === 'android') return undefined;
+  return (await loadConfigIfPresent(projectConfigPath(configPath)))?.app.ios?.treeSource;
+}
+
+/**
  * loadConfig for tools that predate averi.yaml and must keep working without
  * one (ui_snapshot, tap, ...): a MISSING file is `undefined`, but a
  * present-and-invalid file still throws — silently ignoring a broken config
@@ -396,8 +453,7 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
  */
 export function defaultLaunchActivity(
   cfg: AveriConfig | undefined,
-  platform: Platform,
-  appId: string,
+  { platform, appId }: { platform: Platform; appId: string },
 ): string | undefined {
   if (platform !== 'android') return undefined;
   const android = cfg?.app.android;

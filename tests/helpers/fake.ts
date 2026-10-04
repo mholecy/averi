@@ -135,7 +135,7 @@ export class FakeAdapter implements DeviceAdapter {
 
   // Unused by tests:
   async listDevices(): Promise<Device[]> { return []; }
-  async install(): Promise<void> {}
+  async install(_path: string): Promise<void> {}
   async terminate(): Promise<void> {}
   async openDeepLink(): Promise<void> {}
   async longPress(): Promise<void> {}

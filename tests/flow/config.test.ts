@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  appBuildPath,
+  iosTreeSourceFor,
   defaultLaunchActivity,
   loadConfig,
   loadConfigIfPresent,
@@ -463,20 +465,78 @@ app:
 `);
 
   it("android, the config's own package → its activity", () => {
-    expect(defaultLaunchActivity(cfg, 'android', 'md.bank.app')).toBe('.MainActivity');
+    expect(defaultLaunchActivity(cfg, { platform: 'android', appId: 'md.bank.app' })).toBe('.MainActivity');
   });
 
   it('another package → none: the config describes a different app', () => {
-    expect(defaultLaunchActivity(cfg, 'android', 'com.other.app')).toBeUndefined();
+    expect(defaultLaunchActivity(cfg, { platform: 'android', appId: 'com.other.app' })).toBeUndefined();
   });
 
   it('ios → none, even when the bundle id equals the android package', () => {
-    expect(defaultLaunchActivity(cfg, 'ios', 'md.bank.app')).toBeUndefined();
+    expect(defaultLaunchActivity(cfg, { platform: 'ios', appId: 'md.bank.app' })).toBeUndefined();
   });
 
   it('no config, no android section, or no activity configured → none', () => {
-    expect(defaultLaunchActivity(undefined, 'android', 'md.bank.app')).toBeUndefined();
-    expect(defaultLaunchActivity(parseConfig('app:\n  ios: { bundleId: md.bank.app }\n'), 'android', 'md.bank.app')).toBeUndefined();
-    expect(defaultLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), 'android', 'md.bank.app')).toBeUndefined();
+    expect(defaultLaunchActivity(undefined, { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+    expect(defaultLaunchActivity(parseConfig('app:\n  ios: { bundleId: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+    expect(defaultLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
+  });
+});
+
+describe('appBuildPath — the build install_app uses when the call names none', () => {
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app, apk: build/app.apk }
+  ios:     { bundleId: md.bank.app, app: build/Bank.app }
+`);
+
+  it('picks the build of the platform asked about', () => {
+    expect(appBuildPath(cfg, 'android')).toBe('build/app.apk');
+    expect(appBuildPath(cfg, 'ios')).toBe('build/Bank.app');
+  });
+
+  it('no build path for that platform — or no section at all — is an error naming the missing key', () => {
+    const none = parseConfig('app:\n  android: { package: md.bank.app }\n');
+    expect(() => appBuildPath(none, 'android')).toThrow('No path given and averi.yaml has no app.android build path');
+    expect(() => appBuildPath(none, 'ios')).toThrow('No path given and averi.yaml has no app.ios build path');
+  });
+});
+
+describe('iosTreeSourceFor — the config-optional tree tools\' policy', () => {
+  let dir: string;
+  const write = async (content: string) => {
+    dir = await mkdtemp(join(tmpdir(), 'averi-tree-source-'));
+    const path = join(dir, 'averi.yaml');
+    await writeFile(path, content);
+    return path;
+  };
+  afterEach(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  const INVALID = 'flows: 12\n';
+
+  it('android never reads the config: a present-but-invalid averi.yaml is not an error', async () => {
+    expect(await iosTreeSourceFor('android', await write(INVALID))).toBeUndefined();
+  });
+
+  it('android gets no kind even from a valid config that names one', async () => {
+    const path = await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
+    expect(await iosTreeSourceFor('android', path)).toBeUndefined();
+  });
+
+  it('ios: the same invalid averi.yaml throws, naming the file', async () => {
+    const path = await write(INVALID);
+    await expect(iosTreeSourceFor('ios', path)).rejects.toThrow(path);
+  });
+
+  it('ios: a missing averi.yaml is undefined — the registry\'s default applies', async () => {
+    await write(INVALID); // a real directory, with the file under another name
+    expect(await iosTreeSourceFor('ios', join(dir, 'no-such.yaml'))).toBeUndefined();
+  });
+
+  it('ios: the configured kind, or undefined when the config names none', async () => {
+    expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n'))).toBe('wda');
+    expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toBeUndefined();
   });
 });
