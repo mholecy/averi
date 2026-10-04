@@ -1,35 +1,64 @@
 import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
+import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
+import { IdbTreeSource, type IosTreeSource } from '../adapters/ios-tree-source.js';
+import { WdaTreeSource } from '../adapters/wda-tree-source.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 
-/** Per-call adapter options — today only the iOS tree source (averi.yaml `app.ios.treeSource`). */
+/** Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). */
 export interface AdapterOpts {
-  treeSource?: 'idb' | 'wda';
+  treeSource?: IosTreeSourceKind;
 }
 
-/** Unbound (deviceId omitted) adapters probe; bound ones drive one device. */
+/**
+ * Unbound (deviceId omitted) adapters probe; bound ones drive one device.
+ * The registry resolves `opts` to a kind before calling (kindFor): a bound
+ * ios call always carries one, an android call never does.
+ */
 export type AdapterFactory = (
   platform: Platform,
   deviceId?: string,
   opts?: AdapterOpts,
 ) => DeviceAdapter;
 
-const defaultFactory: AdapterFactory = (platform, deviceId, opts) =>
-  platform === 'android'
-    ? new AndroidAdapter({ serial: deviceId })
-    : new IosAdapter({ udid: deviceId, treeSource: opts?.treeSource });
+/**
+ * The registry's one construction job at the tree-source seam: the kind
+ * names the adapter, the bound device supplies the concrete UDID both
+ * sources need (ios-tree-source.ts). Typed as a Record so a new kind without
+ * a constructor is a compile error here, not a runtime default. Exported with
+ * defaultFactory because this wiring is the one thing the registry's own
+ * tests (which inject a factory) cannot see — a swapped entry or a source
+ * bound to the wrong device id passed every test until it was pinned
+ * (review 2026-10-02).
+ */
+export const iosTreeSources: Record<IosTreeSourceKind, (udid: string) => IosTreeSource> = {
+  idb: (udid) => new IdbTreeSource({ udid }),
+  wda: (udid) => new WdaTreeSource({ udid }),
+};
+
+export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
+  if (platform === 'android') return new AndroidAdapter({ serial: deviceId });
+  // An unbound ios adapter only probes listDevices() — it gets no tree source.
+  if (deviceId === undefined) return new IosAdapter();
+  // The registry hands over the resolved kind (kindFor); the fallback only
+  // serves a direct caller of the factory, and names the same default.
+  return new IosAdapter({
+    udid: deviceId,
+    treeSource: iosTreeSources[opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE](deviceId),
+  });
+};
 
 /**
- * The adapter variant an opts set maps to. Normalized so equivalent calls
- * share one cached instance: treeSource is meaningless on android, and an
- * explicit 'idb' IS the default — only ios+wda forks a second adapter (the
- * one that owns a WdaServer; a treeSource-less get for the same device gets
- * the default-variant instance and never races it).
+ * The cache key's third part: which tree-source kind an opts set resolves
+ * to. Normalized so equivalent calls share one cached instance: android has
+ * no tree source (a stray value must not fork its cache), and on ios an
+ * omitted kind IS the default — a treeSource-less get for the same device
+ * gets the default-kind instance and never races the wda one, which owns a
+ * WdaServer. Resolving the default HERE is what makes the cache key and the
+ * factory call agree: the factory is handed the resolved kind.
  */
-type Variant = 'default' | 'wda';
-
-function variantFor(platform: Platform, opts?: AdapterOpts): Variant {
-  return platform === 'ios' && opts?.treeSource === 'wda' ? 'wda' : 'default';
+function kindFor(platform: Platform, opts?: AdapterOpts): IosTreeSourceKind | undefined {
+  return platform === 'ios' ? opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 
 /**
@@ -49,17 +78,17 @@ const disposeQuietly = (adapter: DeviceAdapter): Promise<void> =>
  * exactly the surprise select() exists to prevent.
  *
  * The device binding is per platform; ADAPTERS are cached per
- * (platform, deviceId, variant) — a keyed cache instead of a mutable
- * treeSource setter, so two concurrent tool calls with different configs
- * cannot race each other's adapter. Evicting a device's entries disposes
- * them (stops the wda variant's orphan WdaServer).
+ * (platform, deviceId, tree-source kind) — a keyed cache instead of a
+ * mutable treeSource setter, so two concurrent tool calls with different
+ * configs cannot race each other's adapter. Evicting a device's entries
+ * disposes them (the wda adapter's tree source stops its WdaServer).
  */
 export class AdapterRegistry {
-  /** Which device each platform's tools target. Pins survive across variants. */
+  /** Which device each platform's tools target. Pins survive across tree-source kinds. */
   private bindings = new Map<Platform, { deviceId: string; pinned: boolean }>();
   /** Set by shutdown(): no adapter may be created or cached after it (see `get`). */
   private closed = false;
-  /** Key: JSON [platform, deviceId, variant] — device ids may contain ':' (adb over TCP). */
+  /** Key: JSON [platform, deviceId, kind|null] — device ids may contain ':' (adb over TCP). */
   private adapters = new Map<string, { platform: Platform; deviceId: string; adapter: DeviceAdapter }>();
 
   constructor(private readonly factory: AdapterFactory = defaultFactory) {}
@@ -144,22 +173,18 @@ export class AdapterRegistry {
     // spawn the very WebDriverAgent just stopped (review 2026-09-18). Do not
     // remove the earlier guards on the strength of this one being here.
     this.assertOpen();
-    const variant = variantFor(platform, opts);
-    const key = JSON.stringify([platform, deviceId, variant]);
+    const kind = kindFor(platform, opts);
+    const key = JSON.stringify([platform, deviceId, kind ?? null]);
     let entry = this.adapters.get(key);
     if (!entry) {
-      const adapter = this.factory(
-        platform,
-        deviceId,
-        variant === 'wda' ? { treeSource: 'wda' } : undefined,
-      );
+      const adapter = this.factory(platform, deviceId, kind === undefined ? undefined : { treeSource: kind });
       entry = { platform, deviceId, adapter };
       this.adapters.set(key, entry);
     }
     return entry.adapter;
   }
 
-  /** Drop and dispose every cached variant bound to one device. */
+  /** Drop and dispose every cached adapter (every kind) bound to one device. */
   private evict(platform: Platform, deviceId: string): void {
     for (const [key, entry] of this.adapters) {
       if (entry.platform === platform && entry.deviceId === deviceId) {

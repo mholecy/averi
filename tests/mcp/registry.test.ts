@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry, type AdapterOpts } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultFactory, iosTreeSources, type AdapterOpts } from '../../src/mcp/registry.js';
+import { AndroidAdapter } from '../../src/adapters/android.js';
+import { IosAdapter } from '../../src/adapters/ios.js';
+import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import type { Device, DeviceAdapter, Platform } from '../../src/adapters/types.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
@@ -10,6 +14,9 @@ import { FakeAdapter } from '../helpers/fake.js';
 function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
   const bound: string[] = [];
   const created: FakeAdapter[] = [];
+  // Records what the registry asked for: `id+kind` on ios (the registry
+  // resolves the kind before calling, so the default is spelled out), a bare
+  // id on android (no tree source there).
   const factory = (platform: Platform, deviceId?: string, opts?: AdapterOpts): DeviceAdapter => {
     if (deviceId !== undefined) bound.push(opts?.treeSource === undefined ? deviceId : `${deviceId}+${opts.treeSource}`);
     const adapter = new FakeAdapter({}, 'none');
@@ -72,7 +79,7 @@ describe('AdapterRegistry', () => {
     expect(bound).toEqual(['first', 'second']);
   });
 
-  it('caches per treeSource: same opts share an instance, wda gets its own', async () => {
+  it('caches per tree-source kind: same kind shares an instance, wda gets its own', async () => {
     const { registry, bound } = makeRegistry([device('sim', 'booted', 'ios')]);
     const dflt = await registry.get('ios');
     const wda = await registry.get('ios', { treeSource: 'wda' });
@@ -80,17 +87,17 @@ describe('AdapterRegistry', () => {
     expect(wda).not.toBe(dflt);
     // an explicit idb IS the default — no third instance
     expect(await registry.get('ios', { treeSource: 'idb' })).toBe(dflt);
-    expect(bound).toEqual(['sim', 'sim+wda']);
+    expect(bound).toEqual(['sim+idb', 'sim+wda']);
   });
 
-  it('android ignores treeSource — a stray value does not fork the cache', async () => {
+  it('android has no tree source — a stray kind neither forks the cache nor reaches the factory', async () => {
     const { registry, bound } = makeRegistry([device('phone')]);
     const plain = await registry.get('android');
     expect(await registry.get('android', { treeSource: 'wda' })).toBe(plain);
     expect(bound).toEqual(['phone']);
   });
 
-  it('select() pins ALL treeSource variants of the platform to the device', async () => {
+  it('select() pins ALL tree-source kinds of the platform to the device', async () => {
     const { registry, bound } = makeRegistry([
       device('a', 'booted', 'ios'),
       device('b', 'booted', 'ios'),
@@ -98,7 +105,7 @@ describe('AdapterRegistry', () => {
     await registry.select('ios', 'b');
     await registry.get('ios');
     await registry.get('ios', { treeSource: 'wda' });
-    expect(bound).toEqual(['b', 'b+wda']);
+    expect(bound).toEqual(['b+idb', 'b+wda']);
   });
 
   it('select() to a DIFFERENT device disposes the old device\'s cached adapters', async () => {
@@ -136,7 +143,7 @@ describe('AdapterRegistry', () => {
       () => gate,
     );
     const first = (await registry.get('ios')) as FakeAdapter; // auto-binds a
-    expect(bound).toEqual(['a']);
+    expect(bound).toEqual(['a+idb']);
 
     let release!: () => void;
     gate = new Promise((r) => { release = r; });
@@ -148,7 +155,7 @@ describe('AdapterRegistry', () => {
     release();
     const resumed = (await racing) as FakeAdapter;
     expect(resumed).not.toBe(first);
-    expect(bound).toEqual(['a', 'b']); // no second adapter for the deselected a
+    expect(bound).toEqual(['a+idb', 'b+idb']); // no second adapter for the deselected a
     expect(resumed).toBe(await registry.get('ios')); // and it IS b's cached adapter
     expect(created.filter((a) => a.disposed > 0)).toEqual([first]);
   });
@@ -212,5 +219,38 @@ describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
     expect(created.filter((a) => a.disposed === 0)).toHaveLength(0);
     await expect(registry.get('ios')).rejects.toThrow(/shutting down/);
     await expect(registry.select('ios', 'sim')).rejects.toThrow(/shutting down/);
+  });
+});
+
+describe('defaultFactory — the wiring at the tree-source seam the injected factories above never see', () => {
+  // No device is touched: the sources are inspected, never read. A real read
+  // would reach for idb or xcodebuild.
+  const iosSource = (adapter: unknown) => (adapter as IosAdapter).treeSource;
+
+  it("'idb' wires an IdbTreeSource and 'wda' a WdaTreeSource; an omitted kind is idb", () => {
+    expect(iosSource(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }))).toBeInstanceOf(IdbTreeSource);
+    expect(iosSource(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }))).toBeInstanceOf(WdaTreeSource);
+    expect(iosSource(defaultFactory('ios', 'AAAA-1111'))).toBeInstanceOf(IdbTreeSource);
+    expect(iosTreeSources.idb('AAAA-1111')).toBeInstanceOf(IdbTreeSource);
+    expect(iosTreeSources.wda('AAAA-1111')).toBeInstanceOf(WdaTreeSource);
+  });
+
+  it('the source is bound to the GIVEN device id — never the `booted` alias, never another device', () => {
+    const idb = iosSource(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' })) as IdbTreeSource;
+    const wda = iosSource(defaultFactory('ios', 'BBBB-2222', { treeSource: 'wda' })) as WdaTreeSource;
+    expect(idb.udid).toBe('AAAA-1111');
+    expect(wda.udid).toBe('BBBB-2222');
+  });
+
+  it('an unbound ios adapter (probe) has no source: uiTree is the recovery error, listDevices is the only thing it is for', async () => {
+    const probe = defaultFactory('ios');
+    expect(probe).toBeInstanceOf(IosAdapter);
+    expect(iosSource(probe)).toBeUndefined();
+    await expect(probe.uiTree()).rejects.toThrow(/no tree source/);
+  });
+
+  it('android gets an AndroidAdapter, bound or not, whatever the kind says', () => {
+    expect(defaultFactory('android')).toBeInstanceOf(AndroidAdapter);
+    expect(defaultFactory('android', 'emulator-5554', { treeSource: 'wda' })).toBeInstanceOf(AndroidAdapter);
   });
 });

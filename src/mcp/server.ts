@@ -80,9 +80,10 @@ async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
 }
 
 /**
- * registry.get opts from a loaded config — plumbs app.ios.treeSource to the
- * adapter. Safe to pass for an android leg: the registry normalizes android
- * (and explicit idb) to the default variant, only ios+wda forks an adapter.
+ * registry.get opts from a loaded config — plumbs app.ios.treeSource, the
+ * tree-source kind, to the registry. Safe to pass for an android leg: the
+ * registry resolves android to no kind and an omitted ios kind to the
+ * default, so only an ios+wda call forks a second adapter.
  */
 const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
   treeSource: cfg?.app.ios?.treeSource,

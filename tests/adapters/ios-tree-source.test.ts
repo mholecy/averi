@@ -1,0 +1,213 @@
+import { describe, expect, it } from 'vitest';
+import { IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
+import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
+import type { UiNode } from '../../src/adapters/types.js';
+
+/**
+ * One element in the vocabulary both backends share, spelled the two ways
+ * the backends spell it: an idb describe-all element and a WDA /source node.
+ * Every case below runs through BOTH parsers and expects the same UiNode.
+ * Until 2026-10-02 each parser carried its own copy of the normalization and
+ * each test file pinned its own copy — nothing pinned that they agreed.
+ */
+const asIdb = (r: RawIosElement) => ({
+  type: r.type, AXLabel: r.label, AXUniqueId: r.identifier, AXValue: r.value, frame: r.rect,
+});
+const asWda = (r: RawIosElement) => ({
+  type: r.type, rawIdentifier: r.identifier, label: r.label, value: r.value, rect: r.rect,
+  isVisible: '1', isEnabled: '1', children: [],
+});
+// JSON.stringify drops undefined fields, which is exactly how idb omits them.
+const viaIdb = (r: RawIosElement): UiNode => parseIdbDescribeAll(JSON.stringify([asIdb(r)])).children[0];
+// Under a typed root: a WDA ROOT must carry a string `type` (that is how the
+// parser tells a node from the envelope — a structural rule, not
+// normalization), while any node below it is normalized like idb's.
+const viaWda = (r: RawIosElement): UiNode => parseWdaSourceValue({ type: 'Window', children: [asWda(r)] }).children[0];
+
+const CASES: { name: string; raw: RawIosElement; expected: Omit<UiNode, 'children'> }[] = [
+  {
+    name: 'every field set, fractional frame → rounded integer points',
+    raw: {
+      type: 'Button', label: 'Log in', identifier: 'login_button', value: 'v',
+      rect: { x: 20.5, y: 699.6, width: 350.4, height: 48 },
+    },
+    expected: { role: 'button', label: 'Log in', identifier: 'login_button', value: 'v', rect: { x: 21, y: 700, width: 350, height: 48 } },
+  },
+  {
+    name: 'empty strings are null',
+    raw: { type: 'StaticText', label: '', identifier: '', value: '', rect: { x: 0, y: 0, width: 1, height: 1 } },
+    expected: { role: 'text', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 1, height: 1 } },
+  },
+  {
+    name: 'nulls are null',
+    raw: { type: 'TextField', label: null, identifier: null, value: null, rect: { x: 1, y: 2, width: 3, height: 4 } },
+    expected: { role: 'textfield', label: null, identifier: null, value: null, rect: { x: 1, y: 2, width: 3, height: 4 } },
+  },
+  {
+    name: 'absent fields are null and a missing rect is the zero rect',
+    raw: { type: 'Image' },
+    expected: { role: 'image', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 } },
+  },
+  {
+    name: 'an unknown type is `other`, with its fields kept',
+    raw: { type: 'SomeFutureType', label: 'x', identifier: 'y', rect: { x: 0, y: 0, width: 2, height: 2 } },
+    expected: { role: 'other', label: 'x', identifier: 'y', value: null, rect: { x: 0, y: 0, width: 2, height: 2 } },
+  },
+  {
+    name: 'no type at all is `other`',
+    raw: { label: 'untyped' },
+    expected: { role: 'other', label: 'untyped', identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 } },
+  },
+  {
+    // The role map is a plain object: `constructor`, `toString`, ... are
+    // answered by its prototype, and before 2026-10-02 both copies returned
+    // the FUNCTION as the role (an own-key lookup is the fix, in the one owner).
+    name: 'a type that is a prototype key of the role map is `other`, not a function',
+    raw: { type: 'constructor', label: 'ctor' },
+    expected: { role: 'other', label: 'ctor', identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 } },
+  },
+  {
+    name: 'negative and .5 coordinates round like the rest (half up, towards +∞)',
+    raw: { type: 'Other', rect: { x: -2.4, y: 1.5, width: 2.5, height: -1.6 } },
+    expected: { role: 'container', label: null, identifier: null, value: null, rect: { x: -2, y: 2, width: 3, height: -2 } },
+  },
+];
+
+describe('iOS node normalization — one owner, pinned through BOTH tree sources', () => {
+  for (const { name, raw, expected } of CASES) {
+    it(`idb: ${name}`, () => {
+      expect(viaIdb(raw)).toEqual({ ...expected, children: [] });
+    });
+    it(`wda: ${name}`, () => {
+      expect(viaWda(raw)).toEqual({ ...expected, children: [] });
+    });
+  }
+
+  it('every type in the shared role map lands on the same role through both sources', () => {
+    for (const [type, role] of Object.entries(IOS_ROLE_MAP)) {
+      expect(viaIdb({ type }).role, type).toBe(role);
+      expect(viaWda({ type }).role, type).toBe(role);
+    }
+  });
+
+  it('each node gets its own rect object — nodes are mutated downstream and must not share one', () => {
+    const tree = parseIdbDescribeAll(JSON.stringify([{ type: 'Button' }, { type: 'Button' }]));
+    expect(tree.children[0].rect).not.toBe(tree.children[1].rect);
+    const nested = parseWdaSourceValue({ type: 'Other', children: [{ type: 'Other' }] });
+    expect(nested.rect).not.toBe(nested.children[0].rect);
+  });
+});
+
+const IDB_DESCRIBE_ALL = JSON.stringify([
+  {
+    type: 'Button', AXLabel: 'Log in', AXUniqueId: 'login_button', AXValue: '',
+    frame: { x: 20.5, y: 700, width: 350, height: 48 },
+  },
+  {
+    type: 'TextField', AXLabel: 'Username', AXUniqueId: 'username_field', AXValue: 'alice',
+    frame: { x: 20, y: 400, width: 350, height: 44 },
+  },
+  { type: 'StaticText', AXLabel: 'Welcome back', AXUniqueId: null, AXValue: null },
+]);
+
+describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
+  const tree = parseIdbDescribeAll(IDB_DESCRIBE_ALL);
+
+  it('wraps the flat element list under a synthetic 0x0 container root', () => {
+    expect(tree).toMatchObject({
+      role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 },
+    });
+    expect(tree.children).toHaveLength(3);
+    expect(tree.children.every((c) => c.children.length === 0)).toBe(true); // flat stays flat
+  });
+
+  it('normalizes roles, identifiers, values and rounds frames', () => {
+    expect(tree.children[0]).toMatchObject({
+      role: 'button', label: 'Log in', identifier: 'login_button', value: null,
+      rect: { x: 21, y: 700, width: 350, height: 48 },
+    });
+    expect(tree.children[1]).toMatchObject({ role: 'textfield', value: 'alice' });
+    expect(tree.children[2]).toMatchObject({
+      role: 'text', identifier: null, rect: { x: 0, y: 0, width: 0, height: 0 },
+    });
+  });
+
+  it('pairs a same-identifier text BELOW a textfield as its error; the title above is not an error', () => {
+    // Measured convention (payment form, 2026-08-05): the field's title AND
+    // its validation message share the field's accessibilityIdentifier.
+    const withError = parseIdbDescribeAll(
+      JSON.stringify([
+        {
+          type: 'StaticText', AXLabel: 'Amount', AXUniqueId: 'payment.form.amount_input', AXValue: null,
+          frame: { x: 20, y: 380, width: 100, height: 18 },
+        },
+        {
+          type: 'TextField', AXLabel: 'Amount', AXUniqueId: 'payment.form.amount_input', AXValue: '',
+          frame: { x: 20, y: 400, width: 350, height: 44 },
+        },
+        {
+          type: 'StaticText', AXLabel: 'Value is too small', AXUniqueId: 'payment.form.amount_input', AXValue: null,
+          frame: { x: 20, y: 448, width: 200, height: 16 },
+        },
+        {
+          type: 'TextField', AXLabel: 'Note', AXUniqueId: 'note_input', AXValue: null,
+          frame: { x: 20, y: 500, width: 350, height: 44 },
+        },
+      ]),
+    );
+    const amount = withError.children.find((n) => n.role === 'textfield' && n.identifier === 'payment.form.amount_input');
+    expect(amount?.error).toBe('Value is too small');
+    const note = withError.children.find((n) => n.identifier === 'note_input');
+    expect(note?.error).toBeUndefined();
+  });
+
+  it('leaves error unset when no same-identifier text sits below the field', () => {
+    expect(tree.children[1].error).toBeUndefined();
+  });
+
+  it('a payload that is not an array is a loud error, not an empty screen', () => {
+    expect(() => parseIdbDescribeAll('{"elements":[]}')).toThrow(/did not return an array/);
+  });
+});
+
+function fakeExec(responses: Record<string, string>) {
+  const calls: { full: string; timeoutMs?: number }[] = [];
+  const fn: ExecFn = async (cmd, args, opts): Promise<ExecResult> => {
+    const full = [cmd, ...args].join(' ');
+    calls.push({ full, timeoutMs: opts?.timeoutMs });
+    for (const [prefix, out] of Object.entries(responses)) {
+      if (full.startsWith(prefix)) return { stdout: Buffer.from(out), stderr: '' };
+    }
+    return { stdout: Buffer.alloc(0), stderr: '' };
+  };
+  return { fn, calls };
+}
+
+describe('IdbTreeSource — the idb adapter at the seam', () => {
+  it('read runs describe-all for the bound UDID (never the `booted` alias) under a 15 s budget, after the Xcode probe', async () => {
+    const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
+    const tree = await new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }).read();
+    expect(calls[0]?.full).toBe('xcrun --find simctl'); // xcode-env.ts, so DEVELOPER_DIR is injected where xcode-select is broken
+    expect(calls.at(-1)).toEqual({ full: 'idb ui describe-all --json --udid AAAA-1111', timeoutMs: 15_000 });
+    expect(tree.children[0]).toMatchObject({ role: 'button', identifier: 'login_button' });
+  });
+
+  it('every read is a fresh graph — a node mutated after one read is not seen by the next', async () => {
+    const { fn } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
+    const source = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
+    const first = await source.read();
+    first.children[0].label = 'mutated';
+    expect((await source.read()).children[0].label).toBe('Log in');
+  });
+
+  it('dispose has nothing to release: resolves, runs nothing, and a read still works afterwards', async () => {
+    const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
+    const source = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
+    await source.dispose();
+    await source.dispose();
+    expect(calls).toEqual([]);
+    expect((await source.read()).children).toHaveLength(3);
+  });
+});

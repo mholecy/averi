@@ -3,44 +3,48 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
-import { IOS_ROLE_MAP } from './ios-role-map.js';
-import { attachFieldErrors } from './field-errors.js';
-import { WdaServer } from './wda.js';
-import { parseWdaSourceValue } from './wda-source.js';
+import type { IosTreeSource } from './ios-tree-source.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
 /**
- * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input and
- * the accessibility tree. Everything idb-specific stays in the three `idb*`
- * methods so a WebDriverAgent swap stays cheap (ARCHITECTURE.md §10).
+ * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
+ * an injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
+ * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
+ * averi.yaml). Everything idb-specific for INPUT stays in the `idb*` methods;
+ * the tree read belongs to the source, so swapping the tree backend touches
+ * no line of this class (ARCHITECTURE.md §3, §10). Until 2026-10-02 the
+ * adapter dispatched on a `treeSource` flag and owned the WdaServer itself.
  */
 export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   private readonly exec: ExecFn;
   private readonly udid: string | undefined;
-  private readonly treeSource: 'idb' | 'wda';
-  private readonly wdaServerFactory: (udid: string) => Pick<WdaServer, 'source' | 'shutdown'>;
+  /**
+   * Readable, not just held: the registry wires the source (which adapter
+   * sits at the seam, bound to which simulator), and that wiring must be
+   * checkable without a device — a read through a real source would reach
+   * for idb or xcodebuild.
+   */
+  readonly treeSource: IosTreeSource | undefined;
 
   constructor(
     opts: {
       udid?: string;
       exec?: ExecFn;
       /**
-       * 'wda' routes uiTree() through WebDriverAgent (RN host-view ids idb
-       * cannot see — docs/plans/ios-wda-tree-source.md). ONLY the tree read
-       * moves: taps/typing/install/launch stay on idb/simctl, compatible
-       * because WDA frames are points, the same units idb rects use
-       * (plan, decision 4).
+       * Where uiTree() reads from. Absent on an UNBOUND adapter: the registry
+       * constructs one per platform to probe listDevices(), and a probe never
+       * reads a tree. A bound adapter always gets one — both sources need the
+       * concrete UDID (idb rejects simctl's `booted` alias, WDA builds
+       * `-destination id=`), and the registry is the one caller that has it,
+       * which is why the source is injected here and not defaulted.
        */
-      treeSource?: 'idb' | 'wda';
-      /** Test seam, mirrors the injectable exec. */
-      wdaServerFactory?: (udid: string) => Pick<WdaServer, 'source' | 'shutdown'>;
+      treeSource?: IosTreeSource;
     } = {},
   ) {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
-    this.treeSource = opts.treeSource ?? 'idb';
-    this.wdaServerFactory = opts.wdaServerFactory ?? ((udid) => new WdaServer({ udid, exec: this.exec }));
+    this.treeSource = opts.treeSource;
   }
 
   private target(): string {
@@ -57,7 +61,7 @@ export class IosAdapter implements DeviceAdapter {
     return this.exec('xcrun', ['simctl', ...args], { env, ...(timeoutMs ? { timeoutMs } : {}) });
   }
 
-  // --- idb boundary (swap candidate: WebDriverAgent) ---
+  // --- idb boundary (input only — the tree read is the source's) ---
 
   /**
    * idb rejects simctl's `booted` alias — it wants a concrete UDID. Resolve
@@ -89,38 +93,29 @@ export class IosAdapter implements DeviceAdapter {
   // `settle` (DeviceAdapter.uiTree) is accepted and ignored here on purpose:
   // neither idb nor WDA has uiautomator's "no window yet" transient — a
   // launching app simply appears in the next read.
-  async uiTree(): Promise<UiNode> {
-    if (this.treeSource === 'wda') {
-      return parseWdaSourceValue(await (await this.wdaServer()).source());
+  uiTree(): Promise<UiNode> {
+    if (!this.treeSource) {
+      return Promise.reject(
+        new Error(
+          'This IosAdapter has no tree source — it was created unbound, for device probing only; ' +
+            'read trees through an adapter the registry bound to a simulator',
+        ),
+      );
     }
-    const { stdout } = await this.idb(['ui', 'describe-all', '--json'], 15_000);
-    return parseIdbDescribeAll(stdout.toString('utf8'));
+    return this.treeSource.read();
   }
 
   /**
-   * ONE server per adapter, started lazily on the first wda uiTree()
-   * (WdaServer.source() runs ensureRunning itself). WdaServer needs a
-   * concrete UDID — 'booted' is a simctl-only alias — hence resolveTarget.
-   */
-  private wdaServerPromise: Promise<Pick<WdaServer, 'source' | 'shutdown'>> | undefined;
-
-  private wdaServer(): Promise<Pick<WdaServer, 'source' | 'shutdown'>> {
-    this.wdaServerPromise ??= this.resolveTarget().then((udid) => this.wdaServerFactory(udid));
-    return this.wdaServerPromise;
-  }
-
-  /**
-   * Shut the WdaServer down if one was started; no-op otherwise (and always a
-   * no-op on the idb path). Chained through the promise so a dispose racing
-   * the lazy start still shuts the server down instead of leaking it.
+   * The adapter's hop of the disposal chain (lifecycle → registry → adapter →
+   * tree source → WdaServer). Returned, not fire-and-forget: the process
+   * shutdown awaits it, and the WDA source's shutdown is the part that takes
+   * time (it polls until the port is quiet) —
+   * docs/bugs/2026-09-18-wda-orphan-after-server-restart.md. Idempotency is
+   * the source's contract (an idb source has nothing to release; the WDA
+   * source's WdaServer.shutdown() is terminal and a second call is a no-op).
    */
   dispose(): Promise<void> {
-    const pending = this.wdaServerPromise;
-    this.wdaServerPromise = undefined;
-    // Returned, not fire-and-forget: the process shutdown awaits it, and the
-    // WDA shutdown is the part that takes time (it polls until the port is
-    // quiet) — docs/bugs/2026-09-18-wda-orphan-after-server-restart.md.
-    return pending ? pending.then((server) => server.shutdown()).catch(() => undefined) : Promise.resolve();
+    return this.treeSource?.dispose() ?? Promise.resolve();
   }
 
   // --- simctl-backed lifecycle ---
@@ -268,51 +263,6 @@ export class IosAdapter implements DeviceAdapter {
       await rm(join(container, entry), { recursive: true, force: true });
     }
   }
-}
-
-interface IdbElement {
-  type?: string;
-  AXLabel?: string | null;
-  AXUniqueId?: string | null;
-  AXValue?: string | null;
-  frame?: { x: number; y: number; width: number; height: number };
-}
-
-/**
- * `idb ui describe-all --json` returns a FLAT array of elements, not a tree —
- * normalize under a synthetic root with all elements as direct children.
- */
-export function parseIdbDescribeAll(json: string): UiNode {
-  const elements = JSON.parse(json) as IdbElement[];
-  if (!Array.isArray(elements)) throw new Error('idb describe-all did not return an array');
-  const children: UiNode[] = elements.map((el) => ({
-    role: IOS_ROLE_MAP[el.type ?? ''] ?? 'other',
-    label: emptyToNull(el.AXLabel),
-    identifier: emptyToNull(el.AXUniqueId),
-    value: emptyToNull(el.AXValue),
-    rect: el.frame
-      ? {
-          x: Math.round(el.frame.x),
-          y: Math.round(el.frame.y),
-          width: Math.round(el.frame.width),
-          height: Math.round(el.frame.height),
-        }
-      : { x: 0, y: 0, width: 0, height: 0 },
-    children: [],
-  }));
-  attachFieldErrors(children);
-  return {
-    role: 'container',
-    label: null,
-    identifier: null,
-    value: null,
-    rect: { x: 0, y: 0, width: 0, height: 0 },
-    children,
-  };
-}
-
-function emptyToNull(value: string | null | undefined): string | null {
-  return value === undefined || value === null || value === '' ? null : value;
 }
 
 /** `log show --start` expects "YYYY-MM-DD HH:MM:SS" in local time. */

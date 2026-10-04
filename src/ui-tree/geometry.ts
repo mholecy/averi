@@ -215,7 +215,7 @@ function overhangs(tree: UiNode, window: Rect): boolean {
  *
  * The root is it when the root has one. When the root has NO usable rect the
  * window is one level down: idb's flat `describe-all` and uiautomator's
- * multi-root dump are normalized under a synthetic 0x0 root (adapters/ios.ts,
+ * multi-root dump are normalized under a synthetic 0x0 root (adapters/ios-tree-source.ts,
  * adapters/android.ts), and WDA's live /source roots a sheet tree in a node
  * carrying no `rect` at all, which the parser zero-fills — in all three the
  * real window sits among the children (measured 2026-08-26: the iOS filter

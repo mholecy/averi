@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
-import { mkdir, mkdtemp, readFile, utimes, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   resetWdaPortAllocatorForTests,
@@ -10,89 +9,9 @@ import {
   wdaPortFor,
   wdaProjectPath,
   type FetchFn,
-  type SpawnFn,
-  type WdaChild,
 } from '../../src/adapters/wda.js';
-import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
-
-const WDA_STATUS = {
-  value: { build: { productBundleIdentifier: 'com.facebook.WebDriverAgentRunner' } },
-  sessionId: null,
-};
-
-const IMPOSTER_STATUS = {
-  value: { build: { productBundleIdentifier: 'com.example.something-else' } },
-};
-
-function fakeExec(onCall?: (full: string) => Promise<void> | void) {
-  const calls: string[] = [];
-  const fn: ExecFn = async (cmd, args): Promise<ExecResult> => {
-    const full = [cmd, ...args].join(' ');
-    calls.push(full);
-    await onCall?.(full);
-    return { stdout: Buffer.alloc(0), stderr: '' };
-  };
-  return { fn, calls };
-}
-
-/** handler returns 'refused' (nothing listening) or an HTTP response. */
-function fakeFetch(handler: (url: string) => 'refused' | { status: number; body?: unknown }) {
-  const urls: string[] = [];
-  const fn: FetchFn = async (url) => {
-    urls.push(url);
-    const r = handler(url);
-    if (r === 'refused') throw new Error('ECONNREFUSED');
-    return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body };
-  };
-  return { fn, urls };
-}
-
-interface FakeChildListeners {
-  exit: Array<() => void>;
-  error: Array<(err: Error) => void>;
-}
-
-function fakeSpawn(opts: { spawnError?: Error } = {}) {
-  const spawns: { cmd: string; args: string[]; env: NodeJS.ProcessEnv }[] = [];
-  const kills: string[] = [];
-  const children: FakeChildListeners[] = [];
-  const fn: SpawnFn = (cmd, args, o) => {
-    const listeners: FakeChildListeners = { exit: [], error: [] };
-    children.push(listeners);
-    spawns.push({ cmd, args, env: o.env });
-    if (opts.spawnError) {
-      // node delivers ENOENT as an async 'error' EVENT, never a spawn throw.
-      setTimeout(() => listeners.error.forEach((l) => l(opts.spawnError!)), 0);
-    }
-    const child: WdaChild = {
-      // pid stays undefined so killChild never signals a real process group.
-      pid: undefined,
-      kill: (signal) => {
-        kills.push(signal ?? 'SIGTERM');
-        return true;
-      },
-      once: ((event: 'exit' | 'error', listener: (...args: never[]) => void) => {
-        if (event === 'exit') listeners.exit.push(listener as () => void);
-        else listeners.error.push(listener as (err: Error) => void);
-        return undefined;
-      }) as WdaChild['once'],
-      unref: () => undefined,
-    };
-    return child;
-  };
-  return { fn, spawns, kills, children };
-}
-
-async function tempDerivedData(withXctestrun = false): Promise<{ dd: string; products: string; xctestrun: string }> {
-  const dd = await mkdtemp(join(tmpdir(), 'averi-wda-test-'));
-  const products = join(dd, 'Build', 'Products');
-  const xctestrun = join(products, 'WebDriverAgentRunner_iphonesimulator26.5-arm64.xctestrun');
-  if (withXctestrun) {
-    await mkdir(products, { recursive: true });
-    await writeFile(xctestrun, '');
-  }
-  return { dd, products, xctestrun };
-}
+import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
+import { fakeExec, fakeFetch, fakeSpawn, IMPOSTER_STATUS, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 
 describe('wdaPortFor / port selection', () => {
   it('allocates sequential ports from 8100 — first UDID 8100, second 8101', () => {

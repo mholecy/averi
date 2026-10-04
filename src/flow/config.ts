@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent } from '../adapters/types.js';
+import { IOS_TREE_SOURCE_KINDS } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
   elementSpecSchema,
@@ -244,9 +245,10 @@ const configSchema = z
              * AX child carries no identifier, so idb sees nothing (measured
              * 2026-08-12, docs/plans/ios-wda-tree-source.md §Problem).
              * No `auto` value — deferred until the Phase 4 latency
-             * measurement of /source on deep trees.
+             * measurement of /source on deep trees. The kinds are the
+             * tree-source seam's (adapters/ios-node.ts), spelled once.
              */
-            treeSource: z.enum(['idb', 'wda']).optional(),
+            treeSource: z.enum(IOS_TREE_SOURCE_KINDS).optional(),
           })
           .strict()
           .optional(),

@@ -1,4 +1,4 @@
-import { IOS_ROLE_MAP } from './ios-role-map.js';
+import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors, everyNode } from './field-errors.js';
 import type { UiNode } from './types.js';
 
@@ -14,7 +14,7 @@ import type { UiNode } from './types.js';
 /**
  * WDA element `type` → normalized role. Types arrive WITHOUT the
  * "XCUIElementType" prefix (measured: plain "StaticText", "Other", ...).
- * The shared iOS vocabulary (ios-role-map.ts) plus structural types only
+ * The shared iOS vocabulary (ios-node.ts) plus structural types only
  * the nested tree has.
  */
 const ROLE_MAP: Record<string, string> = {
@@ -82,23 +82,9 @@ function isElement(value: unknown): value is WdaElement {
 }
 
 function toUiNode(el: WdaElement): UiNode {
-  return {
-    role: ROLE_MAP[el.type ?? ''] ?? 'other',
-    label: emptyToNull(el.label),
-    identifier: emptyToNull(el.rawIdentifier),
-    value: emptyToNull(el.value),
-    rect: el.rect
-      ? {
-          x: Math.round(el.rect.x),
-          y: Math.round(el.rect.y),
-          width: Math.round(el.rect.width),
-          height: Math.round(el.rect.height),
-        }
-      : { x: 0, y: 0, width: 0, height: 0 },
-    children: (el.children ?? []).map(toUiNode),
-  };
-}
-
-function emptyToNull(value: string | null | undefined): string | null {
-  return value === undefined || value === null || value === '' ? null : value;
+  return normalizeIosElement(
+    { type: el.type, label: el.label, identifier: el.rawIdentifier, value: el.value, rect: el.rect },
+    ROLE_MAP,
+    (el.children ?? []).map(toUiNode),
+  );
 }

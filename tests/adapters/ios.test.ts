@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { tapElement } from '../../src/ui-tree/tap-element.js';
-import { IosAdapter, parseIdbDescribeAll } from '../../src/adapters/ios.js';
+import { IosAdapter } from '../../src/adapters/ios.js';
+import { IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
+import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 
 function fakeExec(responses: Record<string, string | Buffer>) {
   const calls: { full: string; stdin?: string }[] = [];
@@ -55,63 +57,11 @@ describe('IosAdapter.listDevices', () => {
   });
 });
 
-describe('parseIdbDescribeAll', () => {
-  const tree = parseIdbDescribeAll(IDB_DESCRIBE_ALL);
-
-  it('wraps the flat element list under a synthetic root', () => {
-    expect(tree.role).toBe('container');
-    expect(tree.children).toHaveLength(3);
-  });
-
-  it('normalizes roles, identifiers, values and rounds frames', () => {
-    expect(tree.children[0]).toMatchObject({
-      role: 'button', label: 'Log in', identifier: 'login_button', value: null,
-      rect: { x: 21, y: 700, width: 350, height: 48 },
-    });
-    expect(tree.children[1]).toMatchObject({ role: 'textfield', value: 'alice' });
-    expect(tree.children[2]).toMatchObject({
-      role: 'text', identifier: null, rect: { x: 0, y: 0, width: 0, height: 0 },
-    });
-  });
-
-  it('pairs a same-identifier text BELOW a textfield as its error; the title above is not an error', () => {
-    // Measured convention (payment form, 2026-08-05): the field's title AND
-    // its validation message share the field's accessibilityIdentifier.
-    const withError = parseIdbDescribeAll(
-      JSON.stringify([
-        {
-          type: 'StaticText', AXLabel: 'Amount', AXUniqueId: 'payment.form.amount_input', AXValue: null,
-          frame: { x: 20, y: 380, width: 100, height: 18 },
-        },
-        {
-          type: 'TextField', AXLabel: 'Amount', AXUniqueId: 'payment.form.amount_input', AXValue: '',
-          frame: { x: 20, y: 400, width: 350, height: 44 },
-        },
-        {
-          type: 'StaticText', AXLabel: 'Value is too small', AXUniqueId: 'payment.form.amount_input', AXValue: null,
-          frame: { x: 20, y: 448, width: 200, height: 16 },
-        },
-        {
-          type: 'TextField', AXLabel: 'Note', AXUniqueId: 'note_input', AXValue: null,
-          frame: { x: 20, y: 500, width: 350, height: 44 },
-        },
-      ]),
-    );
-    const amount = withError.children.find((n) => n.role === 'textfield' && n.identifier === 'payment.form.amount_input');
-    expect(amount?.error).toBe('Value is too small');
-    const note = withError.children.find((n) => n.identifier === 'note_input');
-    expect(note?.error).toBeUndefined();
-  });
-
-  it('leaves error unset when no same-identifier text sits below the field', () => {
-    expect(tree.children[1].error).toBeUndefined();
-  });
-});
-
 describe('IosAdapter interactions', () => {
-  it('tapElement resolves against the idb tree and taps the center', async () => {
+  it('end to end on the idb source: tapElement resolves against describe-all and taps the center through idb', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
-    await tapElement(new IosAdapter({ udid: 'AAAA-1111', exec: fn }), 'id:login_button');
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
+    await tapElement(adapter, 'id:login_button');
     expect(calls.at(-1)?.full).toBe('idb ui tap 196 724 --udid AAAA-1111');
   });
 
@@ -181,118 +131,79 @@ describe('IosAdapter interactions', () => {
   });
 });
 
-describe('IosAdapter treeSource: wda', () => {
-  // Raw /source envelope as WdaServer.source() returns it — the host-view
-  // `Other` node carrying the identifier is what the wda path exists for.
-  const WDA_ENVELOPE = {
-    value: {
-      type: 'Application',
-      rawIdentifier: null,
-      label: 'MyPort',
-      rect: { x: 0, y: 0, width: 402, height: 874 },
-      children: [
-        {
-          type: 'Other',
-          rawIdentifier: 'home.header',
-          label: null,
-          rect: { x: 0, y: 100, width: 402, height: 50 },
-          children: [
-            {
-              type: 'StaticText',
-              rawIdentifier: 'home.title',
-              label: 'Welcome',
-              rect: { x: 16, y: 110, width: 200, height: 20 },
-              children: [],
-            },
-          ],
-        },
-      ],
-    },
-    sessionId: 'abc-123',
+describe('IosAdapter.uiTree and dispose — one delegation each to the tree source', () => {
+  // A nested tree of the shape the WDA source returns; the fake stands at the
+  // seam so these tests pin the ADAPTER's half of the contract alone.
+  const TREE: UiNode = {
+    role: 'container', label: 'MyPort', identifier: null, value: null,
+    rect: { x: 0, y: 0, width: 402, height: 874 },
+    children: [
+      {
+        role: 'container', label: null, identifier: 'home.header', value: null,
+        rect: { x: 0, y: 100, width: 402, height: 50 },
+        children: [
+          {
+            role: 'text', label: 'Welcome', identifier: 'home.title', value: null,
+            rect: { x: 16, y: 110, width: 200, height: 20 }, children: [],
+          },
+        ],
+      },
+    ],
   };
 
-  const fakeWda = () => {
-    const state = { udids: [] as string[], stops: 0 };
-    const factory = (udid: string) => {
-      state.udids.push(udid);
-      return {
-        source: async () => WDA_ENVELOPE,
-        // Resolves on a MACROTASK, so `await adapter.dispose()` observes the
-        // stop only if dispose really returned this chain — a fire-and-forget
-        // dispose would pass on microtask ordering alone (review 2026-09-18).
-        shutdown: () =>
-          new Promise<void>((resolve) =>
-            setTimeout(() => {
-              state.stops++;
-              resolve();
-            }, 5),
-          ),
-      };
+  const fakeSource = () => {
+    const state = { reads: 0, disposes: 0 };
+    const source: IosTreeSource = {
+      read: async () => {
+        state.reads++;
+        return structuredClone(TREE);
+      },
+      // Resolves on a MACROTASK, so `await adapter.dispose()` observes the
+      // release only if dispose really returned this chain — a fire-and-forget
+      // dispose would pass on microtask ordering alone (review 2026-09-18).
+      dispose: () =>
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            state.disposes++;
+            resolve();
+          }, 5),
+        ),
     };
-    return { state, factory };
+    return { source, state };
   };
 
-  const tick = () => new Promise((r) => setTimeout(r, 0));
-
-  it('uiTree routes through ONE WdaServer and parses the raw envelope', async () => {
+  it("uiTree is the source's read: no idb call for the tree, `settle` accepted and ignored", async () => {
     const { fn, calls } = fakeExec({});
-    const { state, factory } = fakeWda();
-    const adapter = new IosAdapter({
-      udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
-    });
-    const tree = await adapter.uiTree();
-    await adapter.uiTree();
-    expect(state.udids).toEqual(['AAAA-1111']); // one server, reused
-    expect(calls.filter((c) => c.full.startsWith('idb'))).toEqual([]); // tree read left idb entirely
-    expect(tree.role).toBe('container'); // Application root
-    expect(tree.children[0]).toMatchObject({ role: 'container', identifier: 'home.header' });
-    expect(tree.children[0].children[0]).toMatchObject({
-      role: 'text', identifier: 'home.title', label: 'Welcome',
-    });
+    const { source, state } = fakeSource();
+    // Through the interface: `settle` is DeviceAdapter's option, and iOS has no transient to wait out.
+    const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source });
+    const tree = await adapter.uiTree({ settle: true });
+    expect(tree).toEqual(TREE);
+    expect(state.reads).toBe(1);
+    expect(calls.filter((c) => c.full.startsWith('idb'))).toEqual([]); // the tree read left idb entirely
   });
 
-  it('resolves the booted simulator to a concrete UDID for the server', async () => {
-    const { fn } = fakeExec({ 'xcrun simctl list devices --json': SIMCTL_LIST });
-    const { state, factory } = fakeWda();
-    const adapter = new IosAdapter({ exec: fn, treeSource: 'wda', wdaServerFactory: factory });
-    await adapter.uiTree();
-    expect(state.udids).toEqual(['AAAA-1111']); // never the 'booted' alias
-  });
-
-  it('taps still go through idb — only the tree read moved', async () => {
+  it("taps resolve against the source's tree and still go through idb — only the tree read is the source's", async () => {
     const { fn, calls } = fakeExec({});
-    const { factory } = fakeWda();
-    const adapter = new IosAdapter({
-      udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
-    });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: fakeSource().source });
     await tapElement(adapter, 'id:home.header');
-    // WDA rects are points, same units as idb — center of the host view
+    // The source's rects are points, the units idb taps in — center of the host view.
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
   });
 
-  it('dispose stops a started server once; before/after that it is a no-op', async () => {
-    const { fn } = fakeExec({});
-    const { state, factory } = fakeWda();
-    const adapter = new IosAdapter({
-      udid: 'AAAA-1111', exec: fn, treeSource: 'wda', wdaServerFactory: factory,
-    });
-    adapter.dispose(); // nothing started yet
-    await tick();
-    expect(state.stops).toBe(0);
+  it("dispose returns the source's release — the process shutdown awaits it", async () => {
+    const { source, state } = fakeSource();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: source });
     await adapter.uiTree();
-    await adapter.dispose(); // resolves only once the WDA shutdown has run — the process shutdown awaits this
-    expect(state.stops).toBe(1);
-    await adapter.dispose(); // idempotent: the server promise was already released
-    await new Promise((r) => setTimeout(r, 10));
-    expect(state.stops).toBe(1);
+    await adapter.dispose(); // resolves only once the source has released — the process shutdown awaits this
+    expect(state.disposes).toBe(1);
   });
 
-  it('dispose on the idb path never creates a server', async () => {
-    const { state, factory } = fakeWda();
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, wdaServerFactory: factory });
-    adapter.dispose();
-    await tick();
-    expect(state.udids).toEqual([]);
-    expect(state.stops).toBe(0);
+  it('an unbound adapter (no udid, no source) probes only: listDevices works, uiTree is a loud error, dispose is a no-op', async () => {
+    const { fn } = fakeExec({ 'xcrun simctl list devices --json': SIMCTL_LIST });
+    const adapter = new IosAdapter({ exec: fn });
+    expect(await adapter.listDevices()).toHaveLength(3);
+    await expect(adapter.uiTree()).rejects.toThrow(/no tree source/);
+    await expect(adapter.dispose()).resolves.toBeUndefined();
   });
 });
