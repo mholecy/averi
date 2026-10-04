@@ -254,29 +254,86 @@ describe('dismissKeyboard — the per-platform key, as its own call', () => {
   const keyed = (platform: 'android' | 'ios') => {
     const fake = formFake();
     fake.platform = platform;
-    const keys: string[] = [];
-    fake.pressKey = async (k) => {
-      keys.push(k);
-    };
-    return { fake, keys };
+    return fake;
   };
+  const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
 
-  it('Android has a back key', async () => {
-    const { fake, keys } = keyed('android');
+  it('Android, keyboard shown: back — it hides the keyboard', async () => {
+    const fake = keyed('android');
+    fake.keyboard = { state: 'shown', frame: FRAME };
     await dismissKeyboard(fake);
-    expect(keys).toEqual(['back']);
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.keyboardQueries).toBe(1);
   });
 
-  it('iOS has no back key: it takes enter', async () => {
-    const { fake, keys } = keyed('ios');
+  it('Android, window state shown and the independent witness CONFIRMS it: back, the witness asked once', async () => {
+    const fake = keyed('android');
+    fake.keyboard = { state: 'shown', frame: FRAME };
+    fake.keyboardWitness = 'shown';
     await dismissKeyboard(fake);
-    expect(keys).toEqual(['enter']);
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.witnessQueries).toBe(1);
+  });
+
+  it('Android, window state shown but the witness DENIES it (stale window state): no key pressed — back would navigate', async () => {
+    const fake = keyed('android');
+    fake.keyboard = { state: 'shown', frame: FRAME };
+    fake.keyboardWitness = 'hidden';
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual([]);
+    expect(fake.witnessQueries).toBe(1);
+  });
+
+  it('Android, window state shown and the witness cannot tell: back, as before 2026-10-04', async () => {
+    const fake = keyed('android');
+    fake.keyboard = { state: 'shown', frame: FRAME };
+    fake.keyboardWitness = 'unknown';
+    const order: string[] = [];
+    const ask = fake.softKeyboardWitness.bind(fake);
+    fake.softKeyboardWitness = async () => (order.push('witness?'), ask());
+    fake.onKey = (key) => void order.push(`key:${key}`);
+    await dismissKeyboard(fake);
+    expect(order).toEqual(['witness?', 'key:back']); // asked BEFORE the key
+  });
+
+  it('Android, window state hidden or unknown: the witness is not asked (hidden presses nothing, unknown presses back as before)', async () => {
+    for (const [state, keys] of [['hidden', []], ['unknown', ['back']]] as const) {
+      const fake = keyed('android');
+      fake.keyboard = { state };
+      fake.keyboardWitness = 'hidden';
+      await dismissKeyboard(fake);
+      expect(fake.keys).toEqual(keys);
+      expect(fake.witnessQueries).toBe(0);
+    }
+  });
+
+  it('Android, keyboard HIDDEN: no key at all — back with no keyboard up would navigate away', async () => {
+    const fake = keyed('android');
+    fake.keyboard = { state: 'hidden' };
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('Android, adapter cannot tell (unknown): back, exactly as before 2026-10-03', async () => {
+    const fake = keyed('android');
+    fake.keyboard = { state: 'unknown' };
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual(['back']);
+  });
+
+  it('iOS has no back key: it takes enter, and asks nothing — even of an adapter that would say hidden', async () => {
+    const fake = keyed('ios');
+    fake.keyboard = { state: 'hidden' };
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual(['enter']);
+    expect(fake.keyboardQueries).toBe(0);
+    expect(fake.witnessQueries).toBe(0);
   });
 
   it('fillField itself never presses a key — the caller dismisses after it has the warning in hand', async () => {
-    const { fake, keys } = keyed('android');
+    const fake = keyed('android');
     await fillField(fake, { id: 'amount_input' }, '2.50', FAST);
-    expect(keys).toEqual([]);
+    expect(fake.keys).toEqual([]);
   });
 });
 

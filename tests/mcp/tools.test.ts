@@ -558,3 +558,72 @@ describe('verify', () => {
     expect(harness.bound().map((c) => c.platform).sort()).toEqual(['android', 'ios']);
   });
 });
+
+describe('tap and type_text under the Android soft keyboard', () => {
+  const KEYBOARD = { x: 0, y: 1285, width: 1080, height: 935 };
+  /** The measured login screen (see tests/interact/keyboard.test.ts); back hides the keyboard and the button moves down. */
+  function loginFake() {
+    const submit = nodeAt('button', 'login_submit', { x: 99, y: 1400, width: 300, height: 132 });
+    const otp = nodeAt('textfield', 'login_otp', { x: 99, y: 1600, width: 882, height: 132 });
+    const fake = new FakeAdapter({ login: { ...screen(submit, otp), rect: { x: 0, y: 0, width: 1080, height: 2220 } } }, 'login');
+    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.onKey = (key, self) => {
+      if (key === 'back') for (const n of self.live().children) n.rect.y += 300;
+    };
+    return fake;
+  }
+  const nodeAt = (role: string, identifier: string, rect: UiNode['rect']): UiNode => ({ ...el({ role, identifier }), rect });
+
+  it('tap by selector: the response carries the note, and the tap landed on the re-resolved point', async () => {
+    const fake = loginFake();
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Tapped id:login_submit (the soft keyboard covered id:login_submit; hidden before tapping)');
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.tapPoints).toEqual([{ x: 249, y: 1766 }]);
+  });
+
+  it('tap by COORDINATES is not guarded: no keyboard query, no key — the caller chose the point', async () => {
+    const fake = loginFake();
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', x: 249, y: 1466 });
+    expect(result.text).toBe('Tapped (249, 1466)');
+    expect(fake.keyboardQueries).toBe(0);
+    expect(fake.keys).toEqual([]);
+    expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
+  });
+
+  it('type_text with a selector: the response carries the note too', async () => {
+    const fake = loginFake();
+    const { call } = await connect({ android: fake });
+    const result = await call('type_text', { platform: 'android', selector: 'id:login_otp', text: '123456', configPath: missing() });
+    expect(result.text).toBe('Filled id:login_otp (6 characters) (the soft keyboard covered id:login_otp; hidden before tapping)');
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1966 }]);
+  });
+
+  it('the two keyboard sources never agree: an error response saying neither back nor the tap was sent', async () => {
+    const fake = loginFake();
+    fake.keyboardWitness = 'hidden';
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('but the input method says no keyboard is shown, and the two still disagreed after 3000ms. Neither back nor the tap was sent');
+    expect(result.text).toContain('From the MCP tools: look at the screen (ui_snapshot / screenshot), then tap again, or press_key back yourself if a keyboard is visibly up');
+    expect(fake.keys).toEqual([]);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('a keyboard that stays is an error response naming the recovery, and nothing is tapped', async () => {
+    const fake = loginFake();
+    fake.onKey = (_key, self) => {
+      self.keyboard = { state: 'shown', frame: KEYBOARD };
+    };
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Pressed back to hide the soft keyboard covering id:login_submit, but back did not close it');
+    expect(result.text).toContain('inspect the screen with ui_snapshot, then press_key back once more or tap a control above the keyboard');
+    expect(fake.taps).toEqual([]);
+  });
+});

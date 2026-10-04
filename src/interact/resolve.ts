@@ -73,6 +73,14 @@ export const DEFAULT_POLL_MS = 500;
  */
 export type Ambiguity = 'first' | 'refuse';
 
+/**
+ * The `'refuse'` mode's error, as a class of its own (2026-10-03) so a caller
+ * that adds context to a failed resolution can tell a refusal — whose FIRST
+ * line is the finding and must stay the headline — from a timeout, without
+ * reading the message. Same message, same `Error` to everyone else.
+ */
+export class AmbiguityRefusal extends Error {}
+
 export interface ResolveOptions {
   ambiguous: Ambiguity;
 }
@@ -109,7 +117,7 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
       .map((n) => `${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`)
       .join(sep);
   if (opts.ambiguous === 'refuse') {
-    throw new Error(
+    throw new AmbiguityRefusal(
       `Selector matches ${candidates.length} elements: ${describeTarget(target)}\n  ${summary('\n  ')}` +
         `\nNarrow it (add role:, id: or an exact text:) so exactly one element matches`,
     );

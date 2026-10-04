@@ -5,7 +5,7 @@ import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IosTreeSource } from './ios-tree-source.js';
-import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
+import type { Device, DeviceAdapter, Key, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from './types.js';
 
 /**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
@@ -225,6 +225,20 @@ export class IosAdapter implements DeviceAdapter {
     if (key === 'back') throw new Error('pressKey("back") has no iOS equivalent — use a back button selector or swipe');
     if (key === 'home') await this.idbUi(['button', 'HOME']);
     else await this.idbUi(['key', '40']); // HID usage 40 = Return/Enter
+  }
+
+  /**
+   * Always `unknown`, and no process is run (2026-10-03): the iOS keyboard is
+   * part of the accessibility tree, so "which rect does it cover" is a tree
+   * question nobody has needed answered yet. See DeviceAdapter.softKeyboard.
+   */
+  async softKeyboard(): Promise<SoftKeyboard> {
+    return { state: 'unknown' };
+  }
+
+  /** Always `unknown`, and no process is run — as softKeyboard above (2026-10-04). */
+  async softKeyboardWitness(): Promise<KeyboardWitness> {
+    return 'unknown';
   }
 
   async setClipboard(text: string): Promise<void> {

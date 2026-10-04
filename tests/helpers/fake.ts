@@ -1,4 +1,4 @@
-import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from '../../src/adapters/types.js';
+import type { Device, DeviceAdapter, Key, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from '../../src/adapters/types.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -69,8 +69,85 @@ export class FakeAdapter implements DeviceAdapter {
     const target = hit(this.screens[this.current]); // the LIVE node: typeText/clearText must mutate the real field
     if (!target?.identifier) throw new Error(`FakeAdapter: nothing tappable at (${x},${y})`);
     this.taps.push(target.identifier);
+    this.tapPoints.push({ x, y });
     this.focused = target.role === 'textfield' ? target : undefined;
     this.onTap(target.identifier, this);
+  }
+
+  /** Where each recorded tap landed, in step with `taps` — for tests that care about the POINT, not only the node. */
+  tapPoints: { x: number; y: number }[] = [];
+
+  /**
+   * What the "device" says about its soft keyboard. `unknown` by default: a
+   * fake that has not been told behaves like an adapter that cannot tell, so
+   * every test written before 2026-10-03 exercises the same paths as before
+   * (taps unguarded, dismissKeyboard presses back). A keyboard test sets it.
+   */
+  keyboard: SoftKeyboard = { state: 'unknown' };
+  /** How many times softKeyboard() was asked — the cost the guard is pinned to. */
+  keyboardQueries = 0;
+
+  /**
+   * Answers for the NEXT queries, in order — each one also becomes the
+   * standing `keyboard` — for a state that changes between queries with no
+   * key pressed (a stale window state clearing by itself).
+   */
+  keyboardQueue: SoftKeyboard[] = [];
+
+  async softKeyboard(): Promise<SoftKeyboard> {
+    this.keyboardQueries++;
+    const next = this.keyboardQueue.shift();
+    if (next !== undefined) this.keyboard = next;
+    return this.keyboard;
+  }
+
+  /**
+   * The independent second opinion (softKeyboardWitness). `unknown` by
+   * default — "cannot tell" — so a test that does not set it gets the
+   * decision the window state alone makes, as before 2026-10-04.
+   */
+  keyboardWitness: KeyboardWitness = 'unknown';
+  witnessQueries = 0;
+
+  /** As keyboardQueue, for the witness. */
+  witnessQueue: KeyboardWitness[] = [];
+
+  async softKeyboardWitness(): Promise<KeyboardWitness> {
+    this.witnessQueries++;
+    const next = this.witnessQueue.shift();
+    if (next !== undefined) this.keyboardWitness = next;
+    return this.keyboardWitness;
+  }
+
+  /** Every key pressed, in order. */
+  keys: Key[] = [];
+  /**
+   * Runs after the fake's own reaction to a key — for a test to move a node
+   * (the re-layout an adjustResize activity does when the keyboard goes) or
+   * to put the keyboard back (one that `back` does not hide).
+   */
+  onKey: ((key: Key, self: FakeAdapter) => void) | undefined;
+
+  /**
+   * Where `back` NAVIGATES when no keyboard is up, as on a device — the
+   * hazard the keyboard guard's race ends in. Unset: back with no keyboard
+   * does nothing (most tests have nowhere to go back to).
+   */
+  backTo: string | undefined;
+
+  /** `back` hides a shown keyboard, as on a device; with none shown it navigates to `backTo` when that is set. */
+  async pressKey(key: Key): Promise<void> {
+    this.keys.push(key);
+    if (key === 'back') {
+      if (this.keyboard.state === 'shown') this.keyboard = { state: 'hidden' };
+      else if (this.backTo !== undefined) this.current = this.backTo;
+    }
+    this.onKey?.(key, this);
+  }
+
+  /** The live screen object, for a test's onKey/onTap to mutate (uiTree hands out snapshots). */
+  live(): UiNode {
+    return this.screens[this.current];
   }
 
   /** Last tapped textfield — typeText/clearText mutate its value like a real field. */
@@ -142,6 +219,5 @@ export class FakeAdapter implements DeviceAdapter {
   async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
     this.swipes.push({ from, to });
   }
-  async pressKey(_k: Key): Promise<void> {}
   async setClipboard(): Promise<void> {}
 }

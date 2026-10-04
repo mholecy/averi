@@ -3,6 +3,7 @@ import { dismissKeyboard, fillField } from '../interact/fill.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
+import { KeyboardGuardError } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec as describeSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
@@ -615,16 +616,20 @@ export class FlowEngine {
   private async runFill(fill: StepPayload<'fill'>): Promise<void> {
     const { value: rawValue, clear, dismissKeyboard: closeKeyboard, ...spec } = fill;
     const { value, secret } = this.resolveValue(rawValue);
-    const { warning } = await fillField(this.adapter, spec, value, {
-      ambiguous: FLOW_AMBIGUITY,
-      clear,
-      timeoutMs: this.tapTimeoutMs,
-      pollMs: this.pollMs,
-      // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
-      // tests mock util/sleep instead of threading a test-only option here.
-    });
-    // The warning is logged BEFORE the keyboard is dismissed: a pressKey that
-    // throws must not take the masked-append warning down with it.
+    const { warning } = await this.tracingDismissal('⚠ fill', () =>
+      fillField(this.adapter, spec, value, {
+        ambiguous: FLOW_AMBIGUITY,
+        clear,
+        timeoutMs: this.tapTimeoutMs,
+        pollMs: this.pollMs,
+        // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
+        // tests mock util/sleep instead of threading a test-only option here.
+      }),
+    );
+    // The warnings are logged BEFORE the keyboard is dismissed: a pressKey that
+    // throws must not take the masked-append warning down with it. The
+    // keyboard line (tracingDismissal's) comes first: it happened first,
+    // before the focus tap.
     if (warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${warning}`);
     if (closeKeyboard) await dismissKeyboard(this.adapter);
     this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
@@ -699,6 +704,12 @@ export class FlowEngine {
       // Split OUTSIDE the try: a malformed `timeout:` is a config error, not
       // an absent element — it must fail the flow, never log as "skipped".
       const tap = 'tap' in s ? splitTapSpec(s.tap) : undefined;
+      // Why a skipped tap was skipped. "not present" is true only until the
+      // presence poll has passed; a tap that fails AFTER it (the element was
+      // there — e.g. the keyboard over it would not close, and `back` was
+      // pressed) says its own headline instead (review 2026-10-03: such a
+      // skip read "(not present)").
+      let present = false;
       try {
         if (tap) {
           // Presence = "something actionable is in the tree": the same policy
@@ -709,12 +720,13 @@ export class FlowEngine {
             tap.timeoutMs ?? this.optionalTimeoutMs,
             `optional element ${describeSpec(tap.spec)}`,
           );
+          present = true;
           await this.tapSpec(tap.spec, this.tapTimeoutMs);
         } else {
           await this.runStep(s); // swallowDepth > 0: no ✗ line, the failure is logged as skipped below
         }
-      } catch {
-        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (not present)`);
+      } catch (e) {
+        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (${present ? headline(e) : 'not present'})`);
       }
     }
   }
@@ -725,10 +737,52 @@ export class FlowEngine {
    * tap tool. The resolution note is not traced: a flow's tap line names
    * the spec the author wrote, and which of several nodes carried it is the
    * tool's concern, not the trace reader's.
+   *
+   * One exception, 2026-10-03: when the soft keyboard covered the target and
+   * had to be hidden first (interact/keyboard.ts), a `⚠ tap` line says so —
+   * even for a quiet tap (a `type_pin` keypad digit: the first digit under a
+   * keyboard gets the one `⚠ tap` and the one `back`; the keyboard is then
+   * gone, so the following digits are plain taps — unless the screen raises
+   * the keyboard again). That is not a detail of which node was chosen: the
+   * flow pressed `back` and the screen re-laid-out, and an author debugging
+   * the next step needs to see it. A tap that met no keyboard traces exactly
+   * what it did before.
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
-    await tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs });
+    await this.tracingDismissal('⚠ tap', () =>
+      tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs }),
+    );
     if (!quiet) this.log('tap', describeSpec(spec));
+  }
+
+  /**
+   * The ONE place the keyboard guard's work reaches the trace, for both
+   * steps that go through it (2026-10-03). Either way the line precedes
+   * whatever the step logs next:
+   * - the step succeeded after the guard pressed `back`: the sentence the
+   *   result carries ("…; hidden before tapping", or "…; back pressed; the
+   *   keyboard's state afterwards could not be read");
+   * - the step FAILED after it: the attempt ("…; back pressed"), BEFORE the
+   *   step's `✗` line — the key press happened whether or not the step
+   *   survived it, and if no keyboard was really up it navigated. Without
+   *   the line the trace showed a bare timeout. The same path carries the
+   *   refusal when the two keyboard sources would not agree ("…; nothing
+   *   sent") — any KeyboardGuardError, its `traceLine`.
+   * A step that met no keyboard logs nothing here.
+   */
+  private async tracingDismissal<T extends { keyboardHidden?: string }>(
+    action: '⚠ tap' | '⚠ fill',
+    run: () => Promise<T>,
+  ): Promise<T> {
+    let result: T;
+    try {
+      result = await run();
+    } catch (e) {
+      if (e instanceof KeyboardGuardError) this.log(action, e.traceLine);
+      throw e;
+    }
+    if (result.keyboardHidden !== undefined) this.log(action, result.keyboardHidden);
+    return result;
   }
 
   private async matches(cond: Condition, tree: UiNode): Promise<boolean> {

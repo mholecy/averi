@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { sleep } from '../util/sleep.js';
-import { zeroRect, type Device, type DeviceAdapter, type Key, type LaunchIntent, type LaunchOptions, type Rect, type UiNode } from './types.js';
+import { zeroRect, type Device, type DeviceAdapter, type Key, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -9,6 +9,17 @@ const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 const NULL_ROOT_RE = /null root node/i;
 const NULL_ROOT_RETRY_MS = 1_000;
 const DUMP_TIMEOUT_MS = 15_000;
+
+/**
+ * Budget for the soft-keyboard question (the measured cost of the call is on
+ * softKeyboard, the one place it is written down). Two seconds is "the host
+ * is badly loaded", and past it the
+ * answer is `unknown` — a tap must not wait 30 s (exec's default) on a
+ * question whose only job is to make the tap safer.
+ */
+const KEYBOARD_QUERY_TIMEOUT_MS = 2_000;
+/** The same reasoning for the independent witness (softKeyboardWitness): past it, `unknown`. */
+const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 
 /**
  * A line of `am start` output that means the activity was not started: am's
@@ -419,6 +430,113 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.adb(['shell', 'input', 'keyevent', KEYCODES[key]]);
   }
 
+  /**
+   * Is the soft keyboard (IME) shown, and which screen rect does it cover?
+   * One adb call: `dumpsys window displays`, read by parseImeInsets below.
+   *
+   * Why that command — measured 2026-10-03 on emulator-5554 (Pixel_3a, API
+   * 33, 1080x2220), three to five runs each, wall time of the whole adb call:
+   *
+   *   dumpsys window displays      15.9 KB    56–96 ms   has the IME InsetsSource line
+   *   dumpsys window InputMethod    4.0 KB    76–83 ms   the IME WINDOW: its frame is the whole
+   *                                                      display below the status bar
+   *                                                      ([0,66][1080,2220]) shown or hidden —
+   *                                                      the covered area is only in
+   *                                                      "touchable region=SkRegion(…)"
+   *   dumpsys window windows       33.0 KB   82–110 ms   no InsetsSource line on this device,
+   *                                                      shown or hidden ("Requested
+   *                                                      visibilities: ITYPE_IME: …" only)
+   *   dumpsys input_method        791 KB   276–318 ms   mInputShown, but no frame — and over
+   *                                                      the budget on its own
+   *
+   * THE COST OF THIS CALL — the one place the figures live (2026-10-03);
+   * every other comment and ARCHITECTURE.md §8 point here:
+   *   - from a shell (the table above; process start included): 56–96 ms;
+   *   - through this adapter's execFile, eleven runs: 18–37 ms.
+   *
+   * `displays` is the one that yields "shown" AND the frame from a single
+   * line, in a format that is the same line on API 36 (40 ms, 11.7 KB there).
+   * Rejected: `dumpsys input_method | grep mInputShown` plus a second call
+   * for the frame (two calls, the first alone ~300 ms); the IME window's
+   * touchable region (an SkRegion string whose shape differs with a floating
+   * or split keyboard, and present while hidden too, as the nav-bar strip).
+   *
+   * FAILS OPEN: any failure of the call — adb exit, timeout, offline device —
+   * is `unknown`, not a throw. This question exists to make a tap safer; it
+   * must never be the reason a tap did not happen. A device that is really
+   * gone fails the tap itself one call later, in the tap's own words.
+   */
+  async softKeyboard(): Promise<SoftKeyboard> {
+    let dump: string;
+    try {
+      dump = (await this.adb(['shell', 'dumpsys', 'window', 'displays'], KEYBOARD_QUERY_TIMEOUT_MS)).stdout.toString('utf8');
+    } catch {
+      return { state: 'unknown' };
+    }
+    return parseImeInsets(dump);
+  }
+
+  /**
+   * The independent witness (2026-10-04): what the input method manager
+   * itself says — `mInputShown=true|false` in `dumpsys input_method` — as
+   * opposed to the window manager's insets that softKeyboard reads.
+   *
+   * Why a second source. Measured that day (Pixel_3a AVD, API 33), right
+   * after a tap that made the app navigate away: `dumpsys window displays`
+   * STILL printed `mIsImeShowing=true` and `InsetsSource type=ITYPE_IME
+   * frame=[0,1398][1080,2220] … visible=true`, while `dumpsys input_method`
+   * already said `mInputShown=false`; a few seconds later (three samples a
+   * second apart) the window state read `mIsImeShowing=false` /
+   * `frame=[0,0][0,0] … visible=false`. So the two witnesses parseImeInsets
+   * cross-checks come from the SAME dump and go stale TOGETHER — and a
+   * guarded tap inside that window, on a target under the stale frame,
+   * would press `back` with no keyboard up and navigate away. With the
+   * keyboard genuinely up, `mInputShown=true` was observed beside
+   * `mIsImeShowing=true`. Rejected: trusting the window state alone (the
+   * above); using this INSTEAD of it (it has no frame, so it cannot say
+   * whether the keyboard covers the tap point).
+   *
+   * The command filters ON THE DEVICE — the whole dump is 776 KB. THE COST,
+   * the one place the figures live (measured 2026-10-04, emulator-5554,
+   * six runs each, wall time of the spawned adb process, keyboard hidden):
+   *   adb shell "dumpsys input_method | grep -m1 mInputShown"   90 bytes   20–32 ms (one 75)
+   *   adb shell "dumpsys input_method | grep mInputShown"       90 bytes   55–59 ms
+   *   adb shell dumpsys input_method                           776 KB      60–66 ms (one 136)
+   * `-m1` lets grep stop at the line (line 134 of ~11 000) instead of
+   * reading the rest. The line as printed there:
+   *   "  mShowRequested=false mShowExplicitlyRequested=false mShowForced=false mInputShown=false"
+   *
+   * The command actually sent (INPUT_SHOWN_COMMAND) matches the name as a
+   * whole WORD — `grep -m1 -w mInputShown` — so an earlier line holding a
+   * name that merely ENDS in it (`…mPrevmInputShown=`) cannot be the one
+   * `-m1` returns, which would read `unknown` and switch the veto off
+   * silently. `=` is not a word character, so `mInputShown=` still matches.
+   * toybox grep has -w and -m; the `-w` form is UNVERIFIED on a device
+   * (written in a round with no adb access) — the timings above are of the
+   * plain pattern.
+   *
+   * Not memoized: the answer changes with every focus, and the registry
+   * keeps one adapter for a whole session — a cached `hidden` would veto
+   * every later dismissal.
+   *
+   * `unknown` — never a throw — when the call fails or times out, and when
+   * grep finds no such line (it exits 1, so that IS a failed call): an
+   * Android version that does not print `mInputShown` is UNVERIFIED either
+   * way (only API 33 was measured), and there the caller keeps the decision
+   * it had without this witness.
+   */
+  async softKeyboardWitness(): Promise<KeyboardWitness> {
+    let out: string;
+    try {
+      out = (
+        await this.adb(['shell', INPUT_SHOWN_COMMAND], KEYBOARD_WITNESS_TIMEOUT_MS)
+      ).stdout.toString('utf8');
+    } catch {
+      return 'unknown';
+    }
+    return parseInputShown(out);
+  }
+
   async clearText(count: number): Promise<void> {
     if (count <= 0) return;
     // One keyevent per adb call: batched multi-keycode calls drop events in
@@ -454,6 +572,156 @@ export class AndroidAdapter implements DeviceAdapter {
     const { stdout } = await this.adb(['logcat', '-d', '-T', seconds]);
     return stdout.toString('utf8').split('\n').filter((l) => l.trim() !== '');
   }
+}
+
+/**
+ * `mInputShown=<bool>` as a whole `key=value` word: it follows whitespace (it
+ * is the LAST word of a line of such words) and its value ends at whitespace
+ * or the line's end, so neither `…mInputShown=` as the tail of a longer name
+ * (`mPrevmInputShown=`) nor
+ * `mInputShown=trueish` reads as an answer.
+ */
+const INPUT_SHOWN_RE = /(?:^|\s)mInputShown=(true|false)(?=\s|$)/g;
+
+/**
+ * ONE argument for `adb shell`: adb hands the string to the device's sh, and
+ * execFile adds no host shell, so the pipe runs on the device. No quoting to
+ * get wrong: `-w` needs none.
+ */
+const INPUT_SHOWN_COMMAND = 'dumpsys input_method | grep -m1 -w mInputShown';
+
+/**
+ * The input method manager's own "is the keyboard shown" out of (a grep of)
+ * `dumpsys input_method`. One value, or several that agree; anything else —
+ * no such word, an unreadable value, two that disagree — is `unknown`. (The
+ * device-side `grep -m1` returns one line, so "two that disagree" only
+ * guards multi-line input: fixtures, or a future unfiltered read.)
+ */
+export function parseInputShown(out: string): KeyboardWitness {
+  const values = new Set([...out.matchAll(INPUT_SHOWN_RE)].map((m) => m[1]));
+  if (values.size !== 1) return 'unknown';
+  return values.has('true') ? 'shown' : 'hidden';
+}
+
+/** One `InsetsSource …` entry of a display's InsetsState, as `dumpsys window displays` lists it. */
+const INSETS_SOURCE_LINE_RE = /^[ \t]*InsetsSource (.*)$/gm;
+/** The IME's insets type: `ITYPE_IME` up to Android 13, `ime` (WindowInsets.Type.toString) from 14. */
+const IME_INSETS_TYPES = new Set(['ITYPE_IME', 'ime']);
+/**
+ * A screen rect as Android prints it everywhere — `[l,t][r,b]`, in a
+ * uiautomator `bounds` attribute and in an InsetsSource `frame=` alike. ONE
+ * pattern for both readers (hoisted 2026-10-03: parseImeInsets had grown a
+ * second copy to test "is this a frame" before parseBounds read it).
+ */
+const BOUNDS_PATTERN = String.raw`\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]`;
+const BOUNDS_RE = new RegExp(BOUNDS_PATTERN);
+/**
+ * The three tokens of an InsetsSource entry parseImeInsets reads (named
+ * 2026-10-03). Each is anchored on BOTH sides — a token starts the entry or
+ * follows whitespace, and its value ends at whitespace or the line's end —
+ * because the entry is a run of `key=value` words and an unanchored match
+ * reads a neighbour: `frame=` is the tail of `visibleFrame=` (API ≤ 33
+ * prints both, and the hidden keyboard's visibleFrame is NOT empty),
+ * `visible=` the tail of any `…visible=`, `type=` of any `…type=`; and
+ * `visible=trueish` must not read as true. All pinned.
+ */
+const INSETS_TYPE_RE = /(?:^|\s)type=(\S+)/;
+const INSETS_FRAME_RE = new RegExp(String.raw`(?:^|\s)frame=(${BOUNDS_PATTERN})(?=\s|$)`);
+const INSETS_VISIBLE_RE = /(?:^|\s)visible=(true|false)(?=\s|$)/;
+/**
+ * DisplayPolicy's own line in the same dump — the second witness
+ * parseImeInsets asks. A whole line, nothing else on it: the same text
+ * mid-line (inside some other object's toString) is not that field.
+ */
+const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
+
+/**
+ * Read the soft keyboard's state out of `dumpsys window displays`.
+ *
+ * The line it reads is the display's InsetsState entry for the IME — the
+ * insets the window manager hands to apps, i.e. the screen area the keyboard
+ * takes from them, in screen pixels (uiautomator's units):
+ *
+ *   API 33, shown   (measured 2026-10-03, emulator, Settings search):
+ *     InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false
+ *   API 33, hidden  (same device):
+ *     InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false
+ *   API 33, ~0.4 s after `back` hid it (the hide animation still running):
+ *     InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=false insetsRoundedCornerFrame=false
+ *   API 36, a booted device that has not shown a keyboard yet (measured the
+ *   same day): NO ime entry — the list holds only
+ *     InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null
+ *   API 34+, shown: `InsetsSource id=… type=ime frame=[l,t][r,b] visible=true …`
+ *   — FROM AOSP's InsetsSource.dump, NOT captured on a device (the one API 36
+ *   AVD available was PIN-locked, so no keyboard could be raised on it); the
+ *   line's layout is verified on that device for the other types.
+ *
+ * What the measurements force:
+ * - `visible=` decides, never the frame alone: a hidden keyboard keeps a
+ *   non-empty `visibleFrame` (the nav-bar strip) and, while it animates out,
+ *   its full `frame`. `visibleFrame` is not read at all (absent from 14 on).
+ * - Only the `InsetsSource …` lines that START a line are read — the state
+ *   list. The same text recurs as `mSource=InsetsSource …` under each
+ *   provider, and `InsetsSourceControl …` is a different object.
+ *
+ * The second witness, since the review of 2026-10-03: DisplayPolicy's
+ * `mIsImeShowing=<bool>` line, printed in the same dump. Measured that day:
+ * `mIsImeShowing=true` (with `mImeHeight=756`) beside the shown line on API
+ * 33, `mIsImeShowing=false` beside the hidden one, and `mIsImeShowing=false`
+ * on the API 36 device with no ime entry. Its value DURING the show/hide
+ * animations was not captured. On API 30–32 the line may not be printed at
+ * all — UNVERIFIED, no such device was at hand — which is why its absence is
+ * tolerated where the InsetsSource entry speaks for itself.
+ *
+ * Never guess (the answer gates a `back` key press, which NAVIGATES when no
+ * keyboard is up — so the worst outcome is a false `shown`, the second worst
+ * a silent `hidden`; `unknown` costs nothing, the callers behave as before):
+ * - no InsetsSource entry that reads fully (type, frame, visible) → unknown:
+ *   the format is not one this parser knows;
+ * - an IME entry that does not read fully, or a visible one with an empty
+ *   frame → unknown;
+ * - several IME entries, or several `mIsImeShowing` lines, that do not all
+ *   say the same thing (state, and frame when visible) → unknown. That is
+ *   the multi-display case: display 0 hidden and display 1 shown must not
+ *   read as `shown` with display 1's frame. Chosen over scoping to the
+ *   default display because all three real dumps are single-display — where
+ *   one display's section ends is not something they can verify. The
+ *   consequence, by design and not a bug: a device with a second display
+ *   reads `unknown` whenever a keyboard is shown (the displays' witnesses
+ *   disagree), i.e. it behaves as before the guard existed;
+ * - `shown` = a visible IME entry with a frame, and `mIsImeShowing` not
+ *   saying false (true, or absent);
+ * - `hidden` = an IME entry with visible=false, and `mIsImeShowing` not
+ *   saying true (false, or absent);
+ * - NO IME entry: `hidden` only when `mIsImeShowing=false` says so (the API
+ *   36 measurement). Otherwise unknown — a dump truncated before the entry,
+ *   or an Android that renamed the type, must not silently switch the guard
+ *   off or stop `dismissKeyboard` pressing back.
+ */
+export function parseImeInsets(dump: string): SoftKeyboard {
+  const unknown: SoftKeyboard = { state: 'unknown' };
+  let recognised = 0;
+  /** What each IME entry says: 'hidden', or the frame text of a visible one. */
+  const entries = new Set<string>();
+  for (const [, body] of dump.matchAll(INSETS_SOURCE_LINE_RE)) {
+    const type = body.match(INSETS_TYPE_RE)?.[1];
+    const frame = body.match(INSETS_FRAME_RE)?.[1];
+    const visible = body.match(INSETS_VISIBLE_RE)?.[1];
+    const reads = type !== undefined && frame !== undefined && visible !== undefined;
+    if (reads) recognised++;
+    if (type === undefined || !IME_INSETS_TYPES.has(type)) continue;
+    if (!reads) return unknown;
+    entries.add(visible === 'true' ? frame : 'hidden');
+  }
+  const flags = new Set([...dump.matchAll(IME_SHOWING_LINE_RE)].map((m) => m[1]));
+  if (recognised === 0 || entries.size > 1 || flags.size > 1) return unknown;
+  const [entry] = entries;
+  const [showing] = flags; // 'true' | 'false' | undefined (line absent)
+  if (entry === undefined) return showing === 'false' ? { state: 'hidden' } : unknown;
+  if (entry === 'hidden') return showing === 'true' ? unknown : { state: 'hidden' };
+  const rect = parseBounds(entry);
+  if (rect.width <= 0 || rect.height <= 0 || showing === 'false') return unknown;
+  return { state: 'shown', frame: rect };
 }
 
 interface RawNode {
@@ -510,7 +778,7 @@ function normalizeNode(raw: RawNode): UiNode {
 }
 
 function parseBounds(bounds: string | undefined): Rect {
-  const m = bounds?.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
+  const m = bounds?.match(BOUNDS_RE);
   if (!m) return zeroRect();
   const [, l, t, r, b] = m.map(Number);
   return { x: l, y: t, width: r - l, height: b - t };

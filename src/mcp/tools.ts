@@ -322,7 +322,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Selector values containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex) — an unquoted text:Sign in fails at "in". ' +
         `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still (same policy as a flow tap: step) and fails with "Timed out … (visible and settled)" ` +
         'if it never does — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes; ' +
-        'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector.',
+        'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector. ' +
+        'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given.',
       inputSchema: {
         platform,
         selector: z.string().optional().describe('Element to tap, e.g. \'id:login_button\' or \'text:"Sign in"\' (quote values with spaces)'),

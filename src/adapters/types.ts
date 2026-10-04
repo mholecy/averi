@@ -60,6 +60,28 @@ export type Selector = string;
 
 export type Key = 'back' | 'home' | 'enter';
 
+/** See `DeviceAdapter.softKeyboardWitness`: confirmed shown / denied / cannot tell. */
+export type KeyboardWitness = 'shown' | 'hidden' | 'unknown';
+
+/**
+ * What a platform can say about its on-screen (soft) keyboard — see
+ * `DeviceAdapter.softKeyboard`. Three answers, not "a frame or undefined",
+ * because the two callers need different things from the missing frame
+ * (2026-10-03): the tap guard only asks "does it cover my point" (hidden and
+ * unknown both mean "tap as before"), but `dismissKeyboard` must tell "no
+ * keyboard — pressing back would NAVIGATE" from "could not tell — keep doing
+ * what was always done". One `undefined` would have forced one of them to
+ * guess.
+ *
+ * `frame` is the screen rect the keyboard covers, in the SAME units as uiTree
+ * rects (Android: pixels), so a tap point can be tested against it directly.
+ */
+export type SoftKeyboard =
+  | { state: 'shown'; frame: Rect }
+  | { state: 'hidden' }
+  /** The platform did not answer, or answered in a shape the adapter does not recognise. Callers behave as before the question existed. */
+  | { state: 'unknown' };
+
 /**
  * Android-only intent parameters for `am start` — how a flow exercises entry
  * points other than the launcher (share sheet, custom actions). String extras
@@ -146,6 +168,46 @@ export interface DeviceAdapter {
    */
   clearText(count: number): Promise<void>;
   pressKey(key: Key): Promise<void>;
+  /**
+   * Is a soft keyboard on screen, and which rect does it cover? (2026-10-03.)
+   *
+   * Platform knowledge, hence here: on Android the keyboard is a separate
+   * window that is NOT in the uiautomator tree, so a node under it resolves,
+   * settles and reports a rect like any other — and a tap at its centre
+   * presses a keyboard key (measured 2026-10-03, finportal login: the submit
+   * button at (249,1466) under an IME frame starting at y=1285; one stray
+   * character went into the password field, nothing was submitted, the tap
+   * was reported done). What to DO about it is interact/keyboard.ts's policy;
+   * this method only answers.
+   *
+   * NEVER throws and never guesses: a command that fails, times out or prints
+   * something unrecognised is `unknown`. iOS always answers `unknown`, without
+   * running anything — there the keyboard is part of the accessibility tree
+   * (its keys are nodes), the covered-target problem has a different shape,
+   * and it is out of scope as of 2026-10-03.
+   *
+   * Not memoized (unlike `viewport`): the answer changes with every focus.
+   */
+  softKeyboard(): Promise<SoftKeyboard>;
+  /**
+   * An INDEPENDENT second opinion on "is a soft keyboard shown" — no frame,
+   * a different source than `softKeyboard()` (2026-10-04). It exists because
+   * the first answer can be stale: measured that day on Android 13, right
+   * after a tap that navigated away the window state still read "shown" with
+   * the full frame for a few seconds, while the input method itself already
+   * said it was not. interact/keyboard.ts asks this immediately before it
+   * presses `back` for keyboard reasons, and only then — never on an
+   * ordinary tap.
+   *
+   * A method of its own rather than an option on `softKeyboard()`: the
+   * caller needs it at a different moment (after the frame has been tested
+   * against the tap point), and one call that sometimes runs two commands
+   * would hide the cost the policy is pinned to.
+   *
+   * Never throws: a failed, timed-out or unreadable query is `unknown`. iOS
+   * always answers `unknown`, without running anything.
+   */
+  softKeyboardWitness(): Promise<KeyboardWitness>;
   setClipboard(text: string): Promise<void>;
 
   /** logcat / os_log excerpt for crash detection. */

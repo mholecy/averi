@@ -129,6 +129,18 @@ describe('IosAdapter interactions', () => {
     await adapter.pressKey('home');
     expect(calls.at(-1)?.full).toBe('idb ui button HOME --udid AAAA-1111');
   });
+
+  it('softKeyboard answers unknown and runs NOTHING: on iOS the keyboard is part of the tree, and a tap must not pay for the question', async () => {
+    const { fn, calls } = fakeExec({});
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn }).softKeyboard()).resolves.toEqual({ state: 'unknown' });
+    expect(calls).toEqual([]);
+  });
+
+  it('softKeyboardWitness cannot tell either, and runs nothing', async () => {
+    const { fn, calls } = fakeExec({});
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn }).softKeyboardWitness()).resolves.toBe('unknown');
+    expect(calls).toEqual([]);
+  });
 });
 
 describe('IosAdapter.uiTree and dispose — one delegation each to the tree source', () => {

@@ -1,12 +1,19 @@
 import type { DeviceAdapter } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { resolveSettled, type SettleOptions, type Target } from './resolve.js';
+import { resolveClearOfKeyboard } from './keyboard.js';
+import type { SettleOptions, Target } from './resolve.js';
 
 /**
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
  * node's center. Returns the resolution note, if any, for the caller to
  * surface — the engine's trace does not print it, the MCP tool does.
+ *
+ * Since 2026-10-03 the node comes from resolveClearOfKeyboard (keyboard.ts):
+ * on Android a target under the soft keyboard is not tapped where it stands —
+ * the keyboard is hidden and the target resolved again first. When that
+ * happened the note says so, and `keyboardHidden` carries the sentence alone
+ * for the one caller that prints no notes (the flow trace's `⚠ tap`).
  *
  * Moved from ui-tree/tap-element.ts on 2026-10-03, where it read the tree
  * once with the adapter's `settle` retry and threw on ambiguity. The poll is
@@ -17,12 +24,12 @@ import { resolveSettled, type SettleOptions, type Target } from './resolve.js';
  * to import the selector layer above it (ARCHITECTURE.md §3).
  */
 export async function tapElement(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'softKeyboard' | 'softKeyboardWitness' | 'pressKey'>,
   target: Target,
   opts: SettleOptions,
-): Promise<{ note?: string }> {
-  const { node, note } = await resolveSettled(adapter, target, opts);
+): Promise<{ note?: string; keyboardHidden?: string }> {
+  const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);
   const point = tapPoint(node);
   await adapter.tap(point.x, point.y);
-  return { note };
+  return { note, keyboardHidden };
 }

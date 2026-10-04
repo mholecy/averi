@@ -1,6 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
-import { AndroidAdapter, parseUiautomatorXml } from '../../src/adapters/android.js';
+import { AndroidAdapter, parseImeInsets, parseInputShown, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 
@@ -546,5 +547,303 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * `adb shell dumpsys window displays`, captured whole on 2026-10-03 (the app
+ * package renamed to com.example.app, nothing else touched):
+ * - api33-keyboard-shown: emulator-5554 (Pixel_3a, API 33, 1080x2220), the
+ *   Settings search field focused, GBoard up;
+ * - api33-keyboard-hidden: the same device with no keyboard up;
+ * - api36-no-ime-source: a freshly booted Pixel_4 AVD (API 36, 1080x2280) on
+ *   its lock screen — it has not shown a keyboard since boot, and its insets
+ *   list has NO ime entry.
+ * A keyboard SHOWN on API 34+ was not captured (that AVD is PIN-locked): the
+ * `type=ime` line below is built from AOSP's InsetsSource.dump on the layout
+ * the API 36 fixture verifies for the other types — from documentation,
+ * unverified on a device.
+ */
+const dumpsys = (name: string) => readFile(new URL(`../fixtures/dumpsys-window-displays-${name}.txt`, import.meta.url), 'utf8');
+
+describe('AndroidAdapter.softKeyboard — is a soft keyboard shown, and which rect does it cover', () => {
+  const STATUS_BAR_33 = '        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false';
+  const STATUS_BAR_36 = '        InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null';
+  const IME_SHOWN_33 = '        InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false';
+  const IME_HIDDEN_33 = '        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false';
+  /** DisplayPolicy's lines, as the real dumps print them. */
+  const SHOWING = '    mIsImeShowing=true\n    mImeHeight=756\n';
+  const HIDING = '    mIsImeShowing=false\n    mImeHeight=0\n';
+  const lines = (...l: string[]) => `    mInsetsState:\n${l.join('\n')}\n    InsetsSourceProviders:\n`;
+
+  it('API 33, keyboard shown (real dump): the IME frame, as a rect in screen pixels', async () => {
+    expect(parseImeInsets(await dumpsys('api33-keyboard-shown'))).toEqual({
+      state: 'shown',
+      frame: { x: 0, y: 1398, width: 1080, height: 822 }, // frame=[0,1398][1080,2220]
+    });
+  });
+
+  it('API 33, keyboard hidden (real dump): hidden — visible=false decides, though visibleFrame still holds the nav-bar strip', async () => {
+    const dump = await dumpsys('api33-keyboard-hidden');
+    expect(dump).toContain('InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false');
+    expect(parseImeInsets(dump)).toEqual({ state: 'hidden' });
+  });
+
+  it('API 33, ~0.4 s after back (real line): visible=false with the full frame still set is HIDDEN, not shown', () => {
+    const animatingOut = '        InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=false insetsRoundedCornerFrame=false';
+    expect(parseImeInsets(lines(STATUS_BAR_33, animatingOut))).toEqual({ state: 'hidden' });
+  });
+
+  it('the measured finportal login line (API 33): frame [0,1285][1080,2220]', () => {
+    const line = '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visibleFrame=[0,1285][1080,2220] visible=true insetsRoundedCornerFrame=false';
+    expect(parseImeInsets(lines(STATUS_BAR_33, line))).toEqual({ state: 'shown', frame: { x: 0, y: 1285, width: 1080, height: 935 } });
+  });
+
+  it('API 36, no keyboard since boot (real dump): the list reads and has no ime entry — hidden', async () => {
+    const dump = await dumpsys('api36-no-ime-source');
+    expect(dump).toContain('InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true');
+    expect(dump).not.toMatch(/type=ime\b/);
+    expect(parseImeInsets(dump)).toEqual({ state: 'hidden' });
+  });
+
+  it('API 34+ format, shown and hidden (FROM DOCUMENTATION, unverified on a device): `id=… type=ime`, no visibleFrame', () => {
+    const ime = (frame: string, visible: boolean) =>
+      `        InsetsSource id=3 type=ime frame=${frame} visible=${visible} flags= sideHint=BOTTOM boundingRects=null`;
+    expect(parseImeInsets(lines(STATUS_BAR_36, ime('[0,1344][1080,2280]', true)))).toEqual({
+      state: 'shown',
+      frame: { x: 0, y: 1344, width: 1080, height: 936 },
+    });
+    expect(parseImeInsets(lines(STATUS_BAR_36, ime('[0,0][0,0]', false)))).toEqual({ state: 'hidden' });
+  });
+
+  // FAIL OPEN: everything below is `unknown` — the callers then behave as
+  // they did before the question existed. None of it may read as shown (a
+  // guessed frame) or as hidden (dismissKeyboard would stop pressing back).
+  it.each([
+    ['an empty dump', ''],
+    ['a dump with no InsetsSource list at all', 'WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)\n  Display: mDisplayId=0\n'],
+    ['only the provider/control lines, not the state list', '        mSource=InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visibleFrame=[0,1285][1080,2220] visible=true\n        mControl=InsetsSourceControl type=ITYPE_IME mLeash=x\n'],
+    ['a list in a format that does not read (no frame=, no visible=)', '        InsetsSource type=ITYPE_STATUS_BAR bounds=Rect(0, 0 - 1080, 66) shown\n        InsetsSource type=ITYPE_IME bounds=Rect(0, 1285 - 1080, 2220) shown\n'],
+    ['an IME entry whose frame does not read', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=Rect(0, 1285 - 1080, 2220) visible=true')],
+    ['an IME entry with no visible=', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220]')],
+    ['an IME entry whose visible is neither true nor false', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visible=maybe')],
+    ['an IME entry with only visibleFrame= (it is not the frame)', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME visibleFrame=[0,1285][1080,2220] visible=true')],
+    ['a visible IME with an EMPTY frame (it says shown but not where)', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=true')],
+    ['two visible IME entries with different frames (two displays)', lines(
+      '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visible=true',
+      '        InsetsSource type=ITYPE_IME frame=[0,600][1920,1080] visible=true',
+    )],
+  ])('unrecognised → unknown: %s', (_name, dump) => {
+    expect(parseImeInsets(dump)).toEqual({ state: 'unknown' });
+  });
+
+  it('a type that merely CONTAINS "ime" is not the IME: with mIsImeShowing=false the list simply has no ime entry (hidden)', () => {
+    const lookalike = '        InsetsSource id=7 type=imeCaptionBar frame=[0,1285][1080,2220] visible=true flags=';
+    expect(parseImeInsets(HIDING + lines(STATUS_BAR_36, lookalike))).toEqual({ state: 'hidden' });
+  });
+
+  // The second witness (review 2026-10-03): DisplayPolicy's mIsImeShowing
+  // line, present in all three real dumps. A false `shown` presses back on a
+  // screen with no keyboard; a silent `hidden` switches the guard off. Both
+  // become `unknown` wherever the two witnesses disagree or one is missing
+  // where it is needed.
+  it('the real dumps carry the witness that agrees with them: true beside shown, false beside hidden and beside no-entry', async () => {
+    expect(await dumpsys('api33-keyboard-shown')).toMatch(/^ {4}mIsImeShowing=true$/m);
+    expect(await dumpsys('api33-keyboard-hidden')).toMatch(/^ {4}mIsImeShowing=false$/m);
+    expect(await dumpsys('api36-no-ime-source')).toMatch(/^ {4}mIsImeShowing=false$/m);
+  });
+
+  it.each([
+    ['two displays, d0 hidden and d1 shown (never display 1\'s frame)', lines(STATUS_BAR_33, IME_HIDDEN_33) + lines(STATUS_BAR_33, IME_SHOWN_33)],
+    ['two displays whose witnesses disagree', HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33) + SHOWING + lines(STATUS_BAR_33, IME_HIDDEN_33)],
+    ['no IME entry and no mIsImeShowing line (a renamed type, an older dump)', lines(STATUS_BAR_36)],
+    ['no IME entry with mIsImeShowing=true (a renamed type while a keyboard is up)', SHOWING + lines(STATUS_BAR_36)],
+    ['visible=true contradicted by mIsImeShowing=false', HIDING + lines(STATUS_BAR_33, IME_SHOWN_33)],
+    ['visible=false contradicted by mIsImeShowing=true', SHOWING + lines(STATUS_BAR_33, IME_HIDDEN_33)],
+    ['mIsImeShowing=false but NO InsetsSource list reads (the witness alone is not a recognised format)', HIDING + '  Display: mDisplayId=0\n'],
+    ['mIsImeShowing=false beside an IME entry that does not read (it is not "no entry")', HIDING + lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=Rect(0, 1285 - 1080, 2220) visible=true')],
+    ['a `visible=` that belongs to a later, longer token (requestedvisible=true)', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] requestedvisible=true')],
+    ['a `visible=` value that only starts with true (visible=trueish)', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visible=trueish')],
+    ['a `type=` that belongs to a longer token (subtype=ITYPE_IME on another source is not an IME entry; no witness)', lines('        InsetsSource subtype=ITYPE_IME type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true')],
+  ])('the witnesses disagree or are missing → unknown: %s', (_name, dump) => {
+    expect(parseImeInsets(dump)).toEqual({ state: 'unknown' });
+  });
+
+  it('a REAL dump truncated before the IME line (the witness is cut off with it, or says true) is unknown, never hidden', async () => {
+    const shown = await dumpsys('api33-keyboard-shown');
+    const cut = shown.slice(0, shown.indexOf('        InsetsSource type=ITYPE_IME'));
+    expect(cut).toContain('InsetsSource type=ITYPE_STATUS_BAR'); // the list was being printed
+    expect(parseImeInsets(cut)).toEqual({ state: 'unknown' }); // mIsImeShowing=true, no entry
+    expect(parseImeInsets(cut.replace(/^ *mIsImeShowing=.*\n/m, ''))).toEqual({ state: 'unknown' }); // no witness at all
+  });
+
+  it('when both witnesses are there and agree, or the entry speaks alone (mIsImeShowing absent — API 30–32, unverified), the entry decides', () => {
+    const frame = { x: 0, y: 1398, width: 1080, height: 822 };
+    expect(parseImeInsets(SHOWING + lines(STATUS_BAR_33, IME_SHOWN_33))).toEqual({ state: 'shown', frame });
+    expect(parseImeInsets(lines(STATUS_BAR_33, IME_SHOWN_33))).toEqual({ state: 'shown', frame });
+    expect(parseImeInsets(HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+    expect(parseImeInsets(lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+    // `mIsImeShowing=true` MID-LINE, after other text, is not the DisplayPolicy field: it must be ignored,
+    // so it neither contradicts a hidden entry nor disagrees with the real witness line.
+    expect(parseImeInsets('    mLastState={foo=1 mIsImeShowing=true}\n' + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+    expect(parseImeInsets('    mLastState={foo=1 mIsImeShowing=true}\n' + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+    // Each anchor on its own: text BEFORE the token (nothing after), and text AFTER the value (nothing before).
+    expect(parseImeInsets('    mLastState: foo=1 mIsImeShowing=true\n' + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+    expect(parseImeInsets('    mIsImeShowing=true mImeHeight=756\n' + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+    // Two displays that agree are not a contradiction.
+    expect(parseImeInsets(HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33) + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
+  });
+
+  it('is exactly one adb call — `shell dumpsys window displays`, with a 2 s budget — and is asked afresh every time', async () => {
+    const calls: { full: string; timeoutMs?: number }[] = [];
+    const dump = await dumpsys('api33-keyboard-shown');
+    const fn: ExecFn = async (cmd, args, opts) => {
+      calls.push({ full: [cmd, ...args].join(' '), timeoutMs: opts?.timeoutMs });
+      return { stdout: Buffer.from(dump), stderr: '' };
+    };
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect((await adapter.softKeyboard()).state).toBe('shown');
+    expect(calls).toEqual([{ full: 'adb -s emulator-5554 shell dumpsys window displays', timeoutMs: 2_000 }]);
+    await adapter.softKeyboard();
+    expect(calls).toHaveLength(2); // not memoized: the answer changes with every focus
+  });
+
+  it.each([
+    ['adb exits non-zero', execErrorLikeExec('adb shell dumpsys window displays', 1, "error: device 'emulator-5554' not found")],
+    ['the call times out', execErrorLikeExec('adb shell dumpsys window displays', null, '', true)],
+    ['adb cannot be spawned', new Error('spawn adb ENOENT')],
+  ])('a failing call does not throw into the tap — %s → unknown', async (_name, failure) => {
+    const fn: ExecFn = async () => {
+      throw failure;
+    };
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).softKeyboard()).resolves.toEqual({ state: 'unknown' });
+  });
+
+  it('end to end through adb: a tap on a node under the keyboard presses back (keyevent 4), re-reads the tree, and taps the node where it now is', async () => {
+    const tree = (top: number) => `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" bounds="[0,0][1080,2220]">
+    <node index="0" text="Sign in" resource-id="com.example.app:id/login_submit" class="android.widget.Button" package="com.example.app" content-desc="" bounds="[99,${top}][399,${top + 132}]"/>
+  </node>
+</hierarchy>
+UI hierchary dumped to: /dev/tty`;
+    const shown = '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visibleFrame=[0,1285][1080,2220] visible=true insetsRoundedCornerFrame=false\n';
+    const hidden = '        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false\n';
+    let keyboardUp = true;
+    const calls: string[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
+      if (full.endsWith('input keyevent 4')) keyboardUp = false;
+      if (full.includes('uiautomator dump')) return out(tree(keyboardUp ? 1400 : 1700));
+      if (full.includes('dumpsys window displays')) return out(keyboardUp ? shown : hidden);
+      if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(keyboardUp));
+      return out('');
+    };
+    const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
+    const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
+    const query = 'adb -s emulator-5554 shell dumpsys window displays';
+    const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
+    // The witness is asked ONCE, right before the key, and not again for the check after it.
+    expect(calls).toEqual([dump, dump, query, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
+    expect(note).toBe('the soft keyboard covered id:login_submit; hidden before tapping');
+  });
+
+  it('end to end, the STALE window state (measured 2026-10-04): window says shown, input method says not — no keyevent; the window state is asked again and, once it has cleared, the node is tapped', async () => {
+    const tree = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" bounds="[0,0][1080,2220]">
+    <node index="0" text="Home" resource-id="com.example.app:id/home_tile" class="android.widget.Button" package="com.example.app" content-desc="" bounds="[99,1400][399,1532]"/>
+  </node>
+</hierarchy>
+UI hierchary dumped to: /dev/tty`;
+    // The two real dumps' lines: stale right after the navigation, caught up a few seconds later.
+    const stale = '    mIsImeShowing=true\n        InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false\n';
+    const caughtUp = '    mIsImeShowing=false\n        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false\n';
+    const calls: string[] = [];
+    let windowQueries = 0;
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
+      if (full.includes('uiautomator dump')) return out(tree);
+      if (full.includes('dumpsys window displays')) return out(++windowQueries <= 2 ? stale : caughtUp);
+      if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(false));
+      return out('');
+    };
+    const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
+    const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
+    const query = 'adb -s emulator-5554 shell dumpsys window displays';
+    const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
+    expect(calls).toEqual([dump, dump, query, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
+    expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
+  });
+});
+
+/** The line `adb shell "dumpsys input_method | grep -m1 mInputShown"` prints — real, emulator-5554 (API 33), 2026-10-04 (false); true was observed on the login screen the same day. */
+const INPUT_SHOWN_LINE = (shown: boolean) =>
+  `  mShowRequested=${shown} mShowExplicitlyRequested=false mShowForced=false mInputShown=${shown}\n`;
+
+describe('AndroidAdapter.softKeyboardWitness — the input method\'s own word, asked before a keyboard back', () => {
+  it('reads mInputShown=true as shown and mInputShown=false as hidden (the real line)', () => {
+    expect(parseInputShown(INPUT_SHOWN_LINE(true))).toBe('shown');
+    expect(parseInputShown(INPUT_SHOWN_LINE(false))).toBe('hidden');
+    expect(parseInputShown('mInputShown=true')).toBe('shown'); // the word alone, no newline
+    expect(parseInputShown('  mInputShown=false mOther=1\n')).toBe('hidden'); // not necessarily last on the line
+  });
+
+  it.each([
+    ['empty output', ''],
+    ['no such word', '  mShowRequested=false mShowForced=false\n'],
+    ['a value that only STARTS with true (mInputShown=trueish; "truthy" too)', '  mShowForced=false mInputShown=trueish\n  mInputShown=truthy\n'],
+    ['a value that only starts with false (mInputShown=falsey)', '  mShowForced=false mInputShown=falsey\n'],
+    ['a value that is neither (mInputShown=1)', '  mInputShown=1\n'],
+    ['a value in another case (mInputShown=TRUE)', '  mInputShown=TRUE\n'],
+    ['a value in another case (mInputShown=False)', '  mInputShown=False\n'],
+    ['the name in another case (minputshown=true)', '  minputshown=true\n'],
+    ['the name as the TAIL of a longer one (mPrevmInputShown=true)', '  mShowForced=false mPrevmInputShown=true\n'],
+    ['the name glued to other text mid-word (xmInputShown=false)', '  foo=xmInputShown=false\n'],
+    ['two words that disagree', '  mInputShown=true\n  mInputShown=false\n'],
+  ])('cannot tell → unknown: %s', (_name, out) => {
+    expect(parseInputShown(out)).toBe('unknown');
+  });
+
+  it('two words that agree are one answer', () => {
+    expect(parseInputShown('  mInputShown=false\n  mInputShown=false\n')).toBe('hidden');
+  });
+
+  it('is exactly one adb call, filtered on the device, with its own 2 s budget', async () => {
+    const calls: { cmd: string; args: string[]; timeoutMs?: number }[] = [];
+    const fn: ExecFn = async (cmd, args, opts) => {
+      calls.push({ cmd, args, timeoutMs: opts?.timeoutMs });
+      return { stdout: Buffer.from(INPUT_SHOWN_LINE(true)), stderr: '' };
+    };
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).softKeyboardWitness()).resolves.toBe('shown');
+    expect(calls).toEqual([
+      // ONE argument after `shell`: the device's sh runs the pipe; -w matches the name as a whole word.
+      { cmd: 'adb', args: ['-s', 'emulator-5554', 'shell', 'dumpsys input_method | grep -m1 -w mInputShown'], timeoutMs: 2_000 },
+    ]);
+  });
+
+  it('is NOT memoized: two calls are two queries, and the second answer is the device\'s new one', async () => {
+    const outputs = [INPUT_SHOWN_LINE(false), INPUT_SHOWN_LINE(true)];
+    let n = 0;
+    const fn: ExecFn = async () => ({ stdout: Buffer.from(outputs[n++]), stderr: '' });
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect([await adapter.softKeyboardWitness(), await adapter.softKeyboardWitness()]).toEqual(['hidden', 'shown']);
+    expect(n).toBe(2);
+  });
+
+  it.each([
+    ['grep finds no line (exit 1 — an Android that does not print mInputShown)', execErrorLikeExec('adb shell dumpsys input_method | grep -m1 mInputShown', 1, '')],
+    ['adb exits non-zero', execErrorLikeExec('adb shell …', 1, "error: device 'emulator-5554' not found")],
+    ['the call times out', execErrorLikeExec('adb shell …', null, '', true)],
+    ['adb cannot be spawned', new Error('spawn adb ENOENT')],
+  ])('a failing call does not throw — %s → unknown', async (_name, failure) => {
+    const fn: ExecFn = async () => {
+      throw failure;
+    };
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).softKeyboardWitness()).resolves.toBe('unknown');
   });
 });

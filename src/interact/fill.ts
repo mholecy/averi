@@ -3,7 +3,8 @@ import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { describeTarget, resolveNow, resolveSettled, type SettleOptions, type Target } from './resolve.js';
+import { pressBackUnlessKeyboardDenied, resolveClearOfKeyboard } from './keyboard.js';
+import { describeTarget, resolveNow, type SettleOptions, type Target } from './resolve.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -25,12 +26,16 @@ export interface FillOptions extends SettleOptions {
 export interface FillResult {
   /** How the field was chosen when several nodes matched (see resolveNow). */
   note?: string;
+  /** The soft keyboard covered the field and was hidden before the focus tap (keyboard.ts) — the sentence, also in `note`. */
+  keyboardHidden?: string;
   /** The fill was legal but suspicious — a masked field already held text and `clear` is off. */
   warning?: string;
 }
 
 /**
- * Focus a field (center tap, after resolveSettled) and type into it. With
+ * Focus a field (center tap, after resolveClearOfKeyboard — the settled
+ * resolution plus, since 2026-10-03, the rule that a field lying under the
+ * keyboard the PREVIOUS field raised is not tapped through it) and type into it. With
  * clear, the current value is deleted first via clearText — typing otherwise
  * APPENDS, the measured Android login trap. A right-edge tap is NOT how clear
  * works: measured 2026-08-05, taps in the field's trailing padding do not
@@ -75,7 +80,7 @@ export async function fillField(
 ): Promise<FillResult> {
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
-  const { node, note } = await resolveSettled(adapter, target, opts);
+  const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);
   const refetch = async (): Promise<UiNode | undefined> => {
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
@@ -132,7 +137,7 @@ export async function fillField(
   }
 
   await adapter.typeText(value);
-  const result: FillResult = { note, warning };
+  const result: FillResult = { note, keyboardHidden, warning };
   if (value !== '') {
     // A masked (secure) field shows one bullet per character to uiautomator
     // and WDA alike, so its content can never EQUAL the value — measured
@@ -180,9 +185,33 @@ export async function fillField(
  * takes enter. Called AFTER a fill has returned, never before (dismissing
  * first closes the keyboard the typing needs), and as its own call so the
  * fill's warning is already in the caller's hands if this throws.
+ *
+ * Android, since 2026-10-03: `back` is pressed only if the adapter does not
+ * say the keyboard is HIDDEN. Before that date it was pressed blindly, and
+ * `back` with no keyboard up NAVIGATES BACK — a field that raises no keyboard
+ * (a custom PIN pad, a hardware keyboard, a picker) turned `dismissKeyboard:
+ * true` into leaving the screen. Three answers, three behaviours:
+ * - shown   → back (it hides the keyboard) — unless, since 2026-10-04, the
+ *   independent witness denies the keyboard (the window state can be stale
+ *   for seconds after a navigation; keyboard.ts#pressBackUnlessKeyboardDenied,
+ *   the one owner of that `back`): then nothing is pressed, and nothing is
+ *   waited for — a keyboard that is not there needs no dismissing;
+ * - hidden  → nothing: there is nothing to dismiss;
+ * - unknown → back, exactly as before — the adapter could not tell (the
+ *   command failed, or printed a format it does not recognise), and a
+ *   keyboard left up over the next tap is the likelier harm after a fill.
+ * One extra adapter call per dismissal (its cost: AndroidAdapter.softKeyboard),
+ * and the witness query when that call says shown.
+ * iOS is unchanged — enter — and its adapter is not asked.
  */
-export async function dismissKeyboard(adapter: Pick<DeviceAdapter, 'platform' | 'pressKey'>): Promise<void> {
-  await adapter.pressKey(adapter.platform === 'android' ? 'back' : 'enter');
+export async function dismissKeyboard(
+  adapter: Pick<DeviceAdapter, 'platform' | 'pressKey' | 'softKeyboard' | 'softKeyboardWitness'>,
+): Promise<void> {
+  if (adapter.platform !== 'android') return adapter.pressKey('enter');
+  const { state } = await adapter.softKeyboard();
+  if (state === 'hidden') return;
+  if (state === 'shown') await pressBackUnlessKeyboardDenied(adapter);
+  else await adapter.pressKey('back');
 }
 
 /** Poll the field until its exposed value satisfies `ok`; returns the last observation. */

@@ -1,0 +1,257 @@
+WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
+  Display: mDisplayId=0 (organized)
+    init=1080x2220 440dpi mMinSizeOfResizeableTaskDp=220 cur=1080x2220 app=1080x2154 rng=1080x948-2220x2088
+    deferred=false mLayoutNeeded=false mTouchExcludeRegion=SkRegion((0,0,1080,2220))
+
+  mLastOrientationSource=WindowedMagnification:0:31@169954532
+  deepestLastOrientationSource=ActivityRecord{d25cde5 u0 com.google.android.settings.intelligence/.modules.search.SearchActivity} t9}
+  overrideConfig={1.0 310mcc260mnc [en_US] ldltr sw393dp w393dp h759dp 440dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2220) mAppBounds=Rect(0, 0 - 1080, 2154) mMaxBounds=Rect(0, 0 - 1080, 2220) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.3 s.59 fontWeightAdjustment=0}
+  mLayoutSeq=255
+  mCurrentFocus=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+  mFocusedApp=ActivityRecord{d25cde5 u0 com.google.android.settings.intelligence/.modules.search.SearchActivity} t9}
+
+  mHoldScreenWindow=null
+  mObscuringWindow=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+  mLastWakeLockHoldingWindow=null
+  mLastWakeLockObscuringWindow=null
+
+  displayId=0
+  mWallpaperTarget=null
+  mLastWallpaperX=0.0 mLastWallpaperY=0.5
+
+  mSystemGestureExclusion=SkRegion((0,1398,82,2220)(998,1398,1080,2220))
+
+  keepClearAreas={Rect(0, 1398 - 1080, 2220)}
+
+  Display areas in top down Z order:
+    * Leaf:36:36
+    * HideDisplayCutout:32:35
+      * OneHanded:34:35
+        * FullscreenMagnification:34:35
+          * Leaf:34:35
+      * FullscreenMagnification:33:33
+        * Leaf:33:33
+      * OneHanded:32:32
+        * Leaf:32:32
+    * WindowedMagnification:0:31
+      * HideDisplayCutout:26:31
+        * OneHanded:26:31
+          * FullscreenMagnification:29:31
+            * Leaf:29:31
+          * Leaf:28:28
+          * FullscreenMagnification:26:27
+            * Leaf:26:27
+      * Leaf:24:25
+      * HideDisplayCutout:18:23
+        * OneHanded:18:23
+          * FullscreenMagnification:18:23
+            * Leaf:18:23
+      * OneHanded:17:17
+        * FullscreenMagnification:17:17
+          * Leaf:17:17
+      * HideDisplayCutout:16:16
+        * OneHanded:16:16
+          * FullscreenMagnification:16:16
+            * Leaf:16:16
+      * OneHanded:15:15
+        * FullscreenMagnification:15:15
+          * Leaf:15:15
+      * HideDisplayCutout:0:14
+        * OneHanded:0:14
+          * ImePlaceholder:13:14
+            * ImeContainer
+          * FullscreenMagnification:0:12
+            * Leaf:3:12
+            * DefaultTaskDisplayArea (organized)
+            * Leaf:0:1
+
+  Task display areas in top down Z order:
+    TaskDisplayArea DefaultTaskDisplayArea
+      overrideConfig={0.0 ?mcc?mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mMaxBounds=Rect(0, 0 - 0, 0) mDisplayRotation=undefined mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=undefined} ?fontWeightAdjustment}
+      mPreferredTopFocusableRootTask=Task{aaf694f #9 type=standard A=10108:com.google.android.settings.intelligence}
+      mLastFocusedRootTask=Task{aaf694f #9 type=standard A=10108:com.google.android.settings.intelligence}
+      Application tokens in top down Z order:
+      * Task{aaf694f #9 type=standard A=10108:com.google.android.settings.intelligence U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+        bounds=[0,0][1080,2220]
+        * ActivityRecord{d25cde5 u0 com.google.android.settings.intelligence/.modules.search.SearchActivity} t9}
+      * Task{bdbce2a #8 type=standard A=10179:com.example.app U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2220]
+        * ActivityRecord{59ce9b8 u0 com.example.app/.MainActivity} t8}
+      * Task{5af513 #1 type=home U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2220]
+        * Task{5b2300a #6 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+          bounds=[0,0][1080,2220]
+          * ActivityRecord{52bce98 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t6}
+      * Task{97b29d5 #3 type=undefined U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=2}
+        bounds=[0,0][1080,2220]
+        * Task{2518e51 #5 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+          bounds=[0,2220][1080,3330]
+        * Task{ad22778 #4 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+          bounds=[0,0][1080,2220]
+
+  no ScreenRotationAnimation 
+
+  rootHomeTask=Task=1
+
+  PinnedTaskController
+    mIsImeShowing=true
+    mImeHeight=756
+    mMinAspectRatio=0.41841003
+    mMaxAspectRatio=2.39
+
+  DisplayFrames w=1080 h=2220 r=0
+
+  DisplayPolicy
+    mCarDockEnablesAccelerometer=true mDeskDockEnablesAccelerometer=true
+ mDeskDockRespectsNoSensorAndLockedWithoutAccelerometer=false
+    mDockMode=EXTRA_DOCK_STATE_UNDOCKED mLidState=LID_OPEN
+    mAwake=true mScreenOnEarly=true mScreenOnFully=true
+    mKeyguardDrawComplete=true mWindowManagerDrawComplete=true
+    mHdmiPlugged=false
+    mLastAppearance=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS
+    mLastBehavior=DEFAULT
+    mShowingDream=false mDreamingLockscreen=false
+    mStatusBar=Window{5b22cc9 u0 StatusBar}
+    mExpandedPanel=Window{e7d67f7 u0 NotificationShade}
+    isKeyguardShowing=false
+    mNavigationBar=Window{a269c7c u0 NavigationBar0}
+    mNavBarOpacityMode=2
+    mNavigationBarCanMove=false
+    mNavigationBarPosition=4
+    mFocusedWindow=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+    mTopFullscreenOpaqueWindowState=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+    mSystemBarColorApps={ActivityRecord{d25cde5 u0 com.google.android.settings.intelligence/.modules.search.SearchActivity} t9}}
+    mNavBarColorWindowCandidate=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+    mNavBarBackgroundWindow=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+    mLastStatusBarAppearanceRegions=
+      AppearanceRegion{LIGHT_STATUS_BARS bounds=[0,0][1080,2220]}
+    mLastLetterboxDetails=
+    mStatusBarBackgroundWindows=
+      Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+    mTopIsFullscreen=false
+    mForceShowNavigationBarEnabled=false mAllowLockscreenWhenOn=false
+    mRemoteInsetsControllerControlsSystemBars=false
+    mDecorInsetsInfo:
+      ROTATION_0={nonDecorInsets=Rect(0, 0 - 0, 66), configInsets=Rect(0, 66 - 0, 66), nonDecorFrame=Rect(0, 0 - 1080, 2154), configFrame=Rect(0, 66 - 1080, 2154)}
+      ROTATION_90={nonDecorInsets=Rect(0, 0 - 0, 66), configInsets=Rect(0, 66 - 0, 66), nonDecorFrame=Rect(0, 0 - 2220, 1014), configFrame=Rect(0, 66 - 2220, 1014)}
+      ROTATION_180={nonDecorInsets=Rect(0, 0 - 0, 66), configInsets=Rect(0, 66 - 0, 66), nonDecorFrame=Rect(0, 0 - 1080, 2154), configFrame=Rect(0, 66 - 1080, 2154)}
+      ROTATION_270={nonDecorInsets=Rect(0, 0 - 0, 66), configInsets=Rect(0, 66 - 0, 66), nonDecorFrame=Rect(0, 0 - 2220, 1014), configFrame=Rect(0, 66 - 2220, 1014)}
+    SystemGestures:
+      mDisplayCutoutTouchableRegionSize=0
+      mSwipeStartThreshold=Rect(66, 66 - 66, 66)
+      mSwipeDistanceThreshold=66
+    Looper state:
+      Looper (android.ui, tid 20) {f9dd1f8}
+        (Total messages: 0, polling=true, quitting=false)
+
+  DisplayRotation
+    mCurrentAppOrientation=SCREEN_ORIENTATION_UNSPECIFIED
+    mLastOrientation=-1
+    mRotation=0 mDeferredRotationPauseCount=0
+    mLandscapeRotation=ROTATION_90 mSeascapeRotation=ROTATION_270
+    mPortraitRotation=ROTATION_0 mUpsideDownRotation=ROTATION_180
+    mSupportAutoRotation=true
+    WindowOrientationListener
+      mEnabled=true
+      mCurrentRotation=ROTATION_0
+      mSensorType=null
+      mSensor={Sensor name="Goldfish 3-axis Accelerometer", vendor="The Android Open Source Project", version=1, type=1, maxRange=39.300102, resolution=2.480159E-4, power=3.0, minDelay=10000}
+      mRate=2
+      AccelSensorJudge
+        mProposedRotation=0
+        mPredictedRotation=0
+        mLastFilteredX=0.0
+        mLastFilteredY=9.776321
+        mLastFilteredZ=0.812345
+        mLastFilteredTimestampNanos=1843337644461 (64.14521ms ago)
+        mTiltHistory={last: 5.0}
+        mFlat=false
+        mSwinging=false
+        mAccelerating=false
+        mOverhead=false
+        mTouched=false
+        mTiltToleranceConfig=[[-25, 70], [-25, 65], [-25, 60], [-25, 65]]
+
+    mCarDockRotation=-1 mDeskDockRotation=-1
+    mUserRotationMode=USER_ROTATION_FREE mUserRotation=ROTATION_0 mCameraRotationMode=0 mAllowAllRotations=unknown
+    mDemoHdmiRotation=ROTATION_90 mDemoHdmiRotationLock=false mUndockedHdmiRotation=-1
+    mLidOpenRotation=-1
+    mFixedToUserRotation=false
+
+  InputConsumers:
+    name=recents_animation_input_consumer pid=1003 user=UserHandle{0}
+
+  WindowInsetsStateController
+    InsetsState
+      mDisplayFrame=Rect(0, 0 - 1080, 2220)
+      mDisplayCutout=DisplayCutout{insets=Rect(0, 0 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=0 displayHeight=0 physicalDisplayWidth=0 physicalDisplayHeight=0 density={0.0} cutoutSpec={} rotation={0} scale={0.0} physicalPixelDisplaySizeRatio={0.0}}}}
+      mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=0, center=Point(0, 0)}, RoundedCorner{position=TopRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomLeft, radius=0, center=Point(0, 0)}]}
+      mRoundedCornerFrame=Rect(0, 0 - 0, 0)
+      mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(816, 0 - 1042, 66) rotation=0}
+        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_LEFT_GESTURES frame=[0,0][82,2220] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_RIGHT_GESTURES frame=[998,0][1080,2220] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_BOTTOM_MANDATORY_GESTURES frame=[0,2132][1080,2220] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_BOTTOM_TAPPABLE_ELEMENT frame=[0,0][0,0] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false
+    Control map:
+      ITYPE_IME -> Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+      ITYPE_STATUS_BAR -> Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+    InsetsSourceProviders:
+      ImeInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 1398 - 1080, 2220)
+        mControl=InsetsSourceControl type=ITYPE_IME mLeash=Surface(name=Surface(name=68a3875 InputMethod)/@0x959a3f3 - animation-leash of insets_animation)/@0xd68ad5d mInitiallyVisible=false mSurfacePosition=Point(0, 66) mInsetsHint=Insets{left=0, top=0, right=0, bottom=822} mSkipAnimationOnce=false
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{68a3875 u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=68a3875 InputMethod)/@0x959a3f3 - animation-leash of insets_animation)/@0xd68ad5d
+        mControlTarget=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+        mImeShowing=true
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_BOTTOM_TAPPABLE_ELEMENT frame=[0,0][0,0] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 0 - 0, 0)
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{a269c7c u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 0 - 1080, 66)
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{5b22cc9 u0 StatusBar}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_BOTTOM_MANDATORY_GESTURES frame=[0,2132][1080,2220] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 2132 - 1080, 2220)
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{a269c7c u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 0 - 1080, 66)
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{5b22cc9 u0 StatusBar}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_RIGHT_GESTURES frame=[998,0][1080,2220] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(998, 0 - 1080, 2220)
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{a269c7c u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_LEFT_GESTURES frame=[0,0][82,2220] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 0 - 82, 2220)
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{a269c7c u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 2154 - 1080, 2220)
+        mOverrideFrames={2011=Rect(0, 2088 - 1080, 2220)}
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{a269c7c u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(0, 0 - 1080, 66)
+        mControl=InsetsSourceControl type=ITYPE_STATUS_BAR mLeash=Surface(name=Surface(name=5b22cc9 StatusBar)/@0xc4b40dd - animation-leash of insets_animation)/@0x5d653a0 mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=66, right=0, bottom=0} mSkipAnimationOnce=false
+        mIsLeashReadyForDispatching=true
+        mWindowContainer=Window{5b22cc9 u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=5b22cc9 StatusBar)/@0xc4b40dd - animation-leash of insets_animation)/@0x5d653a0
+        mControlTarget=Window{c48019c u0 com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.search.SearchActivity}
+
