@@ -7,12 +7,8 @@ import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { tapElement } from '../interact/tap.js';
 import { fillText, launchText, tapText } from './tool-text.js';
-import {
-  appBuildPath,
-  iosTreeSourceFor,
-  loadProjectConfig,
-  type AveriConfig,
-} from '../flow/config.js';
+import type { AveriConfig } from '../flow/config.js';
+import { appBuildPath, iosTreeSourceFor, loadProjectConfig } from '../flow/load.js';
 import { assertSpecSchema } from '../verify/assert.js';
 import { captureFrame } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
@@ -63,7 +59,7 @@ import type { Platform, UiNode } from '../adapters/types.js';
  * as ARCHITECTURE.md §2): its description and input schema, which includes
  * parsing the assert specs; resolving the platform to an adapter through the
  * registry, this layer's own state; the config answers it needs, asked of
- * flow/config.ts (which build to install, which iOS tree source, where
+ * flow/load.ts (which build to install, which iOS tree source, where
  * averi.yaml is) or of run/commands.ts (which activity, which baseline dir);
  * one call into an adapter method, interact/ or run/; and the response —
  * text through tool-text.ts or the callee, wrapped by `text`/`image` below.
@@ -111,7 +107,7 @@ const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
  * registry.get opts for the tree-reading tools that work without averi.yaml.
  * The policy — android never reads the config, ios fails loudly on an
  * invalid one, a missing one means the default — is
- * flow/config.ts#iosTreeSourceFor; this only wraps its answer.
+ * flow/load.ts#iosTreeSourceFor; this only wraps its answer.
  */
 const treeOpts = async (p: Platform, configPath?: string): Promise<AdapterOpts> => ({
   treeSource: await iosTreeSourceFor(p, configPath),
@@ -222,7 +218,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, path, configPath: cp }) => {
-      const appPath = path ?? appBuildPath(await loadProjectConfig(cp), p);
+      const appPath = path ?? appBuildPath((await loadProjectConfig(cp)).cfg, p);
       await (await registry.get(p)).install(appPath);
       return text(`Installed ${appPath} on ${p}`);
     },
@@ -517,7 +513,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: env }) => {
-      const cfg = await loadProjectConfig(cp);
+      const project = await loadProjectConfig(cp);
       // Parsed before the contract is read: a malformed assert spec is the
       // caller's most likely mistake, and it stays the error they see when both
       // are wrong.
@@ -528,7 +524,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const { sections, screenshots } = await runVerification(
         {
           platforms: normalizePlatforms(requested),
-          cfg,
+          cfg: project.cfg,
+          env: project.env,
           specs,
           state,
           flow,
@@ -538,7 +535,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         },
         // Only the ios leg has a treeSource; the registry normalizes it away
         // for android, so one opts expression serves both legs.
-        (p) => registry.get(p, iosOpts(cfg)),
+        (p) => registry.get(p, iosOpts(project.cfg)),
       );
       return { content: [...text(sections.join('\n\n')).content, ...screenshots.map(image)] };
     },

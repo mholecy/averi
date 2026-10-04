@@ -67,6 +67,7 @@ function fake(platform: Platform): FakeAdapter {
 const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => ({
   platforms: ['android', 'ios'] as Platform[],
   cfg: CFG,
+  env: {},
   specs: [],
   baselineDir: '/tmp/averi-test-baselines',
   ...over,

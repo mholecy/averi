@@ -1,14 +1,12 @@
 import { resolve } from 'node:path';
 import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import {
-  configDir,
   resolveLaunchActivity,
   launchConsultsConfigActivity,
-  loadProjectConfig,
-  projectConfigPath,
   type AveriConfig,
   type LaunchEntry,
 } from '../flow/config.js';
+import { configDir, loadProjectConfig, projectConfigPath } from '../flow/load.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
 import { captureFrame } from '../verify/capture.js';
@@ -67,9 +65,9 @@ async function runOnEngine(
   resolveAdapter: ResolveAdapterFor,
   run: (engine: FlowEngine) => Promise<TraceEntry[]>,
 ): Promise<{ adapter: DeviceAdapter; text: string }> {
-  const cfg = await loadProjectConfig(call.configPath);
+  const { cfg, env } = await loadProjectConfig(call.configPath);
   const adapter = await resolveAdapter(cfg);
-  const trace = await run(new FlowEngine(cfg, adapter, { environment: call.environment }));
+  const trace = await run(new FlowEngine(cfg, adapter, { env, environment: call.environment }));
   return { adapter, text: formatTrace(trace) + (await appHealth(adapter, cfg)) };
 }
 
@@ -104,7 +102,7 @@ export async function runAsserts({ adapter, specs, baselineDir, configPath }: As
   const results = await new Verifier(adapter, { baselineDir }).assertAll(specs);
   let health = '';
   try {
-    health = await appHealth(adapter, await loadProjectConfig(configPath));
+    health = await appHealth(adapter, (await loadProjectConfig(configPath)).cfg);
   } catch {
     // no averi.yaml → no app to health-check; asserts stand on their own
     //
@@ -154,8 +152,8 @@ export interface LaunchCall extends LaunchEntry {
  *   runAsserts above.
  */
 export async function launchActivityFor(call: LaunchCall): Promise<string | undefined> {
-  const cfg = launchConsultsConfigActivity(call)
+  const project = launchConsultsConfigActivity(call)
     ? await loadProjectConfig(call.configPath).catch(() => undefined)
     : undefined;
-  return resolveLaunchActivity(cfg, call);
+  return resolveLaunchActivity(project?.cfg, call);
 }

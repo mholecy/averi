@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The one sleep owner (util/sleep.ts) is a zero-delay macrotask yield here,
 // not a wait: every poll cadence and the fill's 350 ms focus delay collapse to
@@ -54,7 +54,12 @@ flows:
       - tap: { id: tab_payments }
 `);
 
-const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1 };
+/** The environment every engine here resolves `${VAR}` from — a value, not process.env (2026-10-04). */
+const TEST_ENV = { TEST_USER: 'alice@bank.md', TEST_PASSWORD: 'hunter2secret', TEST_PIN: '1234' };
+/** TEST_ENV without the named variables — for the "variable is not set" cases. */
+const envWithout = (...names: string[]) =>
+  Object.fromEntries(Object.entries(TEST_ENV).filter(([k]) => !names.includes(k)));
+const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1, env: TEST_ENV };
 
 function buildScreens() {
   resetLayout();
@@ -85,15 +90,6 @@ function buildScreens() {
 
 beforeEach(() => {
   resetClearStateCount();
-  process.env.TEST_USER = 'alice@bank.md';
-  process.env.TEST_PASSWORD = 'hunter2secret';
-  process.env.TEST_PIN = '1234';
-});
-
-afterEach(() => {
-  delete process.env.TEST_USER;
-  delete process.env.TEST_PASSWORD;
-  delete process.env.TEST_PIN;
 });
 
 describe('ensureState', () => {
@@ -191,14 +187,13 @@ flows:
       - type_pin: { value: $sms }
       - wait: { state: done, timeout: 1s }
 `);
-    process.env.TEST_SMS = '111-111-111';
     const fake = new FakeAdapter(screens, 'otp');
     const origType = fake.typeText.bind(fake);
     fake.typeText = async (text: string) => {
       await origType(text);
       if (fake.typed.length === 9) fake.current = 'dashboard';
     };
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('enter_otp');
+    const trace = await new FlowEngine(cfg, fake, { ...FAST, env: { ...TEST_ENV, TEST_SMS: '111-111-111' } }).runFlow('enter_otp');
     expect(fake.typed).toEqual(['1', '1', '1', '1', '1', '1', '1', '1', '1']);
     expect(trace).toContainEqual({ action: 'type_pin', detail: '9 digits' });
   });
@@ -1303,9 +1298,8 @@ describe('secrets', () => {
   });
 
   it('missing env var error names the variable and the credential', async () => {
-    delete process.env.TEST_PIN;
     const fake = new FakeAdapter(buildScreens(), 'pin_login');
-    await expect(new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in'))
+    await expect(new FlowEngine(CONFIG, fake, { ...FAST, env: envWithout('TEST_PIN') }).ensureState('logged_in'))
       .rejects.toThrow(/TEST_PIN is not set \(needed for credential "pin"\)/);
   });
 });
@@ -1721,7 +1715,6 @@ flows:
   });
 
   it('redacts credential values in the fill trace', async () => {
-    process.env.TEST_PIN = '4321';
     const cfgSecret = parseConfig(`
 app: { android: { package: md.bank.app } }
 credentials:
@@ -1732,7 +1725,7 @@ flows:
       - fill: { id: amount_input, value: $pin }
 `);
     const fake = formFake();
-    const trace = await new FlowEngine(cfgSecret, fake, FAST).runFlow('f');
+    const trace = await new FlowEngine(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '4321' } }).runFlow('f');
     expect(JSON.stringify(trace)).not.toContain('4321');
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = ***' });
   });
@@ -1852,34 +1845,28 @@ flows:
       - type: { value: $password }
 `);
 
-  beforeEach(() => {
-    process.env.TEST_ALFONS_USER = 'martha.key';
-    process.env.TEST_STARTERKIT_USER = 'starter.user';
-  });
-
-  afterEach(() => {
-    delete process.env.TEST_ALFONS_USER;
-    delete process.env.TEST_STARTERKIT_USER;
-    delete process.env.AVERI_ENV;
-  });
+  // The environments' variables on top of the base ones — a value handed to
+  // the engine, so no test here sets or scrubs the process environment.
+  const ENV_USERS = { ...TEST_ENV, TEST_ALFONS_USER: 'martha.key', TEST_STARTERKIT_USER: 'starter.user' };
+  const MULTI = { ...FAST, env: ENV_USERS };
 
   it('types the selected environment’s username and the shared password', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    await new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow('type_username');
+    await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow('type_username');
     // username from the environment, password inherited from base credentials
     expect(fake.typed).toEqual(['starter.user', 'hunter2secret']);
   });
 
   it('switching environment switches the username without touching averi.yaml', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    process.env.AVERI_ENV = 'alfons_dev';
-    await new FlowEngine(MULTI_ENV, fake, FAST).runFlow('type_username');
+    // AVERI_ENV comes from the same environment value (.env.averi can set it), not from the process
+    await new FlowEngine(MULTI_ENV, fake, { ...MULTI, env: { ...ENV_USERS, AVERI_ENV: 'alfons_dev' } }).runFlow('type_username');
     expect(fake.typed[0]).toBe('martha.key');
   });
 
   it('names the active environment in the trace so a mix-up is visible', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const trace = await new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow(
+    const trace = await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow(
       'type_username',
     );
     expect(trace[0]).toEqual({ action: 'environment starterkit', detail: 'overrides: username' });
@@ -1887,7 +1874,7 @@ flows:
 
   it('keeps environment usernames redacted from the trace', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const trace = await new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow(
+    const trace = await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow(
       'type_username',
     );
     expect(JSON.stringify(trace)).not.toContain('starter.user');
@@ -1895,17 +1882,17 @@ flows:
 
   it('fails before touching the device when the environment is unknown', () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    expect(() => new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'nope' })).toThrow(
+    expect(() => new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'nope' })).toThrow(
       /Unknown environment "nope"/,
     );
     expect(fake.taps).toEqual([]);
   });
 
   it('points at the environment when its env var is missing', async () => {
-    delete process.env.TEST_STARTERKIT_USER;
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    const { TEST_STARTERKIT_USER: _unset, ...withoutStarterkit } = ENV_USERS;
     await expect(
-      new FlowEngine(MULTI_ENV, fake, { ...FAST, environment: 'starterkit' }).runFlow('type_username'),
+      new FlowEngine(MULTI_ENV, fake, { ...MULTI, env: withoutStarterkit, environment: 'starterkit' }).runFlow('type_username'),
     ).rejects.toThrow(/TEST_STARTERKIT_USER is not set .*environment "starterkit"/);
   });
 });

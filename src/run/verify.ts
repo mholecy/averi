@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
+import type { EnvValues } from '../flow/credentials.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
@@ -47,6 +48,8 @@ interface VerificationRequestBase {
   /** Already normalized: deduped, canonical android-then-ios order. */
   platforms: Platform[];
   cfg: AveriConfig;
+  /** The environment the legs' engines resolve `${VAR}` from — the loader's, beside `cfg`. */
+  env: EnvValues;
   specs: AssertSpec[];
   state?: string;
   flow?: string;
@@ -304,7 +307,7 @@ const contractRefusal = (problems: string[], source?: string): string =>
  *
  * The path resolves against the process cwd, as it always has — NOT against
  * averi.yaml's directory, which is where the baselines and the build paths
- * hang (flow/config.ts). The asymmetry is inherited, and is why the read
+ * hang (flow/load.ts). The asymmetry is inherited, and is why the read
  * error prints the resolved path beside the one given: a relative contract
  * path next to a `configPath` in another directory is the likely way to get
  * this wrong.
@@ -367,7 +370,7 @@ export async function runVerification(
   req: VerificationRequest,
   resolveAdapter: (platform: Platform) => Promise<DeviceAdapter>,
 ): Promise<VerificationOutput> {
-  const { platforms, cfg, specs } = req;
+  const { platforms, cfg, env, specs } = req;
   // Read and parsed here, first: nothing below may touch a device before the
   // contract is known to exist, to parse, and (next) to carry usable values.
   const contract = req.contractPath === undefined ? req.contract : await loadContract({ ...req, contractPath: req.contractPath });
@@ -383,7 +386,7 @@ export async function runVerification(
 
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);
-    const engine = new FlowEngine(cfg, adapter, { environment: req.environment });
+    const engine = new FlowEngine(cfg, adapter, { env, environment: req.environment });
     const trace: TraceEntry[] = [];
     if (req.state) trace.push(...(await engine.ensureState(req.state)));
     if (req.flow) trace.push(...(await engine.runFlow(req.flow)));

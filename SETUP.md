@@ -108,6 +108,11 @@ values come from a gitignored `.env.averi` next to it (auto-loaded; real env var
 precedence, so CI injects secrets normally). Values are redacted (`***`) from every trace and
 error — you will never see them.
 
+`.env.averi` supplies `${VAR}` credential values and `AVERI_ENV` only. It is read into the
+run's own environment on every tool call and is never exported to the shell or to the child
+processes averi starts (adb, xcrun, xcodebuild) — toolchain variables such as `ANDROID_SERIAL`,
+`ANDROID_HOME` or `DEVELOPER_DIR` belong in the shell or in `.mcp.json`'s `env`, not here.
+
 1. Add `.env.averi` to `.gitignore` **before** creating the file.
 2. Ask the user for the test credentials their login flow needs and write them to `.env.averi`
    at the repo root. Variable names are free-form — they only have to match the `${...}`

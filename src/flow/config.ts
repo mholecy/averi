@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent, Platform } from '../adapters/types.js';
@@ -12,7 +10,15 @@ import {
 } from '../ui-tree/element-spec.js';
 import { elementAssertSchema, type ElementAssert } from '../verify/element-assert.js';
 
-/** Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4). */
+/**
+ * Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4), the types it
+ * infers, and the pure walks over them (reference validation, the container
+ * and destructive-flow rules, the launch-activity rule). Nothing here reads a
+ * file or the environment: loading is flow/load.ts, credentials are
+ * flow/credentials.ts (split 2026-10-04, architecture review C2/C6 — this
+ * file had grown from five responsibilities to seven and held the one
+ * `process.env` write in the layer).
+ */
 
 export interface Condition {
   element?: ElementSpec;
@@ -311,115 +317,6 @@ export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfi
   return result.data;
 }
 
-/**
- * Build paths in averi.yaml are written relative to the CONFIG FILE, not to the
- * process working directory, and are returned absolute.
- *
- * The two coincide when the session runs from the app repo and diverge the
- * moment it does not — nested repos, monorepos, a `configPath:` pointing into a
- * subdirectory. Resolving against cwd turned `apk: android/app/build/...` into
- * `<outer-root>/android/app/build/...` and install_app failed, while passing
- * `configPath` fixed only the lookup of the file itself, never the paths inside
- * it. Config-relative keeps averi.yaml portable: it stays correct in the app
- * repo standing alone and when that repo is nested inside another.
- *
- * Absolute paths pass through untouched.
- */
-export function resolveBuildPaths(cfg: AveriConfig, configPath: string): AveriConfig {
-  const dir = dirname(resolve(configPath));
-  const app = { ...cfg.app };
-  if (app.android?.apk !== undefined) {
-    app.android = { ...app.android, apk: resolve(dir, app.android.apk) };
-  }
-  if (app.ios?.app !== undefined) {
-    app.ios = { ...app.ios, app: resolve(dir, app.ios.app) };
-  }
-  return { ...cfg, app };
-}
-
-/** The directory averi.yaml lives in — the project root every other project-relative path hangs off. */
-export function configDir(configPath: string): string {
-  return dirname(resolve(configPath));
-}
-
-export async function loadConfig(path: string): Promise<AveriConfig> {
-  return resolveBuildPaths(parseConfig(await readFile(path, 'utf8'), path), path);
-}
-
-/**
- * All project configuration lives with the project, not with averi: averi.yaml
- * is looked up against the process cwd (the project root when the server is
- * launched from .mcp.json) unless the caller points elsewhere. Here since
- * 2026-10-03, with the two loaders below — it was mcp/tools.ts's, and the
- * tool compositions in run/ need the same default.
- */
-export const projectConfigPath = (configPath?: string): string => resolve(configPath ?? 'averi.yaml');
-
-/**
- * The strict load every config-REQUIRING tool starts with: credential values
- * auto-load from a sibling .env.averi first (said on stderr, since stdout is
- * the MCP transport), then averi.yaml must exist and parse.
- */
-export async function loadProjectConfig(configPath?: string): Promise<AveriConfig> {
-  const path = projectConfigPath(configPath);
-  const applied = await loadEnvBeside(path);
-  if (applied.length > 0) console.error(`averi: loaded ${applied.join(', ')} from .env.averi`);
-  return loadConfig(path);
-}
-
-/**
- * The build to install when the caller names none: averi.yaml's, for the
- * platform asked about (already resolved against the config's directory by
- * loadConfig). The error is the `install_app` tool's wording, kept
- * byte-identical when the lookup moved here from its handler (2026-10-03).
- */
-export function appBuildPath(cfg: AveriConfig, platform: Platform): string {
-  const path = platform === 'android' ? cfg.app.android?.apk : cfg.app.ios?.app;
-  if (path === undefined) throw new Error(`No path given and averi.yaml has no app.${platform} build path`);
-  return path;
-}
-
-/**
- * The iOS tree-source kind for tree-reading tools that predate averi.yaml and
- * must keep working without one (ui_snapshot, tap, type_text, scroll_until,
- * assert). A policy in three parts, each pinned (tests/flow/config.test.ts,
- * and through the protocol in tests/mcp/tools.test.ts):
- *
- * - android never reads the config. It has no tree source, and an invalid
- *   averi.yaml must not break android calls on these config-blind tools.
- * - ios with NO averi.yaml → `undefined`: the registry's default (idb).
- * - ios with a present-but-invalid averi.yaml throws — see loadConfigIfPresent.
- *
- * Returns the kind, not registry options: until 2026-10-03 this was
- * `loadIosOpts` in the MCP layer, but which file is read and when its absence
- * is tolerated is config policy; only the wrapping into the registry's
- * options is the MCP layer's.
- */
-export async function iosTreeSourceFor(
-  platform: Platform,
-  configPath?: string,
-): Promise<IosTreeSourceKind | undefined> {
-  if (platform === 'android') return undefined;
-  return (await loadConfigIfPresent(projectConfigPath(configPath)))?.app.ios?.treeSource;
-}
-
-/**
- * loadConfig for tools that predate averi.yaml and must keep working without
- * one (ui_snapshot, tap, ...): a MISSING file is `undefined`, but a
- * present-and-invalid file still throws — silently ignoring a broken config
- * would mask the very setting (e.g. app.ios.treeSource) the caller came for.
- */
-export async function loadConfigIfPresent(path: string): Promise<AveriConfig | undefined> {
-  let raw: string;
-  try {
-    raw = await readFile(path, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw err;
-  }
-  return resolveBuildPaths(parseConfig(raw, path), path);
-}
-
 /** What a launch call says about its entry point — a flow `launch:` step or a `launch_app` call. */
 export interface LaunchEntry {
   platform: Platform;
@@ -496,25 +393,6 @@ export function resolveLaunchActivity(cfg: AveriConfig | undefined, entry: Launc
   return android?.package === entry.appId ? android.activity : undefined;
 }
 
-export interface ResolvedCredentials {
-  /** `$name` → template, base overlaid with the chosen environment. */
-  credentials: Record<string, string>;
-  /** The environment actually applied, or undefined when running on base only. */
-  environment?: string;
-}
-
-/**
- * Pick the credential set for a run: base `credentials:` overlaid per-key with
- * `environments.<name>.credentials`.
- *
- * Precedence, most specific first: explicit `requested` (tool argument) →
- * `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in
- * an already-gitignored file) → `defaultEnvironment:` → base only.
- *
- * Why this exists: one username for two backends caused an hour's misdiagnosis
- * on 2026-08-06 — the wrong login name is rejected by the bank one screen AFTER
- * it is typed, so an environment mix-up presents as a credentials problem.
- */
 /**
  * A mistake in the config or the environment, as opposed to the app not being
  * on the screen a flow expected: an undeclared credential, an unset `${VAR}`,
@@ -534,65 +412,6 @@ export class SetupError extends Error {
   }
 }
 
-export function resolveCredentials(cfg: AveriConfig, requested?: string): ResolvedCredentials {
-  const name = requested ?? process.env.AVERI_ENV ?? cfg.defaultEnvironment;
-  const base = cfg.credentials ?? {};
-  if (name === undefined) return { credentials: base };
-
-  const known = Object.keys(cfg.environments ?? {});
-  const env = cfg.environments?.[name];
-  if (!env) {
-    const source =
-      requested !== undefined ? 'requested'
-      : process.env.AVERI_ENV !== undefined ? 'AVERI_ENV'
-      : 'defaultEnvironment';
-    throw new SetupError(
-      `Unknown environment "${name}" (from ${source}) — known: ${known.join(', ') || '(none declared)'}`,
-    );
-  }
-  return { credentials: { ...base, ...env.credentials }, environment: name };
-}
-
-/**
- * Load `.env.averi` sitting next to averi.yaml into process.env — the
- * project-local home for credential values (gitignored). Shell/CI exports
- * win over the file; values the FILE itself supplied earlier are refreshed
- * on every load, so editing .env.averi mid-session takes effect on the next
- * tool call (measured 2026-08-05: the old first-load-wins behavior silently
- * kept typing stale credentials for the server's whole lifetime). Returns
- * the names applied or refreshed.
- *
- * Format: `KEY=value` per line; `export KEY=value`, blank lines, `#` comments
- * and single/double quotes around the value are tolerated.
- */
-const envVarsFromFile = new Set<string>();
-
-export async function loadEnvBeside(configPath: string): Promise<string[]> {
-  const envPath = join(dirname(configPath), '.env.averi');
-  let raw: string;
-  try {
-    raw = await readFile(envPath, 'utf8');
-  } catch {
-    return [];
-  }
-  const applied: string[] = [];
-  for (const line of raw.split('\n')) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if (!m || line.trimStart().startsWith('#')) continue;
-    const [, name, rawValue] = m;
-    const value = rawValue.replace(/^(['"])(.*)\1$/, '$2');
-    const fresh = process.env[name] === undefined;
-    const refreshed = envVarsFromFile.has(name) && process.env[name] !== value;
-    if (fresh || refreshed) {
-      process.env[name] = value;
-      envVarsFromFile.add(name);
-      applied.push(name);
-    }
-  }
-  return applied;
-}
-
-/** Cross-reference checks zod can't express: state/flow names must exist. */
 /**
  * The steps nested inside a step, or `undefined` if this kind holds none.
  *
@@ -665,25 +484,47 @@ function stateReachIsDestructive(cfg: AveriConfig, name: string, stack: Set<stri
  * repeat, and the recovery pass would run the wipe twice. So a kind added to
  * Step without a case here costs a skipped recovery — slower, exactly the
  * pre-2026-08-26 behaviour — never a wipe.
+ *
+ * Since 2026-10-04 that cost is not paid silently either: `SAFE_LEAVES` must
+ * name every kind of Step that is neither `launch` nor a container, or `tsc`
+ * fails (the `satisfies` below). A new kind forces the one decision this walk
+ * exists to make — safe to repeat, or not — at compile time, where before it
+ * was made by omission (architecture review 2026-10-04, C4's one-line residue).
  */
+type StepKind = Step extends infer S ? (S extends unknown ? keyof S : never) : never;
+/**
+ * The kinds `childSteps` descends into — the platform override counts twice,
+ * once per key. A NEW CONTAINER GOES HERE AND IN `childSteps`, NEVER IN
+ * `SAFE_LEAVES`: the compile error a new kind raises asks for a name in the
+ * leaf list, and `repeat: true` there would class a `clearState` nested in a
+ * `repeat:` as safe to re-run — the fail-unsafe answer to a check that exists
+ * to make the decision explicit. tests/flow/config.test.ts pins that every
+ * kind named here is one `childSteps` descends into, so the two lists cannot
+ * drift apart.
+ */
+export type ContainerKind = 'branch' | 'optional' | 'android' | 'ios';
+/** Every leaf kind a flow may repeat without consequence; `launch` decides for itself. Containers never belong here (see ContainerKind). */
+const SAFE_LEAVES = {
+  tap: true,
+  type: true,
+  type_pin: true,
+  swipe: true,
+  scroll_until: true,
+  fill: true,
+  assert: true,
+  wait: true,
+} as const satisfies Record<Exclude<StepKind, 'launch' | ContainerKind>, true>;
+
 function stepsAreDestructive(steps: Step[]): boolean {
   return steps.some((step) => {
     if ('launch' in step) return step.launch.clearState === true;
     const children = childSteps(step);
     if (children !== undefined) return stepsAreDestructive(children);
-    return !(
-      'tap' in step ||
-      'type' in step ||
-      'type_pin' in step ||
-      'swipe' in step ||
-      'scroll_until' in step ||
-      'fill' in step ||
-      'assert' in step ||
-      'wait' in step
-    );
+    return !Object.keys(step).some((kind) => Object.hasOwn(SAFE_LEAVES, kind));
   });
 }
 
+/** Cross-reference checks zod can't express: state/flow names must exist. */
 function validateReferences(cfg: AveriConfig, source: string): void {
   const fail = (msg: string) => {
     throw new Error(`Invalid ${source}: ${msg}`);

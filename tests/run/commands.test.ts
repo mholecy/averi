@@ -253,20 +253,25 @@ describe('launchActivityFor — which activity a launch_app call starts', () => 
 
   // The android half of the guard changes no answer (the rule says undefined
   // off android); what it does is keep an ios launch from loading averi.yaml
-  // and .env.averi at all. The env file's side effect is the observable.
+  // and .env.averi at all. Since 2026-10-04 the env file is read into a value,
+  // not into process.env, so the observable is the stderr line the load
+  // prints — each test gets its own temp dir, so the line is fresh each time.
   describe('beside a .env.averi', () => {
     const VAR = 'AVERI_COMMANDS_TEST_LAUNCH_ENV';
+    const LOADED = `averi: loaded ${VAR} from .env.averi`;
+    let stderr: ReturnType<typeof vi.spyOn>;
     beforeEach(async () => {
-      delete process.env[VAR];
+      stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
       await file('.env.averi', `${VAR}=loaded\n`);
     });
     afterEach(() => {
-      delete process.env[VAR];
+      stderr.mockRestore();
+      expect(process.env[VAR]).toBeUndefined(); // never written, loaded or not
     });
 
-    it('an ios call does not load the project config: the variable stays unset', async () => {
+    it('an ios call does not load the project config: nothing is said about the env file', async () => {
       expect(await launchActivityFor({ ...call, platform: 'ios', configPath: await validConfig() })).toBeUndefined();
-      expect(process.env[VAR]).toBeUndefined();
+      expect(stderr).not.toHaveBeenCalledWith(LOADED);
     });
 
     // The load is skipped by the RULE's own "when", not by platform alone:
@@ -276,18 +281,12 @@ describe('launchActivityFor — which activity a launch_app call starts', () => 
       ['an intent', { intent: { action: 'android.intent.action.SEND' } }, undefined],
     ])('an android call naming %s does not load it either', async (_what, entry, activity) => {
       expect(await launchActivityFor({ ...call, ...entry, configPath: await validConfig() })).toBe(activity);
-      expect(process.env[VAR]).toBeUndefined();
+      expect(stderr).not.toHaveBeenCalledWith(LOADED);
     });
 
     it('control: the same call on android does load it', async () => {
-      const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
-      try {
-        expect(await launchActivityFor({ ...call, configPath: await validConfig() })).toBe('.MainActivity');
-        expect(process.env[VAR]).toBe('loaded');
-        expect(stderr).toHaveBeenCalledWith(`averi: loaded ${VAR} from .env.averi`);
-      } finally {
-        stderr.mockRestore();
-      }
+      expect(await launchActivityFor({ ...call, configPath: await validConfig() })).toBe('.MainActivity');
+      expect(stderr).toHaveBeenCalledWith(LOADED);
     });
   });
 

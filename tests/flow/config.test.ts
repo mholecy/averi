@@ -1,17 +1,12 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  appBuildPath,
-  iosTreeSourceFor,
+  childSteps,
+  flowIsDestructive,
   resolveLaunchActivity,
   launchConsultsConfigActivity,
-  loadConfig,
-  loadConfigIfPresent,
-  loadEnvBeside,
   parseConfig,
-  resolveCredentials,
+  type ContainerKind,
+  type Step,
 } from '../../src/flow/config.js';
 
 const VALID = `
@@ -235,217 +230,6 @@ states:
   });
 });
 
-describe('loadEnvBeside', () => {
-  it('loads .env.averi next to the config without overriding existing env', async () => {
-    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
-    const dir = await mkdtemp(join(tmpdir(), 'averi-env-'));
-    try {
-      await writeFile(
-        join(dir, '.env.averi'),
-        [
-          '# comment',
-          'AVERI_T_PLAIN=hello',
-          'export AVERI_T_EXPORTED=world',
-          'AVERI_T_QUOTED="with spaces"',
-          "AVERI_T_SINGLE='single'",
-          'AVERI_T_EXISTING=from-file',
-          '',
-          'not a valid line',
-        ].join('\n'),
-      );
-      process.env.AVERI_T_EXISTING = 'from-shell';
-      const applied = await loadEnvBeside(join(dir, 'averi.yaml'));
-      expect(applied.sort()).toEqual(['AVERI_T_EXPORTED', 'AVERI_T_PLAIN', 'AVERI_T_QUOTED', 'AVERI_T_SINGLE']);
-      expect(process.env.AVERI_T_PLAIN).toBe('hello');
-      expect(process.env.AVERI_T_EXPORTED).toBe('world');
-      expect(process.env.AVERI_T_QUOTED).toBe('with spaces');
-      expect(process.env.AVERI_T_SINGLE).toBe('single');
-      expect(process.env.AVERI_T_EXISTING).toBe('from-shell'); // shell wins
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-      for (const k of Object.keys(process.env)) if (k.startsWith('AVERI_T_')) delete process.env[k];
-    }
-  });
-
-  it('refreshes values the file supplied when the file changes, but never shell exports', async () => {
-    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
-    const dir = await mkdtemp(join(tmpdir(), 'averi-env-'));
-    try {
-      process.env.AVERI_T_SHELL = 'from-shell';
-      await writeFile(join(dir, '.env.averi'), 'AVERI_T_ROTATED=first\nAVERI_T_SHELL=from-file');
-      await loadEnvBeside(join(dir, 'averi.yaml'));
-      expect(process.env.AVERI_T_ROTATED).toBe('first');
-
-      // credential rotated mid-session — the next load must pick it up
-      await writeFile(join(dir, '.env.averi'), 'AVERI_T_ROTATED=second\nAVERI_T_SHELL=from-file');
-      const applied = await loadEnvBeside(join(dir, 'averi.yaml'));
-      expect(process.env.AVERI_T_ROTATED).toBe('second');
-      expect(applied).toContain('AVERI_T_ROTATED');
-      expect(process.env.AVERI_T_SHELL).toBe('from-shell'); // shell still wins
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-      for (const k of Object.keys(process.env)) if (k.startsWith('AVERI_T_')) delete process.env[k];
-    }
-  });
-
-  it('returns empty when no .env.averi exists', async () => {
-    expect(await loadEnvBeside('/nonexistent/averi.yaml')).toEqual([]);
-  });
-});
-
-describe('loadConfigIfPresent', () => {
-  it('returns undefined for a missing file — configless tools stay configless', async () => {
-    expect(await loadConfigIfPresent('/nonexistent/averi.yaml')).toBeUndefined();
-  });
-
-  it('parses a present file and STILL throws on an invalid one', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'averi-cfg-'));
-    try {
-      const path = join(dir, 'averi.yaml');
-      await writeFile(path, 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
-      expect((await loadConfigIfPresent(path))?.app.ios?.treeSource).toBe('wda');
-
-      await writeFile(path, 'app:\n  ios: { bundleId: md.bank.app, treeSource: nope }\n');
-      await expect(loadConfigIfPresent(path)).rejects.toThrow(/Invalid/);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-});
-
-/**
- * The regression these cover: with the server running one directory above the
- * app repo, `apk: android/app/build/...` resolved against THAT directory and
- * install_app failed. Passing configPath found the file and changed nothing
- * about the paths inside it.
- */
-describe('build paths resolve against averi.yaml, not the working directory', () => {
-  const withConfig = async (yaml: string, run: (path: string) => Promise<void>) => {
-    const dir = await mkdtemp(join(tmpdir(), 'averi-paths-'));
-    try {
-      const path = join(dir, 'averi.yaml');
-      await writeFile(path, yaml);
-      await run(path);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  };
-
-  it('makes a relative apk / .app absolute against the config directory', async () => {
-    await withConfig(
-      'app:\n' +
-        '  android: { package: md.bank.app, apk: android/build/app.apk }\n' +
-        '  ios: { bundleId: md.bank.app, app: ios/build/App.app }\n',
-      async (path) => {
-        const cfg = await loadConfig(path);
-        expect(cfg.app.android?.apk).toBe(join(dirname(path), 'android/build/app.apk'));
-        expect(cfg.app.ios?.app).toBe(join(dirname(path), 'ios/build/App.app'));
-      },
-    );
-  });
-
-  it('leaves an absolute path untouched', async () => {
-    await withConfig('app:\n  android: { package: md.bank.app, apk: /builds/app.apk }\n', async (path) => {
-      expect((await loadConfig(path)).app.android?.apk).toBe('/builds/app.apk');
-    });
-  });
-
-  it('resolves against the config even when cwd is elsewhere — the nested-repo case', async () => {
-    await withConfig('app:\n  android: { package: md.bank.app, apk: build/app.apk }\n', async (path) => {
-      const cwdBefore = process.cwd();
-      process.chdir(tmpdir());
-      try {
-        expect((await loadConfig(path)).app.android?.apk).toBe(join(dirname(path), 'build/app.apk'));
-      } finally {
-        process.chdir(cwdBefore);
-      }
-    });
-  });
-
-  it('applies to the lenient loader too — configless tools must not see raw relative paths', async () => {
-    await withConfig('app:\n  ios: { bundleId: md.bank.app, app: build/App.app }\n', async (path) => {
-      expect((await loadConfigIfPresent(path))?.app.ios?.app).toBe(join(dirname(path), 'build/App.app'));
-    });
-  });
-
-  it('leaves a config without build paths alone', async () => {
-    await withConfig('app:\n  android: { package: md.bank.app }\n', async (path) => {
-      expect((await loadConfig(path)).app.android).toEqual({ package: 'md.bank.app' });
-    });
-  });
-});
-
-const MULTI_ENV = `
-app:
-  ios: { bundleId: md.bank.app }
-credentials:
-  username: \${AVERI_BANK_USERNAME}
-  pin: \${AVERI_BANK_PIN}
-environments:
-  alfons_dev:
-    credentials:
-      username: \${AVERI_ALFONS_USERNAME}
-  starterkit:
-    credentials:
-      username: \${AVERI_STARTERKIT_USERNAME}
-flows:
-  login:
-    steps:
-      - type_pin: { value: $pin }
-`;
-
-describe('resolveCredentials', () => {
-  const cfg = () => parseConfig(MULTI_ENV);
-
-  afterEach(() => {
-    delete process.env.AVERI_ENV;
-  });
-
-  it('returns base credentials when no environment is selected', () => {
-    const r = resolveCredentials(cfg());
-    expect(r.environment).toBeUndefined();
-    expect(r.credentials.username).toBe('${AVERI_BANK_USERNAME}');
-  });
-
-  it('overlays only the keys the environment declares, inheriting the rest', () => {
-    const r = resolveCredentials(cfg(), 'starterkit');
-    expect(r.environment).toBe('starterkit');
-    expect(r.credentials.username).toBe('${AVERI_STARTERKIT_USERNAME}');
-    // the shared secret is NOT repeated per environment and must still resolve
-    expect(r.credentials.pin).toBe('${AVERI_BANK_PIN}');
-  });
-
-  it('prefers the explicit request over AVERI_ENV', () => {
-    process.env.AVERI_ENV = 'alfons_dev';
-    expect(resolveCredentials(cfg(), 'starterkit').environment).toBe('starterkit');
-  });
-
-  it('falls back to AVERI_ENV, then to defaultEnvironment', () => {
-    process.env.AVERI_ENV = 'starterkit';
-    expect(resolveCredentials(cfg()).environment).toBe('starterkit');
-    delete process.env.AVERI_ENV;
-
-    const withDefault = parseConfig(MULTI_ENV.replace('environments:', 'defaultEnvironment: alfons_dev\nenvironments:'));
-    expect(resolveCredentials(withDefault).environment).toBe('alfons_dev');
-  });
-
-  it('names the source when the environment is unknown — the mix-up must not be silent', () => {
-    expect(() => resolveCredentials(cfg(), 'nope')).toThrow(/Unknown environment "nope" \(from requested\)/);
-    process.env.AVERI_ENV = 'nope';
-    expect(() => resolveCredentials(cfg())).toThrow(/from AVERI_ENV/);
-  });
-
-  it('rejects a defaultEnvironment that is not declared', () => {
-    expect(() => parseConfig(MULTI_ENV.replace('environments:', 'defaultEnvironment: typo\nenvironments:'))).toThrow(
-      /defaultEnvironment "typo" is not declared/,
-    );
-  });
-});
-
 describe('app.android.package format', () => {
   it('rejects a package name that is not a package name — before any adb command could interpolate it', () => {
     expect(() =>
@@ -505,60 +289,49 @@ app:
   });
 });
 
-describe('appBuildPath — the build install_app uses when the call names none', () => {
-  const cfg = parseConfig(`
-app:
-  android: { package: md.bank.app, apk: build/app.apk }
-  ios:     { bundleId: md.bank.app, app: build/Bank.app }
-`);
+describe('ContainerKind and childSteps name the same kinds — the safe-leaf check depends on it', () => {
+  // `SAFE_LEAVES` (config.ts) is checked against every Step kind that is
+  // neither `launch` nor in ContainerKind. ContainerKind is hand-written; a
+  // container missing from it would make tsc ask for the kind in SAFE_LEAVES,
+  // and `repeat: true` there would class a nested clearState as safe. This
+  // table is typed Record<ContainerKind, Step>, so a kind added to ContainerKind
+  // must appear here, and the assertion says childSteps descends into it.
+  const samples: Record<ContainerKind, Step> = {
+    branch: { branch: [{ when: { state: 's' }, do: [{ wait: { state: 's' } }] }] },
+    optional: { optional: [{ tap: { id: 'x' } }] },
+    android: { android: { tap: { id: 'x' } } },
+    ios: { ios: { tap: { id: 'x' } } },
+  };
 
-  it('picks the build of the platform asked about', () => {
-    expect(appBuildPath(cfg, 'android')).toBe('build/app.apk');
-    expect(appBuildPath(cfg, 'ios')).toBe('build/Bank.app');
+  it.each(Object.entries(samples))('%s is a container childSteps descends into', (_kind, step) => {
+    expect(childSteps(step)).toBeDefined();
+    expect(childSteps(step)?.length).toBeGreaterThan(0);
   });
 
-  it('no build path for that platform — or no section at all — is an error naming the missing key', () => {
-    const none = parseConfig('app:\n  android: { package: md.bank.app }\n');
-    expect(() => appBuildPath(none, 'android')).toThrow('No path given and averi.yaml has no app.android build path');
-    expect(() => appBuildPath(none, 'ios')).toThrow('No path given and averi.yaml has no app.ios build path');
+  it('and the leaves are not: childSteps has nothing to descend into', () => {
+    const leaves: Step[] = [
+      { launch: {} },
+      { tap: { id: 'x' } },
+      { type: { value: 'v' } },
+      { type_pin: { value: 'v' } },
+      { swipe: { direction: 'up' } },
+      { scroll_until: { element: { id: 'x' } } },
+      { fill: { id: 'x', value: 'v' } },
+      { assert: [{ element: { id: 'x' } }] },
+      { wait: { state: 's' } },
+    ];
+    for (const leaf of leaves) expect(childSteps(leaf)).toBeUndefined();
   });
 });
 
-describe('iosTreeSourceFor — the config-optional tree tools\' policy', () => {
-  let dir: string;
-  const write = async (content: string) => {
-    dir = await mkdtemp(join(tmpdir(), 'averi-tree-source-'));
-    const path = join(dir, 'averi.yaml');
-    await writeFile(path, content);
-    return path;
-  };
-  afterEach(async () => {
-    if (dir) await rm(dir, { recursive: true, force: true });
-  });
-
-  const INVALID = 'flows: 12\n';
-
-  it('android never reads the config: a present-but-invalid averi.yaml is not an error', async () => {
-    expect(await iosTreeSourceFor('android', await write(INVALID))).toBeUndefined();
-  });
-
-  it('android gets no kind even from a valid config that names one', async () => {
-    const path = await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
-    expect(await iosTreeSourceFor('android', path)).toBeUndefined();
-  });
-
-  it('ios: the same invalid averi.yaml throws, naming the file', async () => {
-    const path = await write(INVALID);
-    await expect(iosTreeSourceFor('ios', path)).rejects.toThrow(path);
-  });
-
-  it('ios: a missing averi.yaml is undefined — the registry\'s default applies', async () => {
-    await write(INVALID); // a real directory, with the file under another name
-    expect(await iosTreeSourceFor('ios', join(dir, 'no-such.yaml'))).toBeUndefined();
-  });
-
-  it('ios: the configured kind, or undefined when the config names none', async () => {
-    expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n'))).toBe('wda');
-    expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toBeUndefined();
+describe('stepsAreDestructive reads SAFE_LEAVES by own key only', () => {
+  it('a step whose only key is an inherited Object property is NOT a safe leaf', () => {
+    // `kind in SAFE_LEAVES` would see `toString` on Object.prototype and call
+    // the step safe; `Object.hasOwn` does not. Such a step cannot come out of
+    // parseConfig (the union is strict), so the rule is pinned on the walk.
+    const cfg = parseConfig('app:\n  android: { package: md.bank.app }\nflows:\n  f:\n    steps:\n      - tap: { id: x }\n');
+    const hostile = { ...cfg, flows: { f: { steps: [{ toString: {} } as unknown as Step] } } };
+    expect(flowIsDestructive(hostile, 'f')).toBe(true);
+    expect(flowIsDestructive(cfg, 'f')).toBe(false);
   });
 });

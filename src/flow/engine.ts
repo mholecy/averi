@@ -15,7 +15,6 @@ import { Verifier } from '../verify/assert.js';
 import {
   resolveLaunchActivity,
   flowIsDestructive,
-  resolveCredentials,
   SetupError,
   type AveriConfig,
   type Condition,
@@ -23,6 +22,7 @@ import {
   type Step,
   type TapSpec,
 } from './config.js';
+import { resolveCredentials, type Credentials, type EnvValues, type ResolvedValue } from './credentials.js';
 
 export interface TraceEntry {
   action: string;
@@ -107,6 +107,16 @@ export interface EngineOptions {
    * Omit to fall back to `AVERI_ENV` then `defaultEnvironment:`.
    */
   environment?: string;
+  /**
+   * The environment `${VAR}` values resolve from — the loader's
+   * (flow/load.ts, `ProjectConfig.env`: the real environment over the
+   * project's `.env.averi`). REQUIRED, not defaulted to `process.env`, since
+   * 2026-10-04: the engine used to read `process.env` at step time, so it
+   * silently depended on the right loader having written the file into it
+   * first; now a caller that has not loaded the environment cannot build an
+   * engine. Tests pass a plain object.
+   */
+  env: EnvValues;
 }
 
 /**
@@ -138,20 +148,17 @@ export class FlowEngine {
   private readonly reachRecheckMs: number;
   private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
-  private readonly credentials: Record<string, string>;
-  private readonly environment: string | undefined;
+  private readonly credentials: Credentials;
 
   constructor(
     private readonly cfg: AveriConfig,
     private readonly adapter: DeviceAdapter,
-    opts: EngineOptions = {},
+    opts: EngineOptions,
   ) {
     // Resolved once per engine so a run cannot type one environment's username
     // and another's password, and so an unknown name fails before touching the
     // device rather than mid-login.
-    const resolved = resolveCredentials(cfg, opts.environment);
-    this.credentials = resolved.credentials;
-    this.environment = resolved.environment;
+    this.credentials = resolveCredentials(cfg, opts.env, opts.environment);
     this.pollMs = opts.pollMs ?? 500;
     this.tapTimeoutMs = opts.tapTimeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
@@ -186,9 +193,10 @@ export class FlowEngine {
    * error and has no way to tell it was really the wrong backend.
    */
   private logEnvironment(): void {
-    if (this.environment === undefined) return;
-    const overrides = Object.keys(this.cfg.environments?.[this.environment]?.credentials ?? {});
-    this.log(`environment ${this.environment}`, overrides.length > 0 ? `overrides: ${overrides.join(', ')}` : undefined);
+    const { environment } = this.credentials;
+    if (environment === undefined) return;
+    const overrides = Object.keys(this.cfg.environments?.[environment]?.credentials ?? {});
+    this.log(`environment ${environment}`, overrides.length > 0 ? `overrides: ${overrides.join(', ')}` : undefined);
   }
 
   private async ensureStateInner(name: string): Promise<void> {
@@ -838,47 +846,14 @@ export class FlowEngine {
   }
 
   /**
-   * `$name` → credentials[name] → `${ENV_VAR}` expansion. Credential values
-   * are registered for redaction. Plain strings pass through.
+   * `$name` → credentials[name] → `${ENV_VAR}` expansion (flow/credentials.ts
+   * owns the rule and the wording). What is the engine's: a resolved secret is
+   * registered for redaction before anything can log it.
    */
-  private resolveValue(raw: string): { value: string; secret: boolean } {
-    if (raw.startsWith('$') && !raw.startsWith('${')) {
-      const key = raw.slice(1);
-      const template = this.credentials[key];
-      if (template === undefined) {
-        const where =
-          this.environment === undefined ?
-            'declare it under credentials:'
-          : `declare it under credentials: or environments.${this.environment}.credentials`;
-        throw new SetupError(`Unknown credential "$${key}" — ${where}`);
-      }
-      const value = this.expandEnv(template, key);
-      this.secrets.add(value);
-      return { value, secret: true };
-    }
-    if (raw.includes('${')) {
-      const value = this.expandEnv(raw);
-      this.secrets.add(value);
-      return { value, secret: true };
-    }
-    return { value: raw, secret: false };
-  }
-
-  private expandEnv(template: string, credential?: string): string {
-    return template.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name: string) => {
-      const value = process.env[name];
-      if (value === undefined) {
-        const forWhom =
-          credential ?
-            ` (needed for credential "${credential}"` +
-            `${this.environment === undefined ? '' : ` in environment "${this.environment}"`})`
-          : '';
-        throw new SetupError(
-          `Environment variable ${name} is not set${forWhom} — set it in .env.averi beside averi.yaml, or export it, and retry`,
-        );
-      }
-      return value;
-    });
+  private resolveValue(raw: string): ResolvedValue {
+    const resolved = this.credentials.resolve(raw);
+    if (resolved.secret) this.secrets.add(resolved.value);
+    return resolved;
   }
 
   private log(action: string, detail?: string): void {
