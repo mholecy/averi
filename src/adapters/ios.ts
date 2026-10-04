@@ -5,7 +5,7 @@ import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IosTreeSource } from './ios-tree-source.js';
-import type { Device, DeviceAdapter, Key, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from './types.js';
+import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
 /**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
@@ -227,19 +227,12 @@ export class IosAdapter implements DeviceAdapter {
     else await this.idbUi(['key', '40']); // HID usage 40 = Return/Enter
   }
 
-  /**
-   * Always `unknown`, and no process is run (2026-10-03): the iOS keyboard is
-   * part of the accessibility tree, so "which rect does it cover" is a tree
-   * question nobody has needed answered yet. See DeviceAdapter.softKeyboard.
-   */
-  async softKeyboard(): Promise<SoftKeyboard> {
-    return { state: 'unknown' };
-  }
-
-  /** Always `unknown`, and no process is run — as softKeyboard above (2026-10-04). */
-  async softKeyboardWitness(): Promise<KeyboardWitness> {
-    return 'unknown';
-  }
+  // No `keyboard` oracle (KeyboardOracle, types.ts): the iOS keyboard is part
+  // of the accessibility tree — its keys are nodes — so "which rect does it
+  // cover" is a tree question nobody has needed answered yet (2026-10-03).
+  // Until 2026-10-04 this class answered `unknown` from two stub methods
+  // without running anything; the absence of the oracle now says the same,
+  // and interact/keyboard.ts queries no device and presses no key here.
 
   async setClipboard(text: string): Promise<void> {
     const env = await this.detectEnv();

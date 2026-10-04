@@ -566,7 +566,7 @@ describe('tap and type_text under the Android soft keyboard', () => {
     const submit = nodeAt('button', 'login_submit', { x: 99, y: 1400, width: 300, height: 132 });
     const otp = nodeAt('textfield', 'login_otp', { x: 99, y: 1600, width: 882, height: 132 });
     const fake = new FakeAdapter({ login: { ...screen(submit, otp), rect: { x: 0, y: 0, width: 1080, height: 2220 } } }, 'login');
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachKeyboard({ state: 'shown', frame: KEYBOARD });
     fake.onKey = (key, self) => {
       if (key === 'back') for (const n of self.live().children) n.rect.y += 300;
     };
@@ -589,7 +589,7 @@ describe('tap and type_text under the Android soft keyboard', () => {
     const { call } = await connect({ android: fake });
     const result = await call('tap', { platform: 'android', x: 249, y: 1466 });
     expect(result.text).toBe('Tapped (249, 1466)');
-    expect(fake.keyboardQueries).toBe(0);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(0);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
   });
@@ -604,7 +604,7 @@ describe('tap and type_text under the Android soft keyboard', () => {
 
   it('the two keyboard sources never agree: an error response saying neither back nor the tap was sent', async () => {
     const fake = loginFake();
-    fake.keyboardWitness = 'hidden';
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     const { call } = await connect({ android: fake });
     const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });
     expect(result.isError).toBe(true);
@@ -617,7 +617,7 @@ describe('tap and type_text under the Android soft keyboard', () => {
   it('a keyboard that stays is an error response naming the recovery, and nothing is tapped', async () => {
     const fake = loginFake();
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'shown', frame: KEYBOARD };
+      self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
     const { call } = await connect({ android: fake });
     const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });

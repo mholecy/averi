@@ -130,16 +130,11 @@ describe('IosAdapter interactions', () => {
     expect(calls.at(-1)?.full).toBe('idb ui button HOME --udid AAAA-1111');
   });
 
-  it('softKeyboard answers unknown and runs NOTHING: on iOS the keyboard is part of the tree, and a tap must not pay for the question', async () => {
-    const { fn, calls } = fakeExec({});
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn }).softKeyboard()).resolves.toEqual({ state: 'unknown' });
-    expect(calls).toEqual([]);
-  });
-
-  it('softKeyboardWitness cannot tell either, and runs nothing', async () => {
-    const { fn, calls } = fakeExec({});
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn }).softKeyboardWitness()).resolves.toBe('unknown');
-    expect(calls).toEqual([]);
+  it('has no keyboard oracle: on iOS the keyboard is part of the tree, so a tap pays nothing for the question and interact/ presses no key here', () => {
+    const { fn } = fakeExec({});
+    const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    expect(adapter.keyboard).toBeUndefined();
+    expect('keyboard' in adapter).toBe(false); // not even a stub: the class declares nothing
   });
 });
 

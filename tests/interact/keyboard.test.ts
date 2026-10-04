@@ -7,7 +7,13 @@ import {
   KEYBOARD_DISAGREEMENT_POLL_MS,
   KEYBOARD_HIDE_DELAY_MS,
   KeyboardStateDisagreement,
+  dismissKeyboard,
+  keyboardAction,
   resolveClearOfKeyboard,
+  windowAnywhere,
+  windowOver,
+  type KeyboardAction,
+  type KeyboardSample,
 } from '../../src/interact/keyboard.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { FakeAdapter, node, screen } from '../helpers/fake.js';
@@ -51,8 +57,7 @@ function loginFake() {
     },
     'login',
   );
-  fake.keyboard = { state: 'shown', frame: KEYBOARD };
-  fake.keyboardWitness = 'shown'; // a keyboard that is really up: both sources say so
+  fake.attachKeyboard({ state: 'shown', frame: KEYBOARD }, 'shown'); // a keyboard that is really up: both sources say so
   fake.onKey = (key, self) => {
     if (key === 'back') submit(self).rect.y = SUBMIT_AFTER_RESIZE_Y;
   };
@@ -60,21 +65,23 @@ function loginFake() {
 }
 const submit = (fake: FakeAdapter): UiNode => fake.live().children[1];
 
-/** One ordered log of everything the guard does to the device. */
+/** One ordered log of everything the guard does to the device — and asks of its keyboard oracle, when it has one. */
 function recorded(fake: FakeAdapter) {
   const events: string[] = [];
-  const wrap = <K extends 'uiTree' | 'softKeyboard' | 'softKeyboardWitness' | 'pressKey' | 'tap'>(name: K, label: (...args: never[]) => string) => {
-    const real = (fake[name] as (...args: unknown[]) => Promise<unknown>).bind(fake);
-    (fake as unknown as Record<string, unknown>)[name] = async (...args: unknown[]) => {
+  const wrap = <T extends object, K extends keyof T>(on: T, name: K, label: (...args: never[]) => string) => {
+    const real = (on[name] as (...args: unknown[]) => Promise<unknown>).bind(on);
+    (on as unknown as Record<string, unknown>)[name as string] = async (...args: unknown[]) => {
       events.push((label as (...a: unknown[]) => string)(...args));
       return real(...args);
     };
   };
-  wrap('uiTree', () => 'read');
-  wrap('softKeyboard', () => 'keyboard?');
-  wrap('softKeyboardWitness', () => 'witness?');
-  wrap('pressKey', (key: string) => `key:${key}`);
-  wrap('tap', (x: number, y: number) => `tap:${x},${y}`);
+  wrap(fake, 'uiTree', () => 'read');
+  if (fake.keyboard !== undefined) {
+    wrap(fake.keyboard, 'state', () => 'keyboard?');
+    wrap(fake.keyboard, 'witness', () => 'witness?');
+  }
+  wrap(fake, 'pressKey', (key: string) => `key:${key}`);
+  wrap(fake, 'tap', (x: number, y: number) => `tap:${x},${y}`);
   return events;
 }
 
@@ -86,7 +93,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_password', FAST);
     expect(events).toEqual(['read', 'read', 'keyboard?', 'tap:540,1166']);
-    expect(fake.witnessQueries).toBe(0); // the independent witness is never asked on an ordinary tap
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0); // the independent witness is never asked on an ordinary tap
     expect(fake.keys).toEqual([]);
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
     expect(sleeps).toEqual([FAST.pollMs]); // the settle pause only
@@ -112,7 +119,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
   it('a keyboard that STAYS after the one dismissal: nothing is tapped, back is not pressed twice, and the error says how to recover', async () => {
     const fake = loginFake();
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'shown', frame: KEYBOARD }; // back did not hide it, and nothing re-laid-out
+      self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD }; // back did not hide it, and nothing re-laid-out
     };
     const error = await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AfterKeyboardDismissal);
@@ -126,7 +133,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     expect((error as AfterKeyboardDismissal).backPressed).toBe('the soft keyboard covered id:login_submit; back pressed');
     expect(fake.taps).toEqual([]);
     expect(fake.keys).toEqual(['back']);
-    expect(fake.keyboardQueries).toBe(2);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(2);
   });
 
   it('the keyboard is gone but the layout did NOT move (adjustPan / adjustNothing): the tap lands on the same point, now uncovered', async () => {
@@ -150,7 +157,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
 
   it('a point beside a keyboard that does not span the screen (floating / split) is not covered', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: { x: 500, y: 1285, width: 580, height: 935 } };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: { x: 500, y: 1285, width: 580, height: 935 } };
     await tapElement(fake, 'id:login_submit', FAST); // centre x = 249 < 500
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
@@ -158,9 +165,9 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
 
   it.each([['hidden'], ['unknown']] as const)('keyboard %s: one query, no back, the tap as before', async (state) => {
     const fake = loginFake();
-    fake.keyboard = { state };
+    fake.attachedKeyboard.windowAnswers.current = { state };
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(fake.keyboardQueries).toBe(1);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
@@ -169,7 +176,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
   it('a keyboard the second query cannot read (unknown) fails open — the point is tapped — but the note does not claim it was hidden', async () => {
     const fake = loginFake();
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'unknown' };
+      self.attachedKeyboard.windowAnswers.current = { state: 'unknown' };
     };
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(fake.taps).toEqual(['login_submit']);
@@ -180,7 +187,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
   it('all four edges: left and top inclusive, right (x+width) and bottom (y+height) exclusive', async () => {
     const at = async (x: number, y: number) => {
       const fake = loginFake();
-      fake.keyboard = { state: 'shown', frame: { x: 160, y: 1285, width: 240, height: 300 } }; // covers x in [160,400), y in [1285,1585)
+      fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: { x: 160, y: 1285, width: 240, height: 300 } }; // covers x in [160,400), y in [1285,1585)
       submit(fake).rect = { x: x - 150, y: y - 66, width: 300, height: 132 }; // centre exactly (x,y)
       await tapElement(fake, 'id:login_submit', FAST);
       return fake.keys;
@@ -195,20 +202,20 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     expect(await at(200, 1585)).toEqual([]); // y + height: outside
   });
 
-  it('iOS: the guard has no platform branch — the adapter is asked, answers unknown (as IosAdapter does, without a device query), and nothing else happens', async () => {
+  it('an adapter WITHOUT the keyboard oracle (iOS): nothing is asked, no key is pressed, the tap lands where the target resolved — the guard has no platform branch', async () => {
     const fake = loginFake();
     fake.platform = 'ios';
-    fake.keyboard = { state: 'unknown' }; // IosAdapter.softKeyboard's constant answer (tests/adapters/ios.test.ts)
+    fake.keyboard = undefined; // as IosAdapter (tests/adapters/ios.test.ts): no oracle, no device query
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'tap:249,1466']);
+    expect(events).toEqual(['read', 'read', 'tap:249,1466']);
     expect(fake.keys).toEqual([]);
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
   });
 
-  it('the answer alone decides, not the platform: whatever adapter says "shown" over the point gets the dismissal', async () => {
+  it('the oracle alone decides, not the platform: whatever adapter says "shown" over the point gets the dismissal', async () => {
     const fake = loginFake();
-    fake.platform = 'ios'; // no real iOS adapter says shown; the policy does not look
+    fake.platform = 'ios'; // no real iOS adapter has an oracle; the policy does not look at the label
     await tapElement(fake, 'id:login_submit', FAST);
     expect(fake.keys).toEqual(['back']);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1766 }]);
@@ -255,7 +262,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     const login = fake.live();
     const raced = new FakeAdapter({ login, previous: screen(node({ role: 'text', identifier: 'previous_title' })) }, 'login');
     raced.backTo = 'previous';
-    raced.keyboardWitness = 'shown'; // wrong too, for this test: the worst case, both sources stale
+    raced.attachKeyboard({ state: 'unknown' }, 'shown'); // the witness wrong too, for this test: the worst case, both sources stale
     return raced;
   }
   const TIMEOUT_AFTER_BACK =
@@ -265,7 +272,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
 
   it('the RACE: shown at query time, gone by the key press — back navigates away, and the failure says back was pressed', async () => {
     const fake = raceFake();
-    fake.softKeyboard = async () => ({ state: 'shown', frame: KEYBOARD }); // what the adapter saw; fake.keyboard is not shown, so back navigates
+    fake.attachedKeyboard.state = async () => ({ state: 'shown', frame: KEYBOARD }); // what the adapter saw; fake.keyboard is not shown, so back navigates
     const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as AfterKeyboardDismissal;
     expect(fake.current).toBe('previous');
     expect(error).toBeInstanceOf(AfterKeyboardDismissal);
@@ -278,8 +285,8 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
 
   it('when the witness COULD NOT BE ASKED (the fallback pressed back on the window state alone) the failure says so', async () => {
     const fake = raceFake();
-    fake.softKeyboard = async () => ({ state: 'shown', frame: KEYBOARD });
-    fake.keyboardWitness = 'unknown';
+    fake.attachedKeyboard.state = async () => ({ state: 'shown', frame: KEYBOARD });
+    fake.attachedKeyboard.witnessAnswers.current = 'unknown';
     await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(
       'After pressing back to hide the soft keyboard that covered id:login_submit at (249,1466): Timed out after 200ms ' +
         'waiting for element id:login_submit (visible and settled). If no keyboard was really up at that moment (the input ' +
@@ -324,7 +331,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
   /** The stale case: the window state says shown over the target, the input method says none is shown. */
   function staleFake() {
     const fake = loginFake();
-    fake.keyboardWitness = 'hidden';
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     return fake;
   }
 
@@ -350,7 +357,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('vetoed, and the window state CLEARS on the first re-check: no key, one 500 ms wait, the target resolved again, the tap, and a note that explains the delay', async () => {
     const fake = staleFake();
-    fake.keyboardQueue = [SHOWN, { state: 'hidden' }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, { state: 'hidden' }];
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'keyboard?', 'read', 'read', 'tap:249,1466']);
@@ -362,13 +369,13 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('vetoed, clearing on the THIRD re-check: three waits, the witness asked again while it still covers, and the tap lands where the target is NOW', async () => {
     const fake = staleFake();
-    fake.keyboardQueue = [SHOWN, SHOWN, SHOWN, { state: 'hidden' }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, SHOWN, SHOWN, { state: 'hidden' }];
     const events = recorded(fake);
     let checks = 0;
-    const ask = fake.softKeyboard;
-    fake.softKeyboard = async () => {
+    const ask = fake.attachedKeyboard.state;
+    fake.attachedKeyboard.state = async () => {
       if (++checks === 4) submit(fake).rect.y = 1500; // the screen moved while averi waited
-      return ask.call(fake);
+      return ask.call(fake.attachedKeyboard);
     };
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'keyboard?', 'witness?', 'keyboard?', 'witness?', 'keyboard?', 'read', 'read', 'tap:249,1566']);
@@ -379,7 +386,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('vetoed, then the frame MOVES off the point (still shown, elsewhere): that is clear too', async () => {
     const fake = staleFake();
-    fake.keyboardQueue = [SHOWN, { state: 'shown', frame: { ...KEYBOARD, y: 1900, height: 320 } }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, { state: 'shown', frame: { ...KEYBOARD, y: 1900, height: 320 } }];
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(fake.keys).toEqual([]);
     expect(fake.taps).toEqual(['login_submit']);
@@ -388,7 +395,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('vetoed, then the window state turns UNKNOWN: fail open — the tap goes ahead — and the note does not claim it cleared', async () => {
     const fake = staleFake();
-    fake.keyboardQueue = [SHOWN, SHOWN, { state: 'unknown' }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, SHOWN, { state: 'unknown' }];
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
@@ -397,7 +404,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('vetoed, then the witness FLIPS to shown: back once, and the normal confirmed path — hide delay, second look, re-check — with the wait in the note', async () => {
     const fake = staleFake();
-    fake.witnessQueue = ['hidden', 'hidden', 'shown'];
+    fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'hidden', 'shown'];
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(events).toEqual([
@@ -412,9 +419,20 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     expect(result).toEqual({ note: sentence, keyboardHidden: sentence });
   });
 
+  it('vetoed, and the witness turns SHOWN only on the LAST round (3000ms): back, not a refusal — the normal confirmed path, with the full wait in the note', async () => {
+    const fake = staleFake();
+    fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'hidden', 'hidden', 'hidden', 'hidden', 'hidden', 'shown']; // the first ask, then six rounds
+    const result = await tapElement(fake, 'id:login_submit', FAST);
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.taps).toEqual(['login_submit']);
+    expect(sleeps.filter((ms) => ms === POLL)).toHaveLength(6);
+    const sentence = `${NOTE} (after waiting ${KEYBOARD_DISAGREEMENT_BUDGET_MS}ms for the input method to confirm it)`;
+    expect(result).toEqual({ note: sentence, keyboardHidden: sentence });
+  });
+
   it('vetoed, then the witness CANNOT BE ASKED: that confirms nothing — no back; the wait goes on to its end', async () => {
     const fake = staleFake();
-    fake.witnessQueue = ['hidden', 'unknown'];
+    fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'unknown'];
     const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as KeyboardStateDisagreement;
     expect(error).toBeInstanceOf(KeyboardStateDisagreement);
     // …and the refusal does not claim an answer the input method did not give at the end.
@@ -429,12 +447,12 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
   function movingFake() {
     const fake = staleFake();
     const LOW = { state: 'shown' as const, frame: { x: 0, y: 1700, width: 1080, height: 520 } };
-    fake.keyboardQueue = [SHOWN, LOW];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, LOW];
     let checks = 0;
-    const ask = fake.softKeyboard;
-    fake.softKeyboard = async () => {
+    const ask = fake.attachedKeyboard.state;
+    fake.attachedKeyboard.state = async () => {
       if (++checks === 2) submit(fake).rect.y = 1800; // centre (249,1866): under the frame's new place
-      return ask.call(fake);
+      return ask.call(fake.attachedKeyboard);
     };
     return fake;
   }
@@ -456,7 +474,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('…and taps once the frame is clear of the NEW point', async () => {
     const fake = movingFake();
-    fake.keyboardQueue.push({ state: 'shown', frame: { x: 0, y: 1700, width: 1080, height: 520 } }, { state: 'hidden' });
+    fake.attachedKeyboard.windowAnswers.queue.push({ state: 'shown', frame: { x: 0, y: 1700, width: 1080, height: 520 } }, { state: 'hidden' });
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1866 }]);
     expect(fake.keys).toEqual([]);
@@ -479,7 +497,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('witness CANNOT TELL at the first ask: back as before the veto existed (the fallback), asked once and before the key', async () => {
     const fake = loginFake();
-    fake.keyboardWitness = 'unknown';
+    fake.attachedKeyboard.witnessAnswers.current = 'unknown';
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
@@ -488,15 +506,15 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it.each([['hidden'], ['unknown']] as const)('window %s: the witness is never asked, whatever it would say', async (state) => {
     const fake = loginFake();
-    fake.keyboard = { state };
+    fake.attachedKeyboard.windowAnswers.current = { state };
     await tapElement(fake, 'id:login_submit', FAST);
-    expect(fake.witnessQueries).toBe(0);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
     expect(fake.keys).toEqual([]);
   });
 
   it('the wait note follows the resolution note of the node that was tapped', async () => {
     const fake = staleFake();
-    fake.keyboardQueue = [SHOWN, { state: 'hidden' }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, { state: 'hidden' }];
     fake.live().children.push(node({ role: 'text', identifier: 'login_submit', label: 'Sign in', rect: { x: 99, y: 1000, width: 300, height: 40 } }));
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(result.note).toBe(`2 matches; picked the only interactive one (button); ${DISAGREEMENT}; waited 500ms for it to clear`);
@@ -504,12 +522,12 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('the look after the wait uses the SAME options: a target that has gone by then is the ordinary settle timeout (nothing was pressed, so no back in the message)', async () => {
     const fake = staleFake();
-    fake.keyboardQueue = [SHOWN, { state: 'hidden' }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, { state: 'hidden' }];
     let checks = 0;
-    const ask = fake.softKeyboard;
-    fake.softKeyboard = async () => {
+    const ask = fake.attachedKeyboard.state;
+    fake.attachedKeyboard.state = async () => {
       if (++checks === 2) fake.live().children.pop();
-      return ask.call(fake);
+      return ask.call(fake.attachedKeyboard);
     };
     await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(/^Timed out after 200ms waiting for element id:login_submit \(visible and settled\)$/);
     expect(fake.taps).toEqual([]);
@@ -525,7 +543,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
 
   it('fillField follows the same rule — cleared: no key, the focus tap after the wait, the text typed, the result says so', async () => {
     const fake = staleFieldFake();
-    fake.keyboardQueue = [SHOWN, SHOWN, { state: 'hidden' }];
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, SHOWN, { state: 'hidden' }];
     const result = await fillField(fake, 'id:login_password', 'abc', FAST);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 540, y: 1466 }]);
@@ -570,7 +588,7 @@ describe('fillField — the focus tap goes through the same guard', () => {
   it('a field clear of the keyboard: exactly one query, no key, nothing reported', async () => {
     const fake = loginFake();
     const result = await fillField(fake, 'id:login_password', 'abc', FAST);
-    expect(fake.keyboardQueries).toBe(1);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 540, y: 1166 }]);
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined });
@@ -579,7 +597,7 @@ describe('fillField — the focus tap goes through the same guard', () => {
   it('a keyboard that stays over the field: the fill throws the recovery error and neither taps nor types', async () => {
     const fake = nextFieldFake();
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'shown', frame: KEYBOARD };
+      self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
     await expect(fillField(fake, 'id:login_password', 'abc', FAST)).rejects.toThrow(
       /^Pressed back to hide the soft keyboard covering id:login_password, but back did not close it/,
@@ -588,13 +606,123 @@ describe('fillField — the focus tap goes through the same guard', () => {
     expect(fake.typed).toEqual([]);
   });
 
-  it('iOS: a fill asks the adapter once, gets unknown, and presses no key', async () => {
+  it('iOS (no oracle): a fill asks nothing and presses no key; the focus tap lands where the field resolved', async () => {
     const fake = nextFieldFake();
     fake.platform = 'ios';
-    fake.keyboard = { state: 'unknown' };
+    fake.keyboard = undefined;
     await fillField(fake, 'id:login_password', 'abc', FAST);
-    expect(fake.keyboardQueries).toBe(1);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 540, y: 1466 }]);
+  });
+});
+
+describe('keyboardAction — THE table, one row per case (2026-10-04)', () => {
+  it.each<[string, KeyboardSample, KeyboardAction]>([
+    // Nothing over the point, or nothing readable: tap, as before the question existed — in every phase of the guard.
+    ['first · window clear', { phase: 'first', window: 'clear' }, 'proceed'],
+    ['first · window unknown: fail open for a tap', { phase: 'first', window: 'unknown' }, 'proceed'],
+    ['recheck · window clear', { phase: 'recheck', window: 'clear' }, 'proceed'],
+    ['recheck · window unknown', { phase: 'recheck', window: 'unknown' }, 'proceed'],
+    ['afterBack · window clear', { phase: 'afterBack', window: 'clear' }, 'proceed'],
+    ['afterBack · window unknown: the tap goes ahead, the note says the state could not be read', { phase: 'afterBack', window: 'unknown' }, 'proceed'],
+    // The first look at a covering keyboard: back unless the input method DENIES it.
+    ['first · covering · witness shown', { phase: 'first', window: 'covering', witness: 'shown' }, 'back'],
+    ['first · covering · witness unknown (cannot be asked): the decision the window state alone made', { phase: 'first', window: 'covering', witness: 'unknown' }, 'back'],
+    ['first · covering · witness hidden: the veto — nothing sent on one disagreeing sample', { phase: 'first', window: 'covering', witness: 'hidden' }, 'hold'],
+    // The bounded re-check: only a witness that has come round confirms; unknown confirms nothing; the budget ends in a refusal.
+    ['recheck · covering · witness shown', { phase: 'recheck', window: 'covering', witness: 'shown', last: false }, 'back'],
+    ['recheck · covering · witness shown on the LAST round: still back, not a refusal', { phase: 'recheck', window: 'covering', witness: 'shown', last: true }, 'back'],
+    ['recheck · covering · witness hidden', { phase: 'recheck', window: 'covering', witness: 'hidden', last: false }, 'hold'],
+    ['recheck · covering · witness unknown: a witness that cannot be reached now has confirmed nothing', { phase: 'recheck', window: 'covering', witness: 'unknown', last: false }, 'hold'],
+    ['recheck · covering · witness hidden · last', { phase: 'recheck', window: 'covering', witness: 'hidden', last: true }, 'refuse'],
+    ['recheck · covering · witness unknown · last', { phase: 'recheck', window: 'covering', witness: 'unknown', last: true }, 'refuse'],
+    // After the one back: still covered is a refusal — never a second back.
+    ['afterBack · covering', { phase: 'afterBack', window: 'covering' }, 'refuse'],
+    // The dismissal after a fill: hidden is nothing to dismiss; unknown is THE one place unknown means back.
+    ['dismiss · window clear (hidden): nothing to dismiss — back would navigate', { phase: 'dismiss', window: 'clear' }, 'proceed'],
+    ['dismiss · window unknown: back, as before 2026-10-03 — the witness is not asked', { phase: 'dismiss', window: 'unknown' }, 'back'],
+    ['dismiss · covering · witness shown', { phase: 'dismiss', window: 'covering', witness: 'shown' }, 'back'],
+    ['dismiss · covering · witness unknown', { phase: 'dismiss', window: 'covering', witness: 'unknown' }, 'back'],
+    ['dismiss · covering · witness hidden: the veto, nothing pressed', { phase: 'dismiss', window: 'covering', witness: 'hidden' }, 'hold'],
+  ])('%s → %s', (_name, sample, expected) => {
+    expect(keyboardAction(sample)).toBe(expected);
+  });
+
+  it('is pure: the same sample judged twice is the same action, and nothing is touched', () => {
+    const sample: KeyboardSample = Object.freeze({ phase: 'recheck', window: 'covering', witness: 'hidden', last: true });
+    expect([keyboardAction(sample), keyboardAction(sample)]).toEqual(['refuse', 'refuse']);
+  });
+});
+
+describe('the two window readings — geometry for the guard, presence for the dismissal', () => {
+  const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
+  it.each([
+    ['shown, point inside the frame', { state: 'shown', frame: FRAME }, { x: 249, y: 1466 }, 'covering'],
+    ['shown, point outside the frame (beside it)', { state: 'shown', frame: FRAME }, { x: 249, y: 1000 }, 'clear'],
+    ['hidden', { state: 'hidden' }, { x: 249, y: 1466 }, 'clear'],
+    ['unknown: kept apart, not folded into clear', { state: 'unknown' }, { x: 249, y: 1466 }, 'unknown'],
+  ] as const)('windowOver — %s → %s', (_name, keyboard, point, expected) => {
+    expect(windowOver(keyboard, point)).toBe(expected);
+  });
+
+  it.each([
+    ['shown anywhere', { state: 'shown', frame: FRAME }, 'covering'],
+    ['hidden', { state: 'hidden' }, 'clear'],
+    ['unknown', { state: 'unknown' }, 'unknown'],
+  ] as const)('windowAnywhere — %s → %s', (_name, keyboard, expected) => {
+    expect(windowAnywhere(keyboard)).toBe(expected);
+  });
+});
+
+describe('dismissKeyboard — the table\'s `dismiss` rows (moved here from fill.ts 2026-10-04)', () => {
+  const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
+  const withOracle = (window: Parameters<FakeAdapter['attachKeyboard']>[0], witness?: Parameters<FakeAdapter['attachKeyboard']>[1]) => {
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    fake.attachKeyboard(window, witness);
+    return fake;
+  };
+
+  it('an adapter WITHOUT the oracle takes enter, blind, and asks nothing — the iOS shape, whatever the platform label says', async () => {
+    for (const platform of ['ios', 'android'] as const) {
+      const fake = new FakeAdapter({ s: screen() }, 's');
+      fake.platform = platform;
+      await dismissKeyboard(fake);
+      expect(fake.keys).toEqual(['enter']);
+    }
+  });
+
+  it('window shown, witness confirms: back, the witness asked once and BEFORE the key', async () => {
+    const fake = withOracle({ state: 'shown', frame: FRAME }, 'shown');
+    const order: string[] = [];
+    const ask = fake.attachedKeyboard.witness.bind(fake.attachedKeyboard);
+    fake.attachedKeyboard.witness = async () => (order.push('witness?'), ask());
+    fake.onKey = (key) => void order.push(`key:${key}`);
+    await dismissKeyboard(fake);
+    expect(order).toEqual(['witness?', 'key:back']);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
+  });
+
+  it('window shown, witness DENIES (stale window state): nothing pressed, nothing waited for', async () => {
+    const fake = withOracle({ state: 'shown', frame: FRAME }, 'hidden');
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual([]);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('window shown, witness cannot tell: back, as before the veto existed', async () => {
+    const fake = withOracle({ state: 'shown', frame: FRAME }, 'unknown');
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual(['back']);
+  });
+
+  it.each([
+    ['hidden', 'nothing is pressed', [] as string[]],
+    ['unknown', 'back is pressed, as before 2026-10-03', ['back']],
+  ] as const)('window %s: the witness is not asked, and %s', async (state, _what, keys) => {
+    const fake = withOracle({ state }, 'hidden');
+    await dismissKeyboard(fake);
+    expect(fake.keys).toEqual(keys);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
   });
 });

@@ -10,8 +10,10 @@ import type { SettleOptions, Target } from './resolve.js';
  * surface — the engine's trace does not print it, the MCP tool does.
  *
  * Since 2026-10-03 the node comes from resolveClearOfKeyboard (keyboard.ts):
- * on Android a target under the soft keyboard is not tapped where it stands —
- * the keyboard is hidden and the target resolved again first. When that
+ * on an adapter with a keyboard oracle (Android) a target under the soft
+ * keyboard is not tapped where it stands — the keyboard is hidden and the
+ * target resolved again first. This function knows nothing of how that is
+ * decided. When that
  * happened the note says so, and `keyboardHidden` carries the sentence alone
  * for the one caller that prints no notes (the flow trace's `⚠ tap`).
  *
@@ -24,7 +26,7 @@ import type { SettleOptions, Target } from './resolve.js';
  * to import the selector layer above it (ARCHITECTURE.md §3).
  */
 export async function tapElement(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'softKeyboard' | 'softKeyboardWitness' | 'pressKey'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'pressKey'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<{ note?: string; keyboardHidden?: string }> {

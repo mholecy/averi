@@ -1566,6 +1566,7 @@ flows:
 
   it('dismissKeyboard presses AFTER the text landed, never before', async () => {
     const fake = formFake();
+    fake.attachKeyboard(); // an Android fake: the dismissal is `back`
     const order: string[] = [];
     const typeText = fake.typeText.bind(fake);
     fake.typeText = async (t: string) => {
@@ -1963,6 +1964,7 @@ describe('tap: / fill: under the Android soft keyboard — the one trace line th
       },
       'login',
     );
+    fake.attachKeyboard(); // Android: the oracle is there, answering `unknown` until a test sets it
     fake.onKey = (key, self) => {
       // adjustResize: the keyboard goes, everything below the password field moves down 300 px.
       if (key === 'back') for (const n of self.live().children.slice(1)) n.rect.y += 300;
@@ -1980,7 +1982,7 @@ flows:
 
   it('a tap: under the keyboard logs ONE ⚠ tap line before the tap line, and taps the re-resolved point', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
     expect(trace).toEqual([
       { action: 'flow f', detail: 'start' },
@@ -1998,7 +2000,7 @@ flows:
     ['shown, but not over the target', { state: 'shown' as const, frame: { ...KEYBOARD, y: 1900, height: 320 } }],
   ])('a tap: that meets no keyboard traces exactly what it always did — keyboard %s', async (_name, keyboard) => {
     const fake = loginFake();
-    fake.keyboard = keyboard;
+    fake.attachedKeyboard.windowAnswers.current = keyboard;
     const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
     expect(JSON.stringify(trace)).toBe('[{"action":"flow f","detail":"start"},{"action":"tap","detail":"id:\\"login_submit\\""},{"action":"flow f","detail":"done"}]');
     expect(fake.keys).toEqual([]);
@@ -2007,7 +2009,7 @@ flows:
 
   it('a fill: whose field lies under the keyboard logs ONE ⚠ fill line before the fill line', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const trace = await new FlowEngine(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST).runFlow('f');
     expect(trace).toEqual([
       { action: 'flow f', detail: 'start' },
@@ -2022,7 +2024,7 @@ flows:
 
   it('a fill: clear of the keyboard traces the one fill line, as before', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const trace = await new FlowEngine(flow('fill: { id: login_password, value: "123456" }'), fake, FAST).runFlow('f');
     expect(JSON.stringify(trace)).toBe('[{"action":"flow f","detail":"start"},{"action":"fill","detail":"id:\\"login_password\\" = 123456"},{"action":"flow f","detail":"done"}]');
     expect(fake.keys).toEqual([]);
@@ -2030,9 +2032,9 @@ flows:
 
   it('a keyboard that stays: the step fails with the recovery error and nothing is tapped', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'shown', frame: KEYBOARD };
+      self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
     const error = (await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error.message).toMatch(/Pressed back to hide the soft keyboard covering id:"login_submit", but back did not close it/);
@@ -2049,8 +2051,8 @@ flows:
     const fake = loginFake();
     const raced = new FakeAdapter({ login: fake.live(), previous: screen(node({ role: 'text', identifier: 'previous_title' })) }, 'login');
     raced.backTo = 'previous';
-    raced.softKeyboard = async () => ({ state: 'shown', frame: KEYBOARD }); // the adapter saw one; none is up when back lands
-    raced.keyboardWitness = 'shown'; // and the input method agreed, wrongly: nothing could have vetoed this back
+    raced.attachKeyboard({ state: 'unknown' }, 'shown'); // the input method agrees, wrongly: nothing could have vetoed this back
+    raced.attachedKeyboard.state = async () => ({ state: 'shown', frame: KEYBOARD }); // the adapter saw one; none is up when back lands
     const error = (await new FlowEngine(flow('tap: { id: login_submit }'), raced, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(raced.current).toBe('previous');
     expect(error.trace.slice(1)).toEqual([
@@ -2067,9 +2069,9 @@ flows:
 
   it('the window state was STALE and cleared while averi waited: ONE ⚠ tap line that explains the wait, no back, the tap', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
-    fake.keyboardWitness = 'hidden';
-    fake.keyboardQueue = [{ state: 'shown', frame: KEYBOARD }, { state: 'shown', frame: KEYBOARD }, { state: 'hidden' }];
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
+    fake.attachedKeyboard.windowAnswers.queue = [{ state: 'shown', frame: KEYBOARD }, { state: 'shown', frame: KEYBOARD }, { state: 'hidden' }];
     const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
     expect(trace.slice(1, -1)).toEqual([
       {
@@ -2084,8 +2086,8 @@ flows:
 
   it('the two sources NEVER agree: the step fails with the refusal, a ⚠ tap line saying they disagreed precedes the ✗, and nothing was sent', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
-    fake.keyboardWitness = 'hidden';
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     const error = (await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1)).toEqual([
       { action: '⚠ tap', detail: 'the window state reported a soft keyboard over id:"login_submit" that the input method denied; nothing sent' },
@@ -2107,8 +2109,8 @@ flows:
 
   it('a fill: refused the same way traces ⚠ fill … nothing sent before its ✗, and types nothing', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
-    fake.keyboardWitness = 'hidden';
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     const error = (await new FlowEngine(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ fill', expect.stringMatching(/^✗ fill/)]);
     expect(error.trace[1].detail).toBe('the window state reported a soft keyboard over id:"login_otp" that the input method denied; nothing sent');
@@ -2117,8 +2119,8 @@ flows:
 
   it('an optional: tap refused that way is skipped with the refusal\'s headline, not "(not present)"', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
-    fake.keyboardWitness = 'hidden';
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     const trace = await new FlowEngine(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST).runFlow('f');
     expect(trace.slice(1, -1).map((t) => t.action)).toEqual(['⚠ tap', 'optional']);
     expect(trace[2].detail).toMatch(/^skipped id:"login_submit" \(The window state reports a soft keyboard over id:"login_submit" — .* no flow step waits on the keyboard itself\)$/);
@@ -2128,8 +2130,8 @@ flows:
 
   it('a guarded dismissal the witness CONFIRMS traces exactly what it did before the veto existed', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
-    fake.keyboardWitness = 'shown';
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.witnessAnswers.current = 'shown';
     const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
     expect(JSON.stringify(trace.slice(1, -1))).toBe(
       '[{"action":"⚠ tap","detail":"the soft keyboard covered id:\\"login_submit\\"; hidden before tapping"},{"action":"tap","detail":"id:\\"login_submit\\""}]',
@@ -2139,16 +2141,16 @@ flows:
 
   it('fill … dismissKeyboard: true with a stale window state: the witness denies the keyboard and no back is pressed', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: { ...KEYBOARD, y: 1900, height: 320 } }; // not over the field: the fill itself meets no keyboard
-    fake.keyboardWitness = 'hidden';
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: { ...KEYBOARD, y: 1900, height: 320 } }; // not over the field: the fill itself meets no keyboard
+    fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     await new FlowEngine(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST).runFlow('f');
     expect(fake.keys).toEqual([]);
-    expect(fake.witnessQueries).toBe(1);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
   });
 
   it('a tap: that fails with NO dismissal (the element is simply not there) gets no ⚠ tap line — only its ✗', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const error = (await new FlowEngine(flow('tap: { id: nope }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['✗ tap id:"nope"']);
     expect(fake.keys).toEqual([]);
@@ -2156,9 +2158,9 @@ flows:
 
   it('a fill: that fails after the dismissal traces ⚠ fill … back pressed before its ✗ line', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'shown', frame: KEYBOARD };
+      self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
     const error = (await new FlowEngine(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ fill', expect.stringMatching(/^✗ fill/)]);
@@ -2168,9 +2170,9 @@ flows:
 
   it('an optional: tap whose keyboard will not hide is NOT "not present": the skip quotes the failure, after the ⚠ tap line', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.onKey = (_key, self) => {
-      self.keyboard = { state: 'shown', frame: KEYBOARD };
+      self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
     const trace = await new FlowEngine(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST).runFlow('f');
     expect(trace.slice(1, -1)).toEqual([
@@ -2190,7 +2192,7 @@ flows:
 
   it('an optional: tap on a genuinely absent element still reads "(not present)", byte for byte', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const trace = await new FlowEngine(flow('optional: [ { tap: { id: promo_close } } ]'), fake, FAST).runFlow('f');
     expect(JSON.stringify(trace.slice(1, -1))).toBe('[{"action":"optional","detail":"skipped id:\\"promo_close\\" (not present)"}]');
     expect(fake.keys).toEqual([]);
@@ -2202,7 +2204,7 @@ flows:
       { pin: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [key('1', 0), key('2', 300), key('3', 600)] }) },
       'pin',
     );
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachKeyboard({ state: 'shown', frame: KEYBOARD });
     const cfg = parseConfig(`
 app: { android: { package: md.bank.app } }
 credentials: { pin: "1231" }
@@ -2218,16 +2220,16 @@ flows:
     ]);
     expect(fake.keys).toEqual(['back']);
     expect(fake.taps).toEqual(['pin_key_1', 'pin_key_2', 'pin_key_3', 'pin_key_1']);
-    expect(fake.keyboardQueries).toBe(5); // one per digit, plus the re-check after the one dismissal
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(5); // one per digit, plus the re-check after the one dismissal
   });
 
   it('a step that SUCCEEDS without the keyboard being confirmed gone traces the "could not be read" sentence, once, and no ✗', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'shown', frame: KEYBOARD };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const move = fake.onKey!;
     fake.onKey = (key, self) => {
       move(key, self);
-      self.keyboard = { state: 'unknown' };
+      self.attachedKeyboard.windowAnswers.current = { state: 'unknown' };
     };
     const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
     expect(trace.slice(1, -1)).toEqual([
@@ -2238,7 +2240,7 @@ flows:
 
   it('fill … dismissKeyboard: true does NOT press back when the adapter says no keyboard is up (it would navigate away)', async () => {
     const fake = loginFake();
-    fake.keyboard = { state: 'hidden' };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'hidden' };
     await new FlowEngine(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST).runFlow('f');
     expect(fake.keys).toEqual([]);
   });

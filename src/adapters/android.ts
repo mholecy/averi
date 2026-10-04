@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { sleep } from '../util/sleep.js';
-import { zeroRect, type Device, type DeviceAdapter, type Key, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { zeroRect, type Device, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -12,13 +12,13 @@ const DUMP_TIMEOUT_MS = 15_000;
 
 /**
  * Budget for the soft-keyboard question (the measured cost of the call is on
- * softKeyboard, the one place it is written down). Two seconds is "the host
+ * keyboardState, the one place it is written down). Two seconds is "the host
  * is badly loaded", and past it the
  * answer is `unknown` — a tap must not wait 30 s (exec's default) on a
  * question whose only job is to make the tap safer.
  */
 const KEYBOARD_QUERY_TIMEOUT_MS = 2_000;
-/** The same reasoning for the independent witness (softKeyboardWitness): past it, `unknown`. */
+/** The same reasoning for the independent witness (keyboardWitness): past it, `unknown`. */
 const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 
 /**
@@ -81,6 +81,18 @@ const ROLE_MAP: Record<string, string> = {
 
 export class AndroidAdapter implements DeviceAdapter {
   readonly platform = 'android' as const;
+  /**
+   * The soft-keyboard oracle (KeyboardOracle in types.ts): Android is the
+   * platform whose keyboard is a separate window that `back` hides, so it is
+   * the one adapter that has one. Two device questions behind it, each one
+   * adb call with its own budget: keyboardState (`dumpsys window displays`,
+   * the frame) and keyboardWitness (`dumpsys input_method`, the input
+   * method's own word). Their measured costs are on those two methods.
+   */
+  readonly keyboard: KeyboardOracle = {
+    state: () => this.keyboardState(),
+    witness: () => this.keyboardWitness(),
+  };
   private readonly exec: ExecFn;
   private readonly serial: string | undefined;
 
@@ -466,7 +478,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * must never be the reason a tap did not happen. A device that is really
    * gone fails the tap itself one call later, in the tap's own words.
    */
-  async softKeyboard(): Promise<SoftKeyboard> {
+  private async keyboardState(): Promise<SoftKeyboard> {
     let dump: string;
     try {
       dump = (await this.adb(['shell', 'dumpsys', 'window', 'displays'], KEYBOARD_QUERY_TIMEOUT_MS)).stdout.toString('utf8');
@@ -479,7 +491,7 @@ export class AndroidAdapter implements DeviceAdapter {
   /**
    * The independent witness (2026-10-04): what the input method manager
    * itself says — `mInputShown=true|false` in `dumpsys input_method` — as
-   * opposed to the window manager's insets that softKeyboard reads.
+   * opposed to the window manager's insets that keyboardState reads.
    *
    * Why a second source. Measured that day (Pixel_3a AVD, API 33), right
    * after a tap that made the app navigate away: `dumpsys window displays`
@@ -525,7 +537,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * way (only API 33 was measured), and there the caller keeps the decision
    * it had without this witness.
    */
-  async softKeyboardWitness(): Promise<KeyboardWitness> {
+  private async keyboardWitness(): Promise<KeyboardWitness> {
     let out: string;
     try {
       out = (

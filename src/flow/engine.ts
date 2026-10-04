@@ -1,9 +1,9 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
-import { dismissKeyboard, fillField } from '../interact/fill.js';
+import { fillField } from '../interact/fill.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
-import { KeyboardGuardError } from '../interact/keyboard.js';
+import { dismissKeyboard, KeyboardGuardError } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec as describeSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';

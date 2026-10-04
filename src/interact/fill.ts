@@ -3,7 +3,7 @@ import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { pressBackUnlessKeyboardDenied, resolveClearOfKeyboard } from './keyboard.js';
+import { resolveClearOfKeyboard } from './keyboard.js';
 import { describeTarget, resolveNow, type SettleOptions, type Target } from './resolve.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
@@ -64,10 +64,10 @@ export interface FillResult {
  * and the error names the fill and how to recover rather than quoting a bare
  * adapter message.
  *
- * Keyboard dismissal is deliberately NOT in here: `dismissKeyboard` is a
- * second call, so a warning this fill produced reaches the caller before the
- * key press can throw (review 2026-10-03: a masked-append warning was lost
- * when `pressKey` failed after the text had landed).
+ * Keyboard dismissal is deliberately NOT in here: `dismissKeyboard`
+ * (keyboard.ts) is a second call, so a warning this fill produced reaches the
+ * caller before the key press can throw (review 2026-10-03: a masked-append
+ * warning was lost when `pressKey` failed after the text had landed).
  *
  * Moved from flow/engine.ts (2026-10-03), where it took a pre-resolved node
  * and a caller-built refetch closure that re-stated the resolution filter.
@@ -178,40 +178,6 @@ export async function fillField(
     }
   }
   return result;
-}
-
-/**
- * Close the on-screen keyboard: Android has a back key, iOS does not and
- * takes enter. Called AFTER a fill has returned, never before (dismissing
- * first closes the keyboard the typing needs), and as its own call so the
- * fill's warning is already in the caller's hands if this throws.
- *
- * Android, since 2026-10-03: `back` is pressed only if the adapter does not
- * say the keyboard is HIDDEN. Before that date it was pressed blindly, and
- * `back` with no keyboard up NAVIGATES BACK — a field that raises no keyboard
- * (a custom PIN pad, a hardware keyboard, a picker) turned `dismissKeyboard:
- * true` into leaving the screen. Three answers, three behaviours:
- * - shown   → back (it hides the keyboard) — unless, since 2026-10-04, the
- *   independent witness denies the keyboard (the window state can be stale
- *   for seconds after a navigation; keyboard.ts#pressBackUnlessKeyboardDenied,
- *   the one owner of that `back`): then nothing is pressed, and nothing is
- *   waited for — a keyboard that is not there needs no dismissing;
- * - hidden  → nothing: there is nothing to dismiss;
- * - unknown → back, exactly as before — the adapter could not tell (the
- *   command failed, or printed a format it does not recognise), and a
- *   keyboard left up over the next tap is the likelier harm after a fill.
- * One extra adapter call per dismissal (its cost: AndroidAdapter.softKeyboard),
- * and the witness query when that call says shown.
- * iOS is unchanged — enter — and its adapter is not asked.
- */
-export async function dismissKeyboard(
-  adapter: Pick<DeviceAdapter, 'platform' | 'pressKey' | 'softKeyboard' | 'softKeyboardWitness'>,
-): Promise<void> {
-  if (adapter.platform !== 'android') return adapter.pressKey('enter');
-  const { state } = await adapter.softKeyboard();
-  if (state === 'hidden') return;
-  if (state === 'shown') await pressBackUnlessKeyboardDenied(adapter);
-  else await adapter.pressKey('back');
 }
 
 /** Poll the field until its exposed value satisfies `ok`; returns the last observation. */

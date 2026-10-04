@@ -1,4 +1,4 @@
-import type { Device, DeviceAdapter, Key, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from '../../src/adapters/types.js';
+import type { Device, DeviceAdapter, Key, KeyboardOracle, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from '../../src/adapters/types.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -78,45 +78,26 @@ export class FakeAdapter implements DeviceAdapter {
   tapPoints: { x: number; y: number }[] = [];
 
   /**
-   * What the "device" says about its soft keyboard. `unknown` by default: a
-   * fake that has not been told behaves like an adapter that cannot tell, so
-   * every test written before 2026-10-03 exercises the same paths as before
-   * (taps unguarded, dismissKeyboard presses back). A keyboard test sets it.
+   * The soft-keyboard oracle (KeyboardOracle) — ABSENT until a test attaches
+   * one (`attachKeyboard`), as on the real adapters: iOS has none, Android has
+   * one. A fake without it behaves like IosAdapter — taps unguarded, nothing
+   * queried, `dismissKeyboard` presses enter — whatever `platform` says: the
+   * interact layer reads the capability, not the label. Tests of the guard
+   * and of the Android dismissal attach one; until 2026-10-04 every fake
+   * carried the simulation and answered `unknown`.
    */
-  keyboard: SoftKeyboard = { state: 'unknown' };
-  /** How many times softKeyboard() was asked — the cost the guard is pinned to. */
-  keyboardQueries = 0;
+  keyboard: FakeKeyboard | undefined;
 
-  /**
-   * Answers for the NEXT queries, in order — each one also becomes the
-   * standing `keyboard` — for a state that changes between queries with no
-   * key pressed (a stale window state clearing by itself).
-   */
-  keyboardQueue: SoftKeyboard[] = [];
-
-  async softKeyboard(): Promise<SoftKeyboard> {
-    this.keyboardQueries++;
-    const next = this.keyboardQueue.shift();
-    if (next !== undefined) this.keyboard = next;
+  /** Attach the oracle, optionally with its first answers; returns it for further scripting. */
+  attachKeyboard(window: SoftKeyboard = { state: 'unknown' }, witness: KeyboardWitness = 'unknown'): FakeKeyboard {
+    this.keyboard = new FakeKeyboard(window, witness);
     return this.keyboard;
   }
 
-  /**
-   * The independent second opinion (softKeyboardWitness). `unknown` by
-   * default — "cannot tell" — so a test that does not set it gets the
-   * decision the window state alone makes, as before 2026-10-04.
-   */
-  keyboardWitness: KeyboardWitness = 'unknown';
-  witnessQueries = 0;
-
-  /** As keyboardQueue, for the witness. */
-  witnessQueue: KeyboardWitness[] = [];
-
-  async softKeyboardWitness(): Promise<KeyboardWitness> {
-    this.witnessQueries++;
-    const next = this.witnessQueue.shift();
-    if (next !== undefined) this.keyboardWitness = next;
-    return this.keyboardWitness;
+  /** The attached oracle, for a test that scripts it — the same object as `keyboard`, typed as present so a script needs no `!`. */
+  get attachedKeyboard(): FakeKeyboard {
+    if (this.keyboard === undefined) throw new Error('FakeAdapter: no keyboard oracle attached — call attachKeyboard() first');
+    return this.keyboard;
   }
 
   /** Every key pressed, in order. */
@@ -139,7 +120,7 @@ export class FakeAdapter implements DeviceAdapter {
   async pressKey(key: Key): Promise<void> {
     this.keys.push(key);
     if (key === 'back') {
-      if (this.keyboard.state === 'shown') this.keyboard = { state: 'hidden' };
+      if (this.keyboard?.windowAnswers.current.state === 'shown') this.keyboard.windowAnswers.current = { state: 'hidden' };
       else if (this.backTo !== undefined) this.current = this.backTo;
     }
     this.onKey?.(key, this);
@@ -220,4 +201,48 @@ export class FakeAdapter implements DeviceAdapter {
     this.swipes.push({ from, to });
   }
   async setClipboard(): Promise<void> {}
+}
+
+/**
+ * One scripted source: a standing answer, a queue of answers for the NEXT
+ * queries (for a state that changes between queries with no key pressed — a
+ * stale window state clearing by itself; each one also becomes the standing
+ * answer), and a count of how often it was asked (the cost the guard is
+ * pinned to).
+ */
+export class ScriptedAnswer<T> {
+  queue: T[] = [];
+  queries = 0;
+  constructor(public current: T) {}
+
+  next(): T {
+    this.queries++;
+    const queued = this.queue.shift();
+    if (queued !== undefined) this.current = queued;
+    return this.current;
+  }
+}
+
+/**
+ * The fake's keyboard oracle: the two sources Android has, scripted alike —
+ * the window state (with a frame) and the input method's own word.
+ */
+export class FakeKeyboard implements KeyboardOracle {
+  /** What the "device" says about its soft keyboard — the window state. `unknown`: cannot tell. */
+  readonly windowAnswers: ScriptedAnswer<SoftKeyboard>;
+  /** The independent second opinion. `unknown` by default — "cannot tell" — so a test that does not set it gets the decision the window state alone makes. */
+  readonly witnessAnswers: ScriptedAnswer<KeyboardWitness>;
+
+  constructor(window: SoftKeyboard = { state: 'unknown' }, witness: KeyboardWitness = 'unknown') {
+    this.windowAnswers = new ScriptedAnswer(window);
+    this.witnessAnswers = new ScriptedAnswer(witness);
+  }
+
+  async state(): Promise<SoftKeyboard> {
+    return this.windowAnswers.next();
+  }
+
+  async witness(): Promise<KeyboardWitness> {
+    return this.witnessAnswers.next();
+  }
 }

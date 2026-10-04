@@ -4,6 +4,7 @@ import { tapElement } from '../../src/interact/tap.js';
 import { AndroidAdapter, parseImeInsets, parseInputShown, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -566,7 +567,7 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
  */
 const dumpsys = (name: string) => readFile(new URL(`../fixtures/dumpsys-window-displays-${name}.txt`, import.meta.url), 'utf8');
 
-describe('AndroidAdapter.softKeyboard — is a soft keyboard shown, and which rect does it cover', () => {
+describe('AndroidAdapter.keyboard.state — is a soft keyboard shown, and which rect does it cover', () => {
   const STATUS_BAR_33 = '        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false';
   const STATUS_BAR_36 = '        InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null';
   const IME_SHOWN_33 = '        InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false';
@@ -702,9 +703,9 @@ describe('AndroidAdapter.softKeyboard — is a soft keyboard shown, and which re
       return { stdout: Buffer.from(dump), stderr: '' };
     };
     const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
-    expect((await adapter.softKeyboard()).state).toBe('shown');
+    expect((await adapter.keyboard.state()).state).toBe('shown');
     expect(calls).toEqual([{ full: 'adb -s emulator-5554 shell dumpsys window displays', timeoutMs: 2_000 }]);
-    await adapter.softKeyboard();
+    await adapter.keyboard.state();
     expect(calls).toHaveLength(2); // not memoized: the answer changes with every focus
   });
 
@@ -716,76 +717,15 @@ describe('AndroidAdapter.softKeyboard — is a soft keyboard shown, and which re
     const fn: ExecFn = async () => {
       throw failure;
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).softKeyboard()).resolves.toEqual({ state: 'unknown' });
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.state()).resolves.toEqual({ state: 'unknown' });
   });
 
-  it('end to end through adb: a tap on a node under the keyboard presses back (keyevent 4), re-reads the tree, and taps the node where it now is', async () => {
-    const tree = (top: number) => `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<hierarchy rotation="0">
-  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" bounds="[0,0][1080,2220]">
-    <node index="0" text="Sign in" resource-id="com.example.app:id/login_submit" class="android.widget.Button" package="com.example.app" content-desc="" bounds="[99,${top}][399,${top + 132}]"/>
-  </node>
-</hierarchy>
-UI hierchary dumped to: /dev/tty`;
-    const shown = '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visibleFrame=[0,1285][1080,2220] visible=true insetsRoundedCornerFrame=false\n';
-    const hidden = '        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false\n';
-    let keyboardUp = true;
-    const calls: string[] = [];
-    const fn: ExecFn = async (cmd, args) => {
-      const full = [cmd, ...args].join(' ');
-      calls.push(full);
-      const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
-      if (full.endsWith('input keyevent 4')) keyboardUp = false;
-      if (full.includes('uiautomator dump')) return out(tree(keyboardUp ? 1400 : 1700));
-      if (full.includes('dumpsys window displays')) return out(keyboardUp ? shown : hidden);
-      if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(keyboardUp));
-      return out('');
-    };
-    const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
-    const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
-    const query = 'adb -s emulator-5554 shell dumpsys window displays';
-    const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
-    // The witness is asked ONCE, right before the key, and not again for the check after it.
-    expect(calls).toEqual([dump, dump, query, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
-    expect(note).toBe('the soft keyboard covered id:login_submit; hidden before tapping');
-  });
-
-  it('end to end, the STALE window state (measured 2026-10-04): window says shown, input method says not — no keyevent; the window state is asked again and, once it has cleared, the node is tapped', async () => {
-    const tree = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<hierarchy rotation="0">
-  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" bounds="[0,0][1080,2220]">
-    <node index="0" text="Home" resource-id="com.example.app:id/home_tile" class="android.widget.Button" package="com.example.app" content-desc="" bounds="[99,1400][399,1532]"/>
-  </node>
-</hierarchy>
-UI hierchary dumped to: /dev/tty`;
-    // The two real dumps' lines: stale right after the navigation, caught up a few seconds later.
-    const stale = '    mIsImeShowing=true\n        InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false\n';
-    const caughtUp = '    mIsImeShowing=false\n        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false\n';
-    const calls: string[] = [];
-    let windowQueries = 0;
-    const fn: ExecFn = async (cmd, args) => {
-      const full = [cmd, ...args].join(' ');
-      calls.push(full);
-      const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
-      if (full.includes('uiautomator dump')) return out(tree);
-      if (full.includes('dumpsys window displays')) return out(++windowQueries <= 2 ? stale : caughtUp);
-      if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(false));
-      return out('');
-    };
-    const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
-    const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
-    const query = 'adb -s emulator-5554 shell dumpsys window displays';
-    const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
-    expect(calls).toEqual([dump, dump, query, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
-    expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
-  });
+  // The guard driven end to end through this adapter — the adb call order of
+  // a dismissal and of the stale-window wait — is tests/integration/android-keyboard.test.ts
+  // (moved 2026-10-04: it pinned interact/'s cadence from the adapter's test file).
 });
 
-/** The line `adb shell "dumpsys input_method | grep -m1 mInputShown"` prints — real, emulator-5554 (API 33), 2026-10-04 (false); true was observed on the login screen the same day. */
-const INPUT_SHOWN_LINE = (shown: boolean) =>
-  `  mShowRequested=${shown} mShowExplicitlyRequested=false mShowForced=false mInputShown=${shown}\n`;
-
-describe('AndroidAdapter.softKeyboardWitness — the input method\'s own word, asked before a keyboard back', () => {
+describe('AndroidAdapter.keyboard.witness — the input method\'s own word, asked before a keyboard back', () => {
   it('reads mInputShown=true as shown and mInputShown=false as hidden (the real line)', () => {
     expect(parseInputShown(INPUT_SHOWN_LINE(true))).toBe('shown');
     expect(parseInputShown(INPUT_SHOWN_LINE(false))).toBe('hidden');
@@ -819,7 +759,7 @@ describe('AndroidAdapter.softKeyboardWitness — the input method\'s own word, a
       calls.push({ cmd, args, timeoutMs: opts?.timeoutMs });
       return { stdout: Buffer.from(INPUT_SHOWN_LINE(true)), stderr: '' };
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).softKeyboardWitness()).resolves.toBe('shown');
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('shown');
     expect(calls).toEqual([
       // ONE argument after `shell`: the device's sh runs the pipe; -w matches the name as a whole word.
       { cmd: 'adb', args: ['-s', 'emulator-5554', 'shell', 'dumpsys input_method | grep -m1 -w mInputShown'], timeoutMs: 2_000 },
@@ -831,7 +771,7 @@ describe('AndroidAdapter.softKeyboardWitness — the input method\'s own word, a
     let n = 0;
     const fn: ExecFn = async () => ({ stdout: Buffer.from(outputs[n++]), stderr: '' });
     const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
-    expect([await adapter.softKeyboardWitness(), await adapter.softKeyboardWitness()]).toEqual(['hidden', 'shown']);
+    expect([await adapter.keyboard.witness(), await adapter.keyboard.witness()]).toEqual(['hidden', 'shown']);
     expect(n).toBe(2);
   });
 
@@ -844,6 +784,6 @@ describe('AndroidAdapter.softKeyboardWitness — the input method\'s own word, a
     const fn: ExecFn = async () => {
       throw failure;
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).softKeyboardWitness()).resolves.toBe('unknown');
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('unknown');
   });
 });
