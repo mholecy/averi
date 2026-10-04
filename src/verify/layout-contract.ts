@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { errorMessage } from '../util/error-message.js';
 
 /**
  * The layout contract: a screen's anchors in Figma-frame units, checked into
@@ -132,7 +133,7 @@ export function parseLayoutContract(jsonText: string, source = 'layout contract'
   try {
     raw = JSON.parse(jsonText);
   } catch (e) {
-    throw new Error(`${source}: not valid JSON — ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(`${source}: not valid JSON — ${errorMessage(e)}`);
   }
   const result = contractSchema.safeParse(raw);
   if (!result.success) {

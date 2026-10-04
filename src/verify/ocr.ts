@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
+import { errorMessage } from '../util/error-message.js';
 
 /**
  * Anchored OCR: what the user actually SEES inside an element's rect, read
@@ -222,7 +223,7 @@ export class VisionOcr implements OcrEngine {
     } catch (e) {
       throw new Error(
         'OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line ' +
-          `Tools (xcode-select --install). Underlying error: ${e instanceof Error ? e.message : String(e)}`,
+          `Tools (xcode-select --install). Underlying error: ${errorMessage(e)}`,
       );
     }
     const key = createHash('sha256').update(RECOGNIZER_SWIFT).update(toolchain).digest('hex').slice(0, 16);

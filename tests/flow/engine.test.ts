@@ -1,4 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The one sleep owner (util/sleep.ts) is a zero-delay macrotask yield here,
+// not a wait: every poll cadence and the fill's 350 ms focus delay collapse to
+// one event-loop turn, so EngineOptions needs no test-only timing knob for
+// the fill (review 2026-10-03). A macrotask rather than a no-op on purpose —
+// some fakes below make an element appear on a real setTimeout, and a poll
+// that never leaves the microtask queue would starve them. Deadlines are
+// Date.now-based and still fire; measured: the suite is ~1 s faster, not
+// slower, with every test green either way.
+vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type Step } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, resetClearStateCount, stepSummary } from '../../src/flow/engine.js';
@@ -44,8 +54,7 @@ flows:
       - tap: { id: tab_payments }
 `);
 
-// focusDelayMs: 0 — a fill: step's focus pause is interact/fill.ts's (pinned there); the engine only plumbs it.
-const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1, focusDelayMs: 0 };
+const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1 };
 
 function buildScreens() {
   resetLayout();

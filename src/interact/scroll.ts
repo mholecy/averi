@@ -1,9 +1,12 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/selectors.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
 import { swipeVector, type Direction } from './swipe.js';
+
+/** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
+export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
 
 export interface ScrollOptions {
   /** Where the CONTENT lies relative to the current view (down = below the fold → finger swipes up). Default down. */
@@ -12,7 +15,7 @@ export interface ScrollOptions {
   maxSwipes?: number;
   /** Require the element ENTIRELY inside the viewport, not merely overlapping it. Default false. */
   fully?: boolean;
-  /** Default 15 000. The flow engine converts its `timeout: 2s` before calling. */
+  /** Default DEFAULT_SCROLL_TIMEOUT_MS. The flow engine converts its `timeout: 2s` before calling. */
   timeoutMs?: number;
   /** Pause after each swipe before the next read. Default 400. */
   settleMs?: number;
@@ -96,7 +99,7 @@ export async function scrollUntilVisible(
   const direction = opts.direction ?? 'down';
   const maxSwipes = opts.maxSwipes ?? 6;
   const fully = opts.fully === true;
-  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS;
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
   const viewport = await adapter.viewport();
@@ -116,7 +119,7 @@ export async function scrollUntilVisible(
   // container has nothing left to scroll — distinguishing "give it another
   // swipe" from "this element CANNOT be fully revealed", which is a real
   // layout defect rather than an impatient loop.
-  let prevRect: UiNode['rect'] | undefined;
+  let prevRect: Rect | undefined;
   for (let swipes = 0; ; swipes++) {
     // A failed read is a miss, not a failure — see readTreeOrError.
     const { tree, error } = await readTreeOrError(adapter);
@@ -171,7 +174,7 @@ export async function scrollUntilVisible(
   }
 }
 
-const rectsEqual = (a: UiNode['rect'], b: UiNode['rect']): boolean =>
+const rectsEqual = (a: Rect, b: Rect): boolean =>
   Math.abs(a.x - b.x) < 1 &&
   Math.abs(a.y - b.y) < 1 &&
   Math.abs(a.width - b.width) < 1 &&

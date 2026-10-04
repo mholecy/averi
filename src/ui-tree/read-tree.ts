@@ -5,10 +5,17 @@ import { sleep } from '../util/sleep.js';
  * Reading the UI tree, and waiting on it.
  *
  * Two primitives live here: `readTreeOrError`, the one-shot read that reports
- * a failure as a value, and `pollTree`, the deadline loop over it that every
- * "wait for the screen to say X" in the codebase is built on. They are one
- * module because the second exists to apply the first's rule, and a caller
- * that needs one usually needs the other.
+ * a failure as a value, and `pollTree`, the deadline loop over it that the
+ * flow engine's waits and detect probe, the verifier's asserts and the
+ * interaction module's settle wait are built on. Two loops are deliberately
+ * NOT built on it: the fill's value poll (interact/fill.ts, pollValue) is
+ * bounded by a round count rather than a deadline and lets a read failure
+ * throw, because by then the field has been tapped and an unreadable tree is
+ * a dead device, not a screen settling; and the scroll loop
+ * (interact/scroll.ts) acts between reads and has a second stop bound. Both
+ * use readTreeOrError's rule where it applies. They are one module because
+ * the second exists to apply the first's rule, and a caller that needs one
+ * usually needs the other.
  *
  * Two ONE-SHOT read policies exist beside these and are deliberately left
  * where they are (assessed 2026-10-03, not changed):

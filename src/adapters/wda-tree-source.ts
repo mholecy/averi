@@ -37,8 +37,7 @@ import type { UiNode } from './types.js';
  * ever have is WdaServer, and one adapter means a hypothetical seam.
  */
 export class WdaTreeSource implements IosTreeSource {
-  /** The simulator this source is bound to — readable so the registry's wiring can be checked without a device. */
-  readonly udid: string;
+  private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;
 

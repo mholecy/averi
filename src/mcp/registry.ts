@@ -1,8 +1,7 @@
 import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
-import { IdbTreeSource, type IosTreeSource } from '../adapters/ios-tree-source.js';
-import { WdaTreeSource } from '../adapters/wda-tree-source.js';
+import { createIosTreeSource } from '../adapters/ios-tree-source.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 
 /** Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). */
@@ -22,20 +21,11 @@ export type AdapterFactory = (
 ) => DeviceAdapter;
 
 /**
- * The registry's one construction job at the tree-source seam: the kind
- * names the adapter, the bound device supplies the concrete UDID both
- * sources need (ios-tree-source.ts). Typed as a Record so a new kind without
- * a constructor is a compile error here, not a runtime default. Exported with
- * defaultFactory because this wiring is the one thing the registry's own
- * tests (which inject a factory) cannot see — a swapped entry or a source
- * bound to the wrong device id passed every test until it was pinned
- * (review 2026-10-02).
+ * Exported for its tests: the registry's own tests inject a factory, so this
+ * is the one piece of wiring they cannot see (review 2026-10-02). Which
+ * backend serves a kind is NOT decided here — adapters/ios-tree-source.ts
+ * owns that (review 2026-10-03); this only hands it the bound device id.
  */
-export const iosTreeSources: Record<IosTreeSourceKind, (udid: string) => IosTreeSource> = {
-  idb: (udid) => new IdbTreeSource({ udid }),
-  wda: (udid) => new WdaTreeSource({ udid }),
-};
-
 export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
   if (platform === 'android') return new AndroidAdapter({ serial: deviceId });
   // An unbound ios adapter only probes listDevices() — it gets no tree source.
@@ -44,7 +34,7 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
   // serves a direct caller of the factory, and names the same default.
   return new IosAdapter({
     udid: deviceId,
-    treeSource: iosTreeSources[opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE](deviceId),
+    treeSource: createIosTreeSource(opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE, deviceId),
   });
 };
 

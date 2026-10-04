@@ -24,6 +24,22 @@ export interface DeviceScreen {
   height: number;
 }
 
+/** Integer points (iOS) or pixels (Android), as the platform reports them. */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The rect of a node that has none: a synthetic root, a dump without bounds,
+ * an element without a frame. A factory, never a shared constant — nodes are
+ * mutated downstream (field-error pairing, geometry) and two nodes must not
+ * share one rect object.
+ */
+export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, ...
@@ -32,7 +48,7 @@ export interface UiNode {
   value: string | null; // current value (text field contents, toggle state)
   /** Validation message associated with an input, when the platform exposes one. */
   error?: string;
-  rect: { x: number; y: number; width: number; height: number };
+  rect: Rect;
   children: UiNode[];
 }
 

@@ -496,6 +496,39 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     expect(result.detail).toContain('scale 1.000');
   });
 
+  /**
+   * The caveats a sample carries are worded ONCE, in color-parity.ts
+   * (`sampleCaveats`), for the table row and this assert alike — since
+   * 63e4ca4 the assert prints the table's fuller wording, recovery step
+   * included. Pinned here at the assert, exactly, because this is the surface
+   * a caller reads.
+   */
+  it('names a clipped sample and a busy one in the table\'s own words, recovery step included', async () => {
+    // Clipped: the card hangs 60% below a 320px-tall png (y 280..380).
+    const hanging = { x: 100, y: 280, width: 800, height: 100 };
+    resetLayout();
+    const clipped = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: hanging })) }, 'detail');
+    clipped.nextScreenshot = png(1000, 320, (p) => fill(p, '#FDFDFD', { ...hanging, height: 40 }));
+    const a = await new Verifier(clipped, FAST).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(a.pass).toBe(true);
+    expect(a.detail).toContain(
+      "clipped 60% off-png — the remaining sliver's dominant may be a neighbor's fill; scroll it fully on-screen and re-run to trust this row",
+    );
+
+    // Busy: three equal bands in three 4-bit buckets across the inset region
+    // (x 196..804), so the winning bucket covers a third.
+    const busy = cardFake('#FDFDFD');
+    busy.nextScreenshot = png(1000, 320, (p) => {
+      fill(p, '#FDFDFD', { x: 100, y: 200, width: 299, height: 100 });
+      fill(p, '#3F3F50', { x: 399, y: 200, width: 203, height: 100 });
+      fill(p, '#A0C040', { x: 602, y: 200, width: 298, height: 100 });
+    });
+    const b = await new Verifier(busy, FAST).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(b.detail).toContain(
+      'dominant bucket covers only 33% of the region — busy content; consider sample: "patches" or a tighter anchor',
+    );
+  });
+
   it('the default deltaE (8) catches the real 2026-08-13 bug: #CFCFD3 where #FDFDFD was expected', async () => {
     const verifier = new Verifier(cardFake('#CFCFD3'), FAST);
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });

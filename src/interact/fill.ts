@@ -1,6 +1,7 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, resolveNow, resolveSettled, type SettleOptions, type Target } from './resolve.js';
 
@@ -19,8 +20,6 @@ export const DEFAULT_VALUE_POLL_MS = 400;
 export interface FillOptions extends SettleOptions {
   /** Delete the field's current content before typing — typing otherwise APPENDS. */
   clear?: boolean;
-  /** Pause after the focus tap, before typing. Default DEFAULT_FOCUS_DELAY_MS; tests pass ~0. */
-  focusDelayMs?: number;
 }
 
 export interface FillResult {
@@ -85,9 +84,8 @@ export async function fillField(
     try {
       tree = await adapter.uiTree();
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
       throw new Error(
-        `fill: could not re-read ${describeTarget(target)} after focusing it — ${message}. ` +
+        `fill: could not re-read ${describeTarget(target)} after focusing it — ${errorMessage(e)}. ` +
           'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
           'xcrun simctl list), then retry with clear: true so the field is reset',
       );
@@ -96,7 +94,7 @@ export async function fillField(
   };
   const point = tapPoint(node);
   await adapter.tap(point.x, point.y);
-  await sleep(opts.focusDelayMs ?? DEFAULT_FOCUS_DELAY_MS); // focus + keyboard
+  await sleep(DEFAULT_FOCUS_DELAY_MS); // focus + keyboard — a constant, not an option: tests mock util/sleep
 
   let current: UiNode | undefined = node;
   let preLen = node.value?.length ?? 0; // what the field holds when typing starts (see `landed`)

@@ -1,4 +1,4 @@
-import type { UiNode } from './types.js';
+import { zeroRect, type Rect, type UiNode } from './types.js';
 
 /**
  * The normalized iOS node and its vocabulary — pure: no process, no device.
@@ -61,7 +61,7 @@ export interface RawIosElement {
   label?: string | null;
   identifier?: string | null;
   value?: string | null;
-  rect?: { x: number; y: number; width: number; height: number };
+  rect?: Rect;
 }
 
 /**
@@ -71,7 +71,7 @@ export interface RawIosElement {
  * whose role was a function, in both copies, until 2026-10-02),
  * empty/null/absent strings → null, rects rounded to integer
  * points (both backends emit fractional points; selectors and the geometry
- * layer want integers), a missing rect → a zero rect. Until 2026-10-02 this
+ * layer want integers), a missing rect → zeroRect(). Until 2026-10-02 this
  * was written out twice, in ios.ts and wda-source.ts, and the tests pinned
  * each copy separately — nothing pinned that they agreed. The rect is a
  * fresh object per node: nodes are mutated downstream and must not share one.
@@ -94,7 +94,7 @@ export function normalizeIosElement(
           width: Math.round(el.rect.width),
           height: Math.round(el.rect.height),
         }
-      : { x: 0, y: 0, width: 0, height: 0 },
+      : zeroRect(),
     children,
   };
 }

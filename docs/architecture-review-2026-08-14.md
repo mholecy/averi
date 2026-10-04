@@ -302,6 +302,7 @@ Called out so a future pass doesn't undo good judgement:
 
 - **`ExecFn` / `FetchFn` / `SpawnFn` / `AdapterFactory` / `wdaServerFactory`** — structural test
   seams, minimal, each used. Correct as-is. Do not formalize into a DI layer.
+  - 2026-10-02: `wdaServerFactory` is gone — it became the `IosTreeSource` seam (`adapters/ios-tree-source.ts`), which has two real adapters; the other four stand.
 - **`evaluateRectAssert` vs `compareRectParity`** — single-element vs whole-screen-with-gap-chain.
   They already share `norm` and `inferScreenWidth`; the rest genuinely differs. Leave separate.
 - **`AndroidAdapter` / `IosAdapter` common shape** — the `viewportPromise` memoization pattern

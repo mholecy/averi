@@ -1,8 +1,8 @@
 import { PNG } from 'pngjs';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { captureFrame, pngRegion, readTreeWithRetry } from '../../src/verify/capture.js';
-import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { captureFrame, pngRegion } from '../../src/verify/capture.js';
+import { FakeAdapter, node } from '../helpers/fake.js';
 
 /**
  * verify/capture.ts is the one owner of frame stability and of the png
@@ -12,6 +12,21 @@ import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
  * on the frame as a reason rather than as an exception, and the scale is
  * derived from the device first.
  */
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on: the two
+// budgets here are sequences of delays, and the sequence is what to pin —
+// a wall clock is a flake, and the real tree-retry budget cost this file
+// 1.5 s (review 2026-10-03, round 2). Yields a macrotask so nothing spins.
+const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
+vi.mock('../../src/util/sleep.js', () => ({
+  sleep: async (ms: number) => {
+    sleeps.push(ms);
+    await new Promise((r) => setTimeout(r, 0));
+  },
+}));
+beforeEach(() => {
+  sleeps.length = 0;
+});
 
 const SCREEN: UiNode = node({
   role: 'container',
@@ -43,7 +58,7 @@ function device(frames: Buffer[]): FakeAdapter {
 describe('captureFrame — the stability wait', () => {
   it('returns the first frame that repeats, and nothing captured before it', async () => {
     const fake = device([frame('a'), frame('b'), frame('b'), frame('c')]);
-    const { shot } = await captureFrame(fake, { delayMs: 1 });
+    const { shot } = await captureFrame(fake);
     expect(shot.equals(frame('b'))).toBe(true);
     // a, b, b — the capture that confirmed stability is the one returned.
     expect(fake.screenshots).toHaveLength(3);
@@ -51,25 +66,25 @@ describe('captureFrame — the stability wait', () => {
 
   it('gives up after `attempts` re-captures and returns the LAST frame as the best available', async () => {
     const fake = device(['a', 'b', 'c', 'd', 'e', 'f'].map(frame));
-    const { shot } = await captureFrame(fake, { attempts: 2, delayMs: 1 });
+    const { shot } = await captureFrame(fake, { attempts: 2, delayMs: 7 });
     expect(fake.screenshots).toHaveLength(3); // the first capture plus 2 re-captures
     expect(shot.equals(frame('c'))).toBe(true);
+    expect(sleeps).toEqual([7, 7]);
   });
 
-  it('defaults to 5 re-captures — the budget the `screenshot` tool has always had', async () => {
+  it('defaults to 5 re-captures, 300 ms apart — the budget the `screenshot` tool has always had', async () => {
     const fake = device(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(frame));
-    const { shot } = await captureFrame(fake, { delayMs: 1 });
+    const { shot } = await captureFrame(fake);
     expect(fake.screenshots).toHaveLength(6);
     expect(shot.equals(frame('f'))).toBe(true);
+    expect(sleeps).toEqual([300, 300, 300, 300, 300]);
   });
 
-  it('defaults to 300 ms between captures', async () => {
+  it('a screen that is already still costs exactly one 300 ms wait and one extra capture', async () => {
     const fake = device([frame('a'), frame('a')]);
-    const started = Date.now();
     await captureFrame(fake);
     expect(fake.screenshots).toHaveLength(2);
-    // One sleep between the two captures. setTimeout may fire a hair early.
-    expect(Date.now() - started).toBeGreaterThanOrEqual(280);
+    expect(sleeps).toEqual([300]);
   });
 });
 
@@ -82,12 +97,14 @@ describe('captureFrame — the tree beside the png', () => {
     fake.viewport = async () => {
       throw new Error('the capture must not read the device unasked');
     };
-    const got = await captureFrame(fake, { delayMs: 1 });
+    const got = await captureFrame(fake);
     expect(got.shot.equals(Buffer.from('not a png'))).toBe(true);
-    expect(got.measured).toEqual({ error: 'no UI tree was asked for beside this png' });
+    // A png-only frame reports nothing — not even a reason: it asked for nothing more.
+    expect(got.measured).toBeUndefined();
+    expect(Object.keys(got)).toEqual(['shot']);
   });
 
-  it('tree: true reads the tree with retry — a transient failure is absorbed', async () => {
+  it('readTree reads the tree with retry — a transient failure (uiautomator null root) is absorbed, 300 ms later', async () => {
     const fake = device([png(1000, 2000)]);
     const orig = fake.uiTree.bind(fake);
     let failures = 1;
@@ -95,22 +112,28 @@ describe('captureFrame — the tree beside the png', () => {
       if (failures-- > 0) throw new Error('null root node returned by UiTestAutomationBridge');
       return orig();
     };
-    const got = await captureFrame(fake, { tree: true, delayMs: 1 });
+    const got = await captureFrame(fake, { readTree: true, delayMs: 5 });
     expect(got.measured.tree?.children[0]?.identifier).toBe('card');
+    expect(failures).toBe(-1); // succeeded on the 2nd attempt
+    // The 5 ms stability wait, then one retry at the tree-read budget's 300 ms
+    // — its own budget, not the stability delay.
+    expect(sleeps).toEqual([5, 300]);
     expect(got.measured.error).toBeUndefined();
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
   });
 
-  it('a tree read that keeps failing lands on the frame as a reason — the png is still returned, nothing throws', async () => {
+  it('a tree read that keeps failing lands on the frame as a reason naming the attempt count and the error — the png is still returned, nothing throws', async () => {
     const fake = device([png(1000, 2000)]);
     fake.uiTree = async () => {
       throw new Error('null root node');
     };
-    const got = await captureFrame(fake, { tree: true, delayMs: 1 });
+    const got = await captureFrame(fake, { readTree: true, delayMs: 5 });
     expect(got.shot.equals(png(1000, 2000))).toBe(true);
     expect(got.measured.tree).toBeUndefined();
-    expect(got.measured.error).toMatch(/after 5 attempts: null root node/);
+    expect(got.measured.error).toMatch(/^UI tree read failed after 5 attempts: null root node$/);
     expect(got.measured.png).toBeUndefined();
+    // Five attempts, four waits between them, each the tree-read budget's 300 ms.
+    expect(sleeps).toEqual([5, 300, 300, 300, 300]);
   });
 
   it('tree: <node> measures the caller\'s own tree against the frame without reading one', async () => {
@@ -118,7 +141,7 @@ describe('captureFrame — the tree beside the png', () => {
     fake.uiTree = async () => {
       throw new Error('the poll owns the tree read');
     };
-    const got = await captureFrame(fake, { tree: SCREEN, delayMs: 1 });
+    const got = await captureFrame(fake, { tree: SCREEN });
     expect(got.measured.tree).toBe(SCREEN);
     expect(got.measured.png).toMatchObject({ width: 1000, height: 2000 });
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
@@ -126,11 +149,12 @@ describe('captureFrame — the tree beside the png', () => {
 
   it('an undecodable png keeps the tree and reports the reason; nothing is measured', async () => {
     const fake = device([Buffer.from('not a png')]);
-    const got = await captureFrame(fake, { tree: true, delayMs: 1 });
+    const got = await captureFrame(fake, { readTree: true });
     expect(got.measured.tree).toBeDefined();
     expect(got.measured.png).toBeUndefined();
-    // The frame's one sentence, pngjs's own words inside it.
-    expect(got.measured.error).toMatch(/^screenshot PNG decode failed: unrecognised content at end of stream/);
+    // The frame's one sentence: pngjs's own words, then how to recover.
+    expect(got.measured.error).toMatch(/^screenshot PNG decode failed: unrecognised content at end of stream — re-run; if it repeats/);
+    expect(got.measured.error).toContain('adb exec-out screencap -p');
   });
 });
 
@@ -138,7 +162,7 @@ describe('captureFrame — the one scale', () => {
   it('derives the scale from the DEVICE screen first, and says so when the tree disagrees', async () => {
     const fake = device([png(1000, 2000)]);
     fake.viewportSize = { width: 500, height: 1000 }; // the tree reads 1000 wide
-    const got = await captureFrame(fake, { tree: true, delayMs: 1 });
+    const got = await captureFrame(fake, { readTree: true });
     expect(got.measured.scale).toMatchObject({ scale: 2, width: 500 });
     expect(got.measured.scale?.note).toMatch(/500x1000 DEVICE screen; the tree reads 1000/);
   });
@@ -148,7 +172,7 @@ describe('captureFrame — the one scale', () => {
     fake.viewport = async () => {
       throw new Error('idb describe returned no screen_dimensions');
     };
-    const got = await captureFrame(fake, { tree: true, delayMs: 1 });
+    const got = await captureFrame(fake, { readTree: true });
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
     expect(got.measured.scale?.note).toMatch(/scaled from the UI tree/);
   });
@@ -159,7 +183,7 @@ describe('captureFrame — the one scale', () => {
     fake.viewport = async () => {
       throw new Error('no idb');
     };
-    const got = await captureFrame(fake, { tree: node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), delayMs: 1 });
+    const got = await captureFrame(fake, { tree: node({ rect: { x: 0, y: 0, width: 0, height: 0 } }) });
     expect(got.measured.scale?.error).toMatch(/screen width could not be inferred/);
   });
 
@@ -172,10 +196,10 @@ describe('captureFrame — the one scale', () => {
     // the parity tables' containment; moved into the capture it must stay
     // contained.
     const malformed = { ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] };
-    const got = await captureFrame(fake, { tree: malformed, delayMs: 1 });
+    const got = await captureFrame(fake, { tree: malformed });
     expect(got.shot.equals(png(1000, 2000))).toBe(true);
     expect(got.measured.tree).toBe(malformed);
-    expect(got.measured.scale?.error).toMatch(/png scale could not be derived from this tree/);
+    expect(got.measured.scale?.error).toMatch(/^the png scale could not be derived from this tree: .* — the tree is not well-formed; dump it with ui_snapshot and re-run/);
   });
 });
 
@@ -200,33 +224,5 @@ describe('pngRegion — the one rect → png mapping', () => {
   it('is undefined for a rect fully off the png, and the inset never empties a tiny one', () => {
     expect(pngRegion({ x: 0, y: 300, width: 10, height: 10 }, 1, png)).toBeUndefined();
     expect(pngRegion({ x: 0, y: 0, width: 2, height: 2 }, 1, png, 0.12)).toMatchObject({ x0: 0, y0: 0, x1: 2, y1: 2 });
-  });
-});
-
-describe('readTreeWithRetry', () => {
-  const dashboardFake = () => {
-    resetLayout();
-    return new FakeAdapter({ dashboard: screen(el({ identifier: 'dashboard_root' })) }, 'dashboard');
-  };
-
-  it('absorbs transient read failures (uiautomator null root) and returns the tree', async () => {
-    const fake = dashboardFake();
-    const orig = fake.uiTree.bind(fake);
-    let failures = 3;
-    fake.uiTree = async () => {
-      if (failures-- > 0) throw new Error('null root node returned by UiTestAutomationBridge');
-      return orig();
-    };
-    const tree = await readTreeWithRetry(fake, 5, 1);
-    expect(tree.children.length).toBeGreaterThan(0);
-    expect(failures).toBe(-1); // succeeded on the 4th attempt
-  });
-
-  it('throws after the last attempt, naming the attempt count and the underlying error', async () => {
-    const fake = dashboardFake();
-    fake.uiTree = async () => {
-      throw new Error('null root node');
-    };
-    await expect(readTreeWithRetry(fake, 3, 1)).rejects.toThrow(/after 3 attempts: null root node/);
   });
 });

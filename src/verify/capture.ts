@@ -1,5 +1,6 @@
 import { PNG } from 'pngjs';
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
+import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { pngScale, type PngScale } from './scale.js';
 
@@ -57,6 +58,16 @@ import { pngScale, type PngScale } from './scale.js';
 const STABILITY_ATTEMPTS = 5;
 const STABILITY_DELAY_MS = 300;
 
+/**
+ * The tree-read budget: a failed `uiTree()` is retried up to 5 times, 300 ms
+ * apart. The same numbers as the stability budget, but a DIFFERENT budget —
+ * one re-asks a device that answered "no window yet", the other re-captures
+ * a screen that is still moving — so each is named for what it governs and
+ * either can move without the other.
+ */
+const TREE_READ_ATTEMPTS = 5;
+const TREE_READ_DELAY_MS = 300;
+
 /** Decoded RGBA screenshot — pngjs's `PNG` satisfies this structurally. */
 export interface RgbaImage {
   width: number;
@@ -77,39 +88,61 @@ export interface MeasuredFrame {
   error?: undefined;
 }
 
+/** The tree is here, the pixels are not: the png did not decode. Rect parity can still use the tree. */
+export interface Undecoded {
+  tree: UiNode;
+  png?: undefined;
+  scale?: undefined;
+  error: string;
+}
+
+/** No tree at all: the read failed after retry. `error` is the one sentence a consumer quotes. */
+export interface Treeless {
+  tree?: undefined;
+  png?: undefined;
+  scale?: undefined;
+  error: string;
+}
+
 /**
- * Why a frame has nothing to measure. Two shapes, told apart by `tree`: the
- * png did not decode (the tree is still here — rect parity can use it), or
- * there is no tree at all (the read failed after retry, or none was asked
- * for). `error` is the one sentence a consumer quotes, so no caller ever
- * interpolates a reason that might not be there.
+ * What a frame that had a tree in play can say about itself: the measured
+ * frame, or one of the two reasons there is none. Narrow on `error`, then on
+ * `tree`. Named for the measurement, not its outcome — `MeasuredFrame` is
+ * the success arm.
  */
-export type Unmeasured =
-  | { tree: UiNode; png?: undefined; scale?: undefined; error: string }
-  | { tree?: undefined; png?: undefined; scale?: undefined; error: string };
+export type FrameMeasurement = MeasuredFrame | Undecoded | Treeless;
 
 export interface Frame {
   /** The settled screenshot bytes — what a tool returns to the caller. */
   shot: Buffer;
-  /** The measured half, or the one reason there is none. Narrow on `error`, then on `tree`. */
-  measured: MeasuredFrame | Unmeasured;
+  /**
+   * Present whenever a tree was read or supplied; absent for a png-only frame
+   * (the `screenshot` and `ensure_state` tools), which asked for nothing more
+   * and so has nothing to report — not even a reason.
+   */
+  measured?: FrameMeasurement;
 }
 
-export interface CaptureOptions {
-  /**
-   * `true`: read the tree beside the png (bounded retry; a final failure is
-   * carried on the frame — a leg must not lose a minutes-long device run
-   * over the optional extra read). A node: the caller already has the tree
-   * — the polling asserts, whose poll owns the read — and wants it measured
-   * against this frame. Omitted: the frame is the png alone, and no decode
-   * or device read is paid for.
-   */
-  tree?: UiNode | true;
+/** A frame captured with a tree in play: its measured half is always there. */
+export interface FrameWithTree extends Frame {
+  measured: FrameMeasurement;
+}
+
+/**
+ * Where the tree comes from, as three states a caller cannot mix: read it
+ * here (`readTree`, bounded retry; a final failure is carried on the frame —
+ * a leg must not lose a minutes-long device run over the optional extra
+ * read), take the caller's own (`tree` — the polling asserts, whose poll owns
+ * the read), or none. A supplied tree with `readTree` beside it is a type
+ * error rather than a documented precedence: a tree the caller already has
+ * is never re-read, and the types say so.
+ */
+export type CaptureOptions = {
   /** Stability re-captures before giving up (default 5). */
   attempts?: number;
   /** Delay between captures (default 300 ms; the Verifier passes its pollMs so tests stay fast). */
   delayMs?: number;
-}
+} & ({ readTree: true; tree?: never } | { tree: UiNode; readTree?: never } | { readTree?: false; tree?: never });
 
 /**
  * Capture a settled frame. Nothing past the screenshot itself throws: a tree
@@ -119,18 +152,18 @@ export interface CaptureOptions {
  * policy applies instead of a lost leg. (The screenshot must throw — without
  * bytes there is no frame to carry a reason on.)
  *
- * Order, when the tree is READ here (`tree: true`): the png first — its
+ * Order, when the tree is READ here (`readTree`): the png first — its
  * stability is the evidence the screen stopped moving — then the tree, so
  * the tree read describes the screen the wait found settled rather than one
  * it found still moving. Until 2026-10-02 the `verify` leg did the reverse,
  * and uiautomator reports LIVE bounds during an animation, so a tree read
  * before the wait could carry mid-animation rects against a settled png.
  *
- * When the tree is SUPPLIED (`tree: <node>`, the color and ocr asserts), the
- * caller owns its freshness and it predates the wait by one poll round's
- * read. That is acceptable where it happens because the poll retries: a crop
- * that lands wrong on a frame that settled after the read fails this round
- * and the next round reads a tree of the settled screen.
+ * When the tree is SUPPLIED (`tree`, the color and ocr asserts), the caller
+ * owns its freshness and it predates the wait by one poll round's read. That
+ * is acceptable where it happens because the poll retries: a crop that lands
+ * wrong on a frame that settled after the read fails this round and the next
+ * round reads a tree of the settled screen.
  *
  * The residual race of png-then-tree, recorded 2026-10-02: the screen can
  * change BETWEEN the stable pair and the tree read — a toast, a late async
@@ -147,27 +180,47 @@ export interface CaptureOptions {
  * derivation, still correct for every root-bearing capture) rather than
  * failing the frame.
  */
+export function captureFrame(
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  opts: CaptureOptions & ({ readTree: true } | { tree: UiNode }),
+): Promise<FrameWithTree>;
+export function captureFrame(
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  opts?: CaptureOptions,
+): Promise<Frame>;
 export async function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions = {},
 ): Promise<Frame> {
-  const shot = await stableScreenshot(adapter, opts.attempts ?? STABILITY_ATTEMPTS, opts.delayMs ?? STABILITY_DELAY_MS);
-  if (opts.tree === undefined) return { shot, measured: { error: 'no UI tree was asked for beside this png' } };
+  const shot = await stableScreenshot(adapter, {
+    attempts: opts.attempts ?? STABILITY_ATTEMPTS,
+    delayMs: opts.delayMs ?? STABILITY_DELAY_MS,
+  });
   let tree: UiNode;
-  if (opts.tree === true) {
+  if (opts.tree !== undefined) {
+    tree = opts.tree;
+  } else if (opts.readTree) {
     try {
-      tree = await readTreeWithRetry(adapter);
+      tree = await readTreeWithRetry(adapter, { attempts: TREE_READ_ATTEMPTS, delayMs: TREE_READ_DELAY_MS });
     } catch (e) {
-      return { shot, measured: { error: message(e) } };
+      return { shot, measured: { error: errorMessage(e) } };
     }
   } else {
-    tree = opts.tree;
+    return { shot };
   }
   let png: PNG;
   try {
     png = PNG.sync.read(shot);
   } catch (e) {
-    return { shot, measured: { tree, error: `screenshot PNG decode failed: ${message(e)}` } };
+    return {
+      shot,
+      measured: {
+        tree,
+        error:
+          `screenshot PNG decode failed: ${errorMessage(e)} — re-run; if it repeats, the device is returning ` +
+          'something other than a PNG (check `adb exec-out screencap -p` / `xcrun simctl io <udid> screenshot` by hand)',
+      },
+    };
   }
   // Memoized inside the adapter (adapters/types.ts), so this is a device read
   // once per adapter, not once per frame.
@@ -180,12 +233,14 @@ export async function captureFrame(
     // or a pathological depth must fail THIS frame's scale, not the leg: the
     // walk used to run inside the parity tables' containment, and moving it
     // here must not widen what a bad tree can take down.
-    scale = { error: `the png scale could not be derived from this tree: ${message(e)}` };
+    scale = {
+      error:
+        `the png scale could not be derived from this tree: ${errorMessage(e)} — the tree is not well-formed; ` +
+        'dump it with ui_snapshot and re-run, and keep the dump if it repeats',
+    };
   }
   return { shot, measured: { tree, png, scale } };
 }
-
-const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
  * Two identical consecutive captures, bounded attempts. Each call costs 2 to
@@ -194,12 +249,11 @@ const message = (e: unknown): string => (e instanceof Error ? e.message : String
  */
 async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot'>,
-  attempts: number,
-  delayMs: number,
+  budget: { attempts: number; delayMs: number },
 ): Promise<Buffer> {
   let previous = await adapter.screenshot();
-  for (let i = 0; i < attempts; i++) {
-    await sleep(delayMs);
+  for (let i = 0; i < budget.attempts; i++) {
+    await sleep(budget.delayMs);
     const current = await adapter.screenshot();
     if (current.equals(previous)) return current;
     previous = current;
@@ -208,35 +262,38 @@ async function stableScreenshot(
 }
 
 /**
- * Bounded-retry tree read for one-shot consumers (a captured frame): right
- * after a flow settles, a device can transiently fail to produce a tree
+ * Bounded-retry tree read for the tree half of a captured frame: right after
+ * a flow settles, a device can transiently fail to produce a tree
  * (uiautomator "null root node") — the same transient the polling asserts
  * absorb via readTreeOrError. Throws after the last attempt with the
- * underlying error in the message.
+ * underlying error in the message; `captureFrame` carries that on the frame.
  */
-export async function readTreeWithRetry(
+async function readTreeWithRetry(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
-  attempts = 5,
-  delayMs = 300,
+  budget: { attempts: number; delayMs: number },
 ): Promise<UiNode> {
-  let lastError: Error | undefined;
-  for (let i = 0; i < attempts; i++) {
-    if (i > 0) await sleep(delayMs);
+  let last: string | undefined;
+  for (let i = 0; i < budget.attempts; i++) {
+    if (i > 0) await sleep(budget.delayMs);
     try {
       return await adapter.uiTree();
     } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
+      last = errorMessage(e);
     }
   }
-  throw new Error(`UI tree read failed after ${attempts} attempts: ${lastError?.message ?? 'unknown error'}`);
+  throw new Error(`UI tree read failed after ${budget.attempts} attempts: ${last ?? 'unknown error'}`);
 }
 
-/** A rect landed in the png: pixel bounds, half-open, plus how much of it fell outside. */
-export interface PngRegion {
+/** Pixel bounds in the png, half-open. */
+export interface PngBounds {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
+}
+
+/** A rect landed in the png: its bounds, plus how much of it fell outside. */
+export interface PngRegion extends PngBounds {
   /** Share of the rect's scaled area that lay off-png before clamping (0 = fully on-png). */
   clipped: number;
 }
@@ -266,7 +323,7 @@ export interface PngRegion {
  * THIS behavior — do not "fix" it to banker's without re-pinning them.
  */
 export function pngRegion(
-  rect: UiNode['rect'],
+  rect: Rect,
   scale: number,
   png: { width: number; height: number },
   inset = 0,

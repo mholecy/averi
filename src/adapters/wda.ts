@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { sleep } from '../util/sleep.js';
+import { errorMessage } from '../util/error-message.js';
 
 /**
  * WebDriverAgent lifecycle for one simulator (docs/plans/ios-wda-tree-source.md,
@@ -219,7 +220,7 @@ export class WdaServer {
     } catch (err) {
       // A bare "fetch failed"/"TimeoutError" names neither device nor server —
       // keep the log-path contract even for connection-level failures.
-      const reason = err instanceof Error ? err.message : String(err);
+      const reason = errorMessage(err);
       // Two failures share this catch and want opposite remedies. A server
       // that still answers /status is ALIVE: /source on a deep tree is the
       // known WDA weakness (SOURCE_TIMEOUT_MS), and killing it would trade a
@@ -346,7 +347,7 @@ export class WdaServer {
       // (no lsof, a timeout) means we could NOT clear the port: say so, since
       // the next session will meet the refusal and needs to know why.
       if (!(e instanceof ExecError && e.exitCode === 1 && !e.timedOut)) {
-        console.error(`averi: could not list the listener on port ${this.port} (${e instanceof Error ? e.message.split('\n')[0] : String(e)}) — a WebDriverAgent may be left behind; \`pkill -f WebDriverAgentRunner\` before the next iOS call`);
+        console.error(`averi: could not list the listener on port ${this.port} (${errorMessage(e).split('\n')[0]}) — a WebDriverAgent may be left behind; \`pkill -f WebDriverAgentRunner\` before the next iOS call`);
       }
       return;
     }

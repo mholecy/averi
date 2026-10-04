@@ -2,7 +2,8 @@ import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
-import { captureFrame, type CaptureOptions, type Frame, type MeasuredFrame } from '../verify/capture.js';
+import { errorMessage } from '../util/error-message.js';
+import { captureFrame, type Frame, type MeasuredFrame, type Undecoded } from '../verify/capture.js';
 import { compareColorParity, contractHasColorAnchors, formatColorParity } from '../verify/color-parity.js';
 import type { LayoutContract } from '../verify/layout-contract.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine, type OcrRegionResult } from '../verify/ocr.js';
@@ -40,13 +41,6 @@ export interface VerificationRequest {
   baselineDir: string;
   /** Test seam: the OCR recognizer behind the text-parity table. */
   ocrEngine?: OcrEngine;
-  /**
-   * Test seam: the delay inside each leg's final-frame stability wait
-   * (verify/capture.ts). Production takes the default — the same wait the
-   * `screenshot` tool applies; a fake device that never changes would
-   * otherwise cost every leg test one real 300 ms sleep.
-   */
-  capture?: Pick<CaptureOptions, 'delayMs'>;
 }
 
 export interface VerificationOutput {
@@ -85,7 +79,7 @@ export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promi
     // The question could not be ASKED — a device under load or unreachable is
     // not a dead app, and saying `false` here sends the caller after a crash
     // that never happened (measured 2026-09-17, finportal b4).
-    const why = (e instanceof Error ? e.message : String(e)).split('\n')[0];
+    const why = errorMessage(e).split('\n')[0];
     const check = adapter.platform === 'android'
       ? 'check `adb devices` and host load'
       : 'check `xcrun simctl list devices booted` and host load (reboot the simulator if it does not answer)';
@@ -168,7 +162,7 @@ export async function runVerification(
     // would discard the trace, assert results and screenshot of a minutes-long
     // device run over an optional extra read — so both land on the frame as
     // reasons the tables quote.
-    const frame = await captureFrame(adapter, { ...req.capture, tree: contract === undefined ? undefined : true });
+    const frame = await captureFrame(adapter, { readTree: contract !== undefined });
     const health = await appHealth(adapter, cfg);
     return { trace, results, frame, health };
   };
@@ -180,7 +174,7 @@ export async function runVerification(
   platforms.forEach((p, i) => {
     const run = runs[i];
     if (run.status === 'rejected') {
-      sections.push(`## ${p}\nFAILED: ${run.reason instanceof Error ? run.reason.message : String(run.reason)}`);
+      sections.push(`## ${p}\nFAILED: ${errorMessage(run.reason)}`);
       return;
     }
     const { trace, results, frame, health } = run.value;
@@ -241,10 +235,10 @@ export async function runVerification(
           platforms,
           runs,
           (leg, p): Contribution<TextCapture> => {
-            const m = leg.frame.measured;
-            if (m.tree === undefined) return { note: noTreeNote(p, m.error) };
+            const tree = treeOf(leg, p);
+            if ('note' in tree) return tree;
             const got = ocrByPlatform.get(p);
-            return { value: { tree: m.tree, ocr: got?.ocr, pngWidth: got?.pngWidth } };
+            return { value: { tree: tree.value, ocr: got?.ocr, pngWidth: got?.pngWidth } };
           },
           'SKIPPED: no leg produced a UI tree.',
           (captures) => formatTextParity(compareTextParity(contract, captures)),
@@ -269,9 +263,21 @@ type Contribution<T> = { value: T } | { note: string };
 const noTreeNote = (p: Platform, reason: string): string =>
   `(${p}: UI tree read failed — ${reason} — compared without it)`;
 
-const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
+/**
+ * The leg's frame when it carries a tree — where every table starts, and the
+ * ONE place the no-tree note is decided. A leg is only asked for a frame
+ * with a tree when there is a contract, and the tables only exist then; the
+ * fallback wording covers the shape the types cannot rule out.
+ */
+const withTree = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFrame | Undecoded> => {
   const m = leg.frame.measured;
-  return m.tree !== undefined ? { value: m.tree } : { note: noTreeNote(p, m.error) };
+  if (m?.tree !== undefined) return { value: m };
+  return { note: noTreeNote(p, m?.error ?? 'no UI tree was read for this leg') };
+};
+
+const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
+  const got = withTree(leg, p);
+  return 'note' in got ? got : { value: got.value.tree };
 };
 
 /**
@@ -280,10 +286,10 @@ const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
  * decode when the tree is here and the pixels are not.
  */
 const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFrame> => {
-  const m = leg.frame.measured;
-  if (m.error === undefined) return { value: m };
-  if (m.tree === undefined) return { note: noTreeNote(p, m.error) };
-  return { note: `(${p}: ${m.error} — compared without it)` };
+  const got = withTree(leg, p);
+  if ('note' in got) return got;
+  const m = got.value;
+  return m.error === undefined ? { value: m } : { note: `(${p}: ${m.error} — compared without it)` };
 };
 
 /** What one platform's OCR pass produced, plus the reasons any of it is absent. */
@@ -322,11 +328,13 @@ async function runOcr(
       const run = runs[i];
       if (run.status === 'rejected') return;
       const { frame } = run.value;
-      const m = frame.measured;
+      // No tree: the text table says so itself (treeOf's note). A tree without
+      // pixels: that is an OCR failure in this table's terms, worded here.
+      const got = withTree(run.value, p);
+      if ('note' in got) return;
+      const m = got.value;
       if (m.error !== undefined) {
-        // No tree: the text table says so itself (noTreeNote). A tree without
-        // pixels: that is an OCR failure in this table's terms, worded here.
-        if (m.tree !== undefined) notes.push(`(${p}: OCR failed — ${m.error} — that platform compared from the tree.)`);
+        notes.push(`(${p}: OCR failed — ${m.error} — that platform compared from the tree.)`);
         return;
       }
       try {
@@ -344,7 +352,7 @@ async function runOcr(
         if (note !== undefined) notes.push(`(${p}: ${note})`);
       } catch (e) {
         notes.push(
-          `(${p}: OCR failed — ${e instanceof Error ? e.message : String(e)} — that platform compared from the tree.)`,
+          `(${p}: OCR failed — ${errorMessage(e)} — that platform compared from the tree.)`,
         );
       }
     }),
@@ -387,7 +395,7 @@ function paritySection<T>(
   try {
     body = format(collected);
   } catch (e) {
-    body = `FAILED: ${e instanceof Error ? e.message : String(e)}`;
+    body = `FAILED: ${errorMessage(e)}`;
   }
   return `## ${title}\n${note}${body}`;
 }

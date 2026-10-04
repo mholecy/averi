@@ -1,4 +1,4 @@
-import type { Selector, UiNode } from '../adapters/types.js';
+import type { Rect, Selector, UiNode } from '../adapters/types.js';
 import type { ElementSpec } from './element-spec.js';
 
 /**
@@ -153,7 +153,7 @@ export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string
  * off-viewport rects — this check makes both read the same.
  */
 export function intersectsViewport(
-  rect: UiNode['rect'],
+  rect: Rect,
   viewport: { width: number; height: number },
 ): boolean {
   const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
@@ -192,7 +192,7 @@ export function absentFromViewport(
  * see the clipping; a caller told "visible" cannot.
  */
 export function visibleFractionInViewport(
-  rect: UiNode['rect'],
+  rect: Rect,
   viewport: { width: number; height: number },
 ): number {
   if (rect.width <= 0 || rect.height <= 0) return 0;
@@ -209,7 +209,7 @@ export function visibleFractionInViewport(
  * overlapping, and the two want different fixes.
  */
 export function clippedEdges(
-  rect: UiNode['rect'],
+  rect: Rect,
   viewport: { width: number; height: number },
 ): ('top' | 'bottom' | 'left' | 'right')[] {
   const out: ('top' | 'bottom' | 'left' | 'right')[] = [];

@@ -1,7 +1,8 @@
-import type { Platform, UiNode } from '../adapters/types.js';
+import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects } from '../ui-tree/geometry.js';
-import { pngRegion, type MeasuredFrame, type PngRegion, type RgbaImage } from './capture.js';
+import { pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
+import { failClosed } from './fail-closed.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -67,11 +68,8 @@ const TOKEN_RE = /^[a-z][a-z0-9]*\.color\d+$/;
 export type ColorTheme = 'light' | 'dark';
 export type ColorSampleMode = 'dominant' | 'patches';
 
-// The decoded image's shape is the captured frame's (verify/capture.ts).
-export type { RgbaImage };
-
-type Rect = UiNode['rect'];
-type Region = { x0: number; y0: number; x1: number; y1: number };
+/** The frame's bounds (verify/capture.ts) — the sampler's regions carry no clipping of their own. */
+type Region = PngBounds;
 
 /** '#RRGGBB(AA)' → '#RRGGBB' uppercase (alpha dropped — see header). */
 export const normalizeHex = (raw: string): string => raw.slice(0, 7).toUpperCase();
@@ -640,21 +638,24 @@ export function evaluateColorAssert(
   const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
   const { png, scale: scaled } = frame;
   if (scaled.error !== undefined) {
-    return { pass: false, detail: `${scaled.error}; failing closed, color unchecked` };
+    return { pass: false, detail: failClosed(scaled.error, 'color') };
   }
   const scale = scaled.scale;
   const got = sampleRegion(rect, scale, png);
   if (got === undefined) {
     return {
       pass: false,
-      detail: `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)}) — scroll it on-screen and re-run; failing closed`,
+      detail: failClosed(
+        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)}) — scroll it on-screen and re-run`,
+        'color',
+      ),
     };
   }
   const mode: ColorSampleMode = expectation.sample ?? 'dominant';
   const regions = mode === 'patches' ? patchRegions(got) : [got];
   const s = sampleDominant(png, regions);
   if (s === undefined) {
-    return { pass: false, detail: 'sample region is empty after inset/clamp; failing closed, color unchecked' };
+    return { pass: false, detail: failClosed('sample region is empty after inset/clamp', 'color') };
   }
   const hex = rgbToHex(s.rgb);
   const expectedHex = normalizeHex(expectation.expected);

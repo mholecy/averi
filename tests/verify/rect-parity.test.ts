@@ -577,6 +577,8 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
     );
     expect(pass).toBe(false);
     expect(detail).toContain('screen width could not be inferred');
+    // The one fail-closed sentence (verify/fail-closed.ts), naming what went unchecked.
+    expect(detail).toMatch(/frames\); failing closed, geometry unchecked$/);
     expect(detail).not.toContain('NaN'); // never a vacuous ΔNaN% pass
   });
 });

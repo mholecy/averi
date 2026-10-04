@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry, defaultFactory, iosTreeSources, type AdapterOpts } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultFactory, type AdapterOpts } from '../../src/mcp/registry.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
-import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { resetWdaPortAllocatorForTests, wdaPortFor } from '../../src/adapters/wda.js';
 import type { Device, DeviceAdapter, Platform } from '../../src/adapters/types.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
@@ -222,30 +221,43 @@ describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
   });
 });
 
-describe('defaultFactory — the wiring at the tree-source seam the injected factories above never see', () => {
-  // No device is touched: the sources are inspected, never read. A real read
-  // would reach for idb or xcodebuild.
-  const iosSource = (adapter: unknown) => (adapter as IosAdapter).treeSource;
+describe('defaultFactory — the wiring the injected factories above never see', () => {
+  // No device is touched. Which backend a kind gets is adapters/ knowledge and
+  // is pinned there (ios-tree-source.test.ts, createIosTreeSource); this file
+  // pins only what the registry adds: the bound device id goes through, an
+  // unbound adapter gets nothing, android gets its own adapter.
 
-  it("'idb' wires an IdbTreeSource and 'wda' a WdaTreeSource; an omitted kind is idb", () => {
-    expect(iosSource(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }))).toBeInstanceOf(IdbTreeSource);
-    expect(iosSource(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }))).toBeInstanceOf(WdaTreeSource);
-    expect(iosSource(defaultFactory('ios', 'AAAA-1111'))).toBeInstanceOf(IdbTreeSource);
-    expect(iosTreeSources.idb('AAAA-1111')).toBeInstanceOf(IdbTreeSource);
-    expect(iosTreeSources.wda('AAAA-1111')).toBeInstanceOf(WdaTreeSource);
+  it('a bound wda adapter is bound to the GIVEN device id — its WebDriverAgent holds that udid\'s port, not `booted`\'s', () => {
+    // The one consequence of the udid a wda source is constructed with that
+    // is visible without a device: WdaServer allocates its port per UDID at
+    // construction (wdaPortFor). After a reset, the FIRST udid asked for gets
+    // 8100 — so if construction asked for ours, ours already holds it.
+    resetWdaPortAllocatorForTests();
+    defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' });
+    expect(wdaPortFor('AAAA-1111')).toBe(8100);
+    expect(wdaPortFor('booted')).toBe(8101);
   });
 
-  it('the source is bound to the GIVEN device id — never the `booted` alias, never another device', () => {
-    const idb = iosSource(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' })) as IdbTreeSource;
-    const wda = iosSource(defaultFactory('ios', 'BBBB-2222', { treeSource: 'wda' })) as WdaTreeSource;
-    expect(idb.udid).toBe('AAAA-1111');
-    expect(wda.udid).toBe('BBBB-2222');
+  it("'idb', and an omitted kind, build NO WebDriverAgent: no port is allocated for the device", () => {
+    // The inverse of the pin above, and the one that catches a factory that
+    // ignores the kind: with no wda source constructed, nothing has asked the
+    // allocator for this udid, so the first asker after the reset still gets
+    // 8100 — here, this test.
+    resetWdaPortAllocatorForTests();
+    defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' });
+    defaultFactory('ios', 'BBBB-2222');
+    expect(wdaPortFor('X')).toBe(8100);
+  });
+
+  it("'wda' DOES allocate the device's port — the kind, not the call, decides", () => {
+    resetWdaPortAllocatorForTests();
+    defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' });
+    expect(wdaPortFor('X')).toBe(8101);
   });
 
   it('an unbound ios adapter (probe) has no source: uiTree is the recovery error, listDevices is the only thing it is for', async () => {
     const probe = defaultFactory('ios');
     expect(probe).toBeInstanceOf(IosAdapter);
-    expect(iosSource(probe)).toBeUndefined();
     await expect(probe.uiTree()).rejects.toThrow(/no tree source/);
   });
 

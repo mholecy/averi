@@ -471,7 +471,8 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
     );
     expect(pass).toBe(false);
     expect(detail).toContain('outside the screenshot');
-    expect(detail).toContain('failing closed');
+    // Recovery step, then the one fail-closed sentence (verify/fail-closed.ts).
+    expect(detail).toMatch(/— scroll it on-screen and re-run; failing closed, color unchecked$/);
   });
 
   it('fails closed when the screen width cannot be inferred (never a vacuous pass)', () => {

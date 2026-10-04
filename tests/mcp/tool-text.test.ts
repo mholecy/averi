@@ -10,13 +10,17 @@ describe('tap and type_text response lines', () => {
   });
 
   it('fillText names the selector, the length, whether it cleared first, the note, and the ⚠ warning on its own line', () => {
-    expect(fillText('id:amount', 4, false, undefined, undefined)).toBe('Filled id:amount (4 characters)');
-    expect(fillText('id:amount', 4, true, undefined, undefined)).toBe('Filled id:amount (4 characters, cleared first)');
-    expect(fillText('id:pw', 16, false, '2 matches; picked the only interactive one (textfield)', undefined)).toBe(
+    expect(fillText('id:amount', { length: 4, cleared: false })).toBe('Filled id:amount (4 characters)');
+    expect(fillText('id:amount', { length: 4, cleared: true })).toBe('Filled id:amount (4 characters, cleared first)');
+    expect(fillText('id:pw', { length: 16, cleared: false, note: '2 matches; picked the only interactive one (textfield)' })).toBe(
       'Filled id:pw (16 characters) (2 matches; picked the only interactive one (textfield))',
     );
     expect(
-      fillText('id:pw', 16, false, undefined, 'masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace'),
+      fillText('id:pw', {
+        length: 16,
+        cleared: false,
+        warning: 'masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
+      }),
     ).toBe(
       'Filled id:pw (16 characters)\n⚠ masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
     );

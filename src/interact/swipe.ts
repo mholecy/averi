@@ -1,4 +1,5 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, Rect } from '../adapters/types.js';
+import { inferScreenSize } from '../ui-tree/geometry.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -18,9 +19,9 @@ export type SwipeMeaning = 'finger' | 'content';
  * centre. Pure; `swipeScreen` and the scroll loop both call it.
  */
 export function swipeVector(
-  box: { x: number; y: number; width: number; height: number },
+  box: Rect,
   direction: Direction,
-  mean: SwipeMeaning,
+  meaning: SwipeMeaning,
 ): { from: { x: number; y: number }; to: { x: number; y: number } } {
   const cx = Math.round(box.x + box.width / 2);
   const cy = Math.round(box.y + box.height / 2);
@@ -33,32 +34,39 @@ export function swipeVector(
     right: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
   } as const;
   const awayFrom = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
-  return mean === 'finger' ? finger[direction] : finger[awayFrom[direction]];
+  return meaning === 'finger' ? finger[direction] : finger[awayFrom[direction]];
+}
+
+export interface SwipeOptions {
+  direction: Direction;
+  meaning: SwipeMeaning;
+  /** Repeat the same gesture. Default 1. */
+  times?: number;
 }
 
 /**
- * Swipe across the screen the tree describes, `times` times. The area is the
- * root rect, or the union of its children when the root is the iOS synthetic
- * 0×0 node. Reads the tree once: the gesture does not care what moved.
+ * Swipe across the screen the tree describes, `times` times. Reads the tree
+ * once: the gesture does not care what moved.
+ *
+ * The area is `ui-tree/geometry.ts#inferScreenSize`, anchored at the origin
+ * — the one owner of "how big is the screen this tree shows", which handles
+ * the iOS synthetic 0×0 root by promoting the screen-shaped child window and
+ * excludes off-layout scrims. Until 2026-10-03 this file worked the extent
+ * out a third time as the union of the root's children, which is NOT the
+ * same computation: the measured WDA sheet (docs/bugs/2026-08-26-png-scale-
+ * needs-out-of-tree-screen-size.md) carries a PopoverDismissRegion at
+ * {-402,-874} sized 1206x2622 under a 0×0 root, and the union read as an
+ * 804x1748 screen — a swipe whose centre is the real screen's bottom-right
+ * corner. A root rect not at the origin is not a window for geometry either;
+ * both platforms' roots sit at (0,0), so anchoring at the origin loses
+ * nothing that was ever measured.
  */
 export async function swipeScreen(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'swipe'>,
-  direction: Direction,
-  mean: SwipeMeaning,
-  times = 1,
+  opts: SwipeOptions,
 ): Promise<void> {
-  const { from, to } = swipeVector(boundingBox(await adapter.uiTree()), direction, mean);
+  const { width, height } = inferScreenSize(await adapter.uiTree());
+  const { from, to } = swipeVector({ x: 0, y: 0, width, height }, opts.direction, opts.meaning);
+  const times = opts.times ?? 1;
   for (let i = 0; i < times; i++) await adapter.swipe(from, to);
-}
-
-/** Screen area to swipe over: the root rect, or the union of children (iOS synthetic root is 0×0). */
-function boundingBox(root: UiNode): UiNode['rect'] {
-  if (root.rect.width > 0 && root.rect.height > 0) return root.rect;
-  let maxX = 0;
-  let maxY = 0;
-  for (const c of root.children) {
-    maxX = Math.max(maxX, c.rect.x + c.rect.width);
-    maxY = Math.max(maxY, c.rect.y + c.rect.height);
-  }
-  return { x: 0, y: 0, width: maxX, height: maxY };
 }

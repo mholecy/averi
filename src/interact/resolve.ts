@@ -68,7 +68,8 @@ export const DEFAULT_POLL_MS = 500;
  * - `'refuse'`: throw, naming the candidates. The MCP tools' policy: an
  *   agent typing a password into `role:textfield` on a two-field login must
  *   be stopped, not told "Filled" with the choice buried in parentheses
- *   (review 2026-10-03). The wording is the pre-interact `resolveOne` one.
+ *   (review 2026-10-03). The wording is the pre-interact `resolveOne` one
+ *   plus a recovery line saying how to narrow the selector.
  */
 export type Ambiguity = 'first' | 'refuse';
 

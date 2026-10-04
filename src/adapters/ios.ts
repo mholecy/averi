@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
+import { runIdb } from './idb.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
@@ -19,13 +20,7 @@ export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   private readonly exec: ExecFn;
   private readonly udid: string | undefined;
-  /**
-   * Readable, not just held: the registry wires the source (which adapter
-   * sits at the seam, bound to which simulator), and that wiring must be
-   * checkable without a device — a read through a real source would reach
-   * for idb or xcodebuild.
-   */
-  readonly treeSource: IosTreeSource | undefined;
+  private readonly treeSource: IosTreeSource | undefined;
 
   constructor(
     opts: {
@@ -81,9 +76,7 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   private async idb(args: string[], timeoutMs?: number) {
-    const env = await this.detectEnv();
-    return this.exec('idb', [...args, '--udid', await this.resolveTarget()],
-      { env, ...(timeoutMs ? { timeoutMs } : {}) });
+    return runIdb(this.exec, await this.resolveTarget(), args, { timeoutMs });
   }
 
   private idbUi(args: string[]) {

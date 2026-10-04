@@ -1,8 +1,10 @@
 import { exec as defaultExec, type ExecFn } from './exec.js';
-import { detectXcodeEnv } from './xcode-env.js';
+import { runIdb } from './idb.js';
 import { attachFieldErrors } from './field-errors.js';
-import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
-import type { UiNode } from './types.js';
+import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
+import { WdaTreeSource } from './wda-tree-source.js';
+import type { WdaServerOptions } from './wda.js';
+import { zeroRect, type Rect, type UiNode } from './types.js';
 
 /**
  * The iOS tree-source seam (2026-10-02). `simctl` cannot read the
@@ -35,6 +37,31 @@ export interface IosTreeSource {
   dispose(): Promise<void>;
 }
 
+/**
+ * The seams the two sources already take, for a caller that has fakes: idb
+ * needs only `exec`; wda takes WdaServer's own injectable fetch, spawn, exec
+ * and DerivedData. One optional object, never a DI layer — the registry
+ * passes none and gets the real backends.
+ */
+export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'>;
+
+/**
+ * The adapter for a configured kind, bound to one simulator. Lives with the
+ * seam, not in the registry: which backend serves a kind is adapter knowledge
+ * (ARCHITECTURE §2, §3), and the registry's one line is to ask for it.
+ * A Record over the kind, so a new kind without a constructor is a compile
+ * error here — not a runtime default somewhere above (moved out of
+ * mcp/registry.ts on review 2026-10-03).
+ */
+const constructors: Record<IosTreeSourceKind, (udid: string, deps: IosTreeSourceDeps) => IosTreeSource> = {
+  idb: (udid, deps) => new IdbTreeSource({ udid, exec: deps.exec }),
+  wda: (udid, deps) => new WdaTreeSource({ ...deps, udid }),
+};
+
+export function createIosTreeSource(kind: IosTreeSourceKind, udid: string, deps: IosTreeSourceDeps = {}): IosTreeSource {
+  return constructors[kind](udid, deps);
+}
+
 // --- idb adapter at the seam ---
 
 interface IdbElement {
@@ -42,7 +69,7 @@ interface IdbElement {
   AXLabel?: string | null;
   AXUniqueId?: string | null;
   AXValue?: string | null;
-  frame?: { x: number; y: number; width: number; height: number };
+  frame?: Rect;
 }
 
 /**
@@ -67,7 +94,7 @@ export function parseIdbDescribeAll(json: string): UiNode {
     label: null,
     identifier: null,
     value: null,
-    rect: { x: 0, y: 0, width: 0, height: 0 },
+    rect: zeroRect(),
     children,
   };
 }
@@ -77,14 +104,13 @@ const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
  * The default tree source: one `idb ui describe-all --json` per read, nothing
- * to start and nothing to dispose. `exec` is injectable like IosAdapter's so a
- * test can feed describe-all output through the same fake; the Xcode env probe
- * (xcode-env.ts) is memoized per ExecFn, so sharing the adapter's exec also
- * shares its probe.
+ * to start and nothing to dispose. `exec` defaults to the real one — the same
+ * function IosAdapter defaults to, so in production the two share the
+ * memoized Xcode probe without anyone passing anything. A test passes its
+ * fake to both for the same effect, and to see the command line.
  */
 export class IdbTreeSource implements IosTreeSource {
-  /** The simulator this source is bound to — readable so the registry's wiring can be checked without a device. */
-  readonly udid: string;
+  private readonly udid: string;
   private readonly exec: ExecFn;
 
   constructor(opts: { udid: string; exec?: ExecFn }) {
@@ -93,12 +119,7 @@ export class IdbTreeSource implements IosTreeSource {
   }
 
   async read(): Promise<UiNode> {
-    const env = await detectXcodeEnv(this.exec);
-    const { stdout } = await this.exec(
-      'idb',
-      ['ui', 'describe-all', '--json', '--udid', this.udid],
-      { env, timeoutMs: DESCRIBE_ALL_TIMEOUT_MS },
-    );
+    const { stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], { timeoutMs: DESCRIBE_ALL_TIMEOUT_MS });
     return parseIdbDescribeAll(stdout.toString('utf8'));
   }
 

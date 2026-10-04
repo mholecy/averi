@@ -8,7 +8,8 @@ import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { installShutdownHandlers } from './lifecycle.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { fillField } from '../interact/fill.js';
-import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
+import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { tapElement } from '../interact/tap.js';
 import { fillText, tapText } from './tool-text.js';
 import {
@@ -274,14 +275,18 @@ registerTool(
   },
 );
 
+/** The settle budget as the tool descriptions quote it — derived, so the number has one owner (interact/resolve.ts). */
+const SETTLE_BUDGET = `${DEFAULT_SETTLE_TIMEOUT_MS / 1000} s`;
+
 registerTool(
   'tap',
   {
     description:
       'Tap an element by selector (preferred: \'id:login_button\', \'text:"Continue"\', \'role:button label~"Pay.*"\') or by x/y coordinates. ' +
       'Selector values containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex) — an unquoted text:Sign in fails at "in". ' +
-      'With a selector, waits up to 5 s for the element to appear and hold still (same policy as a flow tap: step), ignores zero-area nodes, ' +
-      'and when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector.',
+      `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still (same policy as a flow tap: step) and fails with "Timed out … (visible and settled)" ` +
+      'if it never does — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes; ' +
+      'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector.',
     inputSchema: {
       platform,
       selector: z.string().optional().describe('Element to tap, e.g. \'id:login_button\' or \'text:"Sign in"\' (quote values with spaces)'),
@@ -326,8 +331,9 @@ registerTool(
   {
     description:
       'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields), ' +
-      'then verifies the text landed and retries a dropped clear-fill once. The field is resolved like a tap: up to 5 s to appear and hold still, zero-area nodes ignored, ' +
-      'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first). Without selector: types into whatever is focused.',
+      `then verifies the text landed and retries a dropped clear-fill once. The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
+      'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first). ' +
+      'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting an unverified fill. Without selector: types into whatever is focused.',
     inputSchema: {
       platform,
       text: z.string(),
@@ -344,7 +350,7 @@ registerTool(
       return text(`Typed ${value.length} characters`);
     }
     const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear });
-    return text(fillText(selector, value.length, clear === true, note, warning));
+    return text(fillText(selector, { length: value.length, cleared: clear === true, note, warning }));
   },
 );
 
@@ -364,7 +370,7 @@ registerTool(
         .boolean()
         .optional()
         .describe('Require the element ENTIRELY inside the viewport, not just overlapping. Default false'),
-      timeoutMs: z.number().optional().describe('Default 15000'),
+      timeoutMs: z.number().optional().describe(`Default ${DEFAULT_SCROLL_TIMEOUT_MS}`),
       configPath,
     },
   },

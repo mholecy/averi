@@ -15,7 +15,7 @@ vi.mock('../../src/util/sleep.js', () => ({
 }));
 
 /** Tests must not pay the real focus delay; the default is pinned once below. */
-const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, focusDelayMs: 0 };
+const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
 
 function formFake(amountValue: string | null = null) {
   resetLayout();

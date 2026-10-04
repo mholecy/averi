@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
+import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
@@ -19,6 +19,10 @@ function scrollingFake(startY: number, perSwipe = 600, height = 40) {
 }
 
 describe('scrollUntilVisible — the result says what the scroll achieved', () => {
+  it('the default budget is the 15 s the scroll_until tool documents, named once', () => {
+    expect(DEFAULT_SCROLL_TIMEOUT_MS).toBe(15_000);
+  });
+
   it('swipes until the element intersects the viewport; content below → finger moves up', async () => {
     const fake = scrollingFake(3100); // needs 2 swipes to get under y=2000
     const result = await scrollUntilVisible(fake, { id: 'submit_button' }, FAST);

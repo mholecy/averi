@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
 import {
@@ -19,6 +19,21 @@ import { FakeAdapter, node } from '../helpers/fake.js';
  * device run takes minutes, and no downstream failure may throw its traces,
  * assert results and screenshots away.
  */
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on: a leg's
+// settle wait and a failed tree read's retries are sequences of delays, and
+// the sequence is what the production budget IS (review 2026-10-03, round
+// 2). Yields a macrotask so deadline loops stay cooperative.
+const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
+vi.mock('../../src/util/sleep.js', () => ({
+  sleep: async (ms: number) => {
+    sleeps.push(ms);
+    await new Promise((r) => setTimeout(r, 0));
+  },
+}));
+beforeEach(() => {
+  sleeps.length = 0;
+});
 
 const CFG = parseConfig(
   ['app:', '  android: { package: com.example.app }', '  ios: { bundleId: com.example.app }'].join('\n'),
@@ -50,10 +65,6 @@ const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => (
   cfg: CFG,
   specs: [],
   baselineDir: '/tmp/averi-test-baselines',
-  // The leg's final frame is captured SETTLED (verify/capture.ts); the fake
-  // never changes, so the wait resolves on its first re-capture — at 1 ms
-  // rather than the production 300 ms, 36 times over.
-  capture: { delayMs: 1 },
   ...over,
 });
 
@@ -104,8 +115,10 @@ describe('runVerification legs', () => {
     };
     const out = await runVerification(request({ platforms: ['android'] }), async () => adapter);
     expect(out.screenshots[0].equals(settled)).toBe(true);
-    // Two moving frames, then the settled one confirmed by a repeat.
+    // Two moving frames, then the settled one confirmed by a repeat — at the
+    // production budget, 300 ms apart: the leg has no knob of its own.
     expect(adapter.screenshots).toHaveLength(4);
+    expect(sleeps).toEqual([300, 300, 300]);
   });
 
   it('surfaces a failing assert without throwing', async () => {

@@ -7,8 +7,10 @@ import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
 import { PollMiss, pollTree } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
+import { errorMessage } from '../util/error-message.js';
 import { elementAssertSchema } from './element-assert.js';
 import { captureFrame } from './capture.js';
+import { failClosed } from './fail-closed.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
@@ -349,7 +351,7 @@ export class Verifier {
     const description = `element ${describe(element)} renders ${wants.join(' and ')}`;
     const unavailable = this.ocr === undefined ? ocrUnavailableReason() : undefined;
     if (unavailable !== undefined) {
-      return { description, pass: false, detail: `${unavailable}; failing closed, rendered text unchecked` };
+      return { description, pass: false, detail: failClosed(unavailable, 'rendered text') };
     }
     const engine = (this.ocr ??= new VisionOcr());
     return this.poll(
@@ -363,12 +365,12 @@ export class Verifier {
         if (measured.error !== undefined) {
           // Keep polling — the capture may have raced a transition — but stay
           // failed so a deadline reached this way reports the reason.
-          return { pass: false, detail: `${measured.error}; failing closed, rendered text unchecked` };
+          return { pass: false, detail: failClosed(measured.error, 'rendered text') };
         }
         try {
           const { region, note, error } = ocrRegionForRect('element', found[0].rect, measured);
           if (region === undefined) {
-            return { pass: false, detail: `${error}; failing closed, rendered text unchecked` };
+            return { pass: false, detail: failClosed(error, 'rendered text') };
           }
           const [result] = await engine.recognize(shot, [region]);
           if (result?.error !== undefined) return { pass: false, detail: result.error };
@@ -377,7 +379,7 @@ export class Verifier {
         } catch (e) {
           // Keep polling — the capture may have raced a transition — but stay
           // failed so a deadline reached this way reports the reason.
-          return { pass: false, detail: `OCR failed: ${e instanceof Error ? e.message : String(e)}` };
+          return { pass: false, detail: `OCR failed: ${errorMessage(e)}` };
         }
       },
       {
@@ -416,7 +418,7 @@ export class Verifier {
         if (measured.error !== undefined) {
           // Fail closed on an undecodable screenshot, but keep polling —
           // the capture may have raced a transition.
-          return { pass: false, detail: `${measured.error}; failing closed, color unchecked` };
+          return { pass: false, detail: failClosed(measured.error, 'color') };
         }
         return evaluateColorAssert(found[0].rect, expectation, measured);
       },

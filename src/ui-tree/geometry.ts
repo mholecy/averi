@@ -1,4 +1,4 @@
-import type { UiNode } from '../adapters/types.js';
+import { zeroRect, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -9,8 +9,6 @@ import type { UiNode } from '../adapters/types.js';
  * nothing about contracts, tolerances or findings — the same reason
  * intersectsViewport and tapPoint live in this package.
  */
-
-type Rect = UiNode['rect'];
 
 export interface ScreenWidth {
   width: number;
@@ -143,7 +141,7 @@ interface Extent {
  * screen than a scrim is.
  */
 function walkExtent(tree: UiNode): Extent {
-  let widest: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  let widest: Rect = zeroRect();
   let tallest: Rect = widest;
   /** The widest extent reached by anything SHAPED like a screen, if anything is. */
   let screenShaped = 0;

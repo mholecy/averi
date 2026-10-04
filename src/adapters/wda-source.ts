@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors, everyNode } from './field-errors.js';
-import type { UiNode } from './types.js';
+import type { Rect, UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -41,7 +41,7 @@ interface WdaElement {
   rawIdentifier?: string | null;
   label?: string | null;
   value?: string | null;
-  rect?: { x: number; y: number; width: number; height: number };
+  rect?: Rect;
   children?: WdaElement[] | null;
 }
 

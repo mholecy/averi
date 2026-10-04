@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { sleep } from '../util/sleep.js';
-import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
+import { zeroRect, type Device, type DeviceAdapter, type Key, type LaunchOptions, type Rect, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -335,7 +335,7 @@ export function parseUiautomatorXml(xml: string): UiNode {
   if (children.length === 1) return children[0];
   return {
     role: 'container', label: null, identifier: null, value: null,
-    rect: { x: 0, y: 0, width: 0, height: 0 }, children,
+    rect: zeroRect(), children,
   };
 }
 
@@ -365,9 +365,9 @@ function normalizeNode(raw: RawNode): UiNode {
   };
 }
 
-function parseBounds(bounds: string | undefined): UiNode['rect'] {
+function parseBounds(bounds: string | undefined): Rect {
   const m = bounds?.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
-  if (!m) return { x: 0, y: 0, width: 0, height: 0 };
+  if (!m) return zeroRect();
   const [, l, t, r, b] = m.map(Number);
   return { x: l, y: t, width: r - l, height: b - t };
 }

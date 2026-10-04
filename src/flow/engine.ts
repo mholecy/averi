@@ -1,6 +1,6 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { dismissKeyboard, fillField } from '../interact/fill.js';
-import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow } from '../interact/resolve.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
@@ -8,6 +8,7 @@ import { describeElementSpec as describeSpec, selectorOnly, type ElementSpec } f
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { absentFromViewport, findBySpec } from '../ui-tree/selectors.js';
 import { parseDuration } from '../util/duration.js';
+import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
@@ -63,6 +64,18 @@ export class FlowError extends Error {
 type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
 
 /**
+ * What a flow step does when a selector still matches several nodes after
+ * the interaction module's tie-breakers (zero-area dropped, a sole
+ * interactive match preferred): pick the first. A descriptor's selectors
+ * are written against a known app by someone who can see its tree, and a
+ * step that must not guess can say `role:` — whereas an agent exploring
+ * through the MCP tools cannot, so those refuse (interact/resolve.ts,
+ * Ambiguity). One constant so the policy is stated once and the three sites
+ * cannot drift.
+ */
+const FLOW_AMBIGUITY: Ambiguity = 'first';
+
+/**
  * How many `launch { clearState: true }` steps this server process has run.
  * Module-scoped so it spans the tool calls of one session (each call builds a
  * fresh FlowEngine); `resetClearStateCount` exists for tests, which must not
@@ -88,12 +101,6 @@ export interface EngineOptions {
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
   pinKeyDelayMs?: number;
   /**
-   * Pause after a `fill:` step's focus tap, before typing. Exists so tests
-   * need not pay the real delay; the default (350 ms) lives in
-   * interact/fill.ts and is not repeated here.
-   */
-  focusDelayMs?: number;
-  /**
    * Credential environment from `environments:` (see `resolveCredentials`).
    * Omit to fall back to `AVERI_ENV` then `defaultEnvironment:`.
    */
@@ -105,7 +112,7 @@ export interface EngineOptions {
  * message is the trace it already carries — repeating it inside itself reads
  * as a second failure.
  */
-const headline = (e: unknown): string => (e instanceof Error ? e.message : String(e)).split('\n')[0];
+const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
 
 /**
  * Interprets averi.yaml flows against a DeviceAdapter. Every action polls for
@@ -129,7 +136,6 @@ export class FlowEngine {
   private readonly reachRecheckMs: number;
   private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
-  private readonly focusDelayMs: number | undefined;
   private readonly credentials: Record<string, string>;
   private readonly environment: string | undefined;
 
@@ -152,7 +158,6 @@ export class FlowEngine {
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
-    this.focusDelayMs = opts.focusDelayMs;
   }
 
   /** Detect → run reach flows → confirm. Idempotent. */
@@ -581,7 +586,7 @@ export class FlowEngine {
 
   private async runSwipe(spec: StepPayload<'swipe'>): Promise<void> {
     const times = spec.times ?? 1;
-    await swipeScreen(this.adapter, spec.direction, 'finger', times); // a swipe: names the FINGER's movement
+    await swipeScreen(this.adapter, { direction: spec.direction, meaning: 'finger', times }); // a swipe: names the FINGER's movement
     this.log('swipe', `${spec.direction}${times > 1 ? ` ×${times}` : ''}`);
   }
 
@@ -603,11 +608,12 @@ export class FlowEngine {
     const { value: rawValue, clear, dismissKeyboard: closeKeyboard, ...spec } = fill;
     const { value, secret } = this.resolveValue(rawValue);
     const { warning } = await fillField(this.adapter, spec, value, {
-      ambiguous: 'first', // a descriptor's selectors are written against a known app; `role:` narrows when it must
+      ambiguous: FLOW_AMBIGUITY,
       clear,
       timeoutMs: this.tapTimeoutMs,
       pollMs: this.pollMs,
-      focusDelayMs: this.focusDelayMs,
+      // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
+      // tests mock util/sleep instead of threading a test-only option here.
     });
     // The warning is logged BEFORE the keyboard is dismissed: a pressKey that
     // throws must not take the masked-append warning down with it.
@@ -691,7 +697,7 @@ export class FlowEngine {
           // the committed tap will apply, one-shot (resolveNow), so a ghost
           // zero-area node cannot commit a tap that then cannot land.
           await this.pollUntil(
-            async (tree) => (resolveNow(tree, tap.spec, { ambiguous: 'first' }) === undefined ? undefined : true),
+            async (tree) => (resolveNow(tree, tap.spec, { ambiguous: FLOW_AMBIGUITY }) === undefined ? undefined : true),
             tap.timeoutMs ?? this.optionalTimeoutMs,
             `optional element ${describeSpec(tap.spec)}`,
           );
@@ -713,7 +719,7 @@ export class FlowEngine {
    * tool's concern, not the trace reader's.
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
-    await tapElement(this.adapter, spec, { ambiguous: 'first', timeoutMs, pollMs: this.pollMs });
+    await tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs });
     if (!quiet) this.log('tap', describeSpec(spec));
   }
 
@@ -830,7 +836,7 @@ export class FlowEngine {
     try {
       return await fn();
     } catch (e) {
-      const message = this.redact(e instanceof Error ? e.message : String(e));
+      const message = this.redact(errorMessage(e));
       const trace = [...this.trace];
       // The environment line alone is not a step — do not dress it up as one.
       const steps = trace.filter((t) => !t.action.startsWith('environment '));

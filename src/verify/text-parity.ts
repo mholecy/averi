@@ -1,4 +1,4 @@
-import type { Platform, UiNode } from '../adapters/types.js';
+import type { Platform, Rect, UiNode } from '../adapters/types.js';
 import { collectRects } from '../ui-tree/geometry.js';
 import { pngRegion, type MeasuredFrame } from './capture.js';
 import { findBySpec } from '../ui-tree/selectors.js';
@@ -373,7 +373,7 @@ export function ocrRegionsFor(
  */
 export function ocrRegionForRect(
   id: string,
-  rect: UiNode['rect'],
+  rect: Rect,
   frame: MeasuredFrame,
 ): { region: OcrRegion; note?: string; error?: undefined } | { region?: undefined; note?: undefined; error: string } {
   const { png, scale: scaled } = frame;
@@ -387,7 +387,7 @@ export function ocrRegionForRect(
 /** The frame's crop (no inset — see above) in the recognizer's shape, shared by both callers. */
 function regionForRect(
   id: string,
-  rect: UiNode['rect'],
+  rect: Rect,
   scale: number,
   png: { width: number; height: number },
 ): OcrRegion | undefined {

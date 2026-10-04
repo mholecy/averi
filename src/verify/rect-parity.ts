@@ -1,5 +1,6 @@
-import type { Platform, UiNode } from '../adapters/types.js';
+import type { Platform, Rect, UiNode } from '../adapters/types.js';
 import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
+import { failClosed } from './fail-closed.js';
 import { positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row, type Column } from './table.js';
 
@@ -32,8 +33,6 @@ import { headerWithRule, row, type Column } from './table.js';
  *   separately — it is not a parity delta.
  * - First occurrence of an id wins when a tree duplicates it.
  */
-
-type Rect = UiNode['rect'];
 
 /**
  * Max |delta| in % of screen width before a comparison is a finding. Shared by
@@ -666,9 +665,11 @@ export function evaluateRectAssert(
   if (width <= 0) {
     return {
       pass: false,
-      detail:
+      detail: failClosed(
         'screen width could not be inferred (the widest rect in the tree is 0 wide — ' +
-        "idb on iOS can emit a 0×0 synthetic root when elements carry no frames); failing closed, geometry unchecked",
+          'idb on iOS can emit a 0×0 synthetic root when elements carry no frames)',
+        'geometry',
+      ),
     };
   }
   const parts: string[] = [];

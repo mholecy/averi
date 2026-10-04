@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { createIosTreeSource, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
@@ -209,5 +210,42 @@ describe('IdbTreeSource — the idb adapter at the seam', () => {
     await source.dispose();
     expect(calls).toEqual([]);
     expect((await source.read()).children).toHaveLength(3);
+  });
+});
+
+describe('createIosTreeSource — which backend a kind gets, pinned by what the source DOES', () => {
+  // Both fakes are handed to BOTH kinds: a kind wired to the wrong backend
+  // shows up as the wrong fake being driven, not as a class name.
+  async function fakes(describeAll: string) {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch((url) => {
+      if (url.endsWith('/status')) return spawner.spawns.length === 0 ? 'refused' : { status: 200, body: WDA_STATUS };
+      return { status: 200, body: { value: { type: 'Application', label: 'FromWDA', children: [] } } };
+    });
+    const exec = fakeExec({ 'idb ui describe-all': describeAll });
+    return {
+      spawner, fetcher, exec,
+      deps: { exec: exec.fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 },
+    };
+  }
+
+  it("'idb': a read is one describe-all carrying `--udid <the given id>`; no WebDriverAgent is spawned or asked", async () => {
+    const { spawner, fetcher, exec, deps } = await fakes(IDB_DESCRIBE_ALL);
+    const tree = await createIosTreeSource('idb', 'AAAA-1111', deps).read();
+    expect(exec.calls.at(-1)?.full).toBe('idb ui describe-all --json --udid AAAA-1111');
+    expect(tree.children[0]).toMatchObject({ identifier: 'login_button' });
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls).toEqual([]);
+  });
+
+  it("'wda': a read brings a WebDriverAgent up for the given id and parses /source; idb is never asked for a tree", async () => {
+    const { spawner, fetcher, exec, deps } = await fakes(IDB_DESCRIBE_ALL);
+    const tree = await createIosTreeSource('wda', 'BBBB-2222', deps).read();
+    expect(spawner.spawns).toHaveLength(1);
+    expect(spawner.spawns[0].args).toContain('id=BBBB-2222');
+    expect(fetcher.urls.at(-1)).toMatch(/\/source\?format=json$/);
+    expect(tree).toMatchObject({ role: 'container', label: 'FromWDA' });
+    expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
   });
 });
