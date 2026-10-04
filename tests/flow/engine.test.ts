@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, resetClearStateCount, scrollUntilVisible, stepSummary } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, resetClearStateCount, stepSummary } from '../../src/flow/engine.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
@@ -44,7 +44,8 @@ flows:
       - tap: { id: tab_payments }
 `);
 
-const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1 };
+// focusDelayMs: 0 — a fill: step's focus pause is interact/fill.ts's (pinned there); the engine only plumbs it.
+const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1, focusDelayMs: 0 };
 
 function buildScreens() {
   resetLayout();
@@ -1213,17 +1214,25 @@ flows:
     expect(trace).toContainEqual({ action: 'state home', detail: 'reached after warm' });
   });
 
-  it('scroll_until reports the read failure instead of "element never appeared"', async () => {
+  // Until 2026-10-03 the detect probe swallowed its read error: a device that
+  // was gone looked exactly like "not in this state", and the ladder escalated
+  // with nothing in the trace saying it had never been asked.
+  it('a detect probe that cannot read the tree says so in the trace — the ladder still runs, the reason is no longer silent', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, Number.POSITIVE_INFINITY);
-    await expect(
-      scrollUntilVisible(
-        fake,
-        { find: () => [], describe: 'id:below_fold' },
-        { maxSwipes: 2, timeout: 100 },
-        { settleMs: 1 },
-      ),
-    ).rejects.toThrow(/last UI tree read failed: uiautomator dump returned no XML/);
+    const error = await new FlowEngine(cfg, fake, FAST).ensureState('home').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FlowError);
+    expect((error as FlowError).trace).toContainEqual({
+      action: '⚠ detect',
+      detail: 'element id:"dashboard_root" treated as not detected — last UI tree read failed: ' + NULL_ROOT,
+    });
+    expect(fake.launches).toHaveLength(1); // the reach flow ran, as before
+  });
+
+  it('a detect probe that reads fine and simply misses adds NO such line', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    const error = await new FlowEngine(cfg, fake, FAST).ensureState('home').catch((e: unknown) => e);
+    expect((error as FlowError).trace.some((t) => t.action === '⚠ detect')).toBe(false);
   });
 });
 
@@ -1290,6 +1299,29 @@ flows:
 });
 
 describe('tap stability', () => {
+  it("a tap: with two interactive matches taps the FIRST — the flow's 'first' policy — and traces the spec, not the choice", async () => {
+    resetLayout();
+    const first = el({ role: 'button', identifier: 'dup', label: 'A' });
+    const second = el({ role: 'button', identifier: 'dup', label: 'B' });
+    const fake = new FakeAdapter({ s: screen(first, second) }, 's');
+    const points: { x: number; y: number }[] = [];
+    const tap = fake.tap.bind(fake);
+    fake.tap = async (x, y) => {
+      points.push({ x, y });
+      return tap(x, y);
+    };
+    const c = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - tap: { id: dup }
+`);
+    const trace = await new FlowEngine(c, fake, FAST).runFlow('f');
+    expect(points).toEqual([{ x: 50, y: first.rect.y + 5 }]); // the first button's centre, not the second's
+    expect(trace).toContainEqual({ action: 'tap', detail: 'id:"dup"' }); // byte-identical to a one-match tap
+  });
+
   it('does not tap an element while it is still moving (launch animation)', async () => {
     resetLayout();
     const positions = [100, 160, 220, 220, 220]; // animates, then settles at 220
@@ -1311,16 +1343,6 @@ describe('tap stability', () => {
     // tapped exactly once, at the settled position
     expect(fake.taps).toEqual(['tab_payments']);
     expect(poll).toBeGreaterThanOrEqual(4); // needed at least two identical polls after moving
-  });
-
-  it('ignores zero-area nodes as tap targets', async () => {
-    resetLayout();
-    const ghost = node({ role: 'other', identifier: 'tab_payments', rect: { x: 5, y: 5, width: 0, height: 0 } });
-    const real = el({ role: 'button', identifier: 'tab_payments' });
-    const dash = screen(el({ identifier: 'dashboard_root' }), ghost, real);
-    const fake = new FakeAdapter({ dashboard: dash }, 'dashboard');
-    await new FlowEngine(CONFIG, fake, FAST).runFlow('goto_transfers');
-    expect(fake.taps).toEqual(['tab_payments']); // resolved via the real node's rect
   });
 });
 
@@ -1493,6 +1515,25 @@ flows:
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 2.50' });
   });
 
+  it('clear: true through YAML wipes the pre-filled value before typing, and the trace says (cleared)', async () => {
+    const fake = formFake('2.50');
+    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
+    expect(fake.deletes).toEqual([4]); // "2.50".length — the step's `clear` reached the fill
+    expect(fake.typed).toEqual(['7']);
+    expect(fake.focused?.value).toBe('7');
+    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 7 (cleared)' });
+  });
+
+  it('a fill on a field that never appears fails within the TAP budget, with the settle wording', async () => {
+    const fake = formFake();
+    const started = Date.now();
+    await expect(
+      new FlowEngine(cfg('{ id: nope, value: "1" }'), fake, { ...FAST, tapTimeoutMs: 120 }).runFlow('f'),
+    ).rejects.toThrow(/Timed out after 120ms waiting for element id:"nope" \(visible and settled\)/);
+    expect(Date.now() - started).toBeLessThan(FAST.waitTimeoutMs); // not some other budget
+    expect(fake.taps).toEqual([]);
+  });
+
   it('dismissKeyboard presses AFTER the text landed, never before', async () => {
     const fake = formFake();
     const order: string[] = [];
@@ -1515,110 +1556,16 @@ flows:
     expect(order).toEqual(['type:2.50', 'key:back']);
   });
 
-  it('dismissKeyboard is opt-in — no key press without it', async () => {
-    const fake = formFake();
-    const keys: string[] = [];
-    fake.pressKey = async (k) => {
-      keys.push(k);
-    };
-    await new FlowEngine(cfg('{ id: amount_input, value: "2.50" }'), fake, FAST).runFlow('f');
-    expect(keys).toEqual([]);
-  });
-
-  it('clear: true deletes the existing value length before typing', async () => {
-    const fake = formFake('2.50');
-    await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
-    expect(fake.deletes).toEqual([4]); // "2.50".length
-    expect(fake.typed).toEqual(['7']);
-  });
-
-  it('clear on an empty field skips deleting', async () => {
-    const fake = formFake(null);
-    await new FlowEngine(cfg('{ id: amount_input, value: "1.00", clear: true }'), fake, FAST).runFlow('f');
-    expect(fake.deletes).toEqual([]);
-    expect(fake.typed).toEqual(['1.00']);
-  });
-
-  it('verifies the typed value landed and retries a clear-fill whose input was dropped', async () => {
-    // Compose async state can swallow synthetic input (measured 2026-08-05:
-    // bulk typing landed 3 of 11 chars). First typeText drops chars; the
-    // verify pass must wipe and retype.
-    const fake = formFake('9.99');
-    let drops = 1;
-    const origType = fake.typeText.bind(fake);
-    fake.typeText = async (text: string) => {
-      if (drops-- > 0) return origType(text.slice(-1)); // only the last char lands
-      return origType(text);
-    };
-    await new FlowEngine(cfg('{ id: amount_input, value: "12.34", clear: true }'), fake, FAST).runFlow('f');
-    // cleared prefill (4), dropped attempt left "4", verify wiped it (1) and retyped
-    expect(fake.deletes).toEqual([4, 1]);
-    expect(fake.typed).toEqual(['4', '12.34']);
-  });
-
-  it('re-clears once when the first clear leaves content behind', async () => {
-    const fake = formFake('2.50');
-    let swallow = 1;
-    const origClear = fake.clearText.bind(fake);
-    fake.clearText = async (count: number) => {
-      if (swallow-- > 0) return origClear(Math.max(0, count - 2)); // 2 deletes dropped
-      return origClear(count);
-    };
-    await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
-    expect(fake.deletes).toEqual([2, 2]); // first pass left "2.", second cleared the remainder
-    expect(fake.typed).toEqual(['7']);
-  });
-
-  it('fill WITHOUT clear never wipes the field when verification mismatches — it fails instead', async () => {
-    const fake = formFake('9.99');
-    fake.typeText = async (text: string) => {
-      fake.typed.push(text); // drop everything: value never changes
-    };
-    await expect(
-      new FlowEngine(cfg('{ id: amount_input, value: "12.34" }'), fake, FAST).runFlow('f'),
-    ).rejects.toThrow(/typed 5 characters but the field shows 4/);
-    expect(fake.deletes).toEqual([]); // clear stays opt-in even during verification
-  });
-
-  // Measured 2026-09-17 (finportal login, both platforms): a password field reads
-  // back as bullets, so `observed === value` could never pass — "typed 16
-  // characters but the field shows 16" for a fill that had landed.
-  it('a MASKED field (bullets read-back) is verified by LENGTH, so a password fill passes', async () => {
-    const fake = formFake(null);
+  // The fill's mechanics (clear retries, verified typing, the masked-value
+  // length rule, autofill/re-entry re-reads, per-platform keyboard dismissal)
+  // are pinned in tests/interact/fill.test.ts since 2026-10-03. What stays
+  // here is the STEP: the YAML reaching the fill, and the trace it writes.
+  const appendBullets = (fake: ReturnType<typeof formFake>) => {
     fake.typeText = async (text: string) => {
       fake.typed.push(text);
       if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length);
     };
-    await new FlowEngine(cfg('{ id: amount_input, value: "s3cret-passw0rd!", clear: true }'), fake, FAST).runFlow('f');
-    expect(fake.typed).toEqual(['s3cret-passw0rd!']);
-    expect(fake.deletes).toEqual([]); // nothing to clear, nothing retyped
-  });
-
-  it('a masked field that DROPPED characters still fails, and says the comparison was by length', async () => {
-    const fake = formFake(null);
-    fake.typeText = async (text: string) => {
-      fake.typed.push(text);
-      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length - 1);
-    };
-    await expect(
-      new FlowEngine(cfg('{ id: amount_input, value: "12345" }'), fake, FAST).runFlow('f'),
-    ).rejects.toThrow(/typed 5 characters but the field shows 4 \(masked field — compared by length; it held 0 after focus\)/);
-  });
-
-  const appendBullets = (fake: ReturnType<typeof formFake>, drop = 0) => {
-    fake.typeText = async (text: string) => {
-      fake.typed.push(text);
-      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length - drop);
-    };
   };
-
-  it('dropped keystrokes are caught even on a PRE-FILLED masked field (length must reach held + typed)', async () => {
-    const fake = formFake('•'.repeat(20));
-    appendBullets(fake, 4); // the emulator swallowed 4 of 16
-    await expect(
-      new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f'),
-    ).rejects.toThrow(/typed 16 characters but the field shows 32 \(masked field — compared by length; it held 20 after focus\)/);
-  });
 
   it('typing onto a pre-filled masked field without clear is a legal APPEND — it passes, with a ⚠ fill warning', async () => {
     // The length rule cannot see content, so it cannot tell this from a correct
@@ -1633,32 +1580,34 @@ flows:
     });
   });
 
-  // Review 2026-09-18: the pre-tap read is stale for both shapes below, and a
-  // `preLen` taken from it failed two correct fills.
-  it('autofill that POPULATES a masked field on focus does not fail the fill (pre-fill re-read after focus)', async () => {
-    const fake = formFake(null);
-    const origTap = fake.tap.bind(fake);
-    fake.tap = async (x: number, y: number) => {
-      await origTap(x, y);
-      if (fake.focused) fake.focused.value = '•'.repeat(20); // autofill on focus
+  it('a failing fill never presses the dismiss key', async () => {
+    const fake = formFake('9.99');
+    const keys: string[] = [];
+    fake.pressKey = async (k) => {
+      keys.push(k);
     };
-    appendBullets(fake);
-    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f');
-    expect(fake.focused?.value).toHaveLength(36);
-    expect(trace.some((t) => t.action === '⚠ fill')).toBe(true); // and the append is still named
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text); // nothing lands
+    };
+    await expect(
+      new FlowEngine(cfg('{ id: amount_input, value: "12.34", dismissKeyboard: true }'), fake, FAST).runFlow('f'),
+    ).rejects.toThrow(/typed 5 characters/);
+    expect(keys).toEqual([]);
   });
 
-  it('a re-entry screen that CLEARS the masked field on focus does not fail the fill', async () => {
+  it('the ⚠ fill warning is in the trace even when dismissing the keyboard then throws (review 2026-10-03)', async () => {
     const fake = formFake('•'.repeat(20));
-    const origTap = fake.tap.bind(fake);
-    fake.tap = async (x: number, y: number) => {
-      await origTap(x, y);
-      if (fake.focused) fake.focused.value = null; // wrong-PIN re-entry clears on focus
-    };
     appendBullets(fake);
-    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f');
-    expect(fake.focused?.value).toHaveLength(16);
-    expect(trace.some((t) => t.action === '⚠ fill')).toBe(false); // nothing was held after focus
+    fake.pressKey = async () => {
+      throw new Error('idb ui key: timed out');
+    };
+    const error = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password", dismissKeyboard: true }'), fake, FAST)
+      .runFlow('f')
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FlowError);
+    const { trace } = error as FlowError;
+    expect(trace.map((t) => t.action)).toEqual(['flow f', '⚠ fill', '✗ fill id:"amount_input"']);
+    expect(trace[1].detail).toContain('typing APPENDS');
   });
 
   // Measured 2026-09-17 (finportal): steps logged only on success, so the trace

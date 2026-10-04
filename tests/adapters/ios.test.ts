@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tapElement } from '../../src/ui-tree/tap-element.js';
+import { tapElement } from '../../src/interact/tap.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
@@ -61,7 +61,7 @@ describe('IosAdapter interactions', () => {
   it('end to end on the idb source: tapElement resolves against describe-all and taps the center through idb', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
-    await tapElement(adapter, 'id:login_button');
+    await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
     expect(calls.at(-1)?.full).toBe('idb ui tap 196 724 --udid AAAA-1111');
   });
 
@@ -186,7 +186,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
   it("taps resolve against the source's tree and still go through idb — only the tree read is the source's", async () => {
     const { fn, calls } = fakeExec({});
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: fakeSource().source });
-    await tapElement(adapter, 'id:home.header');
+    await tapElement(adapter, 'id:home.header', { ambiguous: 'refuse' });
     // The source's rects are points, the units idb taps in — center of the host view.
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
   });

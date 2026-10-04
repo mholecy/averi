@@ -143,27 +143,9 @@ export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string
   };
 }
 
-/** Resolve a selector to one node, with a note when disambiguation kicked in. */
-export function resolveOne(
-  root: UiNode,
-  selector: Selector,
-): { node: UiNode; note?: string } {
-  const found = findAll(root, selector);
-  if (found.length === 0) throw new Error(`No element matches selector: ${selector}`);
-  if (found.length === 1) return { node: found[0] };
-  const preferred = preferInteractive(found);
-  if (preferred) return preferred;
-  const summary = found
-    .slice(0, 5)
-    .map((n) => `  ${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`)
-    .join('\n');
-  throw new Error(`Selector matches ${found.length} elements: ${selector}\n${summary}`);
-}
-
-/** Resolve a selector to exactly one node; throws with a helpful message otherwise. */
-export function findOne(root: UiNode, selector: Selector): UiNode {
-  return resolveOne(root, selector).node;
-}
+// `resolveOne` / `findOne` lived here until 2026-10-03: a second resolution
+// policy (no zero-area filter, throw on ambiguity) used only by the MCP tap
+// and type_text tools. The one policy is interact/resolve.ts#resolveNow.
 
 /**
  * Does the node's rect visibly intersect the screen? The shared meaning of
@@ -177,6 +159,23 @@ export function intersectsViewport(
   const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
   const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
   return w > 0 && h > 0;
+}
+
+/**
+ * The one portable meaning of "absent": no node matched, or none of the
+ * matches intersects the viewport. The raw trees disagree — Android prunes
+ * off-screen nodes, iOS keeps them with off-viewport rects — and a state
+ * detect (`absent: true`) and an absent assert must read the same tree the
+ * same way, or a state the flow says it reached could fail the assert that
+ * checks it. Since 2026-10-03 this is the one owner; the engine and
+ * verify/assert.ts each spelled it out before, and the two layers cannot
+ * share it anywhere higher (verify sits below the interaction module).
+ */
+export function absentFromViewport(
+  found: readonly UiNode[],
+  viewport: { width: number; height: number },
+): boolean {
+  return !found.some((n) => intersectsViewport(n.rect, viewport));
 }
 
 /**

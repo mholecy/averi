@@ -38,8 +38,7 @@ const whitePng = (): Buffer => {
 
 function fake(platform: Platform): FakeAdapter {
   const adapter = new FakeAdapter({ s: SCREEN }, 's');
-  // `platform` is readonly for callers; the fake needs to stand in for both.
-  (adapter as unknown as { platform: Platform }).platform = platform;
+  adapter.platform = platform;
   adapter.nextScreenshot = whitePng();
   // viewport() is left to derive from SCREEN (100x200), which is also the png
   // size — i.e. scale 1. See the note on FakeAdapter.viewportSize.

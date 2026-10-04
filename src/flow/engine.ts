@@ -1,15 +1,12 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { dismissKeyboard, fillField } from '../interact/fill.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow } from '../interact/resolve.js';
+import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { swipeScreen } from '../interact/swipe.js';
+import { tapElement } from '../interact/tap.js';
 import { describeElementSpec as describeSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
-import { isMaskedValue } from '../ui-tree/masked-value.js';
-import { readTreeOrError } from '../ui-tree/read-tree.js';
-import {
-  clippedEdges,
-  findBySpec,
-  intersectsViewport,
-  preferInteractive,
-  tapPoint,
-  visibleFractionInViewport,
-} from '../ui-tree/selectors.js';
+import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
+import { absentFromViewport, findBySpec } from '../ui-tree/selectors.js';
 import { parseDuration } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
@@ -23,8 +20,6 @@ import {
   type Step,
   type TapSpec,
 } from './config.js';
-
-export { findBySpec } from '../ui-tree/selectors.js';
 
 export interface TraceEntry {
   action: string;
@@ -93,6 +88,12 @@ export interface EngineOptions {
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
   pinKeyDelayMs?: number;
   /**
+   * Pause after a `fill:` step's focus tap, before typing. Exists so tests
+   * need not pay the real delay; the default (350 ms) lives in
+   * interact/fill.ts and is not repeated here.
+   */
+  focusDelayMs?: number;
+  /**
    * Credential environment from `environments:` (see `resolveCredentials`).
    * Omit to fall back to `AVERI_ENV` then `defaultEnvironment:`.
    */
@@ -128,6 +129,7 @@ export class FlowEngine {
   private readonly reachRecheckMs: number;
   private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
+  private readonly focusDelayMs: number | undefined;
   private readonly credentials: Record<string, string>;
   private readonly environment: string | undefined;
 
@@ -143,13 +145,14 @@ export class FlowEngine {
     this.credentials = resolved.credentials;
     this.environment = resolved.environment;
     this.pollMs = opts.pollMs ?? 500;
-    this.tapTimeoutMs = opts.tapTimeoutMs ?? 5_000;
+    this.tapTimeoutMs = opts.tapTimeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
     this.ensureTimeoutMs = opts.ensureTimeoutMs ?? 20_000;
     this.optionalTimeoutMs = opts.optionalTimeoutMs ?? 1_500;
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
+    this.focusDelayMs = opts.focusDelayMs;
   }
 
   /** Detect → run reach flows → confirm. Idempotent. */
@@ -408,13 +411,33 @@ export class FlowEngine {
    * reach flows are needed.
    */
   private async detects(cond: Condition, graceMs: number): Promise<boolean> {
-    const deadline = Date.now() + graceMs;
-    for (;;) {
-      const tree = await this.adapter.uiTree().catch(() => undefined);
-      if (tree !== undefined && (await this.matches(cond, tree))) return true;
-      if (Date.now() >= deadline) return false;
-      await sleep(this.pollMs);
+    const outcome = await pollTree(
+      this.adapter,
+      async (tree) => ((await this.matches(cond, tree)) ? true : undefined),
+      { timeoutMs: graceMs, pollMs: this.pollMs },
+    );
+    if (!outcome.timedOut) return true;
+    // Until 2026-10-03 this probe swallowed the read error (`.catch(() =>
+    // undefined)`), so an adb that had gone away looked exactly like "not in
+    // this state" and the ladder escalated — possibly into a wipe — with no
+    // line saying the device had never been asked. The answer is still
+    // false (an unreadable tree is not "in state"), but the trace now says
+    // why. Right after a cold launch (no window yet) it is the normal case.
+    //
+    // Follow-up, not done here (2026-10-03): `false` still lets the ladder
+    // escalate — possibly into a `clearState` rung — on a device it NEVER
+    // read, which is the one case where "not in state" is not knowledge.
+    // The ladder should refuse to run a non-repeatable (destructive) rung
+    // when the probe before it never produced a tree, and say so. That is
+    // an ensureStateInner decision, not this probe's; it needs its own
+    // measured incident and test before it changes behaviour.
+    if (outcome.readError !== undefined) {
+      this.log(
+        '⚠ detect',
+        `${describeCondition(cond)} treated as not detected — last UI tree read failed: ${outcome.readError.message}`,
+      );
     }
+    return false;
   }
 
   private async runFlowInner(name: string): Promise<void> {
@@ -557,20 +580,19 @@ export class FlowEngine {
   }
 
   private async runSwipe(spec: StepPayload<'swipe'>): Promise<void> {
-    const { from, to } = swipeVector(boundingBox(await this.adapter.uiTree()), spec.direction, 'finger');
     const times = spec.times ?? 1;
-    for (let i = 0; i < times; i++) await this.adapter.swipe(from, to);
+    await swipeScreen(this.adapter, spec.direction, 'finger', times); // a swipe: names the FINGER's movement
     this.log('swipe', `${spec.direction}${times > 1 ? ` ×${times}` : ''}`);
   }
 
   private async runScrollUntil(spec: ScrollUntilSpec): Promise<void> {
-    const { element, ...rest } = spec;
-    const result = await scrollUntilVisible(
-      this.adapter,
-      { find: (tree) => findBySpec(tree, element), describe: describeSpec(element) },
-      rest,
-      { settleMs: this.pollMs },
-    );
+    const { element, timeout, ...rest } = spec;
+    // The YAML's `timeout: 2s` is this layer's vocabulary; interact takes ms.
+    const result = await scrollUntilVisible(this.adapter, element, {
+      ...rest,
+      timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),
+      settleMs: this.pollMs,
+    });
     this.log(
       result.clipped.length > 0 ? '⚠ scroll_until' : 'scroll_until',
       `${describeSpec(element)} ${describeScrollResult(result)}`,
@@ -578,18 +600,19 @@ export class FlowEngine {
   }
 
   private async runFill(fill: StepPayload<'fill'>): Promise<void> {
-    const { value: rawValue, clear, dismissKeyboard, ...spec } = fill;
+    const { value: rawValue, clear, dismissKeyboard: closeKeyboard, ...spec } = fill;
     const { value, secret } = this.resolveValue(rawValue);
-    const node = await this.settledNode(spec, this.tapTimeoutMs);
-    const refetch = async () => {
-      const candidates = findBySpec(await this.adapter.uiTree(), spec).filter(
-        (n) => n.rect.width > 0 && n.rect.height > 0,
-      );
-      return candidates.length > 1 ? (preferInteractive(candidates)?.node ?? candidates[0]) : candidates[0];
-    };
-    const warning = await fillField(this.adapter, node, value, { clear, refetch, pollMs: this.pollMs });
+    const { warning } = await fillField(this.adapter, spec, value, {
+      ambiguous: 'first', // a descriptor's selectors are written against a known app; `role:` narrows when it must
+      clear,
+      timeoutMs: this.tapTimeoutMs,
+      pollMs: this.pollMs,
+      focusDelayMs: this.focusDelayMs,
+    });
+    // The warning is logged BEFORE the keyboard is dismissed: a pressKey that
+    // throws must not take the masked-append warning down with it.
     if (warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${warning}`);
-    if (dismissKeyboard) await this.adapter.pressKey(this.adapter.platform === 'android' ? 'back' : 'enter');
+    if (closeKeyboard) await dismissKeyboard(this.adapter);
     this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
   }
 
@@ -664,10 +687,11 @@ export class FlowEngine {
       const tap = 'tap' in s ? splitTapSpec(s.tap) : undefined;
       try {
         if (tap) {
+          // Presence = "something actionable is in the tree": the same policy
+          // the committed tap will apply, one-shot (resolveNow), so a ghost
+          // zero-area node cannot commit a tap that then cannot land.
           await this.pollUntil(
-            async (tree) =>
-              findBySpec(tree, tap.spec).some((n) => n.rect.width > 0 && n.rect.height > 0) ||
-              undefined,
+            async (tree) => (resolveNow(tree, tap.spec, { ambiguous: 'first' }) === undefined ? undefined : true),
             tap.timeoutMs ?? this.optionalTimeoutMs,
             `optional element ${describeSpec(tap.spec)}`,
           );
@@ -682,59 +706,26 @@ export class FlowEngine {
   }
 
   /**
-   * Wait for the element to appear AND settle (identical rect in two
-   * consecutive polls — screens animate on launch/transition and tapping
-   * mid-animation lands on whatever moved into that spot), then tap its
-   * center. Zero-area nodes are never tap targets.
+   * Wait for the element to appear AND settle, then tap its center — the
+   * interaction module's policy (interact/resolve.ts), shared with the MCP
+   * tap tool. The resolution note is not traced: a flow's tap line names
+   * the spec the author wrote, and which of several nodes carried it is the
+   * tool's concern, not the trace reader's.
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
-    const node = await this.settledNode(spec, timeoutMs);
-    const point = tapPoint(node);
-    await this.adapter.tap(point.x, point.y);
+    await tapElement(this.adapter, spec, { ambiguous: 'first', timeoutMs, pollMs: this.pollMs });
     if (!quiet) this.log('tap', describeSpec(spec));
-  }
-
-  /**
-   * Poll until the spec resolves to a visible node whose rect is identical in
-   * two consecutive polls (tapping mid-animation lands on whatever moved into
-   * that spot). Among several candidates a sole interactive one wins — on iOS
-   * a field's title/error labels share the field's identifier.
-   */
-  private async settledNode(spec: ElementSpec, timeoutMs: number): Promise<UiNode> {
-    let lastRect: string | undefined;
-    return this.pollUntil(
-      async (tree) => {
-        const candidates = findBySpec(tree, spec).filter(
-          (n) => n.rect.width > 0 && n.rect.height > 0,
-        );
-        const candidate =
-          candidates.length > 1
-            ? (preferInteractive(candidates)?.node ?? candidates[0])
-            : candidates[0];
-        if (!candidate) {
-          lastRect = undefined;
-          return undefined;
-        }
-        const rect = JSON.stringify(candidate.rect);
-        if (rect === lastRect) return candidate;
-        lastRect = rect;
-        return undefined;
-      },
-      timeoutMs,
-      `element ${describeSpec(spec)} (visible and settled)`,
-    );
   }
 
   private async matches(cond: Condition, tree: UiNode): Promise<boolean> {
     if (cond.element) {
       const found = findBySpec(tree, cond.element);
       if (!cond.absent) return found.length > 0;
-      // absent: gone from the tree OR nothing visibly on screen (iOS keeps
-      // off-viewport nodes in its tree; Android prunes them — one meaning).
-      // Memoized by the adapter (adapters/types.ts): one device read per
-      // adapter, however many conditions ask.
-      const viewport = await this.adapter.viewport();
-      return !found.some((n) => intersectsViewport(n.rect, viewport));
+      // absent: gone from the tree OR nothing visibly on screen — the one
+      // meaning absentFromViewport owns, shared with the absent assert. The
+      // viewport is memoized by the adapter (adapters/types.ts): one device
+      // read per adapter, however many conditions ask.
+      return absentFromViewport(found, await this.adapter.viewport());
     }
     if (cond.state) {
       const state = this.cfg.states[cond.state];
@@ -761,34 +752,21 @@ export class FlowEngine {
   }
 
   /**
-   * Poll the UI tree until fn returns a value; throws on timeout. A failed
-   * tree READ is a poll miss, not a failure (readTreeOrError owns that rule);
-   * the last read error rides along in the timeout message so a genuinely
-   * broken device stays diagnosable. Errors from `fn` itself (unknown state
-   * names etc.) still propagate immediately.
+   * Poll the UI tree until fn returns a value; throws on timeout. The loop is
+   * `pollTree` (ui-tree/read-tree.ts: a failed READ is a miss, the last read
+   * error is remembered, the predicate's own errors propagate at once); what
+   * this adds is the flow's verdict on a timeout — an exception, worded as
+   * the step the caller was waiting on, with the read error beneath it so a
+   * genuinely broken device stays diagnosable.
    */
   private async pollUntil<T>(
     fn: (tree: UiNode) => Promise<T | undefined>,
     timeoutMs: number,
     what: string,
   ): Promise<T> {
-    const deadline = Date.now() + timeoutMs;
-    let lastReadError: Error | undefined;
-    for (;;) {
-      const { tree, error } = await readTreeOrError(this.adapter);
-      lastReadError = error;
-      if (tree !== undefined) {
-        const result = await fn(tree);
-        if (result !== undefined) return result;
-      }
-      if (Date.now() >= deadline) {
-        throw new Error(
-          `Timed out after ${timeoutMs}ms waiting for ${what}` +
-            (lastReadError === undefined ? '' : `\n  (last UI tree read failed: ${lastReadError.message})`),
-        );
-      }
-      await sleep(this.pollMs);
-    }
+    const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
+    if (!outcome.timedOut) return outcome.value;
+    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError));
   }
 
   /**
@@ -864,332 +842,6 @@ export class FlowEngine {
       );
     }
   }
-}
-
-/**
- * What the scroll actually achieved — not just how many swipes it took.
- *
- * `swipes` alone was the old return, and it made the tool unable to tell the
- * truth: the stop condition is INTERSECTION, so a row clipped at the viewport
- * edge stops the loop and used to be reported as a bare "visible". The caller's
- * very next step is normally an assert or a screenshot on that rect, i.e. the
- * one operation a clipped rect silently corrupts.
- */
-export interface ScrollUntilResult {
-  swipes: number;
-  /** Fraction of the element's area inside the viewport at the stop (0..1). */
-  visible: number;
-  /** Viewport edges the element still extends past, [] when fully revealed. */
-  clipped: ('top' | 'bottom' | 'left' | 'right')[];
-}
-
-/**
- * Deliberately NOT on ScrollUntilResult: whether the content is exhausted.
- * Only the `fully` path can learn it, by spending a swipe and seeing the rect
- * not move — and on that path the answer is always "yes, and here is the
- * throw". A returned result would therefore carry a constitutionally `false`
- * field. Establishing it on the default path would cost every caller an extra
- * swipe past a stop they already accepted, which is a worse trade than the
- * clipped fraction already reported here.
- */
-
-/**
- * How much of an element is on screen, in the terms the caller's next call
- * cares about. Takes the already-computed edges rather than a rect and a
- * viewport, so every site that has judged an element once can describe it
- * without judging it again — including `describeScrollResult`, which holds a
- * result and no rect at all.
- */
-function describeClip(edges: readonly string[], visible: number): string {
-  // Never round a clipped element up to a reassuring 100%: the whole point of
-  // the line is that something is missing.
-  const pct = Math.min(Math.round(visible * 100), 99);
-  return `CLIPPED at ${edges.join('/')}, ${pct}% of it is in the viewport`;
-}
-
-/** The honest one-line summary both call sites print. */
-export function describeScrollResult(r: ScrollUntilResult): string {
-  const n = `${r.swipes} swipe${r.swipes === 1 ? '' : 's'}`;
-  if (r.clipped.length === 0) return `fully visible after ${n}`;
-  return (
-    `visible after ${n} — ${describeClip(r.clipped, r.visible)}` +
-    '. A rect assert or screenshot on this element will measure the CLIPPED box'
-  );
-}
-
-/**
- * Swipe until the element is present AND visibly inside the viewport
- * (ARCHITECTURE.md §4, C1). `direction` is where the content lies relative to
- * the current view (down = below the fold → finger swipes up). Throws with a
- * diagnosis of the last tree.
- *
- * `fully: true` raises the bar from "intersects" to "entirely inside", and
- * keeps swiping until it is — then fails naming the shortfall when the content
- * runs out first. That failure message IS the app bug in the measured case:
- * a scroll container with no clearance for the floating bottom-nav bar can
- * never fully reveal its last row, however far it scrolls. Default stays
- * `false`: the stop condition is unchanged, only the REPORT gains the truth.
- */
-export async function scrollUntilVisible(
-  adapter: DeviceAdapter,
-  target: { find: (tree: UiNode) => UiNode[]; describe: string },
-  spec: Omit<ScrollUntilSpec, 'element'>,
-  opts: { settleMs?: number } = {},
-): Promise<ScrollUntilResult> {
-  const direction = spec.direction ?? 'down';
-  const maxSwipes = spec.maxSwipes ?? 6;
-  const fully = spec.fully === true;
-  const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : 15_000;
-  const settleMs = opts.settleMs ?? 400;
-  const viewport = await adapter.viewport();
-  // `direction` here names where the CONTENT lies — the finger moves the other
-  // way (content below → finger up). See swipeVector.
-  const { from, to } = swipeVector(
-    { x: 0, y: 0, width: viewport.width, height: viewport.height },
-    direction,
-    'content',
-  );
-
-  const deadline = Date.now() + timeoutMs;
-  let lastFound: UiNode[] = [];
-  let lastReadError: Error | undefined;
-  // The best candidate seen so far, and whether the last swipe moved it. A
-  // swipe that does not move the element is the only honest signal that the
-  // container has nothing left to scroll — distinguishing "give it another
-  // swipe" from "this element CANNOT be fully revealed", which is a real
-  // layout defect rather than an impatient loop.
-  let prevRect: UiNode['rect'] | undefined;
-  for (let swipes = 0; ; swipes++) {
-    // A failed read is a miss, not a failure — see readTreeOrError.
-    const { tree, error } = await readTreeOrError(adapter);
-    lastReadError = error;
-    lastFound = tree === undefined ? [] : target.find(tree);
-    // Judge the MOST revealed candidate, not the first: an id can sit on a
-    // container and its child, and reporting the clipped one of the two would
-    // invent a defect.
-    const best = lastFound
-      .map((node) => ({ node, visible: visibleFractionInViewport(node.rect, viewport) }))
-      .sort((a, b) => b.visible - a.visible)[0];
-    if (best !== undefined && best.visible > 0) {
-      const clipped = clippedEdges(best.node.rect, viewport);
-      if (!fully || clipped.length === 0) {
-        return { swipes, visible: best.visible, clipped };
-      }
-      // fully: true and still clipped — only a swipe that MOVES it can help.
-      const stuck = prevRect !== undefined && rectsEqual(prevRect, best.node.rect);
-      prevRect = { ...best.node.rect };
-      if (stuck) {
-        throw new Error(
-          `scroll_until ${target.describe} failed after ${swipes} swipe${swipes === 1 ? '' : 's'} — ` +
-            `element is in the viewport but ${describeClip(clipped, best.visible)}, ` +
-            `and the content is exhausted: swiping ${direction} no longer moves it. ` +
-            `The element cannot be fully revealed — that is a layout defect ` +
-            `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
-            `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
-        );
-      }
-    }
-    if (swipes >= maxSwipes || Date.now() >= deadline) {
-      const partial =
-        best !== undefined && best.visible > 0
-          ? `element reached the viewport but stayed ` +
-            `${describeClip(clippedEdges(best.node.rect, viewport), best.visible)} ` +
-            `(last rect ${JSON.stringify(best.node.rect)})`
-          : undefined;
-      const why =
-        lastReadError !== undefined
-          ? `last UI tree read failed: ${lastReadError.message}`
-          : partial !== undefined
-            ? partial
-            : lastFound.length === 0
-              ? 'element never appeared in the tree'
-              : `element in tree but never intersected the ${viewport.width}x${viewport.height} viewport ` +
-                `(last rect ${JSON.stringify(lastFound[0].rect)})`;
-      const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
-      throw new Error(`scroll_until ${target.describe} failed ${cause} — ${why}`);
-    }
-    await adapter.swipe(from, to);
-    await sleep(settleMs);
-  }
-}
-
-const rectsEqual = (a: UiNode['rect'], b: UiNode['rect']): boolean =>
-  Math.abs(a.x - b.x) < 1 &&
-  Math.abs(a.y - b.y) < 1 &&
-  Math.abs(a.width - b.width) < 1 &&
-  Math.abs(a.height - b.height) < 1;
-
-/**
- * Focus a field (center tap) and type into it. With clear, the current value
- * is deleted first via clearText — typing otherwise APPENDS, the measured
- * Android login trap. A right-edge tap is NOT how clear works: measured
- * 2026-08-05, taps in the field's trailing padding do not focus iOS fields.
- *
- * When `refetch` is given, every phase is VERIFIED against a fresh tree and
- * retried once — synthetic input is droppable end to end (Compose async
- * state, IME queues), so "the call returned" is not "the text landed":
- * - clear: the field must actually be empty; a second pass uses the length
- *   the field still reports.
- * - type with clear: the field must show exactly the value; the retry may
- *   safely wipe and retype (the content is ours).
- * - type without clear: the typed value must appear IN the field (contiguous
- *   insert at the cursor); no destructive retry — clear stays opt-in, so a
- *   mismatch throws instead of corrupting content the field came with.
- * Fields that never expose text (masked/password) verify as best-effort;
- * fields that expose BULLETS verify by length (see `landed`).
- * Errors carry LENGTHS only, never content — values may be credentials.
- * Returns a warning for the caller's trace when the fill is legal but
- * suspicious (a masked field that already held text and `clear` is off).
- */
-export async function fillField(
-  adapter: DeviceAdapter,
-  node: UiNode,
-  value: string,
-  opts: {
-    clear?: boolean;
-    refetch?: () => Promise<UiNode | undefined>;
-    pollMs?: number;
-  } = {},
-): Promise<string | undefined> {
-  const { clear, refetch } = opts;
-  const pollMs = opts.pollMs ?? 400;
-  const point = tapPoint(node);
-  await adapter.tap(point.x, point.y);
-  await sleep(350); // focus + keyboard
-
-  let current: UiNode | undefined = node;
-  let preLen = node.value?.length ?? 0; // what the field holds when typing starts (see `landed`)
-  let note: string | undefined;
-  if (!clear && refetch && (preLen === 0 || isMaskedValue(current?.value ?? ''))) {
-    // The pre-tap read is stale for exactly the fields the length rule cares
-    // about: Android autofill POPULATES a password field on focus, and a
-    // re-entry screen CLEARS one on focus (review 2026-09-18 measured both as
-    // false failures against a pre-tap `preLen`). Re-read after focus. Plain
-    // fields with content skip this — `includes` never uses preLen.
-    const focused = await refetch();
-    if (focused !== undefined) {
-      current = focused;
-      preLen = focused.value?.length ?? 0;
-    }
-    if (preLen > 0 && isMaskedValue(current?.value ?? '')) {
-      // The length rule cannot see content: a password typed onto an
-      // autofilled one reads as a perfect append (finportal 2026-09-17:
-      // backend `invalid_grant`). Say so where the trace is read.
-      note = `masked field already held ${preLen} characters and clear is not set — typing APPENDS; pass clear: true to replace`;
-    }
-  }
-  if (clear) {
-    for (let attempt = 0; ; attempt++) {
-      const existing = current?.value?.length ?? 0;
-      if (existing === 0) break;
-      await adapter.clearText(existing);
-      if (!refetch) break;
-      current = await refetch();
-      const left = current?.value?.length ?? 0;
-      if (left === 0) break;
-      if (attempt >= 1) {
-        throw new Error(`fill: field still shows ${left} characters after clearing twice`);
-      }
-    }
-  }
-
-  await adapter.typeText(value);
-  if (!refetch || value === '') return note;
-
-  // A masked (secure) field shows one bullet per character to uiautomator and
-  // WDA alike, so its content can never EQUAL the value — measured 2026-09-17
-  // (finportal login): `typed 16 characters but the field shows 16` on both
-  // platforms, for a fill that had landed. Its LENGTH still says whether every
-  // keystroke arrived, which is the check that matters on a loaded emulator
-  // (dropped characters there surfaced as a backend `invalid_grant`), so a
-  // bullets-only read-back is compared by count, never by content. The rule
-  // detects the SHORT direction only — dropped keystrokes; without `clear` the
-  // field must show at least what it held after focus plus what was typed. It
-  // cannot tell a correct append from typing onto an autofilled password (both
-  // read `held + typed`); that case is the `note` above, not a failure.
-  const landed = (observed: string) =>
-    isMaskedValue(observed)
-      ? clear
-        ? observed.length === value.length
-        : observed.length >= preLen + value.length
-      : clear
-        ? observed === value
-        : observed.includes(value);
-  let observed = await pollValue(refetch, landed, pollMs);
-  if (observed === undefined || landed(observed)) return note; // undefined: field withholds its text
-  if (clear) {
-    await adapter.clearText(observed.length);
-    await adapter.typeText(value);
-    observed = await pollValue(refetch, landed, pollMs);
-    if (observed === undefined || landed(observed)) return note;
-  }
-  throw new Error(
-    `fill: typed ${value.length} characters but the field shows ${observed.length} ` +
-      (isMaskedValue(observed)
-        ? `(masked field — compared by length${clear ? '' : `; it held ${preLen} after focus`})`
-        : '(content withheld from this error)'),
-  );
-}
-
-
-/** Poll the field until its exposed value satisfies `ok`; returns the last observation. */
-async function pollValue(
-  refetch: () => Promise<UiNode | undefined>,
-  ok: (observed: string) => boolean,
-  pollMs: number,
-): Promise<string | undefined> {
-  let observed: string | undefined;
-  for (let i = 0; i < 5; i++) {
-    observed = (await refetch())?.value ?? undefined;
-    if (observed !== undefined && ok(observed)) return observed;
-    if (observed === undefined && i >= 1) return undefined; // field exposes no text — stop waiting
-    await sleep(pollMs);
-  }
-  return observed;
-}
-
-
-/**
- * The from/to points of a swipe across `box`, 30% of the box either side of
- * centre.
- *
- * `mean` is why this exists once instead of twice: the two callers use the
- * same four words for OPPOSITE gestures. A `swipe:` step names the FINGER's
- * movement (swipe up = finger travels up, revealing content below). A
- * `scroll_until:` names where the CONTENT lies (content below the fold is
- * reached by a finger travelling up). As two separate tables they read as
- * copies of each other, and the next person to correct one would have broken
- * the other.
- */
-export function swipeVector(
-  box: { x: number; y: number; width: number; height: number },
-  direction: 'up' | 'down' | 'left' | 'right',
-  mean: 'finger' | 'content',
-): { from: { x: number; y: number }; to: { x: number; y: number } } {
-  const cx = Math.round(box.x + box.width / 2);
-  const cy = Math.round(box.y + box.height / 2);
-  const dx = Math.round(box.width * 0.3);
-  const dy = Math.round(box.height * 0.3);
-  const finger = {
-    up: { from: { x: cx, y: cy + dy }, to: { x: cx, y: cy - dy } },
-    down: { from: { x: cx, y: cy - dy }, to: { x: cx, y: cy + dy } },
-    left: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
-    right: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
-  } as const;
-  const awayFrom = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
-  return mean === 'finger' ? finger[direction] : finger[awayFrom[direction]];
-}
-
-/** Screen area to swipe over: the root rect, or the union of children (iOS synthetic root is 0×0). */
-function boundingBox(root: UiNode): UiNode['rect'] {
-  if (root.rect.width > 0 && root.rect.height > 0) return root.rect;
-  let maxX = 0;
-  let maxY = 0;
-  for (const c of root.children) {
-    maxX = Math.max(maxX, c.rect.x + c.rect.width);
-    maxY = Math.max(maxY, c.rect.y + c.rect.height);
-  }
-  return { x: 0, y: 0, width: maxX, height: maxY };
 }
 
 /**

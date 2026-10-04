@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { readTreeOrError } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTree, readTreeOrError } from '../../src/ui-tree/read-tree.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -57,5 +57,96 @@ describe('readTreeOrError', () => {
     const second = await readTreeOrError(adapter);
     expect(first.error).toBeDefined();
     expect('error' in second && second.error !== undefined).toBe(false);
+  });
+});
+
+describe('pollTree — the one deadline loop', () => {
+  const FAST = { timeoutMs: 60, pollMs: 2 };
+
+  it('returns the predicate\'s value and reads the tree exactly once on a first-round hit', async () => {
+    let reads = 0;
+    const outcome = await pollTree(
+      { uiTree: async () => (reads++, tree) },
+      (t) => t.rect.width,
+      FAST,
+    );
+    expect(outcome).toEqual({ timedOut: false, value: 10 });
+    expect(reads).toBe(1);
+  });
+
+  it('a failed read is a miss that keeps polling, and the deadline reports the LAST read error', async () => {
+    let reads = 0;
+    const outcome = await pollTree(
+      {
+        uiTree: async () => {
+          throw new Error(`null root node (read ${++reads})`);
+        },
+      },
+      () => true,
+      FAST,
+    );
+    expect(outcome.timedOut).toBe(true);
+    expect(reads).toBeGreaterThan(1);
+    if (outcome.timedOut) expect(outcome.readError?.message).toBe(`null root node (read ${reads})`);
+  });
+
+  it('a successful read clears an earlier read error — the timeout quotes only a device that is STILL unreadable', async () => {
+    let reads = 0;
+    const outcome = await pollTree(
+      {
+        uiTree: async () => {
+          if (reads++ === 0) throw new Error('transient');
+          return tree;
+        },
+      },
+      () => undefined, // never satisfied
+      FAST,
+    );
+    expect(outcome).toEqual({ timedOut: true, detail: undefined, readError: undefined });
+  });
+
+  it('a PollMiss detail survives later rounds that have nothing to say', async () => {
+    let round = 0;
+    const outcome = await pollTree(
+      { uiTree: async () => tree },
+      () => (round++ === 0 ? new PollMiss('element found but content was: WRONG') : undefined),
+      FAST,
+    );
+    expect(outcome).toMatchObject({ timedOut: true, detail: 'element found but content was: WRONG' });
+  });
+
+  it('a later PollMiss replaces an earlier one — the deadline reports the most recent observation', async () => {
+    let round = 0;
+    const outcome = await pollTree({ uiTree: async () => tree }, () => new PollMiss(`seen ${round++}`), FAST);
+    expect(outcome.timedOut).toBe(true);
+    if (outcome.timedOut) expect(outcome.detail).toBe(`seen ${round - 1}`);
+  });
+
+  // The optional-tap finding (2026-08-19): a budget shorter than one device
+  // read must still get one honest look, and a 0 ms budget is a single probe.
+  it('timeoutMs 0 is exactly one read and one evaluation, and that one can hit', async () => {
+    let reads = 0;
+    let evaluations = 0;
+    const adapter = { uiTree: async () => (reads++, tree) };
+    const hit = await pollTree(adapter, () => (evaluations++, 'yes'), { timeoutMs: 0, pollMs: 2 });
+    expect(hit).toEqual({ timedOut: false, value: 'yes' });
+    const miss = await pollTree(adapter, () => (evaluations++, undefined), { timeoutMs: 0, pollMs: 2 });
+    expect(miss.timedOut).toBe(true);
+    expect(reads).toBe(2);
+    expect(evaluations).toBe(2);
+  });
+
+  it('the predicate\'s own error propagates at once — it is the caller\'s bug, not a miss', async () => {
+    let reads = 0;
+    await expect(
+      pollTree(
+        { uiTree: async () => (reads++, tree) },
+        () => {
+          throw new Error('Unknown state "nope"');
+        },
+        FAST,
+      ),
+    ).rejects.toThrow(/Unknown state "nope"/);
+    expect(reads).toBe(1);
   });
 });

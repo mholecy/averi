@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { tapElement } from '../../src/ui-tree/tap-element.js';
+import { tapElement } from '../../src/interact/tap.js';
 import { AndroidAdapter, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
@@ -257,7 +257,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('tapElement resolves a selector and taps the rect center', async () => {
     const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
-    await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:pin_key_2');
+    await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:pin_key_2', { ambiguous: 'refuse' });
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 540 1350');
   });
 

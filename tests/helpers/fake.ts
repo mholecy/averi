@@ -28,7 +28,8 @@ export const screen = (...children: UiNode[]): UiNode =>
  * `onTap(identifier)` mutates `current` to simulate the app reacting.
  */
 export class FakeAdapter implements DeviceAdapter {
-  readonly platform = 'android' as const;
+  /** Assignable: the fake stands in for both platforms (a fill's keyboard dismissal, a verify run's legs). */
+  platform: 'android' | 'ios' = 'android';
   current: string;
   taps: string[] = [];
   typed: string[] = [];

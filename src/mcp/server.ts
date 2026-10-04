@@ -6,8 +6,11 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { AdapterRegistry, type AdapterOpts } from './registry.js';
 import { installShutdownHandlers } from './lifecycle.js';
-import { findAll, resolveOne } from '../ui-tree/selectors.js';
-import { tapElement } from '../ui-tree/tap-element.js';
+import { findAll } from '../ui-tree/selectors.js';
+import { fillField } from '../interact/fill.js';
+import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { tapElement } from '../interact/tap.js';
+import { fillText, tapText } from './tool-text.js';
 import {
   configDir,
   loadConfig,
@@ -15,7 +18,7 @@ import {
   loadEnvBeside,
   type AveriConfig,
 } from '../flow/config.js';
-import { describeScrollResult, fillField, FlowEngine, scrollUntilVisible } from '../flow/engine.js';
+import { FlowEngine } from '../flow/engine.js';
 import { assertSpecSchema, DEFAULT_BASELINE_DIR, Verifier } from '../verify/assert.js';
 import { captureFrame } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
@@ -276,7 +279,9 @@ registerTool(
   {
     description:
       'Tap an element by selector (preferred: \'id:login_button\', \'text:"Continue"\', \'role:button label~"Pay.*"\') or by x/y coordinates. ' +
-      'Selector values containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex) — an unquoted text:Sign in fails at "in".',
+      'Selector values containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex) — an unquoted text:Sign in fails at "in". ' +
+      'With a selector, waits up to 5 s for the element to appear and hold still (same policy as a flow tap: step), ignores zero-area nodes, ' +
+      'and when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector.',
     inputSchema: {
       platform,
       selector: z.string().optional().describe('Element to tap, e.g. \'id:login_button\' or \'text:"Sign in"\' (quote values with spaces)'),
@@ -288,8 +293,8 @@ registerTool(
   async ({ platform: p, selector, x, y, configPath: cp }) => {
     const adapter = await registry.get(p, await loadIosOpts(p, cp));
     if (selector !== undefined) {
-      const note = await tapElement(adapter, selector, { settle: true });
-      return text(`Tapped ${selector}${note ? ` (${note})` : ''}`);
+      const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse' });
+      return text(tapText(selector, note));
     }
     if (x === undefined || y === undefined) {
       throw new Error('Provide either selector or both x and y');
@@ -320,7 +325,9 @@ registerTool(
   'type_text',
   {
     description:
-      'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields). Without selector: types into whatever is focused.',
+      'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields), ' +
+      'then verifies the text landed and retries a dropped clear-fill once. The field is resolved like a tap: up to 5 s to appear and hold still, zero-area nodes ignored, ' +
+      'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first). Without selector: types into whatever is focused.',
     inputSchema: {
       platform,
       text: z.string(),
@@ -336,19 +343,8 @@ registerTool(
       await adapter.typeText(value);
       return text(`Typed ${value.length} characters`);
     }
-    const { node, note } = resolveOne(await adapter.uiTree({ settle: true }), selector);
-    const refetch = async () => {
-      try {
-        return resolveOne(await adapter.uiTree(), selector).node; // a poller (fillField's pollValue): no settle
-      } catch {
-        return undefined;
-      }
-    };
-    const warning = await fillField(adapter, node, value, { clear, refetch });
-    return text(
-      `Filled ${selector} (${value.length} characters${clear ? ', cleared first' : ''})${note ? ` (${note})` : ''}` +
-        (warning ? `\n⚠ ${warning}` : ''),
-    );
+    const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear });
+    return text(fillText(selector, value.length, clear === true, note, warning));
   },
 );
 
@@ -374,11 +370,7 @@ registerTool(
   },
   async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, configPath: cp }) => {
     const adapter = await registry.get(p, await loadIosOpts(p, cp));
-    const result = await scrollUntilVisible(
-      adapter,
-      { find: (tree) => findAll(tree, selector), describe: selector },
-      { direction, maxSwipes, fully, timeout: timeoutMs },
-    );
+    const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs });
     return text(`Element ${selector} ${describeScrollResult(result)}`);
   },
 );

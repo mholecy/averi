@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import type { FetchFn } from '../../src/adapters/wda.js';
-import { findOne } from '../../src/ui-tree/selectors.js';
+import { findAll } from '../../src/ui-tree/selectors.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 
 // Raw /source envelope as WdaServer.source() returns it — the host-view
@@ -65,8 +65,10 @@ describe('WdaTreeSource — the WebDriverAgent adapter at the seam', () => {
     expect(spawner.spawns[0].args).toContain('id=AAAA-1111');
     expect(fetcher.urls.filter((u) => u.endsWith('/source?format=json'))).toHaveLength(2);
     expect(tree).toMatchObject({ role: 'container', label: 'MyPort' }); // Application root, not a synthetic wrapper
-    expect(findOne(tree, 'id:home.header')).toMatchObject({ role: 'container', rect: { x: 0, y: 100, width: 402, height: 50 } });
-    expect(findOne(tree, 'id:home.title')).toMatchObject({ role: 'text', label: 'Welcome' });
+    expect(findAll(tree, 'id:home.header')).toHaveLength(1);
+    expect(findAll(tree, 'id:home.header')[0]).toMatchObject({ role: 'container', rect: { x: 0, y: 100, width: 402, height: 50 } });
+    expect(findAll(tree, 'id:home.title')).toHaveLength(1);
+    expect(findAll(tree, 'id:home.title')[0]).toMatchObject({ role: 'text', label: 'Welcome' });
   });
 
   it('constructing the source starts nothing: dispose before any read spawns, signals and probes nothing', async () => {

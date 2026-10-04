@@ -5,16 +5,15 @@ import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { PollMiss, pollTree } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
-import { sleep } from '../util/sleep.js';
 import { elementAssertSchema } from './element-assert.js';
 import { captureFrame } from './capture.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrUnavailableReason, VisionOcr, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
-import { findBySpec, intersectsViewport } from '../ui-tree/selectors.js';
+import { absentFromViewport, findBySpec } from '../ui-tree/selectors.js';
 import { containsTextHint, flattenTree } from '../ui-tree/text-hint.js';
 
 /**
@@ -434,37 +433,34 @@ export class Verifier {
    * sleeps"): read the tree, evaluate it, stop on a pass, otherwise remember
    * what it said and retry until the deadline.
    *
-   * A FAILED tree read is a miss, not a failure — right after launch the
-   * device can be momentarily unable to produce one (uiautomator "null root
-   * node") — so it never ends the poll and never counts as evidence; it is
-   * kept only to explain a timeout. Owning that rule in one place is the point
-   * of this method: it was written out four times, once per assert.
+   * The loop itself is `pollTree` (ui-tree/read-tree.ts) since 2026-10-03 —
+   * before that this method was one of three copies of it. What stays here
+   * is the verifier's vocabulary: a PollVerdict in, an AssertResult out, and
+   * the per-assert timeout wording. A non-passing verdict with a detail
+   * becomes a PollMiss, which is how "element found but content was: …"
+   * survives the element vanishing again before the deadline; one with
+   * nothing to say continues the poll without erasing an earlier detail.
    */
   private async poll(
     evaluate: (tree: UiNode) => Promise<PollVerdict | undefined> | PollVerdict | undefined,
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
-    const deadline = Date.now() + timeoutMs;
-    let detail: string | undefined;
-    let readError: Error | undefined;
-    for (;;) {
-      const read = await readTreeOrError(this.adapter);
-      readError = read.error;
-      if (read.tree !== undefined) {
-        const verdict = await evaluate(read.tree);
-        if (verdict?.pass) return { description, pass: true, detail: verdict.detail };
-        // Only overwrite with something to say. An evaluation with nothing to
-        // report (element not present this round) must not ERASE what an
-        // earlier round saw — that is what makes "element found but content
-        // was: …" survive the element vanishing again before the deadline.
-        if (verdict?.detail !== undefined) detail = verdict.detail;
-      }
-      if (Date.now() >= deadline) {
-        return { description, pass: false, detail: spec.timeoutDetail({ detail, readError }) };
-      }
-      await sleep(this.pollMs);
-    }
+    const outcome = await pollTree(
+      this.adapter,
+      async (tree) => {
+        const verdict = await evaluate(tree);
+        if (verdict?.pass) return { detail: verdict.detail };
+        return verdict?.detail === undefined ? undefined : new PollMiss(verdict.detail);
+      },
+      { timeoutMs, pollMs: this.pollMs },
+    );
+    if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
+    return {
+      description,
+      pass: false,
+      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError }),
+    };
   }
 
   /**
@@ -482,8 +478,7 @@ export class Verifier {
     return this.poll(
       (tree) => {
         const found = findBySpec(tree, element);
-        const visible = found.filter((n) => intersectsViewport(n.rect, viewport));
-        if (visible.length > 0) return undefined;
+        if (!absentFromViewport(found, viewport)) return undefined;
         return {
           pass: true,
           detail:

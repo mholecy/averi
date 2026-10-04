@@ -1,8 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import { findAll, findOne, resolveOne } from '../../src/ui-tree/selectors.js';
+import { resolveNow } from '../../src/interact/resolve.js';
+import { findAll } from '../../src/ui-tree/selectors.js';
 import type { UiNode } from '../../src/adapters/types.js';
+
+/** The one node a selector matches in a fixture — a mismatch is a fixture bug, not a resolution question. */
+const findOne = (tree: UiNode, selector: string): UiNode => {
+  const found = findAll(tree, selector);
+  expect(found).toHaveLength(1);
+  return found[0];
+};
 
 const fixture = (name: string) =>
   readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
@@ -94,15 +102,16 @@ describe('parseWdaSource — native skeleton fixture', () => {
     expect(nav?.role).toBe('container');
   });
 
-  it('resolveOne under WDA label propagation: the interactive Button wins over its label-carrying ancestor', () => {
+  it('resolution under WDA label propagation: the interactive Button wins over its label-carrying ancestor', () => {
     // The nested tree surfaces what idb's flat list hid: an ancestor `Other`
     // carries the same propagated label as its Button descendant. A text:
-    // selector matches both — resolveOne must disambiguate to the Button.
+    // selector matches both — the shared resolution policy (interact/resolve.ts)
+    // must disambiguate to the Button.
     const matches = findAll(tree, 'text:"Password login"');
     expect(matches.length).toBeGreaterThan(1); // the ambiguity is real in this fixture
-    const { node: target, note } = resolveOne(tree, 'text:"Password login"');
-    expect(target.role).toBe('button');
-    expect(note).toContain('picked the only interactive one');
+    const resolved = resolveNow(tree, 'text:"Password login"', { ambiguous: 'refuse' }); // the tools' mode — and it does not need to refuse
+    expect(resolved?.node.role).toBe('button');
+    expect(resolved?.note).toContain('picked the only interactive one');
   });
 });
 

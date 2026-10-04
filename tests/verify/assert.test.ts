@@ -60,6 +60,28 @@ describe('element asserts', () => {
     expect(await verifier.assert({ element: { id: 'amount_input' }, absent: true })).toMatchObject({ pass: false });
   });
 
+  it('absent uses the ONE viewport rule the engine\'s detect uses (absentFromViewport): in the tree but off-screen is absent, on-screen is not', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        s: screen(
+          node({ identifier: 'card_face', rect: { x: 0, y: -300, width: 100, height: 100 } }), // iOS keeps it, scrolled above the top
+          el({ identifier: 'row_0' }),
+        ),
+      },
+      's',
+    );
+    const verifier = new Verifier(fake, FAST);
+    expect(await verifier.assert({ element: { id: 'card_face' }, absent: true })).toMatchObject({
+      pass: true,
+      detail: '1 node(s) in tree but none intersect the viewport',
+    });
+    expect(await verifier.assert({ element: { id: 'row_0' }, absent: true })).toMatchObject({
+      pass: false,
+      detail: expect.stringContaining('still visible'),
+    });
+  });
+
   it('error asserts check the node error attribute and report the actual error on mismatch', async () => {
     resetLayout();
     const fake = new FakeAdapter(

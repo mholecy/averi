@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import {
+  absentFromViewport,
   findAll,
-  findOne,
   intersectsViewport,
+  preferInteractive,
   parseSelector,
-  resolveOne,
   tapPoint,
 } from '../../src/ui-tree/selectors.js';
 
@@ -95,13 +95,7 @@ describe('findAll / findOne', () => {
     expect(found.map((n) => n.label)).toEqual(['Pay now', 'Pay later']);
   });
 
-  it('findOne throws on zero and on multiple matches', () => {
-    expect(() => findOne(tree, 'id:nope')).toThrow(/No element matches/);
-    expect(() => findOne(tree, 'role:button label~"Pay.*"')).toThrow(/matches 2 elements/);
-    expect(findOne(tree, 'id:login_button').role).toBe('button');
-  });
-
-  it('disambiguates to the sole interactive node when labels share the id (iOS field convention)', () => {
+  it('preferInteractive picks the sole interactive node when labels share the id (iOS field convention)', () => {
     // Measured on the payment form: textfield + title label + error label all
     // carry the field's accessibilityIdentifier.
     const shared: UiNode = node({
@@ -111,20 +105,35 @@ describe('findAll / findOne', () => {
         node({ role: 'text', identifier: 'payment.form.amount_input', label: 'Value is too small' }),
       ],
     });
-    const { node: chosen, note } = resolveOne(shared, 'id:payment.form.amount_input');
-    expect(chosen.role).toBe('textfield');
-    expect(note).toMatch(/3 matches.*interactive/);
-    expect(findOne(shared, 'id:payment.form.amount_input').role).toBe('textfield');
+    const preferred = preferInteractive(findAll(shared, 'id:payment.form.amount_input'));
+    expect(preferred?.node.role).toBe('textfield');
+    expect(preferred?.note).toMatch(/3 matches.*interactive/);
   });
 
-  it('still errors when multiple interactive nodes match', () => {
+  it('preferInteractive stays undecided when several interactive nodes match', () => {
     const twoButtons: UiNode = node({
       children: [
         node({ role: 'button', identifier: 'dup', label: 'A' }),
         node({ role: 'button', identifier: 'dup', label: 'B' }),
       ],
     });
-    expect(() => resolveOne(twoButtons, 'id:dup')).toThrow(/matches 2 elements/);
+    expect(preferInteractive(findAll(twoButtons, 'id:dup'))).toBeUndefined();
+  });
+});
+
+describe('absentFromViewport — the one meaning of "gone", shared by state detects and absent asserts', () => {
+  const vp = { width: 400, height: 800 };
+  it('nothing matched is absent; a match on screen is not; a match pushed off-viewport (iOS keeps it) is', () => {
+    expect(absentFromViewport([], vp)).toBe(true);
+    expect(absentFromViewport([node({ rect: { x: 10, y: 10, width: 50, height: 50 } })], vp)).toBe(false);
+    expect(absentFromViewport([node({ rect: { x: 0, y: -300, width: 100, height: 100 } })], vp)).toBe(true);
+    // One visible match among off-screen ones is enough to be present.
+    expect(
+      absentFromViewport(
+        [node({ rect: { x: 0, y: -300, width: 100, height: 100 } }), node({ rect: { x: 10, y: 10, width: 50, height: 50 } })],
+        vp,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -142,7 +151,7 @@ describe('intersectsViewport', () => {
 
 describe('tapPoint', () => {
   it('returns the rect center', () => {
-    const target = findOne(tree, 'label:"Pay now"');
+    const target = findAll(tree, 'label:"Pay now"')[0];
     expect(tapPoint(target)).toEqual({ x: 50, y: 220 });
   });
 });
