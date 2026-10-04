@@ -1,6 +1,6 @@
 import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
-import { clippedEdges, visibleFractionInViewport } from '../ui-tree/selectors.js';
+import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
 import { swipeVector, type Direction } from './swipe.js';

@@ -15,8 +15,9 @@ import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpe
 import { ocrEngineFor, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
-import { absentFromViewport, findBySpec } from '../ui-tree/selectors.js';
-import { containsTextHint, flattenTree } from '../ui-tree/text-hint.js';
+import { findBySpec } from '../ui-tree/selectors.js';
+import { absentFromViewport } from '../ui-tree/geometry.js';
+import { containsTextHint, flattenTree } from './text-hint.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5). Three tiers, cheapest first:

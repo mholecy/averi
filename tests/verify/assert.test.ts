@@ -246,7 +246,12 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     const verifier = new Verifier(fake, FAST);
     for (const id of ['dash', 'space']) {
       const result = await verifier.assert({ element: { id }, text: '1 of 13 selected' });
-      expect(result.detail).toContain('CONTAIN it');
+      // The hint's full sentence, byte-for-byte — text-hint.ts moved to verify/
+      // on 2026-10-04 and this wording is the thing that must not drift.
+      expect(result.detail).toContain('no node has this exact text, but 1 node(s) CONTAIN it as a whole segment:');
+      expect(result.detail).toContain(
+        '(iOS combines a container\'s children into one accessibility element — use match: "1 of 13 selected" for a cross-platform assert)',
+      );
     }
   });
 

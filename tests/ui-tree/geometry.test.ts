@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import { inferScreenSize, inferScreenWidth } from '../../src/ui-tree/geometry.js';
+import {
+  absentFromViewport,
+  inferScreenSize,
+  inferScreenWidth,
+  intersectsViewport,
+} from '../../src/ui-tree/geometry.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
 /**
@@ -222,5 +227,36 @@ describe('inferScreenSize on the real iOS filter-sheet shape', () => {
       reliable: true,
       trustworthyHeight: true,
     });
+  });
+});
+
+// ─── Viewport predicates (moved here from selectors.test.ts, 2026-10-04) ────
+
+
+describe('absentFromViewport — the one meaning of "gone", shared by state detects and absent asserts', () => {
+  const vp = { width: 400, height: 800 };
+  it('nothing matched is absent; a match on screen is not; a match pushed off-viewport (iOS keeps it) is', () => {
+    expect(absentFromViewport([], vp)).toBe(true);
+    expect(absentFromViewport([node({ x: 10, y: 10, width: 50, height: 50 })], vp)).toBe(false);
+    expect(absentFromViewport([node({ x: 0, y: -300, width: 100, height: 100 })], vp)).toBe(true);
+    // One visible match among off-screen ones is enough to be present.
+    expect(
+      absentFromViewport(
+        [node({ x: 0, y: -300, width: 100, height: 100 }), node({ x: 10, y: 10, width: 50, height: 50 })],
+        vp,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('intersectsViewport', () => {
+  const vp = { width: 400, height: 800 };
+  it('true for on-screen rects, false for off-viewport and zero-area rects', () => {
+    expect(intersectsViewport({ x: 10, y: 10, width: 50, height: 50 }, vp)).toBe(true);
+    expect(intersectsViewport({ x: 390, y: 790, width: 50, height: 50 }, vp)).toBe(true); // partial
+    expect(intersectsViewport({ x: 0, y: 900, width: 50, height: 50 }, vp)).toBe(false); // below
+    expect(intersectsViewport({ x: -60, y: 10, width: 50, height: 50 }, vp)).toBe(false); // left
+    expect(intersectsViewport({ x: 0, y: -100, width: 400, height: 100 }, vp)).toBe(false); // edge-touching
+    expect(intersectsViewport({ x: 10, y: 10, width: 0, height: 0 }, vp)).toBe(false); // zero-area
   });
 });

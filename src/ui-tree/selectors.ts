@@ -1,5 +1,5 @@
-import type { Rect, Selector, UiNode } from '../adapters/types.js';
-import type { ElementSpec } from './element-spec.js';
+import type { Selector, UiNode } from '../adapters/types.js';
+import { SELECTOR_FIELDS, type ElementSpec } from './element-spec.js';
 
 /**
  * Selector syntax (ARCHITECTURE.md §3): space-separated conditions, all must match.
@@ -102,8 +102,8 @@ function matches(node: UiNode, conditions: Condition[]): boolean {
   });
 }
 
-export function findAll(root: UiNode, selector: Selector): UiNode[] {
-  const conditions = parseSelector(selector);
+/** Every node under `root` (pre-order) that satisfies all `conditions`. The one walk both lookups share. */
+function findMatching(root: UiNode, conditions: Condition[]): UiNode[] {
   const found: UiNode[] = [];
   const walk = (node: UiNode) => {
     if (matches(node, conditions)) found.push(node);
@@ -111,6 +111,45 @@ export function findAll(root: UiNode, selector: Selector): UiNode[] {
   };
   walk(root);
   return found;
+}
+
+export function findAll(root: UiNode, selector: Selector): UiNode[] {
+  return findMatching(root, parseSelector(selector));
+}
+
+/**
+ * The structured spec as conditions — the SAME matcher the selector grammar
+ * uses, so `text` means label-or-value in both forms by construction rather
+ * than by two bodies agreeing. Every field is an exact match (`eq`): the spec
+ * has no regex form, and `text: "Pay.*"` is the literal string. Built as
+ * conditions directly, never by serializing the spec into a selector string —
+ * the grammar has no escape inside `"…"`, so a value containing a double
+ * quote could not be written at all (a 2026-10-04 probe: 120 of 512 specs).
+ * Iterating SELECTOR_FIELDS means a payload carrying non-selector keys
+ * (`value`, `timeout` on a fill/tap step) is ignored, as before, and a field
+ * added to the spec schema is matched here with no edit.
+ */
+function conditionsOf(spec: ElementSpec): Condition[] {
+  const conditions: Condition[] = [];
+  for (const field of SELECTOR_FIELDS) {
+    const value = spec[field];
+    if (value !== undefined) conditions.push({ field, op: 'eq', value });
+  }
+  return conditions;
+}
+
+/**
+ * Exact-match element lookup; `text` matches label or value (selector
+ * semantics). Since 2026-10-04 this IS the selector matcher over
+ * `conditionsOf(spec)`; before it was a second, hand-written matcher over the
+ * same fields — identical on every probed input, and one edit away from not
+ * being. Pinned by the differential test in tests/ui-tree/selectors.test.ts.
+ * One difference at the type's edge: a runtime `null` field now matches
+ * nothing (the old `===` matched nodes whose field was null); the zod string
+ * schemas make such a spec unreachable, so no behaviour changes.
+ */
+export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
+  return findMatching(root, conditionsOf(spec));
 }
 
 /**
@@ -147,78 +186,9 @@ export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string
 // policy (no zero-area filter, throw on ambiguity) used only by the MCP tap
 // and type_text tools. The one policy is interact/resolve.ts#resolveNow.
 
-/**
- * Does the node's rect visibly intersect the screen? The shared meaning of
- * "gone": Android prunes off-screen nodes from its tree, iOS keeps them with
- * off-viewport rects — this check makes both read the same.
- */
-export function intersectsViewport(
-  rect: Rect,
-  viewport: { width: number; height: number },
-): boolean {
-  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
-  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
-  return w > 0 && h > 0;
-}
-
-/**
- * The one portable meaning of "absent": no node matched, or none of the
- * matches intersects the viewport. The raw trees disagree — Android prunes
- * off-screen nodes, iOS keeps them with off-viewport rects — and a state
- * detect (`absent: true`) and an absent assert must read the same tree the
- * same way, or a state the flow says it reached could fail the assert that
- * checks it. Since 2026-10-03 this is the one owner; the engine and
- * verify/assert.ts each spelled it out before, and the two layers cannot
- * share it anywhere higher (verify sits below the interaction module).
- */
-export function absentFromViewport(
-  found: readonly UiNode[],
-  viewport: { width: number; height: number },
-): boolean {
-  return !found.some((n) => intersectsViewport(n.rect, viewport));
-}
-
-/**
- * How much of the rect actually lies inside the viewport, as a fraction of its
- * own area (0 = fully outside, 1 = fully inside).
- *
- * The companion to `intersectsViewport`, which answers only "any overlap at
- * all". That predicate is the right stop condition for a scroll, but it is the
- * WRONG thing to report: measured 2026-08-27, a row clipped by the floating
- * bottom-nav bar intersected by 87% of its height, `scroll_until` reported a
- * bare "visible", and the next assert measured the CLIPPED rect — reading
- * h 143 against a pinned 60 and pointing the investigation at the app's
- * row-height logic, which was correct. A caller who is told the fraction can
- * see the clipping; a caller told "visible" cannot.
- */
-export function visibleFractionInViewport(
-  rect: Rect,
-  viewport: { width: number; height: number },
-): number {
-  if (rect.width <= 0 || rect.height <= 0) return 0;
-  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
-  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
-  if (w <= 0 || h <= 0) return 0;
-  return (w * h) / (rect.width * rect.height);
-}
-
-/**
- * Which viewport edges the rect extends past, in the order a reader scans.
- * Named rather than counted because the edge IS the diagnosis: 'bottom' with
- * the content exhausted is a missing-clearance bug, 'top' is a sticky header
- * overlapping, and the two want different fixes.
- */
-export function clippedEdges(
-  rect: Rect,
-  viewport: { width: number; height: number },
-): ('top' | 'bottom' | 'left' | 'right')[] {
-  const out: ('top' | 'bottom' | 'left' | 'right')[] = [];
-  if (rect.y < 0) out.push('top');
-  if (rect.y + rect.height > viewport.height) out.push('bottom');
-  if (rect.x < 0) out.push('left');
-  if (rect.x + rect.width > viewport.width) out.push('right');
-  return out;
-}
+// The viewport predicates (intersectsViewport, absentFromViewport,
+// visibleFractionInViewport, clippedEdges) lived here until 2026-10-04; they
+// are geometry, not selection, and sit in geometry.ts with the rest of it.
 
 /** Center of the node's rect — where taps land. */
 export function tapPoint(node: UiNode): { x: number; y: number } {
@@ -226,20 +196,4 @@ export function tapPoint(node: UiNode): { x: number; y: number } {
     x: Math.round(node.rect.x + node.rect.width / 2),
     y: Math.round(node.rect.y + node.rect.height / 2),
   };
-}
-
-/** Exact-match element lookup; `text` matches label or value (selector semantics). */
-export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
-  const found: UiNode[] = [];
-  const walk = (n: UiNode) => {
-    const ok =
-      (spec.id === undefined || n.identifier === spec.id) &&
-      (spec.role === undefined || n.role === spec.role) &&
-      (spec.label === undefined || n.label === spec.label) &&
-      (spec.text === undefined || n.label === spec.text || n.value === spec.text);
-    if (ok) found.push(n);
-    n.children.forEach(walk);
-  };
-  walk(root);
-  return found;
 }

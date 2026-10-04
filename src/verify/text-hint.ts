@@ -13,6 +13,11 @@ import type { UiNode } from '../adapters/types.js';
  * dumps the tree, which is the expensive part.
  *
  * `match` (regex, unanchored) is the portable form, so the hint names it.
+ *
+ * In verify/ since 2026-10-04 (it was ui-tree/text-hint.ts): its one consumer
+ * is the element assert, and its user-facing text recommends `match:` —
+ * assert-spec vocabulary that the tree layer, which "knows no averi.yaml"
+ * (ARCHITECTURE.md §2), had no business speaking.
  */
 
 /**

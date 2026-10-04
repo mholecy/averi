@@ -6,8 +6,14 @@ import { zeroRect, type Rect, type UiNode } from '../adapters/types.js';
  * two: how wide is the screen, and where is each identified element.
  *
  * These live here rather than in verify/ because they walk a `UiNode` and know
- * nothing about contracts, tolerances or findings — the same reason
- * intersectsViewport and tapPoint live in this package.
+ * nothing about contracts, tolerances or findings. Since 2026-10-04 the
+ * viewport predicates (intersectsViewport, absentFromViewport,
+ * visibleFractionInViewport, clippedEdges) are here too, at the end of the
+ * file: they were in selectors.ts, but they are rect arithmetic, not
+ * selection, and the 2026-08-14 review (E2) had already asked for them to
+ * join this module. tapPoint stays in selectors.ts on purpose: it is the
+ * tap-target rule (where a resolved node is pressed), its importers include
+ * interact/keyboard.ts, and the move deliberately left it alone.
  */
 
 export interface ScreenWidth {
@@ -254,5 +260,80 @@ export function collectRects(tree: UiNode): Map<string, Rect> {
     n.children.forEach(walk);
   };
   walk(tree);
+  return out;
+}
+
+// ─── Viewport predicates ─────────────────────────────────────────────────────
+
+/**
+ * Does the node's rect visibly intersect the screen? The shared meaning of
+ * "gone": Android prunes off-screen nodes from its tree, iOS keeps them with
+ * off-viewport rects — this check makes both read the same.
+ */
+export function intersectsViewport(
+  rect: Rect,
+  viewport: { width: number; height: number },
+): boolean {
+  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
+  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
+  return w > 0 && h > 0;
+}
+
+/**
+ * The one portable meaning of "absent": no node matched, or none of the
+ * matches intersects the viewport. The raw trees disagree — Android prunes
+ * off-screen nodes, iOS keeps them with off-viewport rects — and a state
+ * detect (`absent: true`) and an absent assert must read the same tree the
+ * same way, or a state the flow says it reached could fail the assert that
+ * checks it. Since 2026-10-03 this is the one owner; the engine and
+ * verify/assert.ts each spelled it out before, and the two layers cannot
+ * share it anywhere higher (verify sits below the interaction module).
+ */
+export function absentFromViewport(
+  found: readonly UiNode[],
+  viewport: { width: number; height: number },
+): boolean {
+  return !found.some((n) => intersectsViewport(n.rect, viewport));
+}
+
+/**
+ * How much of the rect actually lies inside the viewport, as a fraction of its
+ * own area (0 = fully outside, 1 = fully inside).
+ *
+ * The companion to `intersectsViewport`, which answers only "any overlap at
+ * all". That predicate is the right stop condition for a scroll, but it is the
+ * WRONG thing to report: measured 2026-08-27, a row clipped by the floating
+ * bottom-nav bar intersected by 87% of its height, `scroll_until` reported a
+ * bare "visible", and the next assert measured the CLIPPED rect — reading
+ * h 143 against a pinned 60 and pointing the investigation at the app's
+ * row-height logic, which was correct. A caller who is told the fraction can
+ * see the clipping; a caller told "visible" cannot.
+ */
+export function visibleFractionInViewport(
+  rect: Rect,
+  viewport: { width: number; height: number },
+): number {
+  if (rect.width <= 0 || rect.height <= 0) return 0;
+  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
+  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
+  if (w <= 0 || h <= 0) return 0;
+  return (w * h) / (rect.width * rect.height);
+}
+
+/**
+ * Which viewport edges the rect extends past, in the order a reader scans.
+ * Named rather than counted because the edge IS the diagnosis: 'bottom' with
+ * the content exhausted is a missing-clearance bug, 'top' is a sticky header
+ * overlapping, and the two want different fixes.
+ */
+export function clippedEdges(
+  rect: Rect,
+  viewport: { width: number; height: number },
+): ('top' | 'bottom' | 'left' | 'right')[] {
+  const out: ('top' | 'bottom' | 'left' | 'right')[] = [];
+  if (rect.y < 0) out.push('top');
+  if (rect.y + rect.height > viewport.height) out.push('bottom');
+  if (rect.x < 0) out.push('left');
+  if (rect.x + rect.width > viewport.width) out.push('right');
   return out;
 }
