@@ -85,6 +85,30 @@ export function ocrUnavailableReason(): string | undefined {
 }
 
 /**
+ * An engine to recognize with, or the one reason there is none. Discriminated
+ * so a caller cannot hold an engine AND a reason, and cannot read `engine`
+ * without having ruled `unavailable` out.
+ */
+export type OcrEngineChoice =
+  | { engine: OcrEngine; unavailable?: undefined }
+  | { engine?: undefined; unavailable: string };
+
+/**
+ * THE engine-selection rule (2026-10-04): a supplied engine (the test seam —
+ * the real one needs swiftc on macOS) is used as given; otherwise the host is
+ * asked whether Vision can run here, and a `VisionOcr` is built only when it
+ * can. Until now the `ocr` assert and the verify run's text table each wrote
+ * this rule themselves — "ask the reason, then construct" — two copies a
+ * third caller would have made three. Callers turn `unavailable` into a
+ * failed assert or a SKIPPED note, never a pass (see ocrUnavailableReason).
+ */
+export function ocrEngineFor(override?: OcrEngine): OcrEngineChoice {
+  if (override !== undefined) return { engine: override };
+  const unavailable = ocrUnavailableReason();
+  return unavailable === undefined ? { engine: new VisionOcr() } : { unavailable };
+}
+
+/**
  * The recognizer, embedded rather than shipped as a .swift file so it survives
  * packaging (`files: [dist]`) with no build-step change.
  *

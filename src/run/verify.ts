@@ -6,7 +6,7 @@ import type { EnvValues } from '../flow/credentials.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
-import { captureFrame, type Frame, type MeasuredFrame, type Undecoded } from '../verify/capture.js';
+import { captureFrame, type Frame, type MeasuredFrame } from '../verify/capture.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -15,7 +15,7 @@ import {
   type ColorParityOptions,
 } from '../verify/color-parity.js';
 import { parseLayoutContract, type LayoutContract } from '../verify/layout-contract.js';
-import { ocrUnavailableReason, VisionOcr, type OcrEngine, type OcrRegionResult } from '../verify/ocr.js';
+import type { OcrEngine } from '../verify/ocr.js';
 import {
   compareRectParity,
   formatRectParity,
@@ -26,11 +26,15 @@ import {
   compareTextParity,
   contractHasTextAnchors,
   formatTextParity,
-  ocrRegionsFor,
+  measureTextLeg,
+  textRecognizer,
   validateTextContract,
   type TextCapture,
+  type TextLegFrame,
   type TextParityOptions,
+  type TextRecognizer,
 } from '../verify/text-parity.js';
+import type { Contribution } from '../verify/contribution.js';
 
 /**
  * The `verify` tool's orchestration: run the same sequence on each requested
@@ -180,6 +184,44 @@ export function formatLogExcerpt(all: string[], grep: string | undefined, maxLin
 }
 
 /**
+ * Every parity dimension opens the same way — no tree, no contribution — and
+ * all three said so in the same words. One owner, because the words are the
+ * point: a dimension that dropped a leg SILENTLY would print a one-platform
+ * table that looks like a completed comparison.
+ */
+const noTreeNote = (p: Platform, reason: string): string =>
+  `(${p}: UI tree read failed — ${reason} — compared without it)`;
+
+/**
+ * The leg's frame when it carries a tree — where every table starts, and the
+ * ONE place the no-tree note is decided. A leg is only asked for a frame
+ * with a tree when there is a contract, and the tables only exist then; the
+ * fallback wording covers the shape the types cannot rule out.
+ */
+const withTree = (leg: VerificationLeg, p: Platform): Contribution<TextLegFrame> => {
+  const m = leg.frame.measured;
+  if (m?.tree !== undefined) return { value: { shot: leg.frame.shot, measured: m } };
+  return { note: noTreeNote(p, m?.error ?? 'no UI tree was read for this leg') };
+};
+
+const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
+  const got = withTree(leg, p);
+  return 'note' in got ? got : { value: got.value.measured.tree };
+};
+
+/**
+ * The frame's measured half, or why there is none — the frame's own one
+ * sentence, which names the tree read when that is what failed and the png
+ * decode when the tree is here and the pixels are not.
+ */
+const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFrame> => {
+  const got = withTree(leg, p);
+  if ('note' in got) return got;
+  const m = got.value.measured;
+  return m.error === undefined ? { value: m } : { note: `(${p}: ${m.error} — compared without it)` };
+};
+
+/**
  * The parity dimensions a contract can add to a run: the table's title, the
  * predicate deciding whether THIS contract produces it, the options its
  * comparator runs under, and the comparator's own validator for the fields it
@@ -200,22 +242,46 @@ export function formatLogExcerpt(all: string[], grep: string | undefined, maxLin
  * comparator alone would let a bad `bg_dark` through validation and fail it
  * after the legs, which is the cost this whole check exists to remove.
  *
- * The table holds FACTS only — title, produced, options, validate. Comparing
- * and formatting stay hand-written per dimension below, on purpose: the three
- * collect different artifacts and degrade differently, and the 2026-08-14
+ * The table holds FACTS only — title, produced, options, validate, and since
+ * 2026-10-04 what one leg contributes (`collect`) and what the section says
+ * when no leg could. Comparing and formatting stay hand-written per dimension
+ * below, on purpose: the three degrade differently, and the 2026-08-14
  * review's decision stands — no generic reporting framework.
+ *
+ * `collect` is one line per dimension because each comparator's own module
+ * owns its measurement: the tree (rect), the measured frame (color), and the
+ * text capture WITH its OCR pass (text — `measureTextLeg`, which until
+ * 2026-10-04 was a 50-line `runOcr` here, the one measurement phase that sat
+ * a layer above the module it belonged to).
  */
-interface ParityDimension<Options> {
+export interface ParityDimension<Options, Artifact> {
   title: string;
   produced: (contract: LayoutContract) => boolean;
   options: Options;
   validate: (contract: LayoutContract, options: Options) => string[];
+  /** One leg's artifact, or why it cannot contribute one. */
+  collect: (leg: VerificationLeg, platform: Platform, run: RunContext) => Contribution<Artifact> | Promise<Contribution<Artifact>>;
+  /** The section body when NO leg contributed. */
+  emptyMessage: string;
+  /** Notes the run decided before any leg was collected — why the whole table is degraded (text: no recognizer here). */
+  runNotes?: (run: RunContext) => string[];
+}
+
+/**
+ * What a run decides once, before the tables, for every dimension's
+ * collector: the contract, and the recognizer the text table runs under —
+ * present only when the contract produces a text table, so a rect-only
+ * contract prints no OCR note.
+ */
+export interface RunContext {
+  contract: LayoutContract;
+  text: TextRecognizer | undefined;
 }
 
 const DIMENSIONS: {
-  rect: ParityDimension<RectParityOptions>;
-  color: ParityDimension<ColorParityOptions>;
-  text: ParityDimension<TextParityOptions>;
+  rect: ParityDimension<RectParityOptions, UiNode>;
+  color: ParityDimension<ColorParityOptions, MeasuredFrame>;
+  text: ParityDimension<TextParityOptions, TextCapture>;
 } = {
   // Geometry is what a contract IS: the rect table exists whenever one does.
   rect: {
@@ -223,8 +289,13 @@ const DIMENSIONS: {
     produced: () => true,
     options: {},
     validate: validateRectContract,
+    collect: treeOf,
+    emptyMessage: 'SKIPPED: no leg produced a UI tree.',
   },
-  // Opt-in: any anchor carrying bg / bg_dark / sample.
+  // Opt-in: any anchor carrying bg / bg_dark / sample. Reuses each leg's
+  // frame — the exact pixels already returned to the caller, the tree read
+  // beside them and the scale derived once — never a second capture that
+  // could race a UI change.
   //
   // Theme is always 'light' — deliberate: verify exposes no theme input
   // because averi cannot switch device themes, and sampling a light capture
@@ -235,18 +306,28 @@ const DIMENSIONS: {
     produced: contractHasColorAnchors,
     options: { theme: 'light' },
     validate: validateColorContract,
+    collect: measuredOf,
+    emptyMessage: 'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
   },
-  // Opt-in: any anchor carrying text / text_dynamic.
+  // Opt-in: any anchor carrying text / text_dynamic. The recognizer runs on
+  // the bytes each leg already returned; when it cannot run at all the run
+  // says so once (RunContext.text.notes) and every leg stands on its tree.
   text: {
     title: 'text parity',
     produced: contractHasTextAnchors,
     options: {},
     validate: validateTextContract,
+    collect: (leg, p, run) => {
+      const got = withTree(leg, p);
+      return 'note' in got ? got : measureTextLeg(run.contract, p, got.value, run.text?.engine);
+    },
+    emptyMessage: 'SKIPPED: no leg produced a UI tree.',
+    runNotes: (run) => run.text?.notes ?? [],
   },
 };
 
 /** One dimension's problems — none when this contract does not produce its table. */
-const dimensionProblems = <Options>(d: ParityDimension<Options>, contract: LayoutContract): string[] =>
+const dimensionProblems = <Options, T>(d: ParityDimension<Options, T>, contract: LayoutContract): string[] =>
   d.produced(contract) ? d.validate(contract, d.options) : [];
 
 /**
@@ -422,63 +503,35 @@ export async function runVerification(
   });
 
   if (contract !== undefined) {
+    // What the dimensions' collectors may need. The recognizer the text table
+    // runs under is decided ONCE here — so a host without OCR prints its one
+    // caveat once rather than per leg — and only for a contract that produces
+    // a text table, so a rect-only contract prints no OCR note at all.
+    const run: RunContext = {
+      contract,
+      text: DIMENSIONS.text.produced(contract) ? textRecognizer(req.ocrEngine) : undefined,
+    };
+    // The options are the dimension's, shared with the validation that ran
+    // before the legs (see ParityDimension). The three sections are produced
+    // the same way; only the comparator differs.
     if (DIMENSIONS.rect.produced(contract)) {
       sections.push(
-        paritySection(DIMENSIONS.rect.title, platforms, runs, treeOf, 'SKIPPED: no leg produced a UI tree.', (trees) =>
+        await paritySection(DIMENSIONS.rect, platforms, runs, run, (trees) =>
           formatRectParity(compareRectParity(contract, trees, DIMENSIONS.rect.options)),
         ),
       );
     }
-
-    // Color parity, only when the contract opts in (any anchor carrying
-    // bg / bg_dark / sample). Reuses each leg's frame — the exact pixels
-    // already returned to the caller, the tree read beside them and the
-    // scale derived once — never a second capture that could race a UI change.
-    // The theme is the dimension's (DIMENSIONS.color.options), shared with the
-    // validation that ran before the legs.
     if (DIMENSIONS.color.produced(contract)) {
       sections.push(
-        paritySection(
-          DIMENSIONS.color.title,
-          platforms,
-          runs,
-          measuredOf,
-          'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
-          (captures) => formatColorParity(compareColorParity(contract, captures, DIMENSIONS.color.options)),
+        await paritySection(DIMENSIONS.color, platforms, runs, run, (captures) =>
+          formatColorParity(compareColorParity(contract, captures, DIMENSIONS.color.options)),
         ),
       );
     }
-
-    // Text parity, only when the contract opts in (any anchor carrying
-    // text / text_dynamic). Runs the recognizer FIRST, on the bytes each leg
-    // already returned, then compares — OCR touches no device, so it costs no
-    // extra capture and cannot race a UI change.
-    //
-    // OCR is macOS-only and needs a Swift toolchain. When it cannot run, the
-    // comparison falls back to the accessibility tree and SAYS SO: on iOS the
-    // tree carries authored a11y summaries rather than rendered copy, so a
-    // silent fallback would quietly weaken the check it claims to perform.
     if (DIMENSIONS.text.produced(contract)) {
-      const { ocrByPlatform, notes: ocrNotes } = await runOcr(
-        contract,
-        platforms,
-        runs,
-        req.ocrEngine,
-      );
       sections.push(
-        paritySection(
-          DIMENSIONS.text.title,
-          platforms,
-          runs,
-          (leg, p): Contribution<TextCapture> => {
-            const tree = treeOf(leg, p);
-            if ('note' in tree) return tree;
-            const got = ocrByPlatform.get(p);
-            return { value: { tree: tree.value, ocr: got?.ocr, pngWidth: got?.pngWidth } };
-          },
-          'SKIPPED: no leg produced a UI tree.',
-          (captures) => formatTextParity(compareTextParity(contract, captures, DIMENSIONS.text.options)),
-          ocrNotes,
+        await paritySection(DIMENSIONS.text, platforms, runs, run, (captures) =>
+          formatTextParity(compareTextParity(contract, captures, DIMENSIONS.text.options)),
         ),
       );
     }
@@ -487,151 +540,62 @@ export async function runVerification(
   return { sections, screenshots };
 }
 
-/** Either the artifact this leg contributes, or why it cannot contribute one. */
-type Contribution<T> = { value: T } | { note: string };
-
-/**
- * Every parity dimension opens the same way — no tree, no contribution — and
- * all three said so in the same words. One owner, because the words are the
- * point: a dimension that dropped a leg SILENTLY would print a one-platform
- * table that looks like a completed comparison.
- */
-const noTreeNote = (p: Platform, reason: string): string =>
-  `(${p}: UI tree read failed — ${reason} — compared without it)`;
-
-/**
- * The leg's frame when it carries a tree — where every table starts, and the
- * ONE place the no-tree note is decided. A leg is only asked for a frame
- * with a tree when there is a contract, and the tables only exist then; the
- * fallback wording covers the shape the types cannot rule out.
- */
-const withTree = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFrame | Undecoded> => {
-  const m = leg.frame.measured;
-  if (m?.tree !== undefined) return { value: m };
-  return { note: noTreeNote(p, m?.error ?? 'no UI tree was read for this leg') };
-};
-
-const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
-  const got = withTree(leg, p);
-  return 'note' in got ? got : { value: got.value.tree };
-};
-
-/**
- * The frame's measured half, or why there is none — the frame's own one
- * sentence, which names the tree read when that is what failed and the png
- * decode when the tree is here and the pixels are not.
- */
-const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFrame> => {
-  const got = withTree(leg, p);
-  if ('note' in got) return got;
-  const m = got.value;
-  return m.error === undefined ? { value: m } : { note: `(${p}: ${m.error} — compared without it)` };
-};
-
-/** What one platform's OCR pass produced, plus the reasons any of it is absent. */
-interface OcrPass {
-  ocrByPlatform: Map<Platform, { ocr: Map<string, OcrRegionResult>; pngWidth: number }>;
-  notes: string[];
-}
-
-/**
- * Recognize the contract's text anchors on each leg's own screenshot bytes.
- *
- * Every failure here degrades to a NOTE rather than an exception: an
- * unavailable toolchain, an undecodable png or a recognizer crash must leave
- * the text table standing on tree evidence, clearly labelled as such, instead
- * of taking down a device run that took minutes.
- */
-async function runOcr(
-  contract: LayoutContract,
-  platforms: Platform[],
-  runs: PromiseSettledResult<VerificationLeg>[],
-  engineOverride: OcrEngine | undefined,
-): Promise<OcrPass> {
-  const ocrByPlatform: OcrPass['ocrByPlatform'] = new Map();
-  const notes: string[] = [];
-  const unavailable = engineOverride === undefined ? ocrUnavailableReason() : undefined;
-  if (unavailable !== undefined) {
-    notes.push(
-      `(OCR unavailable — ${unavailable}. Compared from the accessibility tree only, which on iOS ` +
-        'reads authored a11y labels rather than rendered copy.)',
-    );
-    return { ocrByPlatform, notes };
-  }
-  const engine = engineOverride ?? new VisionOcr();
-  await Promise.all(
-    platforms.map(async (p, i) => {
-      const run = runs[i];
-      if (run.status === 'rejected') return;
-      const { frame } = run.value;
-      // No tree: the text table says so itself (treeOf's note). A tree without
-      // pixels: that is an OCR failure in this table's terms, worded here.
-      const got = withTree(run.value, p);
-      if ('note' in got) return;
-      const m = got.value;
-      if (m.error !== undefined) {
-        notes.push(`(${p}: OCR failed — ${m.error} — that platform compared from the tree.)`);
-        return;
-      }
-      try {
-        const { regions, note } = ocrRegionsFor(contract, m);
-        // Nothing scaled, nothing to caveat.
-        if (regions.length === 0) return;
-        const results = await engine.recognize(frame.shot, regions);
-        ocrByPlatform.set(p, {
-          ocr: new Map(results.map((r) => [r.id, r])),
-          pngWidth: m.png.width,
-        });
-        // After the recognizer, so a leg that ends up compared from the tree
-        // carries THAT reason alone rather than a caveat about regions it
-        // never used.
-        if (note !== undefined) notes.push(`(${p}: ${note})`);
-      } catch (e) {
-        notes.push(
-          `(${p}: OCR failed — ${errorMessage(e)} — that platform compared from the tree.)`,
-        );
-      }
-    }),
-  );
-  return { ocrByPlatform, notes };
-}
-
 /**
  * Every parity table has the same shape: collect one artifact per leg, note
  * the legs that cannot contribute, skip when none can, and CONTAIN any
- * comparator error. That containment is the point — a contract that cannot be
- * normalized must not reject the tool call and throw away the traces, assert
- * results and screenshots of a device run that took minutes.
+ * collector or comparator error. That containment is the point — a contract
+ * that cannot be normalized, or a measurement that throws, must not reject
+ * the tool call and throw away the traces, assert results and screenshots of
+ * a device run that took minutes. The collectors in DIMENSIONS cannot throw
+ * today (each degrades to a note itself); the catch is for the next one,
+ * since `collect` is where a new dimension's measurement lands.
+ *
+ * The legs are collected in parallel (the text dimension's collector runs a
+ * recognizer per leg) and their notes printed in platform order: the run's
+ * own notes first (why the whole table is degraded), then each leg's — the
+ * leg that could not contribute, or the caveats of the one that did.
+ * (2026-10-04: per-leg notes in platform order after the run-level note;
+ * previously the per-leg OCR notes came first, in Promise.all completion
+ * order — nondeterministic.)
+ *
+ * Exported for its containment test only; runVerification is the caller.
  */
-function paritySection<T>(
-  title: string,
+export async function paritySection<Options, T>(
+  dimension: ParityDimension<Options, T>,
   platforms: Platform[],
   runs: PromiseSettledResult<VerificationLeg>[],
-  collect: (leg: VerificationLeg, platform: Platform) => Contribution<T>,
-  emptyMessage: string,
+  run: RunContext,
   format: (collected: Partial<Record<Platform, T>>) => string,
-  /** Notes gathered before collection — e.g. why OCR could not run. */
-  extraNotes: string[] = [],
-): string {
+): Promise<string> {
   const collected: Partial<Record<Platform, T>> = {};
-  const notes: string[] = [...extraNotes];
+  const notes: string[] = [...(dimension.runNotes?.(run) ?? [])];
+  const contributions = await Promise.all(
+    platforms.map(async (p, i): Promise<Contribution<T>> => {
+      const leg = runs[i];
+      if (leg.status === 'rejected') return { note: `(${p} leg failed — compared without it)` };
+      try {
+        return await dimension.collect(leg.value, p, run);
+      } catch (e) {
+        return { note: `(${p}: ${dimension.title} could not be measured — ${errorMessage(e)} — compared without it)` };
+      }
+    }),
+  );
   platforms.forEach((p, i) => {
-    const run = runs[i];
-    if (run.status === 'rejected') {
-      notes.push(`(${p} leg failed — compared without it)`);
-      return;
+    const contribution = contributions[i];
+    if ('note' in contribution) {
+      notes.push(contribution.note);
+    } else {
+      collected[p] = contribution.value;
+      notes.push(...(contribution.notes ?? []));
     }
-    const contribution = collect(run.value, p);
-    if ('note' in contribution) notes.push(contribution.note);
-    else collected[p] = contribution.value;
   });
   const note = notes.length > 0 ? notes.join('\n') + '\n' : '';
-  if (Object.keys(collected).length === 0) return `## ${title}\n${note}${emptyMessage}`;
+  if (Object.keys(collected).length === 0) return `## ${dimension.title}\n${note}${dimension.emptyMessage}`;
   let body: string;
   try {
     body = format(collected);
   } catch (e) {
     body = `FAILED: ${errorMessage(e)}`;
   }
-  return `## ${title}\n${note}${body}`;
+  return `## ${dimension.title}\n${note}${body}`;
 }

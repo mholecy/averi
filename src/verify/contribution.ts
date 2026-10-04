@@ -1,0 +1,12 @@
+/**
+ * What one leg contributes to a parity table: its artifact — with any caveats
+ * the measurement raised, which the table prints as notes — or why it cannot
+ * contribute one.
+ *
+ * One type for the three dimensions (2026-10-04): rect contributes the tree,
+ * color the measured frame, text its capture with the OCR pass — and
+ * run/verify.ts's section loop reads them all through this shape, so the
+ * producer in verify/ and the consumer in run/ share one definition rather
+ * than two that happen to line up.
+ */
+export type Contribution<T> = { value: T; notes?: string[] } | { note: string };

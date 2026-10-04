@@ -1,19 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import type { MeasuredFrame } from '../../src/verify/capture.js';
+import type { MeasuredFrame, Undecoded } from '../../src/verify/capture.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
-import type { OcrLine, OcrRegionResult } from '../../src/verify/ocr.js';
+import { ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
 import { pngScale } from '../../src/verify/scale.js';
 import {
   compareTextParity,
   contractHasTextAnchors,
   evaluateOcrAssert,
   formatTextParity,
+  measureTextLeg,
   normalizeText,
   ocrRegionsFor,
   renderedTextFromTree,
   survivesIn,
   textParityVerdict,
+  textRecognizer,
   validateTextContract,
   type TextCapture,
 } from '../../src/verify/text-parity.js';
@@ -122,13 +124,11 @@ describe('compareTextParity — the measured copy drift', () => {
   const captures = (): Partial<Record<'android' | 'ios', TextCapture>> => ({
     android: {
       tree: root(1080, [n({ role: 'textfield', identifier: 'amount', value: null })]),
-      ocr: ocrMap({ amount: [line('0.00', 30)] }),
-      pngWidth: 1080,
+      ocr: { byId: ocrMap({ amount: [line('0.00', 30)] }), pngWidth: 1080 },
     },
     ios: {
       tree: root(402, [n({ role: 'textfield', identifier: 'amount' }), text('amount', 'Enter amount')]),
-      ocr: ocrMap({ amount: [line('Enter amount', 33)] }),
-      pngWidth: 1206,
+      ocr: { byId: ocrMap({ amount: [line('Enter amount', 33)] }), pngWidth: 1206 },
     },
   });
 
@@ -147,7 +147,7 @@ describe('compareTextParity — the measured copy drift', () => {
 
   it('a fixed android build PASSES', () => {
     const caps = captures();
-    (caps.android as TextCapture).ocr = ocrMap({ amount: [line('Enter amount', 30)] });
+    (caps.android as TextCapture).ocr = { byId: ocrMap({ amount: [line('Enter amount', 30)] }), pngWidth: 1080 };
     const r = compareTextParity(c, caps);
     expect(r.findings).toHaveLength(0);
     expect(r.pass).toBe(true);
@@ -170,8 +170,8 @@ describe('compareTextParity — type size, the validation pair', () => {
   it('CONTINUE PASSES: android 32px/1080 vs ios 36px/1206 → 0.74% apart', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: [line('CONTINUE', 32)] }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: [line('CONTINUE', 36)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: { byId: ocrMap({ cta: [line('CONTINUE', 32)] }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('cta', 'CONTINUE')]), ocr: { byId: ocrMap({ cta: [line('CONTINUE', 36)] }), pngWidth: 1206 } },
     });
     expect(r.rows[0].sizeDelta).toBeCloseTo(0.74, 2);
     expect(r.findings).toHaveLength(0);
@@ -181,8 +181,8 @@ describe('compareTextParity — type size, the validation pair', () => {
   it('the 22sp-vs-17pt title FAILS: android 41px/1080 vs ios 40px/1206 → 12.63% apart', () => {
     const c = contract([{ id: 'title', text: 'TO MY ACCOUNT' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('title', 'TO MY ACCOUNT')]), ocr: ocrMap({ title: [line('TO MY ACCOUNT', 41)] }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('title', 'TO MY ACCOUNT')]), ocr: ocrMap({ title: [line('TO MY ACCOUNT', 40)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('title', 'TO MY ACCOUNT')]), ocr: { byId: ocrMap({ title: [line('TO MY ACCOUNT', 41)] }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('title', 'TO MY ACCOUNT')]), ocr: { byId: ocrMap({ title: [line('TO MY ACCOUNT', 40)] }), pngWidth: 1206 } },
     });
     expect(r.rows[0].sizeDelta).toBeCloseTo(12.63, 2);
     const size = r.findings.filter((f) => f.field === 'size');
@@ -194,8 +194,8 @@ describe('compareTextParity — type size, the validation pair', () => {
   it('the tolerance sits between the two: the same title pair passes at 13%, the CTA pair fails at 0.5%', () => {
     const title = contract([{ id: 'title', text: 'T' }], { tolerance_size_pct: 13 });
     const r = compareTextParity(title, {
-      android: { tree: root(1080, [text('title', 'T')]), ocr: ocrMap({ title: [line('T', 41)] }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('title', 'T')]), ocr: ocrMap({ title: [line('T', 40)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('title', 'T')]), ocr: { byId: ocrMap({ title: [line('T', 41)] }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('title', 'T')]), ocr: { byId: ocrMap({ title: [line('T', 40)] }), pngWidth: 1206 } },
     });
     expect(r.findings.filter((f) => f.field === 'size')).toHaveLength(0);
   });
@@ -203,8 +203,8 @@ describe('compareTextParity — type size, the validation pair', () => {
   it('size is NOT compared when the strings differ — different glyphs have different ink extents', () => {
     const c = contract([{ id: 'a', text_dynamic: false }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('a', 'CONTINUE')]), ocr: ocrMap({ a: [line('CONTINUE', 32)] }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('a', 'NEXT')]), ocr: ocrMap({ a: [line('NEXT', 80)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('a', 'CONTINUE')]), ocr: { byId: ocrMap({ a: [line('CONTINUE', 32)] }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('a', 'NEXT')]), ocr: { byId: ocrMap({ a: [line('NEXT', 80)] }), pngWidth: 1206 } },
     });
     expect(r.rows[0].sizeDelta).toBeUndefined();
     // The copy drift is still reported — only the height comparison is withheld.
@@ -214,8 +214,8 @@ describe('compareTextParity — type size, the validation pair', () => {
   it('size is NOT compared on a multi-line anchor — line boxes do not compose into one height', () => {
     const c = contract([{ id: 'a', text: 'one two' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('a', 'one two')]), ocr: ocrMap({ a: [line('one', 30), line('two', 30)] }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('a', 'one two')]), ocr: ocrMap({ a: [line('one', 33), line('two', 33)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('a', 'one two')]), ocr: { byId: ocrMap({ a: [line('one', 30), line('two', 30)] }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('a', 'one two')]), ocr: { byId: ocrMap({ a: [line('one', 33), line('two', 33)] }), pngWidth: 1206 } },
     });
     expect(r.rows[0].sizeDelta).toBeUndefined();
     expect(r.pass).toBe(true);
@@ -240,8 +240,8 @@ describe('compareTextParity — dynamic anchors', () => {
   it('a dynamic anchor is never size-checked either', () => {
     const c = contract([{ id: 'balance', text_dynamic: true }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('balance', '1,121.00')]), ocr: ocrMap({ balance: [line('1,121.00', 41)] }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('balance', '1,121.00')]), ocr: ocrMap({ balance: [line('1,121.00', 20)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('balance', '1,121.00')]), ocr: { byId: ocrMap({ balance: [line('1,121.00', 41)] }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('balance', '1,121.00')]), ocr: { byId: ocrMap({ balance: [line('1,121.00', 20)] }), pngWidth: 1206 } },
     });
     expect(r.rows[0].sizeDelta).toBeUndefined();
     expect(r.pass).toBe(true);
@@ -252,7 +252,7 @@ describe('compareTextParity — source honesty', () => {
   it('never mixes sources: OCR on one platform only falls back to tree for BOTH, with a note', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: [line('CONTINUE', 32)] }), pngWidth: 1080 },
+      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: { byId: ocrMap({ cta: [line('CONTINUE', 32)] }), pngWidth: 1080 } },
       ios: { tree: root(402, [text('cta', 'CONTINUE')]) },
     });
     expect(r.rows[0].source).toBe('tree');
@@ -262,8 +262,8 @@ describe('compareTextParity — source honesty', () => {
   it('a per-region OCR error degrades that platform to tree evidence rather than failing the row', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: { error: 'region outside the screenshot' } }), pngWidth: 1080 },
-      ios: { tree: root(402, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: [line('CONTINUE', 36)] }), pngWidth: 1206 },
+      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: { byId: ocrMap({ cta: { error: 'region outside the screenshot' } }), pngWidth: 1080 } },
+      ios: { tree: root(402, [text('cta', 'CONTINUE')]), ocr: { byId: ocrMap({ cta: [line('CONTINUE', 36)] }), pngWidth: 1206 } },
     });
     expect(r.rows[0].source).toBe('tree');
     expect(r.pass).toBe(true);
@@ -276,8 +276,7 @@ describe('compareTextParity — the accessibility note', () => {
     const r = compareTextParity(c, {
       android: {
         tree: root(1080, [n({ role: 'textfield', identifier: 'amount', label: null, value: null })]),
-        ocr: ocrMap({ amount: [line('0.00', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ amount: [line('0.00', 30)] }), pngWidth: 1080 },
       },
     });
     expect(r.notes.join(' ')).toContain('invisible to assistive technology');
@@ -290,8 +289,7 @@ describe('compareTextParity — the accessibility note', () => {
     const r = compareTextParity(c, {
       ios: {
         tree: root(402, [n({ role: 'button', identifier: 'cta', label: 'Continue to summary' })]),
-        ocr: ocrMap({ cta: [line('CONTINUE', 36)] }),
-        pngWidth: 1206,
+        ocr: { byId: ocrMap({ cta: [line('CONTINUE', 36)] }), pngWidth: 1206 },
       },
     });
     expect(r.notes.join(' ')).not.toContain('invisible to assistive technology');
@@ -307,8 +305,7 @@ describe('compareTextParity — the occlusion guard', () => {
     const r = compareTextParity(c, {
       android: {
         tree: root(1080, [text('cta', 'Prihlásiť sa')]),
-        ocr: ocrMap({ cta: [line('Prihlásit sa', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ cta: [line('Prihlásit sa', 30)] }), pngWidth: 1080 },
       },
     });
     expect(r.occluded).toHaveLength(0);
@@ -323,7 +320,7 @@ describe('compareTextParity — the occlusion guard', () => {
   it('a TREE reading that differs only in diacritics is still drift — the tree carries marks faithfully', () => {
     const c = contract([{ id: 'cta', text: 'Prihlásiť sa' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('cta', 'Prihlásit sa')]), pngWidth: 1080 },
+      android: { tree: root(1080, [text('cta', 'Prihlásit sa')]) },
     });
     expect(r.rows[0].verdict).toBe('FAIL');
   });
@@ -334,8 +331,7 @@ describe('compareTextParity — the occlusion guard', () => {
       android: {
         tree: root(1080, [text('cta', 'CONTINUE')]),
         // What the recognizer saw through the keyboard drawn over the button.
-        ocr: ocrMap({ cta: [line('0', 30), line('.', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ cta: [line('0', 30), line('.', 30)] }), pngWidth: 1080 },
       },
     });
     expect(r.occluded).toHaveLength(1);
@@ -353,7 +349,7 @@ describe('compareTextParity — the occlusion guard', () => {
   it('flags an empty reading over a tree that has text', () => {
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: ocrMap({ cta: [] }), pngWidth: 1080 },
+      android: { tree: root(1080, [text('cta', 'CONTINUE')]), ocr: { byId: ocrMap({ cta: [] }), pngWidth: 1080 } },
     });
     expect(r.occluded[0].covered.android).toContain('(nothing)');
   });
@@ -365,8 +361,7 @@ describe('compareTextParity — the occlusion guard', () => {
     const r = compareTextParity(c, {
       android: {
         tree: root(1080, [n({ identifier: 'debit', children: [text(null, 'From:'), text(null, '1,121'), text(null, '.00')] })]),
-        ocr: ocrMap({ debit: [line('From: My Account CZK 1,121.00', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ debit: [line('From: My Account CZK 1,121.00', 30)] }), pngWidth: 1080 },
       },
     });
     expect(r.occluded).toHaveLength(0);
@@ -382,13 +377,11 @@ describe('compareTextParity — the occlusion guard', () => {
     const r = compareTextParity(c, {
       android: {
         tree: root(1080, [text('profile_row_6', 'Phone, +123 456 789 1')]),
-        ocr: ocrMap({ profile_row_6: [line('Phone +123 456 789 1', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ profile_row_6: [line('Phone +123 456 789 1', 30)] }), pngWidth: 1080 },
       },
       ios: {
         tree: root(402, [text('profile_row_6', 'Phone, +123 456 789 1')]),
-        ocr: ocrMap({ profile_row_6: [line('Phone +123 456 789 1', 30)] }),
-        pngWidth: 1206,
+        ocr: { byId: ocrMap({ profile_row_6: [line('Phone +123 456 789 1', 30)] }), pngWidth: 1206 },
       },
     });
     expect(r.occluded).toHaveLength(0);
@@ -406,8 +399,7 @@ describe('compareTextParity — the occlusion guard', () => {
     const r = compareTextParity(c, {
       android: {
         tree: root(1080, [text('product_row_4', 'My Account, * 5433, visible')]),
-        ocr: ocrMap({ product_row_4: [line('My Account *5433', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ product_row_4: [line('My Account *5433', 30)] }), pngWidth: 1080 },
       },
     });
     expect(r.occluded).toHaveLength(0);
@@ -420,8 +412,7 @@ describe('compareTextParity — the occlusion guard', () => {
     const r = compareTextParity(c, {
       ios: {
         tree: root(402, [n({ role: 'button', identifier: 'cta', label: 'Continue to summary' })]),
-        ocr: ocrMap({ cta: [line('CONTINUE', 36)] }),
-        pngWidth: 1206,
+        ocr: { byId: ocrMap({ cta: [line('CONTINUE', 36)] }), pngWidth: 1206 },
       },
     });
     expect(r.occluded).toHaveLength(0);
@@ -458,7 +449,7 @@ describe('compareTextParity — regressions found in review', () => {
     // case-sensitive survival test failed every Material caps button.
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
-      android: { tree: root(1080, [text('cta', 'Continue')]), ocr: ocrMap({ cta: [line('CONTINUE', 30)] }), pngWidth: 1080 },
+      android: { tree: root(1080, [text('cta', 'Continue')]), ocr: { byId: ocrMap({ cta: [line('CONTINUE', 30)] }), pngWidth: 1080 } },
     });
     expect(r.occluded).toHaveLength(0);
     expect(r.rows[0].verdict).toBe('OK');
@@ -469,8 +460,7 @@ describe('compareTextParity — regressions found in review', () => {
     const r = compareTextParity(c, {
       android: {
         tree: root(1080, [text('row', 'Select credit account')]),
-        ocr: ocrMap({ row: [line('Select credit acc…', 30)] }),
-        pngWidth: 1080,
+        ocr: { byId: ocrMap({ row: [line('Select credit acc…', 30)] }), pngWidth: 1080 },
       },
     });
     expect(r.occluded).toHaveLength(0);
@@ -568,6 +558,127 @@ describe('ocrRegionsFor', () => {
   });
 });
 
+describe('measureTextLeg — the text table\'s measurement phase', () => {
+  /**
+   * Until 2026-10-04 this phase lived in run/verify.ts as `runOcr`, and these
+   * wordings were pinned only through the whole verify run. They are the text
+   * table's own now, with exactly one emission site each; the run tests still
+   * see them through the table.
+   */
+  const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
+  const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
+  const shot = Buffer.from('png bytes');
+  const recording = (byId: Record<string, OcrLine[]> = { cta: [line('CONTINUE', 36)] }) => {
+    const calls: OcrRegion[][] = [];
+    const engine: OcrEngine = {
+      recognize: async (_png, regions) => {
+        calls.push(regions);
+        return regions.map((r) => ({ id: r.id, lines: byId[r.id] ?? [] }));
+      },
+    };
+    return { engine, calls };
+  };
+
+  it('no engine (OCR unavailable here): the tree alone, no note — the run said why, once', async () => {
+    const got = await measureTextLeg(c, 'ios', { shot, measured: frame(ios, 1206, 2622) }, undefined);
+    expect(got).toEqual({ value: { tree: ios }, notes: [] });
+  });
+
+  it('recognizes the opted-in anchors on the leg\'s own bytes, keyed by id, WITH the png width', async () => {
+    const { engine, calls } = recording();
+    // Scaled by the device screen, so the scale has no caveat of its own to carry.
+    const f: MeasuredFrame = { ...frame(ios, 1206, 2622), scale: pngScale(ios, 1206, 2622, { width: 402, height: 874 }) };
+    const got = await measureTextLeg(c, 'ios', { shot, measured: f }, engine);
+    expect(calls).toEqual([[{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]]);
+    expect(got.notes).toEqual([]);
+    expect(got.value.tree).toBe(ios);
+    expect(got.value.ocr?.pngWidth).toBe(1206);
+    expect(got.value.ocr?.byId.get('cta')?.lines).toEqual([line('CONTINUE', 36)]);
+  });
+
+  it('a tree without pixels is an OCR failure in this table\'s words: tree only, the frame\'s reason quoted', async () => {
+    const { engine, calls } = recording();
+    const undecoded: Undecoded = { tree: ios, error: 'screenshot PNG decode failed: not a png' };
+    const got = await measureTextLeg(c, 'android', { shot, measured: undecoded }, engine);
+    expect(calls).toEqual([]);
+    expect(got).toEqual({
+      value: { tree: ios },
+      notes: ['(android: OCR failed — screenshot PNG decode failed: not a png — that platform compared from the tree.)'],
+    });
+  });
+
+  it('a recognizer that throws degrades to tree evidence with the note, never an exception', async () => {
+    const failing: OcrEngine = { recognize: async () => { throw new Error('swiftc not found'); } };
+    const got = await measureTextLeg(c, 'ios', { shot, measured: frame(ios, 1206, 2622) }, failing);
+    expect(got).toEqual({
+      value: { tree: ios },
+      notes: ['(ios: OCR failed — swiftc not found — that platform compared from the tree.)'],
+    });
+  });
+
+  it('an unusable scale is this table\'s per-platform note (color fails closed on the same frame)', async () => {
+    const { engine, calls } = recording();
+    const got = await measureTextLeg(c, 'android', { shot, measured: frame(root(402, [n({ identifier: 'cta' })]), 0, 800) }, engine);
+    expect(calls).toEqual([]);
+    expect(got.value).toEqual({ tree: expect.anything() });
+    expect(got.notes).toHaveLength(1);
+    expect(got.notes[0]).toMatch(/^\(android: OCR failed — text parity: .*degenerate dimensions 0x800.* — that platform compared from the tree\.\)$/);
+  });
+
+  it('nothing scaled, nothing to caveat: an anchor missing from the tree asks the recognizer nothing', async () => {
+    const { engine, calls } = recording();
+    const got = await measureTextLeg(c, 'ios', { shot, measured: frame(root(402, [n({ identifier: 'other' })]), 1206, 2622) }, engine);
+    expect(calls).toEqual([]);
+    expect(got.notes).toEqual([]);
+    expect(got.value.ocr).toBeUndefined();
+  });
+
+  it('carries the scale\'s own caveat AFTER the recognizer ran, once per platform', async () => {
+    const { engine } = recording();
+    const tree = root(100, [n({ identifier: 'cta', rect: { x: 10, y: 10, width: 40, height: 10 } })], 200);
+    // The device screen reads twice the tree — the whole-capture fact the
+    // table says once (review 2026-08-27: the text table used to drop it).
+    const f: MeasuredFrame = {
+      tree,
+      png: { width: 200, height: 400, data: Buffer.alloc(0) },
+      scale: pngScale(tree, 200, 400, { width: 200, height: 400 }),
+    };
+    const { note } = ocrRegionsFor(c, f);
+    expect(note).toMatch(/DEVICE screen/);
+    const got = await measureTextLeg(c, 'android', { shot, measured: f }, engine);
+    expect(got.notes).toEqual([`(android: ${note})`]);
+    expect(got.value.ocr?.pngWidth).toBe(200);
+  });
+});
+
+describe('textRecognizer — decided once per run', () => {
+  const onHost = async (platform: string, body: () => void | Promise<void>) => {
+    const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    try {
+      await body();
+    } finally {
+      Object.defineProperty(process, 'platform', real);
+    }
+  };
+
+  it('a supplied engine is used as given, with no caveat', () => {
+    const engine: OcrEngine = { recognize: async () => [] };
+    expect(textRecognizer(engine)).toEqual({ engine, notes: [] });
+  });
+
+  it('no engine where Vision cannot run: the one run-level note, from the one reason', () =>
+    onHost('linux', () => {
+      const got = textRecognizer();
+      expect(got.engine).toBeUndefined();
+      expect(got.notes).toEqual([
+        `(OCR unavailable — ${ocrUnavailableReason()}. Compared from the accessibility tree only, which on iOS ` +
+          'reads authored a11y labels rather than rendered copy.)',
+      ]);
+      expect(ocrUnavailableReason()).toContain('this host is linux');
+    }));
+});
+
 describe('evaluateOcrAssert', () => {
   it('passes an exact string and reports what it read', () => {
     const r = evaluateOcrAssert({ text: 'CONTINUE' }, [line('CONTINUE', 32)], 1080);
@@ -611,8 +722,8 @@ describe('formatTextParity', () => {
     const c = contract([{ id: 'amount', text: 'Enter amount' }]);
     const out = formatTextParity(
       compareTextParity(c, {
-        android: { tree: root(1080, [n({ role: 'textfield', identifier: 'amount' })]), ocr: ocrMap({ amount: [line('0.00', 30)] }), pngWidth: 1080 },
-        ios: { tree: root(402, [text('amount', 'Enter amount')]), ocr: ocrMap({ amount: [line('Enter amount', 33)] }), pngWidth: 1206 },
+        android: { tree: root(1080, [n({ role: 'textfield', identifier: 'amount' })]), ocr: { byId: ocrMap({ amount: [line('0.00', 30)] }), pngWidth: 1080 } },
+        ios: { tree: root(402, [text('amount', 'Enter amount')]), ocr: { byId: ocrMap({ amount: [line('Enter amount', 33)] }), pngWidth: 1206 } },
       }),
     );
     expect(out).toContain('screen: payment.form');

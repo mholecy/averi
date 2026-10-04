@@ -1,9 +1,12 @@
 import type { Platform, Rect, UiNode } from '../adapters/types.js';
 import { collectRects } from '../ui-tree/geometry.js';
-import { pngRegion, type MeasuredFrame } from './capture.js';
+import { errorMessage } from '../util/error-message.js';
+import { pngRegion, type MeasuredFrame, type Undecoded } from './capture.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
-import type { OcrLine, OcrRegion, OcrRegionResult } from './ocr.js';
+import type { Contribution } from './contribution.js';
+import { ocrEngineFor, type OcrEngine, type OcrEngineChoice, type OcrLine, type OcrRegion, type OcrRegionResult } from './ocr.js';
+export type { Contribution };
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
 /**
@@ -116,13 +119,35 @@ export interface TextParityResult {
   pass: boolean;
 }
 
-/** One platform's inputs. `ocr`/`pngWidth` are present only when OCR ran. */
+/**
+ * What the recognizer read on one platform's frame, WITH the normalizer that
+ * turns its ink boxes into a size. One value, so a capture cannot carry OCR
+ * results without the width that makes them comparable — until 2026-10-04 the
+ * two were sibling optionals and a wiring that forgot the width silently
+ * dropped every size check (`inkPctOf(lines, pngWidth ?? 0)`).
+ */
+export interface TextOcr {
+  /** Recognizer output keyed by anchor id. */
+  byId: Map<string, OcrRegionResult>;
+  /** PNG width in pixels — the normalizer for ink height. */
+  pngWidth: number;
+}
+
+/** One platform's inputs. `ocr` is present only when OCR ran on this frame. */
 export interface TextCapture {
   tree: UiNode;
-  /** Recognizer output keyed by anchor id. */
-  ocr?: Map<string, OcrRegionResult>;
-  /** PNG width in pixels — the normalizer for ink height. Required with `ocr`. */
-  pngWidth?: number;
+  ocr?: TextOcr;
+}
+
+export interface TextContribution {
+  value: TextCapture;
+  notes: string[];
+}
+
+/** The leg's frame as the text table measures it: the settled bytes the recognizer reads, and the tree (with or without decoded pixels) beside them. */
+export interface TextLegFrame {
+  shot: Buffer;
+  measured: MeasuredFrame | Undecoded;
 }
 
 export interface TextParityOptions {
@@ -336,15 +361,15 @@ function hasAccessibleName(tree: UiNode, id: string): boolean {
  *
  * Returns the scale's own caveat alongside the regions — the device and the
  * tree disagreeing is a whole-capture fact, so the table says it once per
- * platform rather than once per anchor (run/verify.ts pushes it).
+ * platform rather than once per anchor (measureTextLeg carries it).
  *
  * THROWS when the SCALE itself is unusable — that is a whole-capture fault,
  * not a per-anchor one, so returning an empty list would read to the caller as
  * "this screen has no text anchors" and quietly drop the entire text table.
  * This is the text table's policy on a failed scale, and it differs from the
- * color table's on purpose: run/verify.ts contains the throw as a per-platform
- * note and the table stands on tree evidence, because a tree has copy to
- * compare and a png has no colour to sample without a scale.
+ * color table's on purpose: measureTextLeg contains the throw as a
+ * per-platform note and the table stands on tree evidence, because a tree has
+ * copy to compare and a png has no colour to sample without a scale.
  */
 export function ocrRegionsFor(
   contract: LayoutContract,
@@ -393,6 +418,88 @@ function regionForRect(
 ): OcrRegion | undefined {
   const r = pngRegion(rect, scale, png);
   return r === undefined ? undefined : { id, x: r.x0, y: r.y0, w: r.x1 - r.x0, h: r.y1 - r.y0 };
+}
+
+// ------------------------------------------------------------ measurement
+
+/**
+ * The recognizer the text table runs under, decided ONCE per run: the one
+ * engine choice (verify/ocr.ts#ocrEngineFor) plus this table's POLICY on an
+ * absent engine, as the note the run prints. The `ocr` assert fails closed on
+ * the same choice; the table degrades to tree evidence and says so, once —
+ * OCR is macOS-only and needs a Swift toolchain, and on iOS the tree carries
+ * authored a11y summaries rather than rendered copy, so a silent fallback
+ * would quietly weaken the check it claims to perform.
+ */
+export type TextRecognizer = OcrEngineChoice & {
+  /** The run-level caveat for an absent engine; empty when there is one. */
+  notes: string[];
+};
+
+export function textRecognizer(override?: OcrEngine): TextRecognizer {
+  const choice = ocrEngineFor(override);
+  if (choice.unavailable === undefined) return { ...choice, notes: [] };
+  return {
+    ...choice,
+    notes: [
+      `(OCR unavailable — ${choice.unavailable}. Compared from the accessibility tree only, which on iOS ` +
+        'reads authored a11y labels rather than rendered copy.)',
+    ],
+  };
+}
+
+/** The ONE wording for a leg whose OCR did not happen: it stands on tree evidence, and the table says why. */
+const ocrFailedNote = (platform: Platform, reason: string): string =>
+  `(${platform}: OCR failed — ${reason} — that platform compared from the tree.)`;
+
+/**
+ * Measure ONE leg for the text table: recognize the contract's text anchors
+ * on the leg's own screenshot bytes — the exact pixels already returned to
+ * the caller, the tree read beside them, the scale derived once — and hand
+ * back the capture the comparator reads, with the caveats the measurement
+ * raised. OCR touches no device, so it costs no extra capture and cannot
+ * race a UI change.
+ *
+ * This is the text dimension's measurement phase. Until 2026-10-04 it lived
+ * one layer up, in run/verify.ts, which therefore had to know that OCR is
+ * keyed by anchor id, that the png width is the ink normalizer, and which of
+ * `ocrRegionsFor`'s throws are this table's policy — while rect and color
+ * handed the run a one-line collector. Now all three do.
+ *
+ * Every failure here degrades to a NOTE rather than an exception: an
+ * undecodable png, an unusable scale or a recognizer crash must leave the
+ * text table standing on tree evidence, clearly labelled as such, instead of
+ * taking down a device run that took minutes. The leg always contributes —
+ * it has a tree, or the run would not have asked.
+ *
+ * No engine (OCR unavailable here): tree only, no per-leg note — the run
+ * already printed the one caveat (textRecognizer). A tree whose scale yields
+ * no region: tree only, no note — nothing scaled, nothing to caveat. The
+ * scale's own caveat is carried AFTER the recognizer ran, so a leg that ends
+ * up compared from the tree carries THAT reason alone rather than a caveat
+ * about regions it never used.
+ */
+export async function measureTextLeg(
+  contract: LayoutContract,
+  platform: Platform,
+  { shot, measured: frame }: TextLegFrame,
+  engine: OcrEngine | undefined,
+): Promise<TextContribution> {
+  const treeOnly: TextContribution = { value: { tree: frame.tree }, notes: [] };
+  if (engine === undefined) return treeOnly;
+  // A tree without pixels: that is an OCR failure in this table's terms, worded here.
+  if (frame.error !== undefined) return { ...treeOnly, notes: [ocrFailedNote(platform, frame.error)] };
+  try {
+    const { regions, note } = ocrRegionsFor(contract, frame);
+    if (regions.length === 0) return treeOnly;
+    const results = await engine.recognize(shot, regions);
+    return {
+      value: { tree: frame.tree, ocr: { byId: new Map(results.map((r) => [r.id, r])), pngWidth: frame.png.width } },
+      notes: note === undefined ? [] : [`(${platform}: ${note})`],
+    };
+  } catch (e) {
+    return { ...treeOnly, notes: [ocrFailedNote(platform, errorMessage(e))] };
+  }
 }
 
 // ------------------------------------------------------- contract handling
@@ -486,11 +593,12 @@ function measure(
   const treeStrings = renderedTextFromTree(capture.tree, id);
   const measurement: TextMeasurement = { tree: normalizeText(treeStrings.join(' ')) };
 
-  const ocrResult = capture.ocr?.get(id);
-  if (ocrResult !== undefined && ocrResult.error === undefined) {
+  const ocr = capture.ocr;
+  const ocrResult = ocr?.byId.get(id);
+  if (ocr !== undefined && ocrResult !== undefined && ocrResult.error === undefined) {
     const lines = ocrResult.lines;
     measurement.ocr = normalizeText(lines.map((l) => l.text).join(' '));
-    measurement.inkPct = inkPctOf(lines, capture.pngWidth ?? 0);
+    measurement.inkPct = inkPctOf(lines, ocr.pngWidth);
   }
 
   // Occlusion guard. The tree reports an element's LAYOUT rect; the screenshot

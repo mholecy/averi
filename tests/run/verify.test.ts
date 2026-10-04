@@ -10,10 +10,13 @@ import {
   assertSummary,
   contractProblems,
   formatLogExcerpt,
+  paritySection,
   runVerification,
+  type ParityDimension,
 } from '../../src/run/verify.js';
+import { Verifier } from '../../src/verify/assert.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
-import type { OcrEngine } from '../../src/verify/ocr.js';
+import { ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 
 /**
@@ -721,6 +724,125 @@ describe('text parity opt-in', () => {
     expect(color).toMatch(/FAILED: color parity: android: the png scale could not be derived from this tree/);
     const text = out.sections.find((s) => s.startsWith('## text parity'));
     expect(text).toContain('OCR failed — text parity: the png scale could not be derived from this tree');
+  });
+});
+
+describe('paritySection — the containment every table shares', () => {
+  /**
+   * `collect` is the one async extension point under the tables (2026-10-04):
+   * the next dimension's measurement lands there. Today's collectors degrade
+   * to notes themselves; this pins that a collector which THROWS still costs
+   * only its leg — the other leg's artifact is compared, the section stands,
+   * and the run is never rejected.
+   */
+  const leg = (platform: Platform): Parameters<typeof paritySection>[2][number] => ({
+    status: 'fulfilled',
+    value: { trace: [], results: [], frame: { shot: whitePng() }, health: `\n${platform}` },
+  });
+  const run = { contract: contract([]), text: undefined };
+
+  it('a collector that throws for one leg degrades that leg to a note and compares the other', async () => {
+    const dimension: ParityDimension<Record<string, never>, string> = {
+      title: 'probe parity',
+      produced: () => true,
+      options: {},
+      validate: () => [],
+      collect: (_leg, p) => {
+        if (p === 'android') throw new Error('adb: device offline');
+        return { value: `${p} artifact` };
+      },
+      emptyMessage: 'SKIPPED: nothing measured.',
+    };
+    const section = await paritySection(dimension, ['android', 'ios'], [leg('android'), leg('ios')], run, (c) =>
+      `compared ${Object.keys(c).join(',')}`,
+    );
+    expect(section).toBe(
+      '## probe parity\n(android: probe parity could not be measured — adb: device offline — compared without it)\ncompared ios',
+    );
+  });
+
+  it('a collector that rejects for every leg prints the empty message under the notes', async () => {
+    const dimension: ParityDimension<Record<string, never>, string> = {
+      title: 'probe parity',
+      produced: () => true,
+      options: {},
+      validate: () => [],
+      collect: async () => {
+        throw new Error('boom');
+      },
+      emptyMessage: 'SKIPPED: nothing measured.',
+    };
+    const section = await paritySection(dimension, ['android'], [leg('android')], run, () => 'never');
+    expect(section).toBe('## probe parity\n(android: probe parity could not be measured — boom — compared without it)\nSKIPPED: nothing measured.');
+  });
+
+  it('the run-level notes come first, then each leg\'s in platform order — the one order, deterministic', async () => {
+    const dimension: ParityDimension<Record<string, never>, string> = {
+      title: 'probe parity',
+      produced: () => true,
+      options: {},
+      validate: () => [],
+      // ios resolves FIRST; the printed order is still android, ios.
+      collect: async (_leg, p) => {
+        await new Promise((r) => setTimeout(r, p === 'android' ? 10 : 0));
+        return { value: p, notes: [`(${p}: caveat)`] };
+      },
+      emptyMessage: 'SKIPPED',
+      runNotes: () => ['(run-level)'],
+    };
+    const section = await paritySection(dimension, ['android', 'ios'], [leg('android'), leg('ios')], run, () => 'body');
+    expect(section).toBe('## probe parity\n(run-level)\n(android: caveat)\n(ios: caveat)\nbody');
+  });
+});
+
+describe('the recognizer is decided only for a contract that opts into text', () => {
+  it('a rect-only contract never asks whether OCR can run here', async () => {
+    const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    try {
+      const out = await runVerification(
+        request({ platforms: ['android'], contract: contract([{ id: 'card', x: 10, w: 40, bg: '#FFFFFF' }]) }),
+        async () => fake('android'),
+      );
+      for (const section of out.sections) expect(section).not.toContain('OCR unavailable');
+    } finally {
+      Object.defineProperty(process, 'platform', real);
+    }
+  });
+});
+
+describe('OCR unavailable — one reason, quoted by both callers', () => {
+  /**
+   * The `ocr` assert and the text table used to each decide "can OCR run
+   * here" themselves (2026-10-04: one rule, verify/ocr.ts#ocrEngineFor). A
+   * drift between the two would let one caller skip a check the other
+   * refused; so both are pinned to the SAME sentence from the same source.
+   */
+  it('the text table degrades with the note and the ocr assert fails closed, both naming the one reason', async () => {
+    const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    try {
+      const reason = ocrUnavailableReason();
+      expect(reason).toBe('OCR needs the macOS Vision framework (this host is linux)');
+
+      const out = await runVerification(
+        request({ platforms: ['android'], contract: contract([{ id: 'card', text: 'CONTINUE' }]) }),
+        async () => fake('android'),
+      );
+      const text = out.sections.find((s) => s.startsWith('## text parity'));
+      expect(text).toContain(`(OCR unavailable — ${reason}. Compared from the accessibility tree only`);
+      // Said once, not once per leg.
+      expect(text?.split('OCR unavailable').length).toBe(2);
+
+      const result = await new Verifier(fake('android'), { pollMs: 5, timeoutMs: 100 }).assert({
+        element: { id: 'card' },
+        ocr: { text: 'CONTINUE' },
+      });
+      expect(result.pass).toBe(false);
+      expect(result.detail).toContain(reason!);
+    } finally {
+      Object.defineProperty(process, 'platform', real);
+    }
   });
 });
 

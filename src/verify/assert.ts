@@ -12,7 +12,7 @@ import { elementAssertSchema } from './element-assert.js';
 import { captureFrame } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
-import { ocrUnavailableReason, VisionOcr, type OcrEngine } from './ocr.js';
+import { ocrEngineFor, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
 import { absentFromViewport, findBySpec } from '../ui-tree/selectors.js';
@@ -349,11 +349,12 @@ export class Verifier {
       expectation.heightPct !== undefined ? `ink height ${expectation.heightPct}% of width` : undefined,
     ].filter((v): v is string => v !== undefined);
     const description = `element ${describe(element)} renders ${wants.join(' and ')}`;
-    const unavailable = this.ocr === undefined ? ocrUnavailableReason() : undefined;
-    if (unavailable !== undefined) {
-      return { description, pass: false, detail: failClosed(unavailable, 'rendered text') };
+    const choice = ocrEngineFor(this.ocr);
+    if (choice.unavailable !== undefined) {
+      return { description, pass: false, detail: failClosed(choice.unavailable, 'rendered text') };
     }
-    const engine = (this.ocr ??= new VisionOcr());
+    // Memoized: one VisionOcr per Verifier, so its compiled binary is reused across asserts.
+    const engine = (this.ocr ??= choice.engine);
     return this.poll(
       async (tree) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
