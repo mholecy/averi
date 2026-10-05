@@ -194,9 +194,11 @@ const noTreeNote = (p: Platform, reason: string): string =>
 
 /**
  * The leg's frame when it carries a tree — where every table starts, and the
- * ONE place the no-tree note is decided. A leg is only asked for a frame
- * with a tree when there is a contract, and the tables only exist then; the
- * fallback wording covers the shape the types cannot rule out.
+ * ONE place the no-tree note is decided (`measuredOf` below adds the one
+ * further note a tree-bearing frame can carry: the png did not decode). A
+ * leg is only asked for a frame with a tree when there is a contract, and
+ * the tables only exist then; the fallback wording covers the shape the
+ * types cannot rule out.
  */
 const withTree = (leg: VerificationLeg, p: Platform): Contribution<TextLegFrame> => {
   const m = leg.frame.measured;

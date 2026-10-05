@@ -20,7 +20,7 @@ import type { EnvValues } from './credentials.js';
  */
 
 /** What a config-requiring tool starts from: the parsed descriptor and the environment its values resolve in. */
-export interface ProjectConfig {
+interface ProjectConfig {
   cfg: AveriConfig;
   /** See flow/credentials.ts — real environment over `.env.averi`, assembled once per load. */
   env: EnvValues;
@@ -40,7 +40,7 @@ export interface ProjectConfig {
  *
  * Absolute paths pass through untouched.
  */
-export function resolveBuildPaths(cfg: AveriConfig, configPath: string): AveriConfig {
+function resolveBuildPaths(cfg: AveriConfig, configPath: string): AveriConfig {
   const dir = configDir(configPath);
   const app = { ...cfg.app };
   if (app.android?.apk !== undefined) {

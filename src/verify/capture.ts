@@ -105,7 +105,7 @@ export interface Undecoded {
 }
 
 /** No tree at all: the read failed after retry. `error` is the one sentence a consumer quotes. */
-export interface Treeless {
+interface Treeless {
   tree?: undefined;
   png?: undefined;
   scale?: undefined;
@@ -118,7 +118,7 @@ export interface Treeless {
  * `tree`. Named for the measurement, not its outcome — `MeasuredFrame` is
  * the success arm.
  */
-export type FrameMeasurement = MeasuredFrame | Undecoded | Treeless;
+type FrameMeasurement = MeasuredFrame | Undecoded | Treeless;
 
 export interface Frame {
   /** The settled screenshot bytes — what a tool returns to the caller. */
@@ -132,7 +132,7 @@ export interface Frame {
 }
 
 /** A frame captured with a tree in play: its measured half is always there. */
-export interface FrameWithTree extends Frame {
+interface FrameWithTree extends Frame {
   measured: FrameMeasurement;
 }
 
@@ -145,7 +145,7 @@ export interface FrameWithTree extends Frame {
  * error rather than a documented precedence: a tree the caller already has
  * is never re-read, and the types say so.
  */
-export type CaptureOptions = {
+type CaptureOptions = {
   /** Stability re-captures before giving up (default 5). */
   attempts?: number;
   /** Delay between captures (default 300 ms; the Verifier passes its pollMs so tests stay fast). */

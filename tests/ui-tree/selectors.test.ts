@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import type { ElementSpec } from '../../src/ui-tree/element-spec.js';
+import { SELECTOR_FIELDS, type ElementSpec } from '../../src/ui-tree/element-spec.js';
 import { findAll, findBySpec, preferInteractive, parseSelector, tapPoint } from '../../src/ui-tree/selectors.js';
 
 const node = (partial: Partial<UiNode>): UiNode => ({
@@ -72,7 +72,8 @@ describe('parseSelector', () => {
   });
 });
 
-describe('findAll / findOne', () => {
+// findOne lived here until 2026-10-03; interact/resolve.ts owns resolution now (selectors.ts says so beside preferInteractive).
+describe('findAll', () => {
   it('finds by id anywhere in the tree', () => {
     const found = findAll(tree, 'id:login_button');
     expect(found).toHaveLength(1);
@@ -126,24 +127,31 @@ describe('tapPoint', () => {
  * findBySpec is derived from the selector matcher since 2026-10-04
  * (`findMatching(root, conditionsOf(spec))`, eq-only). Before, it was a second
  * matcher over the spec's four fields, written by hand — and a second place
- * where "what does `text` mean" could drift. This is the frozen body it
- * replaced, kept here as the oracle: a 2026-10-04 probe over 512 specs × 513
- * nodes found zero differences, and this test keeps it that way. The two
- * traps the probe surfaced are pinned below: the spec must NEVER be
- * serialized into a selector string (the grammar has no escape for `"`, so
- * 120 of those 512 specs would throw), and `text: 'Pay.*'` is a literal, not
- * a regex.
- *
- * DO NOT EDIT — frozen copy of the 2026-10-04 HEAD body; delete once trusted.
+ * where "what does `text` mean" could drift. The refactor was proved by a
+ * frozen copy of that hand-written body run as an oracle (zero differences
+ * over 864 specs × 217 nodes); the oracle was deleted on 2026-10-05, once
+ * trusted, because it hard-coded the four fields and so could never pin the
+ * claim the derivation makes — "a field added to ElementSpec is matched with
+ * no edit". What pins the behaviour now is the DEFINITION, stated once here
+ * and checked against the same combinatorial tree: a node matches when every
+ * field the spec sets equals the node's (`text` against label OR value),
+ * never as a regex, and the result is the pre-order filter. The two traps
+ * the oracle surfaced stay pinned below: the spec must NEVER be serialized
+ * into a selector string (the grammar has no escape for `"`), and
+ * `text: 'Pay.*'` is a literal.
  */
-function legacyFindBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
+const NODE_FIELD: Record<(typeof SELECTOR_FIELDS)[number], (n: UiNode) => (string | null)[]> = {
+  id: (n) => [n.identifier],
+  role: (n) => [n.role],
+  label: (n) => [n.label],
+  text: (n) => [n.label, n.value],
+};
+
+/** The pre-order filter the definition describes — no selector grammar, no shared code with the implementation. */
+function expectedBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
   const found: UiNode[] = [];
   const walk = (n: UiNode) => {
-    const ok =
-      (spec.id === undefined || n.identifier === spec.id) &&
-      (spec.role === undefined || n.role === spec.role) &&
-      (spec.label === undefined || n.label === spec.label) &&
-      (spec.text === undefined || n.label === spec.text || n.value === spec.text);
+    const ok = SELECTOR_FIELDS.every((f) => spec[f] === undefined || NODE_FIELD[f](n).includes(spec[f] as string));
     if (ok) found.push(n);
     n.children.forEach(walk);
   };
@@ -151,7 +159,19 @@ function legacyFindBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
   return found;
 }
 
-describe('findBySpec — derived from the selector matcher, behaviour-identical to the hand-written one it replaced', () => {
+/**
+ * The same spec written in the selector grammar. The grammar has no escape
+ * for `"`, so a value containing one cannot be spelled at all; an empty spec
+ * is not a selector (`parseSelector('')` throws). `id:""` IS spellable and
+ * is included, so the property covers the empty-string field too.
+ */
+const selectorFor = (spec: ElementSpec): string | undefined => {
+  const parts = SELECTOR_FIELDS.filter((f) => spec[f] !== undefined).map((f) => [f, spec[f] as string] as const);
+  if (parts.length === 0 || parts.some(([, v]) => v.includes('"'))) return undefined;
+  return parts.map(([f, v]) => `${f}:"${v}"`).join(' ');
+};
+
+describe('findBySpec — derived from the selector matcher, pinned against its definition', () => {
   // Every combination of identifier × label × value over values that exercise
   // null, the empty string, regex metacharacters, spaces and a double quote.
   // Every sixth node hangs under the one before it, so an ancestor and its
@@ -191,13 +211,13 @@ describe('findBySpec — derived from the selector matcher, behaviour-identical 
     }
   }
 
-  it(`returns the same nodes, by identity and in pre-order, as the legacy matcher for ${specs.length} specs over ${count + 1} nodes`, () => {
+  it(`returns exactly the definition's pre-order filter, by identity, for ${specs.length} specs over ${count + 1} nodes`, () => {
     expect(specs.length).toBeGreaterThan(500);
     expect(nested).toBeGreaterThan(30);
     let nonEmpty = 0;
     let nestedMatches = 0;
     for (const spec of specs) {
-      const expected = legacyFindBySpec(combinatorial, spec);
+      const expected = expectedBySpec(combinatorial, spec);
       const actual = findBySpec(combinatorial, spec);
       if (expected.length > 0) nonEmpty++;
       // A parent and its child both in the result is the order-sensitive case.
@@ -205,16 +225,31 @@ describe('findBySpec — derived from the selector matcher, behaviour-identical 
       expect(actual.length, JSON.stringify(spec)).toBe(expected.length);
       actual.forEach((n, i) => expect(n, JSON.stringify(spec)).toBe(expected[i]));
     }
-    // The oracle is only worth something if it actually matched things — and
-    // matched ancestor+descendant pairs, or pre-order would go unexercised.
+    // The definition is only worth something if it actually matched things —
+    // and matched ancestor+descendant pairs, or pre-order would go unexercised.
     expect(nonEmpty).toBeGreaterThan(100);
     expect(nestedMatches).toBeGreaterThan(10);
   });
 
+  it('finds exactly what the selector grammar finds for the same fields spelled with `:` (no `~`), by identity and in order — for every spec the grammar can spell', () => {
+    let checked = 0;
+    for (const spec of specs) {
+      const selector = selectorFor(spec);
+      if (selector === undefined) continue;
+      checked++;
+      const viaGrammar = findAll(combinatorial, selector);
+      const viaSpec = findBySpec(combinatorial, spec);
+      expect(viaSpec.length, selector).toBe(viaGrammar.length);
+      viaSpec.forEach((n, i) => expect(n, selector).toBe(viaGrammar[i]));
+    }
+    expect(checked).toBeGreaterThan(100);
+  });
+
   it('a value containing a double quote resolves — the spec is never serialized into the selector grammar', () => {
     expect(() => findBySpec(combinatorial, { text: 'say "hi"' })).not.toThrow();
-    expect(findBySpec(combinatorial, { text: 'say "hi"' })).toEqual(legacyFindBySpec(combinatorial, { text: 'say "hi"' }));
+    expect(findBySpec(combinatorial, { text: 'say "hi"' })).toEqual(expectedBySpec(combinatorial, { text: 'say "hi"' }));
     expect(findBySpec(combinatorial, { text: 'say "hi"' }).length).toBeGreaterThan(0);
+    expect(() => findAll(combinatorial, 'text:"say "hi""')).toThrow(/Invalid selector/);
   });
 
   it('text is a literal, never a regex: `Pay.*` matches the node whose label IS "Pay.*", not every "Pay…"', () => {
@@ -231,21 +266,21 @@ describe('findBySpec — derived from the selector matcher, behaviour-identical 
 
   it('extra, non-selector keys on the payload are ignored (a fill step carries `value`, a tap step `timeout`)', () => {
     const payload = { id: 'username_field', value: 'zzz', timeout: '2s' } as ElementSpec;
-    expect(findBySpec(tree, payload)).toEqual(legacyFindBySpec(tree, { id: 'username_field' }));
+    expect(findBySpec(tree, payload)).toEqual(expectedBySpec(tree, { id: 'username_field' }));
     expect(findBySpec(tree, payload)).toHaveLength(1);
   });
 
-  it('DOCUMENTED DEVIATION: a runtime null field matches nothing (the legacy `===` matched null-fielded nodes); the zod string schemas make it unreachable', () => {
+  it('DOCUMENTED DEVIATION: a runtime null field matches nothing (the pre-2026-10-04 `===` matched null-fielded nodes); the zod string schemas make it unreachable', () => {
     const nullId = { id: null } as unknown as ElementSpec;
-    expect(legacyFindBySpec(combinatorial, nullId).length).toBeGreaterThan(0);
+    expect(leaves.some((n) => n.identifier === null), 'the tree has null-id nodes the old matcher would have returned').toBe(true);
     expect(findBySpec(combinatorial, nullId)).toEqual([]);
     const nullText = { text: null } as unknown as ElementSpec;
-    expect(legacyFindBySpec(combinatorial, nullText).length).toBeGreaterThan(0);
+    expect(leaves.some((n) => n.label === null || n.value === null), 'the tree has null-text nodes the old matcher would have returned').toBe(true);
     expect(findBySpec(combinatorial, nullText)).toEqual([]);
   });
 
   it('an empty spec matches every node, in pre-order', () => {
-    expect(findBySpec(tree, {})).toEqual(legacyFindBySpec(tree, {}));
+    expect(findBySpec(tree, {})).toEqual(expectedBySpec(tree, {}));
     expect(findBySpec(tree, {})[0]).toBe(tree);
   });
 });

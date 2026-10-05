@@ -16,7 +16,7 @@ import { zeroRect, type Rect, type UiNode } from '../adapters/types.js';
  * interact/keyboard.ts, and the move deliberately left it alone.
  */
 
-export interface ScreenWidth {
+interface ScreenWidth {
   width: number;
   /**
    * True when the numbers describe the WINDOW rather than some subset of it —

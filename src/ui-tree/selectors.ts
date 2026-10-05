@@ -143,7 +143,10 @@ function conditionsOf(spec: ElementSpec): Condition[] {
  * semantics). Since 2026-10-04 this IS the selector matcher over
  * `conditionsOf(spec)`; before it was a second, hand-written matcher over the
  * same fields — identical on every probed input, and one edit away from not
- * being. Pinned by the differential test in tests/ui-tree/selectors.test.ts.
+ * being. Proved by a frozen copy of that matcher run as an oracle (zero
+ * differences over 864 specs × 217 nodes); since 2026-10-05 pinned against
+ * the definition itself in tests/ui-tree/selectors.test.ts — the oracle
+ * hard-coded four fields and could not pin "a new field needs no edit".
  * One difference at the type's edge: a runtime `null` field now matches
  * nothing (the old `===` matched nodes whose field was null); the zod string
  * schemas make such a spec unreachable, so no behaviour changes.

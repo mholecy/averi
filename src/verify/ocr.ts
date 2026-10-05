@@ -72,7 +72,7 @@ export interface OcrEngine {
  * Below this, a "recognized" string is noise rather than copy. Vision returned
  * 1.0 on every real UI string measured, so this only ever drops artifacts.
  */
-export const MIN_OCR_CONFIDENCE = 0.5;
+const MIN_OCR_CONFIDENCE = 0.5;
 
 /**
  * Why OCR cannot run here, or undefined when it can. Callers turn this into a

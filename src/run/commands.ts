@@ -139,8 +139,10 @@ export interface LaunchCall extends LaunchEntry {
  *   — only when the fallback can apply (`launchConsultsConfigActivity`, the
  *   rule's own "when", asked before there is a config to hand it). So an ios
  *   launch, or one that names an activity or an intent, loads nothing.
- *   Pinned by that side effect, in tests/run/commands.test.ts only: an ios
- *   call beside a .env.averi leaves the variable unset.
+ *   Pinned in tests/run/commands.test.ts only, through the one observable
+ *   the load has left since 2026-10-04 (the env file is read into a value,
+ *   not into process.env): an ios call beside a .env.averi prints no
+ *   "loaded … from .env.averi" line.
  * - The catch is a catch-ALL: a missing averi.yaml and a present-but-invalid
  *   one both mean "no activity", and the launch goes ahead on the adapter's
  *   own fallback (pinned at both levels: tests/run/commands.test.ts and
