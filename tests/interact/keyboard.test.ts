@@ -7,13 +7,13 @@ import {
   KEYBOARD_DISAGREEMENT_POLL_MS,
   KEYBOARD_HIDE_DELAY_MS,
   KeyboardStateDisagreement,
+  afterBack,
   dismissKeyboard,
-  keyboardAction,
+  dismissal,
+  firstLook,
+  recheck,
   resolveClearOfKeyboard,
-  windowAnywhere,
   windowOver,
-  type KeyboardAction,
-  type KeyboardSample,
 } from '../../src/interact/keyboard.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { FakeAdapter, node, screen } from '../helpers/fake.js';
@@ -616,65 +616,62 @@ describe('fillField — the focus tap goes through the same guard', () => {
   });
 });
 
-describe('keyboardAction — THE table, one row per case (2026-10-04)', () => {
-  it.each<[string, KeyboardSample, KeyboardAction]>([
-    // Nothing over the point, or nothing readable: tap, as before the question existed — in every phase of the guard.
-    ['first · window clear', { phase: 'first', window: 'clear' }, 'proceed'],
-    ['first · window unknown: fail open for a tap', { phase: 'first', window: 'unknown' }, 'proceed'],
-    ['recheck · window clear', { phase: 'recheck', window: 'clear' }, 'proceed'],
-    ['recheck · window unknown', { phase: 'recheck', window: 'unknown' }, 'proceed'],
-    ['afterBack · window clear', { phase: 'afterBack', window: 'clear' }, 'proceed'],
-    ['afterBack · window unknown: the tap goes ahead, the note says the state could not be read', { phase: 'afterBack', window: 'unknown' }, 'proceed'],
-    // The first look at a covering keyboard: back unless the input method DENIES it.
-    ['first · covering · witness shown', { phase: 'first', window: 'covering', witness: 'shown' }, 'back'],
-    ['first · covering · witness unknown (cannot be asked): the decision the window state alone made', { phase: 'first', window: 'covering', witness: 'unknown' }, 'back'],
-    ['first · covering · witness hidden: the veto — nothing sent on one disagreeing sample', { phase: 'first', window: 'covering', witness: 'hidden' }, 'hold'],
-    // The bounded re-check: only a witness that has come round confirms; unknown confirms nothing; the budget ends in a refusal.
-    ['recheck · covering · witness shown', { phase: 'recheck', window: 'covering', witness: 'shown', last: false }, 'back'],
-    ['recheck · covering · witness shown on the LAST round: still back, not a refusal', { phase: 'recheck', window: 'covering', witness: 'shown', last: true }, 'back'],
-    ['recheck · covering · witness hidden', { phase: 'recheck', window: 'covering', witness: 'hidden', last: false }, 'hold'],
-    ['recheck · covering · witness unknown: a witness that cannot be reached now has confirmed nothing', { phase: 'recheck', window: 'covering', witness: 'unknown', last: false }, 'hold'],
-    ['recheck · covering · witness hidden · last', { phase: 'recheck', window: 'covering', witness: 'hidden', last: true }, 'refuse'],
-    ['recheck · covering · witness unknown · last', { phase: 'recheck', window: 'covering', witness: 'unknown', last: true }, 'refuse'],
-    // After the one back: still covered is a refusal — never a second back.
-    ['afterBack · covering', { phase: 'afterBack', window: 'covering' }, 'refuse'],
-    // The dismissal after a fill: hidden is nothing to dismiss; unknown is THE one place unknown means back.
-    ['dismiss · window clear (hidden): nothing to dismiss — back would navigate', { phase: 'dismiss', window: 'clear' }, 'proceed'],
-    ['dismiss · window unknown: back, as before 2026-10-03 — the witness is not asked', { phase: 'dismiss', window: 'unknown' }, 'back'],
-    ['dismiss · covering · witness shown', { phase: 'dismiss', window: 'covering', witness: 'shown' }, 'back'],
-    ['dismiss · covering · witness unknown', { phase: 'dismiss', window: 'covering', witness: 'unknown' }, 'back'],
-    ['dismiss · covering · witness hidden: the veto, nothing pressed', { phase: 'dismiss', window: 'covering', witness: 'hidden' }, 'hold'],
-  ])('%s → %s', (_name, sample, expected) => {
-    expect(keyboardAction(sample)).toBe(expected);
+describe('the four decisions — one pure function per phase, each reached only where its phase decides (2026-10-05)', () => {
+  const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
+
+  it.each([
+    ['witness shown', 'shown', 'back'],
+    ['witness unknown (cannot be asked): the decision the window state alone made', 'unknown', 'back'],
+    ['witness hidden: the veto — nothing sent on one disagreeing sample', 'hidden', 'hold'],
+  ] as const)('firstLook (the window covers the point) — %s → %s', (_name, witness, expected) => {
+    expect(firstLook(witness)).toBe(expected);
   });
 
-  it('is pure: the same sample judged twice is the same action, and nothing is touched', () => {
-    const sample: KeyboardSample = Object.freeze({ phase: 'recheck', window: 'covering', witness: 'hidden', last: true });
-    expect([keyboardAction(sample), keyboardAction(sample)]).toEqual(['refuse', 'refuse']);
+  it.each([
+    ['witness shown', 'shown', 500, 'back'],
+    ['witness shown on the LAST round: still back, not a refusal', 'shown', KEYBOARD_DISAGREEMENT_BUDGET_MS, 'back'],
+    ['witness hidden', 'hidden', 500, 'hold'],
+    ['witness unknown: a witness that cannot be reached now has confirmed nothing', 'unknown', 500, 'hold'],
+    ['witness hidden · one round short of the budget', 'hidden', KEYBOARD_DISAGREEMENT_BUDGET_MS - KEYBOARD_DISAGREEMENT_POLL_MS, 'hold'],
+    ['witness hidden · the budget spent', 'hidden', KEYBOARD_DISAGREEMENT_BUDGET_MS, 'refuse'],
+    ['witness unknown · the budget spent', 'unknown', KEYBOARD_DISAGREEMENT_BUDGET_MS, 'refuse'],
+  ] as const)('recheck (the window still covers the point) — %s → %s', (_name, witness, waitedMs, expected) => {
+    expect(recheck(witness, waitedMs)).toBe(expected);
+  });
+
+  it.each([
+    ['window clear', { over: 'clear' }, { action: 'proceed' }],
+    ['window unknown: the tap goes ahead, the note says the state could not be read', { over: 'unknown' }, { action: 'proceed' }],
+    ['covering: a refusal that carries the frame — never a second back', { over: 'covering', frame: FRAME }, { action: 'refuse', frame: FRAME }],
+  ] as const)('afterBack — %s → %s', (_name, window, expected) => {
+    expect(afterBack(window)).toEqual(expected);
+  });
+
+  it.each([
+    ['window clear (hidden): nothing to dismiss — back would navigate', ['clear'], 'nothing'],
+    ['window unknown: back, as before 2026-10-03 — the witness is not asked', ['unknown'], 'back'],
+    ['covering · witness shown', ['covering', 'shown'], 'back'],
+    ['covering · witness unknown', ['covering', 'unknown'], 'back'],
+    ['covering · witness hidden: the veto, nothing pressed', ['covering', 'hidden'], 'nothing'],
+  ] as const)('dismissal — %s → %s', (_name, args, expected) => {
+    const decided = args.length === 1 ? dismissal(args[0]) : dismissal(args[0], args[1]);
+    expect(decided).toBe(expected);
   });
 });
 
-describe('the two window readings — geometry for the guard, presence for the dismissal', () => {
+describe('the guard\'s window reading — geometry, with the frame when it covers', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
   it.each([
-    ['shown, point inside the frame', { state: 'shown', frame: FRAME }, { x: 249, y: 1466 }, 'covering'],
-    ['shown, point outside the frame (beside it)', { state: 'shown', frame: FRAME }, { x: 249, y: 1000 }, 'clear'],
-    ['hidden', { state: 'hidden' }, { x: 249, y: 1466 }, 'clear'],
-    ['unknown: kept apart, not folded into clear', { state: 'unknown' }, { x: 249, y: 1466 }, 'unknown'],
+    ['shown, point inside the frame', { state: 'shown', frame: FRAME }, { x: 249, y: 1466 }, { over: 'covering', frame: FRAME }],
+    ['shown, point outside the frame (beside it)', { state: 'shown', frame: FRAME }, { x: 249, y: 1000 }, { over: 'clear' }],
+    ['hidden', { state: 'hidden' }, { x: 249, y: 1466 }, { over: 'clear' }],
+    ['unknown: kept apart, not folded into clear', { state: 'unknown' }, { x: 249, y: 1466 }, { over: 'unknown' }],
   ] as const)('windowOver — %s → %s', (_name, keyboard, point, expected) => {
-    expect(windowOver(keyboard, point)).toBe(expected);
-  });
-
-  it.each([
-    ['shown anywhere', { state: 'shown', frame: FRAME }, 'covering'],
-    ['hidden', { state: 'hidden' }, 'clear'],
-    ['unknown', { state: 'unknown' }, 'unknown'],
-  ] as const)('windowAnywhere — %s → %s', (_name, keyboard, expected) => {
-    expect(windowAnywhere(keyboard)).toBe(expected);
+    expect(windowOver(keyboard, point)).toEqual(expected);
   });
 });
 
-describe('dismissKeyboard — the table\'s `dismiss` rows (moved here from fill.ts 2026-10-04)', () => {
+describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved here from fill.ts 2026-10-04)', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
   const withOracle = (window: Parameters<FakeAdapter['attachKeyboard']>[0], witness?: Parameters<FakeAdapter['attachKeyboard']>[1]) => {
     const fake = new FakeAdapter({ s: screen() }, 's');

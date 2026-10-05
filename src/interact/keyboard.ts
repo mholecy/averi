@@ -1,4 +1,4 @@
-import { zeroRect, type DeviceAdapter, type KeyboardOracle, type KeyboardWitness, type Rect, type SoftKeyboard } from '../adapters/types.js';
+import type { DeviceAdapter, KeyboardWitness, Rect, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { sleep } from '../util/sleep.js';
 import { errorMessage } from '../util/error-message.js';
@@ -104,167 +104,171 @@ export class KeyboardStateDisagreement extends KeyboardGuardError {
   }
 }
 
-// ─── The decision table ──────────────────────────────────────────────────────
+// ─── The decisions, one per phase ────────────────────────────────────────────
+//
+// 2026-10-05 (verification pass, V1). Until this date the four moments at
+// which the guard and the dismissal decide — the first look, a re-check
+// round, the look after the one `back`, the post-fill dismissal — were ONE
+// table over one union of samples, returning one four-way action. The table
+// was honest about the rows but dishonest about the shape: each phase can
+// produce only a subset of the four answers (the first look never `refuse`s,
+// the look after the back never `back`s again), so every call site switched
+// over answers its phase could not get, five `unexpected()` throws guarded
+// arms no input could reach (and no test did), a `judge` helper rebuilt the
+// sample from loose fields, `hold` meant "wait and ask again" in the guard
+// and "do nothing" in the dismissal, and the budget rule lived in the loop
+// while the `last` flag it fed lived in the table. The guard read worse than
+// before the table existed.
+//
+// Now each phase is its own pure, synchronous decision with its own result
+// type, so the compiler — not a runtime throw — rules out the impossible
+// arms, and `resolveClearOfKeyboard` reads top to bottom as the protocol its
+// doc describes. The guard's decisions take the input method's word and
+// nothing else, because they are reached only once the window state covers
+// the point — the one fail-open rule for every other reading is the guard's
+// own, stated where it is applied, not a row. What the table got
+// right stays: one `pressKey('back')` in the codebase (`pressBack`, below),
+// one `unknown → back` rule (the dismissal's) and one `unknown → proceed`
+// rule (the guard's), each with its reason beside it. Proven unchanged by an
+// old-vs-new differential over seeded window/witness/back-effect sequences
+// (the same harness that proved the table on 2026-10-04).
 
 /**
- * What the guard (and the dismissal) does on ONE sample of the two sources.
- * - `proceed`: nothing stands in the way — tap the point / there is nothing to
- *   dismiss. No key is pressed.
- * - `back`: press `back`; the window state's keyboard is confirmed, or at least
- *   not denied, by the input method.
- * - `hold`: send NOTHING on this sample — neither back nor the tap. The guard
- *   asks both sources again after a pause; the dismissal, which has nothing
- *   to wait for, simply stops.
- * - `refuse`: throw — the budget for disagreeing samples is spent, or the one
- *   `back` the guard allows itself did not close the keyboard.
+ * The dismissal's reading of the window state — it has no point, so shown
+ * ANYWHERE is `covering`, hidden is `clear`, and `unknown` is kept apart
+ * because it is the one place unknown means back (`dismissal`). The guard
+ * reads the state through `CoverReading` instead, with the frame.
  */
-export type KeyboardAction = 'proceed' | 'back' | 'hold' | 'refuse';
+type WindowReading = 'covering' | 'clear' | 'unknown';
 
-/**
- * The window state, read for the question at hand. For the guard, which has
- * a point: its frame contains the point (`covering`), does not — hidden, or a
- * frame elsewhere — (`clear`), or the state could not be read (`unknown`).
- * For the dismissal, which has no point: shown anywhere is `covering`,
- * hidden is `clear`. `unknown` is kept apart rather than folded into either,
- * because the two callers need opposite things from it (the table's rows).
- */
-export type WindowReading = 'covering' | 'clear' | 'unknown';
+/** The guard's reading of one window state against the tap point, with the frame when it covers — so a message can quote it without a second look. */
+type CoverReading = { over: 'covering'; frame: Rect } | { over: 'clear' } | { over: 'unknown' };
 
-/**
- * One reading of the two sources, as the table judges it. The input method's
- * word (`witness`) is REQUIRED by the type exactly when the window is
- * `covering`, and absent otherwise: a caller cannot forget to ask it where it
- * decides, nor ask it where it does not — an ordinary tap costs what it did,
- * and the look after the key press never asks (the key is already pressed;
- * the frame decides).
- *
- * The phases:
- * - `first`: the guard's look before anything was sent;
- * - `recheck`: a round of the bounded wait that a vetoed `first` starts;
- *   `last` marks the round the budget ends on;
- * - `afterBack`: the guard's look after the one `back`, to confirm the
- *   keyboard went;
- * - `dismiss`: the dismissal after a fill — no point, no second look.
- */
-export type KeyboardSample =
-  | { phase: 'first'; window: 'clear' | 'unknown' }
-  | { phase: 'first'; window: 'covering'; witness: KeyboardWitness }
-  | { phase: 'recheck'; window: 'clear' | 'unknown' }
-  | { phase: 'recheck'; window: 'covering'; witness: KeyboardWitness; last: boolean }
-  | { phase: 'afterBack'; window: WindowReading }
-  | { phase: 'dismiss'; window: 'clear' | 'unknown' }
-  | { phase: 'dismiss'; window: 'covering'; witness: KeyboardWitness };
-
-/**
- * THE table — window state × input method × phase → action — written once,
- * as a pure function, for every sample the guard and the dismissal take: the
- * guard's first look, each round of its bounded re-check, its look after the
- * one `back` (resolveClearOfKeyboard), and the dismissal after a fill
- * (dismissKeyboard). Until 2026-10-04 it lived twice: as the loop in the
- * guard and as a second copy of the `unknown → back` rule in fill.ts. A first
- * cut the same day squashed the window state to a boolean before the table
- * saw it, so `unknown` was still decided twice OUTSIDE it (review, round 1);
- * now the reading reaches the table and both of its `unknown` rows are here.
- *
- * The rows, with their reasons:
- *
- *   first / recheck / afterBack · window clear     → proceed
- *   first / recheck / afterBack · window unknown   → proceed
- *     Hidden or a frame elsewhere: nothing over the point — tap. Unknown
- *     over a tap point FAILS OPEN, as everywhere: the question exists to make
- *     a tap safer and must never be the reason a tap did not happen (a device
- *     that is really gone fails the tap itself, in the tap's own words).
- *
- *   first   · covering · witness shown             → back
- *   first   · covering · witness unknown           → back
- *     The decision the window state alone made before the veto existed
- *     (2026-10-04): a witness that cannot be asked — adb failure, an Android
- *     version that does not print `mInputShown` (unverified outside API 33;
- *     the stale-window hazard REMAINS there) — leaves it standing.
- *   first   · covering · witness hidden            → hold
- *     The veto. The window state can be stale for seconds after a navigation
- *     (measured that day: full frame reported, input method already said
- *     not shown); `back` then navigates, a tap then presses a key. Nothing
- *     is sent on one disagreeing sample.
- *
- *   recheck · covering · witness shown             → back   (even when last)
- *     The input method has come round: the normal dismissal, as if it had
- *     said so at first.
- *   recheck · covering · witness hidden            → hold, or refuse when last
- *   recheck · covering · witness unknown           → hold, or refuse when last
- *     A witness that said "hidden" half a second ago and cannot be reached
- *     now has confirmed nothing — so unlike `first`, `unknown` presses
- *     nothing here. When the budget ends still disagreeing: a refusal
- *     (KeyboardStateDisagreement) — acting on either guess is the harm.
- *
- *   afterBack · covering                           → refuse
- *     Still covered after the one dismissal: THROW, tap nothing. Never a
- *     loop — a keyboard `back` does not hide (a field that re-requests it,
- *     an IME that ignores back) would be a `back` per round, and the second
- *     one navigates.
- *
- *   dismiss · window clear                         → proceed
- *     Hidden: nothing to dismiss — back with no keyboard up NAVIGATES (the
- *     2026-10-03 finding: a custom PIN pad, a hardware keyboard, a picker).
- *   dismiss · window unknown                       → back
- *     The ONE place unknown means back, exactly as before 2026-10-03: the
- *     adapter could not tell (the command failed, or printed a format it does
- *     not recognise), and after a fill a keyboard left up over the next tap
- *     is the likelier harm. No witness is asked: there is no window state
- *     for it to contradict.
- *   dismiss · covering · witness shown             → back
- *   dismiss · covering · witness unknown           → back
- *   dismiss · covering · witness hidden            → hold
- *     As `first`: the veto applies to the dismissal too (the stale window
- *     state after a navigation is where it was measured), and with nothing
- *     to wait for, `hold` simply presses nothing.
- *
- * Rejected: a `whenUnknown` option on the back press (the same rule in two
- * shapes, 2026-10-04 → this table); a `covering: boolean` sample (the window
- * reading decided outside the table, review round 1 → the union above);
- * trusting the window state alone (the measurement above); asking the
- * witness on every tap instead of the window state (it has no frame).
- */
-export function keyboardAction(sample: KeyboardSample): KeyboardAction {
-  switch (sample.phase) {
-    case 'first':
-      if (sample.window !== 'covering') return 'proceed';
-      return sample.witness === 'hidden' ? 'hold' : 'back';
-    case 'recheck':
-      if (sample.window !== 'covering') return 'proceed';
-      if (sample.witness === 'shown') return 'back';
-      return sample.last ? 'refuse' : 'hold';
-    case 'afterBack':
-      return sample.window === 'covering' ? 'refuse' : 'proceed';
-    case 'dismiss':
-      if (sample.window !== 'covering') return sample.window === 'unknown' ? 'back' : 'proceed';
-      return sample.witness === 'hidden' ? 'hold' : 'back';
-  }
-}
-
-// ─── Reading the window state ────────────────────────────────────────────────
-
-const covers = (keyboard: SoftKeyboard, point: { x: number; y: number }): keyboard is SoftKeyboard & { state: 'shown' } =>
-  keyboard.state === 'shown' &&
+const covers = (keyboard: SoftKeyboard & { state: 'shown' }, point: { x: number; y: number }): boolean =>
   point.x >= keyboard.frame.x &&
   point.x < keyboard.frame.x + keyboard.frame.width &&
   point.y >= keyboard.frame.y &&
   point.y < keyboard.frame.y + keyboard.frame.height;
 
-/** The guard's reading: does the frame contain the point about to be tapped? Geometry only; the table decides. */
-export const windowOver = (keyboard: SoftKeyboard, point: { x: number; y: number }): WindowReading =>
-  keyboard.state === 'unknown' ? 'unknown' : covers(keyboard, point) ? 'covering' : 'clear';
-
-/** The dismissal's reading: a keyboard shown ANYWHERE is in the way — there is no point to test. */
-export const windowAnywhere = (keyboard: SoftKeyboard): WindowReading =>
+/**
+ * The dismissal's reading: a keyboard shown ANYWHERE is in the way — there is
+ * no point to test — hidden is clear, and an unreadable state stays apart.
+ * One owner of the SoftKeyboard → reading mapping for the dismissal, kept as
+ * a function rather than inlined at its one call so the mapping and
+ * `dismissal`'s rows read in the same vocabulary.
+ */
+const windowAnywhere = (keyboard: SoftKeyboard): WindowReading =>
   keyboard.state === 'shown' ? 'covering' : keyboard.state === 'hidden' ? 'clear' : 'unknown';
 
+/** The guard's reading: does the frame contain the point about to be tapped? Geometry only; the decisions below judge. */
+export const windowOver = (keyboard: SoftKeyboard, point: { x: number; y: number }): CoverReading =>
+  keyboard.state === 'unknown'
+    ? { over: 'unknown' }
+    : keyboard.state === 'shown' && covers(keyboard, point)
+      ? { over: 'covering', frame: keyboard.frame }
+      : { over: 'clear' };
+
 /**
- * The frame behind a `covering` reading. Read only after the table has said
- * the window covers the point — which it says exactly when the state is
- * `shown` — so the zero rect is the type's fallback, never a printed one.
+ * The guard's FIRST look, once the window state has put a keyboard over the
+ * tap point (the not-covering case — hidden, a frame elsewhere, or a state
+ * that could not be read — never reaches a decision: it is the guard's own
+ * one fail-open rule, stated where it is applied in resolveClearOfKeyboard).
+ *
+ *   witness shown / unknown                   → back
+ *     The decision the window state alone made before the veto existed
+ *     (2026-10-04): a witness that cannot be asked — adb failure, an Android
+ *     version that does not print `mInputShown` (unverified outside API 33;
+ *     the stale-window hazard REMAINS there) — leaves it standing.
+ *   witness hidden                            → hold
+ *     The veto. The window state can be stale for seconds after a navigation
+ *     (measured that day: full frame reported, input method already said
+ *     not shown); `back` then navigates, a tap then presses a key. Nothing
+ *     is sent on one disagreeing sample; the re-check rounds follow.
  */
-const shownFrame = (keyboard: SoftKeyboard): Rect => (keyboard.state === 'shown' ? keyboard.frame : zeroRect());
+export function firstLook(witness: KeyboardWitness): 'back' | 'hold' {
+  return witness === 'hidden' ? 'hold' : 'back';
+}
+
+/**
+ * One round of the bounded re-check that a vetoed first look starts, while
+ * the window state STILL covers the point (a round in which it stopped
+ * covering ends the wait in the guard itself — the same fail-open rule as
+ * the first look, resolve again and tap). The budget rule lives HERE,
+ * beside the answer it shapes (`waitedMs` is how long the rounds have taken
+ * so far).
+ *
+ *   witness shown                             → back   (even when the budget is spent)
+ *     The input method has come round: the normal dismissal, as if it had
+ *     said so at first.
+ *   witness hidden / unknown                  → hold, or refuse once waitedMs ≥ KEYBOARD_DISAGREEMENT_BUDGET_MS
+ *     A witness that said "hidden" half a second ago and cannot be reached
+ *     now has confirmed nothing — so unlike the first look, `unknown` presses
+ *     nothing here. When the budget ends still disagreeing: a refusal
+ *     (KeyboardStateDisagreement) — acting on either guess is the harm.
+ */
+export function recheck(witness: KeyboardWitness, waitedMs: number): 'back' | 'hold' | 'refuse' {
+  if (witness === 'shown') return 'back';
+  return waitedMs >= KEYBOARD_DISAGREEMENT_BUDGET_MS ? 'refuse' : 'hold';
+}
+
+/**
+ * The look after the one `back`, to confirm the keyboard went. No witness:
+ * the key is already pressed, the frame decides — and comes back with the
+ * refusal, so the message can quote it without a second look.
+ *
+ *   window clear / unknown                    → proceed
+ *     Gone, or unreadable — fail open; the note says when the state could
+ *     not be read.
+ *   covering                                  → refuse (with the frame)
+ *     Still covered after the one dismissal: THROW, tap nothing. Never a
+ *     loop — a keyboard `back` does not hide (a field that re-requests it,
+ *     an IME that ignores back) would be a `back` per round, and the second
+ *     one navigates.
+ */
+export function afterBack(window: CoverReading): { action: 'proceed' } | { action: 'refuse'; frame: Rect } {
+  return window.over === 'covering' ? { action: 'refuse', frame: window.frame } : { action: 'proceed' };
+}
+
+/**
+ * The dismissal after a fill — no point, no second look; `covering` here
+ * means shown anywhere.
+ *
+ *   window clear (hidden)                     → nothing
+ *     Nothing to dismiss — back with no keyboard up NAVIGATES (the
+ *     2026-10-03 finding: a custom PIN pad, a hardware keyboard, a picker).
+ *   window unknown                            → back
+ *     The ONE place unknown means back, exactly as before 2026-10-03: the
+ *     adapter could not tell (the command failed, or printed a format it does
+ *     not recognise), and after a fill a keyboard left up over the next tap
+ *     is the likelier harm. No witness is asked: there is no window state
+ *     for it to contradict.
+ *   covering · witness shown / unknown        → back
+ *   covering · witness hidden                 → nothing
+ *     As the first look: the veto applies to the dismissal too (the stale
+ *     window state after a navigation is where it was measured), and with
+ *     nothing to wait for, a denied keyboard is simply left alone.
+ */
+export function dismissal(window: 'clear' | 'unknown'): 'back' | 'nothing';
+export function dismissal(window: 'covering', witness: KeyboardWitness): 'back' | 'nothing';
+export function dismissal(window: WindowReading, witness?: KeyboardWitness): 'back' | 'nothing' {
+  if (window !== 'covering') return window === 'unknown' ? 'back' : 'nothing';
+  return witness === 'hidden' ? 'nothing' : 'back';
+}
+
+// ─── The callers ─────────────────────────────────────────────────────────────
+
+/** The adapter surface the guard and the dismissal need: the oracle, when there is one, and the key. */
+type KeyboardAdapter = Pick<DeviceAdapter, 'keyboard' | 'pressKey'>;
+
+/**
+ * THE ONE `back` averi sends for keyboard reasons (2026-10-04): the tap
+ * guard's dismissal and `dismissKeyboard` both come through here, and only
+ * after a decision above has said `back` — on a witness asked immediately
+ * before, or on `dismissal`'s one `unknown → back` row (no witness: there is
+ * no window state for it to contradict) — never after the key, never on a
+ * path that presses nothing.
+ */
+const pressBack = (adapter: KeyboardAdapter): Promise<void> => adapter.pressKey('back');
 
 /** `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling in every message that quotes one. */
 const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
@@ -275,70 +279,6 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
   note: resolved.note === undefined ? keyboardHidden : `${resolved.note}; ${keyboardHidden}`,
   keyboardHidden,
 });
-
-// ─── The callers ─────────────────────────────────────────────────────────────
-
-/** The adapter surface the guard and the dismissal need: the oracle, when there is one, and the key. */
-type KeyboardAdapter = Pick<DeviceAdapter, 'keyboard' | 'pressKey'>;
-
-/** A sample before the input method has been asked: what the caller knows on its own. */
-type Unjudged =
-  | { phase: 'first' | 'dismiss'; window: WindowReading }
-  | { phase: 'recheck'; window: WindowReading; last: boolean };
-
-/**
- * Take one sample in a phase that may press — and send THE ONE `back` averi
- * sends for keyboard reasons (2026-10-04): the tap guard's dismissal and
- * `dismissKeyboard` both come through here. The witness is read when, and
- * only when, the window reading demands it (the type of `KeyboardSample`
- * says when: never on an ordinary tap, never after the key); the table
- * judges; `back` goes out only when it says so. The witness's answer is
- * handed back beside the action for the wording of a later failure.
- */
-async function judge(
-  adapter: KeyboardAdapter,
-  oracle: KeyboardOracle,
-  unjudged: Unjudged,
-): Promise<{ action: KeyboardAction; witness: KeyboardWitness | undefined }> {
-  let sample: KeyboardSample;
-  let witness: KeyboardWitness | undefined;
-  if (unjudged.window !== 'covering') {
-    sample = unjudged.phase === 'recheck' ? { phase: 'recheck', window: unjudged.window } : { phase: unjudged.phase, window: unjudged.window };
-  } else {
-    witness = await oracle.witness();
-    sample =
-      unjudged.phase === 'recheck'
-        ? { phase: 'recheck', window: 'covering', witness, last: unjudged.last }
-        : { phase: unjudged.phase, window: 'covering', witness };
-  }
-  const action = keyboardAction(sample);
-  if (action === 'back') await adapter.pressKey('back');
-  return { action, witness };
-}
-
-/**
- * A table outcome this call site has no move for. Every site switches over
- * all four actions and sends the ones it cannot act on here, so a wrong edit
- * to the table fails LOUDLY instead of quietly tapping over a keyboard or
- * pressing a second `back` (review 2026-10-04). `sample` is what the site
- * knew — a witness it never asked is simply absent from the message, never
- * invented. After the key press (`backPressed` given) the failure is an
- * AfterKeyboardDismissal, as every failure past the key must be (§8).
- */
-function unexpected(
-  action: KeyboardAction,
-  sample: { phase: KeyboardSample['phase']; window: WindowReading; witness?: KeyboardWitness; last?: boolean },
-  backPressed?: string,
-): never {
-  const message = `keyboard guard: the decision table answered "${action}" for ${JSON.stringify(sample)}, which this step cannot act on`;
-  if (backPressed !== undefined) throw new AfterKeyboardDismissal(`${message} (back had been pressed)`, backPressed);
-  throw new Error(message);
-}
-
-/** Exhaustiveness at compile time: a fifth action must be handled at every site before this builds. */
-function assertNever(action: never): never {
-  throw new Error(`keyboard guard: unhandled action ${String(action)}`);
-}
 
 /**
  * resolveSettled, plus the one rule every tap on a resolved node shares
@@ -355,15 +295,16 @@ function assertNever(action: never): never {
  * out of its way unless the activity resizes. A fill has the same exposure
  * when the NEXT field sits under the keyboard the previous one raised.
  *
- * The protocol — each decision is a row of `keyboardAction`:
+ * The protocol — each step is one of the decisions above, in order:
  *   no oracle on the adapter: done, the node as resolved. Nothing is asked
  *   and nothing is pressed (iOS: the keyboard is part of the tree).
  *   resolve → ask the oracle where the keyboard is → tap point outside it
- *   (or hidden, or unknown): done, the node as resolved.
- *   Inside it (`first`): ask the witness, press `back` unless it DENIES the
- *   keyboard — the "shown" just read can be stale and `back` with no keyboard
- *   up navigates away. Denied: nothing is sent, neither back nor the tap;
- *   both sources are asked again for a bounded time (`recheck`, the
+ *   (or hidden, or unknown): done, the node as resolved (the fail-open
+ *   rule, below).
+ *   Inside it: ask the witness, press `back` unless it DENIES the keyboard —
+ *   the "shown" just read can be stale and `back` with no keyboard up
+ *   navigates away (`firstLook`). Denied: nothing is sent, neither back nor
+ *   the tap; both sources are asked again for a bounded time (`recheck`, the
  *   constants above).
  *   · the window state stops covering the point (hidden, a frame elsewhere,
  *     or unknown — fail open as everywhere): resolve AGAIN (time has passed)
@@ -406,7 +347,9 @@ function assertNever(action: never): never {
  * tap is not sent on ONE sample in which the input method contradicts the
  * window state (b631792 did that for a day): the input method can be the
  * stale side too (an IME switch or restart, a hide recorded but not yet
- * applied), and then that tap is the stray character.
+ * applied), and then that tap is the stray character. Also rejected, after
+ * a day in the tree (2026-10-04 → 2026-10-05): one decision table over all
+ * four phases — see the note above the decisions.
  */
 export async function resolveClearOfKeyboard(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'keyboard' | 'pressKey'>,
@@ -417,109 +360,93 @@ export async function resolveClearOfKeyboard(
   const oracle = adapter.keyboard;
   if (oracle === undefined) return first;
   const at = tapPoint(first.node);
-  const initial = await oracle.state();
+  const opening = windowOver(await oracle.state(), at);
+  // THE guard's one fail-open rule, applied here and at each re-check round
+  // below: nothing over the point — hidden, a frame elsewhere — or a state
+  // that could not be read means the tap goes ahead as before the question
+  // existed. The question exists to make a tap safer and must never be the
+  // reason a tap did not happen; a device that is really gone fails the tap
+  // itself, in the tap's own words. Only a COVERING reading reaches
+  // firstLook/recheck; after the back, afterBack has its own fail-open row
+  // (its reason there).
+  if (opening.over !== 'covering') return first;
+
   const what = describeTarget(target);
   /** The fact every sentence below starts from; each outcome appends its own ending. */
   const covered = `the soft keyboard covered ${what}`;
   const backPressed = `${covered}; back pressed`;
-  const opening = windowOver(initial, at);
-  let verdict = await judge(adapter, oracle, { phase: 'first', window: opening });
+  /** The input method's last word — the wording of a later failure depends on whether it could be asked. */
+  let witness = await oracle.witness();
   /** The point being judged: the first resolution's, until a look during the wait finds the target elsewhere. */
   let judged = at;
   /** How long the input method took to confirm the keyboard, when it denied it at first. */
   let confirmedAfterMs: number | undefined;
-  switch (verdict.action) {
-    case 'proceed':
-      return first; // nothing over the point (or nothing readable): the node as resolved
-    case 'back':
-      break; // the dismissal: the second look below
-    case 'refuse':
-      return unexpected(verdict.action, { phase: 'first', window: opening, witness: verdict.witness });
-    case 'hold': {
-      // Vetoed: the window state says covered, the input method says no
-      // keyboard. Send nothing on this one sample; ask both again, bounded.
-      const disagreement = `the window state reported a soft keyboard over ${what} that the input method denied`;
-      let stillCovering = shownFrame(initial);
-      recheck: for (let waited = KEYBOARD_DISAGREEMENT_POLL_MS; ; waited += KEYBOARD_DISAGREEMENT_POLL_MS) {
-        await sleep(KEYBOARD_DISAGREEMENT_POLL_MS);
-        const now = await oracle.state();
-        let reading = windowOver(now, judged);
-        if (reading !== 'covering') {
-          const settled = await resolveSettled(adapter, target, opts);
-          // The frame just read is tested against where the target is NOW —
-          // free, `now` is in hand: a frame that left the old point but lies
-          // over the new one (the layout moved while averi waited) is still a
-          // keyboard over the target, and the wait goes on with that point.
-          const moved = tapPoint(settled.node);
-          reading = windowOver(now, moved);
-          if (reading !== 'covering') {
-            const sample: KeyboardSample = { phase: 'recheck', window: reading };
-            // The pure table, not `judge`: nothing on this path may press a
-            // key, so a row that says `back` must be refused BEFORE the key,
-            // not discovered after it.
-            const action = keyboardAction(sample);
-            switch (action) {
-              case 'proceed':
-                return withNote(
-                  settled,
-                  reading === 'unknown'
-                    ? `${disagreement}; waited ${waited}ms, then the window state could not be read`
-                    : `${disagreement}; waited ${waited}ms for it to clear`,
-                );
-              case 'back':
-              case 'hold':
-              case 'refuse':
-                return unexpected(action, sample);
-              default:
-                return assertNever(action);
-            }
-          }
-          judged = moved;
+
+  if (firstLook(witness) === 'hold') {
+    // Vetoed: the window state says covered, the input method says no
+    // keyboard. Send nothing on this one sample; ask both again, bounded.
+    const disagreement = `the window state reported a soft keyboard over ${what} that the input method denied`;
+    let stillCovering = opening.frame;
+    for (let waited = KEYBOARD_DISAGREEMENT_POLL_MS; ; waited += KEYBOARD_DISAGREEMENT_POLL_MS) {
+      await sleep(KEYBOARD_DISAGREEMENT_POLL_MS);
+      const now = await oracle.state();
+      let window = windowOver(now, judged);
+      if (window.over !== 'covering') {
+        const settled = await resolveSettled(adapter, target, opts);
+        // The frame just read is tested against where the target is NOW —
+        // free, `now` is in hand: a frame that left the old point but lies
+        // over the new one (the layout moved while averi waited) is still a
+        // keyboard over the target, and the wait goes on with that point.
+        const moved = tapPoint(settled.node);
+        window = windowOver(now, moved);
+        if (window.over !== 'covering') {
+          // The keyboard left the point (or the state could not be read): the
+          // fail-open rule above — proceed, saying how long the wait took.
+          return withNote(
+            settled,
+            window.over === 'unknown'
+              ? `${disagreement}; waited ${waited}ms, then the window state could not be read`
+              : `${disagreement}; waited ${waited}ms for it to clear`,
+          );
         }
-        stillCovering = shownFrame(now);
-        const last = waited >= KEYBOARD_DISAGREEMENT_BUDGET_MS;
-        verdict = await judge(adapter, oracle, { phase: 'recheck', window: 'covering', last });
-        switch (verdict.action) {
-          case 'back':
-            confirmedAfterMs = waited;
-            break recheck; // confirmed: the normal dismissal below
-          case 'hold':
-            continue recheck; // one more round
-          case 'proceed':
-            return unexpected(verdict.action, { phase: 'recheck', window: 'covering', witness: verdict.witness, last });
-          case 'refuse': {
-            // The last answer decides the wording: a witness that could not be
-            // asked in the later rounds ends here too, and "says no keyboard is
-            // shown" would then claim an answer nobody gave.
-            const inputMethod =
-              verdict.witness === 'unknown'
-                ? `the input method said none was shown at first, then could not be asked, and nothing had confirmed a ` +
-                  `keyboard after ${KEYBOARD_DISAGREEMENT_BUDGET_MS}ms`
-                : `the input method says no keyboard is shown, and the two still disagreed after ${KEYBOARD_DISAGREEMENT_BUDGET_MS}ms`;
-            // Names MCP tools and "a flow" — the deliberate exception recorded
-            // at the "back did not close it" error below. The flow half names
-            // only what a flow can do: `wait:` takes an element or a state,
-            // never a duration, and nothing in a flow waits on the keyboard.
-            throw new KeyboardStateDisagreement(
-              `The window state reports a soft keyboard over ${what} — its frame ${frameText(stillCovering)} ` +
-                `contains the tap point (${judged.x},${judged.y}) — but ${inputMethod}. Neither back nor the tap was sent: ` +
-                `back would navigate away if no keyboard is up, and the tap would press a key if one is. From the MCP tools: ` +
-                `look at the screen (ui_snapshot / screenshot), then tap again, or press_key back yourself if a keyboard is ` +
-                `visibly up. In a flow: wait for an element or state that only holds once the screen has settled after the ` +
-                `previous step (wait: { element: … } / wait: { state: … }), or fix the screen so the target is not under a ` +
-                `keyboard — no flow step waits on the keyboard itself`,
-              `${disagreement}; nothing sent`,
-            );
-          }
-          default:
-            return assertNever(verdict.action);
-        }
+        judged = moved;
       }
-      break;
+      stillCovering = window.frame;
+      witness = await oracle.witness();
+      const round = recheck(witness, waited);
+      if (round === 'back') {
+        confirmedAfterMs = waited; // confirmed: the normal dismissal below
+        break;
+      }
+      if (round === 'refuse') {
+        // The last answer decides the wording: a witness that could not be
+        // asked in the later rounds ends here too, and "says no keyboard is
+        // shown" would then claim an answer nobody gave.
+        const inputMethod =
+          witness === 'unknown'
+            ? `the input method said none was shown at first, then could not be asked, and nothing had confirmed a ` +
+              `keyboard after ${KEYBOARD_DISAGREEMENT_BUDGET_MS}ms`
+            : `the input method says no keyboard is shown, and the two still disagreed after ${KEYBOARD_DISAGREEMENT_BUDGET_MS}ms`;
+        // Names MCP tools and "a flow" — the deliberate exception recorded
+        // at the "back did not close it" error below. The flow half names
+        // only what a flow can do: `wait:` takes an element or a state,
+        // never a duration, and nothing in a flow waits on the keyboard.
+        throw new KeyboardStateDisagreement(
+          `The window state reports a soft keyboard over ${what} — its frame ${frameText(stillCovering)} ` +
+            `contains the tap point (${judged.x},${judged.y}) — but ${inputMethod}. Neither back nor the tap was sent: ` +
+            `back would navigate away if no keyboard is up, and the tap would press a key if one is. From the MCP tools: ` +
+            `look at the screen (ui_snapshot / screenshot), then tap again, or press_key back yourself if a keyboard is ` +
+            `visibly up. In a flow: wait for an element or state that only holds once the screen has settled after the ` +
+            `previous step (wait: { element: … } / wait: { state: … }), or fix the screen so the target is not under a ` +
+            `keyboard — no flow step waits on the keyboard itself`,
+          `${disagreement}; nothing sent`,
+        );
+      }
+      // hold: one more round
     }
-    default:
-      return assertNever(verdict.action);
   }
+
+  await pressBack(adapter);
   await sleep(KEYBOARD_HIDE_DELAY_MS);
 
   let second: Resolved;
@@ -533,7 +460,7 @@ export async function resolveClearOfKeyboard(
     // When the witness could not be asked, back went out on the window state
     // alone — the fallback — and the reader must know the veto did not run.
     const hint =
-      (verdict.witness === 'unknown'
+      (witness === 'unknown'
         ? 'If no keyboard was really up at that moment (the input method could not be asked whether a keyboard was shown), '
         : 'If no keyboard was really up at that moment, ') +
       'back may have navigated away — check the screen (ui_snapshot / screenshot)';
@@ -546,47 +473,36 @@ export async function resolveClearOfKeyboard(
     throw new AfterKeyboardDismissal(message, backPressed, { cause: e });
   }
   const point = tapPoint(second.node);
-  const after = await oracle.state();
-  // The pure table, not `judge`: it never answers `back` after the one back,
-  // and a table that did must not be obeyed — it is sent to `unexpected`.
-  const afterSample: KeyboardSample = { phase: 'afterBack', window: windowOver(after, point) };
-  const afterAction = keyboardAction(afterSample);
-  switch (afterAction) {
-    case 'proceed':
-      break;
-    case 'back':
-    case 'hold':
-      return unexpected(afterAction, afterSample, backPressed);
-    case 'refuse':
-      // Honest advice only (review 2026-10-03): scroll_until stops as soon as
-      // the target intersects the viewport, which a node under the keyboard
-      // already does; tapping outside a field does not close the Android IME;
-      // `enter` may submit the form; and a flow has neither a key step nor a
-      // coordinate tap.
-      //
-      // A deliberate exception, 2026-10-03, of the kind amStart's comment
-      // records in adapters/android.ts: this string names MCP tools
-      // (ui_snapshot, press_key) and speaks of "a flow", vocabulary of the two
-      // layers ABOVE interact. Kept, as in verify/capture.ts and
-      // interact/scroll.ts: the reader's next move differs per surface, and
-      // one message with two honest halves beats two translation sites that
-      // must agree. Only words cross the layer, no import.
-      throw new AfterKeyboardDismissal(
-        `Pressed back to hide the soft keyboard covering ${what}, but back did not close it: the keyboard frame ` +
-          `${frameText(shownFrame(after))} still contains the tap point (${point.x},${point.y}); nothing was tapped. ` +
-          `From the MCP tools: inspect the screen with ui_snapshot, then press_key back once more or tap a control above ` +
-          `the keyboard. In a flow: no step can recover this — the screen keeps a keyboard that back does not close ` +
-          `over ${what} — fix the screen (or the test data) so the target is not under the keyboard`,
-        backPressed,
-      );
-    default:
-      return assertNever(afterAction);
+  const after = windowOver(await oracle.state(), point);
+  const confirmation = afterBack(after);
+  if (confirmation.action === 'refuse') {
+    // Honest advice only (review 2026-10-03): scroll_until stops as soon as
+    // the target intersects the viewport, which a node under the keyboard
+    // already does; tapping outside a field does not close the Android IME;
+    // `enter` may submit the form; and a flow has neither a key step nor a
+    // coordinate tap.
+    //
+    // A deliberate exception, 2026-10-03, of the kind amStart's comment
+    // records in adapters/android.ts: this string names MCP tools
+    // (ui_snapshot, press_key) and speaks of "a flow", vocabulary of the two
+    // layers ABOVE interact. Kept, as in verify/capture.ts and
+    // interact/scroll.ts: the reader's next move differs per surface, and
+    // one message with two honest halves beats two translation sites that
+    // must agree. Only words cross the layer, no import.
+    throw new AfterKeyboardDismissal(
+      `Pressed back to hide the soft keyboard covering ${what}, but back did not close it: the keyboard frame ` +
+        `${frameText(confirmation.frame)} still contains the tap point (${point.x},${point.y}); nothing was tapped. ` +
+        `From the MCP tools: inspect the screen with ui_snapshot, then press_key back once more or tap a control above ` +
+        `the keyboard. In a flow: no step can recover this — the screen keeps a keyboard that back does not close ` +
+        `over ${what} — fix the screen (or the test data) so the target is not under the keyboard`,
+      backPressed,
+    );
   }
   // `unknown` after the dismissal fails open like everywhere else — the tap
   // goes ahead — but the note must not claim what was not seen.
   return withNote(
     second,
-    after.state === 'unknown'
+    after.over === 'unknown'
       ? `${backPressed}; the keyboard's state afterwards could not be read`
       : confirmedAfterMs === undefined
         ? `${covered}; hidden before tapping`
@@ -599,25 +515,20 @@ export async function resolveClearOfKeyboard(
  * returned, never before (dismissing first closes the keyboard the typing
  * needs), and as its own call so the fill's warning is already in the
  * caller's hands if this throws. Moved here from fill.ts on 2026-10-04: its
- * samples are `keyboardAction`'s `dismiss` rows, and this file is where the
- * one `back` lives — fill.ts had kept a second copy of the `unknown → back`
- * rule.
+ * decision is `dismissal` above, and this file is where the one `back`
+ * lives — fill.ts had kept a second copy of the `unknown → back` rule.
  *
- * An adapter WITHOUT the oracle (iOS) has no back key and takes `enter`,
- * blind, asking nothing — what the platform branch this replaces did. The
- * absence of the oracle carries that (KeyboardOracle, adapters/types.ts): an
- * adapter that cannot see its keyboard as a window has no `back` to hide it
- * with. The same applies to a NEW adapter that ships without an oracle: its
- * blind dismissal is `enter`, and `enter` may SUBMIT a form — a platform
- * where that is wrong adds the oracle (or extends it with its dismiss key),
- * it does not branch here.
+ * An adapter WITHOUT the oracle takes the blind in-tree dismissal, asking
+ * nothing — what the platform branch this replaced did; which key that is,
+ * and why the oracle's presence or absence decides it, is stated once on
+ * KeyboardOracle (adapters/types.ts).
  *
  * With the oracle (Android), since 2026-10-03: `back` is pressed only if the
  * window state does not say the keyboard is HIDDEN. Before that date it was
  * pressed blindly, and `back` with no keyboard up NAVIGATES BACK — a field
  * that raises no keyboard (a custom PIN pad, a hardware keyboard, a picker)
- * turned `dismissKeyboard: true` into leaving the screen. The table's
- * `dismiss` rows (keyboardAction, where the reasons are):
+ * turned `dismissKeyboard: true` into leaving the screen. The rows (and
+ * their reasons) are `dismissal`'s:
  * - shown   → back — unless, since 2026-10-04, the independent witness denies
  *   the keyboard: then nothing is pressed, and nothing is waited for;
  * - hidden  → nothing: there is nothing to dismiss;
@@ -629,15 +540,6 @@ export async function dismissKeyboard(adapter: KeyboardAdapter): Promise<void> {
   const oracle = adapter.keyboard;
   if (oracle === undefined) return adapter.pressKey('enter');
   const reading = windowAnywhere(await oracle.state());
-  const { action, witness } = await judge(adapter, oracle, { phase: 'dismiss', window: reading });
-  switch (action) {
-    case 'proceed':
-    case 'back':
-    case 'hold':
-      return; // nothing to dismiss / back went out / the witness denied it — all done
-    case 'refuse':
-      return unexpected(action, { phase: 'dismiss', window: reading, witness });
-    default:
-      return assertNever(action);
-  }
+  const decision = reading === 'covering' ? dismissal(reading, await oracle.witness()) : dismissal(reading);
+  if (decision === 'back') await pressBack(adapter);
 }

@@ -94,15 +94,22 @@ export type SoftKeyboard =
  * constant from each without a device query, and the fake carried the
  * simulation of both for a feature one adapter has.
  *
- * Providing an oracle asserts the Android model: the keyboard it describes is
- * a window that `back` hides. interact/keyboard.ts — the one owner of what to
- * DO about the answers — presses `back` only through an adapter that has one,
- * and takes the absence of one as "nothing to see; the blind dismissal is
- * `enter`" (its `dismissKeyboard`). That cuts both ways: a NEW adapter that
- * ships without an oracle gets `enter` for its blind dismissal too, and
- * `enter` may SUBMIT a form — a platform where that is wrong adds the oracle
- * (or extends it with its own dismiss key) rather than a platform branch in
- * interact/.
+ * Two kinds of keyboard, one fact with two halves — stated in full here,
+ * beside the capability; interact/keyboard.ts#dismissKeyboard points here
+ * and ARCHITECTURE §3 repeats the short form. Providing an oracle asserts
+ * the WINDOW model: the keyboard it describes is a separate window that
+ * `back` hides, and interact/keyboard.ts — the one owner of what to DO about
+ * the answers — presses that `back` only through an adapter that has one,
+ * witness-vetoed. Its absence asserts the IN-TREE model (iOS: the keys are
+ * nodes): nothing to observe, no `back` to press, and the blind dismissal
+ * after a fill is `enter`, pressed asking nothing. That cuts both ways: a
+ * NEW adapter that ships without an oracle gets the same blind dismissal,
+ * and that key may SUBMIT a form — a platform where that is wrong adds the
+ * oracle rather than a platform branch in interact/. Not a dismiss-key
+ * property on the adapter (judged 2026-10-05): the guard's `back` must stay
+ * bound to the window model, or an oracle whose key were the in-tree one
+ * would submit forms under a covering keyboard, and "back was pressed (it
+ * may have navigated)" would be false.
  *
  * Both methods NEVER throw and never guess: a command that fails, times out or
  * prints something unrecognised is `unknown`, and callers behave as before the
