@@ -1,12 +1,11 @@
 import type { Platform, Rect, UiNode } from '../adapters/types.js';
 import { collectRects } from '../ui-tree/geometry.js';
 import { errorMessage } from '../util/error-message.js';
-import { pngRegion, type MeasuredFrame, type Undecoded } from './capture.js';
+import { pngRegion, type MeasuredFrame, type TreeFrame } from './capture.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
-import type { Contribution } from './contribution.js';
-import { ocrEngineFor, type OcrEngine, type OcrEngineChoice, type OcrLine, type OcrRegion, type OcrRegionResult } from './ocr.js';
-export type { Contribution };
+import type { Contributed } from './contribution.js';
+import { ocrEngineFor, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from './ocr.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
 /**
@@ -137,17 +136,6 @@ export interface TextOcr {
 export interface TextCapture {
   tree: UiNode;
   ocr?: TextOcr;
-}
-
-export interface TextContribution {
-  value: TextCapture;
-  notes: string[];
-}
-
-/** The leg's frame as the text table measures it: the settled bytes the recognizer reads, and the tree (with or without decoded pixels) beside them. */
-export interface TextLegFrame {
-  shot: Buffer;
-  measured: MeasuredFrame | Undecoded;
 }
 
 export interface TextParityOptions {
@@ -361,14 +349,15 @@ function hasAccessibleName(tree: UiNode, id: string): boolean {
  *
  * Returns the scale's own caveat alongside the regions — the device and the
  * tree disagreeing is a whole-capture fact, so the table says it once per
- * platform rather than once per anchor (measureTextLeg carries it).
+ * platform rather than once per anchor (the measurement reached through
+ * `textMeasurement` carries it).
  *
  * THROWS when the SCALE itself is unusable — that is a whole-capture fault,
  * not a per-anchor one, so returning an empty list would read to the caller as
  * "this screen has no text anchors" and quietly drop the entire text table.
  * This is the text table's policy on a failed scale, and it differs from the
- * color table's on purpose: measureTextLeg contains the throw as a
- * per-platform note and the table stands on tree evidence, because a tree has
+ * color table's on purpose: the measurement behind `textMeasurement`
+ * contains the throw as a per-platform note and the table stands on tree evidence, because a tree has
  * copy to compare and a png has no colour to sample without a scale.
  */
 export function ocrRegionsFor(
@@ -423,29 +412,38 @@ function regionForRect(
 // ------------------------------------------------------------ measurement
 
 /**
- * The recognizer the text table runs under, decided ONCE per run: the one
- * engine choice (verify/ocr.ts#ocrEngineFor) plus this table's POLICY on an
- * absent engine, as the note the run prints. The `ocr` assert fails closed on
- * the same choice; the table degrades to tree evidence and says so, once —
- * OCR is macOS-only and needs a Swift toolchain, and on iOS the tree carries
- * authored a11y summaries rather than rendered copy, so a silent fallback
- * would quietly weaken the check it claims to perform.
+ * The text table's measurement for ONE run, decided once: the engine choice
+ * (verify/ocr.ts#ocrEngineFor — the `ocr` assert fails closed on the same
+ * choice) and BOTH halves of this table's policy on an absent engine, in one
+ * value — the run-level caveat the section prints before any leg, and the
+ * per-leg `measure` that then stands on tree evidence without a note of its
+ * own. One function owns the two because they are one rule: a run that
+ * prints the caveat and legs that keep quiet, never one without the other.
+ * Until 2026-10-05 they were split — `textRecognizer` produced the notes
+ * and a separately exported `measureTextLeg` took the engine as a bare
+ * argument, returning tree-only SILENTLY when it was undefined and trusting
+ * the caller to have printed the caveat; a caller that forgot would have
+ * weakened the check without a word. OCR is macOS-only and needs a Swift
+ * toolchain, and on iOS the tree carries authored a11y summaries rather than
+ * rendered copy, so that silence is the one thing this table must not do.
  */
-export type TextRecognizer = OcrEngineChoice & {
-  /** The run-level caveat for an absent engine; empty when there is one. */
-  notes: string[];
-};
+export interface TextMeasurementRun {
+  /** What the section prints before any leg: the one caveat for an absent engine; empty when there is one. */
+  runNotes: string[];
+  /** One leg's capture with its own caveats — never a `note`-only arm: a leg with a tree always contributes. */
+  measure: (platform: Platform, frame: TreeFrame) => Promise<Contributed<TextCapture>>;
+}
 
-export function textRecognizer(override?: OcrEngine): TextRecognizer {
+export function textMeasurement(contract: LayoutContract, override?: OcrEngine): TextMeasurementRun {
   const choice = ocrEngineFor(override);
-  if (choice.unavailable === undefined) return { ...choice, notes: [] };
-  return {
-    ...choice,
-    notes: [
-      `(OCR unavailable — ${choice.unavailable}. Compared from the accessibility tree only, which on iOS ` +
-        'reads authored a11y labels rather than rendered copy.)',
-    ],
-  };
+  const runNotes =
+    choice.unavailable === undefined
+      ? []
+      : [
+          `(OCR unavailable — ${choice.unavailable}. Compared from the accessibility tree only, which on iOS ` +
+            'reads authored a11y labels rather than rendered copy.)',
+        ];
+  return { runNotes, measure: (platform, frame) => measureTextLeg(contract, platform, frame, choice.engine) };
 }
 
 /** The ONE wording for a leg whose OCR did not happen: it stands on tree evidence, and the table says why. */
@@ -469,23 +467,25 @@ const ocrFailedNote = (platform: Platform, reason: string): string =>
  * Every failure here degrades to a NOTE rather than an exception: an
  * undecodable png, an unusable scale or a recognizer crash must leave the
  * text table standing on tree evidence, clearly labelled as such, instead of
- * taking down a device run that took minutes. The leg always contributes —
- * it has a tree, or the run would not have asked.
+ * taking down a device run that took minutes. Always `Contributed`, never a
+ * bare note: the leg has a tree, or the run would not have asked; `notes` is
+ * always present (`[]` when none).
  *
- * No engine (OCR unavailable here): tree only, no per-leg note — the run
- * already printed the one caveat (textRecognizer). A tree whose scale yields
- * no region: tree only, no note — nothing scaled, nothing to caveat. The
- * scale's own caveat is carried AFTER the recognizer ran, so a leg that ends
- * up compared from the tree carries THAT reason alone rather than a caveat
- * about regions it never used.
+ * Reached only through `textMeasurement` (private since 2026-10-05, so the
+ * no-engine path below cannot be taken without the run-level caveat that
+ * explains it). No engine: tree only, no per-leg note — the run printed the
+ * one caveat. A tree whose scale yields no region: tree only, no note —
+ * nothing scaled, nothing to caveat. The scale's own caveat is carried AFTER
+ * the recognizer ran, so a leg that ends up compared from the tree carries
+ * THAT reason alone rather than a caveat about regions it never used.
  */
-export async function measureTextLeg(
+async function measureTextLeg(
   contract: LayoutContract,
   platform: Platform,
-  { shot, measured: frame }: TextLegFrame,
+  { shot, measured: frame }: TreeFrame,
   engine: OcrEngine | undefined,
-): Promise<TextContribution> {
-  const treeOnly: TextContribution = { value: { tree: frame.tree }, notes: [] };
+): Promise<Contributed<TextCapture>> {
+  const treeOnly: Contributed<TextCapture> = { value: { tree: frame.tree }, notes: [] };
   if (engine === undefined) return treeOnly;
   // A tree without pixels: that is an OCR failure in this table's terms, worded here.
   if (frame.error !== undefined) return { ...treeOnly, notes: [ocrFailedNote(platform, frame.error)] };

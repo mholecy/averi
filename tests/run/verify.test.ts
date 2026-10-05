@@ -12,7 +12,6 @@ import {
   formatLogExcerpt,
   paritySection,
   runVerification,
-  type ParityDimension,
 } from '../../src/run/verify.js';
 import { Verifier } from '../../src/verify/assert.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
@@ -266,6 +265,25 @@ describe('parity containment', () => {
  * touched, lists every problem by dimension, and asks only the dimensions
  * whose table the contract would produce.
  */
+describe('a leg without a tree — the one no-tree wording every table shares', () => {
+  it('rect parity notes the leg with the frame\'s own reason, byte for byte, and compares what is left', async () => {
+    const android = fake('android');
+    android.uiTree = async () => {
+      throw new Error('adb: device offline');
+    };
+    const out = await runVerification(
+      request({ contract: contract([{ id: 'card', x: 10, w: 40 }]) }),
+      async (p) => (p === 'android' ? android : fake('ios')),
+    );
+    const rect = out.sections.find((s) => s.startsWith('## rect parity'));
+    // The reason is the frame's own one sentence (the bounded retry's), quoted whole.
+    expect(rect).toContain(
+      '\n(android: UI tree read failed — UI tree read failed after 5 attempts: adb: device offline — compared without it)\n',
+    );
+    expect(rect).not.toContain('(ios:');
+  });
+});
+
 describe('the contract is validated before the legs', () => {
   /** An adapter seam that records being asked for anything at all. */
   const untouched = () => {
@@ -780,64 +798,49 @@ describe('paritySection — the containment every table shares', () => {
     status: 'fulfilled',
     value: { trace: [], results: [], frame: { shot: whitePng(), stability: 'settled', captures: 2 }, health: `\n${platform}` },
   });
-  const run = { contract: contract([]), text: undefined };
 
   it('a collector that throws for one leg degrades that leg to a note and compares the other', async () => {
-    const dimension: ParityDimension<Record<string, never>, string> = {
-      title: 'probe parity',
-      produced: () => true,
-      options: {},
-      validate: () => [],
+    const section = await paritySection<string>('probe parity', ['android', 'ios'], [leg('android'), leg('ios')], {
       collect: (_leg, p) => {
         if (p === 'android') throw new Error('adb: device offline');
         return { value: `${p} artifact` };
       },
-      emptyMessage: 'SKIPPED: nothing measured.',
-    };
-    const section = await paritySection(dimension, ['android', 'ios'], [leg('android'), leg('ios')], run, (c) =>
-      `compared ${Object.keys(c).join(',')}`,
-    );
+      empty: 'SKIPPED: nothing measured.',
+      format: (c) => `compared ${Object.keys(c).join(',')}`,
+    });
     expect(section).toBe(
       '## probe parity\n(android: probe parity could not be measured — adb: device offline — compared without it)\ncompared ios',
     );
   });
 
   it('a collector that rejects for every leg prints the empty message under the notes', async () => {
-    const dimension: ParityDimension<Record<string, never>, string> = {
-      title: 'probe parity',
-      produced: () => true,
-      options: {},
-      validate: () => [],
+    const section = await paritySection<string>('probe parity', ['android'], [leg('android')], {
       collect: async () => {
         throw new Error('boom');
       },
-      emptyMessage: 'SKIPPED: nothing measured.',
-    };
-    const section = await paritySection(dimension, ['android'], [leg('android')], run, () => 'never');
+      empty: 'SKIPPED: nothing measured.',
+      format: () => 'never',
+    });
     expect(section).toBe('## probe parity\n(android: probe parity could not be measured — boom — compared without it)\nSKIPPED: nothing measured.');
   });
 
   it('the run-level notes come first, then each leg\'s in platform order — the one order, deterministic', async () => {
-    const dimension: ParityDimension<Record<string, never>, string> = {
-      title: 'probe parity',
-      produced: () => true,
-      options: {},
-      validate: () => [],
+    const section = await paritySection<string>('probe parity', ['android', 'ios'], [leg('android'), leg('ios')], {
       // ios resolves FIRST; the printed order is still android, ios.
       collect: async (_leg, p) => {
         await new Promise((r) => setTimeout(r, p === 'android' ? 10 : 0));
         return { value: p, notes: [`(${p}: caveat)`] };
       },
-      emptyMessage: 'SKIPPED',
-      runNotes: () => ['(run-level)'],
-    };
-    const section = await paritySection(dimension, ['android', 'ios'], [leg('android'), leg('ios')], run, () => 'body');
+      empty: 'SKIPPED',
+      runNotes: ['(run-level)'],
+      format: () => 'body',
+    });
     expect(section).toBe('## probe parity\n(run-level)\n(android: caveat)\n(ios: caveat)\nbody');
   });
 });
 
 describe('the recognizer is decided only for a contract that opts into text', () => {
-  it('a rect-only contract never asks whether OCR can run here', async () => {
+  it('a rect-only contract prints no OCR note, even on a host without OCR', async () => {
     const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
     try {

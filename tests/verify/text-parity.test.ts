@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
-import { measuredFrameFor, type MeasuredFrame, type Undecoded } from '../../src/verify/capture.js';
+import { measuredFrameFor, type MeasuredFrame, type TreeFrame, type Undecoded } from '../../src/verify/capture.js';
 import { sizeOnlyPng } from '../helpers/fake.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
@@ -9,13 +9,12 @@ import {
   contractHasTextAnchors,
   evaluateOcrAssert,
   formatTextParity,
-  measureTextLeg,
   normalizeText,
   ocrRegionsFor,
   renderedTextFromTree,
   survivesIn,
   textParityVerdict,
-  textRecognizer,
+  textMeasurement,
   validateTextContract,
   type TextCapture,
 } from '../../src/verify/text-parity.js';
@@ -557,16 +556,20 @@ describe('ocrRegionsFor', () => {
   });
 });
 
-describe('measureTextLeg — the text table\'s measurement phase', () => {
+describe('textMeasurement(...).measure — the text table\'s per-leg measurement', () => {
   /**
    * Until 2026-10-04 this phase lived in run/verify.ts as `runOcr`, and these
    * wordings were pinned only through the whole verify run. They are the text
    * table's own now, with exactly one emission site each; the run tests still
-   * see them through the table.
+   * see them through the table. Reached as production reaches it — through
+   * `textMeasurement` with a supplied engine (since 2026-10-05 the bare
+   * per-leg function is private); the no-engine case is the describe below.
    */
   const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
   const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
   const shot = Buffer.from('png bytes');
+  /** A leg's frame as the run hands it over: the settled bytes plus what the capture concluded (capture.ts#TreeFrame). */
+  const leg = (measured: MeasuredFrame | Undecoded): TreeFrame => ({ shot, stability: 'settled', captures: 2, measured });
   const recording = (byId: Record<string, OcrLine[]> = { cta: [line('CONTINUE', 36)] }) => {
     const calls: OcrRegion[][] = [];
     const engine: OcrEngine = {
@@ -578,16 +581,11 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
     return { engine, calls };
   };
 
-  it('no engine (OCR unavailable here): the tree alone, no note — the run said why, once', async () => {
-    const got = await measureTextLeg(c, 'ios', { shot, measured: frame(ios, 1206, 2622) }, undefined);
-    expect(got).toEqual({ value: { tree: ios }, notes: [] });
-  });
-
   it('recognizes the opted-in anchors on the leg\'s own bytes, keyed by id, WITH the png width', async () => {
     const { engine, calls } = recording();
     // Scaled by the device screen, so the scale has no caveat of its own to carry.
     const f = frame(ios, 1206, 2622, { width: 402, height: 874 });
-    const got = await measureTextLeg(c, 'ios', { shot, measured: f }, engine);
+    const got = await textMeasurement(c, engine).measure('ios', leg(f));
     expect(calls).toEqual([[{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]]);
     expect(got.notes).toEqual([]);
     expect(got.value.tree).toBe(ios);
@@ -598,7 +596,7 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
   it('a tree without pixels is an OCR failure in this table\'s words: tree only, the frame\'s reason quoted', async () => {
     const { engine, calls } = recording();
     const undecoded: Undecoded = { tree: ios, error: 'screenshot PNG decode failed: not a png' };
-    const got = await measureTextLeg(c, 'android', { shot, measured: undecoded }, engine);
+    const got = await textMeasurement(c, engine).measure('android', leg(undecoded));
     expect(calls).toEqual([]);
     expect(got).toEqual({
       value: { tree: ios },
@@ -608,7 +606,7 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
 
   it('a recognizer that throws degrades to tree evidence with the note, never an exception', async () => {
     const failing: OcrEngine = { recognize: async () => { throw new Error('swiftc not found'); } };
-    const got = await measureTextLeg(c, 'ios', { shot, measured: frame(ios, 1206, 2622) }, failing);
+    const got = await textMeasurement(c, failing).measure('ios', leg(frame(ios, 1206, 2622)));
     expect(got).toEqual({
       value: { tree: ios },
       notes: ['(ios: OCR failed — swiftc not found — that platform compared from the tree.)'],
@@ -617,16 +615,16 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
 
   it('an unusable scale is this table\'s per-platform note (color fails closed on the same frame)', async () => {
     const { engine, calls } = recording();
-    const got = await measureTextLeg(c, 'android', { shot, measured: frame(root(402, [n({ identifier: 'cta' })]), 0, 800) }, engine);
+    const got = await textMeasurement(c, engine).measure('android', leg(frame(root(402, [n({ identifier: 'cta' })]), 0, 800)));
     expect(calls).toEqual([]);
     expect(got.value).toEqual({ tree: expect.anything() });
     expect(got.notes).toHaveLength(1);
-    expect(got.notes[0]).toMatch(/^\(android: OCR failed — text parity: .*degenerate dimensions 0x800.* — that platform compared from the tree\.\)$/);
+    expect(got.notes?.[0]).toMatch(/^\(android: OCR failed — text parity: .*degenerate dimensions 0x800.* — that platform compared from the tree\.\)$/);
   });
 
   it('nothing scaled, nothing to caveat: an anchor missing from the tree asks the recognizer nothing', async () => {
     const { engine, calls } = recording();
-    const got = await measureTextLeg(c, 'ios', { shot, measured: frame(root(402, [n({ identifier: 'other' })]), 1206, 2622) }, engine);
+    const got = await textMeasurement(c, engine).measure('ios', leg(frame(root(402, [n({ identifier: 'other' })]), 1206, 2622)));
     expect(calls).toEqual([]);
     expect(got.notes).toEqual([]);
     expect(got.value.ocr).toBeUndefined();
@@ -640,13 +638,20 @@ describe('measureTextLeg — the text table\'s measurement phase', () => {
     const f = frame(tree, 200, 400, { width: 200, height: 400 });
     const { note } = ocrRegionsFor(c, f);
     expect(note).toMatch(/DEVICE screen/);
-    const got = await measureTextLeg(c, 'android', { shot, measured: f }, engine);
+    const got = await textMeasurement(c, engine).measure('android', leg(f));
     expect(got.notes).toEqual([`(android: ${note})`]);
     expect(got.value.ocr?.pngWidth).toBe(200);
   });
 });
 
-describe('textRecognizer — decided once per run', () => {
+describe('textMeasurement — the text table\'s one run-level decision', () => {
+  /**
+   * Both halves of the absent-engine policy in one value (2026-10-05): the
+   * caveat the section prints before any leg, and the per-leg `measure` that
+   * then stands on tree evidence WITHOUT a note of its own. Until that date
+   * `textRecognizer` produced the notes and `measureTextLeg` took the engine
+   * as a bare argument — two things a caller had to keep in step.
+   */
   const onHost = async (platform: string, body: () => void | Promise<void>) => {
     const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
     Object.defineProperty(process, 'platform', { value: platform, configurable: true });
@@ -656,21 +661,37 @@ describe('textRecognizer — decided once per run', () => {
       Object.defineProperty(process, 'platform', real);
     }
   };
+  const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
+  const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
+  const leg = (measured: MeasuredFrame): TreeFrame => ({ shot: Buffer.from('png bytes'), stability: 'settled', captures: 2, measured });
 
-  it('a supplied engine is used as given, with no caveat', () => {
-    const engine: OcrEngine = { recognize: async () => [] };
-    expect(textRecognizer(engine)).toEqual({ engine, notes: [] });
+  it('a supplied engine is used as given, with no caveat, and `measure` recognizes with it', async () => {
+    const calls: OcrRegion[][] = [];
+    const engine: OcrEngine = {
+      recognize: async (_png, regions) => {
+        calls.push(regions);
+        return regions.map((r) => ({ id: r.id, lines: [line('CONTINUE', 36)] }));
+      },
+    };
+    const run = textMeasurement(c, engine);
+    expect(run.runNotes).toEqual([]);
+    const got = await run.measure('ios', leg(frame(ios, 1206, 2622, { width: 402, height: 874 })));
+    expect(calls).toHaveLength(1);
+    expect(got.value.ocr?.byId.get('cta')?.lines).toEqual([line('CONTINUE', 36)]);
+    expect(got.notes).toEqual([]);
   });
 
-  it('no engine where Vision cannot run: the one run-level note, from the one reason', () =>
-    onHost('linux', () => {
-      const got = textRecognizer();
-      expect(got.engine).toBeUndefined();
-      expect(got.notes).toEqual([
+  it('no engine where Vision cannot run: the one run-level note from the one reason, and every leg stands on its tree silently', () =>
+    onHost('linux', async () => {
+      const run = textMeasurement(c);
+      expect(run.runNotes).toEqual([
         `(OCR unavailable — ${ocrUnavailableReason()}. Compared from the accessibility tree only, which on iOS ` +
           'reads authored a11y labels rather than rendered copy.)',
       ]);
       expect(ocrUnavailableReason()).toContain('this host is linux');
+      // The leg does NOT repeat the caveat: the run said it once.
+      const got = await run.measure('ios', leg(frame(ios, 1206, 2622)));
+      expect(got).toEqual({ value: { tree: ios }, notes: [] });
     }));
 });
 

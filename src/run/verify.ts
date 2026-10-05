@@ -7,7 +7,7 @@ import { refuseUnknownEnvironment } from './preflight.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
-import { captureFrame, unsettledNote, type Frame, type MeasuredFrame } from '../verify/capture.js';
+import { captureFrame, unsettledNote, type Frame, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -27,13 +27,10 @@ import {
   compareTextParity,
   contractHasTextAnchors,
   formatTextParity,
-  measureTextLeg,
-  textRecognizer,
+  textMeasurement,
   validateTextContract,
   type TextCapture,
-  type TextLegFrame,
   type TextParityOptions,
-  type TextRecognizer,
 } from '../verify/text-parity.js';
 import type { Contribution } from '../verify/contribution.js';
 
@@ -201,9 +198,11 @@ const noTreeNote = (p: Platform, reason: string): string =>
  * the tables only exist then; the fallback wording covers the shape the
  * types cannot rule out.
  */
-const withTree = (leg: VerificationLeg, p: Platform): Contribution<TextLegFrame> => {
+const withTree = (leg: VerificationLeg, p: Platform): Contribution<TreeFrame> => {
   const m = leg.frame.measured;
-  if (m?.tree !== undefined) return { value: { shot: leg.frame.shot, measured: m } };
+  // The frame is spread, not re-spelled, so what it says about itself
+  // (`stability`, `captures`, whatever comes next) reaches every table.
+  if (m?.tree !== undefined) return { value: { ...leg.frame, measured: m } };
   return { note: noTreeNote(p, m?.error ?? 'no UI tree was read for this leg') };
 };
 
@@ -245,46 +244,32 @@ const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFra
  * comparator alone would let a bad `bg_dark` through validation and fail it
  * after the legs, which is the cost this whole check exists to remove.
  *
- * The table holds FACTS only — title, produced, options, validate, and since
- * 2026-10-04 what one leg contributes (`collect`) and what the section says
- * when no leg could. Comparing and formatting stay hand-written per dimension
- * below, on purpose: the three degrade differently, and the 2026-08-14
- * review's decision stands — no generic reporting framework.
- *
- * `collect` is one line per dimension because each comparator's own module
- * owns its measurement: the tree (rect), the measured frame (color), and the
- * text capture WITH its OCR pass (text — `measureTextLeg`, which until
- * 2026-10-04 was a 50-line `runOcr` here, the one measurement phase that sat
- * a layer above the module it belonged to).
+ * The table holds FACTS only — title, produced, options, validate — the four
+ * that are asked at two moments (before the legs, after them) and must agree
+ * between the two. Everything about HOW one table is built — what a leg
+ * contributes, what the section says when no leg could, what the run decided
+ * before any leg — is handed to `paritySection` at the one call that builds
+ * it. For one day (2026-10-04 → 2026-10-05) those hooks sat in this record
+ * too, with a run-context object only the text collector read — one or two
+ * users each, so they failed the deletion test and went back to the call
+ * sites (ARCHITECTURE §2 has the full account). Comparing and formatting
+ * stay hand-written per dimension below, on purpose: the three degrade
+ * differently, and the 2026-08-14 review's decision stands — no generic
+ * reporting framework. Rejected on 2026-10-05: its opposite, a `report()` in
+ * the record and one loop over the three, which would have needed type
+ * erasure to iterate a heterogeneous record.
  */
-export interface ParityDimension<Options, Artifact> {
+interface ParityDimension<Options> {
   title: string;
   produced: (contract: LayoutContract) => boolean;
   options: Options;
   validate: (contract: LayoutContract, options: Options) => string[];
-  /** One leg's artifact, or why it cannot contribute one. */
-  collect: (leg: VerificationLeg, platform: Platform, run: RunContext) => Contribution<Artifact> | Promise<Contribution<Artifact>>;
-  /** The section body when NO leg contributed. */
-  emptyMessage: string;
-  /** Notes the run decided before any leg was collected — why the whole table is degraded (text: no recognizer here). */
-  runNotes?: (run: RunContext) => string[];
-}
-
-/**
- * What a run decides once, before the tables, for every dimension's
- * collector: the contract, and the recognizer the text table runs under —
- * present only when the contract produces a text table, so a rect-only
- * contract prints no OCR note.
- */
-export interface RunContext {
-  contract: LayoutContract;
-  text: TextRecognizer | undefined;
 }
 
 const DIMENSIONS: {
-  rect: ParityDimension<RectParityOptions, UiNode>;
-  color: ParityDimension<ColorParityOptions, MeasuredFrame>;
-  text: ParityDimension<TextParityOptions, TextCapture>;
+  rect: ParityDimension<RectParityOptions>;
+  color: ParityDimension<ColorParityOptions>;
+  text: ParityDimension<TextParityOptions>;
 } = {
   // Geometry is what a contract IS: the rect table exists whenever one does.
   rect: {
@@ -292,8 +277,6 @@ const DIMENSIONS: {
     produced: () => true,
     options: {},
     validate: validateRectContract,
-    collect: treeOf,
-    emptyMessage: 'SKIPPED: no leg produced a UI tree.',
   },
   // Opt-in: any anchor carrying bg / bg_dark / sample. Reuses each leg's
   // frame — the exact pixels already returned to the caller, the tree read
@@ -309,28 +292,23 @@ const DIMENSIONS: {
     produced: contractHasColorAnchors,
     options: { theme: 'light' },
     validate: validateColorContract,
-    collect: measuredOf,
-    emptyMessage: 'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
   },
   // Opt-in: any anchor carrying text / text_dynamic. The recognizer runs on
   // the bytes each leg already returned; when it cannot run at all the run
-  // says so once (RunContext.text.notes) and every leg stands on its tree.
+  // says so once and every leg stands on its tree (text-parity.ts#textMeasurement).
   text: {
     title: 'text parity',
     produced: contractHasTextAnchors,
     options: {},
     validate: validateTextContract,
-    collect: (leg, p, run) => {
-      const got = withTree(leg, p);
-      return 'note' in got ? got : measureTextLeg(run.contract, p, got.value, run.text?.engine);
-    },
-    emptyMessage: 'SKIPPED: no leg produced a UI tree.',
-    runNotes: (run) => run.text?.notes ?? [],
   },
 };
 
+/** The one sentence two tables share for "no leg had a tree" — rect and text both stand on the tree alone. */
+const SKIPPED_NO_TREE = 'SKIPPED: no leg produced a UI tree.';
+
 /** One dimension's problems — none when this contract does not produce its table. */
-const dimensionProblems = <Options, T>(d: ParityDimension<Options, T>, contract: LayoutContract): string[] =>
+const dimensionProblems = <Options>(d: ParityDimension<Options>, contract: LayoutContract): string[] =>
   d.produced(contract) ? d.validate(contract, d.options) : [];
 
 /**
@@ -514,41 +492,61 @@ export async function runVerification(
   });
 
   if (contract !== undefined) {
-    // What the dimensions' collectors may need. The recognizer the text table
-    // runs under is decided ONCE here — so a host without OCR prints its one
-    // caveat once rather than per leg — and only for a contract that produces
-    // a text table, so a rect-only contract prints no OCR note at all.
-    const run: RunContext = {
-      contract,
-      text: DIMENSIONS.text.produced(contract) ? textRecognizer(req.ocrEngine) : undefined,
-    };
     // The options are the dimension's, shared with the validation that ran
     // before the legs (see ParityDimension). The three sections are produced
-    // the same way; only the comparator differs.
+    // the same way — one `paritySection` call each, handed what one leg
+    // contributes and what the section says when none could; only the
+    // comparator differs.
     if (DIMENSIONS.rect.produced(contract)) {
       sections.push(
-        await paritySection(DIMENSIONS.rect, platforms, runs, run, (trees) =>
-          formatRectParity(compareRectParity(contract, trees, DIMENSIONS.rect.options)),
-        ),
+        await paritySection(DIMENSIONS.rect.title, platforms, runs, {
+          collect: treeOf,
+          empty: SKIPPED_NO_TREE,
+          format: (trees) => formatRectParity(compareRectParity(contract, trees, DIMENSIONS.rect.options)),
+        }),
       );
     }
     if (DIMENSIONS.color.produced(contract)) {
       sections.push(
-        await paritySection(DIMENSIONS.color, platforms, runs, run, (captures) =>
-          formatColorParity(compareColorParity(contract, captures, DIMENSIONS.color.options)),
-        ),
+        await paritySection(DIMENSIONS.color.title, platforms, runs, {
+          collect: measuredOf,
+          empty: 'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
+          format: (captures) => formatColorParity(compareColorParity(contract, captures, DIMENSIONS.color.options)),
+        }),
       );
     }
     if (DIMENSIONS.text.produced(contract)) {
+      // Decided ONCE, inside the guard: a host without OCR prints its one
+      // caveat once rather than per leg, and a rect-only contract never asks
+      // whether OCR can run here — the question is not reached.
+      const text = textMeasurement(contract, req.ocrEngine);
       sections.push(
-        await paritySection(DIMENSIONS.text, platforms, runs, run, (captures) =>
-          formatTextParity(compareTextParity(contract, captures, DIMENSIONS.text.options)),
-        ),
+        await paritySection(DIMENSIONS.text.title, platforms, runs, {
+          collect: (leg, p) => {
+            const got = withTree(leg, p);
+            return 'note' in got ? got : text.measure(p, got.value);
+          },
+          empty: SKIPPED_NO_TREE,
+          runNotes: text.runNotes,
+          format: (captures) => formatTextParity(compareTextParity(contract, captures, DIMENSIONS.text.options)),
+        }),
       );
     }
   }
 
   return { sections, screenshots };
+}
+
+/** How ONE parity table is built from the legs — handed to `paritySection` at the call that builds it. */
+interface SectionBuild<T> {
+  /** One leg's artifact with its caveats, or why it cannot contribute one. May be async (the text table runs a recognizer per leg). */
+  collect: (leg: VerificationLeg, platform: Platform) => Contribution<T> | Promise<Contribution<T>>;
+  /** The section body when NO leg contributed. */
+  empty: string;
+  /** What the run decided before any leg — why the whole table is degraded (text: no recognizer on this host). */
+  runNotes?: string[];
+  /** The comparator and its renderer, over the legs that contributed. */
+  format: (collected: Partial<Record<Platform, T>>) => string;
 }
 
 /**
@@ -557,9 +555,9 @@ export async function runVerification(
  * collector or comparator error. That containment is the point — a contract
  * that cannot be normalized, or a measurement that throws, must not reject
  * the tool call and throw away the traces, assert results and screenshots of
- * a device run that took minutes. The collectors in DIMENSIONS cannot throw
- * today (each degrades to a note itself); the catch is for the next one,
- * since `collect` is where a new dimension's measurement lands.
+ * a device run that took minutes. Today's collectors cannot throw (each
+ * degrades to a note itself); the catch is for the next one, since `collect`
+ * is where a new dimension's measurement lands.
  *
  * The legs are collected in parallel (the text dimension's collector runs a
  * recognizer per leg) and their notes printed in platform order: the run's
@@ -571,23 +569,22 @@ export async function runVerification(
  *
  * Exported for its containment test only; runVerification is the caller.
  */
-export async function paritySection<Options, T>(
-  dimension: ParityDimension<Options, T>,
+export async function paritySection<T>(
+  title: string,
   platforms: Platform[],
   runs: PromiseSettledResult<VerificationLeg>[],
-  run: RunContext,
-  format: (collected: Partial<Record<Platform, T>>) => string,
+  build: SectionBuild<T>,
 ): Promise<string> {
   const collected: Partial<Record<Platform, T>> = {};
-  const notes: string[] = [...(dimension.runNotes?.(run) ?? [])];
+  const notes: string[] = [...(build.runNotes ?? [])];
   const contributions = await Promise.all(
     platforms.map(async (p, i): Promise<Contribution<T>> => {
       const leg = runs[i];
       if (leg.status === 'rejected') return { note: `(${p} leg failed — compared without it)` };
       try {
-        return await dimension.collect(leg.value, p, run);
+        return await build.collect(leg.value, p);
       } catch (e) {
-        return { note: `(${p}: ${dimension.title} could not be measured — ${errorMessage(e)} — compared without it)` };
+        return { note: `(${p}: ${title} could not be measured — ${errorMessage(e)} — compared without it)` };
       }
     }),
   );
@@ -601,12 +598,12 @@ export async function paritySection<Options, T>(
     }
   });
   const note = notes.length > 0 ? notes.join('\n') + '\n' : '';
-  if (Object.keys(collected).length === 0) return `## ${dimension.title}\n${note}${dimension.emptyMessage}`;
+  if (Object.keys(collected).length === 0) return `## ${title}\n${note}${build.empty}`;
   let body: string;
   try {
-    body = format(collected);
+    body = build.format(collected);
   } catch (e) {
     body = `FAILED: ${errorMessage(e)}`;
   }
-  return `## ${dimension.title}\n${note}${body}`;
+  return `## ${title}\n${note}${body}`;
 }

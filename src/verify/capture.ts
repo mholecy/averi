@@ -215,9 +215,29 @@ export const isMoving = (frame: Pick<Frame, 'stability'>): boolean => frame.stab
 export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): string | undefined =>
   isMoving(frame) ? `⚠ frame: ${unsettledReason(frame)} — the last capture is returned as the best available` : undefined;
 
-/** A frame captured with a tree in play: its measured half is always there. */
-interface FrameWithTree extends Frame {
+/**
+ * A frame for which a tree was ASKED — read here or supplied — so its
+ * measured half is always there, though it may say the read failed
+ * (`Treeless`). What `captureFrame` returns to such a caller.
+ */
+interface TreeRequestedFrame extends Frame {
   measured: FrameMeasurement;
+}
+
+/**
+ * A frame that HAS a tree (2026-10-05): the captured bytes, the tree (with or
+ * without decoded pixels) beside them, and whatever else the frame says
+ * about itself (`stability`, `captures`). Derived from `Frame` rather than
+ * spelled as `{ shot, measured }`, so a field added to the frame reaches
+ * every consumer without an edit here; the one narrowing is `measured`,
+ * which has lost its treeless arm — the difference from `TreeRequestedFrame`
+ * above, which only promises the question was asked. Until this date the
+ * shape was `TextLegFrame` in text-parity.ts: a text-named type one consumer
+ * handed to all three parity tables, and a freestanding copy that would have
+ * silently dropped `stability`.
+ */
+export interface TreeFrame extends Omit<Frame, 'measured'> {
+  measured: MeasuredFrame | Undecoded;
 }
 
 /**
@@ -279,7 +299,7 @@ type CaptureOptions = {
 export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions & ({ readTree: true } | { tree: UiNode }),
-): Promise<FrameWithTree>;
+): Promise<TreeRequestedFrame>;
 export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
   opts?: CaptureOptions,
