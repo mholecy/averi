@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import type { UiNode } from '../../src/adapters/types.js';
 import { PollMiss, pollTree, readTreeOrError } from '../../src/ui-tree/read-tree.js';
 
@@ -134,6 +136,57 @@ describe('pollTree — the one deadline loop', () => {
     expect(miss.timedOut).toBe(true);
     expect(reads).toBe(2);
     expect(evaluations).toBe(2);
+  });
+
+  // 2026-10-05: the loop's deadline rule is HEAD's — checked after each
+  // round, never before a read — and that is pinned here because two
+  // tightenings were tried and withdrawn: projecting the previous round's
+  // cost (a static element under a 600 ms dump threw after ONE read at
+  // 615 ms of a 1500 ms budget; a `wait:` landing at 8.5 s of 10 timed out
+  // at 9.6 s) and refusing a round after a pause that crossed the deadline
+  // (the same two cases, timed out AT the deadline where HEAD found them).
+  // A predicate that waits bounds its own wait with the deadline it is
+  // handed; the loop keeps the slack a late element is found by.
+  it('a late round still inside the deadline IS taken: an element appearing at 2.5 s of 3 s is found by it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.now();
+      let reads = 0;
+      const adapter = {
+        uiTree: async () => {
+          const at = Date.now() - start;
+          reads += 1;
+          vi.setSystemTime(Date.now() + 1000); // a slow dump
+          return { ...tree, children: at >= 2500 ? [tree] : [] };
+        },
+      };
+      const outcome = await pollTree(adapter, (t) => (t.children.length > 0 ? 'found' : undefined), { timeoutMs: 3000, pollMs: 300 });
+      // Reads at 0, 1300 and 2600 (each 1 s, then a 300 ms pause): the third starts inside the deadline and finds it.
+      expect(outcome).toEqual({ timedOut: false, value: 'found' });
+      expect(reads).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a pause that crosses the deadline still gets one last read — the slack HEAD always had, kept (2026-10-05)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let reads = 0;
+      const adapter = {
+        uiTree: async () => {
+          reads += 1;
+          vi.setSystemTime(Date.now() + 700);
+          return tree;
+        },
+      };
+      const outcome = await pollTree(adapter, () => undefined, { timeoutMs: 1000, pollMs: 400 });
+      // Read 0→700, pause →1100 (past the deadline), one more read →1800, then the check ends it.
+      expect(outcome.timedOut).toBe(true);
+      expect(reads).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('the predicate\'s own error propagates at once — it is the caller\'s bug, not a miss', async () => {

@@ -11,6 +11,7 @@ import {
   runNamedFlow,
 } from '../../src/run/commands.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
 /**
  * The single-platform tool compositions at their own level: a FakeAdapter, a
@@ -21,17 +22,11 @@ import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
  */
 
 // The one sleep owner is recorded, not waited on (as in tests/verify/capture.test.ts).
-const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
-vi.mock('../../src/util/sleep.js', () => ({
-  sleep: async (ms: number) => {
-    sleeps.push(ms);
-    await new Promise((r) => setTimeout(r, 0));
-  },
-}));
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 let dir: string;
 beforeEach(async () => {
-  sleeps.length = 0;
+  resetSleeps();
   resetLayout();
   dir = await mkdtemp(join(tmpdir(), 'averi-commands-'));
 });
@@ -105,6 +100,20 @@ describe('runEnsureState', () => {
     expect(fake.screenshots).toEqual(frames);
     // The adapter is resolved FROM the loaded config (it names the iOS tree source).
     expect(resolvedWith.map((cfg) => cfg.app.android?.package)).toEqual(['md.bank.app']);
+  });
+
+  it('a frame that never settled is returned with ONE note line after the health line; a settled one adds nothing (2026-10-05)', async () => {
+    const fake = home();
+    let i = 0;
+    fake.screenshot = async () => {
+      const shot = frame(`moving ${i++}`);
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    const out = await runEnsureState({ state: 'home', configPath: await validConfig() }, resolver(fake).resolve);
+    expect(out.text).toMatch(/\nappAlive: true\n⚠ frame: /);
+    expect(out.text.split('\n').at(-1)).toBe('⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available');
+    expect(out.shot).toEqual(frame('moving 5'));
   });
 
   it('runs in the environment the call names: the trace opens with it', async () => {

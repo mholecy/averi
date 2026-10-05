@@ -91,7 +91,14 @@ export const resetClearStateCount = (): void => {
 };
 
 export interface EngineOptions {
-  /** Poll interval for waits; tests use a few ms. */
+  /**
+   * Poll interval for waits — and ONLY that (2026-10-05). It is handed to the
+   * Verifier the inline `assert:` steps use as its poll interval too; the
+   * stability wait before a pixel reading is verify/capture.ts's own budget,
+   * which this knob no longer touches (it used to be forwarded as the delay
+   * between stability captures, so asserts inside flows waited 500 ms where
+   * the MCP `assert` tool waited 300). Tests use a few ms.
+   */
   pollMs?: number;
   tapTimeoutMs?: number;
   waitTimeoutMs?: number;
@@ -611,10 +618,16 @@ export class FlowEngine {
   private async runScrollUntil(spec: ScrollUntilSpec): Promise<void> {
     const { element, timeout, ...rest } = spec;
     // The YAML's `timeout: 2s` is this layer's vocabulary; interact takes ms.
+    // The pause after each swipe is interact/scroll.ts's own (400 ms): it is
+    // a gesture-settle wait, not this engine's poll interval. Until 2026-10-05
+    // `pollMs` (500) was passed as `settleMs` — the same one-knob-two-meanings
+    // habit that made the stability budget 500 ms inside flows (capture.ts).
+    // That is a production timing change (500 → 400 ms between a swipe and
+    // the next tree read in flows) nobody has measured on a device yet: the
+    // next device run should look at `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),
-      settleMs: this.pollMs,
     });
     this.log(
       result.clipped.length > 0 ? '⚠ scroll_until' : 'scroll_until',

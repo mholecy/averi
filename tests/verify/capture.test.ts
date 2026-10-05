@@ -1,8 +1,9 @@
 import { PNG } from 'pngjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { captureFrame, measuredFrameFor, pngRegion } from '../../src/verify/capture.js';
+import { captureFrame, measuredFrameFor, pngRegion, STABILITY_DELAY_MS, unsettledNote, unsettledReason } from '../../src/verify/capture.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
 /**
  * verify/capture.ts is the one owner of frame stability and of the png
@@ -17,15 +18,12 @@ import { FakeAdapter, node } from '../helpers/fake.js';
 // budgets here are sequences of delays, and the sequence is what to pin —
 // a wall clock is a flake, and the real tree-retry budget cost this file
 // 1.5 s (review 2026-10-03, round 2). Yields a macrotask so nothing spins.
-const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
-vi.mock('../../src/util/sleep.js', () => ({
-  sleep: async (ms: number) => {
-    sleeps.push(ms);
-    await new Promise((r) => setTimeout(r, 0));
-  },
-}));
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
-  sleeps.length = 0;
+  resetSleeps();
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const SCREEN: UiNode = node({
@@ -64,26 +62,71 @@ describe('captureFrame — the stability wait', () => {
     expect(fake.screenshots).toHaveLength(3);
   });
 
-  it('gives up after `attempts` re-captures and returns the LAST frame as the best available', async () => {
-    const fake = device(['a', 'b', 'c', 'd', 'e', 'f'].map(frame));
-    const { shot } = await captureFrame(fake, { attempts: 2, delayMs: 7 });
-    expect(fake.screenshots).toHaveLength(3); // the first capture plus 2 re-captures
-    expect(shot.equals(frame('c'))).toBe(true);
-    expect(sleeps).toEqual([7, 7]);
-  });
-
-  it('defaults to 5 re-captures, 300 ms apart — the budget the `screenshot` tool has always had', async () => {
+  it('a screen that never settles: 5 re-captures 300 ms apart, the LAST frame as the best available, and `stability: moving` saying so', async () => {
     const fake = device(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(frame));
-    const { shot } = await captureFrame(fake);
+    const got = await captureFrame(fake);
     expect(fake.screenshots).toHaveLength(6);
-    expect(shot.equals(frame('f'))).toBe(true);
-    expect(sleeps).toEqual([300, 300, 300, 300, 300]);
+    expect(got.shot.equals(frame('f'))).toBe(true);
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+    // Until 2026-10-05 this frame was indistinguishable from a settled one.
+    expect(got.stability).toBe('moving');
+    expect(got.captures).toBe(6);
+    expect(unsettledReason(got)).toBe(
+      'the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run',
+    );
+    expect(unsettledNote(got)).toBe(`⚠ frame: ${unsettledReason(got)} — the last capture is returned as the best available`);
   });
 
-  it('a screen that is already still costs exactly one 300 ms wait and one extra capture', async () => {
+  it('a screen that is already still costs exactly one 300 ms wait and one extra capture, and is settled', async () => {
     const fake = device([frame('a'), frame('a')]);
-    await captureFrame(fake);
+    const got = await captureFrame(fake);
     expect(fake.screenshots).toHaveLength(2);
+    expect(sleeps).toEqual([300]);
+    expect(got).toMatchObject({ stability: 'settled', captures: 2 });
+    expect(unsettledNote(got)).toBeUndefined();
+  });
+
+  /**
+   * The budget has no knobs (2026-10-05): a `delayMs` "so tests stay fast"
+   * was how the Verifier came to forward its poll interval as the stability
+   * delay, and asserts inside flows waited 500 ms where the tool waited 300.
+   * The budget is the two constants, whoever calls.
+   */
+  it('takes no budget options — the delay sequence is the module\'s, whoever calls', async () => {
+    const fake = device(['a', 'b', 'b'].map(frame));
+    // @ts-expect-error — delayMs/attempts are not options any more (2026-10-05)
+    await captureFrame(fake, { delayMs: 5, attempts: 1 });
+    expect(sleeps).toEqual([300, 300]);
+  });
+
+  it('a `deadline` bounds the wait: a re-capture that would end after it (judged by what the last one cost) is not taken, and the frame says it was still moving', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = device(['a', 'b', 'c', 'd', 'e', 'f'].map(frame));
+    // Room for one 300 ms re-capture, not two: the first re-capture is taken
+    // (nothing measured yet), costs 300 ms on the clock, and the next would
+    // end at 600 — past a deadline at 450.
+    const got = await captureFrame(fake, { deadline: Date.now() + 450 });
+    expect(fake.screenshots).toHaveLength(2);
+    expect(sleeps).toEqual([300]);
+    expect(got.shot.equals(frame('b'))).toBe(true);
+    expect(got).toMatchObject({ stability: 'moving', captures: 2 });
+  });
+
+  it('an expired deadline still gets one honest look — the first capture is never skipped', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = device(['a', 'a'].map(frame));
+    const got = await captureFrame(fake, { deadline: Date.now() - 1 });
+    expect(fake.screenshots).toHaveLength(1);
+    expect(sleeps).toEqual([]);
+    // One capture says nothing about stability — decided here, once: no note for a tool that returns it.
+    expect(got).toMatchObject({ stability: 'unjudged', captures: 1 });
+    expect(unsettledNote(got)).toBeUndefined();
+  });
+
+  it('a deadline that still allows the stable pair returns `stability: settled` as usual', async () => {
+    const fake = device(['a', 'a'].map(frame));
+    const got = await captureFrame(fake, { deadline: Date.now() + 10_000 });
+    expect(got).toMatchObject({ stability: 'settled', captures: 2 });
     expect(sleeps).toEqual([300]);
   });
 });
@@ -99,9 +142,11 @@ describe('captureFrame — the tree beside the png', () => {
     };
     const got = await captureFrame(fake);
     expect(got.shot.equals(Buffer.from('not a png'))).toBe(true);
-    // A png-only frame reports nothing — not even a reason: it asked for nothing more.
+    // A png-only frame reports nothing about a tree — not even a reason: it
+    // asked for nothing more. It still says whether it settled.
     expect(got.measured).toBeUndefined();
-    expect(Object.keys(got)).toEqual(['shot']);
+    expect(Object.keys(got)).toEqual(['shot', 'stability', 'captures']);
+    expect(got).toMatchObject({ stability: 'settled', captures: 2 });
   });
 
   it('readTree reads the tree with retry — a transient failure (uiautomator null root) is absorbed, 300 ms later', async () => {
@@ -112,12 +157,12 @@ describe('captureFrame — the tree beside the png', () => {
       if (failures-- > 0) throw new Error('null root node returned by UiTestAutomationBridge');
       return orig();
     };
-    const got = await captureFrame(fake, { readTree: true, delayMs: 5 });
+    const got = await captureFrame(fake, { readTree: true });
     expect(got.measured.tree?.children[0]?.identifier).toBe('card');
     expect(failures).toBe(-1); // succeeded on the 2nd attempt
-    // The 5 ms stability wait, then one retry at the tree-read budget's 300 ms
-    // — its own budget, not the stability delay.
-    expect(sleeps).toEqual([5, 300]);
+    // The stability wait, then one retry at the tree-read budget's 300 ms —
+    // its own budget, named separately even though the numbers coincide.
+    expect(sleeps).toEqual([300, 300]);
     expect(got.measured.error).toBeUndefined();
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
   });
@@ -127,13 +172,13 @@ describe('captureFrame — the tree beside the png', () => {
     fake.uiTree = async () => {
       throw new Error('null root node');
     };
-    const got = await captureFrame(fake, { readTree: true, delayMs: 5 });
+    const got = await captureFrame(fake, { readTree: true });
     expect(got.shot.equals(png(1000, 2000))).toBe(true);
     expect(got.measured.tree).toBeUndefined();
     expect(got.measured.error).toMatch(/^UI tree read failed after 5 attempts: null root node$/);
     expect(got.measured.png).toBeUndefined();
-    // Five attempts, four waits between them, each the tree-read budget's 300 ms.
-    expect(sleeps).toEqual([5, 300, 300, 300, 300]);
+    // One stability wait, then five attempts with four waits between them, each the tree-read budget's 300 ms.
+    expect(sleeps).toEqual([300, 300, 300, 300, 300]);
   });
 
   it('tree: <node> measures the caller\'s own tree against the frame without reading one', async () => {

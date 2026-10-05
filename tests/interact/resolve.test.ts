@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+afterEach(() => {
+  vi.useRealTimers();
+});
 import type { UiNode } from '../../src/adapters/types.js';
 import {
   DEFAULT_SETTLE_TIMEOUT_MS,
@@ -11,6 +16,30 @@ import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
 const REFUSE = { ambiguous: 'refuse' as const };
+
+describe('resolveSettled — the deadline rule (2026-10-05)', () => {
+  // The optional-tap shape: timeout 1500 (optionalTimeoutMs), poll 500, a
+  // 600 ms uiautomator dump, a STATIC element. Two reads prove it still
+  // (0→600, pause →1100, 1100→1700) and the second starts inside the
+  // deadline, so it is taken. A cut of this that projected the previous
+  // round's cost threw after ONE read at 615 ms — every tap and fill in a
+  // flow would have lost its second look.
+  it('a static element under a slow dump resolves in two reads, the second starting inside the deadline', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    resetLayout();
+    const fake = new FakeAdapter({ s: screen(el({ role: 'button', identifier: 'target' })) }, 's');
+    const origTree = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      reads += 1;
+      vi.setSystemTime(Date.now() + 600);
+      return origTree();
+    };
+    const resolved = await resolveSettled(fake, { id: 'target' }, { ambiguous: 'first', timeoutMs: 1500, pollMs: 500 });
+    expect(resolved.node.identifier).toBe('target');
+    expect(reads).toBe(2);
+  });
+});
 
 describe('resolveNow — the one resolution policy, applied to one tree', () => {
   it('a zero-area node is never a target: the real node wins even when the ghost comes first', () => {

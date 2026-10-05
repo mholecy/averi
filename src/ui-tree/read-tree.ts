@@ -138,6 +138,21 @@ export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: 
  * - Errors thrown by the predicate itself (an unknown state name, a viewport
  *   that cannot be read) propagate at once: they are the caller's bug or the
  *   device's, never a miss.
+ * - The predicate is handed the poll's `deadline` (since 2026-10-05), for a
+ *   predicate that itself waits — the color and ocr asserts capture a
+ *   settled frame per round, up to 1.5 s — so it bounds ITS OWN wait: the
+ *   loop's deadline rule is unchanged. The deadline is checked after each
+ *   round and never before a read, so the last round may begin up to one
+ *   pause past the deadline and end one read after it. That slack is kept
+ *   on purpose: it is the read that finds a late element (a `wait:` that
+ *   lands at 8.5 s of 10 under 1.5 s dumps; a static element a slow dump
+ *   needs two reads to prove still). Two tightenings were tried on
+ *   2026-10-05 and withdrawn against the reviewer's own measurements:
+ *   projecting the previous round's cost (it shortened every caller's
+ *   timeout — a static element threw after one read at 615 ms of 1500) and
+ *   refusing a round after a pause that crossed the deadline (it turned two
+ *   found-late cases into timeouts AT the deadline). The before/after
+ *   figures are kept once, on `Verifier.poll` (verify/assert.ts).
  *
  * Returns an outcome rather than throwing on timeout because the callers
  * disagree about what a timeout IS: a flow wait throws, an assert returns a
@@ -146,7 +161,7 @@ export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: 
  */
 export async function pollTree<T>(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
-  predicate: (tree: UiNode) => Promise<T | PollMiss | undefined> | T | PollMiss | undefined,
+  predicate: (tree: UiNode, round: { deadline: number }) => Promise<T | PollMiss | undefined> | T | PollMiss | undefined,
   opts: PollOptions,
 ): Promise<PollOutcome<T>> {
   const deadline = Date.now() + opts.timeoutMs;
@@ -156,7 +171,7 @@ export async function pollTree<T>(
     const read = await readTreeOrError(adapter);
     readError = read.error;
     if (read.tree !== undefined) {
-      const verdict = await predicate(read.tree);
+      const verdict = await predicate(read.tree, { deadline });
       if (verdict instanceof PollMiss) detail = verdict.detail;
       else if (verdict !== undefined) return { timedOut: false, value: verdict };
     }

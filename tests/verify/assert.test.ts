@@ -2,10 +2,26 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 
+// The one sleep owner (util/sleep.ts) is recorded, not waited on
+// (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
+// is capture.ts's constant and no option of the Verifier's, so this file
+// cannot buy speed with a small `pollMs` any more — it pins the DELAY
+// SEQUENCE instead. The deadline tests fake the Date; the recorder moves it.
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+beforeEach(() => {
+  resetSleeps();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Poll interval only (2026-10-05) — the stability delay is not this file's to set. */
 const FAST = { pollMs: 5, timeoutMs: 100 };
 
 function dashboardFake() {
@@ -673,10 +689,8 @@ describe('screenshot baseline asserts', () => {
     const settled = png(50, 50);
     const fake = dashboardFake();
     const frames = [movingA, movingB, settled, settled];
-    const capturedAt: number[] = [];
     let i = 0;
     fake.screenshot = async () => {
-      capturedAt.push(Date.now());
       const shot = frames[Math.min(i++, frames.length - 1)];
       fake.screenshots.push(shot);
       return shot;
@@ -687,17 +701,266 @@ describe('screenshot baseline asserts', () => {
     // movingA, movingB, settled, settled — the capture that confirmed stability is the one stored.
     expect(fake.screenshots).toHaveLength(4);
     expect((await readFile(join(dir, 'android', 'dash.png'))).equals(settled)).toBe(true);
-    // The wait between captures is the Verifier's pollMs (FAST: 5 ms), not
-    // capture.ts's 300 ms default — otherwise every baseline assert in this
-    // file would pay a real 300 ms per capture. One bound over all three
-    // gaps (15 ms expected, a 900 ms floor at the default) so a loaded CI
-    // box cannot flake it while a wrong delay cannot pass it.
-    expect(capturedAt[capturedAt.length - 1] - capturedAt[0]).toBeLessThan(300);
+    // The wait between captures is capture.ts's 300 ms, not the Verifier's
+    // pollMs (FAST: 5) — one budget, whoever calls (2026-10-05).
+    expect(sleeps).toEqual(Array(3).fill(STABILITY_DELAY_MS));
 
     // The same still screen on a rerun is a 0% diff against the settled baseline: two identical captures.
     const second = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(second).toMatchObject({ pass: true, detail: '0.00% of pixels differ' });
     expect(fake.screenshots).toHaveLength(6);
+  });
+});
+
+describe('screenshot baseline asserts — a frame that did not settle is never a verdict (2026-10-05)', () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'averi-baselines-'));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  /** A screen that never holds still: every capture differs from the last. */
+  const neverSettling = () => {
+    const fake = dashboardFake();
+    let i = 0;
+    fake.screenshot = async () => {
+      const shot = png(50, 50, (p) => (p.data[0] = i++ % 256));
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    return fake;
+  };
+
+  it('refuses to CREATE a baseline from a screen that never settled, naming the budget it spent', async () => {
+    const fake = neverSettling();
+    const verifier = new Verifier(fake, { ...FAST, baselineDir: dir });
+    const result = await verifier.assert({ screenshot: { baseline: 'dash' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'baseline not created: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run (a baseline of a moving screen would fail every later run)',
+    );
+    // The full budget was spent looking (6 captures, 5 waits) and nothing was written.
+    expect(fake.screenshots).toHaveLength(6);
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+    await expect(readFile(join(dir, 'android', 'dash.png'))).rejects.toThrow();
+  });
+
+  it('an unsettled DIFF still compares the last frame and keeps its verdict, carrying the ⚠ frame note (2026-10-05, review)', async () => {
+    const still = dashboardFake();
+    still.nextScreenshot = png(50, 50);
+    await new Verifier(still, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+
+    // A caret blinking in one pixel: never two identical captures, but every
+    // frame is within the threshold of the baseline — the threshold exists
+    // for exactly this, so the diff passes and says what it saw.
+    const caret = dashboardFake();
+    let i = 0;
+    caret.screenshot = async () => {
+      const shot = png(50, 50, (p) => (p.data[0] = i++ % 2 === 0 ? 0 : 128));
+      caret.screenshots.push(shot);
+      return shot;
+    };
+    const result = await new Verifier(caret, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toBe(
+      '0.04% of pixels differ\n⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available',
+    );
+    expect(caret.screenshots).toHaveLength(6);
+  });
+});
+
+describe('the polling asserts and the stability budget (2026-10-05)', () => {
+  const CARD = { x: 100, y: 100, width: 800, height: 100 };
+  const fill = (p: PNG, hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let y = CARD.y; y < CARD.y + CARD.height; y++) {
+      for (let x = CARD.x; x < CARD.x + CARD.width; x++) {
+        const o = (y * p.width + x) << 2;
+        p.data[o] = r;
+        p.data[o + 1] = g;
+        p.data[o + 2] = b;
+        p.data[o + 3] = 255;
+      }
+    }
+  };
+  const cardFake = () => {
+    resetLayout();
+    return new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: { ...CARD } })) }, 'detail');
+  };
+
+  it('the stability delay is capture.ts\'s 300 ms whatever pollMs the Verifier was given — one budget for every consumer', async () => {
+    const fake = cardFake();
+    fake.nextScreenshot = png(1000, 320, (p) => fill(p, '#FDFDFD'));
+    // A FlowEngine builds its Verifier with pollMs 500: until 2026-10-05 that
+    // became the delay between stability captures, so an assert inside a flow
+    // waited 500 where the MCP tool waited 300.
+    const verifier = new Verifier(fake, { pollMs: 500, timeoutMs: 100 });
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(fake.screenshots).toHaveLength(2);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS]);
+  });
+
+  /**
+   * A fake device on a fake clock: a screencap takes 300 ms of virtual time
+   * and never returns the same frame twice, the uiautomator dump 1.5 s. The
+   * mocked sleep advances the same clock. This is the explorer's 2026-10-05
+   * measurement scenario (real Verifier, 3 s timeout, 300 ms poll) replayed
+   * deterministically; the real-time figures are on `Verifier.poll`.
+   */
+  const slowNeverSettling = () => {
+    const fake = cardFake();
+    let i = 0;
+    let treeReads = 0;
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      treeReads += 1;
+      vi.setSystemTime(Date.now() + 1500);
+      return origTree();
+    };
+    fake.screenshot = async () => {
+      vi.setSystemTime(Date.now() + 300);
+      const shot = png(1000, 320, (p) => {
+        fill(p, '#FDFDFD');
+        p.data[0] = i++ % 256;
+      });
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    return { fake, treeReads: () => treeReads };
+  };
+
+  it('a screen that never settles: the deadline, not a moving frame, decides — the capture stops short of it and the failure says the frame never settled', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, treeReads } = slowNeverSettling();
+    const start = Date.now();
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    const elapsed = Date.now() - start;
+    expect(result.pass).toBe(false);
+    // Before: 4.86 s, 6 captures, 1 evaluation, a verdict ("sampled #…") from a frame nobody knew was moving.
+    expect(result.detail).toBe(
+      'the screen did not settle: 2 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run; failing closed, color unchecked',
+    );
+    // Round 1: 1.5 s dump, a capture, one re-capture (600 ms) → 2.4 s; a second re-capture would end at 3.0 s, not taken.
+    // Round 2 starts at 2.7 s (inside the deadline — a late element is found by exactly such a round), its dump ends at
+    // 4.2 s, and the deadline has passed, so nothing is captured: the overrun is one tree read, never a capture budget.
+    expect(elapsed).toBeLessThanOrEqual(3000 + 1500);
+    expect(treeReads()).toBe(2);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('a screen that SETTLES in the second round passes — the previous round\'s cost never forbids the next one', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = cardFake(); // not slowNeverSettling(): its 1.5 s dump leaves no room for a second round
+    const start = Date.now();
+    let i = 0;
+    fake.screenshot = async () => {
+      vi.setSystemTime(Date.now() + 300);
+      // Moving for the first 3.8 s, then still and the right colour. Each
+      // re-capture costs 600 ms on the clock (the 300 ms pause, then a 300 ms
+      // screencap), so round 1 (dump 400, captures at 0.7, 1.3, …, 3.7 s)
+      // spends its whole budget on the animation and is unsettled; round 2
+      // (from 4.0 s) finds the screen still and passes.
+      const moving = Date.now() - start < 3800;
+      const shot = png(1000, 320, (p) => {
+        fill(p, '#FDFDFD');
+        if (moving) p.data[0] = i++ % 256;
+      });
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    // The dump must be short enough for two rounds: 400 ms here.
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 400);
+      return origTree();
+    };
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 6000 });
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('sampled #FDFDFD');
+    expect(fake.screenshots).toHaveLength(8); // 6 in the unsettled round, 2 in the one that passed
+  });
+
+  it('when every round is cut before a settled frame could be captured, the failure says the element was FOUND, not "not found"', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake } = slowNeverSettling();
+    // A dump longer than the whole budget: the element is found, but the
+    // round that found it is already past the deadline.
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 4000);
+      return origTree();
+    };
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame');
+    expect(fake.screenshots).toHaveLength(0);
+  });
+
+  it('a round whose first screencap crosses the deadline captures nothing more and says the element was found, no time left', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake } = slowNeverSettling();
+    // The dump ends 100 ms inside the deadline; the one screencap (300 ms)
+    // crosses it, so the stability wait cannot take a second capture — one
+    // capture is no verdict on stability and names no capture count.
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 2900 - 1500); // slowNeverSettling's dump adds 1500: ends at 2900
+      return origTree();
+    };
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame');
+    expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it('a settled screen whose assert keeps failing is measured and the measurement is the verdict, within the timeout', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, treeReads } = slowNeverSettling();
+    // Still screen: every capture is the same wrong colour.
+    fake.screenshot = async () => {
+      vi.setSystemTime(Date.now() + 300);
+      const shot = png(1000, 320, (p) => fill(p, '#CFCFD3'));
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    const start = Date.now();
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
+    const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/sampled #CFCFD3/);
+    // Round 1 measures (2.1 s); round 2 starts at 2.4 s, its dump ends past
+    // the deadline and nothing is captured — the measured finding stands.
+    expect(Date.now() - start).toBeLessThanOrEqual(3000 + 1500);
+    expect(treeReads()).toBe(2);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('the ocr assert treats an unsettled frame the same way: a miss, worded as rendered text unchecked', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // only the mocked sleeps move the clock: the full 6-capture budget fits one round
+    const fake = cardFake();
+    let i = 0;
+    fake.screenshot = async () => {
+      const shot = png(1000, 320, (p) => (p.data[0] = i++ % 256));
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    const engine = { recognize: async () => [{ id: 'element', lines: [{ text: 'CONTINUE', box: { x: 0, y: 0, width: 10, height: 10 } }] }] };
+    // Round 1's six captures end at 1.5 s; round 2 (from 1.8 s) is cut by the
+    // deadline after TWO — and the failure still says six: the most any round
+    // took, so a cut round never understates the one that spent the budget.
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 2000, ocrEngine: engine as never });
+    const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run; failing closed, rendered text unchecked',
+    );
   });
 });
 

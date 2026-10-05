@@ -9,7 +9,7 @@ import {
 import { configDir, loadProjectConfig, projectConfigPath } from '../flow/load.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
-import { captureFrame } from '../verify/capture.js';
+import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { appHealth, assertSummary, formatAsserts, formatTrace } from './verify.js';
 
 /**
@@ -77,8 +77,9 @@ export async function runEnsureState(
   resolveAdapter: ResolveAdapterFor,
 ): Promise<{ text: string; shot: Buffer }> {
   const { adapter, text } = await runOnEngine(call, resolveAdapter, (engine) => engine.ensureState(call.state));
-  const { shot } = await captureFrame(adapter);
-  return { text, shot };
+  const frame = await captureFrame(adapter);
+  const unsettled = unsettledNote(frame);
+  return { text: unsettled === undefined ? text : `${text}\n${unsettled}`, shot: frame.shot };
 }
 
 /** `run_flow`: the trace and health line. */

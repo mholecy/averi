@@ -18,6 +18,7 @@ import { Verifier } from '../../src/verify/assert.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
 /**
  * These cover the `verify` orchestration, which until this refactor lived
@@ -31,15 +32,9 @@ import { FakeAdapter, node } from '../helpers/fake.js';
 // settle wait and a failed tree read's retries are sequences of delays, and
 // the sequence is what the production budget IS (review 2026-10-03, round
 // 2). Yields a macrotask so deadline loops stay cooperative.
-const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
-vi.mock('../../src/util/sleep.js', () => ({
-  sleep: async (ms: number) => {
-    sleeps.push(ms);
-    await new Promise((r) => setTimeout(r, 0));
-  },
-}));
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
-  sleeps.length = 0;
+  resetSleeps();
 });
 
 const CFG = parseConfig(
@@ -129,6 +124,25 @@ describe('runVerification legs', () => {
     // production budget, 300 ms apart: the leg has no knob of its own.
     expect(adapter.screenshots).toHaveLength(4);
     expect(sleeps).toEqual([300, 300, 300]);
+  });
+
+  it('a leg whose frame never settled says so in ONE line before its health line; a settled leg adds nothing (2026-10-05)', async () => {
+    const adapter = fake('android');
+    let i = 0;
+    adapter.screenshot = async () => {
+      const shot = Buffer.from(`frame mid-animation ${i++}`);
+      adapter.screenshots.push(shot);
+      return shot;
+    };
+    const out = await runVerification(request({ platforms: ['android'] }), async () => adapter);
+    const section = out.sections[0];
+    expect(section).toContain('\n' + '⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available' + '\nappAlive');
+    expect(adapter.screenshots).toHaveLength(6);
+    expect(out.screenshots[0].equals(Buffer.from('frame mid-animation 5'))).toBe(true);
+
+    const still = fake('android');
+    const settledOut = await runVerification(request({ platforms: ['android'] }), async () => still);
+    expect(settledOut.sections[0]).not.toContain('⚠ frame');
   });
 
   // The same gap the single-platform tools had (review 2026-10-03): nothing
@@ -737,7 +751,7 @@ describe('paritySection — the containment every table shares', () => {
    */
   const leg = (platform: Platform): Parameters<typeof paritySection>[2][number] => ({
     status: 'fulfilled',
-    value: { trace: [], results: [], frame: { shot: whitePng() }, health: `\n${platform}` },
+    value: { trace: [], results: [], frame: { shot: whitePng(), stability: 'settled', captures: 2 }, health: `\n${platform}` },
   });
   const run = { contract: contract([]), text: undefined };
 

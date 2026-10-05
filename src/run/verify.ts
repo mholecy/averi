@@ -6,7 +6,7 @@ import type { EnvValues } from '../flow/credentials.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
-import { captureFrame, type Frame, type MeasuredFrame } from '../verify/capture.js';
+import { captureFrame, unsettledNote, type Frame, type MeasuredFrame } from '../verify/capture.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -500,7 +500,11 @@ export async function runVerification(
     }
     const { trace, results, frame, health } = run.value;
     const verdict = specs.length === 0 ? '' : `\n${assertSummary(results)}`;
-    sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${health}`);
+    // One line when the leg's frame did not settle (2026-10-05): the picture
+    // below may be mid-animation, and the tables that read it say nothing.
+    const unsettled = unsettledNote(frame);
+    const frameLine = unsettled === undefined ? '' : `\n${unsettled}`;
+    sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${frameLine}${health}`);
     screenshots.push(frame.shot);
   });
 

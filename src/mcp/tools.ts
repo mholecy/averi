@@ -10,7 +10,7 @@ import { fillText, launchText, tapText } from './tool-text.js';
 import type { AveriConfig } from '../flow/config.js';
 import { appBuildPath, iosTreeSourceFor, loadProjectConfig } from '../flow/load.js';
 import { assertSpecSchema } from '../verify/assert.js';
-import { captureFrame } from '../verify/capture.js';
+import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import {
@@ -287,8 +287,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: { platform },
     },
     async ({ platform: p }) => {
-      const { shot } = await captureFrame(await registry.get(p));
-      return { content: [image(shot)] };
+      const frame = await captureFrame(await registry.get(p));
+      const unsettled = unsettledNote(frame);
+      return { content: unsettled === undefined ? [image(frame.shot)] : [...text(unsettled).content, image(frame.shot)] };
     },
   );
 

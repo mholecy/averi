@@ -8,6 +8,7 @@ import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
 
 /**
@@ -29,18 +30,12 @@ import { TOOL_NAMES } from '../helpers/tool-names.js';
 // The one sleep owner (util/sleep.ts) is recorded, not waited on — as in
 // tests/verify/capture.test.ts. Yields a macrotask so a deadline loop on
 // Date.now still advances and nothing spins.
-const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
-vi.mock('../../src/util/sleep.js', () => ({
-  sleep: async (ms: number) => {
-    sleeps.push(ms);
-    await new Promise((r) => setTimeout(r, 0));
-  },
-}));
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 let dir: string;
 const closers: (() => Promise<void>)[] = [];
 beforeEach(async () => {
-  sleeps.length = 0;
+  resetSleeps();
   resetLayout();
   dir = await mkdtemp(join(tmpdir(), 'averi-tools-'));
 });
@@ -231,7 +226,18 @@ describe('screenshot and ensure_state return a SETTLED frame', () => {
     const result = await call('screenshot', { platform: 'android' });
     expect(result.isError).toBe(false);
     expect(result.images).toEqual([frame('c')]);
+    expect(result.shape).toEqual([['image', 'image/png']]); // a settled frame comes alone: no note block
     expect(fake.screenshots).toEqual([frame('a'), frame('b'), frame('c'), frame('c')]);
+  });
+
+  it('screenshot: a screen that never settles returns its LAST frame with one note before the image (2026-10-05)', async () => {
+    const fake = withFrames(home(), ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(frame));
+    const { call } = await connect({ android: fake });
+    const result = await call('screenshot', { platform: 'android' });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text'], ['image', 'image/png']]);
+    expect(result.text).toBe('⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available');
+    expect(result.images).toEqual([frame('f')]); // 6 captures: the last one
   });
 
   it('ensure_state: the trace, the health line, and a settled image — not the first capture', async () => {

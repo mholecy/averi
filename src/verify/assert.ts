@@ -9,7 +9,7 @@ import { PollMiss, pollTree } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { elementAssertSchema } from './element-assert.js';
-import { captureFrame } from './capture.js';
+import { captureFrame, isMoving, unsettledNote, unsettledReason, type Frame } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrEngineFor, type OcrEngine } from './ocr.js';
@@ -199,6 +199,48 @@ const notFound = (timeoutMs: number, readError?: Error): string =>
   `not found within ${timeoutMs}ms` +
   (readError === undefined ? '' : ` (last UI tree read failed: ${readError.message})`);
 
+/**
+ * What a polling pixel assert does with the deadline and the frame, across
+ * the WHOLE poll — one instance per assert (2026-10-05). A round that begins
+ * past the deadline, or whose one capture the deadline cut before a second
+ * (`stability: 'unjudged'`), has nothing to say about the screen: it returns
+ * `undefined` so that an earlier round's finding — a measured drift, a
+ * sampled colour — is what the timeout reports, and it remembers that the
+ * element WAS found so a poll in which every round was cut can say so, not
+ * "not found". A frame seen `moving` is a MISS with the reason, worded
+ * fail-closed like every other reason this assert cannot measure past; the
+ * capture count it quotes is the most any round took, so a late round the
+ * deadline cut short never understates the one that spent the whole budget.
+ */
+class PixelPoll {
+  private foundNoTime = false;
+  private mostCaptures = 0;
+
+  /** Nothing to capture: the deadline has passed. */
+  outOfTime(deadline: number): boolean {
+    if (Date.now() < deadline) return false;
+    this.foundNoTime = true;
+    return true;
+  }
+
+  /** The frame is not a verdict: a miss with the reason when it was seen moving, silence when nothing could be judged. */
+  unsettled(frame: Pick<Frame, 'stability' | 'captures'>, unchecked: 'color' | 'rendered text'): PollVerdict | undefined {
+    if (!isMoving(frame)) {
+      this.foundNoTime = true;
+      return undefined;
+    }
+    this.mostCaptures = Math.max(this.mostCaptures, frame.captures);
+    return { pass: false, detail: failClosed(unsettledReason({ captures: this.mostCaptures }), unchecked) };
+  }
+
+  /** The timeout wording when nothing was measured: found-but-no-time outranks not-found. */
+  timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error }): string {
+    if (last.detail !== undefined) return last.detail;
+    if (this.foundNoTime) return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame`;
+    return notFound(timeoutMs, last.readError);
+  }
+}
+
 export class Verifier {
   private readonly baselineDir: string;
   private readonly pollMs: number;
@@ -356,14 +398,20 @@ export class Verifier {
     }
     // Memoized: one VisionOcr per Verifier, so its compiled binary is reused across asserts.
     const engine = (this.ocr ??= choice.engine);
+    const round = new PixelPoll();
     return this.poll(
-      async (tree) => {
+      async (tree, { deadline }) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         // (The whole-screen text table deliberately does the opposite; here
         // the caller named ONE element and gets that element's rect.)
         const found = findBySpec(tree, element);
         if (found.length === 0) return undefined;
-        const { shot, measured } = await captureFrame(this.adapter, { tree, delayMs: this.pollMs });
+        if (round.outOfTime(deadline)) return undefined;
+        const frame = await captureFrame(this.adapter, { tree, deadline });
+        // A moving frame is never the verdict (2026-10-05): keep polling, and
+        // let the deadline — not the frame — decide, saying why if it does.
+        if (frame.stability !== 'settled') return round.unsettled(frame, 'rendered text');
+        const { shot, measured } = frame;
         if (measured.error !== undefined) {
           // Keep polling — the capture may have raced a transition — but stay
           // failed so a deadline reached this way reports the reason.
@@ -387,7 +435,7 @@ export class Verifier {
       {
         description,
         timeoutMs,
-        timeoutDetail: ({ detail, readError }) => detail ?? notFound(timeoutMs, readError),
+        timeoutDetail: (last) => round.timeoutDetail(timeoutMs, last),
       },
     );
   }
@@ -398,8 +446,12 @@ export class Verifier {
    * same captured frame the `ocr` assert measures against.
    * Polls like the other asserts; each evaluation samples a freshly captured
    * STABLE screenshot — the same two-identical-consecutive-captures wait the
-   * `screenshot` tool applies — so mid-animation frames are not the verdict,
-   * and the tree is re-read alongside so both come from the same state.
+   * `screenshot` tool applies, on the same budget — so mid-animation frames
+   * are not the verdict, and the tree is re-read alongside so both come from
+   * the same state. Since 2026-10-05 the capture takes the poll's deadline
+   * and reports whether it settled; a frame that did not is a miss, never a
+   * sample — before, the last of six differing captures was measured and the
+   * number called a verdict.
    */
   private async assertColor(
     element: ElementSpec,
@@ -411,12 +463,19 @@ export class Verifier {
     const description =
       `element ${describe(element)} fill within dE00 ${tol} of ${expectedHex}` +
       (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
+    const round = new PixelPoll();
     return this.poll(
-      async (tree) => {
+      async (tree, { deadline }) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
         if (found.length === 0) return undefined;
-        const { measured } = await captureFrame(this.adapter, { tree, delayMs: this.pollMs });
+        if (round.outOfTime(deadline)) return undefined;
+        const frame = await captureFrame(this.adapter, { tree, deadline });
+        // A moving frame is never the verdict (2026-10-05): keep polling, and
+        // let the deadline — not the frame — decide, saying why if it does
+        // (PixelPoll words the round the deadline cut short).
+        if (frame.stability !== 'settled') return round.unsettled(frame, 'color');
+        const { measured } = frame;
         if (measured.error !== undefined) {
           // Fail closed on an undecodable screenshot, but keep polling —
           // the capture may have raced a transition.
@@ -427,7 +486,7 @@ export class Verifier {
       {
         description,
         timeoutMs,
-        timeoutDetail: ({ detail, readError }) => detail ?? notFound(timeoutMs, readError),
+        timeoutDetail: (last) => round.timeoutDetail(timeoutMs, last),
       },
     );
   }
@@ -444,16 +503,42 @@ export class Verifier {
    * becomes a PollMiss, which is how "element found but content was: …"
    * survives the element vanishing again before the deadline; one with
    * nothing to say continues the poll without erasing an earlier detail.
+   *
+   * `pollMs` is the interval between rounds and NOTHING else (2026-10-05):
+   * until then it was also forwarded to the capture as its stability delay,
+   * so an assert inside a flow (engine pollMs 500) waited 500 ms between
+   * stability captures and the same assert from the MCP tool 300 — the
+   * budget capture.ts documents as one. The round's deadline is handed to
+   * the evaluator instead, so a capture stops short of it. Measured with the
+   * same fake-device harness as before (screencap 300 ms, uiautomator dump
+   * 1.5 s, timeoutMs 3000, pollMs 300):
+   *
+   *   screen               before                        after
+   *   never settles        4.86 s · 6 shots · 1 round,   4.24 s · 2 shots · 2 rounds · the failure
+   *                        a "verdict" from a frame      says the frame never settled; the 2nd
+   *                        nobody knew was moving        round's read ends past the deadline and
+   *                                                      captures nothing
+   *   settled, failing     5.13 s · 4 shots · 2 rounds   4.23 s · 2 shots · 2 rounds · the measured
+   *                                                      finding is the verdict
+   *   fast fake 50/100 ms  4.23 s · 12 shots · 2 rounds  3.19 s · 8 shots · 3 rounds
+   *
+   * A "round" is one tree read (one `pollTree` iteration), whether or not it
+   * went on to capture; a round that captured nothing measured nothing —
+   * with a 1.5 s dump and a 3 s budget exactly one evaluation fits.
+   * The overrun that remains is one tree read past the deadline — the slack
+   * every poll has (ui-tree/read-tree.ts), kept so a late element is found;
+   * what is gone is the capture budget spent on top of it, and the verdict
+   * from a frame that was still moving.
    */
   private async poll(
-    evaluate: (tree: UiNode) => Promise<PollVerdict | undefined> | PollVerdict | undefined,
+    evaluate: (tree: UiNode, round: { deadline: number }) => Promise<PollVerdict | undefined> | PollVerdict | undefined,
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
     const outcome = await pollTree(
       this.adapter,
-      async (tree) => {
-        const verdict = await evaluate(tree);
+      async (tree, round) => {
+        const verdict = await evaluate(tree, round);
         if (verdict?.pass) return { detail: verdict.detail };
         return verdict?.detail === undefined ? undefined : new PollMiss(verdict.detail);
       },
@@ -505,28 +590,42 @@ export class Verifier {
   private async assertScreenshot(name: string, threshold: number): Promise<AssertResult> {
     const description = `screenshot matches baseline "${name}" (threshold ${threshold * 100}%)`;
     const path = join(this.baselineDir, this.adapter.platform, `${name}.png`);
-    // The SETTLED frame (verify/capture.ts, png-only arm; same delay as the
-    // color and ocr asserts). Until 2026-10-04 this was the one pixel reading
-    // that took a bare screenshot, so a baseline diff could compare two
-    // mid-animation frames — the flakiest assert by construction. It now
-    // costs the stability budget where it cost one capture (captures, wait
-    // and failure chances: capture.ts, STABILITY_*). Whether the
-    // frame settled is not reported by the capture: a screen that never
-    // settles (spinner, caret) still yields its last frame, so a first run on
-    // such a screen stores it silently, as before — re-baseline any screenshot
-    // assert that was flaky under the bare read. Follow-up, not done here: a
-    // `settled: boolean` on the frame would let baseline creation refuse or
-    // mark an unsettled frame.
-    const { shot: current } = await captureFrame(this.adapter, { delayMs: this.pollMs });
+    // The SETTLED frame (verify/capture.ts, png-only arm, the one stability
+    // budget). Until 2026-10-04 this was the one pixel reading that took a
+    // bare screenshot, so a baseline diff could compare two mid-animation
+    // frames — the flakiest assert by construction. It now costs the
+    // stability budget where it cost one capture (captures, wait and failure
+    // chances: capture.ts, STABILITY_*). Since 2026-10-05 the capture SAYS
+    // whether it settled. CREATION fails closed on a frame seen moving —
+    // before, a screen that never settled (spinner, caret, live content)
+    // silently stored its last frame as the ground truth for every later
+    // run. A DIFF against an existing baseline still compares the last frame
+    // and keeps its verdict, with the `⚠ frame:` note on the detail: a
+    // blinking caret or a clock inside the 1.5 s budget used to pass the
+    // diff under threshold, and the threshold exists for exactly that — a
+    // refusal there (tried the same day, withdrawn in review) would have
+    // tightened a passing assert. Re-baseline any screenshot assert that
+    // was flaky under the bare read.
+    const frame = await captureFrame(this.adapter);
+    const current = frame.shot;
 
     let baseline: Buffer;
     try {
       baseline = await readFile(path);
     } catch {
+      if (isMoving(frame)) {
+        return {
+          description,
+          pass: false,
+          detail: `baseline not created: ${unsettledReason(frame)} (a baseline of a moving screen would fail every later run)`,
+        };
+      }
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, current);
       return { description, pass: true, detail: `baseline created at ${path}` };
     }
+    const note = unsettledNote(frame);
+    const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);
 
     const a = PNG.sync.read(baseline);
     const b = PNG.sync.read(current);
@@ -534,7 +633,7 @@ export class Verifier {
       return {
         description,
         pass: false,
-        detail: `size mismatch: baseline ${a.width}x${a.height}, current ${b.width}x${b.height}`,
+        detail: withNote(`size mismatch: baseline ${a.width}x${a.height}, current ${b.width}x${b.height}`),
       };
     }
     const diffPixels = pixelmatch(a.data, b.data, undefined, a.width, a.height, { threshold: 0.1 });
@@ -543,7 +642,7 @@ export class Verifier {
     return {
       description,
       pass: ratio <= threshold,
-      detail: `${pct}% of pixels differ`,
+      detail: withNote(`${pct}% of pixels differ`),
     };
   }
 }

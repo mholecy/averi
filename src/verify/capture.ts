@@ -45,13 +45,51 @@ import { pngScale, type PngScale } from './scale.js';
  * `captureFrame`. The pure tail (tree + png + screen → measured frame) is
  * exported as `measuredFrameFor`, and the comparator tests build their
  * fixtures with it rather than re-deriving the scale themselves.
+ *
+ * Since 2026-10-05 the budget has ONE owner and the frame SAYS whether it
+ * settled:
+ * - The stability delay is this module's constant and nothing else's. Until
+ *   then `CaptureOptions.delayMs` existed "so tests stay fast", and the
+ *   Verifier forwarded its poll interval as that delay at three sites — so
+ *   the color, ocr and baseline asserts inside a FLOW (FlowEngine's pollMs
+ *   defaults to 500) waited 500 ms between captures while the same asserts
+ *   from the MCP `assert` tool waited 300, and the sentence "the same budget
+ *   for every consumer" below was false in production. `pollMs` now means
+ *   the poll interval only; the tests that need speed mock util/sleep, as
+ *   the engine tests always did.
+ * - `Frame.stability` reports what the wait concluded (settled / moving /
+ *   unjudged) and `Frame.captures` how many were taken. Until then a screen
+ *   that never settled (spinner, caret, live content) silently yielded its
+ *   LAST frame as if it were settled, and the consumers could not tell: the
+ *   color and ocr asserts measured it and called the measurement a verdict;
+ *   the baseline assert stored it as the ground truth for every later run.
+ *   Now the polling asserts treat an unsettled frame as a miss (the deadline,
+ *   not a moving frame, decides), and the baseline assert refuses to create
+ *   or diff against one. The `verify` legs and the `screenshot` /
+ *   `ensure_state` tools still return the best frame — a tool hands the
+ *   picture to the agent, whose own eyes judge it — and read `settled` only
+ *   if they choose to say so.
+ * - `CaptureOptions.deadline` lets a caller with a budget of its own bound
+ *   the wait: a re-capture that would end after the deadline is not taken,
+ *   and the frame comes back `moving` (or `unjudged`, with one capture). The
+ *   before/after figures (2026-10-05) are kept ONCE, on `Verifier.poll` in
+ *   assert.ts, which owns passing the deadline in.
+ *
+ * Not done, recorded: stability is judged on the WHOLE screenshot. A clock
+ * in the status bar or a blinking caret elsewhere on the screen keeps a
+ * frame "unsettled" while the element an assert measures holds perfectly
+ * still; judging stability over the element's own region would let those
+ * asserts pass. It needs the rect before the capture (the asserts have it)
+ * and a crop before the compare — a later step.
  */
 
 /**
  * The stability budget: up to 5 re-captures 300 ms apart, i.e. a frame that
  * does not settle costs 6 captures and 1.5 s before the LAST one is returned
- * as the best available. The same budget for every consumer — a `verify` leg
- * now waits exactly as long as the `screenshot` tool does.
+ * as the best available — marked `stability: moving`. The same budget for every
+ * consumer: a `verify` leg, the `screenshot` tool, and an assert inside a
+ * flow all wait exactly the same (since 2026-10-05; see the header for the
+ * 300-vs-500 split this closed).
  *
  * What that costs a leg that used to take one bare screenshot: a floor of
  * one 300 ms sleep and one extra capture when the screen is already still,
@@ -62,9 +100,13 @@ import { pngScale, type PngScale } from './scale.js';
  * The png is decoded whenever a tree is in play, even for a contract with
  * only rect anchors, which never read a pixel; that decode is paid once and
  * is cheap next to the wait, so it is not gated.
+ *
+ * Not options: a smaller budget "for tests" was how the 300-vs-500 split
+ * crept in. Tests mock util/sleep and pin the DELAY SEQUENCE instead.
  */
 const STABILITY_ATTEMPTS = 5;
-const STABILITY_DELAY_MS = 300;
+/** Exported for the tests, which pin the delay SEQUENCE against it; no production importer. */
+export const STABILITY_DELAY_MS = 300;
 
 /**
  * The tree-read budget: a failed `uiTree()` is retried up to 5 times, 300 ms
@@ -121,8 +163,28 @@ interface Treeless {
 type FrameMeasurement = MeasuredFrame | Undecoded | Treeless;
 
 export interface Frame {
-  /** The settled screenshot bytes — what a tool returns to the caller. */
+  /**
+   * The screenshot bytes — the first capture that repeated when `settled`,
+   * otherwise the LAST one taken, as the best available. What a tool returns
+   * to the caller either way.
+   */
   shot: Buffer;
+  /**
+   * What the stability wait concluded — decided HERE, once, so no consumer
+   * re-derives it from the capture count:
+   * - `settled`: two consecutive captures matched within the budget (and the
+   *   caller's `deadline`, when one was given);
+   * - `moving`: two or more captures were taken and every one differed from
+   *   the last — the screen was still changing when the wait stopped. The
+   *   polling asserts treat that as a miss, the baseline assert refuses to
+   *   create from it, a tool returns the picture with a note;
+   * - `unjudged`: only one capture fit before the deadline, so nothing can be
+   *   said about stability either way. The polling asserts say "found, no
+   *   time left"; nothing else words it.
+   */
+  stability: 'settled' | 'moving' | 'unjudged';
+  /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. */
+  captures: number;
   /**
    * Present whenever a tree was read or supplied; absent for a png-only frame
    * (the `screenshot` and `ensure_state` tools), which asked for nothing more
@@ -130,6 +192,28 @@ export interface Frame {
    */
   measured?: FrameMeasurement;
 }
+
+/**
+ * The one sentence for a frame that did not settle, worded here because the
+ * fact is produced here; each consumer frames it in its own policy (the
+ * asserts through `failClosed`, the baseline assert in its refusal).
+ */
+export const unsettledReason = (frame: Pick<Frame, 'captures'>): string =>
+  `the screen did not settle: ${frame.captures} captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run`;
+
+/** A frame the stability wait saw moving — the one state a consumer words; `unjudged` says nothing about the screen. */
+export const isMoving = (frame: Pick<Frame, 'stability'>): boolean => frame.stability === 'moving';
+
+/**
+ * The one line a consumer that RETURNS an unsettled frame anyway (the
+ * `verify` legs, the `screenshot` and `ensure_state` tools) adds beside it,
+ * so the agent reading the picture knows it may be mid-animation. Nothing is
+ * added for a settled frame, and none for an `unjudged` one (a deadline that
+ * left no time for a second capture): only the polling asserts pass a
+ * deadline, and they word that case themselves.
+ */
+export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): string | undefined =>
+  isMoving(frame) ? `⚠ frame: ${unsettledReason(frame)} — the last capture is returned as the best available` : undefined;
 
 /** A frame captured with a tree in play: its measured half is always there. */
 interface FrameWithTree extends Frame {
@@ -146,10 +230,14 @@ interface FrameWithTree extends Frame {
  * is never re-read, and the types say so.
  */
 type CaptureOptions = {
-  /** Stability re-captures before giving up (default 5). */
-  attempts?: number;
-  /** Delay between captures (default 300 ms; the Verifier passes its pollMs so tests stay fast). */
-  delayMs?: number;
+  /**
+   * Absolute time (ms since epoch) the caller must be done by — a polling
+   * assert's own deadline. A re-capture that would end after it is not taken
+   * and the frame comes back `moving` (or `unjudged`, with one capture); the first capture is always
+   * taken, so even an expired deadline gets one honest look. No deadline:
+   * the full stability budget.
+   */
+  deadline?: number;
 } & ({ readTree: true; tree?: never } | { tree: UiNode; readTree?: never } | { readTree?: false; tree?: never });
 
 /**
@@ -200,10 +288,7 @@ export async function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions = {},
 ): Promise<Frame> {
-  const shot = await stableScreenshot(adapter, {
-    attempts: opts.attempts ?? STABILITY_ATTEMPTS,
-    delayMs: opts.delayMs ?? STABILITY_DELAY_MS,
-  });
+  const { shot, stability, captures } = await stableScreenshot(adapter, opts.deadline);
   let tree: UiNode;
   if (opts.tree !== undefined) {
     tree = opts.tree;
@@ -211,10 +296,10 @@ export async function captureFrame(
     try {
       tree = await readTreeWithRetry(adapter, { attempts: TREE_READ_ATTEMPTS, delayMs: TREE_READ_DELAY_MS });
     } catch (e) {
-      return { shot, measured: { error: errorMessage(e) } };
+      return { shot, stability, captures, measured: { error: errorMessage(e) } };
     }
   } else {
-    return { shot };
+    return { shot, stability, captures };
   }
   let png: PNG;
   try {
@@ -222,6 +307,8 @@ export async function captureFrame(
   } catch (e) {
     return {
       shot,
+      stability,
+      captures,
       measured: {
         tree,
         error:
@@ -233,7 +320,7 @@ export async function captureFrame(
   // Memoized inside the adapter (adapters/types.ts), so this is a device read
   // once per adapter, not once per frame.
   const screen = await adapter.viewport().catch(() => undefined);
-  return { shot, measured: measuredFrameFor(tree, png, screen) };
+  return { shot, stability, captures, measured: measuredFrameFor(tree, png, screen) };
 }
 
 /**
@@ -272,22 +359,41 @@ export function measuredFrameFor(tree: UiNode, png: RgbaImage, screen?: DeviceSc
 }
 
 /**
- * Two identical consecutive captures, bounded attempts. Each call costs 2 to
- * attempts+1 device captures, and the color and ocr asserts pay that PER POLL
- * ITERATION — never call this inside a tight loop.
+ * Two identical consecutive captures, bounded by the stability budget and by
+ * the caller's deadline. Each call costs 2 to STABILITY_ATTEMPTS+1 device
+ * captures, and the color and ocr asserts pay that PER POLL ROUND — which is
+ * why they hand their deadline in: a round must not spend 1.5 s on captures
+ * the poll's own clock has already run out on.
+ *
+ * The deadline test is "would the NEXT re-capture end after it", with the
+ * cost of a re-capture (one delay plus one screencap) taken from the
+ * PREVIOUS one as measured on the clock — a slow screencap (300 ms on a
+ * loaded emulator) is accounted for rather than assumed free, and a
+ * mocked-out sleep (the tests) is not assumed to take 300 ms it does not
+ * take. The first re-capture has no measurement to go on and is taken
+ * unless the deadline has already passed; the first capture is always taken
+ * — one honest look.
  */
 async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot'>,
-  budget: { attempts: number; delayMs: number },
-): Promise<Buffer> {
+  deadline?: number,
+): Promise<Pick<Frame, 'shot' | 'stability' | 'captures'>> {
   let previous = await adapter.screenshot();
-  for (let i = 0; i < budget.attempts; i++) {
-    await sleep(budget.delayMs);
+  let captures = 1;
+  let recaptureMs = 0; // measured cost of the last re-capture (delay + screencap); 0 until one has run
+  for (let i = 0; i < STABILITY_ATTEMPTS; i++) {
+    if (deadline !== undefined && Date.now() + recaptureMs >= deadline) break;
+    const started = Date.now();
+    await sleep(STABILITY_DELAY_MS);
     const current = await adapter.screenshot();
-    if (current.equals(previous)) return current;
+    recaptureMs = Date.now() - started;
+    captures += 1;
+    if (current.equals(previous)) return { shot: current, stability: 'settled', captures };
     previous = current;
   }
-  return previous;
+  // The ONE place "one capture is no verdict" is decided (2026-10-05): a
+  // consumer reads `stability`, never the count.
+  return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures };
 }
 
 /**
