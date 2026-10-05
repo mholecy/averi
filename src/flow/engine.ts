@@ -164,8 +164,10 @@ export class FlowEngine {
     opts: EngineOptions,
   ) {
     // Resolved once per engine so a run cannot type one environment's username
-    // and another's password, and so an unknown name fails before touching the
-    // device rather than mid-login.
+    // and another's password; resolved before any STEP, so a bad name never
+    // fails mid-login. The refusal BEFORE any device is the run layer's
+    // pre-flight (run/preflight.ts#refuseUnknownEnvironment, 2026-10-05) — the
+    // engine is built after the adapter and cannot give that guarantee itself.
     this.credentials = resolveCredentials(cfg, opts.env, opts.environment);
     this.pollMs = opts.pollMs ?? 500;
     this.tapTimeoutMs = opts.tapTimeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
@@ -201,10 +203,12 @@ export class FlowEngine {
    * error and has no way to tell it was really the wrong backend.
    */
   private logEnvironment(): void {
-    const { environment } = this.credentials;
+    const { environment, overriddenNames } = this.credentials;
     if (environment === undefined) return;
-    const overrides = Object.keys(this.cfg.environments?.[environment]?.credentials ?? {});
-    this.log(`environment ${environment}`, overrides.length > 0 ? `overrides: ${overrides.join(', ')}` : undefined);
+    this.log(
+      `environment ${environment}`,
+      overriddenNames.length > 0 ? `overrides: ${overriddenNames.join(', ')}` : undefined,
+    );
   }
 
   private async ensureStateInner(name: string): Promise<void> {

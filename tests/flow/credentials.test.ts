@@ -73,6 +73,13 @@ describe('resolveCredentials', () => {
     );
   });
 
+  it('names exactly the credentials the environment overrides, in declaration order; none on base only', () => {
+    expect(resolveCredentials(cfg(), ENV).overriddenNames).toEqual([]);
+    expect(resolveCredentials(cfg(), ENV, 'starterkit').overriddenNames).toEqual(['username']);
+    // frozen like the rest: the engine's trace line reads it, nothing may edit it
+    expect(Object.isFrozen(resolveCredentials(cfg(), ENV, 'starterkit').overriddenNames)).toBe(true);
+  });
+
   it('is frozen: a run cannot swap credentials under itself', () => {
     expect(Object.isFrozen(resolveCredentials(cfg(), ENV))).toBe(true);
   });

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import type { EnvValues } from '../flow/credentials.js';
+import { refuseUnknownEnvironment } from './preflight.js';
 import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
@@ -466,6 +467,10 @@ export async function runVerification(
     const problems = contractProblems(contract);
     if (problems.length > 0) throw new Error(contractRefusal(problems, req.contractPath));
   }
+  // Same rule for the environment — run/preflight.ts#refuseUnknownEnvironment
+  // has the why (2026-10-05): a thrown refusal here, before any leg, where it
+  // used to be a contained per-leg FAILED section after resolveAdapter.
+  refuseUnknownEnvironment(cfg, env, req.environment);
 
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);

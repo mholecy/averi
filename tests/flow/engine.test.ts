@@ -1872,6 +1872,15 @@ flows:
     expect(trace[0]).toEqual({ action: 'environment starterkit', detail: 'overrides: username' });
   });
 
+  it('an environment that overrides nothing is still the first trace line, with no detail', async () => {
+    // Pins the no-override form of the line (the names come from
+    // Credentials.overriddenNames since 2026-10-05; the wording must not move).
+    const cfg = { ...MULTI_ENV, environments: { ...MULTI_ENV.environments, mirror: { credentials: {} } } };
+    const fake = new FakeAdapter(buildScreens(), 'fresh_login');
+    const trace = await new FlowEngine(cfg, fake, { ...MULTI, environment: 'mirror' }).runFlow('type_username');
+    expect(trace[0]).toEqual({ action: 'environment mirror' });
+  });
+
   it('keeps environment usernames redacted from the trace', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
     const trace = await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow(
@@ -1880,7 +1889,7 @@ flows:
     expect(JSON.stringify(trace)).not.toContain('starter.user');
   });
 
-  it('fails before touching the device when the environment is unknown', () => {
+  it('refuses an unknown environment at construction — before any step (the run layer refuses it before any device)', () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
     expect(() => new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'nope' })).toThrow(
       /Unknown environment "nope"/,

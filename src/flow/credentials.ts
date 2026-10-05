@@ -46,6 +46,14 @@ export interface Credentials {
   /** The environment actually applied, or undefined when running on base only. */
   readonly environment: string | undefined;
   /**
+   * The credential NAMES the active environment overrides, in declaration
+   * order; empty on base only. Computed where the layering is applied, so the
+   * engine's first trace line reads it here instead of re-deriving it from
+   * `cfg.environments` (2026-10-05: until then the layering rule had two
+   * owners).
+   */
+  readonly overriddenNames: readonly string[];
+  /**
    * `$name` → credentials[name] → `${VAR}` expansion from the env; a bare
    * `${VAR}` expands too; plain strings pass through. Throws SetupError —
    * which aborts the reach ladder rather than escalating it — for an
@@ -57,8 +65,10 @@ export interface Credentials {
 /**
  * Pick the credential set for a run: base `credentials:` overlaid per-key with
  * `environments.<name>.credentials`, resolved ONCE so a run cannot type one
- * environment's username and another's password, and so an unknown name fails
- * before the device is touched rather than mid-login.
+ * environment's username and another's password. An unknown name throws here;
+ * since 2026-10-05 the run layer calls this as a pre-flight so the refusal
+ * lands before any device is touched (run/preflight.ts#refuseUnknownEnvironment),
+ * and the engine resolves for itself once more, before any STEP.
  *
  * Precedence, most specific first: explicit `requested` (tool argument) →
  * `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in
@@ -72,10 +82,11 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
   const name = requested ?? env.AVERI_ENV ?? cfg.defaultEnvironment;
   const base = cfg.credentials ?? {};
   let templates: Readonly<Record<string, string>> = base;
+  let overriddenNames: readonly string[] = [];
   if (name !== undefined) {
     const known = Object.keys(cfg.environments ?? {});
-    const overrides = cfg.environments?.[name];
-    if (!overrides) {
+    const environmentEntry = cfg.environments?.[name];
+    if (!environmentEntry) {
       const source =
         requested !== undefined ? 'requested'
         : env.AVERI_ENV !== undefined ? 'AVERI_ENV'
@@ -84,7 +95,8 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
         `Unknown environment "${name}" (from ${source}) — known: ${known.join(', ') || '(none declared)'}`,
       );
     }
-    templates = { ...base, ...overrides.credentials };
+    templates = { ...base, ...environmentEntry.credentials };
+    overriddenNames = Object.freeze(Object.keys(environmentEntry.credentials ?? {}));
   }
   const environment = name;
 
@@ -106,6 +118,7 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
 
   return Object.freeze({
     environment,
+    overriddenNames,
     resolve(raw: string): ResolvedValue {
       if (raw.startsWith('$') && !raw.startsWith('${')) {
         const key = raw.slice(1);

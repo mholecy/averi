@@ -162,10 +162,22 @@ describe('runNamedFlow', () => {
     expect(plain).not.toContain('environment');
   });
 
-  it('an environment averi.yaml does not declare is refused, naming the known ones', async () => {
+  // run_flow and ensure_state share runOnEngine, so the pre-flight below is
+  // theirs alike; run/preflight.ts#refuseUnknownEnvironment has the why.
+  it('an environment averi.yaml does not declare is refused, naming the known ones — before the adapter is resolved', async () => {
+    const r = resolver(home());
     await expect(
-      runNamedFlow({ flow: 'open_menu', environment: 'nope', configPath: await validConfig() }, resolver(home()).resolve),
-    ).rejects.toThrow(/Unknown environment "nope".*known: staging/);
+      runNamedFlow({ flow: 'open_menu', environment: 'nope', configPath: await validConfig() }, r.resolve),
+    ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  it('ensure_state takes the same pre-flight: no adapter is resolved for an undeclared environment', async () => {
+    const r = resolver(home());
+    await expect(
+      runEnsureState({ state: 'home', environment: 'nope', configPath: await validConfig() }, r.resolve),
+    ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
+    expect(r.resolvedWith).toEqual([]);
   });
 
   it('the health line is the app\'s: a dead app is reported, not thrown', async () => {

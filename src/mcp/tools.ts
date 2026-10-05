@@ -439,9 +439,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         environment,
       },
     },
-    async ({ platform: p, state, configPath: cp, environment: env }) => {
+    async ({ platform: p, state, configPath: cp, environment: envName }) => {
       const { text: report, shot } = await runEnsureState(
-        { state, configPath: cp, environment: env },
+        { state, configPath: cp, environment: envName },
         (cfg) => registry.get(p, iosOpts(cfg)),
       );
       return { content: [...text(report).content, image(shot)] };
@@ -460,9 +460,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         environment,
       },
     },
-    async ({ platform: p, flow, configPath: cp, environment: env }) => {
+    async ({ platform: p, flow, configPath: cp, environment: envName }) => {
       return text(
-        await runNamedFlow({ flow, configPath: cp, environment: env }, (cfg) => registry.get(p, iosOpts(cfg))),
+        await runNamedFlow({ flow, configPath: cp, environment: envName }, (cfg) => registry.get(p, iosOpts(cfg))),
       );
     },
   );
@@ -492,7 +492,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
-        'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000; ALWAYS the light axis — bg values — since averi cannot switch device themes; bg_dark anchors wait for the dark-mode round), and when anchors carry text/text_dynamic a ## text parity table compares the RENDERED copy and type size (OCR off the same screenshots; macOS-only, falls back to the tree with a note): numbers over impressions. A contract field a requested table cannot read (a bg that is neither hex nor token, an unknown sample mode, a non-string text, a non-boolean text_dynamic, a tolerance_de / tolerance_size_pct / tolerance_aspect_pct that is not a positive number) REFUSES the call before any device is touched, listing every such field — it no longer runs both legs to report FAILED in that table.',
+        'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000; ALWAYS the light axis — bg values — since averi cannot switch device themes; bg_dark anchors wait for the dark-mode round), and when anchors carry text/text_dynamic a ## text parity table compares the RENDERED copy and type size (OCR off the same screenshots; macOS-only, falls back to the tree with a note): numbers over impressions. A contract field a requested table cannot read (a bg that is neither hex nor token, an unknown sample mode, a non-string text, a non-boolean text_dynamic, a tolerance_de / tolerance_size_pct / tolerance_aspect_pct that is not a positive number) REFUSES the call before any device is touched, listing every such field — it no longer runs both legs to report FAILED in that table. An `environment` averi.yaml does not declare is refused the same way, before any device, naming the known ones.',
       inputSchema: {
         platforms: z
           .array(platform)
@@ -513,7 +513,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         environment,
       },
     },
-    async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: env }) => {
+    async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: envName }) => {
       const project = await loadProjectConfig(cp);
       // Parsed before the contract is read: a malformed assert spec is the
       // caller's most likely mistake, and it stays the error they see when both
@@ -531,7 +531,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           state,
           flow,
           contractPath,
-          environment: env,
+          environment: envName,
           baselineDir: baselineDirFor(cp),
         },
         // Only the ios leg has a treeSource; the registry normalizes it away

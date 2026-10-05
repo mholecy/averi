@@ -7,6 +7,7 @@ import {
   type LaunchEntry,
 } from '../flow/config.js';
 import { configDir, loadProjectConfig, projectConfigPath } from '../flow/load.js';
+import { refuseUnknownEnvironment } from './preflight.js';
 import { FlowEngine, type TraceEntry } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
@@ -40,6 +41,7 @@ import { appHealth, assertSummary, formatAsserts, formatTrace } from './verify.j
 /** Resolves the adapter for a call once its config is loaded (the config names the iOS tree source). */
 export type ResolveAdapterFor = (cfg: AveriConfig) => Promise<DeviceAdapter>;
 
+
 /**
  * Baselines belong to the project, so they hang off averi.yaml like every other
  * project-relative path — `.averi/baselines/` beside the config, not beside
@@ -55,10 +57,11 @@ interface EngineCall {
 }
 
 /**
- * The sequence ensure_state and run_flow share: config, adapter, engine, the
- * trace, then the health line — in that order, each step only if the one
- * before it succeeded (a failing flow throws its own trace; there is no
- * health line on a failure, as there never was).
+ * The sequence ensure_state and run_flow share: config, the environment
+ * pre-flight (`refuseUnknownEnvironment`), adapter, engine, the trace, then
+ * the health line — in that order, each step only if the one before it
+ * succeeded (a failing flow throws its own trace; there is no health line on
+ * a failure, as there never was).
  */
 async function runOnEngine(
   call: EngineCall,
@@ -66,6 +69,7 @@ async function runOnEngine(
   run: (engine: FlowEngine) => Promise<TraceEntry[]>,
 ): Promise<{ adapter: DeviceAdapter; text: string }> {
   const { cfg, env } = await loadProjectConfig(call.configPath);
+  refuseUnknownEnvironment(cfg, env, call.environment);
   const adapter = await resolveAdapter(cfg);
   const trace = await run(new FlowEngine(cfg, adapter, { env, environment: call.environment }));
   return { adapter, text: formatTrace(trace) + (await appHealth(adapter, cfg)) };

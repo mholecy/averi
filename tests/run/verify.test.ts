@@ -170,6 +170,33 @@ flows:
     expect((await run()).sections[0]).not.toContain('environment');
   });
 
+  // run/preflight.ts#refuseUnknownEnvironment has the why (2026-10-05).
+  it('an environment averi.yaml does not declare is refused before ANY adapter is resolved — no leg runs', async () => {
+    const cfg = parseConfig(`
+app:
+  android: { package: a }
+credentials:
+  username: \${AVERI_USER}
+environments:
+  staging:
+    credentials:
+      username: \${AVERI_STAGING_USER}
+states:
+  home:
+    detect: { element: { id: home } }
+flows: {}
+`);
+    const calls: string[] = [];
+    const resolve = async (p: Platform) => {
+      calls.push(`resolveAdapter(${p})`);
+      return fake(p);
+    };
+    await expect(runVerification(request({ cfg, environment: 'nope' }), resolve)).rejects.toThrow(
+      /Unknown environment "nope" \(from requested\) — known: staging/,
+    );
+    expect(calls).toEqual([]);
+  });
+
   it('surfaces a failing assert without throwing', async () => {
     const adapters = { android: fake('android'), ios: fake('ios') };
     const out = await runVerification(
