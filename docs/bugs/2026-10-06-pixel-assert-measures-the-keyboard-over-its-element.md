@@ -104,3 +104,23 @@ covered sentence still winning; the clear round never recorded; a pre-query cut 
 wording; a new covered round not re-arming after a clear.
 
 **Device check.** Not run yet: the fix is verified against the fake oracle only.
+
+## Device check of the fix (2026-10-06 evening, `f1f9ba8`, finportal)
+
+Setup: finportal login screen on Android `emulator-5554` (API 33). Focusing `login_username` raises Gboard over
+`login_submit`. The tree keeps `login_submit` at `99,1400 300x132`.
+
+Results:
+- **Keyboard up, explicit `timeout: "4s"`:** color twice and ocr once. Each FAILED closed with the exact sentence:
+  `the soft keyboard covers the element (element 99,1400 300x132, keyboard 0,1398 1080x822) — dismiss it (…) and
+  re-run; failing closed, color unchecked`. The ocr version ends in `rendered text unchecked`. The keyboard frame matches
+  the screenshot. The keyboard's pixels were no longer reported.
+- **`login_title` above the keyboard:** PASS (5.7 s). The guard raised no false cover.
+- **After `back` hid the IME:** PASS (5.6 s). On finportal, back only hid the IME; it did not navigate.
+- **Keyboard hidden ~3.5 s into an assert:** PASS in 5.0 s.
+  - A `dumpsys` loop logged every ~40 ms showed `visible=false` ~0.45 s after the key. The stale full frame lasted another
+    ~0.7 s with `visible=false`.
+  - The oracle decides on `visible=` alone, so no long stale "shown" was observed.
+- **iOS:** no oracle and no soft keyboard (hardware keyboard), so behaviour is unchanged. PASS, with no covered sentence.
+
+Not exercised: a floating or split IME, API 34+, multi-display (the recorded residuals).
