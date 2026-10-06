@@ -1566,3 +1566,200 @@ describe('rect and color asserts report an unreadable tree at timeout', () => {
     expect(result.detail).toContain('last UI tree read failed: null root node');
   });
 });
+
+/**
+ * docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md:
+ * on Android the soft keyboard is a separate window, absent from the tree, so
+ * a node under it keeps its at-rest rect — and until this fix a color assert
+ * sampled the key faces (#FFFFFF) and an ocr assert read the `?123` key, each
+ * reported as the ELEMENT'S. Since 2026-10-06 the pixel poll asks the
+ * adapter's keyboard oracle once per round, before any capture
+ * (verify/pixel-poll.ts, header). The fake attaches the oracle as a test asks;
+ * without one it behaves like iOS — no oracle, nothing queried, nothing
+ * changed, which every color/ocr test above pins (e.g. 'passes on a matching
+ * fill and reports the sampled hex, dE and scale').
+ */
+describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
+  // The device shape, scaled to this file's fixture: a 1000x2000 screen, the
+  // card in it, the keyboard docked along the bottom.
+  const CARD = { x: 100, y: 200, width: 800, height: 100 };
+  const COVERING = { x: 0, y: 250, width: 1000, height: 1750 };
+  /** Shown, but below the card: the keyboard is up and the element is not under it. */
+  const BELOW = { x: 0, y: 1285, width: 1000, height: 715 };
+  /** Flush with the card's bottom edge (y 300): they touch, they share no area. */
+  const TOUCHING = { x: 0, y: 300, width: 1000, height: 1700 };
+  const COVERED =
+    'the soft keyboard covers the element (element 100,200 800x100, keyboard 0,250 1000x1750) — ' +
+    'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run';
+  const fill = (p: PNG, hex: string): void => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let y = CARD.y; y < CARD.y + CARD.height; y++) {
+      for (let x = CARD.x; x < CARD.x + CARD.width; x++) {
+        const o = (y * p.width + x) << 2;
+        p.data[o] = r;
+        p.data[o + 1] = g;
+        p.data[o + 2] = b;
+        p.data[o + 3] = 255;
+      }
+    }
+  };
+  const cardFake = () => {
+    resetLayout();
+    const fake = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: { ...CARD } })) }, 'detail');
+    fake.nextScreenshot = png(1000, 320, (p) => fill(p, '#3F3F50'));
+    return fake;
+  };
+  /** Every frame would read "CONTINUE" if the recognizer were ever handed one. */
+  const countingEngine = () => {
+    const probe = { recognized: 0 };
+    const engine = {
+      recognize: async (_png: Buffer, regions: { id: string }[]) => {
+        probe.recognized += 1;
+        return regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 200, h: 30 }] }));
+      },
+    };
+    return { probe, engine };
+  };
+  const SLOW = { pollMs: 300, timeoutMs: 1000 };
+
+  it('a keyboard over the element fails closed with both rects, every round, and nothing is captured or measured', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // The colour the keyboard's keys would give: had it been sampled, it would have passed.
+    const color = cardFake();
+    color.nextScreenshot = png(1000, 320, (p) => fill(p, '#FFFFFF'));
+    color.attachKeyboard({ state: 'shown', frame: COVERING });
+    const c = await new Verifier(color, SLOW).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(c.pass).toBe(false);
+    // Every round was covered: the covered miss is the timeout's wording — the
+    // last finding, which the round the deadline cut (no query, no capture)
+    // does not erase.
+    expect(c.detail).toBe(`${COVERED}; failing closed, color unchecked`);
+    expect(color.screenshots).toHaveLength(0);
+    // Reads at 0, 300, 600, 900 ms are asked; the read at 1200 ms is past the deadline and asks nothing.
+    expect(color.attachedKeyboard.windowAnswers.queries).toBe(4);
+    // Only the window state, never the witness: nothing is pressed here.
+    expect(color.attachedKeyboard.witnessAnswers.queries).toBe(0);
+    expect(color.keys).toEqual([]);
+
+    const ocr = cardFake();
+    ocr.attachKeyboard({ state: 'shown', frame: COVERING });
+    const { probe, engine } = countingEngine();
+    const o = await new Verifier(ocr, { ...SLOW, ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toBe(`${COVERED}; failing closed, rendered text unchecked`);
+    expect(ocr.screenshots).toHaveLength(0);
+    expect(probe.recognized).toBe(0);
+  });
+
+  it('a keyboard shown elsewhere, or one that only touches the element\'s edge, changes nothing', async () => {
+    for (const frame of [BELOW, TOUCHING]) {
+      const color = cardFake();
+      color.attachKeyboard({ state: 'shown', frame });
+      const c = await new Verifier(color, FAST).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
+      expect(c.pass).toBe(true);
+      expect(c.detail).toContain('sampled #3F3F50');
+      expect(color.attachedKeyboard.windowAnswers.queries).toBe(1);
+      expect(color.screenshots).toHaveLength(2);
+
+      const ocr = cardFake();
+      ocr.attachKeyboard({ state: 'shown', frame });
+      const { probe, engine } = countingEngine();
+      const o = await new Verifier(ocr, { ...FAST, ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+      expect(o.pass).toBe(true);
+      expect(probe.recognized).toBe(1);
+    }
+  });
+
+  it('a hidden keyboard, or an oracle that cannot tell, changes nothing — asked once, then the round goes on as before', async () => {
+    for (const state of ['hidden', 'unknown'] as const) {
+      const fake = cardFake();
+      fake.attachKeyboard({ state });
+      const result = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
+      expect(result.pass).toBe(true);
+      expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
+      expect(fake.screenshots).toHaveLength(2);
+    }
+  });
+
+  it('a keyboard that goes away between rounds costs one round, not the verdict', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = cardFake();
+    fake.attachKeyboard({ state: 'shown', frame: COVERING }).windowAnswers.queue = [
+      { state: 'shown', frame: COVERING },
+      { state: 'hidden' },
+    ];
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      reads++;
+      return real();
+    };
+    const result = await new Verifier(fake, SLOW).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
+    expect(result.pass).toBe(true);
+    // Round 1: covered, nothing captured. Round 2: hidden, two captures that agree, measured.
+    expect(reads).toBe(2);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(2);
+    expect(fake.screenshots).toHaveLength(2);
+    expect(sleeps).toEqual([SLOW.pollMs, STABILITY_DELAY_MS]);
+  });
+
+  /**
+   * Review 2026-10-06: covered in round 1, found CLEAR by round 2's query, and
+   * round 2's one capture cut by the deadline. The last look said hidden, so
+   * "dismiss the keyboard" would be false; the cut sentence is the truth.
+   */
+  it('a covered miss that a later query contradicted is not the timeout wording — the cut round after it is', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = cardFake();
+    fake.attachKeyboard({ state: 'shown', frame: COVERING }).windowAnswers.queue = [
+      { state: 'shown', frame: COVERING },
+      { state: 'hidden' },
+    ];
+    const realTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 600);
+      return realTree();
+    };
+    fake.screenshot = async () => {
+      vi.setSystemTime(Date.now() + 600);
+      const shot = png(1000, 320, (p) => fill(p, '#3F3F50'));
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    // Round 1: read 0→600 ms, covered. Pause to 900. Round 2: read to 1500,
+    // hidden, one screencap to 2100 — past the 2000 ms deadline, unjudged.
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 2000 }).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'element found, but no time was left within 2000ms to capture a settled frame (the slowest round — a tree read and its captures — took 1200ms here) — raise this assert timeout',
+    );
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(2);
+    expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it('a keyboard that comes back after a clear round is the timeout wording again', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = cardFake();
+    const SHOWN = { state: 'shown' as const, frame: COVERING };
+    // Covered at 0 ms; clear at 300 ms, measured and wrong (#3F3F50 is not #FFFFFF); covered again from 900 ms on.
+    fake.attachKeyboard(SHOWN).windowAnswers.queue = [SHOWN, { state: 'hidden' }, SHOWN];
+    const result = await new Verifier(fake, SLOW).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(`${COVERED}; failing closed, color unchecked`);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(3);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('a real finding made AFTER a contradicted cover is the timeout wording — only the stale cover itself is dropped', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = cardFake();
+    const SHOWN = { state: 'shown' as const, frame: COVERING };
+    // Covered at 0 ms; clear from 300 ms on, measured and wrong (#3F3F50 is
+    // not #FFFFFF). The mismatch is the app's finding and must survive the
+    // rounds after it: the cover was contradicted, the measurement was not.
+    fake.attachKeyboard(SHOWN).windowAnswers.queue = [SHOWN, { state: 'hidden' }];
+    const result = await new Verifier(fake, SLOW).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('sampled #3F3F50 (dominant, 100% of region) vs expected #FFFFFF → dE00 61.62 > 8; scale 1.000');
+  });
+});

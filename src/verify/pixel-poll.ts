@@ -1,6 +1,6 @@
 import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { rectText, sameRect } from '../ui-tree/geometry.js';
+import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -22,9 +22,10 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  *
  * What this module owns:
  * - the round's ORDER: tree read (the tree poll's) → find → deadline check →
- *   capture with that tree and the deadline → stability gate → decode gate →
- *   measure. A round that begins past the deadline takes no screenshot: the
- *   overrun of a slow tree read is never compounded by a stability budget.
+ *   soft-keyboard check (2026-10-06, below) → capture with that tree and the
+ *   deadline → stability gate → decode gate → measure. A round that begins
+ *   past the deadline takes no screenshot: the overrun of a slow tree read is
+ *   never compounded by a stability budget.
  * - the two gates: `measure` sees only a SETTLED, DECODED frame. A moving
  *   frame is a miss with the reason, never a sample — the deadline, not a
  *   moving frame, decides (2026-10-05); one capture (`unjudged`) is no verdict
@@ -69,6 +70,44 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  * rather than "not found" or "did not settle". A frame that settled over the
  * whole SCREEN is measured as before: two identical captures already say
  * nothing moved, the element included.
+ *
+ * Since 2026-10-06 (later that day) a round also asks the adapter's soft-
+ * keyboard oracle, when it has one, before it captures anything
+ * (docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md).
+ * Measured that day on an API 33 emulator: a tap on a field raised the IME
+ * over the bottom ~40% of a payment form, uiautomator went on reporting the
+ * pinned CONTINUE button at its at-rest rect (the keyboard is a separate
+ * window, not in the tree), and a color assert sampled the key faces
+ * (`#FFFFFF`) while an ocr assert read the `?123` key ("123") — each reported
+ * as the ELEMENT'S colour and copy. Had the expected value happened to be the
+ * keyboard's colour — white or light grey, common for a disabled control —
+ * the assert would have PASSED on an element the user cannot see. The rule:
+ * the oracle says `shown` and its frame overlaps the element's rect by any
+ * positive area (`rectsOverlap`; an edge-touching rect is not covered) → the
+ * round is a fail-closed MISS that names both rects and nothing is captured;
+ * the poll keeps going, so a keyboard that goes away before the deadline
+ * costs a round, not the verdict, and once a later query finds the element
+ * clear the covered sentence stops being the timeout's wording. `hidden`, `unknown`, a frame elsewhere, or
+ * no oracle at all (iOS, whose keyboard is in the tree) → the round proceeds
+ * exactly as before. Only `state()` is asked, never `witness()`: the witness
+ * exists to veto a `back` key press, and nothing is pressed here — a stale
+ * `shown` costs covered rounds until the window state catches up (seconds,
+ * measured on `KeyboardOracle.witness`), within the 12 s pixel default; under
+ * a short explicit timeout it fails closed with the covered wording; never a
+ * false pass. "Any overlap" is deliberate: the ocr assert crops the whole
+ * rect, so any keyboard inside it is read; the colour sampler insets 12%, so
+ * a keyboard under only the bottom edge fails closed where colour could have
+ * measured — a cost accepted for one rule, and the sentence quotes both rects
+ * so the case is plain to diagnose. Residual — the old behaviour returns,
+ * silently, when the oracle cannot see the keyboard: a floating or split IME
+ * supplies no insets frame (it reads hidden, or a zero-size frame read as
+ * unknown); the API 34+ `type=ime` line is taken from AOSP and has not been
+ * captured on a device; a multi-display device reads unknown. The check sits after the deadline check so a round that
+ * would capture nothing queries nothing either. Cost: one `dumpsys window
+ * displays` per round, tens of ms (the measured figures are on
+ * AndroidAdapter's `keyboardState`), on Android only, against a round of
+ * ~2.6–4.3 s there. The verify legs are untouched: their text table already
+ * reports this case as OCCLUDED.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
  * `measure`), the scale policy (`measured.scale` may carry a derivation error;
@@ -133,15 +172,30 @@ class PixelPollMemory {
   private mostCaptures = 0;
   /**
    * The slowest ROUND of the poll — a tree read and whatever the round then
-   * captured — quoted when the budget ran out on a found element
-   * (2026-10-06): on the Android emulator one round is ~4.3 s against the
-   * caller's budget, and "no time was left" alone reads like a flaky screen.
+   * captured; since 2026-10-06 also the round's soft-keyboard query, tens of
+   * ms on Android, which the sentence does not name (its wording, "a tree
+   * read and its captures", is pinned byte-for-byte across the suite) —
+   * quoted when the budget ran out on a found element (2026-10-06): on the
+   * Android emulator one round is ~4.3 s against the caller's budget, and
+   * "no time was left" alone reads like a flaky screen.
    * The round, not the read, because either half can be the slow one. A read
    * that FAILED never reaches the round, so it is not counted: its error is
    * the not-found sentence's to quote, not this one's.
    */
   private slowestRoundMs = 0;
   private lastRect: Rect | undefined;
+  /**
+   * The covered sentence the last covered round recorded, and whether an
+   * oracle answer SINCE then said the keyboard no longer covers the element
+   * (review 2026-10-06). pollTree keeps the last PollMiss detail and is not
+   * this module's to change, so a covered miss cannot be withdrawn there;
+   * `timeoutDetail` skips it instead when it is still the last detail and a
+   * later round saw the element clear — "dismiss the keyboard" is false once
+   * the last look found it hidden. A round cut BEFORE the query leaves both
+   * alone: it saw nothing, and the last finding still outranks silence.
+   */
+  private lastCovered: string | undefined;
+  private coverCleared = false;
 
   constructor(private readonly unchecked: PixelPollSpec['unchecked']) {}
 
@@ -198,6 +252,35 @@ class PixelPollMemory {
     return true;
   }
 
+  /**
+   * The soft keyboard covers the element (2026-10-06): a miss that quotes
+   * both rects, never a measurement — what would be sampled is the keyboard.
+   * A finding like any other, so when every round was covered it is the
+   * timeout's wording (`timeoutDetail`: the last finding outranks the silent
+   * rounds and not-found), and a later round cut by the deadline before its
+   * query does not erase it. A later round whose query found the element
+   * clear does (`uncovered`). The remedy names the fill option
+   * (`dismissKeyboard`, flow/config.ts) and `back` — not "tap a field above",
+   * which keeps the keyboard up (review 2026-10-06).
+   */
+  covered(rect: Rect, keyboard: Rect): PollVerdict {
+    const reason =
+      `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)}) — ` +
+      'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run';
+    const detail = failClosed(reason, this.unchecked);
+    this.lastCovered = detail;
+    this.coverCleared = false;
+    return { pass: false, detail };
+  }
+
+  /**
+   * The round's oracle query found nothing over the element (or there is no
+   * oracle): an earlier covered miss is no longer the truth.
+   */
+  uncovered(): void {
+    if (this.lastCovered !== undefined) this.coverCleared = true;
+  }
+
   /** The frame is not a verdict: a miss with the reason when it was seen moving, silence when nothing could be judged. */
   unsettled(frame: Pick<Frame, 'stability' | 'captures'>): PollVerdict | undefined {
     if (!isMoving(frame)) {
@@ -208,9 +291,15 @@ class PixelPollMemory {
     return { pass: false, detail: failClosed(unsettledReason({ captures: this.mostCaptures }), this.unchecked) };
   }
 
-  /** The timeout wording: the last finding, else found-but-no-time (cut or unconfirmed, whichever silenced the last such round), which outranks not-found. */
+  /**
+   * The timeout wording: the last finding, else found-but-no-time (cut or
+   * unconfirmed, whichever silenced the last such round), which outranks
+   * not-found. A covered miss that a later query contradicted is not a
+   * finding any more (`lastCovered`): the silent round after it speaks.
+   */
   timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error }): string {
-    if (last.detail !== undefined) return last.detail;
+    const stale = this.coverCleared && last.detail === this.lastCovered;
+    if (last.detail !== undefined && !stale) return last.detail;
     const roundCost = `the slowest round — a tree read and its captures — took ${this.slowestRoundMs}ms here`;
     if (this.foundSilently === 'cut') {
       return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame (${roundCost}) — raise this assert timeout`;
@@ -226,6 +315,22 @@ class PixelPollMemory {
 }
 
 /**
+ * The soft keyboard's frame when the adapter's oracle says one is shown over
+ * `rect` — any positive-area overlap — else undefined: no oracle (iOS),
+ * `hidden`, `unknown`, or a frame elsewhere (header, 2026-10-06). The two
+ * rects are in the same units: on Android both are device pixels, read from
+ * the same `[l,t][r,b]` notation by the same `parseBounds`
+ * (adapters/android.ts — a uiautomator node's `bounds` and the IME
+ * `InsetsSource` entry's `frame=`), and the tree rect reaches this poll
+ * unscaled. `state()` never throws (KeyboardOracle's contract), so no catch.
+ */
+async function keyboardOver(adapter: Pick<DeviceAdapter, 'keyboard'>, rect: Rect): Promise<Rect | undefined> {
+  if (adapter.keyboard === undefined) return undefined;
+  const keyboard = await adapter.keyboard.state();
+  return keyboard.state === 'shown' && rectsOverlap(rect, keyboard.frame) ? keyboard.frame : undefined;
+}
+
+/**
  * Poll until `measure` passes on a settled, decoded frame of the element, or
  * the deadline passes. `{ pass: true }` carries the passing verdict's
  * detail; `{ pass: false }` the timeout wording — the last measured finding
@@ -235,7 +340,7 @@ class PixelPollMemory {
  * Nms" with the last tree-read error.
  */
 export async function pollPixels(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport' | 'keyboard'>,
   spec: PixelPollSpec,
 ): Promise<PollVerdict> {
   const { element, timeoutMs, pollMs, unchecked, measure } = spec;
@@ -249,6 +354,9 @@ export async function pollPixels(
     const { rect } = found[0];
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
+    const keyboard = await keyboardOver(adapter, rect);
+    if (keyboard !== undefined) return memory.covered(rect, keyboard);
+    memory.uncovered();
     const frame = await captureFrame(adapter, { tree, deadline, region: rect });
     if (frame.stability !== 'settled') return memory.unsettled(frame);
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).

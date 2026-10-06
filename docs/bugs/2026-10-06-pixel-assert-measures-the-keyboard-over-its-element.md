@@ -42,3 +42,65 @@ uses since `f543b2f`) before measuring.
 When the adapter offers the keyboard oracle and the element's rect intersects the keyboard frame, fail closed with
 "covered by the soft keyboard — dismiss it and re-run" (or the `verify` table's OCCLUDED wording) instead of
 measuring. Reuse the tap guard's pure table for the intersection test.
+
+## Fix (2026-10-06, the commit after `6300325`)
+
+**Where.** In the pixel poll (`pollPixels`, `src/verify/pixel-poll.ts`), once per round: after the find and the deadline
+check, before the capture. The color and ocr asserts both poll through it, so both are covered by one check. The
+`verify` legs, the tools and the tap guard are unchanged; the text table already reports this case as OCCLUDED.
+
+**Rule.**
+- The adapter has the keyboard oracle (`DeviceAdapter.keyboard`, Android) → ask `keyboard.state()`.
+- `shown`, and its frame overlaps the element's rect by any positive area (`rectsOverlap`, new in
+  `src/ui-tree/geometry.ts`) → the round is a fail-closed MISS and nothing is captured (`rendered text unchecked` for
+  ocr). The remedy does not say "tap a field above": that keeps the keyboard up (review 2026-10-06).
+
+  ```
+  the soft keyboard covers the element (element 66,1979 948x132, keyboard 0,1285 1080x935) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run; failing closed, color unchecked
+  ```
+- The poll keeps going: a keyboard that goes away before the deadline costs a round, not the verdict.
+- `hidden`, `unknown`, a frame elsewhere, an edge that only touches the element, or no oracle (iOS) → the round
+  proceeds exactly as before.
+- `witness()` is not asked. It exists to veto a `back` press, and nothing is pressed here. A stale `shown` costs
+  covered rounds until the window state catches up (seconds, measured on `KeyboardOracle.witness`), within the 12 s
+  pixel default. Under a short explicit timeout it fails closed with the covered wording. Never a false pass.
+- "Any overlap" is deliberate. ocr crops the whole rect; colour insets 12%, so a keyboard under only the bottom edge
+  fails closed where colour could have measured. The sentence quotes both rects, so that case is plain to diagnose.
+- Both rects are device pixels on Android: the tree's `bounds` and the IME `InsetsSource` `frame=` are read by the same
+  `parseBounds` in `src/adapters/android.ts`.
+- When every round was covered, the covered miss is the timeout's wording. It is the last finding, which outranks the
+  silent rounds and not-found in `PixelPollMemory.timeoutDetail`, and a round the deadline cut before its query does
+  not erase it. A later round whose query found the element clear DOES (review 2026-10-06): the covered sentence is
+  then skipped, and that round's own outcome speaks — e.g. the cut sentence when its capture ran out of time.
+- Residual: the old behaviour returns, silently, when the oracle cannot see the keyboard. A floating or split IME
+  supplies no insets frame (it reads hidden, or a zero-size frame read as unknown); the API 34+ `type=ime` line comes
+  from AOSP and has not been captured on a device; a multi-display device reads unknown.
+
+**Cost.** One `dumpsys window displays` per round, tens of ms, on Android only, against a round of ~2.6–4.3 s there.
+A round that begins past the deadline asks nothing. The quoted round cost includes the query; its wording ("a tree read and
+its captures") is unchanged.
+
+**Regression tests.**
+- In `tests/verify/assert.test.ts`, "pixel asserts under the Android soft keyboard":
+  - a covering keyboard: color and ocr FAIL with the exact sentence; no screenshot is taken; the recognizer is not
+    called; four queries in a 1 s budget at a 300 ms poll; the witness is never asked; no key is pressed. The colour
+    test expects `#FFFFFF` over a white screenshot, so a measurement would have passed;
+  - a keyboard shown below the card, and one flush with its bottom edge: both pass, one query, two captures;
+  - `hidden` and `unknown`: pass, one query;
+  - covered in round 1, hidden in round 2: passes, with two tree reads, two queries, two captures and the sleeps
+    `[300, 300]`;
+  - covered in round 1, hidden in round 2 whose one capture the deadline cuts: the timeout is the cut sentence, not
+    the covered one;
+  - covered, then clear (measured, wrong), then covered again: the covered sentence is the timeout's wording again.
+- No oracle: unchanged, pinned by every existing color/ocr test (e.g. `passes on a matching fill and reports the
+  sampled hex, dE and scale`).
+- `rectsOverlap` unit tests in `tests/ui-tree/geometry.test.ts`: the device case, either order, a 1x1 corner; below,
+  flush with an edge, a corner touch and zero-area all read as no overlap.
+
+**Mutation checks (all killed).** The check removed; edge contact counted as overlap; any shown frame counted as
+covering; the check moved before the deadline check; the witness asked as well; the covered round made silent;
+`unknown` treated as covered; the two rects swapped in the sentence; overlap tested on one axis only; the stale
+covered sentence still winning; the clear round never recorded; a pre-query cut clearing the cover; the old remedy
+wording; a new covered round not re-arming after a clear.
+
+**Device check.** Not run yet: the fix is verified against the fake oracle only.

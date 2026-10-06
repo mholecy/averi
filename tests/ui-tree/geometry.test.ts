@@ -7,6 +7,7 @@ import {
   inferScreenWidth,
   intersectsViewport,
   rectArea,
+  rectsOverlap,
 } from '../../src/ui-tree/geometry.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
@@ -269,5 +270,22 @@ describe('rectArea', () => {
     expect(rectArea({ x: 0, y: 0, width: -10, height: 20 })).toBe(0);
     expect(rectArea({ x: 0, y: 0, width: -10, height: -10 })).toBe(0);
     expect(rectArea({ x: 0, y: 0, width: Number.NaN, height: 10 })).toBe(0);
+  });
+});
+
+describe('rectsOverlap — positive-area overlap only (the pixel poll\'s soft-keyboard check, 2026-10-06)', () => {
+  const card = { x: 66, y: 1979, width: 948, height: 132 };
+  it('true for any shared area, in either order, including containment', () => {
+    const keyboard = { x: 0, y: 1285, width: 1080, height: 935 }; // the 2026-10-06 device case
+    expect(rectsOverlap(card, keyboard)).toBe(true);
+    expect(rectsOverlap(keyboard, card)).toBe(true);
+    expect(rectsOverlap(card, { x: 1013, y: 2110, width: 10, height: 10 })).toBe(true); // a 1x1 corner
+  });
+  it('false for disjoint, edge-touching, corner-touching and zero-area rects', () => {
+    expect(rectsOverlap(card, { x: 0, y: 2200, width: 1080, height: 20 })).toBe(false); // below
+    expect(rectsOverlap(card, { x: 0, y: 2111, width: 1080, height: 109 })).toBe(false); // flush with the bottom edge
+    expect(rectsOverlap(card, { x: 1014, y: 1979, width: 66, height: 132 })).toBe(false); // flush with the right edge
+    expect(rectsOverlap(card, { x: 1014, y: 2111, width: 10, height: 10 })).toBe(false); // corner only
+    expect(rectsOverlap(card, { x: 100, y: 2000, width: 0, height: 50 })).toBe(false); // zero-area, inside
   });
 });
