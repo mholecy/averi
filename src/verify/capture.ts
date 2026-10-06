@@ -32,11 +32,11 @@ import { pngScale, type PngScale } from './scale.js';
  * note, the asserts fail the one assert. Those are different answers to the
  * same fact, and the fact is produced here.
  *
- * Deliberately NOT here: the polling asserts' tree read (Verifier.poll owns
- * the miss-not-failure rule and hands its tree in), and rect parity, which
- * scales from the tree on purpose (docs/bugs/2026-08-26-png-scale-needs-
- * out-of-tree-screen-size.md — its denominator is the app's canvas, not the
- * device screen).
+ * Deliberately NOT here: the polling asserts' tree read (the tree poll owns
+ * the miss-not-failure rule; the pixel poll, verify/pixel-poll.ts, hands
+ * that round's tree in), and rect parity, which scales from the tree on
+ * purpose (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md —
+ * its denominator is the app's canvas, not the device screen).
  *
  * "Every pixel reading" holds since 2026-10-04: until then the screenshot
  * baseline assert took a bare `adapter.screenshot()` — the one reader the
@@ -73,7 +73,8 @@ import { pngScale, type PngScale } from './scale.js';
  *   the wait: a re-capture that would end after the deadline is not taken,
  *   and the frame comes back `moving` (or `unjudged`, with one capture). The
  *   before/after figures (2026-10-05) are kept ONCE, on `Verifier.poll` in
- *   assert.ts, which owns passing the deadline in.
+ *   assert.ts; passing the deadline in is the pixel poll's since 2026-10-06
+ *   (verify/pixel-poll.ts).
  *
  * Not done, recorded: stability is judged on the WHOLE screenshot. A clock
  * in the status bar or a blinking caret elsewhere on the screen keeps a

@@ -5,12 +5,14 @@ import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { PollMiss, pollTree } from '../ui-tree/read-tree.js';
+import { pollTree } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { elementAssertSchema } from './element-assert.js';
-import { captureFrame, isMoving, unsettledNote, unsettledReason, type Frame } from './capture.js';
+import { captureFrame, isMoving, unsettledNote, unsettledReason } from './capture.js';
 import { failClosed } from './fail-closed.js';
+import { pollPixels } from './pixel-poll.js';
+import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrEngineFor, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
@@ -168,18 +170,6 @@ export interface VerifierOptions {
   ocrEngine?: OcrEngine;
 }
 
-/**
- * What one poll round concluded. `undefined` (not this type) means "nothing to
- * say, keep polling" — the element isn't there yet. `pass: true` stops the
- * poll; `pass: false` carries a detail worth reporting IF the deadline is
- * reached, without ending the poll: mid-animation geometry may legitimately be
- * wrong for a frame, so only the state at timeout is the verdict.
- */
-interface PollVerdict {
-  pass: boolean;
-  detail?: string;
-}
-
 interface PollSpec {
   description: string;
   timeoutMs: number;
@@ -188,57 +178,11 @@ interface PollSpec {
    * detail an evaluation produced and the last tree-read error. Each assert
    * words this itself, and they deliberately ORDER the two differently: an
    * element assert prefers the read error (a tree it never read explains the
-   * miss), a rect/color assert prefers the measurement (it did read the tree,
-   * and the numbers are the finding).
+   * miss), a rect assert prefers the measurement (it did read the tree, and
+   * the numbers are the finding) — as the pixel poll does for the color and
+   * ocr asserts (verify/pixel-poll.ts), which word theirs there.
    */
   timeoutDetail: (last: { detail?: string; readError?: Error }) => string;
-}
-
-/** "not found within Nms", plus the last tree-read error when there was one. */
-const notFound = (timeoutMs: number, readError?: Error): string =>
-  `not found within ${timeoutMs}ms` +
-  (readError === undefined ? '' : ` (last UI tree read failed: ${readError.message})`);
-
-/**
- * What a polling pixel assert does with the deadline and the frame, across
- * the WHOLE poll — one instance per assert (2026-10-05). A round that begins
- * past the deadline, or whose one capture the deadline cut before a second
- * (`stability: 'unjudged'`), has nothing to say about the screen: it returns
- * `undefined` so that an earlier round's finding — a measured drift, a
- * sampled colour — is what the timeout reports, and it remembers that the
- * element WAS found so a poll in which every round was cut can say so, not
- * "not found". A frame seen `moving` is a MISS with the reason, worded
- * fail-closed like every other reason this assert cannot measure past; the
- * capture count it quotes is the most any round took, so a late round the
- * deadline cut short never understates the one that spent the whole budget.
- */
-class PixelPoll {
-  private foundNoTime = false;
-  private mostCaptures = 0;
-
-  /** Nothing to capture: the deadline has passed. */
-  outOfTime(deadline: number): boolean {
-    if (Date.now() < deadline) return false;
-    this.foundNoTime = true;
-    return true;
-  }
-
-  /** The frame is not a verdict: a miss with the reason when it was seen moving, silence when nothing could be judged. */
-  unsettled(frame: Pick<Frame, 'stability' | 'captures'>, unchecked: 'color' | 'rendered text'): PollVerdict | undefined {
-    if (!isMoving(frame)) {
-      this.foundNoTime = true;
-      return undefined;
-    }
-    this.mostCaptures = Math.max(this.mostCaptures, frame.captures);
-    return { pass: false, detail: failClosed(unsettledReason({ captures: this.mostCaptures }), unchecked) };
-  }
-
-  /** The timeout wording when nothing was measured: found-but-no-time outranks not-found. */
-  timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error }): string {
-    if (last.detail !== undefined) return last.detail;
-    if (this.foundNoTime) return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame`;
-    return notFound(timeoutMs, last.readError);
-  }
 }
 
 export class Verifier {
@@ -374,9 +318,11 @@ export class Verifier {
   /**
    * Rendered text vs what the screen actually shows (text-parity.ts). Needs
    * BOTH the tree (the element's rect) and a screenshot (pixels), scaled
-   * together — the poll's tree is handed to the capture (verify/capture.ts),
-   * which settles the png and derives the one scale. Polls on a freshly
-   * captured STABLE screenshot for the same reason the color assert does.
+   * together. The round — find, capture against that tree, wait for the png
+   * to settle, decode, and only then measure — is the pixel poll's
+   * (verify/pixel-poll.ts); what is here is the measurement: crop the rect,
+   * recognize, compare. The recognizer is closed over, so the poll never
+   * learns OCR exists.
    *
    * Unavailable OCR fails the assert with the reason rather than skipping it:
    * a check the caller asked for and did not get must never read as a pass.
@@ -398,33 +344,23 @@ export class Verifier {
     }
     // Memoized: one VisionOcr per Verifier, so its compiled binary is reused across asserts.
     const engine = (this.ocr ??= choice.engine);
-    const round = new PixelPoll();
-    return this.poll(
-      async (tree, { deadline }) => {
-        // First occurrence wins — the same duplicate-id rule as rect-parity.
-        // (The whole-screen text table deliberately does the opposite; here
-        // the caller named ONE element and gets that element's rect.)
-        const found = findBySpec(tree, element);
-        if (found.length === 0) return undefined;
-        if (round.outOfTime(deadline)) return undefined;
-        const frame = await captureFrame(this.adapter, { tree, deadline });
-        // A moving frame is never the verdict (2026-10-05): keep polling, and
-        // let the deadline — not the frame — decide, saying why if it does.
-        if (frame.stability !== 'settled') return round.unsettled(frame, 'rendered text');
-        const { shot, measured } = frame;
-        if (measured.error !== undefined) {
-          // Keep polling — the capture may have raced a transition — but stay
-          // failed so a deadline reached this way reports the reason.
-          return { pass: false, detail: failClosed(measured.error, 'rendered text') };
-        }
+    // The rect is the FIRST match's (the pixel poll's rule, the same as
+    // rect-parity's). The whole-screen text table deliberately does the
+    // opposite; here the caller named ONE element and gets that element's rect.
+    const result = await pollPixels(this.adapter, {
+      element,
+      timeoutMs,
+      pollMs: this.pollMs,
+      unchecked: 'rendered text',
+      measure: async ({ rect, shot, measured }) => {
         try {
-          const { region, note, error } = ocrRegionForRect('element', found[0].rect, measured);
+          const { region, note, error } = ocrRegionForRect('element', rect, measured);
           if (region === undefined) {
             return { pass: false, detail: failClosed(error, 'rendered text') };
           }
-          const [result] = await engine.recognize(shot, [region]);
-          if (result?.error !== undefined) return { pass: false, detail: result.error };
-          const verdict = evaluateOcrAssert(expectation, result?.lines ?? [], measured.png.width);
+          const [read] = await engine.recognize(shot, [region]);
+          if (read?.error !== undefined) return { pass: false, detail: read.error };
+          const verdict = evaluateOcrAssert(expectation, read?.lines ?? [], measured.png.width);
           return note === undefined ? verdict : { ...verdict, detail: `${verdict.detail}; ${note}` };
         } catch (e) {
           // Keep polling — the capture may have raced a transition — but stay
@@ -432,26 +368,19 @@ export class Verifier {
           return { pass: false, detail: `OCR failed: ${errorMessage(e)}` };
         }
       },
-      {
-        description,
-        timeoutMs,
-        timeoutDetail: (last) => round.timeoutDetail(timeoutMs, last),
-      },
-    );
+    });
+    return { description, ...result };
   }
 
   /**
    * Fill color vs an expected hex (color-parity.ts). Needs BOTH the tree
    * (the element's rect) and a screenshot (pixels), scaled together — the
-   * same captured frame the `ocr` assert measures against.
-   * Polls like the other asserts; each evaluation samples a freshly captured
-   * STABLE screenshot — the same two-identical-consecutive-captures wait the
-   * `screenshot` tool applies, on the same budget — so mid-animation frames
-   * are not the verdict, and the tree is re-read alongside so both come from
-   * the same state. Since 2026-10-05 the capture takes the poll's deadline
-   * and reports whether it settled; a frame that did not is a miss, never a
-   * sample — before, the last of six differing captures was measured and the
-   * number called a verdict.
+   * same captured frame the `ocr` assert measures against. The measurement
+   * is one sample of that rect; the round around it is the pixel poll's
+   * (verify/pixel-poll.ts), which hands it only a SETTLED, decoded frame.
+   * Since 2026-10-05 a frame that did not settle is a miss, never a sample —
+   * before, the last of six differing captures was measured and the number
+   * called a verdict.
    */
   private async assertColor(
     element: ElementSpec,
@@ -463,55 +392,37 @@ export class Verifier {
     const description =
       `element ${describe(element)} fill within dE00 ${tol} of ${expectedHex}` +
       (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
-    const round = new PixelPoll();
-    return this.poll(
-      async (tree, { deadline }) => {
-        // First occurrence wins — the same duplicate-id rule as rect-parity.
-        const found = findBySpec(tree, element);
-        if (found.length === 0) return undefined;
-        if (round.outOfTime(deadline)) return undefined;
-        const frame = await captureFrame(this.adapter, { tree, deadline });
-        // A moving frame is never the verdict (2026-10-05): keep polling, and
-        // let the deadline — not the frame — decide, saying why if it does
-        // (PixelPoll words the round the deadline cut short).
-        if (frame.stability !== 'settled') return round.unsettled(frame, 'color');
-        const { measured } = frame;
-        if (measured.error !== undefined) {
-          // Fail closed on an undecodable screenshot, but keep polling —
-          // the capture may have raced a transition.
-          return { pass: false, detail: failClosed(measured.error, 'color') };
-        }
-        return evaluateColorAssert(found[0].rect, expectation, measured);
-      },
-      {
-        description,
-        timeoutMs,
-        timeoutDetail: (last) => round.timeoutDetail(timeoutMs, last),
-      },
-    );
+    const result = await pollPixels(this.adapter, {
+      element,
+      timeoutMs,
+      pollMs: this.pollMs,
+      unchecked: 'color',
+      measure: ({ rect, measured }) => evaluateColorAssert(rect, expectation, measured),
+    });
+    return { description, ...result };
   }
 
   /**
-   * The shape every polling assert shares (ARCHITECTURE.md §8, "waits, not
+   * The shape the tree-only asserts share (ARCHITECTURE.md §8, "waits, not
    * sleeps"): read the tree, evaluate it, stop on a pass, otherwise remember
-   * what it said and retry until the deadline.
+   * what it said and retry until the deadline. The color and ocr asserts
+   * poll through `pollPixels` (verify/pixel-poll.ts) since 2026-10-06, on
+   * the same loop and the same verdict translation (verify/poll-verdict.ts).
    *
    * The loop itself is `pollTree` (ui-tree/read-tree.ts) since 2026-10-03 —
    * before that this method was one of three copies of it. What stays here
    * is the verifier's vocabulary: a PollVerdict in, an AssertResult out, and
-   * the per-assert timeout wording. A non-passing verdict with a detail
-   * becomes a PollMiss, which is how "element found but content was: …"
-   * survives the element vanishing again before the deadline; one with
-   * nothing to say continues the poll without erasing an earlier detail.
+   * the per-assert timeout wording.
    *
    * `pollMs` is the interval between rounds and NOTHING else (2026-10-05):
    * until then it was also forwarded to the capture as its stability delay,
    * so an assert inside a flow (engine pollMs 500) waited 500 ms between
    * stability captures and the same assert from the MCP tool 300 — the
    * budget capture.ts documents as one. The round's deadline is handed to
-   * the evaluator instead, so a capture stops short of it. Measured with the
-   * same fake-device harness as before (screencap 300 ms, uiautomator dump
-   * 1.5 s, timeoutMs 3000, pollMs 300):
+   * the capture instead (by the pixel poll since 2026-10-06; by the color and
+   * ocr evaluators through this method until then), so a capture stops short
+   * of it. Measured with the same fake-device harness as before (screencap
+   * 300 ms, uiautomator dump 1.5 s, timeoutMs 3000, pollMs 300):
    *
    *   screen               before                        after
    *   never settles        4.86 s · 6 shots · 1 round,   4.24 s · 2 shots · 2 rounds · the failure
@@ -531,19 +442,14 @@ export class Verifier {
    * from a frame that was still moving.
    */
   private async poll(
-    evaluate: (tree: UiNode, round: { deadline: number }) => Promise<PollVerdict | undefined> | PollVerdict | undefined,
+    evaluate: (tree: UiNode) => PollVerdict | undefined,
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
-    const outcome = await pollTree(
-      this.adapter,
-      async (tree, round) => {
-        const verdict = await evaluate(tree, round);
-        if (verdict?.pass) return { detail: verdict.detail };
-        return verdict?.detail === undefined ? undefined : new PollMiss(verdict.detail);
-      },
-      { timeoutMs, pollMs: this.pollMs },
-    );
+    const outcome = await pollTree(this.adapter, (tree) => verdictToPoll(evaluate(tree)), {
+      timeoutMs,
+      pollMs: this.pollMs,
+    });
     if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
     return {
       description,

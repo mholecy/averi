@@ -550,6 +550,22 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     );
   });
 
+  it('measures the FIRST of duplicate matches — the rect-parity duplicate-id rule, owned by the pixel poll', async () => {
+    resetLayout();
+    const second = { x: 100, y: 20, width: 800, height: 100 };
+    const fake = new FakeAdapter(
+      { detail: screen(node({ identifier: 'card', rect: { ...CARD } }), node({ identifier: 'card', rect: second })) },
+      'detail',
+    );
+    fake.nextScreenshot = png(1000, 320, (p) => {
+      fill(p, '#FDFDFD');
+      fill(p, '#CFCFD3', second);
+    });
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('sampled #FDFDFD');
+  });
+
   it('the default deltaE (8) catches the real 2026-08-13 bug: #CFCFD3 where #FDFDFD was expected', async () => {
     const verifier = new Verifier(cardFake('#CFCFD3'), FAST);
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
@@ -961,6 +977,99 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(result.detail).toBe(
       'the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run; failing closed, rendered text unchecked',
     );
+  });
+
+  /**
+   * The pixel poll's contract (verify/pixel-poll.ts, 2026-10-06): the
+   * measurement runs ONLY on a settled, decoded frame. Pinned at the assert
+   * surface — the recognizer the ocr assert closes over is the probe, and
+   * every frame below would read "CONTINUE" if it were ever handed one.
+   */
+  const countingEngine = () => {
+    const probe = { recognized: 0 };
+    const engine = {
+      recognize: async (_png: Buffer, regions: { id: string }[]) => {
+        probe.recognized += 1;
+        return regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 200, h: 30 }] }));
+      },
+    };
+    return { probe, engine };
+  };
+
+  it('a moving frame is never measured: no text is recognized and no colour sampled while every capture differs', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const moving = () => {
+      const fake = cardFake();
+      let i = 0;
+      fake.screenshot = async () => {
+        const shot = png(1000, 320, (p) => {
+          fill(p, '#FDFDFD');
+          p.data[0] = i++ % 256;
+        });
+        fake.screenshots.push(shot);
+        return shot;
+      };
+      return fake;
+    };
+    const { probe, engine } = countingEngine();
+    const ocr = await new Verifier(moving(), { pollMs: 300, timeoutMs: 2000, ocrEngine: engine }).assert({
+      element: { id: 'card' },
+      ocr: { text: 'CONTINUE' },
+    });
+    expect(ocr.pass).toBe(false);
+    expect(ocr.detail).toMatch(/^the screen did not settle: .*; failing closed, rendered text unchecked$/);
+    expect(probe.recognized).toBe(0);
+
+    const color = await new Verifier(moving(), { pollMs: 300, timeoutMs: 2000 }).assert({
+      element: { id: 'card' },
+      color: { expected: '#FDFDFD' },
+    });
+    expect(color.pass).toBe(false);
+    expect(color.detail).toMatch(/^the screen did not settle: .*; failing closed, color unchecked$/);
+    expect(color.detail).not.toContain('sampled');
+  });
+
+  it('an unjudged frame (one capture, the deadline crossed) is never measured, even when it would pass', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = cardFake();
+    // A still, correct screen: measured, it would pass. The dump ends 100 ms
+    // inside the deadline and the one screencap (300 ms) crosses it.
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 2900);
+      return origTree();
+    };
+    fake.screenshot = async () => {
+      vi.setSystemTime(Date.now() + 300);
+      const shot = png(1000, 320, (p) => fill(p, '#FDFDFD'));
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    const { probe, engine } = countingEngine();
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000, ocrEngine: engine }).assert({
+      element: { id: 'card' },
+      ocr: { text: 'CONTINUE' },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame');
+    expect(fake.screenshots).toHaveLength(1);
+    expect(probe.recognized).toBe(0);
+  });
+
+  // The load-bearing guard here is the exact detail: without the decode gate
+  // the measurement runs and fails earlier than the recognizer (the region
+  // builder throws on the missing png), so the verdict reads "OCR failed: …".
+  it('an undecodable frame is never measured: the decode error is the verdict and nothing downstream runs', async () => {
+    const fake = cardFake();
+    fake.nextScreenshot = Buffer.from('not a png');
+    const { probe, engine } = countingEngine();
+    const result = await new Verifier(fake, { ...FAST, ocrEngine: engine }).assert({
+      element: { id: 'card' },
+      ocr: { text: 'CONTINUE' },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/^screenshot PNG decode failed: .*; failing closed, rendered text unchecked$/);
+    expect(probe.recognized).toBe(0);
   });
 });
 
