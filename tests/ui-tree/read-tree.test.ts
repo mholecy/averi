@@ -104,7 +104,8 @@ describe('pollTree — the one deadline loop', () => {
       () => undefined, // never satisfied
       FAST,
     );
-    expect(outcome).toEqual({ timedOut: true, detail: undefined, readError: undefined });
+    expect(outcome).toMatchObject({ timedOut: true, detail: undefined, readError: undefined });
+    if (outcome.timedOut) expect(outcome.treesRead).toBeGreaterThan(0);
   });
 
   it('a PollMiss detail survives later rounds that have nothing to say', async () => {
@@ -136,6 +137,49 @@ describe('pollTree — the one deadline loop', () => {
     expect(miss.timedOut).toBe(true);
     expect(reads).toBe(2);
     expect(evaluations).toBe(2);
+  });
+
+  // 2026-10-06 (docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-
+  // screen.md): the ladder refuses a destructive rung when the probe before
+  // it never read a tree, and the probe is a 0 ms poll — so its count must
+  // be exactly the one read it made, 0 when that read failed.
+  it('timeoutMs 0 is one uiTree call, and treesRead says whether that one read a tree', async () => {
+    let reads = 0;
+    const unreadable = await pollTree(
+      {
+        uiTree: async () => {
+          reads++;
+          throw new Error('idb returned an empty accessibility tree');
+        },
+      },
+      () => 'never evaluated',
+      { timeoutMs: 0, pollMs: 2 },
+    );
+    expect(reads).toBe(1);
+    expect(unreadable).toMatchObject({ timedOut: true, treesRead: 0 });
+    reads = 0;
+    const read = await pollTree({ uiTree: async () => (reads++, tree) }, () => undefined, { timeoutMs: 0, pollMs: 2 });
+    expect(reads).toBe(1);
+    expect(read).toEqual({ timedOut: true, detail: undefined, readError: undefined, treesRead: 1 });
+  });
+
+  it('treesRead counts only the rounds that READ a tree — a read error after good reads does not reset it, and every failed round adds nothing', async () => {
+    let reads = 0;
+    const outcome = await pollTree(
+      {
+        uiTree: async () => {
+          // read, fail, read, fail, fail, …: two trees in however many rounds
+          const n = reads++;
+          if (n === 0 || n === 2) return tree;
+          throw new Error('transient');
+        },
+      },
+      () => undefined,
+      FAST,
+    );
+    expect(reads).toBeGreaterThan(3);
+    expect(outcome).toMatchObject({ timedOut: true, treesRead: 2 });
+    if (outcome.timedOut) expect(outcome.readError?.message).toBe('transient');
   });
 
   // 2026-10-05: the loop's deadline rule is HEAD's — checked after each
@@ -215,6 +259,14 @@ describe('pollTimeoutMessage — the thrown timeout\'s shape, shared by the flow
     );
     expect(pollTimeoutMessage('element id:"x"', 300, undefined, 'no tree read contained id:"x"')).toBe(
       'Timed out after 300ms waiting for element id:"x"\n  (no tree read contained id:"x")',
+    );
+  });
+
+  // 2026-10-06: the idb empty-tree error puts its advice on a second line;
+  // inside the parenthesis it is indented under the cause, not flush left.
+  it('a multi-line read error keeps its later lines inside the parenthesis, indented under the first', () => {
+    expect(pollTimeoutMessage('state s', 300, new Error('idb returned an empty accessibility tree (an empty list)\nCompare with screenshot'))).toBe(
+      'Timed out after 300ms waiting for state s\n  (last UI tree read failed: idb returned an empty accessibility tree (an empty list)\n   Compare with screenshot)',
     );
   });
 

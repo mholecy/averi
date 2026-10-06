@@ -299,7 +299,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
         'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id. ' +
-        'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or (measured on iOS idb) stuck empty for minutes on a rendered screen. Compare with screenshot before reading the element as absent; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait.',
+        'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait.',
       inputSchema: {
         platform,
         filter: z.string().optional().describe('Selector to filter nodes'),
@@ -440,7 +440,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'ensure_state',
     {
       description:
-        'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.',
+        'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. If the UI tree cannot be read (e.g. iOS idb stuck on a 0×0 tree), a destructive (clearState) reach flow is refused rather than run blind: the call fails with "Refused to run reach flow …" and a ⛔ line in the trace — nothing was wiped; compare with screenshot and retry once the tree reads. Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.',
       inputSchema: {
         platform,
         state: z.string().describe('State name from averi.yaml'),

@@ -59,7 +59,10 @@ export const launchText = (launch: {
  * ui-snapshot-empty-right-after-launch.md: `role:button` → `[]` two seconds
  * after launch_app returned, on a PIN screen with ten buttons; the same
  * day's addendum: the idb tree stayed a 0×0 Application for 4+ minutes on
- * the RENDERED PIN screen, so no retry promise is made):
+ * the RENDERED PIN screen, so no retry promise is made; since the fix of
+ * that addendum idb's stuck shape no longer reaches this note — the idb
+ * source throws it as a read error, adapters/ios-tree-source.ts
+ * IdbEmptyTreeError — and the note covers the bare trees that remain):
  *
  * - filter given, nothing matched, the tree has content: the plain fact —
  *   `0 matches for <filter> in a tree of N nodes (roles: …)`. No ⚠: "absent"

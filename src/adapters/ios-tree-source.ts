@@ -4,7 +4,7 @@ import { attachFieldErrors } from './field-errors.js';
 import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
 import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
-import { zeroRect, type Rect, type UiNode } from './types.js';
+import { rectArea, zeroRect, type Rect, type UiNode } from './types.js';
 
 /**
  * The iOS tree-source seam (2026-10-02). `simctl` cannot read the
@@ -81,8 +81,17 @@ interface IdbElement {
  * size from the children, never from a wrapper.)
  */
 export function parseIdbDescribeAll(json: string): UiNode {
+  return idbTree(idbElements(json));
+}
+
+/** The raw element list — kept apart from the tree so `IdbTreeSource.read` can name an empty payload's types without a second parse. */
+function idbElements(json: string): IdbElement[] {
   const elements = JSON.parse(json) as IdbElement[];
   if (!Array.isArray(elements)) throw new Error('idb describe-all did not return an array');
+  return elements;
+}
+
+function idbTree(elements: IdbElement[]): UiNode {
   const children: UiNode[] = elements.map((el) =>
     normalizeIosElement(
       { type: el.type, label: el.AXLabel, identifier: el.AXUniqueId, value: el.AXValue, rect: el.frame },
@@ -100,6 +109,50 @@ export function parseIdbDescribeAll(json: string): UiNode {
     children,
   };
 }
+
+/**
+ * idb answered, but with no tree: an empty list, or elements none of which
+ * has a frame with any area — measured 2026-10-06 as a lone
+ * `{"type":"Application","AXFrame":"{{0, 0}, {0, 0}}"}` that idb kept
+ * returning for 2.5 to 4+ minutes on a RENDERED screen, on two apps, while
+ * WDA read the same screen in full (docs/bugs/2026-10-06-ios-idb-empty-tree-
+ * persists-on-pin-screen.md). Parsed as a tree, it is a screen on which
+ * nothing matches, so every `wait`/`detect`/`requires` read "absent", an
+ * `absent` wait passed, and an ensure_state ladder escalated into its
+ * `clearState` rung. Thrown as a READ error it is what it is — the device was
+ * not read — and the layers above already handle that: a poll retries it and
+ * quotes it on timeout, the detect probe says so, and the ladder refuses a
+ * destructive rung on a probe that never read a tree (flow/engine.ts).
+ *
+ * The signature is deliberately narrow — no element with positive area, NOT
+ * ui-tree/bare-tree.ts's `isBareTree`. A full-frame `Application` alone is
+ * idb's normal launch transient and must stay a tree, and so must the other
+ * bare shapes (a splash, a spinner): they are loading and will change.
+ * Widening it waits on the device protocol's raw payloads. The synthetic root
+ * is always 0×0 (parseIdbDescribeAll), so only the elements are asked.
+ */
+export class IdbEmptyTreeError extends Error {
+  /** `types`: the raw payload's element types, in order — what the message names as the shape. */
+  constructor(types: readonly (string | undefined)[]) {
+    // The cause on the first line, the advice after a newline: a trace entry
+    // quotes only the first line (flow/engine.ts `headline`), so a probe
+    // that fails every round repeats the cause, not a paragraph of advice.
+    super(
+      `idb returned an empty accessibility tree (${describeEmptyPayload(types)})\n` +
+        'The app may still be rendered: idb can stay stuck like this for minutes on a rendered screen. ' +
+        'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app — ' +
+        'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
+    );
+    this.name = 'IdbEmptyTreeError';
+  }
+}
+
+/** "an empty list", "only a 0×0 Application" (the measured shape), or "N elements, none with any area" for anything else. */
+const describeEmptyPayload = (types: readonly (string | undefined)[]): string => {
+  if (types.length === 0) return 'an empty list';
+  if (types.length === 1 && types[0] === 'Application') return 'only a 0×0 Application';
+  return `${types.length} element${types.length === 1 ? '' : 's'}, none with any area`;
+};
 
 /** The budget uiTree() gave describe-all before the seam existed — a busy screen is slower than a tap. */
 const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
@@ -123,7 +176,11 @@ export class IdbTreeSource implements IosTreeSource {
 
   async read(): Promise<UiNode> {
     const { stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], { timeoutMs: DESCRIBE_ALL_TIMEOUT_MS });
-    return parseIdbDescribeAll(stdout.toString('utf8'));
+    const elements = idbElements(stdout.toString('utf8'));
+    const tree = idbTree(elements);
+    // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.
+    if (!tree.children.some((el) => rectArea(el.rect) > 0)) throw new IdbEmptyTreeError(elements.map((el) => el.type));
+    return tree;
   }
 
   dispose(): Promise<void> {

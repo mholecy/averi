@@ -48,10 +48,14 @@ import { rectArea } from './geometry.js';
  * alone does not: that is the Android decor shape) AND is not a wrapper by
  * size — its area is under SCREEN_SIZED_FRACTION of the largest rect in the
  * tree, which excludes the labelled full-screen Application of both iOS
- * sources. A tree with NO geometry at all (every rect zero-area) is the
- * measured idb empty tree, so there a structural node is a wrapper whatever
- * it says — an app name on the 0×0 Application must not read as content;
- * WDA always sends rects (every fixture), so this case is idb's. Nothing is
+ * sources. A tree with NO geometry at all (every rect zero-area) has no
+ * screen to judge size against, so there a structural node is a wrapper
+ * whatever it says — an app name on a 0×0 root must not read as content.
+ * The measured case was idb's stuck 0×0 Application; since 2026-10-06 the
+ * idb source throws that shape as a read error (IdbEmptyTreeError) before
+ * it reaches this rule, and the clause stays for every other tree with no
+ * geometry — a source or fixture that sends no rects, a synthetic root
+ * alone (WDA always sends rects, every fixture). Nothing is
  * skipped by position (the root counts). Sizes are judged against the tree's
  * OWN largest rect, which assumes every source wraps the screen in a
  * full-size root (idb's Application, WDA's Application/Window, Android's
@@ -69,7 +73,8 @@ import { rectArea } from './geometry.js';
  * bare — rare, since nearly every loaded screen has a text, button, field,
  * scrollable or labelled node, and cheap: a wrong ⚠ sends the agent to a
  * screenshot, never to a conclusion. Device-confirmed 2026-10-06: the WDA
- * and uiautomator splash shapes and idb's stuck 0×0 Application.
+ * and uiautomator splash shapes and idb's stuck 0×0 Application (the last
+ * now a read error at the idb source, see above).
  */
 export function isBareTree(tree: UiNode): boolean {
   const nodes = [...everyNode(tree)];

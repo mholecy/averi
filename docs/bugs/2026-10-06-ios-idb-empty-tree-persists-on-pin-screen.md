@@ -87,3 +87,38 @@ Same direction as the existing note, made stronger. A tree whose root has zero a
   - Whether WDA can show the same symptom.
   - Whether anything other than waiting wakes idb: the original note's tap and app-switch did not.
   - How long it lasts. The 4+ min on mp-native and 2.5 min on finportal suggest a range, not a bound.
+
+## Fix
+
+**Shipped (branch `fix/bugs-2026-10-06`).**
+- **The read.** `IdbTreeSource.read` (`src/adapters/ios-tree-source.ts`) throws `IdbEmptyTreeError` when the payload
+  is `[]` or no element has a positive-area frame. The message names the cause, the screenshot check and
+  `app.ios.treeSource: wda`.
+  - The signature is the narrow one above. A lone full-frame `Application` (idb's launch transient) is still a tree,
+    and `isBareTree` is not used.
+  - The poll machinery then does the rest unchanged: `wait`/`detect`/`requires` retry it, timeouts say `last UI tree
+    read failed: idb returned an empty accessibility tree …`, an `absent` wait or assert fails closed, the idb
+    container-id wait hint is dropped, and the detect probe logs its `⚠ detect` line.
+- **The ladder.** `pollTree` counts the rounds that read a tree (`treesRead`), and the detect probe answers
+  `yes`/`no`/`unknown` (unknown: no read produced a tree).
+  - At the top of the reach loop, a DESTRUCTIVE rung (`flowItselfIsDestructive`) whose immediately preceding probe
+    was `unknown` is refused. The trace gets `⛔ reach <flow>` in place of the DESTRUCTIVE warning, and the call fails
+    with `UnreadTreeRefusal`, which names the state, the rung and the last read error.
+  - The refusal is terminal like a `SetupError`, so an outer ladder does not escalate past a nested `requires:`
+    refusal.
+  - Cheap rungs still run. `run_flow` never refuses the flow's own body, but a `requires:` inside it runs a ladder
+    that applies the rule.
+  - Pinned in `tests/flow/unread-tree-ladder.test.ts`, which runs the measured payload through the real
+    `IdbTreeSource`.
+  - Before refusing, an `unknown` probe gets one second look over the settle budget (`tapTimeoutMs`, 5 s by
+    default, the wait a `tap:` uses for the same transient), so Android's null-root transient right after a cold launch (~2–3 s) does not refuse an ordinary run.
+    A second look that reads the state ends the call; one that reads any tree runs the rung as before.
+- **Accepted cost.** A transient that outlasts the second look is refused too. The fix is to retry the call.
+
+**Deferred to the device protocol.** Each item needs a measured episode first.
+- Prevention: pre-launch `ApplicationAccessibilityEnabled`.
+- Cure: a bridge kickstart, or `AutomationEnabled`.
+- Upgrading the fb-idb client, and `--api axbridge`.
+- A first-read delay after launch.
+- Widening the signature, for example to a lone framed `Application` lasting seconds inside an episode. Only if the
+  raw JSON shows such a phase.

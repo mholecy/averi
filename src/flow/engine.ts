@@ -63,6 +63,50 @@ export class FlowError extends Error {
 }
 
 /**
+ * The ladder declined to run a DESTRUCTIVE rung because the detect probe
+ * right before it never read a UI tree (2026-10-06, docs/bugs/2026-10-06-ios-
+ * idb-empty-tree-persists-on-pin-screen.md: idb returned a 0×0 Application
+ * for minutes on a rendered screen, and every probe read that as "not in
+ * state"). On such a device "not in state" is not knowledge, and the rung's
+ * cost — a wiped app and its device registration — is not undone by the
+ * tree coming back a minute later. Not a SetupError: the descriptor is
+ * fine, the device was not read. Terminal like one (`isTerminal`).
+ */
+export class UnreadTreeRefusal extends Error {
+  /** Why, without the headline — the ladder's `⛔ reach` trace line is this, so the two cannot drift apart. */
+  readonly reason: string;
+
+  constructor(state: string, rung: string, readError: Error) {
+    const reason =
+      'the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
+      `before it never read a UI tree, a second look included, so whether the app is in "${state}" is unknown — ` +
+      `last UI tree read failed: ${headline(readError)}. Compare with screenshot; retry once the tree reads`;
+    super(`Refused to run reach flow "${rung}" for state "${state}": ${reason}`);
+    this.name = 'UnreadTreeRefusal';
+    this.reason = reason;
+  }
+}
+
+/**
+ * An error the ladder must NOT escalate past, nor hand to salvage: re-running
+ * flows cannot fix it, and the next rung may be the destructive one. A
+ * SetupError is a broken descriptor; an UnreadTreeRefusal is a nested ladder
+ * (a rung's `requires:`) that already refused — escalating the OUTER ladder
+ * past it would run the wipe the inner one declined. Only the ladder's catch
+ * asks: the final wait never enters a ladder, so it can see a SetupError
+ * (an unknown state in a condition) but never a refusal.
+ */
+const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanceof UnreadTreeRefusal;
+
+/**
+ * What one detect probe learned. `unknown` is "every read failed — the probe
+ * never saw the device", which callers that only need a boolean fold into
+ * "not detected" by comparing against `'yes'`; the ladder alone tells it
+ * apart (ensureStateInner). `readError` is set exactly when it is unknown.
+ */
+type Detection = { answer: 'yes' | 'no'; readError?: undefined } | { answer: 'unknown'; readError: Error };
+
+/**
  * The payload of one step kind, read off the Step union itself so a handler's
  * parameter type can never drift from the schema it is fed by.
  */
@@ -222,12 +266,19 @@ export class FlowEngine {
   private async ensureStateInner(name: string): Promise<void> {
     const state = this.cfg.states[name];
     if (!state) throw new SetupError(`Unknown state "${name}" — known: ${Object.keys(this.cfg.states).join(', ')}`);
-    if (await this.detects(state.detect, 0)) {
+    // The probe immediately before the next rung: this entry check for rung
+    // 0, then each rung's own re-check. Its answer gates a destructive rung.
+    let probe = await this.detects(state.detect, 0);
+    if (probe.answer === 'yes') {
       this.log(`state ${name}`, 'already active');
       return;
     }
     if (!state.reach || state.reach.length === 0) {
-      throw new SetupError(`Not in state "${name}" and it has no reach flows`);
+      throw new SetupError(
+        probe.answer === 'unknown' ?
+          `State "${name}" could not be checked (last UI tree read failed: ${headline(probe.readError)}) and it has no reach flows`
+        : `Not in state "${name}" and it has no reach flows`,
+      );
     }
     // Re-detect after EVERY reach flow, not only after the last one. A reach
     // list reads as an escalation ladder — "dismiss the post-login prompt;
@@ -266,6 +317,44 @@ export class FlowEngine {
       // recovery pass below asks a different question; see
       // `flowItselfIsDestructive` for why the two predicates must stay apart.
       if (flowItselfIsDestructive(this.cfg, flow)) {
+        // ...unless the probe right before it never read a tree (2026-10-06,
+        // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md).
+        // Then "not in state" is not knowledge — the measured case is idb
+        // returning a 0×0 Application for minutes on a RENDERED screen, where
+        // mp-native's ladder would have wiped a registered app — so the rung
+        // is refused rather than announced. Only the probe immediately
+        // before counts: a later probe that READ a tree and missed is real
+        // knowledge, and an earlier readable one is stale. Cheap rungs still
+        // run on an unknown probe (they are how a ladder gets a tree to read),
+        // and only a ladder applies the rule: `run_flow` never refuses the
+        // flow's OWN body (the caller's own decision), though a `requires:`
+        // inside it runs a ladder that does; the recovery pass never runs a
+        // destructive rung at all.
+        //
+        // One SECOND LOOK first: the entry probe is a single read, and the
+        // ordinary unreadable read is a transient — Android's uiautomator has
+        // no window to dump for ~2–3 s after a cold launch (adapters/
+        // android.ts), and SKILL.md sends agents to ensure_state right after
+        // launch_app. Refusing on that would fail ordinary runs. The window
+        // is the settle budget (`tapTimeoutMs`, DEFAULT_SETTLE_TIMEOUT_MS =
+        // 5 s), not the 2 s re-check grace: that one is sized for a screen
+        // settling after a rung, while this is the transient a tap's settle
+        // wait already rides out — one budget for one transient, and no knob
+        // that only tests would set. It cannot outlast the measured idb
+        // episode (minutes), so that is still refused; a transient longer
+        // than the window is refused too, and retrying the call is the fix.
+        if (probe.answer === 'unknown') {
+          probe = await this.detects(state.detect, this.tapTimeoutMs);
+          if (probe.answer === 'yes') {
+            this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
+            return;
+          }
+        }
+        if (probe.answer === 'unknown') {
+          const refusal = new UnreadTreeRefusal(name, flow, probe.readError);
+          this.log(`⛔ reach ${flow}`, `refused: ${refusal.reason}`);
+          throw refusal;
+        }
         this.log(
           `⚠ reach ${flow}`,
           'this rung is DESTRUCTIVE — it wipes app state, and any device registration with it. ' +
@@ -280,7 +369,9 @@ export class FlowEngine {
         // next rung is the destructive one. Measured: a prelude naming an
         // undeclared credential escalated into a `clearState: true` login,
         // wiping app state to re-run a step that could never have worked.
-        if (e instanceof SetupError) throw e;
+        // A nested ladder's refusal (this rung's `requires:`) is terminal for
+        // the same reason: escalating past it runs the wipe it declined.
+        if (isTerminal(e)) throw e;
         const why = headline(e);
         // A throwing LAST rung is not the end of the ladder's obligations, it
         // is only the end of what the ladder can escalate to. Hand it to
@@ -302,7 +393,8 @@ export class FlowEngine {
       // Checked even after a failure: the flow may have reached the state
       // before dying on a later step, and escalating THERE is the exact
       // destructive escalation this loop exists to prevent.
-      if (await this.detects(state.detect, grace)) {
+      probe = await this.detects(state.detect, grace);
+      if (probe.answer === 'yes') {
         this.log(`state ${name}`, `reached after ${flow}`);
         return;
       }
@@ -359,7 +451,7 @@ export class FlowEngine {
   ): Promise<boolean> {
     // No grace, for the reason the ladder gives: a rung that threw is not a
     // screen still settling.
-    if ((await this.attempt(`salvage ${flow}`, () => this.detects(state.detect, 0))) === true) {
+    if ((await this.attempt(`salvage ${flow}`, () => this.detects(state.detect, 0)))?.answer === 'yes') {
       this.log(`state ${name}`, `reached after ${flow}`);
       return true;
     }
@@ -413,7 +505,7 @@ export class FlowEngine {
       const reached = await this.attempt(`recovery ${flow}`, () =>
         this.detects(state.detect, this.reachRecheckMs),
       );
-      if (reached === true) {
+      if (reached?.answer === 'yes') {
         this.log(`state ${name}`, `reached after recovery ${flow}`);
         return true;
       }
@@ -447,36 +539,37 @@ export class FlowEngine {
    *
    * An unreadable tree is not "in this state", and must not throw either:
    * right after a cold launch/reinstall (no window yet) is exactly when the
-   * reach flows are needed.
+   * reach flows are needed. But it is not "not in this state" either: a
+   * probe that never read a tree answers `unknown` (Detection), which the
+   * ladder alone distinguishes — it refuses a destructive rung on it.
    */
-  private async detects(cond: Condition, graceMs: number): Promise<boolean> {
+  private async detects(cond: Condition, graceMs: number): Promise<Detection> {
     const outcome = await pollTree(
       this.adapter,
       async (tree) => ((await this.matches(cond, tree)) ? true : undefined),
       { timeoutMs: graceMs, pollMs: this.pollMs },
     );
-    if (!outcome.timedOut) return true;
+    if (!outcome.timedOut) return { answer: 'yes' };
     // Until 2026-10-03 this probe swallowed the read error (`.catch(() =>
     // undefined)`), so an adb that had gone away looked exactly like "not in
     // this state" and the ladder escalated — possibly into a wipe — with no
-    // line saying the device had never been asked. The answer is still
-    // false (an unreadable tree is not "in state"), but the trace now says
-    // why. Right after a cold launch (no window yet) it is the normal case.
-    //
-    // Follow-up, not done here (2026-10-03): `false` still lets the ladder
-    // escalate — possibly into a `clearState` rung — on a device it NEVER
-    // read, which is the one case where "not in state" is not knowledge.
-    // The ladder should refuse to run a non-repeatable (destructive) rung
-    // when the probe before it never produced a tree, and say so. That is
-    // an ensureStateInner decision, not this probe's; it needs its own
-    // measured incident and test before it changes behaviour.
+    // line saying the device had never been asked. The answer is still not
+    // "yes" (an unreadable tree is not "in state"), and the trace says why.
+    // Right after a cold launch (no window yet) it is the normal case.
     if (outcome.readError !== undefined) {
       this.log(
         '⚠ detect',
-        `${describeCondition(cond)} treated as not detected — last UI tree read failed: ${outcome.readError.message}`,
+        `${describeCondition(cond)} treated as not detected — last UI tree read failed: ${headline(outcome.readError)}`,
       );
     }
-    return false;
+    // The 2026-10-03 follow-up, done 2026-10-06 with its measured incident
+    // (the idb 0×0 tree): a probe that read NO tree in any round is unknown,
+    // not "no" — the ladder refuses a destructive rung on it. One good read
+    // makes it "no" even if a later read failed: that tree was knowledge.
+    // `treesRead === 0` means every round's read failed, so the last one's
+    // error is set; the second test only narrows the type.
+    if (outcome.treesRead === 0 && outcome.readError !== undefined) return { answer: 'unknown', readError: outcome.readError };
+    return { answer: 'no' };
   }
 
   private async runFlowInner(name: string): Promise<void> {

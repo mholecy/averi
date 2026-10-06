@@ -335,6 +335,11 @@ one happens by itself.
 - **iOS `id:` selectors find nothing on a React Native app, or a `wait:` on a SwiftUI container id
   (`.accessibilityElement(children: .contain)`) times out while the screen is showing** — idb never
   exposes container identifiers: `app.ios.treeSource: wda` (step 4), or wait on a button/row id.
+- **iOS: `idb returned an empty accessibility tree`, or `ensure_state` stops with `Refused to run reach flow …` and a
+  `⛔ reach` line** — idb can return a 0×0 tree for minutes on a rendered screen (measured 2026-10-06, after a cold
+  relaunch). averi treats it as an unread device: waits and asserts fail instead of reading "absent", and the reach
+  ladder will not run a `clearState` rung on it, so nothing was wiped. Compare with `screenshot` and retry once the tree
+  reads; if it keeps happening, `app.ios.treeSource: wda` (step 4) reads the tree through WebDriverAgent instead.
 - **iOS typing lands the wrong characters (`y`↔`z`, `ý` for a digit), or `fill` on a PLAIN field reports fewer
   characters than typed** — HID typing follows the simulator's hardware keyboard layout, which follows the Mac's
   input source unless pinned (measured 2026-09-17 with a Slovak host layout; it read as an averi typing bug for

@@ -1,4 +1,4 @@
-import { zeroRect, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, zeroRect, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -321,15 +321,11 @@ export function visibleFractionInViewport(
 }
 
 /**
- * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
- * a negative or NaN side. The one spelling of "has this rect an area", for
- * the visible fraction above and the bare-tree rule (bare-tree.ts).
+ * `rectArea` lives beside `Rect` in adapters/types.ts since 2026-10-06 — the
+ * idb tree source needs it too and may not import this layer — and is
+ * re-exported here, where the rect arithmetic's callers look for it.
  */
-export function rectArea(rect: Rect): number {
-  if (!(rect.width > 0 && rect.height > 0)) return 0;
-  const a = rect.width * rect.height;
-  return Number.isFinite(a) ? a : 0;
-}
+export { rectArea };
 
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.

@@ -103,6 +103,14 @@ export type PollOutcome<T> =
       detail?: string;
       /** The LAST read's error — set when the final round could not read a tree, cleared by any successful read. */
       readError?: Error;
+      /**
+       * How many rounds READ a tree, whatever the predicate said of it. 0 means
+       * the poll never saw the device — every read failed — so the timeout
+       * says nothing about the screen (2026-10-06: the flow's detect probe
+       * answers "unknown" there, and the ladder refuses a destructive rung on
+       * it). `readError` cannot say this: it reports only the last round.
+       */
+      treesRead: number;
     };
 
 /**
@@ -119,16 +127,18 @@ export type PollOutcome<T> =
  * error, so a reader finds every "why" beneath the headline in one shape —
  * but it is DROPPED when the last read failed: then the reads, not the
  * tree's contents, are the story, and a hint about what the trees held
- * would point the reader the wrong way. The rule lives here, with the
+ * would point the reader the wrong way. A read error's own later lines (the
+ * idb empty tree's advice) are indented under its first, inside the same
+ * parenthesis. The rule lives here, with the
  * message's shape, so every thrower gets it. Deliberately conservative:
- * pollTree reports only the LAST read's error, not whether any earlier
- * round read a tree, so a single late failure after many good reads also
- * silences the hint — a missing hint costs a reader less than a misleading
- * one.
+ * the rule keys on the LAST read's error, not on `treesRead` — so a single
+ * late failure after many good reads also silences the hint, although the
+ * outcome could tell that case apart. A missing hint costs a reader less
+ * than a misleading one, and the read error is the fresher fact.
  */
 export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hint?: string): string =>
   `Timed out after ${timeoutMs}ms waiting for ${what}` +
-  (readError === undefined ? '' : `\n  (last UI tree read failed: ${readError.message})`) +
+  (readError === undefined ? '' : `\n  (last UI tree read failed: ${readError.message.replace(/\n/g, '\n   ')})`) +
   (hint === undefined || readError !== undefined ? '' : `\n  (${hint})`);
 
 /**
@@ -142,7 +152,9 @@ export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: 
  * The loop's shape is load-bearing and pinned by tests:
  * - Every round reads the tree ONCE, through readTreeOrError: a failed read
  *   is a miss that keeps polling, and its error is remembered so a timeout
- *   can quote it. Any later successful read clears it.
+ *   can quote it. Any later successful read clears it. A timeout also counts
+ *   the rounds that read a tree (`treesRead`), so a caller can tell "never
+ *   matched" from "never read".
  * - The predicate runs only on a tree it could read. A value ends the poll;
  *   `undefined` continues it; a `PollMiss` continues it and records a detail
  *   that a later silent round does not overwrite.
@@ -181,15 +193,17 @@ export async function pollTree<T>(
   const deadline = Date.now() + opts.timeoutMs;
   let detail: string | undefined;
   let readError: Error | undefined;
+  let treesRead = 0;
   for (;;) {
     const read = await readTreeOrError(adapter);
     readError = read.error;
     if (read.tree !== undefined) {
+      treesRead++;
       const verdict = await predicate(read.tree, { deadline });
       if (verdict instanceof PollMiss) detail = verdict.detail;
       else if (verdict !== undefined) return { timedOut: false, value: verdict };
     }
-    if (Date.now() >= deadline) return { timedOut: true, detail, readError };
+    if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead };
     await sleep(opts.pollMs);
   }
 }

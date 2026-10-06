@@ -1303,6 +1303,9 @@ describe('transient UI-tree read failures', () => {
     };
   };
 
+  // `warm` is a non-destructive rung on purpose (2026-10-06): a DESTRUCTIVE
+  // rung behind a probe that never read a tree is refused instead of run —
+  // tests/flow/unread-tree-ladder.test.ts pins that side.
   const cfg = parseConfig(`
 app:
   android: { package: md.bank.app }
@@ -1313,7 +1316,7 @@ states:
 flows:
   warm:
     steps:
-      - launch: { clearState: true }
+      - launch: { clearState: false }
   smoke:
     steps:
       - launch: { clearState: true }
@@ -1339,7 +1342,7 @@ flows:
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, 1); // exactly the first probe fails — the cold-launch case
     const trace = await new FlowEngine(cfg, fake, FAST).ensureState('home');
-    expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
+    expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: false, activity: undefined, intent: undefined }]);
     expect(trace).toContainEqual({ action: 'state home', detail: 'reached after warm' });
   });
 

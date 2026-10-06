@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IdbEmptyTreeError } from '../../src/adapters/ios-tree-source.js';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
@@ -470,6 +471,23 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(empty.shape).toEqual([['text'], ['text']]);
     expect(JSON.parse(empty.texts[0])).toEqual({ role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 }, children: [] });
     expect(empty.texts[1]).toMatch(/^⚠ The tree is bare: 1 node, none readable or interactive/);
+  });
+
+  // 2026-10-06 (docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-
+  // screen.md): idb's stuck 0×0 tree is a read error at the source now, so
+  // ui_snapshot no longer shows it as a bare `[]` — the call fails, carrying
+  // the cause and the advice.
+  it('ui_snapshot: an idb read that returns no tree (IdbEmptyTreeError) is an error result naming the cause and the way out', async () => {
+    const stuck = new FakeAdapter({}, 'none');
+    stuck.uiTree = async () => {
+      throw new IdbEmptyTreeError(['Application']);
+    };
+    const { call } = await connect({ ios: stuck, android: home() });
+    const result = await call('ui_snapshot', { platform: 'ios', filter: 'role:button', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('idb returned an empty accessibility tree (only a 0×0 Application)');
+    expect(result.text).toContain('Compare with screenshot');
+    expect(result.text).toContain('app.ios.treeSource: wda');
   });
 
   it('ui_snapshot: an EMPTY filter string means no filter, as it always did — the whole tree, alone', async () => {

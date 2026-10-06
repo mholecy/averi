@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createIosTreeSource, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { createIosTreeSource, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
@@ -210,6 +210,68 @@ describe('IdbTreeSource — the idb adapter at the seam', () => {
     await source.dispose();
     expect(calls).toEqual([]);
     expect((await source.read()).children).toHaveLength(3);
+  });
+});
+
+// docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md: idb
+// returned a lone 0×0 Application for minutes on a RENDERED screen. Read as
+// a tree, nothing matched it, so `absent` passed and the ensure_state ladder
+// escalated into its clearState rung. It is a read error now; the signature
+// is NARROW — no element with any area — so idb's normal launch transient, a
+// lone FULL-FRAME Application, stays a tree.
+describe('IdbTreeSource — an empty tree is a read error, not a screen on which nothing matches', () => {
+  const ZERO = { x: 0, y: 0, width: 0, height: 0 };
+  const read = (payload: unknown[]) =>
+    new IdbTreeSource({ udid: 'AAAA-1111', exec: fakeExec({ 'idb ui describe-all': JSON.stringify(payload) }).fn }).read();
+
+  it('`[]` throws IdbEmptyTreeError naming the empty list', async () => {
+    const error = await read([]).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IdbEmptyTreeError);
+    expect((error as Error).message).toMatch(/^idb returned an empty accessibility tree \(an empty list\)/);
+  });
+
+  it('the measured payload — a LABELLED Application at {{0, 0}, {0, 0}} — throws, and the message names the cause, the check and the way out', async () => {
+    const error = await read([{ type: 'Application', AXLabel: 'dbosbanking', AXFrame: '{{0, 0}, {0, 0}}', frame: ZERO }]).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IdbEmptyTreeError);
+    // The cause alone on the first line (what a trace quotes), the advice beneath it.
+    expect((error as Error).message).toBe(
+      'idb returned an empty accessibility tree (only a 0×0 Application)\n' +
+        'The app may still be rendered: idb can stay stuck like this for minutes on a rendered screen. ' +
+        'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app — ' +
+        'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
+    );
+  });
+
+  it('several elements, every one zero-area (or degenerate), still throws — area, not count, is the signature; and only an Application is called one', async () => {
+    const lone = await read([{ type: 'Other', frame: ZERO }]).catch((e: unknown) => e);
+    expect((lone as Error).message).toMatch(/^idb returned an empty accessibility tree \(1 element, none with any area\)\n/);
+    await expect(
+      read([
+        { type: 'Application', frame: ZERO },
+        { type: 'StaticText', AXLabel: 'ghost', frame: { x: 10, y: 10, width: 0, height: 20 } },
+        { type: 'Button', AXLabel: 'flat', frame: { x: 10, y: 10, width: 20, height: -1 } },
+      ]),
+    ).rejects.toThrow(/^idb returned an empty accessibility tree \(3 elements, none with any area\)\n/);
+  });
+
+  it('a lone FULL-FRAME Application passes — idb\'s normal launch transient is a tree, not an error', async () => {
+    const tree = await read([{ type: 'Application', AXLabel: 'MyPort', frame: { x: 0, y: 0, width: 402, height: 874 } }]);
+    expect(tree.children).toEqual([expect.objectContaining({ label: 'MyPort', rect: { x: 0, y: 0, width: 402, height: 874 } })]);
+  });
+
+  it('a 1×1 element is enough area to be a tree — the threshold is "any", not "screen-sized"', async () => {
+    const tree = await read([{ type: 'Application', frame: ZERO }, { type: 'Other', frame: { x: 0, y: 0, width: 1, height: 1 } }]);
+    expect(tree.children).toHaveLength(2);
+  });
+
+  it('a normal tree passes, its zero-area elements included', async () => {
+    const tree = await read(JSON.parse(IDB_DESCRIBE_ALL) as unknown[]);
+    expect(tree.children).toHaveLength(3);
+    expect(tree.children[2]).toMatchObject({ role: 'text', rect: ZERO });
+  });
+
+  it('the parser itself stays pure: parseIdbDescribeAll still parses the stuck payload — only a READ refuses it', () => {
+    expect(parseIdbDescribeAll(JSON.stringify([{ type: 'Application', frame: ZERO }])).children).toHaveLength(1);
   });
 });
 

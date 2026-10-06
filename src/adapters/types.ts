@@ -42,6 +42,20 @@ export interface Rect {
  */
 export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
 
+/**
+ * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
+ * a negative or NaN side. The one spelling of "has this rect an area": the
+ * visible fraction and the bare-tree rule above this layer (ui-tree/
+ * geometry.ts re-exports it), and the idb source's empty-tree check here
+ * (ios-tree-source.ts). Moved from geometry.ts on 2026-10-06, so that check
+ * did not need a second spelling.
+ */
+export function rectArea(rect: Rect): number {
+  if (!(rect.width > 0 && rect.height > 0)) return 0;
+  const a = rect.width * rect.height;
+  return Number.isFinite(a) ? a : 0;
+}
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, ...
