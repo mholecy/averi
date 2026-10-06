@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, resetClearStateCount, stepSummary } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, resetClearStateCount, stepSummary, type TraceEntry } from '../../src/flow/engine.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
@@ -410,6 +410,109 @@ flows:
     });
     const trace = await new FlowEngine(cfg, fake, FAST).ensureState('logged_in');
     expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
+  });
+
+  describe('a rung whose `requires` leads to a wipe is not itself the wipe', () => {
+    // Measured 2026-10-05: a one-tap navigation flow requiring a logged-in
+    // state printed "this rung is DESTRUCTIVE" on every call, because the
+    // recovery-pass predicate follows `requires` and the login at the end of
+    // that ladder wipes. The next trace line was "already active" — nothing
+    // could have wiped. A warning that fires on every harmless navigation is
+    // not read on the call that does wipe, so the pre-flight line must speak
+    // only for the rung's OWN steps; the nested ladder warns for its own.
+    const yaml2 = `
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+  transfers:
+    detect: { element: { id: transfer_form } }
+    reach: [goto_transfers]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+  login:
+    steps:
+      - launch: { clearState: true }
+  goto_transfers:
+    requires: logged_in
+    steps:
+      - tap: { id: tab_payments }
+`;
+    const cfg2 = parseConfig(yaml2);
+    const destructiveWarnings = (trace: TraceEntry[]) =>
+      trace.filter((t) => t.detail?.includes('this rung is DESTRUCTIVE') === true);
+    const screens2 = () => {
+      resetLayout();
+      return {
+        biometrics_prompt: screen(el({ role: 'button', identifier: 'not_now' })),
+        dashboard: screen(el({ role: 'button', identifier: 'tab_payments' }), el({ identifier: 'dashboard_root' })),
+        transfers: screen(el({ identifier: 'transfer_form' })),
+      };
+    };
+
+    it('stays SILENT when the required state is already active — nothing wipes, nothing launches', async () => {
+      const fake = new FakeAdapter(screens2(), 'dashboard', (id, self) => {
+        if (id === 'tab_payments') self.current = 'transfers';
+      });
+      const trace = await new FlowEngine(cfg2, fake, FAST).ensureState('transfers');
+      expect(fake.launches).toEqual([]);
+      expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
+      expect(trace).toContainEqual({ action: 'state logged_in', detail: 'already active' });
+    });
+
+    it('warns ONCE, naming the rung that wipes, when `requires` does escalate into the login', async () => {
+      // The device is logged out: `goto_transfers` → `requires: logged_in` →
+      // nested ladder → `login`. The warning belongs to `login`, right before
+      // its launch — not to `goto_transfers`, whose own steps are one tap.
+      const fake = new FakeAdapter(screens2(), 'biometrics_prompt'); // tapping changes nothing
+      const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
+      const error = await engine.ensureState('transfers').catch((e: unknown) => e);
+      const trace = (error as FlowError).trace;
+      const warnings = destructiveWarnings(trace);
+      expect(warnings.map((t) => t.action)).toEqual(['⚠ reach login']);
+      const warned = trace.indexOf(warnings[0]);
+      const wiped = trace.findIndex((t) => t.detail?.includes('app state wiped') === true);
+      expect(wiped).toBeGreaterThanOrEqual(0);
+      expect(warned).toBeLessThan(wiped); // still pre-flight
+    });
+
+    describe('entered through run_flow, two levels deep — the measured shape', () => {
+      // The incident was `run_flow goto_swift_payment_form`: the called flow
+      // requires a state whose rung (`goto_payment_type_chooser`, here
+      // `goto_transfers`) requires logged_in. The called flow is not a rung,
+      // so the false warning was on the INNER rung, one level down.
+      const cfg3 = parseConfig(`${yaml2}  goto_swift:
+    requires: transfers
+    steps:
+      - tap: { id: swift }
+`);
+      const screens3 = () => {
+        const s = screens2();
+        return { ...s, transfers: screen(el({ identifier: 'transfer_form' }), el({ role: 'button', identifier: 'swift' })) };
+      };
+
+      it('stays SILENT when logged_in is already active', async () => {
+        const fake = new FakeAdapter(screens3(), 'dashboard', (id, self) => {
+          if (id === 'tab_payments') self.current = 'transfers';
+        });
+        const trace = await new FlowEngine(cfg3, fake, FAST).runFlow('goto_swift');
+        expect(fake.launches).toEqual([]);
+        expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
+        expect(trace).toContainEqual({ action: 'state logged_in', detail: 'already active' });
+      });
+
+      it('warns only on the login when logged out', async () => {
+        const fake = new FakeAdapter(screens3(), 'biometrics_prompt'); // tapping changes nothing
+        const engine = new FlowEngine(cfg3, fake, { ...FAST, reachRecheckMs: 20 });
+        const error = await engine.runFlow('goto_swift').catch((e: unknown) => e);
+        const trace = (error as FlowError).trace;
+        expect(destructiveWarnings(trace).map((t) => t.action)).toEqual(['⚠ reach login']);
+      });
+    });
   });
 
   it('escalates when the cheap flow THROWS, and says so in the trace', async () => {

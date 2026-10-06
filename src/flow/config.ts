@@ -282,7 +282,8 @@ const configSchema = z
             requires: z.string().optional(),
             /**
              * Marks a flow as unrepeatable, which keeps it out of the reach
-             * ladder's recovery pass (`flowIsDestructive`, below). It is
+             * ladder's recovery pass (`flowIsDestructive`, below) and makes the
+             * ladder warn before running it (`flowItselfIsDestructive`). It is
              * already inferred from `launch { clearState: true }`;
              * the flag is for the kinds a static walk cannot see — a flow that
              * taps through "log out", consumes a one-shot SMS code, or deletes
@@ -454,6 +455,10 @@ export function childSteps(step: Step): Step[] | undefined {
  * `requires` is followed because it pulls in a whole other reach ladder: a
  * one-step prelude that requires a state whose only way in is a `clearState`
  * login is not a cheap flow, however cheap its own steps read.
+ *
+ * That transitive answer is the right one for a re-run and the wrong one for
+ * the pre-flight warning the ladder prints before each rung; that line uses
+ * `flowItselfIsDestructive` below. The two must not be merged again.
  */
 export function flowIsDestructive(
   cfg: AveriConfig,
@@ -462,16 +467,61 @@ export function flowIsDestructive(
 ): boolean {
   const flow = cfg.flows[name];
   if (flow === undefined || stack.has(`flow:${name}`)) return true;
-  if (flow.destructive === true) return true;
+  if (bodyIsDestructive(flow)) return true;
   const next = new Set(stack).add(`flow:${name}`);
-  if (flow.requires !== undefined && stateReachIsDestructive(cfg, flow.requires, next)) return true;
-  return stepsAreDestructive(flow.steps);
+  return flow.requires !== undefined && stateReachIsDestructive(cfg, flow.requires, next);
 }
 
 function stateReachIsDestructive(cfg: AveriConfig, name: string, stack: Set<string>): boolean {
   if (stack.has(`state:${name}`)) return true;
   const next = new Set(stack).add(`state:${name}`);
   return (cfg.states[name]?.reach ?? []).some((flow) => flowIsDestructive(cfg, flow, next));
+}
+
+/**
+ * Is this flow's OWN body unrepeatable — `launch { clearState: true }`
+ * anywhere in its steps, or `destructive: true` (which also covers what a
+ * static walk cannot see: a logout, a one-shot SMS code, a server-side
+ * delete)? `requires` is deliberately NOT followed: that is the whole
+ * difference from `flowIsDestructive`.
+ *
+ * Still conservative in one direction: `stepsAreDestructive` walks BOTH
+ * platform-override arms, so a `clearState` under `android:` alone also
+ * warns on iOS. Not fixed here — it needs the platform passed in.
+ *
+ * The two answer different questions. The recovery pass asks "may this rung
+ * be re-run", and a rung that might pull a wipe in through `requires` may
+ * not, so there the transitive answer is right. The reach ladder's pre-flight
+ * line asks "is the rung about to run unrepeatable", and prints it as a
+ * fact. For a flow whose `requires` leads to a `clearState` login the
+ * transitive answer is only a fact when the required state is NOT already
+ * active — a check the engine has not made when the line prints. Measured
+ * 2026-10-05: every navigation flow in a config where every flow requires a
+ * logged-in state printed the warning on every call, one line before
+ * "already active". The sentence that exists to be read on the one call that
+ * wipes was on all of them.
+ *
+ * The escalation case loses nothing: when `requires` is not met, the nested
+ * ensureState ladder runs its own rungs through the same pre-flight check,
+ * so the warning lands on the rung that actually wipes, immediately before
+ * it does.
+ *
+ * An unknown flow is NOT destructive here — the opposite of the re-run gate,
+ * on purpose. "Cannot prove it is safe" lands on "do not re-run" because a
+ * skipped recovery is merely slower, but a warning is a statement, and "this
+ * rung wipes app state" about a flow that cannot run (`runFlowInner` throws
+ * SetupError before any step) would be a false one — the very thing this
+ * predicate exists to stop. In practice the case is unreachable from a parsed
+ * config: `validateReferences` rejects a `reach` naming an unknown flow.
+ */
+export function flowItselfIsDestructive(cfg: AveriConfig, name: string): boolean {
+  const flow = cfg.flows[name];
+  return flow !== undefined && bodyIsDestructive(flow);
+}
+
+/** The one definition of "own body" both predicates above share. */
+function bodyIsDestructive(flow: AveriConfig['flows'][string]): boolean {
+  return flow.destructive === true || stepsAreDestructive(flow.steps);
 }
 
 /**

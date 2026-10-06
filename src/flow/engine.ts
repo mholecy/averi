@@ -16,6 +16,7 @@ import { Verifier } from '../verify/assert.js';
 import {
   resolveLaunchActivity,
   flowIsDestructive,
+  flowItselfIsDestructive,
   SetupError,
   type AveriConfig,
   type Condition,
@@ -253,7 +254,11 @@ export class FlowEngine {
       // only expression of preference, and overriding it silently would be its
       // own bug) — it announces the cost while a human can still interrupt,
       // and names the missing cheap rung as the fix.
-      if (flowIsDestructive(this.cfg, flow)) {
+      //
+      // The rung's OWN steps, not what its `requires` might pull in — the
+      // recovery pass below asks a different question; see
+      // `flowItselfIsDestructive` for why the two predicates must stay apart.
+      if (flowItselfIsDestructive(this.cfg, flow)) {
         this.log(
           `⚠ reach ${flow}`,
           'this rung is DESTRUCTIVE — it wipes app state, and any device registration with it. ' +

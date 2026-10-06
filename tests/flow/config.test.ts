@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   childSteps,
   flowIsDestructive,
+  flowItselfIsDestructive,
   resolveLaunchActivity,
   launchConsultsConfigActivity,
   parseConfig,
@@ -333,5 +334,54 @@ describe('stepsAreDestructive reads SAFE_LEAVES by own key only', () => {
     const hostile = { ...cfg, flows: { f: { steps: [{ toString: {} } as unknown as Step] } } };
     expect(flowIsDestructive(hostile, 'f')).toBe(true);
     expect(flowIsDestructive(cfg, 'f')).toBe(false);
+  });
+});
+
+describe('two destructiveness predicates, two policies', () => {
+  // `flowIsDestructive` follows `requires` because it gates a RE-RUN in the
+  // recovery pass, where "might pull in a wipe" must count. The pre-flight
+  // warning asks a narrower question — will THIS rung's own steps wipe — and
+  // `flowItselfIsDestructive` answers only that (measured 2026-10-05: the
+  // transitive answer put the warning on every navigation flow).
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login]
+flows:
+  login:
+    steps:
+      - launch: { clearState: true }
+  goto_transfers:
+    requires: logged_in
+    steps:
+      - tap: { id: tab_payments }
+  flagged:
+    destructive: true
+    steps:
+      - tap: { id: x }
+`);
+
+  it('a safe-stepped flow that REQUIRES a wiping state: transitive yes, own-steps no', () => {
+    expect(flowIsDestructive(cfg, 'goto_transfers')).toBe(true);
+    expect(flowItselfIsDestructive(cfg, 'goto_transfers')).toBe(false);
+  });
+
+  it('both agree on the rung that wipes, and on `destructive: true`', () => {
+    expect(flowItselfIsDestructive(cfg, 'login')).toBe(true);
+    expect(flowItselfIsDestructive(cfg, 'flagged')).toBe(true);
+    expect(flowIsDestructive(cfg, 'login')).toBe(true);
+    expect(flowIsDestructive(cfg, 'flagged')).toBe(true);
+  });
+
+  it('an unknown flow: the re-run gate refuses, the pre-flight warning stays silent', () => {
+    // Opposite fail-safe directions, on purpose: not re-running an unprovable
+    // rung costs a slower recovery, while warning "this rung wipes" about a
+    // flow that cannot run (runFlowInner throws SetupError first) is a false
+    // statement — the exact thing the narrower predicate exists to prevent.
+    expect(flowIsDestructive(cfg, 'nope')).toBe(true);
+    expect(flowItselfIsDestructive(cfg, 'nope')).toBe(false);
   });
 });
