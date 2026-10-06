@@ -354,6 +354,27 @@ describe('ocr asserts (what the element RENDERS)', () => {
     return fake;
   };
 
+  /**
+   * The rect-off-the-png sentence (verify/text-parity.ts `ocrRegionForRect`,
+   * worded through ui-tree/geometry.ts `rectText` since 2026-10-06) was
+   * pinned nowhere: a change to the shared rect wording reached it
+   * unnoticed. Pinned exactly here, at the surface an agent reads.
+   */
+  it('an element whose rect lands off the screenshot fails closed and says where the rect was', async () => {
+    resetLayout();
+    const below = { x: 100, y: 500, width: 800, height: 100 };
+    const fake = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: below })) }, 'detail');
+    fake.nextScreenshot = png(1000, 320);
+    const result = await new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') }).assert({
+      element: { id: 'card' },
+      ocr: { text: 'CONTINUE' },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'element rect 100,500 800x100 scaled by 1.000 leaves nothing on-screen; failing closed, rendered text unchecked',
+    );
+  });
+
   it('passes on the rendered string and says what it read', async () => {
     const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
