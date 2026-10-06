@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
-import { STABILITY_DELAY_MS } from '../../src/verify/capture.js';
+import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
@@ -736,16 +736,18 @@ describe('screenshot baseline asserts', () => {
     const first = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(first).toMatchObject({ pass: true, detail: expect.stringContaining('baseline created') });
     // movingA, movingB, settled, settled — the capture that confirmed stability is the one stored.
-    expect(fake.screenshots).toHaveLength(4);
+    // ...then, since 2026-10-06, the four captures of the baseline confirmation window (capture.ts).
+    expect(fake.screenshots).toHaveLength(8);
     expect((await readFile(join(dir, 'android', 'dash.png'))).equals(settled)).toBe(true);
     // The wait between captures is capture.ts's 300 ms, not the Verifier's
     // pollMs (FAST: 5) — one budget, whoever calls (2026-10-05).
-    expect(sleeps).toEqual(Array(3).fill(STABILITY_DELAY_MS));
+    // The window adds its one 300 ms wait (2026-10-06).
+    expect(sleeps).toEqual([...Array(3).fill(STABILITY_DELAY_MS), 300]);
 
     // The same still screen on a rerun is a 0% diff against the settled baseline: two identical captures.
     const second = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(second).toMatchObject({ pass: true, detail: '0.00% of pixels differ' });
-    expect(fake.screenshots).toHaveLength(6);
+    expect(fake.screenshots).toHaveLength(10);
   });
 });
 
@@ -805,6 +807,66 @@ describe('screenshot baseline asserts — a frame that did not settle is never a
       '0.04% of pixels differ\n⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available',
     );
     expect(caret.screenshots).toHaveLength(6);
+  });
+
+  /**
+   * The device case (2026-10-06, docs/bugs/2026-10-06-whole-screen-stability-
+   * aliases-a-blinking-caret.md): a caret blinking 500 ms on, 500 ms off, on
+   * a device whose screencap takes 650 ms (the Android emulator measured
+   * that day). The settled pair lands 950 ms apart — in phase — so the pair
+   * alone compares equal, and until this date the assert CREATED a baseline
+   * from it. The confirmation window's next captures fall in the other phase.
+   */
+  const caretDevice = () => {
+    const fake = dashboardFake();
+    const on = png(50, 50, (p) => p.data.fill(0, 0, 4));
+    const off = png(50, 50);
+    fake.screenshot = async () => {
+      const shot = Date.now() % 1000 < 500 ? on : off;
+      fake.screenshots.push(shot);
+      vi.setSystemTime(Date.now() + 650);
+      return shot;
+    };
+    return fake;
+  };
+
+  it('refuses to CREATE a baseline from a caret screen the settled pair alone would have stored (2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 100 ms into the caret's on-phase.
+    vi.setSystemTime(1_000_000_100);
+    // The old rule on this very screen: two captures, in phase, settled.
+    const pairOnly = await captureFrame(caretDevice());
+    expect(pairOnly).toMatchObject({ stability: 'settled', captures: 2 });
+
+    vi.setSystemTime(1_000_000_100);
+    resetSleeps();
+    const caret = caretDevice();
+    const result = await new Verifier(caret, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'baseline not created: the screen did not settle: 4 captures — two consecutive ones matched, then a later confirming capture differed from them — a periodic change such as a blinking caret or a ticking clock, which a matching pair can land in phase with; hide or stop it (unfocus the field, freeze the clock) and re-run (a baseline holding one phase of it would pass or fail every later run by that phase)',
+    );
+    // The pair (on, on), then the window: on at 2000 ms, off at 2650 ms — refused there.
+    expect(caret.screenshots).toHaveLength(4);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS, 300]);
+    await expect(readFile(join(dir, 'android', 'dash.png'))).rejects.toThrow();
+  });
+
+  it('a DIFF against an existing baseline costs what it did: the pair alone, no confirmation window (2026-10-06)', async () => {
+    const still = dashboardFake();
+    still.nextScreenshot = png(50, 50);
+    await new Verifier(still, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1_000_000_100);
+    resetSleeps();
+    const caret = caretDevice();
+    const result = await new Verifier(caret, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+    // In phase, the pair settles and the diff runs on it: two captures, one 300 ms wait. The
+    // `⚠ frame:` note stays silent here — the recorded blind spot the bug note names.
+    expect(result).toMatchObject({ pass: true, detail: '0.04% of pixels differ' });
+    expect(caret.screenshots).toHaveLength(2);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS]);
   });
 });
 

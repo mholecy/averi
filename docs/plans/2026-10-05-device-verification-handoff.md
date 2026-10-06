@@ -18,11 +18,11 @@ every one differential- or mutation-tested, none yet exercised end to end agains
 | `a7f4775` C8 | one selector matcher; viewport predicates in geometry | every `id:` selector in `averi.yaml` resolves as before (differential-proved; a run of `smoke` + `login` is the device proof) |
 | `5473982` C9 | baseline screenshot assert takes a settled frame | a `screenshot` assert's first run creates a baseline from a settled frame |
 | `427c45e` V8 | cleanup only | nothing |
-| `4954ab4` V2+V3 | capture owns the stability budget; `Frame.stability`; color/ocr refuse moving frames; baseline creation refuses a moving frame; `⚠ frame:` note | **tightening**: on a STATIC screen nothing changes and NO `⚠ frame:` line appears in `ensure_state`/`screenshot`/`verify` output; on a screen with an animation or caret the note appears and a color/ocr assert fails "the screen did not settle …"; **unmeasured**: flows' post-swipe pause went 500 → 400 ms (`scroll_until`) |
+| `4954ab4` V2+V3 | capture owns the stability budget; `Frame.stability`; color/ocr refuse moving frames; baseline creation refuses a moving frame; `⚠ frame:` note | **tightening**: on a STATIC screen nothing changes and NO `⚠ frame:` line appears in `ensure_state`/`screenshot`/`verify` output; on a screen with an animation the note appears and a color/ocr assert fails "the screen did not settle …" (a caret does NOT reliably trigger either: measured 2026-10-06, the settled pair lands in phase with a ≈1 s blink on the Android API 33 emulator and the iOS 26.5 simulator — use a continuously animating spinner; a 1 Hz clock seconds field is no reliable substitute: the up-to-six captures settle on an identical pair between its steps in ≈1 run in 4 on the Android emulator and almost always on the iOS simulator; docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md); **unmeasured**: flows' post-swipe pause went 500 → 400 ms (`scroll_until`) |
 | `5ed1478` V1 | keyboard decision per phase | same device proof as `f543b2f` (differential 3 × 25 000 sequences says identical) |
 | `eadca61` V6 | unknown `environment` refused before any adapter | `ensure_state`/`verify` with `environment: "nope"` returns the SetupError immediately, no device work, no `## android` leg section |
 | `e28576b` V4+V5 | `run/verify.ts` fact table; `TreeFrame`; `textMeasurement` | `verify` sections unchanged in wording and order (`## rect parity` / `## color parity` / `## text parity`); needs a contract to see them |
-| pixel poll step 2 (2026-10-06, the commit after `ea5c66a`) | color/ocr asserts judge stability over the element's own region (`captureFrame`'s `region`, passed by `verify/pixel-poll.ts`); baselines, legs and tools stay whole-screen | **loosening, one direction**: on the static login screen with a focused field (blinking caret) and, if visible, a status-bar clock, a `color` assert on `login_submit` and an `ocr` assert on its label PASS where they failed `the screen did not settle: …` before; an element that itself animates (a spinner inside the measured rect) still FAILS with that sentence; `screenshot`/`ensure_state` on the caret screen still carry one `⚠ frame:` line. See §5 |
+| pixel poll step 2 (2026-10-06, the commit after `ea5c66a`) | color/ocr asserts judge stability over the element's own region (`captureFrame`'s `region`, passed by `verify/pixel-poll.ts`); baselines, legs and tools stay whole-screen | **loosening, one direction**: on the static login screen with a focused field (blinking caret) and, if visible, a status-bar clock, a `color` assert on `login_submit` and an `ocr` assert on its label PASS where they failed `the screen did not settle: …` before; an element that itself animates (a spinner inside the measured rect) still FAILS with that sentence; `screenshot`/`ensure_state` keep whole-screen stability (on these devices a caret alone does not produce a `⚠ frame:` line — the pair aliases the blink, 2026-10-06; a continuously animating spinner does; a 1 Hz clock seconds field does in only ≈3 runs in 4 on Android and almost never on iOS). See §5 |
 | pixel poll step 2, rect confirmation (2026-10-06) | a frame that settled over the element's region ONLY is measured only when two consecutive tree reads agree on the rect | **no false pass on a rect the tree reports moving**: a `color` assert on an element during a slide-in/push, with live content elsewhere, must not pass while consecutive tree reads disagree on its rect (two residuals are recorded and checked separately in §5: a tree that already reports the FINAL rect — iOS model-layer frames, Android alpha-0 views — and movement after the confirming snapshot, which a uiautomator dump takes partway through a ~1.5 s read); a never-resting element fails `the element moved between tree reads …`; on a still screen nothing changes (whole-screen settle, measured in round 1). See §5 |
 
 ## 1. Prerequisites
@@ -182,9 +182,11 @@ per server process) — C2.
   tables): finportal has no layout contract and no `color`/`ocr` asserts. Author a 2-anchor contract for
   the login screen (`login_submit` with a `bg`, `login_title`/label with `text`) from one `ui_snapshot` +
   a screenshot, run `verify … contract: <path>` and `assert` with `{ color: … }` / `{ ocr: … }` on the
-  static login screen (must PASS, no `⚠ frame:`), then on the 2FA screen if it has a spinner or a
-  blinking caret (a color/ocr assert must FAIL with `the screen did not settle: N captures …`, and
-  `screenshot`/`ensure_state` output must carry one `⚠ frame:` line). Compare the `## text parity` section
+  static login screen (must PASS, no `⚠ frame:`), then on the 2FA screen if it has a continuously animating
+  spinner (a color/ocr assert must FAIL with `the screen did not settle: N captures …`, and
+  `screenshot`/`ensure_state` output must carry one `⚠ frame:` line). A blinking caret alone is NOT enough for
+  the `⚠ frame:` line on the Android API 33 emulator or the iOS 26.5 simulator: the settled pair lands in phase
+  with its ≈1 s blink (measured 2026-10-06, docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md). Compare the `## text parity` section
   against a run of the same contract on `5473982` — wording and row order must be identical.
 - **`scroll_until`** (V2+V3 changed flows' post-swipe pause 500 → 400 ms): no finportal flow scrolls. Add a
   throwaway `scroll_until` step on any scrollable screen (or use mp-native, which has one) and watch
@@ -196,8 +198,9 @@ per server process) — C2.
   `{ element: { id: "login_submit" }, ocr: { text: "<its label>" } }`: both must PASS, where before this change they
   failed `the screen did not settle: N captures …`. Then on a screen whose asserted element itself animates (a spinner
   inside the measured rect — a loading button, an activity indicator), both must still FAIL with that sentence. On the
-  caret screen, `screenshot` and `ensure_state` output must still carry exactly one `⚠ frame:` line (tools keep
-  whole-screen stability). Record the capture count each failing assert quotes and the wall time of every assert
+  caret screen, `screenshot` and `ensure_state` keep whole-screen stability; a caret alone usually prints NO
+  `⚠ frame:` line on these devices (the pair aliases the blink, 2026-10-06) — use a continuously animating spinner to see
+  the line (a 1 Hz clock seconds field is no reliable substitute: the up-to-six captures settle on an identical pair between its steps in ≈1 run in 4 on the Android emulator and almost always on the iOS simulator). Record the capture count each failing assert quotes and the wall time of every assert
   beside the 2026-10-05 baseline figures (kept on `Verifier.poll` in `verify/assert.ts`): a passing assert on the caret
   screen should cost two rounds of a still screen's cost (two captures and one 300 ms stability wait each): the frame
   settles over the element's region only, and the pixel poll measures it only once a second tree read confirms the
@@ -228,7 +231,13 @@ per server process) — C2.
   on iOS for comparison (its AX read is shorter). File any pass under `docs/bugs/` with the read and capture times.
 - **Baseline screenshot assert** (C9, V2+V3): run `assert { screenshot: 'login', threshold: 0.01 }` twice
   on the static login screen: first `baseline created`, second `0.00% of pixels differ`; then on a moving
-  screen the first run must say `baseline not created: the screen did not settle …`.
+  screen the first run must say `baseline not created: the screen did not settle …`. Since 2026-10-06 a caret screen
+  is refused too (focus `login_username`, delete the baseline, run the assert once): the first run must say
+  `baseline not created: the screen did not settle: N captures — two consecutive ones matched, then a later
+  confirming capture differed from them — a periodic change such as a blinking caret …`, with N between 3 and 10,
+  and no file written; a run on the static screen costs four captures and one 300 ms wait more than before (≈2.9 s
+  on the Android emulator) and still says `baseline created`; a diff against an existing baseline costs what it did.
+  Record N and the wall time of each run.
 
 ## 6. Reading a failure
 

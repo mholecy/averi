@@ -127,6 +127,18 @@ import { pngScale, type PngScale } from './scale.js';
  *   ~1.5 s read, and the captures start only after it returns.
  * Neither is closed by anything in this package; the device checks are in
  * docs/plans/2026-10-05-device-verification-handoff.md.
+ *
+ * A known blind spot of "two identical captures", measured 2026-10-06 and
+ * closed for BASELINE CREATION only (`captureBaselineFrame`): the pair is
+ * STABILITY_DELAY_MS plus one capture time apart, ≈0.95 s on the Android
+ * emulator and ≈0.8 s on the iOS simulator, so a ≈1 s caret blink usually
+ * lands in phase and the pair compares equal. Every other consumer keeps
+ * the pair as its rule — a tool's `⚠ frame:` note therefore stays silent on
+ * a caret screen on those devices (its absence does not prove a still
+ * screen), and a polling assert still judges per round, its region and
+ * deadline unchanged. A baseline is the one frame stored and read for every
+ * later run, so it alone pays the confirmation window
+ * (docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md).
  */
 
 /**
@@ -243,7 +255,7 @@ export interface Frame {
    *   it first — the pixel poll does, with a second tree read.
    */
   settledOver?: 'screen' | 'region';
-  /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. */
+  /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. A `BaselineFrame` adds the confirmations it took (2026-10-06). */
   captures: number;
   /**
    * Present whenever a tree was read or supplied; absent for a png-only frame
@@ -274,6 +286,101 @@ export const isMoving = (frame: Pick<Frame, 'stability'>): boolean => frame.stab
  */
 export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): string | undefined =>
   isMoving(frame) ? `⚠ frame: ${unsettledReason(frame)} — the last capture is returned as the best available` : undefined;
+
+/**
+ * The confirmation window a frame must hold still across before it may
+ * become a BASELINE (2026-10-06, docs/bugs/2026-10-06-whole-screen-stability-
+ * aliases-a-blinking-caret.md): after the settled pair, one wait of this
+ * many ms before each further capture, every one of which must be
+ * byte-identical to the settled shot. A zero is no wait at all — the next
+ * capture starts as soon as the last returns — and no `sleep(0)` is called.
+ *
+ * Why a window at all. "Settled" is two identical captures STABILITY_DELAY_MS
+ * apart, and the real spacing is that delay PLUS the device's capture time c:
+ * ≈0.95 s on the Android emulator (c ≈ 0.65 s), ≈0.8 s on the iOS simulator.
+ * A text caret blinks with a ≈1 s period at ≈50% duty, so the pair usually
+ * lands one period apart, in the same phase, and compares equal — measured
+ * 2026-10-06 on both devices: no `⚠ frame:` on a caret screen, and a
+ * baseline CREATED from it, holding one phase of the blink, so every later
+ * diff passed or failed by the caret's phase. Two samples cannot tell a still
+ * screen from one whose period divides their spacing; more samples, at
+ * spacings that are not one cadence, can.
+ *
+ * Why these four. Chosen by simulation (tests/verify/baseline-confirmation
+ * .test.ts drives `captureBaselineFrame` through it): a square-wave blink of
+ * period 0.4–2.0 s, 20 phase offsets, capture times c ∈ {0.15, 0.4, 0.65,
+ * 0.8} s. The criterion: creation refused for ≥99% of that grid at 50% duty
+ * and for EVERY point with period 0.9–1.1 s at the two measured c (0.65,
+ * 0.15). Measured: the old pair alone refuses 14.3% (24% of the 1 s band);
+ * this schedule 99.8% (100% of the band); 30%/70% duty 86.9%, recorded, not
+ * the criterion. Those are the IDEALISED model's figures — a fixed c, exact
+ * sleeps, a capture that samples the instant it starts — and "100% of the
+ * band" holds there only. The review's model (2026-10-06), whole grid / band:
+ * every capture and sleep jittered ±10% 99.0 / 100, ±25% 98.8 / 99.5 (the
+ * simulation test pins its own seeded ±25% run, 98.1 / 99.5); a screencap
+ * that samples a random instant within its capture 97.4 / 95.0; the window's
+ * captures 1.25× slower than the pair's 96.8 / 95.0, 1.5× slower 94.4 / 77.0.
+ * So the schedule is the cheapest that clears the criterion in the model,
+ * not a guarantee on a device: the device check in
+ * docs/plans/2026-10-05-device-verification-handoff.md §5 is the proof.
+ * The capture spacings it produces are 0.3+c (the pair), 0.3+c, then c, c,
+ * c — two incommensurate cadences, so no one period lines up with all of
+ * them — and the samples span 0.6+5c from the pair's first
+ * to the last confirmation, 1.35 s at c=0.15 and more at every slower c:
+ * longer than the longest phase (1 s) of a 50%-duty blink up to a 2 s
+ * period (at the fast end the waits carry the window; at device speeds the
+ * captures themselves fill it).
+ *
+ * What was tried and failed the criterion (2026-10-06): within a ≈2.1 s
+ * budget at c=0.65, no three-capture schedule reached it (best 94% overall,
+ * never 100% of the 1 s band), nor did three captures at fixed offsets from
+ * the pair's start (best 97%). Outside that budget, [300, 0, 0] — this
+ * schedule minus its last capture — reaches 100% of the band and 98.6%
+ * overall, ≈2.25 s at c=0.65: the cheaper alternative, excluded by the 99%
+ * line and not by the band (review 2026-10-06). Four captures is the
+ * cheapest that clears both, so on a still screen the cost is 0.3 s + 4
+ * captures, ≈2.9 s at c=0.65, ≈0.9 s at c=0.15 — paid by baseline CREATION
+ * only, once per baseline. A
+ * diff against an existing baseline, and every other consumer, takes the
+ * plain `captureFrame` budget, unchanged. The 0.3 s matches
+ * STABILITY_DELAY_MS by result of the search, not by reference: neither
+ * constant may move with the other.
+ *
+ * Not options, as the stability budget is not (the 300-vs-500 split). The
+ * tests pin the sequence: [STABILITY_DELAY_MS, 300] for a still screen.
+ */
+export const BASELINE_CONFIRMATION_DELAYS_MS: readonly number[] = [300, 0, 0, 0];
+
+/**
+ * A frame offered as a baseline (2026-10-06): the plain frame, plus what the
+ * confirmation window concluded — present only when the pair settled (a
+ * moving frame is refused on its own wording, before any confirmation):
+ * - `true`: every confirming capture matched the settled shot;
+ * - `false`: one did not — the window saw a change the pair was in phase
+ *   with. The wait stops at that capture; `captures` counts it and
+ *   everything before, and `shot` is still the settled pair's (the frame
+ *   that WOULD have been stored), never the differing one.
+ * `stability` keeps describing the pair alone; a consumer creating a
+ * baseline reads `confirmed`, and creates ONLY on `true` (review 2026-10-06:
+ * the check was `=== false` first, which would have stored an `unjudged`
+ * frame — `confirmed` absent — if a deadline ever reached this path). The
+ * type says it: `confirmed` is a boolean exactly when the pair settled, and
+ * absent otherwise, so a consumer narrowing on `stability` gets the field
+ * it can read.
+ */
+export type BaselineFrame =
+  | (Frame & { stability: 'settled'; confirmed: boolean })
+  | (Frame & { stability: 'moving' | 'unjudged'; confirmed?: undefined });
+
+/**
+ * The one sentence for a settled pair the confirmation window then saw
+ * change, worded here because the fact is produced here; the baseline assert
+ * frames it in its refusal. Truthful about what was seen: two captures DID
+ * match, so it does not say "each different from the last" (unsettledReason
+ * does, for the frame that never settled).
+ */
+export const unconfirmedReason = (frame: Pick<Frame, 'captures'>): string =>
+  `the screen did not settle: ${frame.captures} captures — two consecutive ones matched, then a later confirming capture differed from them — a periodic change such as a blinking caret or a ticking clock, which a matching pair can land in phase with; hide or stop it (unfocus the field, freeze the clock) and re-run`;
 
 /**
  * A frame for which a tree was ASKED — read here or supplied — so its
@@ -422,6 +529,46 @@ export async function captureFrame(
   // once per adapter, not once per frame.
   const screen = await adapter.viewport().catch(() => undefined);
   return { ...wait, measured: measuredFrameFor(tree, png, screen) };
+}
+
+/**
+ * A frame fit to become a BASELINE (2026-10-06): `captureFrame`'s png-only
+ * arm — the one stability budget, unchanged — and then, only when that pair
+ * settled, the confirmation window (`BASELINE_CONFIRMATION_DELAYS_MS`, whose
+ * doc carries the why, the simulation and the cost). Its one caller is the
+ * screenshot assert when no baseline file exists yet; a DIFF against an
+ * existing one takes plain `captureFrame`, so its captures and sleeps are
+ * exactly what they were. A dedicated export rather than an arm of
+ * `captureFrame`, so no other consumer — a tool, `ensure_state`, a `verify`
+ * leg, a pixel assert — can opt into a ≈3 s wait by a flag, and the arm
+ * types above stay as they are.
+ *
+ * Deadline: none, as baseline creation has none today — the window is
+ * bounded by its own four captures. If a deadline ever reaches this path,
+ * the confirmations must count against it as the re-captures do, and a
+ * window the deadline cuts short is UNconfirmed, never confirmed: a
+ * baseline is stored once and read for every later run, so the cost of a
+ * false "still" is paid forever, and of a false refusal once.
+ *
+ * Bytes only, no region: a baseline is a picture of the whole screen (the
+ * header). A periodic change anywhere on it refuses creation; the remedy
+ * the refusal names is to hide or stop it. The settled pair's own fast path
+ * is untouched, and the window stops at the first differing capture.
+ */
+export async function captureBaselineFrame(
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+): Promise<BaselineFrame> {
+  const frame = await captureFrame(adapter);
+  if (frame.stability !== 'settled') return { ...frame, stability: frame.stability };
+  const stability = frame.stability;
+  let captures = frame.captures;
+  for (const delayMs of BASELINE_CONFIRMATION_DELAYS_MS) {
+    if (delayMs > 0) await sleep(delayMs);
+    const shot = await adapter.screenshot();
+    captures += 1;
+    if (!shot.equals(frame.shot)) return { ...frame, stability, captures, confirmed: false };
+  }
+  return { ...frame, stability, captures, confirmed: true };
 }
 
 /**

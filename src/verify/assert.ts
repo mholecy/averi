@@ -9,7 +9,14 @@ import { pollTree } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { elementAssertSchema } from './element-assert.js';
-import { captureFrame, isMoving, unsettledNote, unsettledReason } from './capture.js';
+import {
+  type BaselineFrame,
+  captureBaselineFrame,
+  captureFrame,
+  unconfirmedReason,
+  unsettledNote,
+  unsettledReason,
+} from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { pollPixels } from './pixel-poll.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
@@ -541,24 +548,46 @@ export class Verifier {
     // refusal there (tried the same day, withdrawn in review) would have
     // tightened a passing assert. Re-baseline any screenshot assert that
     // was flaky under the bare read.
-    const frame = await captureFrame(this.adapter);
-    const current = frame.shot;
-
+    //
+    // Since 2026-10-06 the baseline file is read BEFORE the capture, because
+    // the two paths now capture differently. CREATION takes
+    // `captureBaselineFrame`: the same settled pair, then a confirmation
+    // window of four more captures that must all match it, since a pair
+    // ≈0.95 s apart (Android emulator; ≈0.8 s iOS simulator) lands in phase
+    // with a ≈1 s caret blink and compared equal — a baseline was created
+    // on device from a caret screen, holding one phase of the blink
+    // (docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret
+    // .md; the schedule, its simulation and its cost are on capture.ts's
+    // BASELINE_CONFIRMATION_DELAYS_MS). A refusal there gets its own
+    // sentence, because two captures DID match. A DIFF takes plain
+    // `captureFrame` exactly as before — same captures, same sleeps, same
+    // `⚠ frame:` note — so only the once-per-baseline path pays the window.
+    // A read that fails for any reason means "create", as it did when the
+    // read came second; reading first changes nothing but the order — except
+    // that the read-to-write window is now the whole creation capture, ≈3 s
+    // on the Android emulator where it was a file read: two concurrent first
+    // runs of the same baseline can both find no file and both write, the
+    // later write winning. Each wrote a confirmed still frame, so nothing
+    // unexamined is stored; no lock is taken.
     let baseline: Buffer;
     try {
       baseline = await readFile(path);
     } catch {
-      if (isMoving(frame)) {
-        return {
-          description,
-          pass: false,
-          detail: `baseline not created: ${unsettledReason(frame)} (a baseline of a moving screen would fail every later run)`,
-        };
+      const candidate = await captureBaselineFrame(this.adapter);
+      // Fail closed (review 2026-10-06): ONLY a confirmed window creates.
+      // The first cut refused on `confirmed === false`, so a frame without
+      // the field — `unjudged`, which a deadline on this path would produce —
+      // would have been stored unexamined. Each refusal is worded for what
+      // was actually seen.
+      if (candidate.confirmed !== true) {
+        return { description, pass: false, detail: `baseline not created: ${baselineRefusal(candidate)}` };
       }
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, current);
+      await writeFile(path, candidate.shot);
       return { description, pass: true, detail: `baseline created at ${path}` };
     }
+    const frame = await captureFrame(this.adapter);
+    const current = frame.shot;
     const note = unsettledNote(frame);
     const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);
 
@@ -579,6 +608,26 @@ export class Verifier {
       pass: ratio <= threshold,
       detail: withNote(`${pct}% of pixels differ`),
     };
+  }
+}
+
+/**
+ * Why a baseline candidate was not stored, in the words of what the capture
+ * saw (2026-10-06). `moving` keeps its 2026-10-05 sentence verbatim; a pair
+ * that settled and then changed in the confirmation window says so (two
+ * captures DID match, so "each different from the last" would be false);
+ * `unjudged` cannot happen today — baseline creation passes no deadline, so
+ * the pair always gets its second capture — and is worded rather than
+ * stored, so the day a deadline arrives it fails closed and truthfully.
+ */
+function baselineRefusal(frame: BaselineFrame): string {
+  switch (frame.stability) {
+    case 'moving':
+      return `${unsettledReason(frame)} (a baseline of a moving screen would fail every later run)`;
+    case 'settled':
+      return `${unconfirmedReason(frame)} (a baseline holding one phase of it would pass or fail every later run by that phase)`;
+    case 'unjudged':
+      return `the screen was not judged: ${frame.captures} capture before the deadline, too few to say whether it was still (a baseline needs a settled pair and its confirmation window); re-run with more time`;
   }
 }
 

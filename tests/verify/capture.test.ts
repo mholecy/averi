@@ -1,7 +1,17 @@
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { captureFrame, measuredFrameFor, pngRegion, STABILITY_DELAY_MS, unsettledNote, unsettledReason } from '../../src/verify/capture.js';
+import {
+  BASELINE_CONFIRMATION_DELAYS_MS,
+  captureBaselineFrame,
+  captureFrame,
+  measuredFrameFor,
+  pngRegion,
+  STABILITY_DELAY_MS,
+  unconfirmedReason,
+  unsettledNote,
+  unsettledReason,
+} from '../../src/verify/capture.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
@@ -286,6 +296,63 @@ describe('captureFrame — stability over the caller\'s region', () => {
     await captureFrame(fake, readTreeOpts);
     // @ts-expect-error — `region?: never` on the png-only arm
     await captureFrame(fake, pngOnlyOpts);
+  });
+});
+
+/**
+ * Baseline creation's confirmation window (2026-10-06): the settled pair is
+ * not enough to STORE a frame, because a pair ≈0.95 s apart lands in phase
+ * with a ≈1 s caret blink. The criterion the schedule meets is the
+ * simulation in baseline-confirmation.test.ts; what is pinned here is the
+ * sequence and the frame's report, with the recorded sleeps.
+ */
+describe('captureBaselineFrame — the confirmation window a baseline must hold still across', () => {
+  it('a still screen: the pair, then four confirmations — six captures, and the only waits are the pair\'s 300 ms and the window\'s 300 ms', async () => {
+    const fake = device([frame('a')]);
+    const got = await captureBaselineFrame(fake);
+    expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', confirmed: true, captures: 6 });
+    expect(got.shot.equals(frame('a'))).toBe(true);
+    expect(fake.screenshots).toHaveLength(6);
+    // A zero in the schedule is no sleep at all, not a recorded sleep(0).
+    expect(BASELINE_CONFIRMATION_DELAYS_MS).toEqual([300, 0, 0, 0]);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS, 300]);
+  });
+
+  it('a change inside the window refuses the frame at that capture, keeps the settled shot, and words it as a periodic change — not as "each different from the last"', async () => {
+    // a, a settle; the window sees a, a, then b — the blink's other phase.
+    const fake = device(['a', 'a', 'a', 'a', 'b', 'a'].map(frame));
+    const got = await captureBaselineFrame(fake);
+    expect(got).toMatchObject({ stability: 'settled', confirmed: false, captures: 5 });
+    // Stops at the differing capture: nothing taken after it.
+    expect(fake.screenshots).toHaveLength(5);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS, 300]);
+    expect(got.shot.equals(frame('a'))).toBe(true);
+    expect(unconfirmedReason(got)).toBe(
+      'the screen did not settle: 5 captures — two consecutive ones matched, then a later confirming capture differed from them — a periodic change such as a blinking caret or a ticking clock, which a matching pair can land in phase with; hide or stop it (unfocus the field, freeze the clock) and re-run',
+    );
+  });
+
+  it('the LAST confirmation counts too: a change on the fourth refuses', async () => {
+    const fake = device(['a', 'a', 'a', 'a', 'a', 'b'].map(frame));
+    const got = await captureBaselineFrame(fake);
+    expect(got).toMatchObject({ confirmed: false, captures: 6 });
+  });
+
+  it('a frame that never settled gets no confirmation: the plain budget, `moving`, and no `confirmed` at all', async () => {
+    const fake = device(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(frame));
+    const got = await captureBaselineFrame(fake);
+    expect(got).toMatchObject({ stability: 'moving', captures: 6 });
+    expect(got.confirmed).toBeUndefined();
+    expect(fake.screenshots).toHaveLength(6);
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+  });
+
+  it('confirms against the pair that SETTLED, after earlier motion: the window compares with the settled shot, not the first capture', async () => {
+    const fake = device(['x', 'y', 'a', 'a'].map(frame));
+    const got = await captureBaselineFrame(fake);
+    expect(got).toMatchObject({ stability: 'settled', confirmed: true, captures: 8 });
+    expect(got.shot.equals(frame('a'))).toBe(true);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS, STABILITY_DELAY_MS, STABILITY_DELAY_MS, 300]);
   });
 });
 
