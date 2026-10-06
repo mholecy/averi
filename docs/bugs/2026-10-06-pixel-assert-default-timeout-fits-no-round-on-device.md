@@ -108,3 +108,18 @@ added the confirming round on screens with a clock or caret.
   re-capture is taken while the deadline has not yet passed, so it may end one pause plus one screencap past it;
   two rounds therefore fit at the measured speed in under 8.9 s of budget. The 12 s margin is a judgement for slower
   emulators, not a pinned number.
+
+## Device check of the fix (2026-10-06 evening, `c5ff1c8`, finportal only)
+
+- **No `timeout`, color and ocr asserts:**
+  - Static login screen: 8 of 8 passed. Android 2.7–2.9 s, iOS 2.2–2.6 s.
+  - Caret screen: 8 of 8 passed. Android 5.5–5.8 s (two rounds), iOS 2.7–5.5 s (one or two rounds).
+- **Wrong colour (`#000000`):** FAIL with the sampled colour after 13.6 s on Android and 13.0 s on iOS, i.e. the whole 12 s
+  budget.
+- **Tree assert on a missing id:** `not found within 3000ms` on both platforms.
+- **New wording:** verbatim on Android for color and ocr with explicit 2 s and 1.5 s budgets, e.g. `(the slowest round —
+  a tree read and its captures — took 2142ms here) — raise this assert timeout`.
+- **Gap:** that evening the emulator was faster than in the original run. A bare tree read took ~2.0 s and a static
+  pixel round ~2.6 s, against ~2.7 s and ~4.3 s earlier. So the original failure at an explicit 3 s did not reproduce
+  (it passed in 2.6 s). Round cost varies run to run on the same AVD, which is one more reason the default carries a
+  margin.
