@@ -55,6 +55,18 @@ export interface UiNode {
 }
 
 /**
+ * Every node under `root`, pre-order, the root first. The one tree walk:
+ * field-error pairing feeds WDA's nested tree to its flat rule with it, the
+ * text hint flattens with it, ui_snapshot's note counts with it. It lives
+ * beside UiNode rather than in a verify/ or adapters/ sibling because all
+ * three layers need it and none owns it (review 2026-10-06).
+ */
+export function* everyNode(root: UiNode): Generator<UiNode> {
+  yield root;
+  for (const child of root.children) yield* everyNode(child);
+}
+
+/**
  * Selector strings resolved against the normalized tree, e.g.
  *   id:login_pin_field | text:"Continue" | role:button label~"Pay.*"
  */

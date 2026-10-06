@@ -6,6 +6,7 @@ import {
   inferScreenSize,
   inferScreenWidth,
   intersectsViewport,
+  rectArea,
 } from '../../src/ui-tree/geometry.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
@@ -258,5 +259,15 @@ describe('intersectsViewport', () => {
     expect(intersectsViewport({ x: -60, y: 10, width: 50, height: 50 }, vp)).toBe(false); // left
     expect(intersectsViewport({ x: 0, y: -100, width: 400, height: 100 }, vp)).toBe(false); // edge-touching
     expect(intersectsViewport({ x: 10, y: 10, width: 0, height: 0 }, vp)).toBe(false); // zero-area
+  });
+});
+
+describe('rectArea', () => {
+  it('is width × height for a real rect and 0 for anything degenerate — including BOTH sides negative, whose product is positive', () => {
+    expect(rectArea({ x: 0, y: 0, width: 10, height: 20 })).toBe(200);
+    expect(rectArea({ x: 0, y: 0, width: 0, height: 0 })).toBe(0);
+    expect(rectArea({ x: 0, y: 0, width: -10, height: 20 })).toBe(0);
+    expect(rectArea({ x: 0, y: 0, width: -10, height: -10 })).toBe(0);
+    expect(rectArea({ x: 0, y: 0, width: Number.NaN, height: 10 })).toBe(0);
   });
 });

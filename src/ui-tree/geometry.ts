@@ -313,11 +313,22 @@ export function visibleFractionInViewport(
   rect: Rect,
   viewport: { width: number; height: number },
 ): number {
-  if (rect.width <= 0 || rect.height <= 0) return 0;
+  if (rectArea(rect) === 0) return 0;
   const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
   const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
   if (w <= 0 || h <= 0) return 0;
-  return (w * h) / (rect.width * rect.height);
+  return (w * h) / rectArea(rect);
+}
+
+/**
+ * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
+ * a negative or NaN side. The one spelling of "has this rect an area", for
+ * the visible fraction above and the bare-tree rule (bare-tree.ts).
+ */
+export function rectArea(rect: Rect): number {
+  if (!(rect.width > 0 && rect.height > 0)) return 0;
+  const a = rect.width * rect.height;
+  return Number.isFinite(a) ? a : 0;
 }
 
 /**

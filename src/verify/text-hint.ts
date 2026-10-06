@@ -1,4 +1,4 @@
-import type { UiNode } from '../adapters/types.js';
+import { everyNode, type UiNode } from '../adapters/types.js';
 
 /**
  * Why an exact-text expectation missed when the string is nonetheless ON the
@@ -64,13 +64,7 @@ function occursAsSegment(haystack: string, needle: string): boolean {
 
 /** Every node under `root`, for the unscoped case (the spec matched nothing). */
 export function flattenTree(root: UiNode): UiNode[] {
-  const all: UiNode[] = [];
-  const walk = (n: UiNode) => {
-    all.push(n);
-    n.children.forEach(walk);
-  };
-  walk(root);
-  return all;
+  return [...everyNode(root)];
 }
 
 /**

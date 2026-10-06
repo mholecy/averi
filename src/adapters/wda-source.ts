@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
-import { attachFieldErrors, everyNode } from './field-errors.js';
-import type { Rect, UiNode } from './types.js';
+import { attachFieldErrors } from './field-errors.js';
+import { everyNode, type Rect, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the

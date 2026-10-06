@@ -6,7 +6,7 @@ import { fillField } from '../interact/fill.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { tapElement } from '../interact/tap.js';
-import { fillText, launchText, tapText } from './tool-text.js';
+import { fillText, launchText, snapshotNote, tapText } from './tool-text.js';
 import type { AveriConfig } from '../flow/config.js';
 import { appBuildPath, iosTreeSourceFor, loadProjectConfig } from '../flow/load.js';
 import { assertSpecSchema } from '../verify/assert.js';
@@ -298,7 +298,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
-        'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id.',
+        'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id. ' +
+        'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or (measured on iOS idb) stuck empty for minutes on a rendered screen. Compare with screenshot before reading the element as absent; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait.',
       inputSchema: {
         platform,
         filter: z.string().optional().describe('Selector to filter nodes'),
@@ -307,7 +308,15 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, filter, configPath: cp }) => {
       const tree = await (await registry.get(p, await treeOpts(p, cp))).uiTree({ settle: true });
-      return text(filter ? findAll(tree, filter).map(stripChildren) : tree);
+      // An empty filter string is no filter, as `filter ? … : tree` always read it.
+      const selector = filter || undefined;
+      const matched = selector === undefined ? undefined : findAll(tree, selector).map(stripChildren);
+      // The JSON first and unchanged; the note (if any) is a second block, as
+      // screenshot's unsettledNote is — a parser of the first block sees what
+      // it always saw.
+      const note = snapshotNote(tree, matched === undefined || selector === undefined ? undefined : { selector, matched });
+      const body = text(matched ?? tree);
+      return note === undefined ? body : { content: [...body.content, ...text(note).content] };
     },
   );
 

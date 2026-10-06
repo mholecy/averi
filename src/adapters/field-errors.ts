@@ -1,4 +1,4 @@
-import type { UiNode } from './types.js';
+import { everyNode, type UiNode } from './types.js';
 
 /**
  * Pair validation messages with their inputs — a measured iOS convention
@@ -13,12 +13,6 @@ import type { UiNode } from './types.js';
  * differs — rects are absolute in both, so the rule itself is identical, and
  * it was previously written out twice.
  */
-
-/** Every node under `root`, pre-order — lets a nested tree feed the flat rule. */
-export function* everyNode(root: UiNode): Generator<UiNode> {
-  yield root;
-  for (const child of root.children) yield* everyNode(child);
-}
 
 export function attachFieldErrors(nodes: Iterable<UiNode>): void {
   const fields: UiNode[] = [];

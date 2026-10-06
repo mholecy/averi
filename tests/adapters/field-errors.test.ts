@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { attachFieldErrors, everyNode } from '../../src/adapters/field-errors.js';
+import { attachFieldErrors } from '../../src/adapters/field-errors.js';
+import { everyNode } from '../../src/adapters/types.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { node } from '../helpers/fake.js';
 

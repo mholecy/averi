@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
-import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
 
@@ -95,6 +95,8 @@ async function connect(
     return {
       isError: result.isError === true,
       text: content.filter((c) => c.type === 'text').map((c) => c.text).join('\n'),
+      /** The text blocks one by one — `text` joins them, which hides where one ends (ui_snapshot's array + note). */
+      texts: content.filter((c) => c.type === 'text').map((c) => c.text ?? ''),
       images: content.filter((c) => c.type === 'image').map((c) => Buffer.from(c.data ?? '', 'base64')),
       /** The content blocks IN ORDER, as `[type]` or `[type, mimeType]` — `text` and `images` above lose the order. */
       shape: content.map((c) => (c.mimeType === undefined ? [c.type] : [c.type, c.mimeType])),
@@ -416,6 +418,66 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.isError).toBe(true);
     expect(result.text).toContain(configPath);
     expect(bound).toEqual([]);
+  });
+
+  // 2026-10-06 (docs/bugs/2026-10-06-ui-snapshot-empty-right-after-launch.md):
+  // `ui_snapshot { filter: role:button }` 2 s after launch_app returned `[]`
+  // on a PIN screen with ten buttons. The array stays as it was — a parser
+  // reading the first text block sees exactly what it saw before — and a
+  // no-match or a bare tree gains a SECOND text block, the screenshot
+  // tool's unsettled-note mechanism. The wording's rule is pinned in
+  // tool-text.test.ts against the real tree-source shapes; here: the blocks.
+  const pin = () =>
+    new FakeAdapter({ pin: screen(el({ role: 'button', label: 'Forgot PIN?' }), el({ role: 'text', label: 'Enter your PIN' })) }, 'pin');
+  /** idb for an app with no accessible elements yet: the synthetic root alone. */
+  const launching = () => new FakeAdapter({ launching: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 } }) }, 'launching');
+
+  it('ui_snapshot: a filter that matches returns the array ALONE, byte-identical to before', async () => {
+    const { call } = await connect();
+    const result = await call('ui_snapshot', { platform: 'android', filter: 'id:home_root' });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text']]);
+    expect(result.texts[0]).toBe(
+      JSON.stringify([{ role: 'container', label: null, identifier: 'home_root', value: null, rect: { x: 0, y: 20, width: 100, height: 10 } }], null, 2),
+    );
+  });
+
+  it('ui_snapshot: a filter nothing matches in a tree WITH content returns `[]` and a second block with the tree size — no warning', async () => {
+    const { call } = await connect({ android: pin(), ios: home() });
+    const result = await call('ui_snapshot', { platform: 'android', filter: 'role:textfield' });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text'], ['text']]);
+    expect(result.texts[0]).toBe('[]');
+    expect(result.texts[1]).toBe('0 matches for role:textfield in a tree of 3 nodes (roles: button ×1, container ×1, text ×1)');
+  });
+
+  it('ui_snapshot: a filter on a BARE tree (idb right after launch: the synthetic root alone) returns `[]` and says the screen is probably still loading', async () => {
+    const { call } = await connect({ ios: launching(), android: home() });
+    const result = await call('ui_snapshot', { platform: 'ios', filter: 'role:button', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text'], ['text']]);
+    expect(result.texts[0]).toBe('[]');
+    expect(result.texts[1]).toMatch(/^⚠ 0 matches for role:button, and the tree is bare: 1 node, none readable or interactive .*\. The accessibility tree is empty or unrendered/);
+    expect(result.texts[1]).toContain('do not read the element as absent. assert polls (3 s by default');
+  });
+
+  it('ui_snapshot: unfiltered, a tree with content comes alone; a bare tree comes with the loading note after it', async () => {
+    const { call } = await connect({ ios: launching(), android: pin() });
+    const full = await call('ui_snapshot', { platform: 'android' });
+    expect(full.shape).toEqual([['text']]);
+    expect(JSON.parse(full.texts[0])).toMatchObject({ role: 'container', children: [{ label: 'Forgot PIN?' }, { label: 'Enter your PIN' }] });
+    const empty = await call('ui_snapshot', { platform: 'ios', configPath: missing() });
+    expect(empty.shape).toEqual([['text'], ['text']]);
+    expect(JSON.parse(empty.texts[0])).toEqual({ role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 }, children: [] });
+    expect(empty.texts[1]).toMatch(/^⚠ The tree is bare: 1 node, none readable or interactive/);
+  });
+
+  it('ui_snapshot: an EMPTY filter string means no filter, as it always did — the whole tree, alone', async () => {
+    const { call } = await connect({ android: pin(), ios: home() });
+    const result = await call('ui_snapshot', { platform: 'android', filter: '' });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text']]);
+    expect(JSON.parse(result.texts[0])).toMatchObject({ role: 'container', children: [{ label: 'Forgot PIN?' }, { label: 'Enter your PIN' }] });
   });
 
   // The rule is one helper at five call sites; ui_snapshot above and assert
