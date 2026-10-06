@@ -81,6 +81,8 @@ const ROLE_MAP: Record<string, string> = {
 
 export class AndroidAdapter implements DeviceAdapter {
   readonly platform = 'android' as const;
+  /** One tree (uiautomator), so no kind to report (DeviceAdapter.treeSourceKind). */
+  readonly treeSourceKind = undefined;
   /**
    * The soft-keyboard oracle (KeyboardOracle in types.ts): Android is the
    * platform whose keyboard is a separate window that `back` hides, so it is

@@ -255,6 +255,18 @@ describe('defaultFactory — the wiring the injected factories above never see',
     expect(wdaPortFor('X')).toBe(8101);
   });
 
+  it('a bound ios adapter REPORTS the kind it was built with — an omitted kind as idb — so the engine never re-derives it from the config', () => {
+    // Construction only: a wda source allocates a port and nothing else
+    // (the pins above rely on the same), so no WebDriverAgent, xcodebuild or
+    // idb is started here.
+    resetWdaPortAllocatorForTests();
+    expect(defaultFactory('ios', 'AAAA-1111').treeSourceKind).toBe('idb');
+    expect(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }).treeSourceKind).toBe('idb');
+    expect(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }).treeSourceKind).toBe('wda');
+    expect(defaultFactory('ios').treeSourceKind).toBeUndefined();
+    expect(defaultFactory('android', 'emulator-5554').treeSourceKind).toBeUndefined();
+  });
+
   it('an unbound ios adapter (probe) has no source: uiTree is the recovery error, listDevices is the only thing it is for', async () => {
     const probe = defaultFactory('ios');
     expect(probe).toBeInstanceOf(IosAdapter);

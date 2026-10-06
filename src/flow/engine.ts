@@ -1,11 +1,12 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import type { IosTreeSourceKind } from '../adapters/ios-node.js';
+import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
-import { describeElementSpec as describeSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
+import { describeElementSpec as describeSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absentFromViewport } from '../ui-tree/geometry.js';
@@ -682,8 +683,20 @@ export class FlowEngine {
   private async runWait(spec: StepPayload<'wait'>): Promise<void> {
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.waitTimeoutMs;
     const cond: Condition = spec.element ? { element: spec.element } : { state: spec.state };
-    await this.waitFor(cond, timeoutMs, describeCondition(cond));
+    await this.waitFor(cond, timeoutMs, describeCondition(cond), this.waitHint(cond));
     this.log('wait', describeCondition(cond));
+  }
+
+  /**
+   * The engine's half of `waitTimeoutHint`: platform and tree-source kind
+   * both come from the ADAPTER, never from `app.ios.treeSource` — why is on
+   * `DeviceAdapter.treeSourceKind` (adapters/types.ts). An adapter that does
+   * not say (unknown kind) gets no hint. Only the `wait:` step asks;
+   * ensureState's state waits and branch polls describe conditions a single
+   * id does not own.
+   */
+  private waitHint(cond: Condition): string | undefined {
+    return waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind);
   }
 
   private async runBranch(arms: StepPayload<'branch'>): Promise<void> {
@@ -842,11 +855,12 @@ export class FlowEngine {
     return false;
   }
 
-  private async waitFor(cond: Condition, timeoutMs: number, what: string): Promise<void> {
+  private async waitFor(cond: Condition, timeoutMs: number, what: string, hint?: string): Promise<void> {
     await this.pollUntil(
       async (tree) => ((await this.matches(cond, tree)) ? true : undefined),
       timeoutMs,
       what,
+      hint,
     );
   }
 
@@ -856,16 +870,19 @@ export class FlowEngine {
    * error is remembered, the predicate's own errors propagate at once); what
    * this adds is the flow's verdict on a timeout — an exception, worded as
    * the step the caller was waiting on, with the read error beneath it so a
-   * genuinely broken device stays diagnosable.
+   * genuinely broken device stays diagnosable. A caller's `hint` (a probable
+   * cause it knows, see waitTimeoutHint) is handed over as is — whether it
+   * shows beneath a failed read is pollTimeoutMessage's rule, not this one's.
    */
   private async pollUntil<T>(
     fn: (tree: UiNode) => Promise<T | undefined>,
     timeoutMs: number,
     what: string,
+    hint?: string,
   ): Promise<T> {
     const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
     if (!outcome.timedOut) return outcome.value;
-    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError));
+    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError, hint));
   }
 
   /**
@@ -938,6 +955,51 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
   if (kind === 'wait' && typeof p.state === 'string') return `wait state:${JSON.stringify(p.state)}`;
   if (kind === 'swipe' && typeof p.direction === 'string') return `swipe ${p.direction}`;
   return kind;
+}
+
+/**
+ * What idb's flat tree can never show, said once, for the wait timeout to
+ * quote: an identifier set on a CONTAINER. idb returns accessibility
+ * elements only, so a SwiftUI `.accessibilityElement(children: .contain)`
+ * with an identifier, or a React Native `testID` on a non-interactive host
+ * view, is in no read at all — a wait on it is not late, it is hopeless
+ * (measured 2026-10-05, docs/bugs/2026-10-06-wait-timeout-no-hint-for-ids-
+ * idb-cannot-see.md: 30 s of timeout, indistinguishable from a slow screen).
+ * Worded as a possible cause: the caller only knows the id was in no tree it
+ * read. Lives here, not with the tree source: "wait on a button/row id" is
+ * flow-step advice.
+ */
+export const idbContainerIdHint = (id: string): string =>
+  `no tree read contained id:${JSON.stringify(id)}. iOS treeSource: idb never exposes an identifier set on a container — ` +
+  'SwiftUI .accessibilityElement(children: .contain), React Native testID on a non-interactive view. ' +
+  'If the screen is showing, set app.ios.treeSource: wda in averi.yaml, or wait on a button/row id idb does show';
+
+/**
+ * The probable cause a `wait:` timeout may name, or nothing. Fires only when
+ * every part holds: the device is iOS, its tree source is idb, and the step
+ * waited for an element to be present by its ID ALONE. Only then is the
+ * timeout a statement about the id: findBySpec ANDs every selector field
+ * (ui-tree/selectors.ts conditionsOf), so `{ id, text }` can time out with
+ * the id in every read and the text the one that never matched — and the
+ * id-only presence check (`matches`: found.length > 0) is what makes "no
+ * tree read contained this id" a fact rather than a guess. Under idb that
+ * is what an identifier on a container looks like (idbContainerIdHint).
+ * Everything else stays silent: `absent` waits are about something that
+ * stayed, text/label selectors are not what idb drops, and a state/any/all
+ * condition is not one id's story. Pure — the engine supplies the adapter's
+ * platform and kind (waitHint).
+ */
+export function waitTimeoutHint(
+  cond: Condition,
+  platform: Platform,
+  treeSource: IosTreeSourceKind | undefined,
+): string | undefined {
+  if (platform !== 'ios' || treeSource !== 'idb') return undefined;
+  if (cond.element === undefined || cond.absent) return undefined;
+  const spec = cond.element;
+  const fields = SELECTOR_FIELDS.filter((f) => spec[f] !== undefined);
+  if (fields.length !== 1 || fields[0] !== 'id' || spec.id === undefined) return undefined;
+  return idbContainerIdHint(spec.id);
 }
 
 function describeCondition(cond: Condition): string {

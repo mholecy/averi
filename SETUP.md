@@ -332,7 +332,9 @@ one happens by itself.
 
 - **`idb` install fails** — fb-idb requires Python ≤ 3.13: `pipx install fb-idb --python python3.13`.
 - **Launch opens LeakCanary instead of the app** — set `app.android.activity` (see step 4 skeleton).
-- **iOS `id:` selectors find nothing on a React Native app** — `app.ios.treeSource: wda` (step 4).
+- **iOS `id:` selectors find nothing on a React Native app, or a `wait:` on a SwiftUI container id
+  (`.accessibilityElement(children: .contain)`) times out while the screen is showing** — idb never
+  exposes container identifiers: `app.ios.treeSource: wda` (step 4), or wait on a button/row id.
 - **iOS typing lands the wrong characters (`y`↔`z`, `ý` for a digit), or `fill` on a PLAIN field reports fewer
   characters than typed** — HID typing follows the simulator's hardware keyboard layout, which follows the Mac's
   input source unless pinned (measured 2026-09-17 with a Slovak host layout; it read as an averi typing bug for

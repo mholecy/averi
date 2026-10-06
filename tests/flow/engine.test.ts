@@ -11,7 +11,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, resetClearStateCount, stepSummary, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, idbContainerIdHint, resetClearStateCount, stepSummary, waitTimeoutHint, type TraceEntry } from '../../src/flow/engine.js';
+import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
@@ -2342,5 +2343,121 @@ flows:
     fake.attachedKeyboard.windowAnswers.current = { state: 'hidden' };
     await new FlowEngine(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST).runFlow('f');
     expect(fake.keys).toEqual([]);
+  });
+});
+
+describe('wait: timeout on an id iOS idb cannot see — the message names the likely cause', () => {
+  // Measured 2026-10-05 (docs/bugs/2026-10-06-wait-timeout-no-hint-for-ids-idb-cannot-see.md):
+  // a `wait` on an id set on a SwiftUI container timed out after 30 s with
+  // only "Timed out … waiting for element" while the screen was showing —
+  // idb never exposes container identifiers, so the id was in NO tree read.
+  // Indistinguishable from a slow screen without this hint.
+  const cfgFor = (ios: string, wait: string) =>
+    parseConfig(`
+app:
+  ios: { bundleId: md.bank.app${ios} }
+flows:
+  f:
+    steps:
+      - wait: { element: { ${wait} }, timeout: 60 }
+`);
+  /** The screen shows one button, `debit_select` — the id idb DOES expose in the measured case. */
+  const fakeOn = (platform: 'android' | 'ios', kind?: IosTreeSourceKind) => {
+    resetLayout();
+    const fake = new FakeAdapter({ home: screen(el({ role: 'button', identifier: 'debit_select' })) }, 'home');
+    fake.platform = platform;
+    fake.treeSourceKind = kind;
+    return fake;
+  };
+  /** The failure's message — the headline, any hint beneath it, then the trace the FlowError appends. */
+  const failure = async (cfg: ReturnType<typeof parseConfig>, fake: FakeAdapter): Promise<string> => {
+    const error = await new FlowEngine(cfg, fake, FAST).runFlow('f').then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(FlowError);
+    return (error as Error).message;
+  };
+  const HINT = 'no tree read contained id:';
+
+  it('iOS adapter reading with idb, config omitting treeSource (the measured case): the hint sits beneath the headline', async () => {
+    const message = await failure(cfgFor('', 'id: amount_input'), fakeOn('ios', 'idb'));
+    expect(message).toMatch(
+      /^Timed out after 60ms waiting for element id:"amount_input"\n  \(no tree read contained id:"amount_input"\. [\s\S]*set app\.ios\.treeSource: wda in averi\.yaml[^\n]*\)\n\nSteps that ran/,
+    );
+  });
+
+  it('iOS adapter reading with wda, config omitting treeSource: no hint — the adapter, not the config, says what reads the tree', async () => {
+    const message = await failure(cfgFor('', 'id: amount_input'), fakeOn('ios', 'wda'));
+    expect(message).toMatch(/^Timed out after 60ms waiting for element id:"amount_input"\n\nSteps that ran/);
+    expect(message).not.toContain(HINT);
+  });
+
+  it('iOS adapter that does not say what it reads with: no hint, whatever the config says', async () => {
+    const message = await failure(cfgFor('', 'id: amount_input'), fakeOn('ios'));
+    expect(message).not.toContain(HINT);
+    const configured = await failure(cfgFor(', treeSource: wda', 'id: amount_input'), fakeOn('ios'));
+    expect(configured).not.toContain(HINT);
+  });
+
+  it('android: no hint', async () => {
+    const message = await failure(cfgFor('', 'id: amount_input'), fakeOn('android'));
+    expect(message).toMatch(/^Timed out after 60ms waiting for element id:"amount_input"\n\nSteps that ran/);
+    expect(message).not.toContain(HINT);
+  });
+
+  it('iOS idb, but a text/label selector: no hint — the limitation is about identifiers', async () => {
+    const byText = await failure(cfgFor('', 'text: "Amount"'), fakeOn('ios', 'idb'));
+    expect(byText).toMatch(/^Timed out after 60ms waiting for element text:"Amount"\n\nSteps that ran/);
+    expect(byText).not.toContain(HINT);
+    const byLabel = await failure(cfgFor('', 'label: "Amount"'), fakeOn('ios', 'idb'));
+    expect(byLabel).toMatch(/^Timed out after 60ms waiting for element label:"Amount"\n\nSteps that ran/);
+    expect(byLabel).not.toContain(HINT);
+  });
+
+  it('iOS idb, id AND text, the id on screen in every read: no hint — findBySpec ANDs the fields, so the text is what never matched', async () => {
+    const message = await failure(cfgFor('', 'id: debit_select, text: "Nope"'), fakeOn('ios', 'idb'));
+    expect(message).toMatch(/^Timed out after 60ms waiting for element id:"debit_select" text:"Nope"\n\nSteps that ran/);
+    expect(message).not.toContain(HINT);
+  });
+
+  it('a wait whose LAST read failed names the read error, not the hint — the reads, not idb, are the story', async () => {
+    const fake = fakeOn('ios', 'idb');
+    fake.uiTree = async () => {
+      throw new Error('idb ui describe-all failed');
+    };
+    const message = await failure(cfgFor('', 'id: amount_input'), fake);
+    expect(message).toMatch(
+      /^Timed out after 60ms waiting for element id:"amount_input"\n  \(last UI tree read failed: idb ui describe-all failed\)\n\nSteps that ran/,
+    );
+    expect(message).not.toContain(HINT);
+  });
+
+  describe('waitTimeoutHint — the condition, pure', () => {
+    const id = { element: { id: 'x' } };
+    it('fires only for a non-absent element condition whose SOLE selector is an id, on ios under idb', () => {
+      expect(waitTimeoutHint(id, 'ios', 'idb')).toBe(idbContainerIdHint('x'));
+      expect(waitTimeoutHint(id, 'ios', 'wda')).toBeUndefined();
+      expect(waitTimeoutHint(id, 'ios', undefined)).toBeUndefined();
+      expect(waitTimeoutHint(id, 'android', undefined)).toBeUndefined();
+      expect(waitTimeoutHint({ element: { id: 'x' }, absent: true }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ element: { text: 'x' } }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ element: { id: 'x', text: 'y' } }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ element: { id: 'x', role: 'button' } }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ element: { id: 'x', label: 'y' } }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ state: 's' }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ any: [id] }, 'ios', 'idb')).toBeUndefined();
+      expect(waitTimeoutHint({ all: [id] }, 'ios', 'idb')).toBeUndefined();
+    });
+  });
+
+  describe('idbContainerIdHint — the wording', () => {
+    it('names the id, both container idioms, and the two ways out', () => {
+      expect(idbContainerIdHint('amount_input')).toBe(
+        'no tree read contained id:"amount_input". iOS treeSource: idb never exposes an identifier set on a container — ' +
+          'SwiftUI .accessibilityElement(children: .contain), React Native testID on a non-interactive view. ' +
+          'If the screen is showing, set app.ios.treeSource: wda in averi.yaml, or wait on a button/row id idb does show',
+      );
+    });
   });
 });

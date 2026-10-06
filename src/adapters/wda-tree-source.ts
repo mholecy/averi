@@ -37,6 +37,7 @@ import type { UiNode } from './types.js';
  * ever have is WdaServer, and one adapter means a hypothetical seam.
  */
 export class WdaTreeSource implements IosTreeSource {
+  readonly kind = 'wda' as const;
   private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;

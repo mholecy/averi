@@ -1,3 +1,4 @@
+import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { Device, DeviceAdapter, Key, KeyboardOracle, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
@@ -40,6 +41,8 @@ export const screen = (...children: UiNode[]): UiNode =>
 export class FakeAdapter implements DeviceAdapter {
   /** Assignable: the fake stands in for both platforms (a fill's keyboard dismissal, a verify run's legs). */
   platform: 'android' | 'ios' = 'android';
+  /** Assignable, like `platform`: what a bound iOS adapter would report (the flow engine's wait hint reads it). undefined = unknown. */
+  treeSourceKind: IosTreeSourceKind | undefined = undefined;
   current: string;
   taps: string[] = [];
   typed: string[] = [];

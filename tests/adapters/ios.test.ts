@@ -161,6 +161,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
   const fakeSource = () => {
     const state = { reads: 0, disposes: 0 };
     const source: IosTreeSource = {
+      kind: 'idb',
       read: async () => {
         state.reads++;
         return structuredClone(TREE);
@@ -196,6 +197,14 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     await tapElement(adapter, 'id:home.header', { ambiguous: 'refuse' });
     // The source's rects are points, the units idb taps in — center of the host view.
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
+  });
+
+  it("treeSourceKind is the injected source's kind — the flow engine's wait hint reads it from here, not from averi.yaml", () => {
+    const bound = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: fakeSource().source });
+    expect(bound.treeSourceKind).toBe('idb');
+    const wda = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: { ...fakeSource().source, kind: 'wda' } });
+    expect(wda.treeSourceKind).toBe('wda');
+    expect(new IosAdapter({ exec: fakeExec({}).fn }).treeSourceKind).toBeUndefined(); // unbound: no source, nothing to report
   });
 
   it("dispose returns the source's release — the process shutdown awaits it", async () => {

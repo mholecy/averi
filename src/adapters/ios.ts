@@ -5,6 +5,7 @@ import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IosTreeSource } from './ios-tree-source.js';
+import type { IosTreeSourceKind } from './ios-node.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
 
 /**
@@ -40,6 +41,11 @@ export class IosAdapter implements DeviceAdapter {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
+  }
+
+  /** The injected source's kind; undefined on an unbound adapter, which never reads a tree (DeviceAdapter.treeSourceKind). */
+  get treeSourceKind(): IosTreeSourceKind | undefined {
+    return this.treeSource?.kind;
   }
 
   private target(): string {

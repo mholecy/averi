@@ -112,10 +112,24 @@ export type PollOutcome<T> =
  * interaction module for an element that never appeared or never held still.
  * The verifier does not use it: its timeouts are failing results, worded per
  * assert.
+ *
+ * `hint`, when a caller has one, is a probable cause the caller knows and
+ * this layer cannot (2026-10-06: the flow's wait on an id the iOS idb tree
+ * never carries). It takes the same indented-parenthesis line as the read
+ * error, so a reader finds every "why" beneath the headline in one shape —
+ * but it is DROPPED when the last read failed: then the reads, not the
+ * tree's contents, are the story, and a hint about what the trees held
+ * would point the reader the wrong way. The rule lives here, with the
+ * message's shape, so every thrower gets it. Deliberately conservative:
+ * pollTree reports only the LAST read's error, not whether any earlier
+ * round read a tree, so a single late failure after many good reads also
+ * silences the hint — a missing hint costs a reader less than a misleading
+ * one.
  */
-export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error): string =>
+export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hint?: string): string =>
   `Timed out after ${timeoutMs}ms waiting for ${what}` +
-  (readError === undefined ? '' : `\n  (last UI tree read failed: ${readError.message})`);
+  (readError === undefined ? '' : `\n  (last UI tree read failed: ${readError.message})`) +
+  (hint === undefined || readError !== undefined ? '' : `\n  (${hint})`);
 
 /**
  * Poll the UI tree until the predicate returns a value, or the deadline

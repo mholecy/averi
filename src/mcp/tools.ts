@@ -298,7 +298,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
-        'React Native on iOS: if `id:` finds nothing for static text/containers (identifier: null everywhere), that is the default idb tree source — set `app.ios.treeSource: wda` in averi.yaml and retry.',
+        'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id.',
       inputSchema: {
         platform,
         filter: z.string().optional().describe('Selector to filter nodes'),

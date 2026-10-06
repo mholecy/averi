@@ -33,6 +33,8 @@ import { zeroRect, type Rect, type UiNode } from './types.js';
  * frames are points, the same units idb rects use, so the coordinates agree.
  */
 export interface IosTreeSource {
+  /** The configured kind this source serves — what the adapter reports as its `treeSourceKind`. */
+  readonly kind: IosTreeSourceKind;
   read(): Promise<UiNode>;
   dispose(): Promise<void>;
 }
@@ -110,6 +112,7 @@ const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
  * fake to both for the same effect, and to see the command line.
  */
 export class IdbTreeSource implements IosTreeSource {
+  readonly kind = 'idb' as const;
   private readonly udid: string;
   private readonly exec: ExecFn;
 

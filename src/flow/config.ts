@@ -250,7 +250,11 @@ const configSchema = z
              * native projects see zero change. React Native projects opt in
              * with `treeSource: wda`: RN puts testID on the HOST view whose
              * AX child carries no identifier, so idb sees nothing (measured
-             * 2026-08-12, docs/plans/ios-wda-tree-source.md §Problem).
+             * 2026-08-12, docs/plans/ios-wda-tree-source.md §Problem). The
+             * same goes for a native SwiftUI identifier on a container
+             * (`.accessibilityElement(children: .contain)`, measured
+             * 2026-10-05) — a `wait:` on one under idb says so when it
+             * times out (flow/engine.ts waitTimeoutHint).
              * No `auto` value — deferred until the Phase 4 latency
              * measurement of /source on deep trees. The kinds are the
              * tree-source seam's (adapters/ios-node.ts), spelled once.

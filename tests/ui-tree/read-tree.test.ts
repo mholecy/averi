@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTree, readTreeOrError } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTimeoutMessage, pollTree, readTreeOrError } from '../../src/ui-tree/read-tree.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -201,5 +201,30 @@ describe('pollTree — the one deadline loop', () => {
       ),
     ).rejects.toThrow(/Unknown state "nope"/);
     expect(reads).toBe(1);
+  });
+});
+
+describe('pollTimeoutMessage — the thrown timeout\'s shape, shared by the flow engine and interact/', () => {
+  it('headline alone when nothing else is known', () => {
+    expect(pollTimeoutMessage('element id:"x"', 300)).toBe('Timed out after 300ms waiting for element id:"x"');
+  });
+
+  it('the last read error and a caller\'s hint each take one indented parenthesis line beneath the headline', () => {
+    expect(pollTimeoutMessage('element id:"x"', 300, new Error('null root node'))).toBe(
+      'Timed out after 300ms waiting for element id:"x"\n  (last UI tree read failed: null root node)',
+    );
+    expect(pollTimeoutMessage('element id:"x"', 300, undefined, 'no tree read contained id:"x"')).toBe(
+      'Timed out after 300ms waiting for element id:"x"\n  (no tree read contained id:"x")',
+    );
+  });
+
+  // The rule the flow engine relied on until it moved here (2026-10-06): a
+  // hint about what the trees held is dropped when the last read failed —
+  // the reads are the story then. Conservative on purpose; the docblock
+  // says why.
+  it('drops the hint when the last read failed — the read error is the whole "why"', () => {
+    expect(pollTimeoutMessage('element id:"x"', 300, new Error('null root node'), 'no tree read contained id:"x"')).toBe(
+      'Timed out after 300ms waiting for element id:"x"\n  (last UI tree read failed: null root node)',
+    );
   });
 });
