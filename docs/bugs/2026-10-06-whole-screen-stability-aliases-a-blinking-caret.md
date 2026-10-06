@@ -163,3 +163,20 @@ in handoff §5 is the real proof.
 - the refusal worded with `unsettledReason`;
 - (review round) the creation check put back to `confirmed === false`, which stores the `unjudged` frame;
 - (review round) the ±25% jitter dropped from the window's sleeps or captures, or the window shortened to `[300, 0, 0]`.
+
+## Device check of the fix (2026-10-06 evening, `1382df4`, finportal)
+
+- **Caret screen** (`login_username` focused; Android with Gboard up, iOS with a caret and no soft keyboard): 10 of 10
+  fresh baseline attempts were REFUSED with the new sentence, 5 per platform. N was 3–4 captures on Android and 4–6 on
+  iOS. No baseline file was written. Before the fix, the same screen had created `login_caret_probe`.
+- **Static screen:** the baseline was created, and the second run diffed `0.00%`.
+  - On Android creation took 1.4 s against a 0.7 s diff. The emulator captured fast that evening, so the window cost
+    ~0.7 s rather than the predicted 2.9 s.
+  - On iOS it took 3.6 s against a 1.7 s diff.
+- **One iOS creation on the static screen was refused (N=4).** That assert straddled the status-bar clock's minute
+  rollover (screenshots at 22:20, then 22:21), so the clock changed inside the window. This is the case the sentence
+  names; the next attempt created the baseline.
+- **Diff against an existing baseline on the caret screen:** no refusal and no window. Android differed by 7.94% (the
+  keyboard is in the frame), iOS by 0.43%.
+- **The `screenshot` tool on the caret screen:** still no `⚠ frame:` line, as recorded above. The general wait is
+  unchanged by design.
