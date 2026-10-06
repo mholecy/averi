@@ -131,6 +131,16 @@ class PixelPollMemory {
    */
   private foundSilently: 'cut' | 'unconfirmed' | undefined;
   private mostCaptures = 0;
+  /**
+   * The slowest ROUND of the poll — a tree read and whatever the round then
+   * captured — quoted when the budget ran out on a found element
+   * (2026-10-06): on the Android emulator one round is ~4.3 s against the
+   * caller's budget, and "no time was left" alone reads like a flaky screen.
+   * The round, not the read, because either half can be the slow one. A read
+   * that FAILED never reaches the round, so it is not counted: its error is
+   * the not-found sentence's to quote, not this one's.
+   */
+  private slowestRoundMs = 0;
   private lastRect: Rect | undefined;
 
   constructor(private readonly unchecked: PixelPollSpec['unchecked']) {}
@@ -176,6 +186,11 @@ class PixelPollMemory {
     return { pass: false, detail: failClosed(reason, this.unchecked) };
   }
 
+  /** One round — its tree read and its captures — took this long. */
+  roundTook(ms: number): void {
+    this.slowestRoundMs = Math.max(this.slowestRoundMs, ms);
+  }
+
   /** Nothing to capture: the deadline has passed. */
   outOfTime(deadline: number): boolean {
     if (Date.now() < deadline) return false;
@@ -196,11 +211,14 @@ class PixelPollMemory {
   /** The timeout wording: the last finding, else found-but-no-time (cut or unconfirmed, whichever silenced the last such round), which outranks not-found. */
   timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error }): string {
     if (last.detail !== undefined) return last.detail;
-    if (this.foundSilently === 'cut') return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame`;
+    const roundCost = `the slowest round — a tree read and its captures — took ${this.slowestRoundMs}ms here`;
+    if (this.foundSilently === 'cut') {
+      return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame (${roundCost}) — raise this assert timeout`;
+    }
     if (this.foundSilently === 'unconfirmed') {
       return (
         `element found and its region held still, but no time was left within ${timeoutMs}ms to confirm its position ` +
-        'with a second tree read — raise the timeout or let the screen come to rest'
+        `with a second tree read (${roundCost}) — raise this assert timeout or let the screen come to rest`
       );
     }
     return notFound(timeoutMs, last.readError);
@@ -240,9 +258,24 @@ export async function pollPixels(
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
     return measure({ rect, shot, measured });
   };
+  // Each round is timed from the start of its read, for the timeout wording;
+  // pollTree's loop and what it reads are unchanged.
+  let readStarted = Date.now();
+  const timedReads: Pick<DeviceAdapter, 'uiTree'> = {
+    uiTree: () => {
+      readStarted = Date.now();
+      return adapter.uiTree();
+    },
+  };
   const outcome = await pollTree(
-    adapter,
-    async (tree, { deadline }) => verdictToPoll(await round(tree, deadline)),
+    timedReads,
+    async (tree, { deadline }) => {
+      try {
+        return verdictToPoll(await round(tree, deadline));
+      } finally {
+        memory.roundTook(Date.now() - readStarted);
+      }
+    },
     { timeoutMs, pollMs },
   );
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };

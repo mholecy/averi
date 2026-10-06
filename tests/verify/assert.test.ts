@@ -944,7 +944,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame');
+    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 5500ms here) — raise this assert timeout');
     expect(fake.screenshots).toHaveLength(0);
   });
 
@@ -962,7 +962,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame');
+    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 3200ms here) — raise this assert timeout');
     expect(fake.screenshots).toHaveLength(1);
   });
 
@@ -1113,22 +1113,22 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 300 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toBe(
-      'element found and its region held still, but no time was left within 300ms to confirm its position with a second tree read — raise the timeout or let the screen come to rest',
+      'element found and its region held still, but no time was left within 300ms to confirm its position with a second tree read (the slowest round — a tree read and its captures — took 300ms here) — raise this assert timeout or let the screen come to rest',
     );
     expect(probe.treeReads).toBe(1);
     expect(fake.screenshots).toHaveLength(2);
   });
 
-  it('a round CUT after the unconfirmed one decides the wording: the poll ran out before capturing, and says so as before (review 2026-10-06)', async () => {
+  it('a round CUT after the unconfirmed one decides the wording: the poll ran out before capturing, and the cut sentence says so (review 2026-10-06)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, probe } = clockScreen(() => CARD);
     // Round 1 is unconfirmed and ends at 300 ms, inside a 500 ms deadline;
     // after the 300 ms poll pause, round 2 reads at 600 ms, finds the card,
     // and is past the deadline — it captures nothing. That cut is why the
-    // poll ran out, so the existing sentence stands, byte for byte.
+    // poll ran out, so the cut sentence decides the wording, round cost and all.
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 500 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 500ms to capture a settled frame');
+    expect(result.detail).toBe('element found, but no time was left within 500ms to capture a settled frame (the slowest round — a tree read and its captures — took 300ms here) — raise this assert timeout');
     expect(probe.treeReads).toBe(2);
     expect(fake.screenshots).toHaveLength(2);
   });
@@ -1219,7 +1219,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       ocr: { text: 'CONTINUE' },
     });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame');
+    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 3200ms here) — raise this assert timeout');
     expect(fake.screenshots).toHaveLength(1);
     expect(probe.recognized).toBe(0);
   });
@@ -1238,6 +1238,123 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(result.pass).toBe(false);
     expect(result.detail).toMatch(/^screenshot PNG decode failed: .*; failing closed, rendered text unchecked$/);
     expect(probe.recognized).toBe(0);
+  });
+
+  /**
+   * docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-no-round-on-device.md:
+   * with the shared 3 s default a color/ocr assert could not pass on the
+   * Android emulator even on a still screen. One round there is a 2.7 s
+   * uiautomator read plus two 0.65 s screencaps 300 ms apart, and since
+   * 4954ab4 the capture honours the deadline (before it, the round overran
+   * the 3 s budget by ~1.3 s and that overrun was the only reason it
+   * passed). The device numbers below are the ones measured that day; the
+   * 1.5 s / 300 ms fakes of `Verifier.poll`'s table are what hid this.
+   */
+  const deviceTimed = (live: boolean) => {
+    const fake = cardFake();
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 2700);
+      return origTree();
+    };
+    let tick = 0;
+    fake.screenshot = async () => {
+      vi.setSystemTime(Date.now() + 650);
+      const shot = png(1000, 320, (p) => {
+        fill(p, '#FDFDFD');
+        // A clock or caret OFF the element: the frame settles over the
+        // element's region only, so the poll needs a confirming round.
+        if (live) p.data[0] = tick++ % 256;
+      });
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    return fake;
+  };
+
+  it('with no timeout configured, a color assert passes on a still screen at device speed (2.7 s read, 0.65 s screencap)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = deviceTimed(false);
+    const t0 = Date.now();
+    const result = await new Verifier(fake).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('sampled #FDFDFD');
+    expect(fake.screenshots).toHaveLength(2);
+    expect(Date.now() - t0).toBe(4300);
+  });
+
+  it('with no timeout configured, a color assert passes at device speed when live content off the element needs the confirming round', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = deviceTimed(true);
+    const t0 = Date.now();
+    const result = await new Verifier(fake).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(fake.screenshots).toHaveLength(4);
+    expect(Date.now() - t0).toBe(8900);
+  });
+
+  it('an explicit budget smaller than one round still times out, and the sentence names what one round cost', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = deviceTimed(false);
+    const result = await new Verifier(fake, { timeoutMs: 3000 }).assert({
+      element: { id: 'card' },
+      color: { expected: '#FDFDFD' },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 3350ms here) — raise this assert timeout',
+    );
+  });
+
+  it('with no timeout configured, an ocr assert passes on a still screen at device speed too', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = deviceTimed(false);
+    const { probe, engine } = countingEngine();
+    const t0 = Date.now();
+    const result = await new Verifier(fake, { ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result.pass).toBe(true);
+    expect(probe.recognized).toBe(1);
+    expect(Date.now() - t0).toBe(4300);
+  });
+
+  it('the tree asserts keep the 3 s default — only the pixel asserts pay for a round of captures', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // element exists: never found
+    expect((await new Verifier(cardFake()).assert({ element: { id: 'ghost' } })).detail).toBe('not found within 3000ms');
+    // text content: never found
+    const text = await new Verifier(cardFake()).assert({ element: { id: 'ghost' }, text: 'x' });
+    expect(text.detail).toBe('not found within 3000ms');
+    // rect: never found
+    const rect = await new Verifier(cardFake()).assert({ element: { id: 'ghost' }, rect: { x: 100, frameWidth: 1000 } });
+    expect(rect.detail).toBe('not found within 3000ms');
+    // absent: present the whole time — the poll gives up at 3 s
+    const fake = cardFake();
+    const t0 = Date.now();
+    const absent = await new Verifier(fake, { pollMs: 300 }).assert({ element: { id: 'card' }, absent: true });
+    expect(absent.pass).toBe(false);
+    expect(Date.now() - t0).toBe(3000);
+  });
+
+  it('the timeout sentence quotes the SLOWEST round, not the last one', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = deviceTimed(true);
+    // Round 1: a 3 s read, then the settled pair (0.65 + 0.3 + 0.65) — 4.6 s,
+    // settled over the region only, so unconfirmed. Round 2 (after the 300 ms
+    // pause): a 0.5 s read, one screencap that crosses the 6 s deadline — cut,
+    // 1.15 s. The sentence must name 4600, not 1150.
+    const reads = [3000, 500];
+    const origTree = FakeAdapter.prototype.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + (reads.shift() ?? 500));
+      return origTree();
+    };
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 6000 }).assert({
+      element: { id: 'card' },
+      color: { expected: '#FDFDFD' },
+    });
+    expect(result.detail).toBe(
+      'element found, but no time was left within 6000ms to capture a settled frame (the slowest round — a tree read and its captures — took 4600ms here) — raise this assert timeout',
+    );
   });
 });
 

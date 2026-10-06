@@ -162,9 +162,34 @@ export interface AssertResult {
  */
 export const DEFAULT_BASELINE_DIR = '.averi/baselines';
 
+/** The default budget of a tree assert (element, absent, rect, text) that names no `timeout`. */
+const ASSERT_TIMEOUT_MS = 3_000;
+
+/**
+ * The default budget of a color or ocr assert that names no `timeout`
+ * (2026-10-06). A pixel assert's round is a tree read AND a settled pair of
+ * captures, and since c444c79 a frame that settled over the element's region
+ * only is measured on the NEXT round, once a second read confirms the rect —
+ * two rounds on any screen with a clock or a caret. Measured that day on the
+ * Android emulator (docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-
+ * no-round-on-device.md): one round is a 2.7 s uiautomator read plus two
+ * 0.65 s screencaps 300 ms apart, ~4.3 s, so two rounds and the pause
+ * between them are ~8.9 s. With the shared 3 s these asserts could not pass
+ * on that device even on a still screen: the 3 s only ever "worked" because
+ * the capture overran it, which 4954ab4 stopped. 12 s covers two rounds
+ * there with a margin for a slower emulator; a poll that passes returns as
+ * soon as it does, so the larger budget costs only a failing assert.
+ */
+const PIXEL_ASSERT_TIMEOUT_MS = 12_000;
+
 export interface VerifierOptions {
   baselineDir?: string;
   pollMs?: number;
+  /**
+   * One budget for EVERY assert that does not set its own `timeout`. Unset,
+   * each kind takes its own default: 3 s for the tree asserts, 12 s for the
+   * color and ocr asserts (see `PIXEL_ASSERT_TIMEOUT_MS`).
+   */
   timeoutMs?: number;
   /** Test seam: the recognizer behind the `ocr` assert. */
   ocrEngine?: OcrEngine;
@@ -188,7 +213,8 @@ interface PollSpec {
 export class Verifier {
   private readonly baselineDir: string;
   private readonly pollMs: number;
-  private readonly timeoutMs: number;
+  /** The caller's budget for every assert, when it set one; else each kind's default applies. */
+  private readonly timeoutMs: number | undefined;
   /** Built on first `ocr` assert so non-OCR runs never probe for a toolchain. */
   private ocr: OcrEngine | undefined;
 
@@ -198,7 +224,7 @@ export class Verifier {
   ) {
     this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
-    this.timeoutMs = opts.timeoutMs ?? 3_000;
+    this.timeoutMs = opts.timeoutMs;
     this.ocr = opts.ocrEngine;
   }
 
@@ -212,7 +238,10 @@ export class Verifier {
     if ('screenshot' in spec) {
       return this.assertScreenshot(spec.screenshot.baseline, spec.screenshot.threshold ?? 0.01);
     }
-    const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.timeoutMs;
+    const pixel = 'color' in spec || 'ocr' in spec;
+    const timeoutMs =
+      spec.timeout !== undefined ? parseDuration(spec.timeout)
+      : (this.timeoutMs ?? (pixel ? PIXEL_ASSERT_TIMEOUT_MS : ASSERT_TIMEOUT_MS));
     if ('rect' in spec) return this.assertRect(spec.element, spec.rect, timeoutMs);
     if ('color' in spec) return this.assertColor(spec.element, spec.color, timeoutMs);
     if ('ocr' in spec) return this.assertOcr(spec.element, spec.ocr, timeoutMs);

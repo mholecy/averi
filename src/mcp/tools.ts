@@ -484,7 +484,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'rect geometry vs Figma-frame values ({"element":{...},"rect":{"x":24,"w":345,"frameWidth":393}} — deltas in % of screen width; y is measured but never fails), ' +
         'fill color vs an expected hex ({"element":{...},"color":{"expected":"#FDFDFD","deltaE":8}} — CIEDE2000 over the element\'s sampled region; hex only, token names resolve upstream), ' +
         'rendered text read back off the screenshot ({"element":{...},"ocr":{"text":"CONTINUE","heightPct":2.96}} — what the user SEES, which the tree often does not carry: on iOS SwiftUI collapses a button into one node whose label is an authored a11y summary, so the visible string is absent; heightPct is rendered ink height in % of screen width, the type-size check, single-line only; macOS-only, fails closed elsewhere), ' +
-        'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots.',
+        'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots. ' +
+        'Budgets: an assert without its own `timeout` waits up to 3 s (tree asserts) or 12 s (color/ocr — a round is a tree read plus a settled pair of captures, ~4.3 s on an Android emulator, and a screen with a clock or caret needs two); a passing assert returns at once, a color/ocr assert whose measurement keeps failing spends its whole budget — pass `timeout` to shorten it.',
       inputSchema: { platform, asserts: assertsInput, configPath },
     },
     async ({ platform: p, asserts, configPath: cp }) => {

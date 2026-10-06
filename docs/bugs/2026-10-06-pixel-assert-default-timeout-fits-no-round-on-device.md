@@ -63,3 +63,48 @@ round 1.
   that the budget is smaller than one round on this device. Name the round cost in the sentence.
 - Pin the behaviour in a test using the fake-device harness from `Verifier.poll`'s table, with a 2.7 s dump and a
   0.65 s screencap (the numbers measured here). The table's 1.5 s / 300 ms fakes are what hid this.
+
+## Diagnosis and fix (2026-10-06, the commit after `610864a`)
+
+**Feedback loop.** `Verifier.assert` with a fake device timed as measured (each tree read moves a faked clock 2.7 s,
+each screencap 0.65 s; the recorded sleeps move it too). It reproduced the device symptom exactly: `element found,
+but no time was left within 3000ms …`, 3.35 s, one capture.
+
+**Sweep.**
+- A still screen passes only while one read plus one screencap is under 3 s.
+- A screen with live content off the element needs the confirming round, and it misses 3 s even with a 1 s read.
+
+**Differential.** The same loop against `5473982`, before `4954ab4`:
+- the still screen PASSED in 4.3 s, a 1.3 s overrun of its 3 s budget;
+- the live screen "passed" in 8.1 s by measuring the last of six differing captures.
+
+**Cause (H1, confirmed).** The shared 3 s default never fit one pixel round on this device. It only appeared to
+because the capture ignored the deadline. `4954ab4` made the capture honour the deadline (correctly), and `c444c79`
+added the confirming round on screens with a clock or caret.
+
+**Fix.**
+- color and ocr asserts that name no `timeout` default to 12 s (`PIXEL_ASSERT_TIMEOUT_MS` in `verify/assert.ts`). That
+  is two Android rounds (~8.9 s) with margin.
+- The tree asserts keep 3 s.
+- A caller's own budget (`VerifierOptions.timeoutMs`, a flow's `assertTimeoutMs`, a spec's `timeout`) still wins.
+- The found-but-no-time sentences now quote the slowest ROUND (a tree read and its captures), e.g. `(the slowest
+  round — a tree read and its captures — took 3350ms here) — raise this assert timeout`. The round is quoted rather
+  than the read because either half can be the slow one (review 2026-10-06).
+- The 12 s default, and what a failing color/ocr assert costs, are stated in the MCP `assert` tool description,
+  SKILL.md and the `assertTimeoutMs` doc.
+
+**Regression tests.** In `tests/verify/assert.test.ts`, at the device timings:
+- still screen: passes in 4.3 s;
+- live screen: passes in 8.9 s;
+- ocr: still screen passes in 4.3 s;
+- an explicit 3 s budget still times out, and its sentence names the round cost;
+- the sentence quotes the slowest round, not the last;
+- element, rect and absent asserts keep 3 s.
+
+**Mutation checks.**
+- Killed: pixel default back to 3 s; 12 s applied to every assert; ocr, rect or absent classed wrongly; rounds not
+  timed; the last round quoted instead of the slowest; caller budget ignored.
+- Survives: any default above ~7.95 s (measured by the reviewer: 7.951 passes, 7.950 fails). The last round's first
+  re-capture is taken while the deadline has not yet passed, so it may end one pause plus one screencap past it;
+  two rounds therefore fit at the measured speed in under 8.9 s of budget. The 12 s margin is a judgement for slower
+  emulators, not a pinned number.
