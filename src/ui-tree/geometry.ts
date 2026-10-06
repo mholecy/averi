@@ -348,3 +348,24 @@ export function clippedEdges(
   if (rect.x + rect.width > viewport.width) out.push('right');
   return out;
 }
+
+// ─── Rect identity and wording ───────────────────────────────────────────────
+
+/**
+ * Exactly the same rect — x, y, width AND height; a resize is a change.
+ * Since 2026-10-06 the pixel poll's rect confirmation (verify/pixel-poll.ts)
+ * asks it of two consecutive tree reads; exact, because tree rects are whole
+ * points and "nearly the same place" is the stale-crop case it exists to catch.
+ */
+export function sameRect(a: Rect, b: Rect): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+/**
+ * The one way a sentence quotes a rect: `x,y wxh`, in tree points. Owned here
+ * (2026-10-06) because two failure sentences in verify/ spelled it inline —
+ * the text table's off-screen region and the pixel poll's position change.
+ */
+export function rectText(r: Rect): string {
+  return `${r.x},${r.y} ${r.width}x${r.height}`;
+}

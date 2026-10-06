@@ -22,6 +22,8 @@ every one differential- or mutation-tested, none yet exercised end to end agains
 | `5ed1478` V1 | keyboard decision per phase | same device proof as `f543b2f` (differential 3 × 25 000 sequences says identical) |
 | `eadca61` V6 | unknown `environment` refused before any adapter | `ensure_state`/`verify` with `environment: "nope"` returns the SetupError immediately, no device work, no `## android` leg section |
 | `e28576b` V4+V5 | `run/verify.ts` fact table; `TreeFrame`; `textMeasurement` | `verify` sections unchanged in wording and order (`## rect parity` / `## color parity` / `## text parity`); needs a contract to see them |
+| pixel poll step 2 (2026-10-06, the commit after `ea5c66a`) | color/ocr asserts judge stability over the element's own region (`captureFrame`'s `region`, passed by `verify/pixel-poll.ts`); baselines, legs and tools stay whole-screen | **loosening, one direction**: on the static login screen with a focused field (blinking caret) and, if visible, a status-bar clock, a `color` assert on `login_submit` and an `ocr` assert on its label PASS where they failed `the screen did not settle: …` before; an element that itself animates (a spinner inside the measured rect) still FAILS with that sentence; `screenshot`/`ensure_state` on the caret screen still carry one `⚠ frame:` line. See §5 |
+| pixel poll step 2, rect confirmation (2026-10-06) | a frame that settled over the element's region ONLY is measured only when two consecutive tree reads agree on the rect | **no false pass on a rect the tree reports moving**: a `color` assert on an element during a slide-in/push, with live content elsewhere, must not pass while consecutive tree reads disagree on its rect (two residuals are recorded and checked separately in §5: a tree that already reports the FINAL rect — iOS model-layer frames, Android alpha-0 views — and movement after the confirming snapshot, which a uiautomator dump takes partway through a ~1.5 s read); a never-resting element fails `the element moved between tree reads …`; on a still screen nothing changes (whole-screen settle, measured in round 1). See §5 |
 
 ## 1. Prerequisites
 
@@ -188,6 +190,42 @@ per server process) — C2.
   throwaway `scroll_until` step on any scrollable screen (or use mp-native, which has one) and watch
   for a swipe that "overshoots" because the read happened before the list settled — if it does, 400 ms is
   too short on that device and `interact/scroll.ts`'s default is the knob.
+- **Element-region stability** (pixel poll step 2, 2026-10-06): on the static login screen, focus `login_username`
+  so a caret blinks (and keep the status bar's clock visible if the device shows one), then run `assert` with
+  `{ element: { id: "login_submit" }, color: { expected: "<its fill>" } }` and with
+  `{ element: { id: "login_submit" }, ocr: { text: "<its label>" } }`: both must PASS, where before this change they
+  failed `the screen did not settle: N captures …`. Then on a screen whose asserted element itself animates (a spinner
+  inside the measured rect — a loading button, an activity indicator), both must still FAIL with that sentence. On the
+  caret screen, `screenshot` and `ensure_state` output must still carry exactly one `⚠ frame:` line (tools keep
+  whole-screen stability). Record the capture count each failing assert quotes and the wall time of every assert
+  beside the 2026-10-05 baseline figures (kept on `Verifier.poll` in `verify/assert.ts`): a passing assert on the caret
+  screen should cost two rounds of a still screen's cost (two captures and one 300 ms stability wait each): the frame
+  settles over the element's region only, and the pixel poll measures it only once a second tree read confirms the
+  element's rect.
+- **Rect confirmation on a moving element** (pixel poll step 2, 2026-10-06): with live content elsewhere on screen (a
+  caret, a clock), run a `color` assert on an element DURING a slide-in or push transition (start the assert, then
+  trigger the navigation that animates the element in). While the element's rect changes between tree reads the
+  assert must not report the sampled colour — this is what the check guarantees; a tree that already reports the
+  final rect, and movement after the confirming snapshot, are the residuals in the next bullet, so a pass on a
+  transitional frame there is a recorded limit, not a regression of this one — and if it never comes to rest
+  within the timeout the failure must read `the element moved between tree reads (… → …) while only its own
+  region, not the whole screen, held still …; failing closed, color unchecked`. Once the transition ends, a pass
+  must sample the element at its final rect (check the colour against a `screenshot` taken after it).
+- **The recorded residuals: a tree that reports where the element WILL be, and movement after the confirming
+  snapshot** (pixel poll step 2, 2026-10-06; both are written up on `verify/capture.ts`'s header). First residual —
+  on iOS AND Android, with live content elsewhere so the whole screen keeps moving, run `color` and `ocr` asserts on (1) an element with a delayed or staggered entrance that
+  lands at its final rect after the others, and (2) an alpha-0 fade-in at its final rect. Choose an expected colour
+  or text that EQUALS the background under the element where you can — that is the false-pass shape. Record, per
+  platform and per case, whether any assert passes BEFORE the element is visible (take `screenshot`s alongside and
+  note their timestamps), and the rect each `ui_snapshot` reports during the entrance. A pass before visibility is
+  the residual measured, not a regression; file it under `docs/bugs/` with the numbers so the next step can decide
+  whether a pixel-side confirmation (a crop that must differ from the pre-entrance background) is worth its cost.
+  Second residual — the confirming read is not the moment the captures start: a uiautomator dump snapshots the
+  hierarchy partway through a ~1.5 s read, and the stability captures begin only after it returns, so an element
+  that starts moving inside that window is measured at a rect two reads agreed on but it has left. On Android, start
+  a `color` assert on a still element (live content elsewhere), then trigger its slide-out or push about 0.5–1 s
+  into a round (watch the server's tree-read timing), and record whether the assert passes on the old rect; repeat
+  on iOS for comparison (its AX read is shorter). File any pass under `docs/bugs/` with the read and capture times.
 - **Baseline screenshot assert** (C9, V2+V3): run `assert { screenshot: 'login', threshold: 0.01 }` twice
   on the static login screen: first `baseline created`, second `0.00% of pixels differ`; then on a moving
   screen the first run must say `baseline not created: the screen did not settle …`.

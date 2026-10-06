@@ -1,5 +1,5 @@
 import type { Platform, Rect, UiNode } from '../adapters/types.js';
-import { collectRects } from '../ui-tree/geometry.js';
+import { collectRects, rectText } from '../ui-tree/geometry.js';
 import { errorMessage } from '../util/error-message.js';
 import { pngRegion, type MeasuredFrame, type TreeFrame } from './capture.js';
 import { findBySpec } from '../ui-tree/selectors.js';
@@ -394,7 +394,7 @@ export function ocrRegionForRect(
   if (scaled.error !== undefined) return { error: scaled.error };
   const region = regionForRect(id, rect, scaled.scale, png);
   return region === undefined
-    ? { error: `element rect ${rect.x},${rect.y} ${rect.width}x${rect.height} scaled by ${scaled.scale.toFixed(3)} leaves nothing on-screen` }
+    ? { error: `element rect ${rectText(rect)} scaled by ${scaled.scale.toFixed(3)} leaves nothing on-screen` }
     : { region, note: scaled.note };
 }
 

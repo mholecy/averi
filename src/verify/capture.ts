@@ -76,12 +76,57 @@ import { pngScale, type PngScale } from './scale.js';
  *   assert.ts; passing the deadline in is the pixel poll's since 2026-10-06
  *   (verify/pixel-poll.ts).
  *
- * Not done, recorded: stability is judged on the WHOLE screenshot. A clock
- * in the status bar or a blinking caret elsewhere on the screen keeps a
- * frame "unsettled" while the element an assert measures holds perfectly
- * still; judging stability over the element's own region would let those
- * asserts pass. It needs the rect before the capture (the asserts have it)
- * and a crop before the compare — a later step.
+ * Done 2026-10-06 (recorded until then as "not done"): stability can be
+ * judged over the ELEMENT'S REGION. Until that date it was judged on the
+ * whole screenshot only, so a clock in the status bar or a blinking caret
+ * elsewhere on the screen kept a frame "moving" while the element a color
+ * or ocr assert measured held perfectly still, and the assert failed "the
+ * screen did not settle" about pixels it never reads. `CaptureOptions.region`
+ * (a rect in tree points, accepted only beside a SUPPLIED tree — the pixel
+ * poll passes the first match's) adds a second question to the wait when two
+ * captures differ: decode both, scale the rect the way the measured frame
+ * will (`measuredFrameFor`), land it with `pngRegion` (no inset — the compare
+ * must see every pixel the ocr crop will), and call the pair settled when
+ * the bytes inside match, handing back the LATER capture. Anything that
+ * makes that question unanswerable — a decode that throws, two pngs of
+ * different sizes, a scale that carries an error, a rect that lands nowhere
+ * on the png — falls back to the whole-screen answer, which has already
+ * said "different": the pair is not settled. Never the other way: a frame
+ * the region check cannot check is never called settled. Two identical
+ * buffers stay the fast path (no decode, no device read), and the budget is
+ * untouched. Deliberately whole-screen still: the baseline assert (a
+ * baseline is a picture of the screen, and a region nobody named must not
+ * decide what is stored or diffed), the `verify` legs (their parity tables
+ * measure many anchors from one frame) and the `screenshot`/`ensure_state`
+ * tools (a picture handed to the agent is judged as a picture) — none of
+ * them can pass a region, by the types.
+ *
+ * Region stability alone WIDENS the supplied tree's staleness window
+ * (`captureFrame`'s doc: the tree predates the wait by one round's read),
+ * it does not narrow it: the crop sits at the rect that read reported, so
+ * an element sliding in or pushed aside — its old area showing a static
+ * background — leaves a region pair that matches while the element is
+ * elsewhere, a frame whole-screen stability would have called moving (a
+ * white button sliding onto a white card would sample white and pass). So
+ * the frame SAYS how it settled — `settledOver: 'screen' | 'region'`,
+ * decided here, once — and the pixel poll measures a region-only frame
+ * only when two consecutive tree reads put the element at the same rect
+ * (verify/pixel-poll.ts). The cost is one extra round, about one tree read
+ * (~1.5 s for an Android dump), paid only when the whole screen is NOT
+ * still. Two agreeing reads confirm the TREE, not the pixels, and two
+ * false-pass windows remain, recorded here (review 2026-10-06):
+ * - the tree reports where the element WILL be: iOS AX frames come from the
+ *   model layer, so both reads give a UIKit animation's final rect, and
+ *   Android keeps alpha-0 and not-yet-drawn views in the tree. A staggered
+ *   or delayed entrance, or an alpha-0 fade-in, at its final rect while
+ *   other content animates (so the whole screen is moving) leaves that rect
+ *   showing static background for two rounds — and passes when the expected
+ *   colour or text equals the background;
+ * - the element moves after the confirming SNAPSHOT, which is earlier than
+ *   the read's return: a uiautomator dump snapshots partway through a
+ *   ~1.5 s read, and the captures start only after it returns.
+ * Neither is closed by anything in this package; the device checks are in
+ * docs/plans/2026-10-05-device-verification-handoff.md.
  */
 
 /**
@@ -165,16 +210,18 @@ type FrameMeasurement = MeasuredFrame | Undecoded | Treeless;
 
 export interface Frame {
   /**
-   * The screenshot bytes — the first capture that repeated when `settled`,
-   * otherwise the LAST one taken, as the best available. What a tool returns
-   * to the caller either way.
+   * The screenshot bytes. Settled over the whole screen: the first capture
+   * that repeated. Settled over the caller's region only: the later capture
+   * of the pair whose region matched. Not settled: the LAST one taken, as the
+   * best available. What a tool returns to the caller either way.
    */
   shot: Buffer;
   /**
    * What the stability wait concluded — decided HERE, once, so no consumer
    * re-derives it from the capture count:
-   * - `settled`: two consecutive captures matched within the budget (and the
-   *   caller's `deadline`, when one was given);
+   * - `settled`: two consecutive captures matched — over the whole png, or
+   *   over the caller's `region` when one was given (since 2026-10-06) —
+   *   within the budget (and the caller's `deadline`, when one was given);
    * - `moving`: two or more captures were taken and every one differed from
    *   the last — the screen was still changing when the wait stopped. The
    *   polling asserts treat that as a miss, the baseline assert refuses to
@@ -184,6 +231,18 @@ export interface Frame {
    *   time left"; nothing else words it.
    */
   stability: 'settled' | 'moving' | 'unjudged';
+  /**
+   * HOW a `settled` frame settled (2026-10-06), present only when it did —
+   * decided here, once, no consumer re-derives it:
+   * - `screen`: two whole captures were byte-identical — the fast path, and
+   *   the only answer a caller without a `region` can get;
+   * - `region`: the whole captures differed and only the caller's region
+   *   matched. The crop is still only as fresh as the rect the caller
+   *   supplied: a region pair can match at a rect the element has already
+   *   left (the header), so a consumer measuring at that rect must confirm
+   *   it first — the pixel poll does, with a second tree read.
+   */
+  settledOver?: 'screen' | 'region';
   /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. */
   captures: number;
   /**
@@ -259,7 +318,24 @@ type CaptureOptions = {
    * the full stability budget.
    */
   deadline?: number;
-} & ({ readTree: true; tree?: never } | { tree: UiNode; readTree?: never } | { readTree?: false; tree?: never });
+} & (
+  | { readTree: true; tree?: never; region?: never }
+  | {
+      tree: UiNode;
+      readTree?: never;
+      /**
+       * The element's rect in TREE points, from the supplied tree (2026-10-06):
+       * when two captures differ, the wait also asks whether they match INSIDE
+       * this rect, so live content elsewhere (a status-bar clock, a caret) does
+       * not keep the frame moving. Allowed only beside a supplied tree — the
+       * rect must come from the tree the scale is derived from, and the
+       * `readTree` arm has no tree until after the wait; the png-only arm has
+       * none at all. A type error on either, like `tree` with `readTree`.
+       */
+      region?: Rect;
+    }
+  | { readTree?: false; tree?: never; region?: never }
+);
 
 /**
  * Capture a settled frame. Nothing past the screenshot itself throws: a tree
@@ -280,7 +356,8 @@ type CaptureOptions = {
  * owns its freshness and it predates the wait by one poll round's read. That
  * is acceptable where it happens because the poll retries: a crop that lands
  * wrong on a frame that settled after the read fails this round and the next
- * round reads a tree of the settled screen.
+ * round reads a tree of the settled screen. Its `region`, when given, is
+ * the rect the wait judges stability over (header, 2026-10-06).
  *
  * The residual race of png-then-tree, recorded 2026-10-02: the screen can
  * change BETWEEN the stable pair and the tree read — a toast, a late async
@@ -309,7 +386,11 @@ export async function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions = {},
 ): Promise<Frame> {
-  const { shot, stability, captures } = await stableScreenshot(adapter, opts.deadline);
+  const region = opts.tree !== undefined && opts.region !== undefined ? { rect: opts.region, tree: opts.tree } : undefined;
+  // `wait` is everything the frame says about itself (shot, stability, how it
+  // settled, captures); only the measured half is added below.
+  const { png: waitPng, ...wait } = await stableScreenshot(adapter, opts.deadline, region);
+  const { shot } = wait;
   let tree: UiNode;
   if (opts.tree !== undefined) {
     tree = opts.tree;
@@ -317,19 +398,18 @@ export async function captureFrame(
     try {
       tree = await readTreeWithRetry(adapter, { attempts: TREE_READ_ATTEMPTS, delayMs: TREE_READ_DELAY_MS });
     } catch (e) {
-      return { shot, stability, captures, measured: { error: errorMessage(e) } };
+      return { ...wait, measured: { error: errorMessage(e) } };
     }
   } else {
-    return { shot, stability, captures };
+    return wait;
   }
   let png: PNG;
   try {
-    png = PNG.sync.read(shot);
+    // A shot the region check already decoded (settled or moving) is not decoded twice.
+    png = waitPng ?? PNG.sync.read(shot);
   } catch (e) {
     return {
-      shot,
-      stability,
-      captures,
+      ...wait,
       measured: {
         tree,
         error:
@@ -341,7 +421,7 @@ export async function captureFrame(
   // Memoized inside the adapter (adapters/types.ts), so this is a device read
   // once per adapter, not once per frame.
   const screen = await adapter.viewport().catch(() => undefined);
-  return { shot, stability, captures, measured: measuredFrameFor(tree, png, screen) };
+  return { ...wait, measured: measuredFrameFor(tree, png, screen) };
 }
 
 /**
@@ -387,18 +467,32 @@ export function measuredFrameFor(tree: UiNode, png: RgbaImage, screen?: DeviceSc
  * the poll's own clock has already run out on.
  *
  * The deadline test is "would the NEXT re-capture end after it", with the
- * cost of a re-capture (one delay plus one screencap) taken from the
- * PREVIOUS one as measured on the clock — a slow screencap (300 ms on a
+ * cost of a re-capture (one delay plus one screencap, plus the region check
+ * when there is one — its decode, ~40 ms for a phone-sized png, is time the
+ * next re-capture will spend too) taken from the PREVIOUS one as measured on
+ * the clock — a slow screencap (300 ms on a
  * loaded emulator) is accounted for rather than assumed free, and a
  * mocked-out sleep (the tests) is not assumed to take 300 ms it does not
  * take. The first re-capture has no measurement to go on and is taken
  * unless the deadline has already passed; the first capture is always taken
  * — one honest look.
+ *
+ * With a `region` (2026-10-06, the supplied-tree arm only), a pair whose
+ * whole buffers differ gets a second question — do they match inside the
+ * element's rect? — answered by `regionSettled` below; the header says what
+ * it falls back to and why. Identical buffers never reach it, so a still
+ * screen costs no decode and no device read, region or not. Each capture is
+ * decoded at most once across the wait AND the frame: the later png of one
+ * pair is the earlier of the next, and the returned shot's png — the settled
+ * pair's later one, or a moving frame's last — is handed back so
+ * `captureFrame` measures it without decoding the same bytes again.
  */
 async function stableScreenshot(
-  adapter: Pick<DeviceAdapter, 'screenshot'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>,
   deadline?: number,
-): Promise<Pick<Frame, 'shot' | 'stability' | 'captures'>> {
+  region?: StabilityRegion,
+): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'> & { png?: PNG }> {
+  const memo = lastDecodeMemo();
   let previous = await adapter.screenshot();
   let captures = 1;
   let recaptureMs = 0; // measured cost of the last re-capture (delay + screencap); 0 until one has run
@@ -407,14 +501,88 @@ async function stableScreenshot(
     const started = Date.now();
     await sleep(STABILITY_DELAY_MS);
     const current = await adapter.screenshot();
-    recaptureMs = Date.now() - started;
     captures += 1;
-    if (current.equals(previous)) return { shot: current, stability: 'settled', captures };
+    if (current.equals(previous)) return { shot: current, stability: 'settled', settledOver: 'screen', captures };
+    if (region !== undefined) {
+      const png = await regionSettled(adapter, region, memo.decode(previous), memo.decode(current));
+      if (png !== undefined) return { shot: current, stability: 'settled', settledOver: 'region', captures, png };
+    }
+    // Taken AFTER the region check (review 2026-10-06): its decode is part of
+    // what the next re-capture will cost. The fast path above returns first,
+    // so a still screen's count and sleeps are untouched.
+    recaptureMs = Date.now() - started;
     previous = current;
   }
   // The ONE place "one capture is no verdict" is decided (2026-10-05): a
   // consumer reads `stability`, never the count.
-  return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures };
+  return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures, png: memo.decoded(previous) };
+}
+
+/** The caller's element for a region-judged wait: its rect, and the tree that rect (and, when the device will not say, the scale) comes from. */
+interface StabilityRegion {
+  rect: Rect;
+  tree: UiNode;
+}
+
+/**
+ * Do two differing captures match inside the element's region? The later
+ * png when they do; `undefined` — the whole-screen answer, "different" —
+ * whenever the question cannot be answered: a png that did not decode, two
+ * pngs of different sizes, a scale that carries an error, a rect that lands
+ * nowhere on the png. The scale is the one the measured frame will carry
+ * (`measuredFrameFor`: the device screen when the adapter will say it — a
+ * memoized read, so once per adapter — the tree otherwise), and the rect is
+ * landed with `pngRegion` and no inset, so the compare covers every pixel
+ * the ocr crop reads and more than the colour sampler's inset one.
+ */
+async function regionSettled(
+  adapter: Pick<DeviceAdapter, 'viewport'>,
+  region: StabilityRegion,
+  earlier: PNG | undefined,
+  later: PNG | undefined,
+): Promise<PNG | undefined> {
+  if (earlier === undefined || later === undefined) return undefined;
+  if (earlier.width !== later.width || earlier.height !== later.height) return undefined;
+  const screen = await adapter.viewport().catch(() => undefined);
+  const { scale } = measuredFrameFor(region.tree, later, screen);
+  if (scale.error !== undefined) return undefined;
+  const bounds = pngRegion(region.rect, scale.scale, later);
+  if (bounds === undefined) return undefined;
+  // Row by row: the region's bytes are contiguous within a row, not across rows.
+  const stride = later.width * 4;
+  for (let y = bounds.y0; y < bounds.y1; y++) {
+    const from = y * stride + bounds.x0 * 4;
+    const to = y * stride + bounds.x1 * 4;
+    if (Buffer.compare(earlier.data.subarray(from, to), later.data.subarray(from, to)) !== 0) return undefined;
+  }
+  return later;
+}
+
+/**
+ * A decoder that remembers its last answer: in the stability wait the later
+ * capture of one pair is the earlier of the next, so each capture is decoded
+ * once. `decode` never throws — a png that does not decode is `undefined`,
+ * the region check's fallback; the capture's own decode words that failure.
+ * `decoded` only looks: the png of a shot already decoded, else `undefined`
+ * (never decoded, or did not decode), and the frame decodes it itself.
+ */
+function lastDecodeMemo(): { decode: (shot: Buffer) => PNG | undefined; decoded: (shot: Buffer) => PNG | undefined } {
+  let last: { shot: Buffer; png: PNG | undefined } | undefined;
+  return {
+    decode: (shot) => {
+      if (last?.shot !== shot) {
+        let png: PNG | undefined;
+        try {
+          png = PNG.sync.read(shot);
+        } catch {
+          png = undefined;
+        }
+        last = { shot, png };
+      }
+      return last.png;
+    },
+    decoded: (shot) => (last?.shot === shot ? last.png : undefined),
+  };
 }
 
 /**

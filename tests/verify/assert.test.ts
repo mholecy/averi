@@ -805,6 +805,15 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     resetLayout();
     return new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: { ...CARD } })) }, 'detail');
   };
+  /**
+   * The byte offset of a pixel INSIDE the card (its centre; the tree and the
+   * png share a scale of 1 here). Since 2026-10-06 the color and ocr asserts
+   * judge stability over the element's own region, so an "animation" must
+   * move a pixel the assert measures to keep a frame moving: the pixel at
+   * (0, 0) these tests painted until then lies outside the card and would
+   * now settle — the status-bar clock the change was made for.
+   */
+  const inCard = (p: PNG) => ((CARD.y + CARD.height / 2) * p.width + CARD.x + CARD.width / 2) << 2;
 
   it('the stability delay is capture.ts\'s 300 ms whatever pollMs the Verifier was given — one budget for every consumer', async () => {
     const fake = cardFake();
@@ -840,7 +849,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       vi.setSystemTime(Date.now() + 300);
       const shot = png(1000, 320, (p) => {
         fill(p, '#FDFDFD');
-        p.data[0] = i++ % 256;
+        p.data[inCard(p)] = i++ % 256;
       });
       fake.screenshots.push(shot);
       return shot;
@@ -883,7 +892,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       const moving = Date.now() - start < 3800;
       const shot = png(1000, 320, (p) => {
         fill(p, '#FDFDFD');
-        if (moving) p.data[0] = i++ % 256;
+        if (moving) p.data[inCard(p)] = i++ % 256;
       });
       fake.screenshots.push(shot);
       return shot;
@@ -963,7 +972,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const fake = cardFake();
     let i = 0;
     fake.screenshot = async () => {
-      const shot = png(1000, 320, (p) => (p.data[0] = i++ % 256));
+      const shot = png(1000, 320, (p) => (p.data[inCard(p)] = i++ % 256));
       fake.screenshots.push(shot);
       return shot;
     };
@@ -977,6 +986,144 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(result.detail).toBe(
       'the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run; failing closed, rendered text unchecked',
     );
+  });
+
+  /**
+   * A status-bar clock: the pixel at (0, 0), outside the card, changes on
+   * EVERY capture, so no two captures are ever byte-identical; everything
+   * else is #FDFDFD. The card's tree is served per read by `rectFor`, so a
+   * test can move the element between rounds while every crop stays still.
+   */
+  const clockScreen = (rectFor: (read: number) => typeof CARD | undefined) => {
+    resetLayout();
+    const fake = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: { ...CARD } })) }, 'detail');
+    const probe = { treeReads: 0 };
+    fake.uiTree = async () => {
+      probe.treeReads += 1;
+      const rect = rectFor(probe.treeReads);
+      // undefined: this read's screen has no card at all.
+      return rect === undefined ? screen() : screen(node({ identifier: 'card', rect: { ...rect } }));
+    };
+    let i = 0;
+    fake.screenshot = async () => {
+      const shot = png(1000, 320, (p) => {
+        for (let o = 0; o < p.data.length; o += 4) p.data[o] = p.data[o + 1] = p.data[o + 2] = 0xfd;
+        p.data[0] = i++ % 256;
+      });
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    return { fake, probe };
+  };
+
+  it('live content OFF the element does not keep a color assert from settling: the card holds still, and the assert passes once a second read confirms where it is (2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, probe } = clockScreen(() => CARD);
+    // Until 2026-10-06 this screen never settled and the assert failed "the
+    // screen did not settle: 6 captures …" about pixels it never reads.
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('sampled #FDFDFD');
+    // Settled over the card's region only, so the first round is silent (no
+    // earlier read to confirm the rect) and the second, whose read agrees,
+    // measures: two rounds of a still screen's cost — two captures and one
+    // stability wait each — with the poll's pause between them. A first
+    // version of this test (review round 1) pinned ONE round: that was the
+    // stale-rect window, closed the same day.
+    expect(probe.treeReads).toBe(2);
+    expect(fake.screenshots).toHaveLength(4);
+    expect(sleeps).toEqual([STABILITY_DELAY_MS, 300, STABILITY_DELAY_MS]);
+  });
+
+  it('an element that moved between tree reads is not measured on a region-only frame — even though both crops are still — until two reads agree (2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // A slide-in: read 1 puts the card at y 100, every later read at y 150.
+    // The screen is #FDFDFD wherever either rect lands, so a crop at the
+    // stale rect would sample the right colour — the false pass this guards.
+    const moved = { ...CARD, y: 150 };
+    const { fake, probe } = clockScreen((read) => (read === 1 ? CARD : moved));
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    // Round 1: no earlier rect, silent. Round 2: the rect changed, a miss.
+    // Round 3: two reads agree, measured.
+    expect(probe.treeReads).toBe(3);
+    expect(fake.screenshots).toHaveLength(6);
+  });
+
+  it('an element that moves every round times out on the position-changed sentence, quoting the last two rects (2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, probe } = clockScreen((read) => ({ ...CARD, y: 100 + 10 * read }));
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    // Each round costs 600 ms of virtual time (a 300 ms stability wait, a
+    // 300 ms poll pause): rounds 2..5 each find a new rect and miss; round 6
+    // reads at 3.0 s, past the deadline, and captures nothing — so the
+    // finding is round 5's, reads 4 → 5. Not "not found", not "did not settle".
+    expect(probe.treeReads).toBe(6);
+    expect(result.detail).toBe(
+      'the element moved between tree reads (100,140 800x100 → 100,150 800x100) while only its own region, ' +
+        'not the whole screen, held still — the crop may sit where the element was, not where it is; let it come to rest and re-run; ' +
+        'failing closed, color unchecked',
+    );
+    expect(fake.screenshots).toHaveLength(10);
+  });
+
+  it('a resize is a move: the same origin with a growing card is never confirmed, and the timeout quotes both sizes (review 2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, probe } = clockScreen((read) => ({ ...CARD, width: 700 + 10 * read }));
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    // The same 600 ms rounds as the moving case above: round 5's finding, reads 4 → 5.
+    expect(probe.treeReads).toBe(6);
+    expect(result.detail).toBe(
+      'the element moved between tree reads (100,100 740x100 → 100,100 750x100) while only its own region, ' +
+        'not the whole screen, held still — the crop may sit where the element was, not where it is; let it come to rest and re-run; ' +
+        'failing closed, color unchecked',
+    );
+  });
+
+  it('a poll that ends after ONE region-only round — nothing to confirm it against — says the region held still and there was no time to confirm the position (review 2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, probe } = clockScreen(() => CARD);
+    // Round 1 takes its two captures (one 300 ms wait) and ends exactly at
+    // the 300 ms deadline, so there is no second round to confirm the rect.
+    // A settled frame WAS captured: "no time … to capture a settled frame"
+    // would be false, and "not found" falser.
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 300 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'element found and its region held still, but no time was left within 300ms to confirm its position with a second tree read — raise the timeout or let the screen come to rest',
+    );
+    expect(probe.treeReads).toBe(1);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('a round CUT after the unconfirmed one decides the wording: the poll ran out before capturing, and says so as before (review 2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { fake, probe } = clockScreen(() => CARD);
+    // Round 1 is unconfirmed and ends at 300 ms, inside a 500 ms deadline;
+    // after the 300 ms poll pause, round 2 reads at 600 ms, finds the card,
+    // and is past the deadline — it captures nothing. That cut is why the
+    // poll ran out, so the existing sentence stands, byte for byte.
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 500 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('element found, but no time was left within 500ms to capture a settled frame');
+    expect(probe.treeReads).toBe(2);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('a read that does not find the element breaks the confirmation: found at A, gone, back at A is not two agreeing reads (review 2026-10-06)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // A bottom CTA with the same id at the same rect on consecutive wizard
+    // screens, with a read between them that saw neither.
+    const { fake, probe } = clockScreen((read) => (read === 2 ? undefined : CARD));
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    // Round 1: found, silent. Round 2: not found, no capture. Round 3: found
+    // at A again, but the previous read did not have it — silent. Round 4: two
+    // consecutive reads agree, measured.
+    expect(probe.treeReads).toBe(4);
+    expect(fake.screenshots).toHaveLength(6);
   });
 
   /**
@@ -1004,7 +1151,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       fake.screenshot = async () => {
         const shot = png(1000, 320, (p) => {
           fill(p, '#FDFDFD');
-          p.data[0] = i++ % 256;
+          p.data[inCard(p)] = i++ % 256;
         });
         fake.screenshots.push(shot);
         return shot;

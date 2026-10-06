@@ -1,5 +1,6 @@
 import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
+import { rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -30,6 +31,44 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  *   and says nothing; an undecodable png is a miss that fails closed, and the
  *   poll keeps going because the capture may have raced a transition.
  * - the memory and the wording at the deadline (`PixelPollMemory`, private).
+ *
+ * Since 2026-10-06 the round hands the capture the first match's rect as its
+ * `region`, so "settled" means the ELEMENT'S pixels held still across two
+ * captures (verify/capture.ts's header has the rule and its whole-screen
+ * fallback). For a pixel assert, then, "the screen did not settle: N
+ * captures, each different from the last" USUALLY means the element's region
+ * kept changing — a spinner or a fade inside the measured rect — and hiding
+ * a status-bar clock or a caret elsewhere will not cure it; until that date
+ * it could mean either. The exception is the capture's fallback: when the
+ * region cannot be checked — the png scale carries an error, the rect lands
+ * nowhere on the png (an element scrolled off-screen), a capture did not
+ * decode, two captures differ in size — the verdict is still the WHOLE
+ * screen's, and a live clock elsewhere still reads "did not settle". The
+ * sentence does not say which; a `ui_snapshot` of the element's rect does.
+ * The sentence itself is unchanged: it is the capture's,
+ * the baseline assert and the tools' `⚠ frame:` note quote it too, and the
+ * captures it counts WERE each different from the last.
+ *
+ * A frame that settled over the region ONLY (`settledOver: 'region'`) is
+ * measured only when the element's rect this round equals — x, y, width,
+ * height, exactly — its rect in the previous round that found it. The crop
+ * sits at the rect the round's tree read reported, before the captures, so
+ * an element sliding in or pushed aside can leave its OLD area static and
+ * the region pair matching while the element is elsewhere; region stability
+ * alone would have widened that stale-rect window, and two consecutive
+ * reads agreeing narrows it to what the tree itself gets wrong — a tree that
+ * reports where the element WILL be (an entrance or fade-in at its final
+ * rect), and movement after the confirming snapshot (verify/capture.ts's
+ * header has both residuals and the cost). A failed tree read between two
+ * agreeing ones does not break the confirmation, on purpose — `forgetRect`
+ * says why. No previous rect — the first round to find it, or the first
+ * after a round that did not — is a silent round that still records
+ * "found", and at the deadline says the region held still but there was no
+ * time for the confirming read; a different one is a miss that quotes
+ * both rects, so a poll in which the element never held still says so,
+ * rather than "not found" or "did not settle". A frame that settled over the
+ * whole SCREEN is measured as before: two identical captures already say
+ * nothing moved, the element included.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
  * `measure`), the scale policy (`measured.scale` may carry a derivation error;
@@ -78,35 +117,92 @@ export interface PixelPollSpec {
  * reason, worded fail-closed like every other reason the assert cannot
  * measure past; the capture count it quotes is the most any round took, so a
  * late round the deadline cut short never understates the one that spent the
- * whole budget.
+ * whole budget. Since 2026-10-06 it also remembers where the element was
+ * last found, for the rect confirmation a region-only frame needs (header).
  */
 class PixelPollMemory {
-  private foundNoTime = false;
+  /**
+   * Why the LAST round that found the element said nothing, when one did:
+   * `cut` — it began past the deadline or its capture was unjudged, so no
+   * settled frame was captured; `unconfirmed` (2026-10-06) — a frame DID
+   * settle over the element's region, and no earlier read could confirm the
+   * rect. Either outranks not-found; each has its own sentence, because
+   * "no time to capture a settled frame" is false once one was captured.
+   */
+  private foundSilently: 'cut' | 'unconfirmed' | undefined;
   private mostCaptures = 0;
+  private lastRect: Rect | undefined;
 
   constructor(private readonly unchecked: PixelPollSpec['unchecked']) {}
+
+  /**
+   * A round whose tree does not have the element: forget its rect. "Found at
+   * A, gone, back at A" is two appearances, not two reads agreeing — a
+   * bottom CTA with the same id at the same rect on consecutive wizard
+   * screens would otherwise be confirmed by the PREVIOUS screen's read
+   * (review 2026-10-06).
+   *
+   * A round whose tree READ failed never gets here, so "A, read error, A"
+   * still confirms A — a deliberate, recorded decision (2026-10-06), not an
+   * oversight: the tree poll (ui-tree/read-tree.ts) owns failed reads and
+   * never hands them to the predicate, and forgetting on one would need a
+   * round counter here or a change to `pollTree` for every caller. The read
+   * that failed saw nothing either way; the two reads that agree are real.
+   */
+  forgetRect(): void {
+    this.lastRect = undefined;
+  }
+
+  /** Every round that finds the element: record its rect, and return the one the previous round saw — consecutive, since a round without it forgets. */
+  foundAt(rect: Rect): Rect | undefined {
+    const previous = this.lastRect;
+    this.lastRect = { ...rect };
+    return previous;
+  }
+
+  /**
+   * A frame settled over the element's region only, at a rect the previous
+   * read did not confirm: silence (still "found") when there was no previous
+   * read to confirm it, a miss quoting both rects when it differed.
+   */
+  unconfirmed(previous: Rect | undefined, rect: Rect): PollVerdict | undefined {
+    if (previous === undefined) {
+      this.foundSilently = 'unconfirmed';
+      return undefined;
+    }
+    const reason =
+      `the element moved between tree reads (${rectText(previous)} → ${rectText(rect)}) while only its own region, ` +
+      'not the whole screen, held still — the crop may sit where the element was, not where it is; let it come to rest and re-run';
+    return { pass: false, detail: failClosed(reason, this.unchecked) };
+  }
 
   /** Nothing to capture: the deadline has passed. */
   outOfTime(deadline: number): boolean {
     if (Date.now() < deadline) return false;
-    this.foundNoTime = true;
+    this.foundSilently = 'cut';
     return true;
   }
 
   /** The frame is not a verdict: a miss with the reason when it was seen moving, silence when nothing could be judged. */
   unsettled(frame: Pick<Frame, 'stability' | 'captures'>): PollVerdict | undefined {
     if (!isMoving(frame)) {
-      this.foundNoTime = true;
+      this.foundSilently = 'cut';
       return undefined;
     }
     this.mostCaptures = Math.max(this.mostCaptures, frame.captures);
     return { pass: false, detail: failClosed(unsettledReason({ captures: this.mostCaptures }), this.unchecked) };
   }
 
-  /** The timeout wording: the last finding, else found-but-no-time, which outranks not-found. */
+  /** The timeout wording: the last finding, else found-but-no-time (cut or unconfirmed, whichever silenced the last such round), which outranks not-found. */
   timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error }): string {
     if (last.detail !== undefined) return last.detail;
-    if (this.foundNoTime) return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame`;
+    if (this.foundSilently === 'cut') return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame`;
+    if (this.foundSilently === 'unconfirmed') {
+      return (
+        `element found and its region held still, but no time was left within ${timeoutMs}ms to confirm its position ` +
+        'with a second tree read — raise the timeout or let the screen come to rest'
+      );
+    }
     return notFound(timeoutMs, last.readError);
   }
 }
@@ -115,8 +211,10 @@ class PixelPollMemory {
  * Poll until `measure` passes on a settled, decoded frame of the element, or
  * the deadline passes. `{ pass: true }` carries the passing verdict's
  * detail; `{ pass: false }` the timeout wording — the last measured finding
- * or fail-closed reason, else "element found, but no time was left…", else
- * "not found within Nms" with the last tree-read error.
+ * or fail-closed reason, else "element found, but no time was left…" (to
+ * capture a settled frame, or — after a region-only round with nothing to
+ * confirm it — to confirm the element's position), else "not found within
+ * Nms" with the last tree-read error.
  */
 export async function pollPixels(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
@@ -126,14 +224,21 @@ export async function pollPixels(
   const memory = new PixelPollMemory(unchecked);
   const round = async (tree: UiNode, deadline: number): Promise<PollVerdict | undefined> => {
     const found = findBySpec(tree, element);
-    if (found.length === 0) return undefined;
+    if (found.length === 0) {
+      memory.forgetRect();
+      return undefined;
+    }
+    const { rect } = found[0];
+    const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
-    const frame = await captureFrame(adapter, { tree, deadline });
+    const frame = await captureFrame(adapter, { tree, deadline, region: rect });
     if (frame.stability !== 'settled') return memory.unsettled(frame);
+    // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).
+    if (frame.settledOver === 'region' && (previous === undefined || !sameRect(previous, rect))) return memory.unconfirmed(previous, rect);
     const { shot, measured } = frame;
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
-    return measure({ rect: found[0].rect, shot, measured });
+    return measure({ rect, shot, measured });
   };
   const outcome = await pollTree(
     adapter,

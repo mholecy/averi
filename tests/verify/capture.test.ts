@@ -131,6 +131,164 @@ describe('captureFrame — the stability wait', () => {
   });
 });
 
+/**
+ * Element-region stability (2026-10-06): beside a supplied tree, a caller
+ * may name the rect it will measure, and two captures that differ only
+ * OUTSIDE it are settled. The device here reports the SCREEN's 1000x2000
+ * points and the pngs are 100x200, so the scale is 0.1 and the card
+ * (x 100..900, y 200..300 in points) lands on png x 10..90, y 20..30 —
+ * the region check scales exactly as the measured frame will.
+ */
+describe('captureFrame — stability over the caller\'s region', () => {
+  const CARD = SCREEN.children[0].rect;
+  /** A 100x200 png (or as tall as asked) with one pixel painted: (0, 0) is off the card, (50, 25) is inside it. */
+  const painted = (x: number, y: number, value: number, height = 200): Buffer => {
+    const image = new PNG({ width: 100, height });
+    image.data.fill(255);
+    image.data[(y * 100 + x) << 2] = value;
+    return PNG.sync.write(image);
+  };
+  const clock = (tick: number) => painted(0, 0, tick);
+  const spinner = (tick: number) => painted(50, 25, tick);
+  /** Seven captures, each changing the one pixel at (x, y). */
+  const ticking = (x: number, y: number) => device([1, 2, 3, 4, 5, 6, 7].map((t) => painted(x, y, t)));
+
+  it('a clock ticking OUTSIDE the region does not keep the frame moving: settled on the first pair, the later capture returned', async () => {
+    const fake = device([clock(1), clock(2), clock(3)]);
+    const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
+    expect(got).toMatchObject({ stability: 'settled', settledOver: 'region', captures: 2 });
+    expect(sleeps).toEqual([STABILITY_DELAY_MS]);
+    // The capture that confirmed stability — the later of the pair — is the frame, and it is what gets measured.
+    expect(got.shot.equals(clock(2))).toBe(true);
+    expect(got.measured.png?.data[0]).toBe(2);
+    expect(got.measured.scale).toMatchObject({ scale: 0.1 });
+  });
+
+  it('a change INSIDE the region still moves the frame, through the whole budget', async () => {
+    const fake = device([1, 2, 3, 4, 5, 6, 7].map(spinner));
+    const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
+    expect(got).toMatchObject({ stability: 'moving', captures: 6 });
+    expect(fake.screenshots).toHaveLength(6);
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+    expect(got.shot.equals(spinner(6))).toBe(true);
+    // Only a settled frame says how it settled.
+    expect(got.settledOver).toBeUndefined();
+  });
+
+  it('the deadline counts the region check as part of a re-capture\'s cost: it is measured AFTER the check, not before', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = ticking(50, 25); // inside the card: every region pair differs
+    // The region check's device read stands in for its decode cost: 200 ms of virtual time per pair.
+    fake.viewport = async () => {
+      vi.setSystemTime(Date.now() + 200);
+      return { width: 1000, height: 2000 };
+    };
+    // The first re-capture costs 300 (sleep) + 200 (region check) = 500 and
+    // ends at 500; the next would end at 1000, past a deadline at 900. Timed
+    // before the check (300 ms), it would look like it ends at 800 and be taken.
+    const got = await captureFrame(fake, { tree: SCREEN, region: CARD, deadline: Date.now() + 900 });
+    expect(got).toMatchObject({ stability: 'moving', captures: 2 });
+    expect(sleeps).toEqual([STABILITY_DELAY_MS]);
+  });
+
+  /**
+   * The compare covers EXACTLY the crop the measurement will read, no inset
+   * and no missing edge (review 2026-10-06): the card lands on png x 10..90,
+   * y 20..30, half-open, so (10, 20) is its first pixel, (89, 29) its last,
+   * and (90, 29) the first one past it.
+   */
+  it('the region\'s edges: a change on its first or last pixel moves the frame, one pixel past the last does not', async () => {
+    const first = await captureFrame(ticking(10, 20), { tree: SCREEN, region: CARD });
+    expect(first).toMatchObject({ stability: 'moving', captures: 6 });
+    const last = await captureFrame(ticking(89, 29), { tree: SCREEN, region: CARD });
+    expect(last).toMatchObject({ stability: 'moving', captures: 6 });
+    const past = await captureFrame(ticking(90, 29), { tree: SCREEN, region: CARD });
+    expect(past).toMatchObject({ stability: 'settled', settledOver: 'region', captures: 2 });
+  });
+
+  it('the region is scaled from the DEVICE screen first, as the measured frame is — not from the tree', async () => {
+    // The device says 500x1000 points; the tree's root says 1000x2000. The
+    // png scale is 0.2 (device), so the card lands on png x 20..100, y 40..60;
+    // from the tree (0.1) it would land on y 20..30.
+    const insideByDevice = ticking(50, 45);
+    insideByDevice.viewportSize = { width: 500, height: 1000 };
+    expect(await captureFrame(insideByDevice, { tree: SCREEN, region: CARD })).toMatchObject({ stability: 'moving', captures: 6 });
+    const insideByTreeOnly = ticking(50, 25);
+    insideByTreeOnly.viewportSize = { width: 500, height: 1000 };
+    expect(await captureFrame(insideByTreeOnly, { tree: SCREEN, region: CARD })).toMatchObject({ stability: 'settled', settledOver: 'region', captures: 2 });
+  });
+
+  it('whole buffers that match are the fast path: the same count and sleeps as without a region, and no decode or device read in the wait', async () => {
+    const fake = device([Buffer.from('not a png'), Buffer.from('not a png')]);
+    let viewportReads = 0;
+    fake.viewport = async () => {
+      viewportReads += 1;
+      throw new Error('the stability wait must not read the device for identical captures');
+    };
+    const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
+    expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', captures: 2 });
+    expect(sleeps).toEqual([STABILITY_DELAY_MS]);
+    expect(viewportReads).toBe(0);
+    // The capture's own decode, after the wait, is the one that words the failure.
+    expect(got.measured.error).toMatch(/^screenshot PNG decode failed: /);
+  });
+
+  it('a frame whose scale cannot be derived falls back to whole-screen stability: an off-element change is still moving', async () => {
+    const fake = device([1, 2, 3, 4, 5, 6, 7].map(clock));
+    fake.viewport = async () => {
+      throw new Error('no idb');
+    };
+    // No device screen and a 0-wide root: the scale error the capture already carries (see "the one scale").
+    const unscalable = node({ rect: { x: 0, y: 0, width: 0, height: 0 } });
+    // A region that is on the png and clear of (0, 0) at ANY plausible scale,
+    // so only the scale error — not an off-png landing — can keep this moving.
+    const got = await captureFrame(fake, { tree: unscalable, region: { x: 10, y: 20, width: 10, height: 5 } });
+    expect(got).toMatchObject({ stability: 'moving', captures: 6 });
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+    expect(got.measured.scale?.error).toMatch(/screen width could not be inferred/);
+  });
+
+  it('a region that lands nowhere on the png falls back to whole-screen stability: an off-element change is still moving', async () => {
+    const fake = device([1, 2, 3, 4, 5, 6, 7].map(clock));
+    const got = await captureFrame(fake, { tree: SCREEN, region: { x: 0, y: 5000, width: 100, height: 100 } });
+    expect(got).toMatchObject({ stability: 'moving', captures: 6 });
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+  });
+
+  it('a capture that does not decode falls back to whole-screen stability: every pair with one in it is moving', async () => {
+    const garbage = (n: number) => Buffer.from(`not a png ${n}`);
+    const fake = device([garbage(1), clock(1), garbage(2), clock(2), garbage(3), clock(3), garbage(4)]);
+    const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
+    expect(got).toMatchObject({ stability: 'moving', captures: 6 });
+    expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
+  });
+
+  it('two captures of different sizes fall back to whole-screen stability, even when the region\'s bytes agree', async () => {
+    // White everywhere: inside the card's rows (y 20..30) the two sizes hold the same bytes.
+    const short = painted(0, 0, 255);
+    const tall = painted(0, 0, 255, 300);
+    const fake = device([short, tall, short, tall, short, tall, short]);
+    const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
+    expect(got).toMatchObject({ stability: 'moving', captures: 6 });
+  });
+
+  it('a region is accepted only beside a supplied tree — the readTree and png-only arms reject it by type', async () => {
+    const fake = device([clock(1), clock(1)]);
+    // @ts-expect-error — the readTree arm has no tree until after the wait (2026-10-06)
+    await captureFrame(fake, { readTree: true, region: CARD });
+    // @ts-expect-error — the png-only arm has no tree at all (2026-10-06)
+    await captureFrame(fake, { region: CARD });
+    // Options built elsewhere get no excess-property check: the `region?: never`
+    // fields are what refuse these two, not the literal's freshness.
+    const readTreeOpts = { readTree: true as const, region: CARD };
+    const pngOnlyOpts = { readTree: false as const, region: CARD };
+    // @ts-expect-error — `region?: never` on the readTree arm
+    await captureFrame(fake, readTreeOpts);
+    // @ts-expect-error — `region?: never` on the png-only arm
+    await captureFrame(fake, pngOnlyOpts);
+  });
+});
+
 describe('captureFrame — the tree beside the png', () => {
   it('without a tree in play, the frame is the png alone: no tree read, no device read, no decode', async () => {
     const fake = device([Buffer.from('not a png'), Buffer.from('not a png')]);
@@ -145,8 +303,9 @@ describe('captureFrame — the tree beside the png', () => {
     // A png-only frame reports nothing about a tree — not even a reason: it
     // asked for nothing more. It still says whether it settled.
     expect(got.measured).toBeUndefined();
-    expect(Object.keys(got)).toEqual(['shot', 'stability', 'captures']);
-    expect(got).toMatchObject({ stability: 'settled', captures: 2 });
+    // It says HOW it settled since 2026-10-06 — over the whole screen, the only answer without a region.
+    expect(Object.keys(got)).toEqual(['shot', 'stability', 'settledOver', 'captures']);
+    expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', captures: 2 });
   });
 
   it('readTree reads the tree with retry — a transient failure (uiautomator null root) is absorbed, 300 ms later', async () => {
