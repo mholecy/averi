@@ -2464,3 +2464,109 @@ flows:
     });
   });
 });
+
+/**
+ * The in-tree keyboard (iOS, 2026-10-07; docs/bugs/2026-10-05-ios-tap-lands-
+ * on-soft-keyboard.md): the WDA source marks the band the keyboard covers
+ * (role `keyboard`), the adapter has no oracle, and the guard REFUSES a
+ * target under it — nothing to press. The policy is pinned in
+ * tests/interact/keyboard.test.ts; here: the STEP, and the trace it writes
+ * through the same `tracingDismissal` path as every KeyboardGuardError.
+ */
+describe('tap: / fill: under the iOS in-tree keyboard — the ⚠ line says nothing was sent, before the ✗ (2026-10-07)', () => {
+  function iosFake(band = true) {
+    const fake = new FakeAdapter(
+      {
+        login: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 402, height: 874 },
+          children: [
+            node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect: { x: 36, y: 291, width: 330, height: 24 } }),
+            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 479, width: 222, height: 20 } }),
+            node({ role: 'button', identifier: 'login_submit', rect: { x: 36, y: 547, width: 141, height: 48 } }),
+            ...(band ? [node({ role: 'keyboard', rect: { x: 0, y: 539, width: 402, height: 335 } })] : []),
+          ],
+        }),
+      },
+      'login',
+    );
+    fake.platform = 'ios';
+    fake.treeSourceKind = 'wda';
+    fake.keyboard = undefined; // as IosAdapter: no oracle
+    fake.keyboardAdvice = 'ADVICE'; // the adapter's own sentence, quoted by the refusal
+    return fake;
+  }
+  const flow = (steps: string) =>
+    parseConfig(`
+app: { ios: { bundleId: sk.finportal.myport } }
+flows:
+  f:
+    steps:
+${steps}
+`);
+
+  it('the measured bug as a flow: fill, fill, tap login_submit → the tap step fails with the refusal, ⚠ tap then ✗ tap, nothing tapped or pressed', async () => {
+    const fake = iosFake();
+    const error = (await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    expect(error).toBeInstanceOf(FlowError);
+    expect(error.message).toMatch(/^The soft keyboard covers id:"login_submit": the band it draws over \[0,539\]\[402,874\] contains the tap point \(107,571\)/);
+    expect(error.message).toMatch(/on two looks 300ms apart, and this adapter cannot hide it \(ADVICE\)\. Nothing was tapped/);
+    expect(error.message).toMatch(/In a flow: hide it with a step before this one \(a tap: on an element the keyboard does not cover\), or lay the screen out so id:"login_submit" is not under the keyboard$/);
+    expect(error.trace.slice(1)).toEqual([
+      { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
+      { action: '✗ tap id:"login_submit"', detail: expect.stringMatching(/^failed — The soft keyboard covers id:"login_submit"/) },
+    ]);
+    expect(fake.taps).toEqual([]);
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('the workaround the message names: a tap: on the title first — a target clear of the band traces exactly what it always did', async () => {
+    const fake = iosFake();
+    const trace = await new FlowEngine(flow('      - tap: { id: login_title }'), fake, FAST).runFlow('f');
+    expect(JSON.stringify(trace)).toBe('[{"action":"flow f","detail":"start"},{"action":"tap","detail":"id:\\"login_title\\""},{"action":"flow f","detail":"done"}]');
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 303 }]);
+  });
+
+  it('no band in the tree (keyboard parked or absent, or an idb tree): the tap lands as before 2026-10-07, no ⚠ line', async () => {
+    const fake = iosFake(false);
+    const trace = await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    expect(trace.map((t) => t.action)).toEqual(['flow f', 'tap', 'flow f']);
+    expect(fake.tapPoints).toEqual([{ x: 107, y: 571 }]);
+  });
+
+  it('a fill: whose field lies under the band is refused the same way — ⚠ fill, ✗ fill, nothing typed', async () => {
+    const fake = iosFake();
+    fake.live().children[1].rect = { x: 90, y: 600, width: 222, height: 20 };
+    const error = (await new FlowEngine(flow('      - fill: { id: login_password, value: secret }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ fill', expect.stringMatching(/^✗ fill/)]);
+    expect(error.trace[1].detail).toBe('the soft keyboard covered id:"login_password"; no dismissal, nothing sent');
+    expect(fake.typed).toEqual([]);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('the second look fails (the target gone by then): still a ⚠ tap line, saying the first look found it covered and nothing was sent, before the ✗', async () => {
+    const fake = iosFake();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (++reads === 3) fake.live().children = fake.live().children.filter((c) => c.identifier !== 'login_submit');
+      return real();
+    };
+    const error = (await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1)).toEqual([
+      { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; nothing sent, and the second look failed' },
+      { action: '✗ tap id:"login_submit"', detail: expect.stringMatching(/^failed — After the soft keyboard covered id:"login_submit" at \(107,571\) on a first look, the second look failed: Timed out/) },
+    ]);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('an optional: tap under the band is skipped quoting the refusal, not "not present", after its ⚠ tap line', async () => {
+    const fake = iosFake();
+    const trace = await new FlowEngine(flow('      - optional:\n          - tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    expect(trace.slice(1, -1)).toEqual([
+      { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
+      { action: 'optional', detail: expect.stringMatching(/^skipped id:"login_submit" \(The soft keyboard covers id:"login_submit"/) },
+    ]);
+    expect(fake.taps).toEqual([]);
+  });
+});

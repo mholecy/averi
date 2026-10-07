@@ -7,16 +7,21 @@ import {
   KEYBOARD_DISAGREEMENT_POLL_MS,
   KEYBOARD_HIDE_DELAY_MS,
   KeyboardStateDisagreement,
+  KeyboardWithoutDismissal,
   afterBack,
   dismissKeyboard,
   dismissal,
   firstLook,
+  inTreeLook,
   recheck,
   resolveClearOfKeyboard,
   windowOver,
 } from '../../src/interact/keyboard.js';
 import { tapElement } from '../../src/interact/tap.js';
+import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { FakeAdapter, node, screen } from '../helpers/fake.js';
+import { readFile } from 'node:fs/promises';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (as in
 // fill.test.ts): the pause after `back` is asserted as a delay in a sequence.
@@ -721,5 +726,314 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     await dismissKeyboard(fake);
     expect(fake.keys).toEqual(keys);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
+  });
+});
+
+/**
+ * The in-tree keyboard (2026-10-07, docs/bugs/2026-10-05-ios-tap-lands-on-
+ * soft-keyboard.md): the measured iOS login, in points — `login_submit` at
+ * {36,547,141,48} (centre 107,571), the keyboard's band {0,539,402,335}
+ * with the AutoFill bar, as the WDA source marks it (role `keyboard`,
+ * tests/adapters/wda-source-keyboard.test.ts pins the parser). No oracle on
+ * the adapter: the guard reads the band off the tree that resolved the
+ * target, takes a second look when it covers, and there is nothing to press.
+ */
+describe('tapElement — an in-tree keyboard (no oracle) covering the target: a refusal, nothing sent (2026-10-07)', () => {
+  const BAND: Rect = { x: 0, y: 539, width: 402, height: 335 };
+  const SUBMIT: Rect = { x: 36, y: 547, width: 141, height: 48 };
+  const TITLE: Rect = { x: 36, y: 291, width: 330, height: 24 };
+  /** The adapter's own sentence (DeviceAdapter.keyboardAdvice) — quoted, never composed, by the guard. */
+  const ADVICE = 'no key hides it here, says the adapter';
+  const bandNode = (band: Rect) => node({ role: 'keyboard', rect: { ...band }, children: [node({ role: 'container', rect: { x: 0, y: 583, width: 402, height: 233 } })] });
+  function iosFake(band: Rect | null = BAND) {
+    const fake = new FakeAdapter(
+      {
+        login: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 402, height: 874 },
+          children: [
+            node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect: { ...TITLE } }),
+            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 479, width: 222, height: 20 } }),
+            node({ role: 'button', identifier: 'login_submit', rect: { ...SUBMIT } }),
+            ...(band === null ? [] : [bandNode(band)]),
+          ],
+        }),
+      },
+      'login',
+    );
+    fake.platform = 'ios';
+    fake.keyboard = undefined; // as IosAdapter: no oracle
+    fake.keyboardAdvice = ADVICE;
+    return fake;
+  }
+  /** Let the Nth tree read (1-based) see the screen changed by `change` — the keyboard leaving, the target going — without touching the live screen's earlier reads. */
+  const onRead = (fake: FakeAdapter, n: number, change: (live: UiNode) => void) => {
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (++reads === n) change(fake.live());
+      return real();
+    };
+  };
+  const dropBand = (live: UiNode) => {
+    live.children = live.children.filter((c) => c.role !== 'keyboard');
+  };
+  const REFUSAL =
+    'The soft keyboard covers id:login_submit: the band it draws over [0,539][402,874] contains the tap point (107,571) on two looks ' +
+    `${KEYBOARD_HIDE_DELAY_MS}ms apart, and this adapter cannot hide it (${ADVICE}). Nothing was tapped: the tap would have pressed the ` +
+    'keyboard and been reported done. From the MCP tools: hide the keyboard first, then tap id:login_submit again. In a flow: hide it ' +
+    'with a step before this one (a tap: on an element the keyboard does not cover), or lay the screen out so id:login_submit is not under the keyboard';
+
+  it('the bug: the target\'s centre inside the band on both looks → KeyboardWithoutDismissal; no tap, no key, no oracle, four reads and the hide delay between the looks', async () => {
+    const fake = iosFake();
+    const events = recorded(fake);
+    const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+    expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
+    expect(error).not.toBeInstanceOf(AfterKeyboardDismissal); // nothing was pressed
+    expect(error.message).toBe(REFUSAL);
+    expect(error.traceLine).toBe('the soft keyboard covered id:login_submit; no dismissal, nothing sent');
+    expect(events).toEqual(['read', 'read', 'read', 'read']); // two settle reads per look; the band came from those, no read of its own
+    expect(fake.taps).toEqual([]);
+    expect(fake.keys).toEqual([]);
+    expect(sleeps).toEqual([FAST.pollMs, KEYBOARD_HIDE_DELAY_MS, FAST.pollMs]);
+  });
+
+  it('an adapter without a sentence of its own: the refusal says only that it cannot hide it', async () => {
+    const fake = iosFake();
+    fake.keyboardAdvice = undefined;
+    await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(/and this adapter cannot hide it\. Nothing was tapped/);
+  });
+
+  it('the keyboard LEAVES between the looks (still sliding away after the step before): the tap lands on the second look\'s node, with a note', async () => {
+    const fake = iosFake();
+    onRead(fake, 3, dropBand);
+    const events = recorded(fake);
+    const result = await tapElement(fake, 'id:login_submit', FAST);
+    expect(events).toEqual(['read', 'read', 'read', 'read', 'tap:107,571']);
+    expect(sleeps).toEqual([FAST.pollMs, KEYBOARD_HIDE_DELAY_MS, FAST.pollMs]);
+    const sentence = 'the soft keyboard covered id:login_submit; gone on the second look';
+    expect(result).toEqual({ note: sentence, keyboardHidden: sentence });
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('the band is read from the read that SETTLED the target (the second agreeing one), not the first: band in read 1, none in read 2 → no second look, no delay, no note', async () => {
+    const fake = iosFake();
+    onRead(fake, 2, dropBand);
+    const events = recorded(fake);
+    const result = await tapElement(fake, 'id:login_submit', FAST);
+    expect(events).toEqual(['read', 'read', 'tap:107,571']);
+    expect(sleeps).toEqual([FAST.pollMs]);
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
+  });
+
+  it('the target VANISHES by the second look: the settle timeout, wrapped so the trace shows the first look found it covered — and that nothing was pressed', async () => {
+    const fake = iosFake();
+    onRead(fake, 3, (live) => {
+      live.children = live.children.filter((c) => c.identifier !== 'login_submit');
+    });
+    const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+    expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
+    expect(error.message).toBe(
+      'After the soft keyboard covered id:login_submit at (107,571) on a first look, the second look failed: Timed out after 200ms ' +
+        'waiting for element id:login_submit (visible and settled). Nothing was pressed; the screen is as the step found it',
+    );
+    expect(error.traceLine).toBe('the soft keyboard covered id:login_submit; nothing sent, and the second look failed');
+    expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit (visible and settled)');
+    expect(fake.taps).toEqual([]);
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('a second look that reads a dead tree keeps the read error beneath the headline', async () => {
+    const fake = iosFake();
+    onRead(fake, 3, () => {
+      fake.uiTree = async () => {
+        throw new Error('device offline');
+      };
+    });
+    const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as Error;
+    expect(error.message.split('\n')).toEqual([
+      'After the soft keyboard covered id:login_submit at (107,571) on a first look, the second look failed: Timed out after 200ms ' +
+        'waiting for element id:login_submit (visible and settled). Nothing was pressed; the screen is as the step found it',
+      '  (last UI tree read failed: device offline)',
+    ]);
+  });
+
+  it('a refusal on the second look (refuse mode, a second interactive match revealed) keeps its FIRST line as the headline and says below it that nothing was pressed', async () => {
+    const fake = iosFake();
+    onRead(fake, 3, (live) => {
+      live.children.push(node({ role: 'button', identifier: 'login_submit', label: 'Other', rect: { x: 200, y: 400, width: 100, height: 40 } }));
+    });
+    const error = (await tapElement(fake, 'id:login_submit', { ...FAST, ambiguous: 'refuse' }).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+    expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
+    const lines = error.message.split('\n');
+    expect(lines[0]).toBe('Selector matches 2 elements: id:login_submit');
+    expect(lines.at(-1)).toBe('(This was the second look, after the soft keyboard covered id:login_submit at (107,571) on a first look. Nothing was pressed)');
+    expect(error.traceLine).toBe('the soft keyboard covered id:login_submit; nothing sent, and the second look failed');
+    expect(error.cause).toBeInstanceOf(AmbiguityRefusal);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('an app element named inputView (an RN testID) does not disable the guard: the K1 dump with login_card renamed still refuses login_submit', async () => {
+    const renamed = (await readFile(new URL('../fixtures/wda-source-myport-login-keyboard-bar.json', import.meta.url), 'utf8')).replace('"rawIdentifier":"login_card"', '"rawIdentifier":"inputView"');
+    const fake = new FakeAdapter({ dump: parseWdaSource(renamed) }, 'dump');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    const error = (await resolveClearOfKeyboard(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+    expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
+    expect(error.message).toContain('the band it draws over [0,539][402,874] contains the tap point (107,571)');
+  });
+
+  it('a target clear of the band (the title) is tapped as before: two reads, no delay, no note', async () => {
+    const fake = iosFake();
+    const events = recorded(fake);
+    const result = await tapElement(fake, 'id:login_title', FAST);
+    expect(events).toEqual(['read', 'read', 'tap:201,303']);
+    expect(sleeps).toEqual([FAST.pollMs]);
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
+  });
+
+  it('no band in the tree (no keyboard on screen, or an idb tree): exactly what happened before — the tap lands on the centre', async () => {
+    const fake = iosFake(null);
+    const events = recorded(fake);
+    const result = await tapElement(fake, 'id:login_submit', FAST);
+    expect(events).toEqual(['read', 'read', 'tap:107,571']);
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
+  });
+
+  it('the band is half-open like a frame: a centre on its top row (539) is covered, one point above (538) is clear', async () => {
+    const at = async (centreY: number) => {
+      const fake = iosFake();
+      fake.live().children[2].rect = { x: 36, y: centreY - 24, width: 141, height: 48 };
+      return tapElement(fake, 'id:login_submit', FAST).then(() => 'tapped', (e: unknown) => (e as Error).name);
+    };
+    expect(await at(539)).toBe('KeyboardWithoutDismissal');
+    expect(await at(538)).toBe('tapped');
+  });
+
+  it('the band without the bar ({0,566,402,308}, the K2 shape) still covers the centre at 571', async () => {
+    const fake = iosFake({ x: 0, y: 566, width: 402, height: 308 });
+    await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(/the band it draws over \[0,566\]\[402,874\] contains the tap point \(107,571\)/);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('fillField: a field under the band on both looks is refused before the focus tap — nothing tapped, nothing typed', async () => {
+    const fake = iosFake();
+    fake.live().children[1].rect = { x: 90, y: 600, width: 222, height: 20 };
+    await expect(fillField(fake, 'id:login_password', 'abc', FAST)).rejects.toBeInstanceOf(KeyboardWithoutDismissal);
+    expect(fake.taps).toEqual([]);
+    expect(fake.typed).toEqual([]);
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('fillField: a field clear of the band is focused and typed into, asking nothing', async () => {
+    const fake = iosFake();
+    const result = await fillField(fake, 'id:login_password', 'abc', FAST);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 489 }]);
+    expect(fake.typed).toEqual(['abc']);
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined });
+  });
+
+  it('an ElementSpec target is named in the flow vocabulary, in the message and the trace line', async () => {
+    const fake = iosFake();
+    const error = (await resolveClearOfKeyboard(fake, { id: 'login_submit' }, FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+    expect(error.traceLine).toBe('the soft keyboard covered id:"login_submit"; no dismissal, nothing sent');
+    expect(error.message).toMatch(/^The soft keyboard covers id:"login_submit": /);
+  });
+
+  it('the band must have area: a zero-area keyboard node is not a keyboard on screen', async () => {
+    const fake = iosFake({ x: 0, y: 539, width: 0, height: 0 });
+    await tapElement(fake, 'id:login_submit', FAST);
+    expect(fake.taps).toEqual(['login_submit']);
+  });
+
+  it('an adapter WITH an oracle never reads the tree for the keyboard: the oracle says hidden, the band in the tree changes nothing (Android untouched)', async () => {
+    const fake = iosFake();
+    fake.platform = 'android';
+    fake.attachKeyboard({ state: 'hidden' });
+    const events = recorded(fake);
+    await tapElement(fake, 'id:login_submit', FAST);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'tap:107,571']);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
+  });
+
+  it('the guard\'s answer carries the node and its note only — never the tree the resolution rode in on (in-tree clear, and oracle hidden)', async () => {
+    const clear = await resolveClearOfKeyboard(iosFake(), 'id:login_title', FAST);
+    expect(Object.keys(clear)).toEqual(['node', 'note']);
+    const android = iosFake();
+    android.attachKeyboard({ state: 'hidden' });
+    const hidden = await resolveClearOfKeyboard(android, 'id:login_submit', FAST);
+    expect(Object.keys(hidden)).toEqual(['node', 'note']);
+  });
+
+  it('the resolution note of the node tapped is kept, unchanged, when the band does not cover it', async () => {
+    const fake = iosFake();
+    fake.live().children.push(node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect: { x: 36, y: 320, width: 330, height: 24 } }));
+    fake.live().children.push(node({ role: 'button', identifier: 'login_title', label: 'x', rect: { x: 36, y: 350, width: 30, height: 24 } }));
+    const result = await tapElement(fake, 'id:login_title', FAST);
+    expect(result.note).toBe('3 matches; picked the only interactive one (button)');
+    expect(result.keyboardHidden).toBeUndefined();
+  });
+
+  /**
+   * The keyboard's OWN controls (review 2026-10-07): a tap on a key, on the
+   * accessory toolbar's Done, on the Passwords bar or on dictation lands
+   * inside the band and is what the user does — an OTP digit, the one
+   * non-submitting dismissal. The WDA source marks their Windows
+   * (`ofKeyboard`); the guard reads them as not covered. On the REAL dumps.
+   */
+  describe('the keyboard\'s own controls are tappable on the real dumps — only the app\'s element under the band is refused', () => {
+    const fixture = async (name: string) => parseWdaSource(await readFile(new URL(`../fixtures/wda-source-myport-${name}.json`, import.meta.url), 'utf8'));
+    const onDump = async (name: string) => {
+      const fake = new FakeAdapter({ dump: await fixture(name) }, 'dump');
+      fake.platform = 'ios';
+      fake.keyboard = undefined;
+      return fake;
+    };
+    const resolves = async (name: string, selector: string) => {
+      const fake = await onDump(name);
+      const events = recorded(fake);
+      const { node: found, keyboardHidden } = await resolveClearOfKeyboard(fake, selector, FAST);
+      expect(events).toEqual(['read', 'read']); // one look, no delay
+      expect(keyboardHidden).toBeUndefined();
+      return found;
+    };
+
+    it.each([
+      ['2fa-keyboard-toolbar', 'label:Done', { x: 317, y: 523, width: 64, height: 38 }], // the inputAccessoryView Done — the natural non-submitting dismissal, in a DIFFERENT Window than the band
+      ['2fa-keyboard-toolbar', 'id:Toolbar', { x: 0, y: 518, width: 402, height: 48 }],
+      ['2fa-keyboard-toolbar', 'label:1', { x: 4, y: 590, width: 133, height: 54 }], // an OTP digit
+      ['login-keyboard-bar', 'label:Passwords', { x: 30, y: 539, width: 342, height: 44 }],
+      ['login-keyboard-bar', 'label:q', { x: 4, y: 590, width: 40, height: 54 }],
+      ['login-keyboard-bar', 'id:dictation', { x: 325, y: 805, width: 69, height: 70 }],
+      ['login-keyboard', 'id:dictation', { x: 325, y: 805, width: 69, height: 70 }],
+    ])('%s: %s resolves clear, inside the band', async (name, selector, rect) => {
+      expect((await resolves(name, selector)).rect).toEqual(rect);
+    });
+
+    it.each([
+      ['login-keyboard-bar', '[0,539][402,874]'],
+      ['login-keyboard', '[0,566][402,874]'],
+    ])('%s: login_submit (centre 107,571) is still refused, naming the band %s', async (name, band) => {
+      const fake = await onDump(name);
+      const error = (await resolveClearOfKeyboard(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+      expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
+      expect(error.message).toContain(`the band it draws over ${band} contains the tap point (107,571)`);
+    });
+
+    it('the parked dump (no band): the toolbar\'s Done and the app\'s submit both resolve clear', async () => {
+      expect((await resolves('2fa-keyboard-parked', 'label:Done')).rect).toEqual({ x: 317, y: 831, width: 64, height: 38 });
+      expect((await resolves('2fa-keyboard-parked', 'id:twofactor_submit')).rect).toEqual({ x: 225, y: 501, width: 141, height: 49 });
+    });
+  });
+});
+
+describe('inTreeLook — the in-tree decision (2026-10-07)', () => {
+  const FRAME = { x: 0, y: 539, width: 402, height: 335 };
+  it.each([
+    ['window clear: proceed', { over: 'clear' }, { action: 'proceed' }],
+    ['window unknown (no band in the tree — none on screen, an idb tree, or a target that is the keyboard\'s own UI): proceed, the fail-open rule', { over: 'unknown' }, { action: 'proceed' }],
+    ['covering: refuse with the band — there was never a key to press', { over: 'covering', frame: FRAME }, { action: 'refuse', frame: FRAME }],
+  ] as const)('%s', (_name, window, expected) => {
+    expect(inTreeLook(window)).toEqual(expected);
   });
 });

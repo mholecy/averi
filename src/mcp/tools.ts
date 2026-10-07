@@ -299,7 +299,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
         'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id. ' +
-        'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait.',
+        'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait. ' +
+        'iOS wda with the software keyboard up: one node has role "keyboard" — its rect is the band the keyboard covers (keys, AutoFill bar, accessory toolbar slot), where a tap is refused — and the two Windows that ARE the keyboard\'s UI carry "ofKeyboard": true (their descendants — keys, Done, the Passwords bar — are tappable).',
       inputSchema: {
         platform,
         filter: z.string().optional().describe('Selector to filter nodes'),
@@ -329,7 +330,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still (same policy as a flow tap: step) and fails with "Timed out … (visible and settled)" ` +
         'if it never does — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes; ' +
         'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector. ' +
-        'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given.',
+        'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given. ' +
+        'On iOS with treeSource: wda a target COVERED by the on-screen keyboard (its band: keys, AutoFill bar, accessory toolbar slot) is REFUSED — nothing is tapped or pressed, since no non-submitting dismissal exists; hide it first (tap a neutral, non-interactive element such as a title), then tap again. ' +
+        "The keyboard's own controls — a key, the toolbar's Done, the Passwords bar, dictation — are tappable as always. With treeSource: idb the tree carries no keyboard and the tap is sent as before.",
       inputSchema: {
         platform,
         selector: z.string().optional().describe('Element to tap, e.g. \'id:login_button\' or \'text:"Sign in"\' (quote values with spaces)'),
@@ -376,7 +379,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields), ' +
         `then verifies the text landed and retries a dropped clear-fill once. The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
         'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first). ' +
-        'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting an unverified fill. Without selector: types into whatever is focused.',
+        'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting an unverified fill. Without selector: types into whatever is focused. ' +
+        'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android and refused on iOS (treeSource: wda; nothing typed).',
       inputSchema: {
         platform,
         text: z.string(),

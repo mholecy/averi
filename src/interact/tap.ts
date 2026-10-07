@@ -26,7 +26,7 @@ import type { SettleOptions, Target } from './resolve.js';
  * to import the selector layer above it (ARCHITECTURE.md §3).
  */
 export async function tapElement(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'pressKey'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<{ note?: string; keyboardHidden?: string }> {

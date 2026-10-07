@@ -233,3 +233,98 @@ id` `login_password` → `click`). Screens are 402 × 874 pt.
 | `Keyboard` node present with nothing focused? (K3) | no, a single `Window` and no `Keyboard` |
 | Extra `/source` cost per tap, median/p90 (K4) | login: up 0.873/0.983 s, down 0.592/0.614 s. 2FA: up 0.667/0.687 s, parked 0.750/0.782 s |
 | Non-submitting dismissal that works (K5) | an `idb ui tap` on a neutral, non-interactive point (the title). WDA `keyboard/dismiss` fails both ways, a swipe does nothing, and the return key submits |
+
+## Fix (stage A) — 2026-10-07, not yet device-checked
+
+**Shipped.** A tap on a resolved node whose centre lies under the on-screen keyboard is REFUSED on iOS `treeSource: wda`,
+and the refusal is visible in the trace. No device read is added and nothing is pressed. (Revised the same day after
+review round 1: the keyboard's own controls are exempt, the band rule has a fail-safe, the guard takes a second look,
+and one helper owns the oracle-or-tree switch.)
+
+1. **The band comes from the tree that resolved the target** (`src/adapters/wda-source.ts#keyboardMarks`). For every
+   `Keyboard` element that is on screen — `isVisible` is `"1"` AND its rect intersects its Window's — the parser gives
+   ONE node the new role `keyboard` (`KEYBOARD_ROLE`, `src/adapters/types.ts`): the outermost ancestor below that
+   Window whose rect is a *band* of it — starts below the window's top and is under 60 % of its height
+   (`MAX_BAND_FRACTION`; the measured bands are 38–41 %) — falling back to the `Keyboard` itself (exempt from the bound).
+   A wrapper merely smaller than its Window (a safe-area inset, a fractional 873.67 edge, a Stage Manager frame) is
+   walked past, so it can never be crowned and refuse every tap. On the fixtures the band is the union `Other` the
+   measurements above describe: `{0,539,402,335}` with the Passwords bar (K1), `{0,566,402,308}` without it (K2),
+   `{0,518,402,356}` with the 2FA toolbar (toolbar slot included). A parked keyboard (2FA-0: `isVisible=0`, y 891) and
+   a screen with nothing focused (K3) mark nothing. The `Keyboard` element stays `container`, its keys `other`; the role
+   is not interactive and no selector or resolution changes (`tests/adapters/wda-source-keyboard.test.ts`, 46 tests
+   over the five shrunk fixtures `tests/fixtures/wda-source-myport-*.json`).
+   - **Correction to the second pass above:** the band rule was checked against the screenshots' pixels, and in K2
+     the keyboard's grey begins at **566 pt** (at x = 8 %, through the key columns; the left-margin strip at 566–578 is
+     the rounded edge), 17 pt above the `Keyboard` rect's 583 — exactly the union `Other {0,566,402,308}`. So
+     "covered ≈583–874" for K2 was the `Keyboard` rect, not the drawn area, and Submit's centre (571) lies inside
+     the keyboard in K2 as well. K1 and 2FA-up agree with their unions too (grey from 540 at x = 8 %, where the bar
+     is keyboard-coloured; the white Done toolbar from 519, grey from 566). Why the second-pass `run_flow login`
+     passed is therefore open: not because 571 was clear with the bar absent — more likely the keyboard was parked or
+     hidden at the moment of that tap (the 2026-10-05 observation), which the run did not capture.
+2. **The keyboard's own controls are the keyboard, not under it** (review round 1). A tap on a key, on the toolbar's
+   Done {317,523} — the natural non-submitting dismissal, an OTP digit, the Passwords bar or dictation lands inside
+   the band and must not be refused. The parser marks the roots of the keyboard's UI with `UiNode.ofKeyboard`: the
+   Window holding a `Keyboard` element, and the Window holding an `inputView`-identified element — UIKit's input-host
+   Window, which in the 2FA fixture holds the Toolbar in a *different* Window than the band (so "a descendant of the
+   band node" would miss Done). On the roots only, so `ui_snapshot` shows the mark twice, not on seventy keys.
+   `ui-tree/soft-keyboard.ts#partOfKeyboard` walks the ancestry; a keyboard-side subject reads as not covered in the
+   guard and in the pixel poll. The `inputView` half is guarded twice (review round 2 — `rawIdentifier` is an RN
+   `testID`, and renaming K1's `login_card` to `inputView` had marked the app's Window and let `login_submit` be
+   tapped): the element must have the placeholder's measured shape — full window width, flush with the window's
+   bottom, a band by the 60 % rule (it is the band's own rect in all three keyboard-up fixtures) — AND must not sit in
+   the Application's first Window child, the app's own (UIKit orders windows by level; the keyboard's and the input
+   host's come after it in all five fixtures). The `Keyboard`-type rule stays unconditional: the type is UIKit's.
+   Pinned with the renamed dump (window 0 unmarked, `login_submit` still refused) and per-guard synthetics. Pinned on the real dumps: Done, Toolbar, the `1` key, Passwords, `q`, dictation resolve
+   clear; `login_submit` is still refused on K1 and K2. Residual: in the parked fixture the Toolbar's Window holds no
+   `inputView` and is not marked — with no band on screen nothing is refused there either.
+3. **The guard** (`src/interact/keyboard.ts#resolveClearOfKeyboard`): `resolveSettled` returns the tree of the read
+   that settled the target (`ResolvedSettled.tree`, the second agreeing read — pinned: a band in read 1 and none in
+   read 2 taps at once); `ui-tree/soft-keyboard.ts#readSoftKeyboard` — THE one switch between the oracle (`state()`)
+   and the tree, shared with the pixel poll — reads the keyboard with the target as its subject, through the same
+   `windowOver` geometry as Android. Without an oracle a covering first look is not final (the settle wait proves the
+   target held still, not the keyboard — one still sliding away after `tap: title` → `tap: submit` would read as
+   covering): the guard waits `KEYBOARD_HIDE_DELAY_MS` (300 ms), resolves again and decides on that look
+   (`inTreeLook`): clear → the tap, with the note `…; gone on the second look`; still covering →
+   `KeyboardWithoutDismissal` (a `KeyboardGuardError`), nothing tapped, nothing pressed; a second look that cannot
+   resolve the target (timeout, ambiguity, a dead read) is wrapped the same way the Android second look is
+   (`After the soft keyboard covered X at (x,y) on a first look, the second look failed: …. Nothing was pressed`,
+   trace line `…; nothing sent, and the second look failed`, the original error as `cause`). The flow engine's existing
+   `tracingDismissal` path prints `⚠ tap id:"login_submit" — the soft keyboard covered id:"login_submit"; no
+   dismissal, nothing sent` before the `✗ tap` line; the message quotes the band and the point ("on two looks 300ms
+   apart") and says "this adapter cannot hide it (…)" quoting the ADAPTER's own sentence — `DeviceAdapter.keyboardAdvice`,
+   set by `IosAdapter` from the K5 measurements (no back key, return submits, WDA `keyboard/dismiss` fails, swipe does
+   nothing; a tap on a neutral element hid it; a hardware keyboard keeps it from showing) — so interact/ and verify/
+   carry no platform fact. `fill:`'s focus tap goes through the same guard. An adapter WITH an oracle is never read
+   from the tree (pinned: oracle `hidden` + band in tree → tap, one query): Android is byte-identical. The guard's
+   result carries `node` and `note` only, never the tree (pinned).
+4. **Pixel asserts** (`src/verify/pixel-poll.ts`): the round reads `readSoftKeyboard` with the found element as the
+   subject — the oracle, else the round's own tree; a keyboard-side element is not covered — and a covered element
+   fails closed with both rects; the remedy says "hide it first and re-run; this adapter cannot hide it (<advice>)"
+   rather than naming `back`/`dismissKeyboard`.
+5. **MCP `tap` / `type_text` descriptions** say so, including that the keyboard's own controls stay tappable;
+   `ui_snapshot` shows the band as a `keyboard` node and `ofKeyboard: true` on the two keyboard-side Windows, and its
+   description says what both mean.
+6. **Fixtures**: shrunk to the parser's fields (29–39 KB, one element per line), the username replaced by
+   `user@example`, the filled password normalized to 8 bullets (the real length is not in the repo).
+
+**Deferred / residuals.**
+- **Stage B, a dismissal.** The only non-submitting dismissal measured (K5b) is a tap on a neutral point, which is
+  app-specific; `dismissKeyboard` / `fill { dismissKeyboard: true }` on iOS still presses `enter` blind (K5d: submits).
+  A generic candidate (the toolbar's Done or the keyboard's `Hide keyboard` key when present — both now resolve as
+  tappable — or a `dismissKeyboard: { tap: <element> }` option) needs its own measurement.
+- **An accessory toolbar alone** (2FA-0: `Toolbar` on screen at 826–874, `isVisible=1`, keyboard parked below the
+  screen) marks no band; a target under it is tapped as before.
+- **`treeSource: idb`** has no keyboard in its tree: no band, no marks, no refusal — the pre-fix behaviour, fail-open.
+- **iPad split / floating keyboard, a second on-screen `Keyboard`**: not measured; the first on-screen Keyboard's
+  band is read; the 60 % bound was chosen on portrait phone measurements.
+- **iPhone landscape**: on a 402 pt-tall screen the 60 % bound is 241 pt, and keys + predictive bar + an accessory
+  toolbar may well exceed it (unmeasured estimate). The rule would then walk past the union and fall back to a
+  deeper, smaller band — or the `Keyboard` rect — and miss the bar: fail-open there, not a false refusal. Measure
+  before relying on the guard in landscape; the bound may need to be per-orientation.
+- **An app with a second window of its own holding a band-shaped `inputView`-identified element** (full width,
+  flush with that window's bottom, under 60 % of its height, starting below its top) gets that window marked as the
+  keyboard's, and targets in it are tapped unguarded — the pre-fix behaviour, for that window only (review round 3
+  constructed it on K1; no measured app does this).
+- **The device check** of the fix is pending: expected on the finportal `login` flow with the keyboard up, a `⚠ tap`
+  refusal naming `[0,539][402,874]` (or `[0,566][402,874]`) and `(107,571)` instead of a 45 s timeout; with a
+  `tap: { id: login_title }` added before the submit, a pass; and `tap text:"Done"` on the 2FA number pad hiding it.

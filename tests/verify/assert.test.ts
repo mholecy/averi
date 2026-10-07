@@ -1825,3 +1825,103 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     expect(result.detail).toBe('sampled #3F3F50 (dominant, 100% of region) vs expected #FFFFFF → dE00 61.62 > 8; scale 1.000');
   });
 });
+
+/**
+ * The same rule from the tree (iOS, 2026-10-07): the WDA source marks the
+ * band the keyboard covers with role `keyboard`
+ * (tests/adapters/wda-source-keyboard.test.ts), the adapter has no oracle,
+ * and the pixel poll reads the band off the round's own tree — no query, no
+ * extra read — with a remedy that names no `back`.
+ */
+describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
+  const CARD = { x: 100, y: 200, width: 800, height: 100 };
+  const COVERING = { x: 0, y: 250, width: 1000, height: 1750 };
+  const BELOW = { x: 0, y: 1285, width: 1000, height: 715 };
+  const COVERED =
+    'the soft keyboard covers the element (element 100,200 800x100, keyboard 0,250 1000x1750) — ' +
+    'hide it first and re-run; this adapter cannot hide it (ADVICE)';
+  const fill = (p: PNG, hex: string): void => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let y = CARD.y; y < CARD.y + CARD.height; y++) {
+      for (let x = CARD.x; x < CARD.x + CARD.width; x++) {
+        const o = (y * p.width + x) << 2;
+        p.data[o] = r;
+        p.data[o + 1] = g;
+        p.data[o + 2] = b;
+        p.data[o + 3] = 255;
+      }
+    }
+  };
+  const iosFake = (band?: { x: number; y: number; width: number; height: number }) => {
+    resetLayout();
+    const children = [node({ identifier: 'card', rect: { ...CARD } }), ...(band ? [node({ role: 'keyboard', rect: { ...band } })] : [])];
+    const fake = new FakeAdapter({ detail: screen(...children) }, 'detail');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.keyboardAdvice = 'ADVICE'; // the adapter's own sentence (IosAdapter has the measured one), quoted by the miss
+    fake.nextScreenshot = png(1000, 320, (p) => fill(p, '#FFFFFF')); // the keys' white: had it been sampled, it would have passed
+    return fake;
+  };
+  const SLOW = { pollMs: 300, timeoutMs: 1000 };
+
+  it('a band over the element fails closed every round, naming both rects and the in-tree remedy, and captures nothing', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fake = iosFake(COVERING);
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      reads++;
+      return real();
+    };
+    const c = await new Verifier(fake, SLOW).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(c.pass).toBe(false);
+    expect(c.detail).toBe(`${COVERED}; failing closed, color unchecked`);
+    expect(fake.screenshots).toHaveLength(0);
+    expect(reads).toBe(5); // the rounds' own reads (0, 300, 600, 900 ms asked; 1200 ms past the deadline, asks nothing) — the band costs none of its own
+    expect(fake.keys).toEqual([]);
+
+    const ocr = iosFake(COVERING);
+    let recognized = 0;
+    const engine = {
+      recognize: async (_png: Buffer, regions: { id: string }[]) => {
+        recognized += 1;
+        return regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 200, h: 30 }] }));
+      },
+    };
+    const o = await new Verifier(ocr, { ...SLOW, ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toBe(`${COVERED}; failing closed, rendered text unchecked`);
+    expect(recognized).toBe(0);
+  });
+
+  it('an element that IS the keyboard\'s UI (under an `ofKeyboard` root, inside the band) is not covered: measured, two captures', async () => {
+    resetLayout();
+    const kbWindow = node({ role: 'container', ofKeyboard: true, rect: { x: 0, y: 0, width: 1000, height: 2000 }, children: [node({ identifier: 'card', rect: { ...CARD } }), node({ role: 'keyboard', rect: { ...COVERING } })] });
+    const fake = new FakeAdapter({ detail: screen(kbWindow) }, 'detail');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.nextScreenshot = png(1000, 320, (p) => fill(p, '#FFFFFF'));
+    const c = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(c.pass).toBe(true);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('an adapter WITH an oracle is not read from the tree: the oracle says hidden, a band in the tree changes nothing (Android untouched)', async () => {
+    const fake = iosFake(COVERING);
+    fake.platform = 'android';
+    fake.attachKeyboard({ state: 'hidden' });
+    const c = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(c.pass).toBe(true);
+    expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('a band elsewhere, or no band at all (parked keyboard, or an idb tree), changes nothing', async () => {
+    for (const band of [BELOW, undefined]) {
+      const fake = iosFake(band);
+      const c = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+      expect(c.pass).toBe(true);
+      expect(fake.screenshots).toHaveLength(2);
+    }
+  });
+});

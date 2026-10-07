@@ -295,10 +295,34 @@ export class IosAdapter implements DeviceAdapter {
 
   // No `keyboard` oracle (KeyboardOracle, types.ts): the iOS keyboard is part
   // of the accessibility tree — its keys are nodes — so "which rect does it
-  // cover" is a tree question nobody has needed answered yet (2026-10-03).
-  // Until 2026-10-04 this class answered `unknown` from two stub methods
-  // without running anything; the absence of the oracle now says the same,
-  // and interact/keyboard.ts queries no device and presses no key here.
+  // cover" is a tree question, answered since 2026-10-07 by the WDA source
+  // (wda-source.ts#keyboardMarks: the band the keyboard draws over, and the
+  // Windows that are its own UI) and read by ui-tree/soft-keyboard.ts off
+  // the tree that resolved the target; interact/keyboard.ts queries no
+  // device here and presses no key — a covered target is refused, with the
+  // sentence below. The idb source carries no keyboard, so under it the
+  // guard is as it was. Until 2026-10-04 this class answered `unknown` from
+  // two stub methods without running anything.
+
+  /**
+   * Why a covering keyboard cannot be hidden from here, and what was
+   * measured to work (DeviceAdapter.keyboardAdvice) — measured 2026-10-07 on
+   * the finportal login, iPhone 17 simulator, docs/bugs/2026-10-05-ios-tap-
+   * lands-on-soft-keyboard.md K5: WebDriverAgent's `/wda/keyboard/dismiss`
+   * answered "Did not know how to dismiss the keyboard" with and without
+   * `keyNames`; the keyboard's return key SUBMITTED the form (the dummy
+   * login was rejected, the fields cleared); a swipe over the form did
+   * nothing; a tap on the screen's title (a neutral, non-interactive point)
+   * hid it and submitted nothing, twice; and there is no back key
+   * (`pressKey('back')` throws above). The simulator shows no software
+   * keyboard while it believes a hardware keyboard is typing, which is the
+   * other way the target is clear.
+   */
+  readonly keyboardAdvice =
+    'the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, ' +
+    "the return key submits from the field, WebDriverAgent's keyboard/dismiss fails and a swipe does nothing; " +
+    'a tap on a neutral, non-interactive element (a title label) was measured to hide it without submitting, ' +
+    'and typing with a hardware keyboard keeps the software keyboard from showing';
 
   async setClipboard(text: string): Promise<void> {
     const env = await this.detectEnv();

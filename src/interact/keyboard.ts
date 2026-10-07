@@ -1,8 +1,9 @@
 import type { DeviceAdapter, KeyboardWitness, Rect, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import { errorMessage } from '../util/error-message.js';
-import { AmbiguityRefusal, describeTarget, resolveSettled, type Resolved, type SettleOptions, type Target } from './resolve.js';
+import { AmbiguityRefusal, describeTarget, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type Target } from './resolve.js';
 
 /**
  * Pause between the `back` that hides the keyboard and the re-resolution.
@@ -101,6 +102,26 @@ export class KeyboardStateDisagreement extends KeyboardGuardError {
   constructor(message: string, traceLine: string) {
     super(message, traceLine);
     this.name = 'KeyboardStateDisagreement';
+  }
+}
+
+/**
+ * The in-tree keyboard covers the tap point on two looks and the adapter
+ * has nothing to hide it with (2026-10-07). NOT an AfterKeyboardDismissal —
+ * nothing was pressed — and not a disagreement: one source, the tree that
+ * resolved the target, read the keyboard over the point twice. A refusal,
+ * because the alternative is the harm: the tap presses the keyboard and is
+ * reported done (measured that day on the finportal login, 3 of 3 runs —
+ * the bug this guards against, docs/bugs/2026-10-05-ios-tap-lands-on-soft-
+ * keyboard.md). WHY the adapter cannot hide it is the adapter's sentence
+ * (`DeviceAdapter.keyboardAdvice`), quoted in the message; this layer knows
+ * only that it has no dismissal to send. A generic dismissal is stage B's
+ * question.
+ */
+export class KeyboardWithoutDismissal extends KeyboardGuardError {
+  constructor(message: string, traceLine: string, options?: ErrorOptions) {
+    super(message, traceLine, options);
+    this.name = 'KeyboardWithoutDismissal';
   }
 }
 
@@ -230,6 +251,33 @@ export function afterBack(window: CoverReading): { action: 'proceed' } | { actio
 }
 
 /**
+ * The in-tree keyboard's decision (2026-10-07): the adapter has no oracle,
+ * the reading is the tree's (`readSoftKeyboard`, off the tree that resolved
+ * the target — no device read), and there is no dismissal to decide about,
+ * so the phase has no witness and presses nothing. Taken TWICE when the
+ * first look covers (review round 1): the settle wait proves the TARGET
+ * held still across two reads, not the keyboard, and a keyboard still
+ * sliding away after the step before (a `tap:` on the title, then at once
+ * the submit) reads as covering on one look — so the covering case waits
+ * KEYBOARD_HIDE_DELAY_MS, resolves again and decides on that look; only a
+ * second `refuse` refuses. The same two rows as `afterBack`, kept as its
+ * own decision because the reason behind `refuse` differs: there, the one
+ * `back` is already spent; here, there was never a key to press.
+ *
+ *   window clear / unknown                    → proceed
+ *     No band in the tree (none on screen, or a source that carries none —
+ *     idb), a band elsewhere, or a target that is the keyboard's own UI
+ *     (`partOfKeyboard`, read as unknown): the guard's fail-open rule, as
+ *     everywhere.
+ *   covering                                  → refuse (with the band)
+ *     First look: the second look. Second look: tap nothing, press nothing —
+ *     KeyboardWithoutDismissal.
+ */
+export function inTreeLook(window: CoverReading): { action: 'proceed' } | { action: 'refuse'; frame: Rect } {
+  return window.over === 'covering' ? { action: 'refuse', frame: window.frame } : { action: 'proceed' };
+}
+
+/**
  * The dismissal after a fill — no point, no second look; `covering` here
  * means shown anywhere.
  *
@@ -273,6 +321,9 @@ const pressBack = (adapter: KeyboardAdapter): Promise<void> => adapter.pressKey(
 /** `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling in every message that quotes one. */
 const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
 
+/** The guard's answer when it had nothing to do: the node and its note, without the tree the resolution rode in on. */
+const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
+
 /** The guard's answer: the node, with the keyboard sentence folded into the resolution note and kept alone beside it. */
 const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => ({
   node: resolved.node,
@@ -296,9 +347,19 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
  * when the NEXT field sits under the keyboard the previous one raised.
  *
  * The protocol — each step is one of the decisions above, in order:
- *   no oracle on the adapter: done, the node as resolved. Nothing is asked
- *   and nothing is pressed (iOS: the keyboard is part of the tree).
- *   resolve → ask the oracle where the keyboard is → tap point outside it
+ *   resolve → read the keyboard (`readSoftKeyboard`: the oracle's `state()`
+ *   when the adapter has one, else the band the tree source marked in the
+ *   tree that resolved the target — no device asked; `unknown` when the
+ *   target is the keyboard's own UI) → tap point outside it (or hidden, or
+ *   unknown): done, the node as resolved (the fail-open rule, below).
+ *   Inside it, no oracle (iOS: the keyboard is part of the tree): wait out
+ *   a hide animation (KEYBOARD_HIDE_DELAY_MS), resolve AGAIN and read again
+ *   (`inTreeLook`): clear now — the node of that look, with a note that
+ *   the keyboard left; still covering — KeyboardWithoutDismissal, nothing
+ *   tapped, nothing pressed, since the adapter has no dismissal (its own
+ *   sentence says why). Before 2026-10-07 the oracle-less adapter returned
+ *   the node unguarded, and the measured tap went into the AutoFill bar.
+ *   Inside it, with the oracle:
  *   (or hidden, or unknown): done, the node as resolved (the fail-open
  *   rule, below).
  *   Inside it: ask the witness, press `back` unless it DENIES the keyboard —
@@ -326,8 +387,12 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
  *
  * No platform test here (dropped 2026-10-03, after review: this layer is
  * platform-agnostic, ARCHITECTURE.md §2): whether the adapter HAS an oracle
- * already carries it. The remedy (`back`) is an Android key, and only an
- * adapter with an oracle that says `shown` ever reaches it.
+ * already carries it — the window model reads the oracle and may press
+ * `back`, the in-tree model reads the tree and presses nothing. The remedy
+ * (`back`) is an Android key, and only an adapter with an oracle that says
+ * `shown` ever reaches it; an adapter WITH an oracle never reads the tree
+ * for the keyboard (the Android tree carries no band, and two readings of
+ * one keyboard would need a rule for their disagreement).
  *
  * Cost on Android: ONE oracle query per tap when nothing covers the target
  * (what one call costs is measured on AndroidAdapter's keyboardState, the one
@@ -352,15 +417,14 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
  * four phases — see the note above the decisions.
  */
 export async function resolveClearOfKeyboard(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'keyboard' | 'pressKey'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<ResolvedClear> {
   const first = await resolveSettled(adapter, target, opts);
-  const oracle = adapter.keyboard;
-  if (oracle === undefined) return first;
   const at = tapPoint(first.node);
-  const opening = windowOver(await oracle.state(), at);
+  const reading = await readSoftKeyboard(adapter, first.tree, first.node);
+  const opening = windowOver(reading.keyboard, at);
   // THE guard's one fail-open rule, applied here and at each re-check round
   // below: nothing over the point — hidden, a frame elsewhere — or a state
   // that could not be read means the tap goes ahead as before the question
@@ -369,11 +433,52 @@ export async function resolveClearOfKeyboard(
   // itself, in the tap's own words. Only a COVERING reading reaches
   // firstLook/recheck; after the back, afterBack has its own fail-open row
   // (its reason there).
-  if (opening.over !== 'covering') return first;
+  if (opening.over !== 'covering') return bare(first);
 
   const what = describeTarget(target);
   /** The fact every sentence below starts from; each outcome appends its own ending. */
   const covered = `the soft keyboard covered ${what}`;
+  const oracle = adapter.keyboard;
+  if (oracle === undefined) {
+    // The in-tree model (KeyboardOracle, adapters/types.ts): nothing is
+    // asked of the device and nothing is pressed, whichever way it goes.
+    // The second look — same options, so the target proves it holds still
+    // again — decides (inTreeLook's doc has why one look is not enough).
+    await sleep(KEYBOARD_HIDE_DELAY_MS);
+    let second: ResolvedSettled;
+    try {
+      second = await resolveSettled(adapter, target, opts);
+    } catch (e) {
+      // The target did not come back for the second look (or came back
+      // ambiguous). Nothing was pressed, so the screen is as the step found
+      // it — but the trace must still show that the first look found the
+      // keyboard over the target, or a timeout here reads as a plain slow
+      // screen (review round 2; the Android path's AfterKeyboardDismissal
+      // does the same for its second look, with the key press to report).
+      const saw = `the soft keyboard covered ${what} at (${at.x},${at.y}) on a first look`;
+      const [headline, ...rest] = errorMessage(e).split('\n');
+      const message =
+        e instanceof AmbiguityRefusal
+          ? `${errorMessage(e)}\n(This was the second look, after ${saw}. Nothing was pressed)`
+          : [`After ${saw}, the second look failed: ${headline}. Nothing was pressed; the screen is as the step found it`, ...rest].join('\n');
+      throw new KeyboardWithoutDismissal(message, `${covered}; nothing sent, and the second look failed`, { cause: e });
+    }
+    const point = tapPoint(second.node);
+    const look = inTreeLook(windowOver((await readSoftKeyboard(adapter, second.tree, second.node)).keyboard, point));
+    if (look.action === 'proceed') return withNote(second, `${covered}; gone on the second look`);
+    // Names MCP tools and "a flow" — the deliberate exception recorded at
+    // the "back did not close it" error below. The platform's facts (why no
+    // key hides it, what was measured to) are the adapter's sentence, quoted.
+    const cannot = reading.advice === undefined ? 'this adapter cannot hide it' : `this adapter cannot hide it (${reading.advice})`;
+    throw new KeyboardWithoutDismissal(
+      `The soft keyboard covers ${what}: the band it draws over ${frameText(look.frame)} contains the tap point ` +
+        `(${point.x},${point.y}) on two looks ${KEYBOARD_HIDE_DELAY_MS}ms apart, and ${cannot}. Nothing was tapped: ` +
+        `the tap would have pressed the keyboard and been reported done. From the MCP tools: hide the keyboard first, ` +
+        `then tap ${what} again. In a flow: hide it with a step before this one (a tap: on an element the keyboard ` +
+        `does not cover), or lay the screen out so ${what} is not under the keyboard`,
+      `${covered}; no dismissal, nothing sent`,
+    );
+  }
   const backPressed = `${covered}; back pressed`;
   /** The input method's last word — the wording of a later failure depends on whether it could be asked. */
   let witness = await oracle.witness();
@@ -521,7 +626,11 @@ export async function resolveClearOfKeyboard(
  * An adapter WITHOUT the oracle takes the blind in-tree dismissal, asking
  * nothing — what the platform branch this replaced did; which key that is,
  * and why the oracle's presence or absence decides it, is stated once on
- * KeyboardOracle (adapters/types.ts).
+ * KeyboardOracle (adapters/types.ts). Still blind on 2026-10-07, when the
+ * tap guard above started reading the in-tree keyboard: `enter` from a
+ * field was measured to SUBMIT the finportal login (K5d), so reading the
+ * tree here would only tell when NOT to press it — a change left to stage B
+ * with the dismissal itself, and recorded as a residual in the bug note.
  *
  * With the oracle (Android), since 2026-10-03: `back` is pressed only if the
  * window state does not say the keyboard is HIDDEN. Before that date it was

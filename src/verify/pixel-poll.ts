@@ -3,6 +3,7 @@ import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
+import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
@@ -108,6 +109,23 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  * AndroidAdapter's `keyboardState`), on Android only, against a round of
  * ~2.6–4.3 s there. The verify legs are untouched: their text table already
  * reports this case as OCCLUDED.
+ *
+ * Since 2026-10-07 an adapter WITHOUT the oracle (iOS: the keyboard is part
+ * of the tree) gets the same rule from the round's own tree: the WDA source
+ * marks the band the keyboard draws over with `KEYBOARD_ROLE`
+ * (adapters/wda-source.ts#keyboardMarks has the rule and the measurements —
+ * the band, not the `Keyboard` element's rect, which stops 17–44 pt short of
+ * the drawn area), `ui-tree/soft-keyboard.ts#readSoftKeyboard` — the one
+ * switch between the oracle and the tree, shared with the tap guard — reads
+ * it, and a band overlapping the element's rect is the same covered miss.
+ * No extra read: the tree is the one the round found the element in. An
+ * element that IS the keyboard's UI (a key, the toolbar's Done — `ofKeyboard`
+ * on its Window) reads as not covered. The remedy sentence differs: with no
+ * dismissal on the adapter the miss says it cannot hide the keyboard and
+ * quotes the adapter's own sentence on why (`DeviceAdapter.keyboardAdvice`)
+ * rather than naming `back` or the fill's `dismissKeyboard`. An idb tree
+ * carries no band and reads `unknown`: the pre-2026-10-07 behaviour,
+ * silently, as the Android residuals above.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
  * `measure`), the scale policy (`measured.scale` may carry a derivation error;
@@ -259,14 +277,20 @@ class PixelPollMemory {
    * timeout's wording (`timeoutDetail`: the last finding outranks the silent
    * rounds and not-found), and a later round cut by the deadline before its
    * query does not erase it. A later round whose query found the element
-   * clear does (`uncovered`). The remedy names the fill option
+   * clear does (`uncovered`). The remedy, when the adapter has a `back`
+   * (`dismissal: 'back'`, the oracle's window model), names the fill option
    * (`dismissKeyboard`, flow/config.ts) and `back` — not "tap a field above",
-   * which keeps the keyboard up (review 2026-10-06).
+   * which keeps the keyboard up (review 2026-10-06). When it has none
+   * (`'none'`, the in-tree model, 2026-10-07) it says so and quotes the
+   * adapter's own sentence on why and what works instead (`advice`,
+   * `DeviceAdapter.keyboardAdvice`) — no platform fact of this module's.
    */
-  covered(rect: Rect, keyboard: Rect): PollVerdict {
+  covered(rect: Rect, keyboard: Rect, dismissal: 'back' | 'none', advice?: string): PollVerdict {
     const reason =
       `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)}) — ` +
-      'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run';
+      (dismissal === 'back'
+        ? 'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run'
+        : `hide it first and re-run; this adapter cannot hide it${advice === undefined ? '' : ` (${advice})`}`);
     const detail = failClosed(reason, this.unchecked);
     this.lastCovered = detail;
     this.coverCleared = false;
@@ -315,19 +339,27 @@ class PixelPollMemory {
 }
 
 /**
- * The soft keyboard's frame when the adapter's oracle says one is shown over
- * `rect` — any positive-area overlap — else undefined: no oracle (iOS),
- * `hidden`, `unknown`, or a frame elsewhere (header, 2026-10-06). The two
- * rects are in the same units: on Android both are device pixels, read from
- * the same `[l,t][r,b]` notation by the same `parseBounds`
- * (adapters/android.ts — a uiautomator node's `bounds` and the IME
- * `InsetsSource` entry's `frame=`), and the tree rect reaches this poll
- * unscaled. `state()` never throws (KeyboardOracle's contract), so no catch.
+ * The soft keyboard's frame when the round's reading says one is shown over
+ * the element's rect — any positive-area overlap — else undefined: `hidden`,
+ * `unknown`, or a frame elsewhere (header, 2026-10-06). The reading is
+ * `readSoftKeyboard`'s (ui-tree/soft-keyboard.ts): the adapter's oracle when
+ * it has one, else (2026-10-07) the round's own tree, with the element
+ * itself as the subject; `dismissal` and `advice` ride along for the remedy
+ * sentence. The two rects are in the same units: on Android both are
+ * device pixels, read from the same `[l,t][r,b]` notation by the same
+ * `parseBounds` (adapters/android.ts — a uiautomator node's `bounds` and
+ * the IME `InsetsSource` entry's `frame=`); on iOS both are points of one
+ * WDA tree; and the tree rect reaches this poll unscaled. `state()` never
+ * throws (KeyboardOracle's contract), so no catch.
  */
-async function keyboardOver(adapter: Pick<DeviceAdapter, 'keyboard'>, rect: Rect): Promise<Rect | undefined> {
-  if (adapter.keyboard === undefined) return undefined;
-  const keyboard = await adapter.keyboard.state();
-  return keyboard.state === 'shown' && rectsOverlap(rect, keyboard.frame) ? keyboard.frame : undefined;
+async function keyboardOver(
+  adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
+  tree: UiNode,
+  element: UiNode,
+): Promise<{ frame: Rect; dismissal: 'back' | 'none'; advice?: string } | undefined> {
+  const { keyboard, dismissal, advice } = await readSoftKeyboard(adapter, tree, element);
+  if (keyboard.state !== 'shown' || !rectsOverlap(element.rect, keyboard.frame)) return undefined;
+  return { frame: keyboard.frame, dismissal, advice };
 }
 
 /**
@@ -340,7 +372,7 @@ async function keyboardOver(adapter: Pick<DeviceAdapter, 'keyboard'>, rect: Rect
  * Nms" with the last tree-read error.
  */
 export async function pollPixels(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport' | 'keyboard'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport' | 'keyboard' | 'keyboardAdvice'>,
   spec: PixelPollSpec,
 ): Promise<PollVerdict> {
   const { element, timeoutMs, pollMs, unchecked, measure } = spec;
@@ -354,8 +386,8 @@ export async function pollPixels(
     const { rect } = found[0];
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
-    const keyboard = await keyboardOver(adapter, rect);
-    if (keyboard !== undefined) return memory.covered(rect, keyboard);
+    const keyboard = await keyboardOver(adapter, tree, found[0]);
+    if (keyboard !== undefined) return memory.covered(rect, keyboard.frame, keyboard.dismissal, keyboard.advice);
     memory.uncovered();
     const frame = await captureFrame(adapter, { tree, deadline, region: rect });
     if (frame.stability !== 'settled') return memory.unsettled(frame);

@@ -56,9 +56,28 @@ export function rectArea(rect: Rect): number {
   return Number.isFinite(a) ? a : 0;
 }
 
+/**
+ * The role of the ONE node per on-screen soft keyboard that a tree source
+ * emits when its tree contains the keyboard (2026-10-07: the WDA source,
+ * adapters/wda-source.ts#keyboardMarks). Its rect is the screen band the
+ * keyboard covers — keys, AutoFill bar, accessory toolbar slot and dictation
+ * row together — not the `Keyboard` element's own rect, which was measured
+ * 17–44 pt short of the drawn area (docs/bugs/2026-10-05-ios-tap-lands-on-
+ * soft-keyboard.md). Read by `ui-tree/soft-keyboard.ts#keyboardInTree`, the
+ * in-tree half of the soft-keyboard reading the tap guard and the pixel
+ * poll share with the Android oracle. Defined beside UiNode because the
+ * adapter writes it and ui-tree reads it, and neither may spell the string.
+ * Not in INTERACTIVE_ROLES (a selector never prefers it) and not structural
+ * (ui-tree/bare-tree.ts: a screen with its keyboard up has rendered).
+ * Absent from a tree means nothing — an idb tree never carries one and a
+ * WDA tree without one has no keyboard on screen, and the tree cannot say
+ * which source it came from.
+ */
+export const KEYBOARD_ROLE = 'keyboard';
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
-  role: string; // normalized: button, text, textfield, image, container, ...
+  role: string; // normalized: button, text, textfield, image, container, keyboard (KEYBOARD_ROLE), ...
   label: string | null; // visible text / content description
   identifier: string | null; // resource-id / accessibilityIdentifier
   value: string | null; // current value (text field contents, toggle state)
@@ -66,6 +85,21 @@ export interface UiNode {
   error?: string;
   rect: Rect;
   children: UiNode[];
+  /**
+   * Set on the ROOT of a subtree that is the soft keyboard's own UI
+   * (2026-10-07, review round 1): on iOS through WDA, the Window that holds
+   * the `Keyboard` element — keys, AutoFill bar, dictation button — and the
+   * input-host Window UIKit pairs with it, which holds the app's
+   * `inputAccessoryView` toolbar (the "Done" above a number pad) and the
+   * `inputView` placeholder (adapters/wda-source.ts#keyboardMarks). A node
+   * under such a root is never COVERED by the keyboard: it is the keyboard,
+   * and a tap on it — a digit, Done, the Passwords bar — is what the user
+   * does (ui-tree/soft-keyboard.ts#partOfKeyboard walks the ancestry). On
+   * the roots only, not on every descendant: `ui_snapshot` prints the tree
+   * as JSON, and one mark per window says it where seventy would be noise.
+   * Absent everywhere on Android and on an idb tree.
+   */
+  ofKeyboard?: true;
 }
 
 /**
@@ -116,8 +150,12 @@ export type SoftKeyboard =
  * about it. An optional capability of the adapter (`DeviceAdapter.keyboard`,
  * 2026-10-04), not two methods every adapter must stub: exactly one platform
  * answers (Android), and an adapter without the oracle is one whose keyboard,
- * if any, is part of the tree — on iOS its keys are nodes, the covered-target
- * problem has a different shape, and it is out of scope as of 2026-10-03.
+ * if any, is part of the tree — on iOS its keys are nodes, and the
+ * covered-target problem has a different shape: since 2026-10-07 the tree
+ * that resolved the target is read for a `KEYBOARD_ROLE` node (the WDA
+ * source emits one per on-screen keyboard), a covered tap point is REFUSED,
+ * and nothing is pressed — there is no non-submitting dismissal to try
+ * (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, "Fix (stage A)").
  * Until 2026-10-04 both methods sat on `DeviceAdapter`, iOS returned a
  * constant from each without a device query, and the fake carried the
  * simulation of both for a feature one adapter has.
@@ -279,10 +317,26 @@ export interface DeviceAdapter {
   /**
    * The soft-keyboard oracle (see `KeyboardOracle`) — present on a platform
    * whose keyboard is a separate window that `back` hides (Android), absent
-   * where it is part of the tree (iOS). Absent means: taps are not guarded,
-   * no device is queried, and the blind dismissal key is `enter`.
+   * where it is part of the tree (iOS). Absent means: no device is queried,
+   * the tap guard reads the keyboard from the tree that resolved the target
+   * (`KEYBOARD_ROLE`; a covered point is refused, nothing is pressed — since
+   * 2026-10-07, before that taps were unguarded), and the blind dismissal
+   * key is `enter`.
    */
   readonly keyboard?: KeyboardOracle;
+  /**
+   * The in-tree model's one sentence (2026-10-07): why THIS adapter cannot
+   * hide a soft keyboard that covers a target, and what was measured to work
+   * instead. Set only by an adapter WITHOUT the oracle (iOS: `IosAdapter`),
+   * quoted verbatim — in parentheses, after "this adapter cannot hide it" —
+   * by the refusals in interact/keyboard.ts and verify/pixel-poll.ts, which
+   * own the generic halves of their sentences and no platform fact. The
+   * adapter owns it for the reason it owns the blind dismissal key: the
+   * facts (which key submits, which endpoint fails) are the platform's, and
+   * the layers above are platform-agnostic (ARCHITECTURE.md §2). Absent, the
+   * refusal says only that the adapter cannot hide it.
+   */
+  readonly keyboardAdvice?: string;
   setClipboard(text: string): Promise<void>;
 
   /** logcat / os_log excerpt for crash detection. */

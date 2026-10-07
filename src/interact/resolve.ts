@@ -129,9 +129,22 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
 }
 
 /**
+ * A settled resolution, with the tree it came from (2026-10-07): the second
+ * of the two reads that agreed on the rect, the whole of it. The keyboard
+ * guard (keyboard.ts) reads the soft keyboard off it on a platform whose
+ * keyboard is in the tree — the one reading that costs no device read,
+ * because this read already happened. Only resolveSettled hands it out:
+ * resolveNow is the one-shot policy over a tree the caller already holds.
+ */
+export interface ResolvedSettled extends Resolved {
+  tree: UiNode;
+}
+
+/**
  * Wait for the target to resolve to a node whose rect is identical in two
  * consecutive tree reads — screens animate on launch and transition, and a
- * tap mid-animation lands on whatever moved into that spot — then return it.
+ * tap mid-animation lands on whatever moved into that spot — then return it,
+ * with the tree of that second read.
  * The rect comparison restarts whenever a round finds nothing: a node that
  * vanishes and returns has to prove it holds still again.
  *
@@ -143,7 +156,7 @@ export async function resolveSettled(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
   target: Target,
   opts: SettleOptions,
-): Promise<Resolved> {
+): Promise<ResolvedSettled> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
   const outcome = await pollTree(
@@ -155,7 +168,7 @@ export async function resolveSettled(
         return undefined;
       }
       const rect = JSON.stringify(resolved.node.rect);
-      if (rect === lastRect) return resolved;
+      if (rect === lastRect) return { ...resolved, tree };
       lastRect = rect;
       return undefined;
     },
