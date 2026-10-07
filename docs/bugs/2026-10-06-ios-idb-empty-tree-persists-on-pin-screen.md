@@ -113,6 +113,10 @@ Same direction as the existing note, made stronger. A tree whose root has zero a
   - Before refusing, an `unknown` probe gets one second look over the settle budget (`tapTimeoutMs`, 5 s by
     default, the wait a `tap:` uses for the same transient), so Android's null-root transient right after a cold launch (~2–3 s) does not refuse an ordinary run.
     A second look that reads the state ends the call; one that reads any tree runs the rung as before.
+  - **Superseded 2026-10-07** (docs/bugs/2026-10-06-second-look-reads-android-decor-as-not-in-state.md): the 5 s
+    look ended on Android's decor tree and ran the wipe on an app already in the state. The second look is now
+    `ensureTimeoutMs` (20 s), a probe whose every tree was bare answers `bare` and is treated like `unknown` before a
+    destructive rung, and only a RENDERED tree outside the state runs the rung.
 - **Accepted cost.** A transient that outlasts the second look is refused too. The fix is to retry the call.
 
 **Deferred to the device protocol.** Each item needs a measured episode first.

@@ -5,8 +5,14 @@ import { rectArea } from './geometry.js';
  * Does the tree hold anything a user could read or act on? If not it is
  * BARE — the accessibility tree is empty or unrendered, and a selector that
  * matches nothing in it says nothing about the screen. Asked by ui_snapshot's
- * second text block (mcp/tool-text.ts `snapshotNote`); the wording lives
- * there, the question here, with the rest of what is asked OF a tree.
+ * second text block (mcp/tool-text.ts `snapshotNote`) and, since 2026-10-07,
+ * by the flow engine's detect probe (flow/engine.ts `detects`: a probe whose
+ * every tree was bare answers `bare`, not `no`, and the ladder will not run
+ * a DESTRUCTIVE rung on it — docs/bugs/2026-10-06-second-look-reads-android-
+ * decor-as-not-in-state.md). The question lives here, with the rest of what
+ * is asked OF a tree, and so does the tree's shape (`treeShape`, `nodeCount`
+ * at the end of this file) — a fact about the tree both askers quote; the
+ * sentence around it lives with each asker.
  *
  * Measured (docs/bugs/2026-10-06-ui-snapshot-empty-right-after-launch.md,
  * and its addendum the same day): `role:button` → `[]` two seconds after
@@ -71,10 +77,17 @@ import { rectArea } from './geometry.js';
  * with a testID and no accessibilityLabel, an Android camera/QR screen whose
  * controls are clickable ImageViews without contentDescription) is called
  * bare — rare, since nearly every loaded screen has a text, button, field,
- * scrollable or labelled node, and cheap: a wrong ⚠ sends the agent to a
- * screenshot, never to a conclusion. Device-confirmed 2026-10-06: the WDA
- * and uiautomator splash shapes and idb's stuck 0×0 Application (the last
- * now a read error at the idb source, see above).
+ * scrollable or labelled node. For ui_snapshot that miss is cheap: a wrong
+ * ⚠ sends the agent to a screenshot, never to a conclusion. Since the ladder
+ * asks too (2026-10-07) it has a second cost: on such an icon-only loaded
+ * screen `ensure_state` cannot reach a DESTRUCTIVE rung — the probe reads
+ * `bare` for the whole second look and the rung is refused (⛔) rather than
+ * run. That is the safe direction (a refusal, never a wipe), and `run_flow`
+ * of the rung still runs it deliberately. Device-confirmed 2026-10-06: the
+ * WDA and uiautomator splash shapes and idb's stuck 0×0 Application (the
+ * last now a read error at the idb source, see above); the uiautomator decor
+ * shape is also what the ladder's second look read for +5.3…+13.8 s of a
+ * measured Android cold launch before `login_screen` rendered at +18.3 s.
  */
 export function isBareTree(tree: UiNode): boolean {
   const nodes = [...everyNode(tree)];
@@ -100,3 +113,31 @@ export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress
  * row (a Cell, a Pressable) sits far below it.
  */
 export const SCREEN_SIZED_FRACTION = 0.9;
+
+/**
+ * `button ×3, container ×1, text ×1` — by count, then name; the normalized
+ * role vocabulary is small, so nothing is cut. Here, beside the rule, since
+ * 2026-10-07 (it was private to mcp/tool-text.ts): the flow engine names a
+ * bare tree by its shape too, and flow/ may not import mcp/.
+ */
+const rolesPresent = (nodes: readonly UiNode[]): string => {
+  const counts = new Map<string, number>();
+  for (const n of nodes) counts.set(n.role, (counts.get(n.role) ?? 0) + 1);
+  return [...counts]
+    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .map(([role, n]) => `${role} ×${n}`)
+    .join(', ');
+};
+
+/**
+ * `7 nodes`, `1 node` — the pluralisation spelled once, for treeShape and
+ * ui_snapshot's bare note (mcp/tool-text.ts `snapshotNote`, which counts
+ * without the roles); until the 2026-10-07 review each spelled its own.
+ */
+export const nodeCount = (nodes: readonly UiNode[]): string => `${nodes.length} node${nodes.length === 1 ? '' : 's'}`;
+
+/** `7 nodes (roles: container ×6, image ×1)` — a tree by its shape, for a line that says what a bare read held. */
+export const treeShape = (tree: UiNode): string => {
+  const nodes = [...everyNode(tree)];
+  return `${nodeCount(nodes)} (roles: ${rolesPresent(nodes)})`;
+};

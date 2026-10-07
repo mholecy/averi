@@ -444,7 +444,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'ensure_state',
     {
       description:
-        'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. If the UI tree cannot be read (e.g. iOS idb stuck on a 0×0 tree), a destructive (clearState) reach flow is refused rather than run blind: the call fails with "Refused to run reach flow …" and a ⛔ line in the trace — nothing was wiped; compare with screenshot and retry once the tree reads. Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.',
+        'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. If the UI tree cannot be read (e.g. iOS idb stuck on a 0×0 tree) or holds nothing rendered (a cold launch\'s decor or splash) for the whole ~20 s second look, a destructive (clearState) reach flow is refused rather than run blind: the call fails with "Refused to run reach flow …" and a ⛔ line in the trace — nothing was wiped; compare with screenshot and retry once the screen has rendered, or run_flow the rung deliberately. Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.',
       inputSchema: {
         platform,
         state: z.string().describe('State name from averi.yaml'),

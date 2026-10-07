@@ -257,7 +257,8 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
     // relaunch runs; the relaunch lands on home but the tree is stuck past
     // the post-rung grace (40 ms), then readable inside the second look.
     // Timed, not counted, because a grace poll's read count is not fixed:
-    // stuck for 100 ms after the launch, against a 1 s settle budget.
+    // stuck for 100 ms after the launch, against a 1 s second look (the
+    // window is ensureTimeoutMs since 2026-10-07; it was tapTimeoutMs).
     const { fake, state } = stuckIdb(() => false);
     const launch = fake.launch.bind(fake);
     fake.launch = async (appId, opts) => {
@@ -266,7 +267,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
       state.stuck = () => Date.now() - at < 100;
       return launch(appId, opts);
     };
-    const trace = await new FlowEngine(CFG, fake, { ...FAST, tapTimeoutMs: 1000 }).ensureState('relaunch_then_login');
+    const trace = await new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 1000 }).ensureState('relaunch_then_login');
     expect(clearStateLaunches(fake)).toEqual([]);
     expect(fake.launches).toHaveLength(1);
     expect(trace).toContainEqual({ action: 'state relaunch_then_login', detail: 'reached after relaunch' });

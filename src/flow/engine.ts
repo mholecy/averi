@@ -10,6 +10,7 @@ import { describeElementSpec as describeSpec, SELECTOR_FIELDS, selectorOnly, typ
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absentFromViewport } from '../ui-tree/geometry.js';
+import { isBareTree, treeShape } from '../ui-tree/bare-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -64,24 +65,85 @@ export class FlowError extends Error {
 }
 
 /**
+ * A detect probe that learned nothing about the screen: `unknown` — every
+ * read failed, the probe never saw the device — or `bare` — every tree it
+ * read was bare (ui-tree/bare-tree.ts: only wrappers and unlabeled
+ * decoration, a launch's decor or splash), so a miss in it says nothing
+ * about the state (2026-10-07). `shape` is the last bare tree's shape
+ * (`treeShape`), for the line that says so. Exported because the refusal
+ * below is built from two of them.
+ */
+export type UnreadProbe = { answer: 'unknown'; readError: Error } | { answer: 'bare'; shape: string };
+
+/**
+ * What the probe before a destructive rung and its second look learned
+ * TOGETHER — the refusal's cause. Until the 2026-10-07 review the cause was
+ * the second look alone, and both mixed orders were worded wrong: a bare
+ * entry read followed by a second look whose every read failed said "never
+ * read a UI tree" (the entry had read one), and a failed entry read followed
+ * by a bare second look said "every read was bare" (the entry's had failed).
+ * So: if the second look read a tree it was bare, and it is the latest one
+ * (`bare` — "every UI TREE read was bare" stays true of a failed entry read,
+ * which read no tree); if only the entry read one, the cause is that shape
+ * AND the second look's failure (`bare-then-failed`); only when neither read
+ * any tree is it `unknown`, worded as before.
+ */
+type UnreadCause = UnreadProbe | { answer: 'bare-then-failed'; shape: string; readError: Error };
+
+const unreadCause = (before: UnreadProbe, secondLook: UnreadProbe): UnreadCause =>
+  secondLook.answer === 'unknown' && before.answer === 'bare' ?
+    { answer: 'bare-then-failed', shape: before.shape, readError: secondLook.readError }
+  : secondLook;
+
+const readFailed = (e: unknown): string => `last UI tree read failed: ${headline(e)}`;
+
+/**
+ * What an unread probe (or the refusal's cause) learned, as one clause:
+ * `last UI tree read failed: …` or `every UI tree read was bare, the last
+ * one 7 nodes (roles: …) of only wrappers and unlabeled decoration`. One
+ * spelling for the probe's `⚠ detect` line, the no-reach SetupError and the
+ * refusal, so they cannot drift apart; each sentence around it is its own.
+ */
+const describeUnreadCause = (cause: UnreadCause): string => {
+  if (cause.answer === 'unknown') return readFailed(cause.readError);
+  const bare = `every UI tree read was bare, the last one ${cause.shape} of only wrappers and unlabeled decoration`;
+  return cause.answer === 'bare' ? bare : `${bare}, and every read after it failed (${readFailed(cause.readError)})`;
+};
+
+/**
  * The ladder declined to run a DESTRUCTIVE rung because the detect probe
  * right before it never read a UI tree (2026-10-06, docs/bugs/2026-10-06-ios-
  * idb-empty-tree-persists-on-pin-screen.md: idb returned a 0×0 Application
  * for minutes on a rendered screen, and every probe read that as "not in
- * state"). On such a device "not in state" is not knowledge, and the rung's
- * cost — a wiped app and its device registration — is not undone by the
- * tree coming back a minute later. Not a SetupError: the descriptor is
- * fine, the device was not read. Terminal like one (`isTerminal`).
+ * state") — or, since 2026-10-07, read only BARE trees (docs/bugs/2026-10-06-
+ * second-look-reads-android-decor-as-not-in-state.md: Android's decor-only
+ * tree for ~9 s of a cold launch, WDA's 7-node splash). On such a device
+ * "not in state" is not knowledge, and the rung's cost — a wiped app and
+ * its device registration — is not undone by the tree coming back a minute
+ * later. Not a SetupError: the descriptor is fine, the device was not read.
+ * Terminal like one (`isTerminal`). The cause is what that probe and its
+ * second look learned together (`UnreadCause`), so each kind is worded with
+ * what was read and the kinds cannot be confused.
  */
 export class UnreadTreeRefusal extends Error {
   /** Why, without the headline — the ladder's `⛔ reach` trace line is this, so the two cannot drift apart. */
   readonly reason: string;
 
-  constructor(state: string, rung: string, readError: Error) {
+  constructor(state: string, rung: string, before: UnreadProbe, secondLook: UnreadProbe) {
+    const cause = unreadCause(before, secondLook);
+    const lead = 'the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe before it ';
+    // The two kinds share every clause but the cause's and the retry's, in
+    // a different order: the unread wording predates the bare one and is
+    // pinned, so the parts are spelled once and each kind arranges them.
+    const unknownState = `so whether the app is in "${state}" is unknown`;
+    const retry = (once: string) => `Compare with screenshot; retry once ${once}`;
     const reason =
-      'the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
-      `before it never read a UI tree, a second look included, so whether the app is in "${state}" is unknown — ` +
-      `last UI tree read failed: ${headline(readError)}. Compare with screenshot; retry once the tree reads`;
+      cause.answer === 'unknown' ?
+        lead +
+        `never read a UI tree, a second look included, ${unknownState} — ${describeUnreadCause(cause)}. ${retry('the tree reads')}`
+      : lead +
+        `never read a RENDERED UI tree, a second look included — ${describeUnreadCause(cause)} — ${unknownState}. ` +
+        `${retry('the screen has rendered')}, or run_flow "${rung}" runs it deliberately`;
     super(`Refused to run reach flow "${rung}" for state "${state}": ${reason}`);
     this.name = 'UnreadTreeRefusal';
     this.reason = reason;
@@ -101,11 +163,16 @@ const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanc
 
 /**
  * What one detect probe learned. `unknown` is "every read failed — the probe
- * never saw the device", which callers that only need a boolean fold into
- * "not detected" by comparing against `'yes'`; the ladder alone tells it
- * apart (ensureStateInner). `readError` is set exactly when it is unknown.
+ * never saw the device"; `bare` is "every tree read was bare" (UnreadProbe).
+ * Callers that only need a boolean fold both into "not detected" by
+ * comparing against `'yes'` (salvage, the recovery pass); the ladder alone
+ * tells them apart (ensureStateInner). `readError` is set exactly when it is
+ * unknown, `shape` exactly when it is bare.
  */
-type Detection = { answer: 'yes' | 'no'; readError?: undefined } | { answer: 'unknown'; readError: Error };
+type Detection = { answer: 'yes' | 'no' } | UnreadProbe;
+
+/** The answers on which the ladder will not run a destructive rung: the probe learned nothing about the screen. */
+const learnedNothing = (d: Detection): d is UnreadProbe => d.answer === 'unknown' || d.answer === 'bare';
 
 /**
  * The payload of one step kind, read off the Step union itself so a handler's
@@ -286,8 +353,8 @@ export class FlowEngine {
     }
     if (!state.reach || state.reach.length === 0) {
       throw new SetupError(
-        probe.answer === 'unknown' ?
-          `State "${name}" could not be checked (last UI tree read failed: ${headline(probe.readError)}) and it has no reach flows`
+        learnedNothing(probe) ?
+          `State "${name}" could not be checked (${describeUnreadCause(probe)}) and it has no reach flows`
         : `Not in state "${name}" and it has no reach flows`,
       );
     }
@@ -329,42 +396,63 @@ export class FlowEngine {
       // `flowItselfIsDestructive` for why the two predicates must stay apart.
       if (flowItselfIsDestructive(this.cfg, flow)) {
         // ...unless the probe right before it never read a tree (2026-10-06,
-        // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md).
-        // Then "not in state" is not knowledge — the measured case is idb
-        // returning a 0×0 Application for minutes on a RENDERED screen, where
-        // mp-native's ladder would have wiped a registered app — so the rung
-        // is refused rather than announced. Only the probe immediately
-        // before counts: a later probe that READ a tree and missed is real
-        // knowledge, and an earlier readable one is stale. Cheap rungs still
-        // run on an unknown probe (they are how a ladder gets a tree to read),
+        // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md)
+        // or read only BARE ones (2026-10-07, docs/bugs/2026-10-06-second-
+        // look-reads-android-decor-as-not-in-state.md). Then "not in state"
+        // is not knowledge — the measured cases are idb returning a 0×0
+        // Application for minutes on a RENDERED screen, where mp-native's
+        // ladder would have wiped a registered app, and a cold launch's
+        // decor or splash read as "not logged out" on an app whose login
+        // screen was seconds away — so the rung is refused rather than
+        // announced. Only the probe immediately before counts: a later probe
+        // that READ a rendered tree and missed is real knowledge, and an
+        // earlier readable one is stale. Cheap rungs still run on an unknown
+        // or bare probe, at once (they are how a ladder gets a tree to read),
         // and only a ladder applies the rule: `run_flow` never refuses the
         // flow's OWN body (the caller's own decision), though a `requires:`
         // inside it runs a ladder that does; the recovery pass never runs a
         // destructive rung at all.
         //
-        // One SECOND LOOK first: the entry probe is a single read, and the
-        // ordinary unreadable read is a transient — Android's uiautomator has
-        // no window to dump for ~2–3 s after a cold launch (adapters/
-        // android.ts), and SKILL.md sends agents to ensure_state right after
-        // launch_app. Refusing on that would fail ordinary runs. The window
-        // is the settle budget (`tapTimeoutMs`, DEFAULT_SETTLE_TIMEOUT_MS =
-        // 5 s), not the 2 s re-check grace: that one is sized for a screen
-        // settling after a rung, while this is the transient a tap's settle
-        // wait already rides out — one budget for one transient, and no knob
-        // that only tests would set. It cannot outlast the measured idb
-        // episode (minutes), so that is still refused; a transient longer
-        // than the window is refused too, and retrying the call is the fix.
-        if (probe.answer === 'unknown') {
-          probe = await this.detects(state.detect, this.tapTimeoutMs);
+        // One SECOND LOOK first: the entry probe is a single read (so the
+        // warm path stays one read), and both of these are what a cold
+        // launch looks like for a while — SKILL.md sends agents to
+        // ensure_state right after launch_app. Measured 2026-10-06 on
+        // finportal (Android 13 emulator, RN debug build): null root to
+        // ~+3 s, the decor alone (android:id/content, action_bar_root)
+        // +5.3…+13.8 s, `login_screen` at +18.3 s; through WDA the 7-node
+        // splash is read at +0.3 s. Until 2026-10-07 the window was the
+        // settle budget (`tapTimeoutMs`, 5 s) and only an unknown probe got
+        // it: it ended on the decor, read that as "no", and wiped an app
+        // that was already logged out — three runs of three; under WDA the
+        // ENTRY probe read the splash as "no" and the wipe ran with no
+        // second look at all. Now the window is `ensureTimeoutMs` (20 s by
+        // default), the budget that already means "how long a state may take
+        // to appear" — the final wait below uses it — and one loop with one
+        // deadline rides out null root → decor → rendered as the one
+        // transient it is. A second look that reads the state ends the call;
+        // one whose window held a rendered tree outside the state runs the
+        // rung, warning as usual (it polls to its deadline first, as every
+        // detect window does — at most 20 s, only after a cold-launch probe,
+        // in front of a rung that costs a wipe and a login); one that still
+        // read nothing rendered is refused. It cannot outlast the measured
+        // idb episode (minutes), so that is still refused; a transient longer
+        // than the window is refused too, and retrying the call — or
+        // run_flow of the rung — is the fix.
+        if (learnedNothing(probe)) {
+          // The refusal's cause is what BOTH probes read (UnreadCause): a
+          // bare entry read is still worth naming when every read of the
+          // second look failed.
+          const before = probe;
+          probe = await this.detects(state.detect, this.ensureTimeoutMs);
           if (probe.answer === 'yes') {
             this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
             return;
           }
-        }
-        if (probe.answer === 'unknown') {
-          const refusal = new UnreadTreeRefusal(name, flow, probe.readError);
-          this.log(`⛔ reach ${flow}`, `refused: ${refusal.reason}`);
-          throw refusal;
+          if (learnedNothing(probe)) {
+            const refusal = new UnreadTreeRefusal(name, flow, before, probe);
+            this.log(`⛔ reach ${flow}`, `refused: ${refusal.reason}`);
+            throw refusal;
+          }
         }
         this.log(
           `⚠ reach ${flow}`,
@@ -541,7 +629,7 @@ export class FlowEngine {
   }
 
   /**
-   * Is `detect` satisfied, within a grace window? `graceMs: 0` is a single
+   * Is `detect` satisfied, within a window? `windowMs: 0` is a single
    * probe — the entry check, which must be cheap, and the check after the last
    * reach flow, which has the ensureState wait right behind it. A rung with
    * another rung after it polls for a moment instead: a flow that just tapped
@@ -551,27 +639,43 @@ export class FlowEngine {
    * An unreadable tree is not "in this state", and must not throw either:
    * right after a cold launch/reinstall (no window yet) is exactly when the
    * reach flows are needed. But it is not "not in this state" either: a
-   * probe that never read a tree answers `unknown` (Detection), which the
-   * ladder alone distinguishes — it refuses a destructive rung on it.
+   * probe that never read a tree answers `unknown` (Detection), and one
+   * that read only bare trees answers `bare` — the ladder alone tells either
+   * from `no`, and refuses a destructive rung on them. The window is a
+   * grace window (`reachRecheckMs`) after a rung, and since 2026-10-07 the
+   * second look (`ensureTimeoutMs`) before a destructive one.
    */
-  private async detects(cond: Condition, graceMs: number): Promise<Detection> {
+  private async detects(cond: Condition, windowMs: number): Promise<Detection> {
+    // Trees that held something rendered, and the last bare one's shape —
+    // asked only of a tree that MISSED: a match is "yes" whatever else the
+    // tree holds. (So an `absent: true` detect still answers "yes" on a bare
+    // tree, since nothing in it matches; that predates the bare answer and is
+    // not this probe's question.)
+    let rendered = 0;
+    let lastBareTree: UiNode | undefined;
     const outcome = await pollTree(
       this.adapter,
-      async (tree) => ((await this.matches(cond, tree)) ? true : undefined),
-      { timeoutMs: graceMs, pollMs: this.pollMs },
+      async (tree) => {
+        if (await this.matches(cond, tree)) return true;
+        if (isBareTree(tree)) lastBareTree = tree;
+        else rendered++;
+        return undefined;
+      },
+      { timeoutMs: windowMs, pollMs: this.pollMs },
     );
     if (!outcome.timedOut) return { answer: 'yes' };
+    // Trees were read and none was rendered: the probe's answer is `bare`
+    // (below), and its line says so — a read error on a later round is not
+    // the answer then, so it gets no line of its own.
+    const allBareTree = rendered === 0 ? lastBareTree : undefined;
     // Until 2026-10-03 this probe swallowed the read error (`.catch(() =>
     // undefined)`), so an adb that had gone away looked exactly like "not in
     // this state" and the ladder escalated — possibly into a wipe — with no
     // line saying the device had never been asked. The answer is still not
     // "yes" (an unreadable tree is not "in state"), and the trace says why.
     // Right after a cold launch (no window yet) it is the normal case.
-    if (outcome.readError !== undefined) {
-      this.log(
-        '⚠ detect',
-        `${describeCondition(cond)} treated as not detected — last UI tree read failed: ${headline(outcome.readError)}`,
-      );
+    if (outcome.readError !== undefined && allBareTree === undefined) {
+      this.log('⚠ detect', `${describeCondition(cond)} treated as not detected — ${readFailed(outcome.readError)}`);
     }
     // The 2026-10-03 follow-up, done 2026-10-06 with its measured incident
     // (the idb 0×0 tree): a probe that read NO tree in any round is unknown,
@@ -580,6 +684,18 @@ export class FlowEngine {
     // `treesRead === 0` means every round's read failed, so the last one's
     // error is set; the second test only narrows the type.
     if (outcome.treesRead === 0 && outcome.readError !== undefined) return { answer: 'unknown', readError: outcome.readError };
+    // 2026-10-07 (docs/bugs/2026-10-06-second-look-reads-android-decor-as-
+    // not-in-state.md): a tree is not knowledge either when it is BARE — the
+    // decor Android shows for ~9 s of a cold launch, WDA's splash. "One good
+    // read makes it 'no'" now means one RENDERED read: a probe whose every
+    // tree was bare answers `bare`, and says so in the trace the way an
+    // unreadable one does. `treesRead > 0` here, so `allBareTree` is set
+    // exactly when nothing rendered was read.
+    if (allBareTree !== undefined) {
+      const probe: UnreadProbe = { answer: 'bare', shape: treeShape(allBareTree) };
+      this.log('⚠ detect', `${describeCondition(cond)} treated as not detected — ${describeUnreadCause(probe)}`);
+      return probe;
+    }
     return { answer: 'no' };
   }
 

@@ -520,7 +520,7 @@ flows:
     // The everyday shape: the prelude taps an interstitial that is not there,
     // so its `tap:` times out. Aborting the ladder here would mean the prelude
     // only works on the runs that did not need it.
-    const noPrompt = { ...screens(), biometrics_prompt: screen(el({ identifier: 'something_else' })) };
+    const noPrompt = { ...screens(), biometrics_prompt: screen(el({ role: 'text', identifier: 'something_else' })) };
     const fake = new FakeAdapter(noPrompt, 'biometrics_prompt');
     const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
     await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
@@ -531,7 +531,7 @@ flows:
   });
 
   it('does not swallow the failed rung — the trace names it and the escalation', async () => {
-    const noPrompt = { ...screens(), biometrics_prompt: screen(el({ identifier: 'something_else' })) };
+    const noPrompt = { ...screens(), biometrics_prompt: screen(el({ role: 'text', identifier: 'something_else' })) };
     const fake = new FakeAdapter(noPrompt, 'biometrics_prompt');
     const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
     const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
@@ -640,7 +640,7 @@ flows:
 const lateInterstitial = () => {
   resetLayout();
   const screens = {
-    logged_out: screen(el({ identifier: 'login_button' })),
+    logged_out: screen(el({ role: 'button', identifier: 'login_button' })),
     interstitial: screen(el({ role: 'button', identifier: 'not_now' })),
     dashboard: screen(el({ identifier: 'dashboard_root' })),
   };
@@ -1009,7 +1009,7 @@ flows:
 `);
     resetLayout();
     const fake = new FakeAdapter(
-      { out: screen(el({ identifier: 'login_button' })), dashboard: screen(el({ identifier: 'dashboard_root' })) },
+      { out: screen(el({ role: 'button', identifier: 'login_button' })), dashboard: screen(el({ identifier: 'dashboard_root' })) },
       'out',
     );
     const launch = fake.launch.bind(fake);
@@ -1050,7 +1050,7 @@ flows:
     resetLayout();
     const fake = new FakeAdapter(
       {
-        logged_out: screen(el({ identifier: 'login_button' })),
+        logged_out: screen(el({ role: 'button', identifier: 'login_button' })),
         // the banner sits ON the dashboard, and dismissing it navigates away
         dashboard: screen(el({ identifier: 'dashboard_root' }), el({ role: 'button', identifier: 'not_now' })),
         elsewhere: screen(el({ identifier: 'some_other_screen' })),
@@ -1952,7 +1952,7 @@ states:
 describe('failure modes', () => {
   it('branch with no matching arm times out with the tried conditions', async () => {
     resetLayout();
-    const fake = new FakeAdapter({ blank: screen(el({ identifier: 'something_else' })) }, 'blank');
+    const fake = new FakeAdapter({ blank: screen(el({ role: 'text', identifier: 'something_else' })) }, 'blank');
     await expect(new FlowEngine(CONFIG, fake, FAST).runFlow('login'))
       .rejects.toThrow(/any branch condition.*pin_keyboard.*username_field/);
   });

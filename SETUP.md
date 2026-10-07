@@ -355,6 +355,14 @@ one happens by itself.
   launch it makes, but a process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app`
   on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
   <udid> && xcrun simctl boot <udid>`), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
+- **`ensure_state` stops with `Refused to run reach flow …` and `every UI tree read was bare` (either platform)** — every
+  tree the detect probe read held only wrappers and unlabeled decoration: a cold launch's Android decor
+  (`android:id/content`, `action_bar_root`; measured +5.3…+13.8 s after launch on an RN debug build) or the WDA splash
+  (7 nodes, `SplashScreenLogo`). Before a `clearState` rung averi takes a second look of up to `ensureTimeoutMs` (20 s):
+  it ends at once on the state, runs the rung after the full 20 s when it saw a rendered screen outside the state, and
+  refuses rather than wipe an app whose screen it never saw (until 2026-10-07 it read the decor as "not in
+  state" and wiped). Take a `screenshot`: still launching → retry the call; rendered but made only of unlabeled icons
+  (they read as bare too) → `run_flow` the rung deliberately, or give the screen a labelled element to detect on.
 - **iOS typing lands the wrong characters (`y`↔`z`, `ý` for a digit), or `fill` on a PLAIN field reports fewer
   characters than typed** — HID typing follows the simulator's hardware keyboard layout, which follows the Mac's
   input source unless pinned (measured 2026-09-17 with a Slovak host layout; it read as an averi typing bug for

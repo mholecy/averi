@@ -16,7 +16,7 @@
  */
 
 import { everyNode, type Platform, type UiNode } from '../adapters/types.js';
-import { isBareTree } from '../ui-tree/bare-tree.js';
+import { isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import type { FillResult } from '../interact/fill.js';
 
 /** `Tapped <selector>`, with the resolution note in parentheses when there was one. */
@@ -82,27 +82,15 @@ export const launchText = (launch: {
  */
 export const snapshotNote = (tree: UiNode, match?: { selector: string; matched: readonly unknown[] }): string | undefined => {
   if (match !== undefined && match.matched.length > 0) return undefined;
-  const nodes = [...everyNode(tree)];
-  const count = `${nodes.length} node${nodes.length === 1 ? '' : 's'}`;
   if (isBareTree(tree)) {
     const lead = match === undefined ? 'The' : `0 matches for ${match.selector}, and the`;
     return (
-      `⚠ ${lead} tree is bare: ${count}, none readable or interactive (only wrappers and unlabeled decoration). ` +
+      `⚠ ${lead} tree is bare: ${nodeCount([...everyNode(tree)])}, none readable or interactive (only wrappers and unlabeled decoration). ` +
       'The accessibility tree is empty or unrendered: the screen may still be loading, or — measured on iOS idb 2026-10-06 — ' +
       'the tree stays empty for minutes on a rendered screen. Compare with screenshot: if the screen is rendered, the tree source is stuck, ' +
       'not the app — do not read the element as absent. assert polls (3 s by default; set "timeout" in the spec).'
     );
   }
   if (match === undefined) return undefined;
-  return `0 matches for ${match.selector} in a tree of ${count} (roles: ${rolesPresent(nodes)})`;
-};
-
-/** `button ×3, container ×1, text ×1` — by count, then name; the normalized role vocabulary is small, so nothing is cut. */
-const rolesPresent = (nodes: UiNode[]): string => {
-  const counts = new Map<string, number>();
-  for (const n of nodes) counts.set(n.role, (counts.get(n.role) ?? 0) + 1);
-  return [...counts]
-    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
-    .map(([role, n]) => `${role} ×${n}`)
-    .join(', ');
+  return `0 matches for ${match.selector} in a tree of ${treeShape(tree)}`;
 };
