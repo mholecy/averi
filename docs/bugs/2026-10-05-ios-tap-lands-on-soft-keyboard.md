@@ -252,7 +252,7 @@ and one helper owns the oracle-or-tree switch.)
    `{0,518,402,356}` with the 2FA toolbar (toolbar slot included). A parked keyboard (2FA-0: `isVisible=0`, y 891) and
    a screen with nothing focused (K3) mark nothing. The `Keyboard` element stays `container`, its keys `other`; the role
    is not interactive and no selector or resolution changes (`tests/adapters/wda-source-keyboard.test.ts`, 46 tests
-   over the five shrunk fixtures `tests/fixtures/wda-source-myport-*.json`).
+   at `6f41787`, over the five shrunk fixtures `tests/fixtures/wda-source-myport-*.json`).
    - **Correction to the second pass above:** the band rule was checked against the screenshots' pixels, and in K2
      the keyboard's grey begins at **566 pt** (at x = 8 %, through the key columns; the left-margin strip at 566–578 is
      the rounded edge), 17 pt above the `Keyboard` rect's 583 — exactly the union `Other {0,566,402,308}`. So
@@ -510,7 +510,7 @@ element (K5b, K3 of the device check) and the accessory toolbar's Done (K4) — 
    step is not even under the keyboard, and whatever the keyboard would harm — the next tap, a pixel assert — is
    guarded in its own place and refuses there with the full message; the warning makes that refusal no surprise. A
    dismissal that WAS tapped and did not hide the keyboard throws: the screen was touched.
-5. **Tests** (87 new, 1473 total; 29 mutants of the rule killed on an rsync copy — the band skip, the keyboard-side skip,
+5. **Tests** (87 new, 1473 total at `0036762`; 29 mutants of the rule killed on an rsync copy — the band skip, the keyboard-side skip,
    the confirming looks, the blind `enter`, the band and `ofKeyboard` halves of the accessory rule, the last-button choice,
    the engine's and the tools' plumbing, the android policy, the confirming re-read, the hide delay, the second look's
    tree, the oracle path's empty result, and after review round 1 the interactive filter, the off-screen and shadowing

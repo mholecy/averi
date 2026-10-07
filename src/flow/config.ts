@@ -331,9 +331,10 @@ const configSchema = z
              * order of preference (stage B, 2026-10-07; see
              * KeyboardDismissStrategy). Without it a covered target is
              * refused (stage A) and `fill { dismissKeyboard: true }` leaves
-             * the keyboard up with a warning. Only read under `treeSource:
-             * wda` — idb's tree carries no keyboard, so nothing is ever
-             * covered or dismissed there.
+             * the keyboard up with a warning. Read under every tree source,
+             * but inert under `treeSource: idb` — idb's tree carries no
+             * keyboard, so nothing is ever covered or dismissed there (the
+             * loader says so on stderr: inertKeyboardDismissNote).
              */
             keyboardDismiss: z.array(keyboardDismissStrategy).min(1).optional(),
           })

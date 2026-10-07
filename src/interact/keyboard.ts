@@ -133,8 +133,10 @@ export class KeyboardStateDisagreement extends KeyboardGuardError {
 }
 
 /**
- * The in-tree keyboard covers the tap point on two looks and the adapter
- * has nothing to hide it with (2026-10-07). NOT an AfterKeyboardDismissal —
+ * The in-tree keyboard covers the tap point on two looks and nothing can
+ * hide it — the adapter has no means and no configured dismissal is usable
+ * (2026-10-07) — or the second look could not resolve the target after the
+ * first found it covered (wrapped here, `cause` kept). NOT an AfterKeyboardDismissal —
  * nothing was pressed — and not a disagreement: one source, the tree that
  * resolved the target, read the keyboard over the point twice. A refusal,
  * because the alternative is the harm: the tap presses the keyboard and is
@@ -142,8 +144,9 @@ export class KeyboardStateDisagreement extends KeyboardGuardError {
  * the bug this guards against, docs/bugs/2026-10-05-ios-tap-lands-on-soft-
  * keyboard.md). WHY the adapter cannot hide it is the adapter's sentence
  * (`DeviceAdapter.keyboardAdvice`), quoted in the message; this layer knows
- * only that it has no dismissal to send. A generic dismissal is stage B's
- * question.
+ * only that it has no dismissal to send. Configured dismissals (stage B)
+ * are tried before this is thrown; their reasons for being passed over are
+ * in the message.
  */
 export class KeyboardWithoutDismissal extends KeyboardGuardError {
   constructor(message: string, traceLine: string, options?: ErrorOptions) {
@@ -668,7 +671,7 @@ export async function resolveClearOfKeyboard(
     // look's tree — the one that just read the keyboard covering. None
     // configured, or none usable on this screen: the refusal, as stage A.
     const dismissals = opts.dismissals ?? [];
-    const { picked, skipped } = dismissals.length === 0 ? { picked: undefined, skipped: [] } : pickDismissal(second.tree, dismissals, opts.ambiguous);
+    const { picked, skipped } = pickDismissal(second.tree, dismissals, opts.ambiguous);
     if (picked === undefined) {
       // Names MCP tools and "a flow" — the deliberate exception recorded at
       // the "back did not close it" error below. The platform's facts (why

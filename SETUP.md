@@ -347,10 +347,14 @@ one happens by itself.
   (`.accessibilityElement(children: .contain)`) times out while the screen is showing** — idb never
   exposes container identifiers: `app.ios.treeSource: wda` (step 4), or wait on a button/row id.
 - **iOS: `idb returned an empty accessibility tree`, or `ensure_state` stops with `Refused to run reach flow …` and a
-  `⛔ reach` line** — idb can return a 0×0 tree for minutes on a rendered screen (measured 2026-10-06, after a cold
-  relaunch). averi treats it as an unread device: waits and asserts fail instead of reading "absent", and the reach
-  ladder will not run a `clearState` rung on it, so nothing was wiped. Compare with `screenshot` and retry once the tree
-  reads; if it keeps happening, `app.ios.treeSource: wda` (step 4) reads the tree through WebDriverAgent instead.
+  `⛔ reach` line** — idb returns a 0×0 tree on a rendered screen (measured 2026-10-06/07). averi treats it as an
+  unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a `clearState`
+  rung on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
+  (`treeSource: wda` in any project, or another XCTest driver): every app process launched after it starts stuck, and
+  waiting does not end it (18+ min measured). averi re-enables the simulator's accessibility automation before each
+  launch it makes, but a process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app`
+  on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
+  <udid> && xcrun simctl boot <udid>`), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
 - **iOS typing lands the wrong characters (`y`↔`z`, `ý` for a digit), or `fill` on a PLAIN field reports fewer
   characters than typed** — HID typing follows the simulator's hardware keyboard layout, which follows the Mac's
   input source unless pinned (measured 2026-09-17 with a Slovak host layout; it read as an averi typing bug for
@@ -366,5 +370,7 @@ one happens by itself.
   listener if xcodebuild's teardown did not. An older server, a SIGKILL, or a second signal during that wait still
   leave one behind: `pkill -f WebDriverAgentRunner` before the first iOS call.
 - **A `${VAR}` is missing or empty** — the error names the credential (and environment) that needed it;
-  add the variable to `.env.averi`. Never ask the user for the value itself.
+  add the variable to `.env.averi`. If it IS in `.env.averi` and the error says "set but empty", an empty variable
+  exported in the shell or CI shadows it (exported variables win): unset it there. Never ask the user for the value
+  itself.
 - **Flow times out after a UI change** — fix the descriptor as part of the change; it's code.

@@ -91,7 +91,7 @@ passes, and clears what an autofill put in on focus; `''` without clear is the t
 field), `tests/mcp/tools.test.ts` (both `type_text` paths with `text: ""`), `tests/flow/credentials.test.ts` (the
 empty variable's message; a literal `''` passes through) and `tests/flow/engine.test.ts` (an empty `TEST_PIN` fails
 the fill before the tap; a literal `value: ""` with clear clears and passes). The B4 probe — `fill: { id:
-twofactor_code, value: "", dismissKeyboard: true }` — is the device check to run.
+twofactor_code, value: "", dismissKeyboard: true }` — was the device check; it ran, below.
 
 ## Device check of the fix (2026-10-07, `5786fc3`)
 
