@@ -126,12 +126,37 @@ single-element form is a `color` assert: `{"element":{"id":"card"},"color":{"exp
 caller chose the hex), so the default catches the 10.19 bug. Thin 1–2 px strokes are invisible
 to region sampling — borders stay with the screenshot judge.
 
-Screen width per platform is inferred from the widest rect in the whole tree (the id-less
-root/window node). **Reliability caveat:** when the widest rect starts inset, the inferred width
-is a content width and every delta is scaled wrong — the output says so explicitly. On iOS this
-typically means the default idb tree source surfaced no real window rect (width came from the
-widest accessibility element): set `app.ios.treeSource: wda` in `averi.yaml`, whose tree carries
-a real window rect. Otherwise the tree was filtered before it reached the comparator.
+Screen width per platform is the WINDOW's width, read from the whole tree (the id-less
+root/window node), and the device screen witnesses it. Both the `rect` assert and the rect
+table **fail closed** on a width that cannot be trusted — they print no deltas and no verdict:
+
+- **a content width** — the widest rect starts inset, so every delta would be scaled wrong
+  (until 2026-10-07 this was only a warning, and a real -4.2 % defect could read WITHIN
+  TOLERANCE under it). On iOS this typically means the default idb tree source surfaced no real
+  window rect (width came from the widest accessibility element): set `app.ios.treeSource: wda`
+  in `averi.yaml`, whose tree carries a real window rect. On Android it is usually the app's own
+  window letterboxed or freeform (a fixed-orientation or non-resizable app on a large screen),
+  which starts inset by design — measure it full-screen. Otherwise the tree was filtered before
+  it reached the comparator.
+- **a 0-wide tree** (idb's 0×0 synthetic root when elements carry no frames).
+- **a window wider than the device screen side it faces** — a portrait window rect against the
+  short side, a landscape one against the long side, a width with no window rect against the
+  longer side — a node that is not the window was counted as it. Before refusing, averi reads
+  the device screen once more (the size is otherwise read once and kept), so a screen changed
+  since the first read — `wm size`, an unfold — is judged as it is now; the refusal says the
+  screen was read again, or that the re-read failed.
+
+An Android app window in landscape beside a 3-button navigation bar or a display cutout starts
+inset, or ends short of the screen, by the bar's width. With the device screen as witness it is
+measured — at its own width, with `x` measured from its left edge — and not refused as a
+content width or noted as a split view. The rule is narrow: landscape-shaped, the full short
+side tall, each gap at most 10 % of the long side, Android only (an iOS app window is the
+screen; an inset rect there is content).
+
+A window NARROWER than the device screen is still measured (a split view's canvas is what the
+Figma frame describes) with a `! <platform>: window … DEVICE screen` line; a leg whose device
+screen could not be read says the width is the tree's alone. A refused width fails the WHOLE
+rect table (`FAILED: rect parity: <platform>: …`), not just that platform's rows.
 
 ## Text and type-size parity
 

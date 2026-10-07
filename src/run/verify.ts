@@ -21,6 +21,7 @@ import {
   compareRectParity,
   formatRectParity,
   validateRectContract,
+  type RectLeg,
   type RectParityOptions,
 } from '../verify/rect-parity.js';
 import {
@@ -206,9 +207,18 @@ const withTree = (leg: VerificationLeg, p: Platform): Contribution<TreeFrame> =>
   return { note: noTreeNote(p, m?.error ?? 'no UI tree was read for this leg') };
 };
 
-const treeOf = (leg: VerificationLeg, p: Platform): Contribution<UiNode> => {
+/**
+ * What the rect table reads off a leg: the tree and the window width judged
+ * for it at capture (verify/scale.ts#windowWidth) — both tree-bearing arms
+ * carry them, so a png that did not decode costs this table nothing. Until
+ * 2026-10-07 this kept the tree alone and the comparator measured the width
+ * itself, dropping the device screen the frame had already read.
+ */
+const rectLegOf = (leg: VerificationLeg, p: Platform): Contribution<RectLeg> => {
   const got = withTree(leg, p);
-  return 'note' in got ? got : { value: got.value.measured.tree };
+  if ('note' in got) return got;
+  const { tree, window } = got.value.measured;
+  return { value: { tree, window } };
 };
 
 /**
@@ -508,7 +518,7 @@ export async function runVerification(
     if (DIMENSIONS.rect.produced(contract)) {
       sections.push(
         await paritySection(DIMENSIONS.rect.title, platforms, runs, {
-          collect: treeOf,
+          collect: rectLegOf,
           empty: SKIPPED_NO_TREE,
           format: (trees) => formatRectParity(compareRectParity(contract, trees, DIMENSIONS.rect.options)),
         }),

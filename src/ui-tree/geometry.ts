@@ -34,6 +34,12 @@ interface ScreenWidth {
    * candidate the tree offered, not a measurement of the screen — only
    * `DeviceAdapter.viewport()` is that. Callers that can have both should
    * compare them (verify/scale.ts) rather than read this as certainty.
+   *
+   * Deciding what a `false` COSTS is not this file's business: verify/scale.ts
+   * is the one reader that turns it into a refusal, for the png scale and
+   * the rect denominator alike. `inferScreenWidth`, the width-only view the
+   * rect table and the `rect` assert read directly — and so kept `false` as a
+   * remark — was deleted on 2026-10-07 for that reason.
    */
   reliable: boolean;
 }
@@ -51,6 +57,19 @@ export interface ScreenSize extends ScreenWidth {
    * cross-check) must not run without it.
    */
   trustworthyHeight: boolean;
+  /**
+   * Set only when no window rect was found (the walk answered): a node in
+   * the WINDOW's position — the root when it has a rect, else the widest
+   * screen-shaped child of a rectless root — that is screen-shaped but does
+   * NOT start at the origin. The measured shape: an Android app window laid
+   * out beside a side navigation bar or a display cutout in landscape starts
+   * at x ≈ the bar's width, and uiautomator's root IS that window. Whether
+   * such a rect may be trusted as the window is not this file's call — the
+   * tree cannot tell it from a filtered tree's inset content, so `reliable`
+   * stays false; verify/scale.ts decides it, with the device screen as the
+   * witness (2026-10-07, the parity code review's A1).
+   */
+  insetWindow?: Rect;
 }
 
 /**
@@ -118,11 +137,13 @@ export function inferScreenSize(tree: UiNode): ScreenSize {
     };
   }
   const walked = walkExtent(tree);
+  const inset = insetWindowRect(tree);
   return {
     width: walked.width,
     height: walked.height,
     reliable: walked.reliable,
     trustworthyHeight: false,
+    ...(inset !== undefined && { insetWindow: inset }),
   };
 }
 
@@ -249,10 +270,35 @@ function windowRect(tree: UiNode): { rect: Rect; leg: 'root' | 'child' } | undef
   return { rect: best, leg: 'child' };
 }
 
-/** Screen width alone, for the callers that never touch a screenshot. */
-export function inferScreenWidth(tree: UiNode): ScreenWidth {
-  const { width, reliable } = inferScreenSize(tree);
-  return { width, reliable };
+/**
+ * The rect in the window's position that starts inset — see
+ * `ScreenSize.insetWindow`. Only called when `windowRect` found nothing, so
+ * no candidate here is origin-anchored. The root leg is the window by
+ * construction (uiautomator's single root is the app window's decor); a
+ * child of a rectless root (a multi-window dump, or idb's flat list) faces
+ * the same contradiction test a guessed window does: content starting
+ * inside it that reaches materially past its right edge rules it out.
+ */
+function insetWindowRect(tree: UiNode): Rect | undefined {
+  const shaped = (r: Rect): boolean => r.width > 0 && r.height > 0 && onLayout(r) && isScreenShaped(r);
+  if (tree.rect.width > 0 && tree.rect.height > 0) return shaped(tree.rect) ? tree.rect : undefined;
+  const candidates = tree.children.map((c) => c.rect).filter(shaped);
+  if (candidates.length === 0) return undefined;
+  const best = candidates.reduce((champion, r) =>
+    r.width > champion.width || (r.width === champion.width && r.height > champion.height) ? r : champion,
+  );
+  const right = best.x + best.width;
+  let contradicted = false;
+  const walk = (n: UiNode): void => {
+    if (contradicted) return;
+    if (onLayout(n.rect) && n.rect.x < right && n.rect.x + n.rect.width > best.x + best.width * MAX_OVERHANG) {
+      contradicted = true;
+      return;
+    }
+    n.children.forEach(walk);
+  };
+  walk(tree);
+  return contradicted ? undefined : best;
 }
 
 /** {id → rect} for the FIRST occurrence of each identifier (pre-order). */

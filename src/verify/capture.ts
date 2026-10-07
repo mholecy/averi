@@ -2,7 +2,8 @@ import { PNG } from 'pngjs';
 import type { DeviceAdapter, DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { pngScale, type PngScale } from './scale.js';
+import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
+import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.js';
 
 /**
  * One settled frame, one scale, one crop — the module every pixel reading in
@@ -36,7 +37,12 @@ import { pngScale, type PngScale } from './scale.js';
  * the miss-not-failure rule; the pixel poll, verify/pixel-poll.ts, hands
  * that round's tree in), and rect parity, which scales from the tree on
  * purpose (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md —
- * its denominator is the app's canvas, not the device screen).
+ * its denominator is the app's canvas, not the device screen). What IS here
+ * since 2026-10-07 is that denominator's trust: each tree-bearing frame
+ * carries `window` (verify/scale.ts#windowWidth — still the tree's window,
+ * the device screen only witnessing it), derived once beside the scale and
+ * before the png is decoded, so the rect table reads it from the frame
+ * instead of measuring the tree itself.
  *
  * "Every pixel reading" holds since 2026-10-04: until then the screenshot
  * baseline assert took a bare `adapter.screenshot()` — the one reader the
@@ -44,7 +50,10 @@ import { pngScale, type PngScale } from './scale.js';
  * could both be mid-animation. It now takes the png-only arm of
  * `captureFrame`. The pure tail (tree + png + screen → measured frame) is
  * exported as `measuredFrameFor`, and the comparator tests build their
- * fixtures with it rather than re-deriving the scale themselves.
+ * fixtures with it rather than re-deriving the scale themselves; it runs the
+ * same `scaleFor` / `windowFor` pair over one tree walk that `captureFrame`
+ * runs, which adds only the one fresh screen re-read (`ScreenWitness`) —
+ * that needs an adapter.
  *
  * Since 2026-10-05 the budget has ONE owner and the frame SAYS whether it
  * settled:
@@ -187,20 +196,28 @@ export interface RgbaImage {
 /**
  * A frame that decoded and has a tree beside it: what the pixel comparators
  * measure against. `scale` is the ONE derivation for this frame — consumers
- * read `.error` and apply their own policy, never re-derive.
+ * read `.error` and apply their own policy, never re-derive. `window` is the
+ * same for the rect denominator (since 2026-10-07, `windowFor`).
  */
 export interface MeasuredFrame {
   tree: UiNode;
   png: RgbaImage;
   scale: PngScale;
+  window: WindowWidth;
   error?: undefined;
 }
 
-/** The tree is here, the pixels are not: the png did not decode. Rect parity can still use the tree. */
+/**
+ * The tree is here, the pixels are not: the png did not decode. Rect parity
+ * can still use the tree — and its `window`, which is why that is derived
+ * without the png: the rect table must not lose its witness, or its
+ * refusal, to a decode failure (2026-10-07).
+ */
 export interface Undecoded {
   tree: UiNode;
   png?: undefined;
   scale?: undefined;
+  window: WindowWidth;
   error: string;
 }
 
@@ -496,7 +513,16 @@ export async function captureFrame(
   const region = opts.tree !== undefined && opts.region !== undefined ? { rect: opts.region, tree: opts.tree } : undefined;
   // `wait` is everything the frame says about itself (shot, stability, how it
   // settled, captures); only the measured half is added below.
-  const { png: waitPng, ...wait } = await stableScreenshot(adapter, opts.deadline, region);
+  // The supplied tree is walked ONCE for the whole capture — the region
+  // check's scale on every differing pair, the frame's scale and its window
+  // all read this one size (the parity code review's A4: until then each
+  // measured frame walked it twice, and each region pair once more).
+  const suppliedSize = opts.tree === undefined ? undefined : treeSizeOf(opts.tree);
+  const { png: waitPng, ...wait } = await stableScreenshot(
+    adapter,
+    opts.deadline,
+    region && suppliedSize && { ...region, size: suppliedSize },
+  );
   const { shot } = wait;
   let tree: UiNode;
   if (opts.tree !== undefined) {
@@ -510,6 +536,16 @@ export async function captureFrame(
   } else {
     return wait;
   }
+  // Memoized inside the adapter (adapters/types.ts), so this is a device read
+  // once per adapter, not once per frame — and once more, fresh, only when
+  // the window reads wider than the memoized screen (ScreenWitness). Judged
+  // BEFORE the decode: the rect table runs on a frame whose png did not
+  // decode, and the device screen is what witnesses its window width
+  // (scale.ts#windowWidth).
+  const size = suppliedSize ?? treeSizeOf(tree);
+  const witness = await ScreenWitness.read(adapter);
+  const window = await witness.judge(tree, size);
+  const { screen } = witness;
   let png: PNG;
   try {
     // A shot the region check already decoded (settled or moving) is not decoded twice.
@@ -519,16 +555,14 @@ export async function captureFrame(
       ...wait,
       measured: {
         tree,
+        window,
         error:
           `screenshot PNG decode failed: ${errorMessage(e)} — re-run; if it repeats, the device is returning ` +
           'something other than a PNG (check `adb exec-out screencap -p` / `xcrun simctl io <udid> screenshot` by hand)',
       },
     };
   }
-  // Memoized inside the adapter (adapters/types.ts), so this is a device read
-  // once per adapter, not once per frame.
-  const screen = await adapter.viewport().catch(() => undefined);
-  return { ...wait, measured: measuredFrameFor(tree, png, screen) };
+  return { ...wait, measured: { tree, png, scale: scaleFor(tree, png, screen, size), window } };
 }
 
 /**
@@ -572,6 +606,77 @@ export async function captureBaselineFrame(
 }
 
 /**
+ * The device screen as a WITNESS: the adapter's memoized `viewport()`, or
+ * `undefined` when it cannot be read — a failed read degrades every answer
+ * that would have been checked against it (the png scale, the window width)
+ * to the tree's alone, each saying so in its own note; it never fails the
+ * frame or the assert. One owner for that degradation (review round 1,
+ * 2026-10-07): the capture, the region check and the `rect` assert each
+ * spelled the `.catch` themselves. Not for `absent`, whose viewport is the
+ * reference frame itself and whose failed read is an error.
+ */
+export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise<DeviceScreen | undefined> =>
+  adapter.viewport().catch(() => undefined);
+
+/**
+ * The device screen as the WINDOW's witness, for one frame (`captureFrame`)
+ * or one `rect` assert's rounds (Verifier.assertRect): the memoized screen,
+ * re-read FRESH at most once — when a window reads wider than the side it
+ * faces (`WindowWidth.widerThanScreen`), the one refusal a stale screen can
+ * cause — and the window judged again against what the device says now.
+ * The parity code review's A3 (2026-10-07): the screen was memoized for
+ * the adapter's life, so a `wm size` or an unfold after the first read kept
+ * refusing until the MCP server was restarted (the device check, row 18c).
+ *
+ * The refusal that survives says which: the screen was read again and
+ * still says so (the tree, not a stale size), or the re-read failed (a
+ * changed screen cannot be ruled out). A screen read fresh is kept for the
+ * later rounds, and the adapter's memo is replaced by it too.
+ */
+export class ScreenWitness {
+  #screen: DeviceScreen | undefined;
+  /** undefined: not re-read yet; otherwise what the one re-read added to a refusal. */
+  #reread: string | undefined;
+
+  private constructor(
+    private readonly adapter: Pick<DeviceAdapter, 'viewport'>,
+    screen: DeviceScreen | undefined,
+  ) {
+    this.#screen = screen;
+  }
+
+  static async read(adapter: Pick<DeviceAdapter, 'viewport'>): Promise<ScreenWitness> {
+    return new ScreenWitness(adapter, await witnessScreen(adapter));
+  }
+
+  /** The screen the last judgement used — the memoized one, or the fresh one once re-read. */
+  get screen(): DeviceScreen | undefined {
+    return this.#screen;
+  }
+
+  /** `windowWidth` for this tree, with the one fresh re-read before a wider-than-screen refusal. */
+  async judge(tree: UiNode, size: TreeSize = treeSizeOf(tree)): Promise<WindowWidth> {
+    let window = windowFor(tree, this.#screen, size);
+    if (window.widerThanScreen !== true) return window;
+    if (this.#reread === undefined) {
+      try {
+        this.#screen = await this.adapter.viewport({ fresh: true });
+        this.#reread =
+          'the device screen was read again just before this refusal, so the size above is the one it reports now, ' +
+          'not a stale read';
+      } catch (e) {
+        this.#reread =
+          `a fresh read of the device screen failed (${errorMessage(e)}), so a screen changed since the first ` +
+          'read (a fold or unfold, `wm size`) cannot be ruled out; re-run';
+      }
+      window = windowFor(tree, this.#screen, size);
+      if (window.widerThanScreen !== true) return window;
+    }
+    return { ...window, error: `${window.error} — ${this.#reread}` };
+  }
+}
+
+/**
  * The pure tail of `captureFrame`: a tree, a decoded png and (when the
  * device would say) its screen become the ONE measured frame — the scale
  * derived once, a throwing geometry walk carried as the scale's failure
@@ -585,25 +690,63 @@ export async function captureBaselineFrame(
  * caught throw) would have left the comparator tests green against fixtures
  * built the old way — the shape of the 2026-08-26 ocr-crop-scale bug, which
  * was a dropped field at the call site, not a wrong unit. The two failure
- * arms (`Undecoded`, `Treeless`) are decided before this tail and need
- * nothing from it.
+ * arms (`Undecoded`, `Treeless`) are decided before this tail; `Undecoded`
+ * shares only its window derivation (`windowFor`), the one fact it carries
+ * that does not need pixels.
  */
 export function measuredFrameFor(tree: UiNode, png: RgbaImage, screen?: DeviceScreen): MeasuredFrame {
-  let scale: PngScale;
+  const size = treeSizeOf(tree);
+  return { tree, png, scale: scaleFor(tree, png, screen, size), window: windowFor(tree, screen, size) };
+}
+
+/**
+ * The tree's `inferScreenSize`, walked ONCE per frame and handed to both the
+ * png scale and the window width (the parity code review's A4) — or the
+ * walk's throw, carried, so each answer still fails with its own words.
+ */
+type TreeSize = { size: ScreenSize; thrown?: undefined } | { size?: undefined; thrown: unknown };
+
+function treeSizeOf(tree: UiNode): TreeSize {
   try {
-    scale = pngScale(tree, png.width, png.height, screen);
+    return { size: inferScreenSize(tree) };
   } catch (e) {
-    // The geometry walk assumes a well-formed tree. A node without children
-    // or a pathological depth must fail THIS frame's scale, not the leg: the
-    // walk used to run inside the parity tables' containment, and moving it
-    // here must not widen what a bad tree can take down.
-    scale = {
-      error:
-        `the png scale could not be derived from this tree: ${errorMessage(e)} — the tree is not well-formed; ` +
-        'dump it with ui_snapshot and re-run, and keep the dump if it repeats',
-    };
+    return { thrown: e };
   }
-  return { tree, png, scale };
+}
+
+/** The frame's png scale from an already-walked tree size, with the walk's containment. */
+function scaleFor(tree: UiNode, png: RgbaImage, screen: DeviceScreen | undefined, size: TreeSize): PngScale {
+  // The geometry walk assumes a well-formed tree. A node without children
+  // or a pathological depth must fail THIS frame's scale, not the leg: the
+  // walk used to run inside the parity tables' containment, and moving it
+  // here must not widen what a bad tree can take down.
+  if (size.thrown !== undefined) return { error: malformedTree('the png scale', size.thrown) };
+  try {
+    return pngScale(tree, png.width, png.height, screen, size.size);
+  } catch (e) {
+    return { error: malformedTree('the png scale', e) };
+  }
+}
+
+/** The one sentence for a geometry walk that threw on this tree, naming what it was deriving. */
+const malformedTree = (what: string, e: unknown): string =>
+  `${what} could not be derived from this tree: ${errorMessage(e)} — the tree is not well-formed; ` +
+  'dump it with ui_snapshot and re-run, and keep the dump if it repeats';
+
+/**
+ * The frame's window width — `scale.ts#windowWidth`, derived once per frame
+ * beside the scale, with the same containment: a tree the geometry walk
+ * cannot traverse fails THIS answer as a carried reason, never the leg.
+ * Shared by both tree-bearing arms (`MeasuredFrame`, `Undecoded`), so a png
+ * that did not decode still reaches the rect table with its window judged.
+ */
+function windowFor(tree: UiNode, screen: DeviceScreen | undefined, size: TreeSize): WindowWidth {
+  if (size.thrown !== undefined) return { error: malformedTree('the window width', size.thrown) };
+  try {
+    return windowWidth(tree, screen, size.size);
+  } catch (e) {
+    return { error: malformedTree('the window width', e) };
+  }
 }
 
 /**
@@ -637,7 +780,7 @@ export function measuredFrameFor(tree: UiNode, png: RgbaImage, screen?: DeviceSc
 async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>,
   deadline?: number,
-  region?: StabilityRegion,
+  region?: SizedRegion,
 ): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'> & { png?: PNG }> {
   const memo = lastDecodeMemo();
   let previous = await adapter.screenshot();
@@ -671,27 +814,35 @@ interface StabilityRegion {
   tree: UiNode;
 }
 
+/** A region with its tree already walked — the size every pair's scale reads (A4). */
+interface SizedRegion extends StabilityRegion {
+  size: TreeSize;
+}
+
 /**
  * Do two differing captures match inside the element's region? The later
  * png when they do; `undefined` — the whole-screen answer, "different" —
  * whenever the question cannot be answered: a png that did not decode, two
  * pngs of different sizes, a scale that carries an error, a rect that lands
  * nowhere on the png. The scale is the one the measured frame will carry
- * (`measuredFrameFor`: the device screen when the adapter will say it — a
- * memoized read, so once per adapter — the tree otherwise), and the rect is
+ * (`scaleFor`, on the region tree's size walked once per capture: the
+ * device screen when the adapter will say it — a memoized read, so once per
+ * adapter — the tree otherwise), and the rect is
  * landed with `pngRegion` and no inset, so the compare covers every pixel
  * the ocr crop reads and more than the colour sampler's inset one.
  */
 async function regionSettled(
   adapter: Pick<DeviceAdapter, 'viewport'>,
-  region: StabilityRegion,
+  region: SizedRegion,
   earlier: PNG | undefined,
   later: PNG | undefined,
 ): Promise<PNG | undefined> {
   if (earlier === undefined || later === undefined) return undefined;
   if (earlier.width !== later.width || earlier.height !== later.height) return undefined;
-  const screen = await adapter.viewport().catch(() => undefined);
-  const { scale } = measuredFrameFor(region.tree, later, screen);
+  const screen = await witnessScreen(adapter);
+  // The scale only — the window is not this check's question (A4: it used
+  // to run the whole measuredFrameFor, both walks, per differing pair).
+  const scale = scaleFor(region.tree, later, screen, region.size);
   if (scale.error !== undefined) return undefined;
   const bounds = pngRegion(region.rect, scale.scale, later);
   if (bounds === undefined) return undefined;

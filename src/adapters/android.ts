@@ -2,8 +2,9 @@ import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { shellCommandLine, shellQuote } from './adb-shell.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
+import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
-import { zeroRect, type Device, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { zeroRect, type Device, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -443,19 +444,19 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.shell(['input', 'tap', String(x), String(y)]);
   }
 
-  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
+  private readonly viewportMemo = new ViewportMemo(async () => {
+    const { stdout } = await this.shell(['wm', 'size']);
+    const raw = stdout.toString('utf8');
+    // "Physical size: 1080x2280", optionally overridden ("Override size: ...")
+    const m = raw.match(/Override size:\s*(\d+)x(\d+)/) ?? raw.match(/Physical size:\s*(\d+)x(\d+)/);
+    if (!m) throw new Error(`Cannot parse wm size output: ${raw.slice(0, 120)}`);
+    // An Android app window may sit beside a side nav bar or a cutout (types.ts#DeviceScreen).
+    return { width: Number(m[1]), height: Number(m[2]), windowsBesideSystemBars: true };
+  });
 
-  /** Screen size in device pixels — the units uiautomator bounds use. */
-  viewport(): Promise<{ width: number; height: number }> {
-    this.viewportPromise ??= (async () => {
-      const { stdout } = await this.shell(['wm', 'size']);
-      const raw = stdout.toString('utf8');
-      // "Physical size: 1080x2280", optionally overridden ("Override size: ...")
-      const m = raw.match(/Override size:\s*(\d+)x(\d+)/) ?? raw.match(/Physical size:\s*(\d+)x(\d+)/);
-      if (!m) throw new Error(`Cannot parse wm size output: ${raw.slice(0, 120)}`);
-      return { width: Number(m[1]), height: Number(m[2]) };
-    })();
-    return this.viewportPromise;
+  /** Screen size in device pixels — the units uiautomator bounds use. Memoized: types.ts#viewport. */
+  viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
+    return this.viewportMemo.get(opts);
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {

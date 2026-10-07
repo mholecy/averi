@@ -330,6 +330,132 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
     expect(result.detail).toContain('(measured only, never fails)');
   });
 
+  // The false pass of the 2026-10-07 parity review (P1): a tree whose content
+  // starts inset reads its CONTENT width (384) as the screen's, which turns a
+  // real -4.2 % `w` delta on a 402-pt screen into +0.06 %.
+  it('fails closed on a CONTENT width instead of passing with a caveat in the detail', async () => {
+    const fake = new FakeAdapter(
+      {
+        s: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 0, height: 0 },
+          children: [
+            node({
+              rect: { x: 16, y: 100, width: 368, height: 600 },
+              children: [node({ identifier: 'card', rect: { x: 16, y: 120, width: 368, height: 100 } })],
+            }),
+          ],
+        }),
+      },
+      's',
+    );
+    fake.viewportSize = { width: 402, height: 874 };
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 16, w: 385, frameWidth: 402 },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/CONTENT width.*failing closed, geometry unchecked/);
+  });
+
+  it('the device screen witnesses the width: a window wider than the screen fails closed', async () => {
+    const fake = cardFake();
+    fake.viewportSize = { width: 400, height: 800 }; // the tree's window is 1000 wide
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 50, frameWidth: 500 }, // passes against the tree's 1000
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(
+      /the 400x800 device screen is 400 on the short side a portrait window faces .*; failing closed, geometry unchecked$/,
+    );
+  });
+
+  it('a failed device read degrades to the tree\'s width, saying so — not a failed assert', async () => {
+    const fake = cardFake();
+    fake.viewport = async () => {
+      throw new Error('adb: device offline');
+    };
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 50, frameWidth: 500 },
+    });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('screen width 1000 (window width from the UI tree alone');
+  });
+
+  /**
+   * The parity code review's A3 (2026-10-07): `viewport()` is memoized, so a
+   * screen changed after the first read (`wm size`, an unfold) refused until
+   * the server restarted (device check row 18c). Before a wider-than-screen
+   * refusal the assert re-reads the screen ONCE, bypassing the memo.
+   */
+  it('a screen changed since the memoized read: the one fresh re-read lifts the refusal', async () => {
+    const fake = cardFake();
+    const reads: (boolean | undefined)[] = [];
+    fake.viewport = async (opts?: { fresh?: boolean }) => {
+      reads.push(opts?.fresh);
+      return opts?.fresh === true ? { width: 1000, height: 2000 } : { width: 400, height: 800 };
+    };
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 50, frameWidth: 500 },
+    });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toMatch(/; screen width 1000$/);
+    expect(reads).toEqual([undefined, true]);
+  });
+
+  it('re-reads at most once per assert, and a refusal that survives says the screen was read again', async () => {
+    const fake = cardFake();
+    let fresh = 0;
+    let rounds = 0;
+    fake.viewport = async (opts?: { fresh?: boolean }) => {
+      if (opts?.fresh === true) fresh++;
+      return { width: 400, height: 800 };
+    };
+    const uiTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      rounds++;
+      return uiTree();
+    };
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 50, frameWidth: 500 },
+    });
+    expect(result.pass).toBe(false);
+    expect(rounds).toBeGreaterThan(1);
+    expect(fresh).toBe(1);
+    expect(result.detail).toMatch(
+      /the 400x800 device screen is 400 on the short side .* — the device screen was read again just before this refusal, so the size above is the one it reports now, not a stale read; failing closed, geometry unchecked$/,
+    );
+  });
+
+  it('a re-read that fails keeps the refusal and says a changed screen cannot be ruled out', async () => {
+    const fake = cardFake();
+    fake.viewport = async (opts?: { fresh?: boolean }) => {
+      if (opts?.fresh === true) throw new Error('adb: device offline');
+      return { width: 400, height: 800 };
+    };
+    const result = await new Verifier(fake, FAST).assert({
+      element: { id: 'card' },
+      rect: { x: 50, w: 400, h: 50, frameWidth: 500 },
+    });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toMatch(/a fresh read of the device screen failed \(adb: device offline\), so a screen changed since the first read .* cannot be ruled out; re-run/);
+  });
+
+  it('a window that fits the memoized screen never pays a fresh read', async () => {
+    const fake = cardFake();
+    const reads: (boolean | undefined)[] = [];
+    fake.viewport = async (opts?: { fresh?: boolean }) => {
+      reads.push(opts?.fresh);
+      return { width: 1000, height: 2000 };
+    };
+    await new Verifier(fake, FAST).assert({ element: { id: 'card' }, rect: { x: 50, w: 400, h: 50, frameWidth: 500 } });
+    expect(reads).toEqual([undefined]);
+  });
+
   it('fails with a timeout detail when the element never appears', async () => {
     const verifier = new Verifier(cardFake(), FAST);
     const result = await verifier.assert({ element: { id: 'ghost' }, rect: { x: 1, frameWidth: 500 } });

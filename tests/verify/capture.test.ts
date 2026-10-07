@@ -238,9 +238,15 @@ describe('captureFrame — stability over the caller\'s region', () => {
     const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
     expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', captures: 2 });
     expect(sleeps).toEqual([STABILITY_DELAY_MS]);
-    expect(viewportReads).toBe(0);
+    // One read, and it is not the wait's: since 2026-10-07 the frame reads the
+    // device screen once AFTER the wait and BEFORE the decode, so a png that
+    // does not decode still carries its window width, witnessed (here the
+    // read fails, and the width is the tree's, saying so). A wait that read
+    // the device too would make this 2 or more.
+    expect(viewportReads).toBe(1);
     // The capture's own decode, after the wait, is the one that words the failure.
     expect(got.measured.error).toMatch(/^screenshot PNG decode failed: /);
+    expect(got.measured).toMatchObject({ window: { width: 1000, note: expect.stringMatching(/^window width from the UI tree alone/) } });
   });
 
   it('a frame whose scale cannot be derived falls back to whole-screen stability: an off-element change is still moving', async () => {
@@ -497,6 +503,49 @@ describe('measuredFrameFor — the pure tail captureFrame and the comparator fix
     const measured = measuredFrameFor(SCREEN, decode(png(1000, 2000)));
     expect(measured.scale).toMatchObject({ scale: 1, width: 1000 });
     expect(measured.scale.note).toMatch(/scaled from the UI tree/);
+  });
+
+  it('carries the window width beside the scale, judged by the same device screen', () => {
+    const measured = measuredFrameFor(SCREEN, decode(png(1000, 2000)), { width: 2000, height: 4000 });
+    expect(measured.window).toEqual({
+      width: 1000,
+      note: expect.stringMatching(/^window 1000 wide on a 2000x4000 DEVICE screen/),
+    });
+  });
+
+  // The parity code review's A3 (2026-10-07): a screen changed since the
+  // memoized read is re-read once before a wider-than-screen refusal, and
+  // the frame's scale and window both use what the device says now.
+  it('re-reads the device screen once before a wider-than-screen refusal, and measures the frame by the fresh screen', async () => {
+    const fake = new FakeAdapter({ s: node({ rect: { x: 0, y: 0, width: 1000, height: 2000 } }) }, 's');
+    fake.nextScreenshot = png(1000, 2000);
+    const reads: (boolean | undefined)[] = [];
+    fake.viewport = async (opts?: { fresh?: boolean }) => {
+      reads.push(opts?.fresh);
+      return opts?.fresh === true ? { width: 1000, height: 2000 } : { width: 500, height: 1000 };
+    };
+    const got = await captureFrame(fake, { readTree: true });
+    expect(reads).toEqual([undefined, true]);
+    expect(got.measured).toMatchObject({ window: { width: 1000 }, scale: { scale: 1, width: 1000 } });
+    expect(got.measured).not.toHaveProperty('window.note');
+    expect(got.measured).not.toHaveProperty('window.error');
+  });
+
+  it('a png that does not decode still carries its window, WITNESSED — the device is read before the decode', async () => {
+    const fake = device([Buffer.from('not a png'), Buffer.from('not a png')]);
+    fake.viewportSize = { width: 2000, height: 4000 };
+    const got = await captureFrame(fake, { tree: SCREEN });
+    expect(got.measured.error).toMatch(/^screenshot PNG decode failed: /);
+    expect(got.measured).toMatchObject({
+      window: { width: 1000, note: expect.stringMatching(/^window 1000 wide on a 2000x4000 DEVICE screen/) },
+    });
+  });
+
+  it('a tree the geometry walk cannot traverse fails the WINDOW as a carried reason too, never throws', () => {
+    const malformed = { ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] };
+    expect(measuredFrameFor(malformed, decode(png(1000, 2000))).window.error).toMatch(
+      /^the window width could not be derived from this tree: .* — the tree is not well-formed/,
+    );
   });
 
   it('a tree the geometry walk cannot traverse fails the SCALE as a carried reason, never throws', () => {

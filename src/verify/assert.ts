@@ -13,6 +13,7 @@ import {
   type BaselineFrame,
   captureBaselineFrame,
   captureFrame,
+  ScreenWitness,
   unconfirmedReason,
   unsettledNote,
   unsettledReason,
@@ -325,8 +326,11 @@ export class Verifier {
   }
 
   /**
-   * Geometry vs Figma-frame values, in % of screen width (screen width =
-   * widest rect in the tree, same rule as the whole-screen comparator).
+   * Geometry vs Figma-frame values, in % of screen width — the window width
+   * `verify/scale.ts#windowWidth` judges for each round's tree, witnessed by
+   * the device screen, the same answer the whole-screen comparator reads off
+   * its frame. A width it refuses fails the round closed (2026-10-07; a
+   * CONTENT width used to pass with a remark).
    * Polls like the other asserts: mid-animation geometry may legitimately be
    * off for a frame, so only the state at timeout is the verdict.
    */
@@ -337,11 +341,17 @@ export class Verifier {
   ): Promise<AssertResult> {
     const tolerance = expected.tolerancePct ?? DEFAULT_TOLERANCE_PCT;
     const description = `element ${describe(element)} rect within ${tolerance}% of screen width (figma frame ${expected.frameWidth})`;
+    // The witness, read once (memoized by the adapter), and re-read fresh at
+    // most once for the whole assert, before a wider-than-screen refusal
+    // (capture.ts#ScreenWitness). A failed read is not a failed assert: the
+    // width is then the tree's alone, and windowWidth says so in the detail —
+    // the degradation captureFrame applies to the table.
+    const witness = await ScreenWitness.read(this.adapter);
     return this.poll(
-      (tree) => {
+      async (tree) => {
         // First occurrence wins — the same duplicate-id rule as rect-parity.
         const found = findBySpec(tree, element);
-        return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, tree);
+        return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, await witness.judge(tree));
       },
       {
         description,
@@ -478,11 +488,11 @@ export class Verifier {
    * from a frame that was still moving.
    */
   private async poll(
-    evaluate: (tree: UiNode) => PollVerdict | undefined,
+    evaluate: (tree: UiNode) => PollVerdict | undefined | Promise<PollVerdict | undefined>,
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
-    const outcome = await pollTree(this.adapter, (tree) => verdictToPoll(evaluate(tree)), {
+    const outcome = await pollTree(this.adapter, async (tree) => verdictToPoll(await evaluate(tree)), {
       timeoutMs,
       pollMs: this.pollMs,
     });

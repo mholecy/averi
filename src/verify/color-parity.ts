@@ -346,9 +346,6 @@ export interface ColorParityOptions {
   toleranceDe?: number;
 }
 
-const SCALE_SANE_MIN = 0.5;
-const SCALE_SANE_MAX = 4.0;
-
 /**
  * Per-platform scale and sanity, failing closed on anything degenerate: a
  * 0-width root or a 0-width png would make every region empty and every
@@ -574,10 +571,9 @@ export function formatColorParity(r: ColorParityResult): string {
       lines.push(line + ')');
       continue;
     }
+    // An implausible scale is no longer judged here: verify/scale.ts puts it
+    // on the scale's own note, printed below (2026-10-07).
     let line = `${p}: png ${s.pngWidth}x${s.pngHeight}  root ${s.rootWidth}  scale ${s.scale.toFixed(3)}`;
-    if (s.scale < SCALE_SANE_MIN || s.scale > SCALE_SANE_MAX) {
-      line += `   ! scale outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`;
-    }
     if (s.translucent) line += '   ! alpha<255 pixels present — alpha ignored, RGB used as stored';
     if (s.note !== undefined) line += `   ! ${s.note}`;
     lines.push(line);
@@ -711,9 +707,7 @@ export function evaluateColorAssert(
   const de = deltaEHex(hex, expectedHex);
   const pass = de <= tol;
   const notes = sampleCaveats(got, s);
-  if (scale < SCALE_SANE_MIN || scale > SCALE_SANE_MAX) {
-    notes.push(`scale ${scale.toFixed(3)} outside [${SCALE_SANE_MIN}, ${SCALE_SANE_MAX}] — wrong png/tree pairing?`);
-  }
+  // Carries the implausible-scale remark too, when there is one (verify/scale.ts).
   if (scaled.note !== undefined) notes.push(scaled.note);
   return {
     pass,

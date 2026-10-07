@@ -269,6 +269,60 @@ describe('parity containment', () => {
  * touched, lists every problem by dimension, and asks only the dimensions
  * whose table the contract would produce.
  */
+/**
+ * The false WITHIN TOLERANCE of the 2026-10-07 parity review (P1). A tree
+ * whose content starts inset — a filtered dump, or idb's flat source with no
+ * window rect under its 0x0 root — reads its CONTENT width (384) as the
+ * screen's. On a 402-pt screen whose card is 368 wide against a contract
+ * that asks for 385, the real `w` delta is -4.2 % of width; divided by the
+ * content width it is +0.06 %. The png scale already refused that width; the
+ * rect table printed "every delta below is scaled wrong" and then a passing
+ * verdict under it.
+ */
+describe('a CONTENT width never reaches a rect verdict', () => {
+  const contentWidthTree = (): UiNode =>
+    node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 0, height: 0 },
+      children: [
+        node({
+          rect: { x: 16, y: 100, width: 368, height: 600 },
+          children: [node({ identifier: 'card', rect: { x: 16, y: 120, width: 368, height: 100 } })],
+        }),
+      ],
+    });
+
+  it('fails the rect table closed instead of WITHIN TOLERANCE', async () => {
+    const adapter = new FakeAdapter({ s: contentWidthTree() }, 's');
+    adapter.platform = 'ios';
+    adapter.nextScreenshot = whitePng();
+    adapter.viewportSize = { width: 402, height: 874 };
+    const out = await runVerification(
+      request({
+        platforms: ['ios'],
+        contract: { screen: 's', figma_frame_width: 402, anchors: [{ id: 'card', x: 16, w: 385 }] },
+      }),
+      async () => adapter,
+    );
+    const rect = out.sections.find((s) => s.startsWith('## rect parity'));
+    expect(rect).not.toContain('WITHIN TOLERANCE');
+    expect(rect).toContain('FAILED:');
+    expect(rect).toContain('CONTENT width');
+  });
+
+  it('the table reads the window off the leg\'s frame, witness included — it no longer measures the tree itself', async () => {
+    const adapter = fake('android');
+    adapter.viewportSize = { width: 200, height: 400 }; // twice the tree's 100x200: a split view
+    const out = await runVerification(
+      request({ platforms: ['android'], contract: { screen: 's', figma_frame_width: 100, anchors: [{ id: 'card', x: 10, w: 40 }] } }),
+      async () => adapter,
+    );
+    const rect = out.sections.find((s) => s.startsWith('## rect parity'));
+    expect(rect).toContain('\n  ! android: window 100 wide on a 200x400 DEVICE screen');
+    expect(rect).toContain('WITHIN TOLERANCE'); // the window is still the denominator
+  });
+});
+
 describe('a leg without a tree — the one no-tree wording every table shares', () => {
   it('rect parity notes the leg with the frame\'s own reason, byte for byte, and compares what is left', async () => {
     const android = fake('android');
@@ -787,6 +841,9 @@ describe('text parity opt-in', () => {
     expect(color).toMatch(/FAILED: color parity: android: the png scale could not be derived from this tree/);
     const text = out.sections.find((s) => s.startsWith('## text parity'));
     expect(text).toContain('OCR failed — text parity: the png scale could not be derived from this tree');
+    // The rect table reads the frame's window, which carries the same kind of reason (2026-10-07).
+    const rect = out.sections.find((s) => s.startsWith('## rect parity'));
+    expect(rect).toMatch(/FAILED: rect parity: android: the window width could not be derived from this tree/);
   });
 });
 

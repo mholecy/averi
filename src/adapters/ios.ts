@@ -7,7 +7,8 @@ import { runIdb } from './idb.js';
 import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
+import type { Device, DeviceAdapter, DeviceScreen, Key, LaunchOptions, UiNode } from './types.js';
+import { ViewportMemo } from './viewport-memo.js';
 
 /**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
@@ -244,22 +245,21 @@ export class IosAdapter implements DeviceAdapter {
     await this.idbUi(['tap', String(x), String(y)]);
   }
 
-  private viewportPromise: Promise<{ width: number; height: number }> | undefined;
+  private readonly viewportMemo = new ViewportMemo(async () => {
+    const { stdout } = await this.idb(['describe', '--json']);
+    const parsed = JSON.parse(stdout.toString('utf8')) as {
+      screen_dimensions?: { width_points?: number; height_points?: number };
+    };
+    const dims = parsed.screen_dimensions;
+    if (!dims?.width_points || !dims.height_points) {
+      throw new Error('idb describe returned no screen_dimensions.{width,height}_points');
+    }
+    return { width: dims.width_points, height: dims.height_points };
+  });
 
-  /** Screen size in POINTS — the units idb AX frames use. */
-  viewport(): Promise<{ width: number; height: number }> {
-    this.viewportPromise ??= (async () => {
-      const { stdout } = await this.idb(['describe', '--json']);
-      const parsed = JSON.parse(stdout.toString('utf8')) as {
-        screen_dimensions?: { width_points?: number; height_points?: number };
-      };
-      const dims = parsed.screen_dimensions;
-      if (!dims?.width_points || !dims.height_points) {
-        throw new Error('idb describe returned no screen_dimensions.{width,height}_points');
-      }
-      return { width: dims.width_points, height: dims.height_points };
-    })();
-    return this.viewportPromise;
+  /** Screen size in POINTS — the units idb AX frames use. Memoized: types.ts#viewport. */
+  viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
+    return this.viewportMemo.get(opts);
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {

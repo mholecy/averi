@@ -107,15 +107,31 @@ describe('IosAdapter interactions', () => {
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
   });
 
-  // adapters/types.ts promises the memo covers failure too: the layers above
-  // read viewport() per captured frame and per absent check, and a device
-  // that will not answer must not be re-asked on every one of them.
-  it('viewport memoizes a FAILED read as well — one idb call, however many callers', async () => {
-    const { fn, calls } = fakeExec({ 'idb describe --json': JSON.stringify({}) });
+  // adapters/types.ts#viewport since the parity code review (A3, 2026-10-07):
+  // a FAILED read is not kept — one transient `idb describe` failure used to
+  // strip the device-screen witness for the life of the server.
+  it('viewport does not memoize a FAILED read: the next call asks idb again, and its success is kept', async () => {
+    const responses: Record<string, string> = { 'idb describe --json': JSON.stringify({}) };
+    const { fn, calls } = fakeExec(responses);
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
     await expect(adapter.viewport()).rejects.toThrow(/no screen_dimensions/);
-    await expect(adapter.viewport()).rejects.toThrow(/no screen_dimensions/);
-    expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
+    responses['idb describe --json'] = JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(2);
+  });
+
+  it('viewport({ fresh: true }) asks idb again and replaces the memo', async () => {
+    const responses: Record<string, string> = {
+      'idb describe --json': JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } }),
+    };
+    const { fn, calls } = fakeExec(responses);
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    responses['idb describe --json'] = JSON.stringify({ screen_dimensions: { width_points: 820, height_points: 1180 } });
+    expect(await adapter.viewport({ fresh: true })).toEqual({ width: 820, height: 1180 });
+    expect(await adapter.viewport()).toEqual({ width: 820, height: 1180 });
+    expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(2);
   });
 
   it('clearText sends backspaces then forward-deletes (position-independent)', async () => {

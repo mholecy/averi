@@ -24,6 +24,18 @@ export interface Device {
 export interface DeviceScreen {
   width: number;
   height: number;
+  /**
+   * The platform may lay an app window out BESIDE its system bars: on
+   * Android a landscape window next to a side navigation bar (3-button
+   * navigation) or a display cutout the app does not draw into starts inset,
+   * or ends short of the screen, by that bar's width — and uiautomator's
+   * root is that window. Set by the Android adapter only. iOS leaves it
+   * unset: its app window is the screen and the safe areas lie INSIDE it,
+   * so an inset rect in an iOS tree is content, never the window. Read by
+   * verify/scale.ts, which measures such a window instead of refusing it as
+   * a CONTENT width (2026-10-07, the parity code review's A1/A2).
+   */
+  windowsBesideSystemBars?: boolean;
 }
 
 /** Integer points (iOS) or pixels (Android), as the platform reports them. */
@@ -331,15 +343,25 @@ export interface DeviceAdapter {
    * load-bearing: verify/ divides png pixels by this width, so a platform that
    * started reporting the other unit would move every crop.
    *
-   * MEMOIZED per adapter, success and failure alike — the panel does not
-   * change under a session — and that is part of the contract, not a detail:
-   * the layers above read it freely (per captured frame, per absent check)
+   * MEMOIZED per adapter — a SUCCESSFUL read; the panel rarely changes
+   * under a session — and that is part of the contract, not a detail: the
+   * layers above read it freely (per captured frame, per absent check)
    * instead of caching it themselves. The Verifier and the FlowEngine each
    * carried a memo of their own until 2026-10-02; both were pass-through
    * over this one, and both are gone. An adapter that re-read the device on
    * every call would make every pixel assert poll pay a shell-out.
+   *
+   * Two exceptions since the 2026-10-07 parity code review (A3). A FAILED
+   * read is not kept: until then one transient `idb describe` or `wm size`
+   * failure took the witness away for the life of the server; now the next
+   * call asks again (concurrent callers still share one read in flight).
+   * And `{ fresh: true }` reads the device again and replaces the memo: the
+   * screen DOES change under a session — a fold or unfold, `wm size` — and
+   * the window-width check (verify/capture.ts#witnessedWindow) re-reads once
+   * before refusing a window as wider than the screen, instead of refusing
+   * until the server restarts.
    */
-  viewport(): Promise<DeviceScreen>;
+  viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen>;
 
   tap(x: number, y: number): Promise<void>;
   longPress(x: number, y: number, durationMs?: number): Promise<void>;

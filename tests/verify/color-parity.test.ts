@@ -350,12 +350,12 @@ describe('compareColorParity — failing closed', () => {
     expect(() => compareColorParity(cardContract(), {})).toThrow(/no platform capture/);
   });
 
-  it('flags an insane scale in the stats line', () => {
+  it('flags an insane scale in the stats line — the scale\'s own note, worded by verify/scale.ts', () => {
     const captures = capturePair(WHITE, WHITE);
     // png 200 wide but root claims 25 → scale 8, outside [0.5, 4].
     captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)]), captures.android.png);
     const r = compareColorParity(cardContract(), captures);
-    expect(formatColorParity(r)).toContain('! scale outside [0.5, 4]');
+    expect(formatColorParity(r)).toContain('scale 8.000 outside [0.5, 4] — wrong png/tree pairing?');
   });
 
   it('throws on a filtered tree rather than scaling by a content width', () => {

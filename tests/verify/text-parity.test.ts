@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { measuredFrameFor, type MeasuredFrame, type TreeFrame, type Undecoded } from '../../src/verify/capture.js';
 import { sizeOnlyPng } from '../helpers/fake.js';
+import { windowWidth } from '../../src/verify/scale.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
 import {
@@ -595,7 +596,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
 
   it('a tree without pixels is an OCR failure in this table\'s words: tree only, the frame\'s reason quoted', async () => {
     const { engine, calls } = recording();
-    const undecoded: Undecoded = { tree: ios, error: 'screenshot PNG decode failed: not a png' };
+    const undecoded: Undecoded = { tree: ios, window: windowWidth(ios), error: 'screenshot PNG decode failed: not a png' };
     const got = await textMeasurement(c, engine).measure('android', leg(undecoded));
     expect(calls).toEqual([]);
     expect(got).toEqual({

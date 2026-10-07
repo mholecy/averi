@@ -1,7 +1,8 @@
 import type { Platform, Rect, UiNode } from '../adapters/types.js';
-import { collectRects, inferScreenWidth } from '../ui-tree/geometry.js';
+import { collectRects } from '../ui-tree/geometry.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
+import type { WindowWidth } from './scale.js';
 import { headerWithRule, row, type Column } from './table.js';
 
 /**
@@ -18,9 +19,17 @@ import { headerWithRule, row, type Column } from './table.js';
  *
  * Semantics preserved from the script:
  * - Every comparison is in PERCENT OF SCREEN WIDTH. Per-platform width = the
- *   widest rect in the WHOLE tree (the root/window node, which carries no id
- *   — inferring from id-bearing children only scaled every delta by the
- *   content inset and reported a phantom +5.7% on correct geometry).
+ *   WINDOW's width, read from the WHOLE tree (the root/window node, which
+ *   carries no id — inferring from id-bearing children only scaled every
+ *   delta by the content inset and reported a phantom +5.7% on correct
+ *   geometry). Since 2026-10-07 neither the table nor the `rect` assert
+ *   measures it: both are handed `verify/scale.ts#windowWidth`'s answer —
+ *   the table on the leg's frame, the assert from its caller — and a width
+ *   that answer refuses (0 wide, a CONTENT width, wider than the device
+ *   screen) reaches no verdict. Until then both read geometry.ts directly
+ *   and kept its "unreliable" flag as a remark, so a content width printed
+ *   a warning and then WITHIN TOLERANCE under it (the 2026-10-07 parity
+ *   review, P1).
  * - Contract values are Figma-frame units, normalized by `figma_frame_width`
  *   (fallback: the widest anchor `w`). Omitted anchor fields are compared
  *   platform-to-platform only, never against the contract.
@@ -94,7 +103,8 @@ export interface RectParityResult {
   frameWidthDeclared: boolean;
   platforms: Platform[];
   anchorCount: number;
-  widths: { platform: Platform; width: number; reliable: boolean }[];
+  /** The window width each platform was measured against, and what its witness said about it. */
+  widths: { platform: Platform; width: number; note?: string }[];
   entries: RectEntry[];
   missing: { id: string; absentOn: Platform[] }[];
   /** Single-platform runs only: anchors with no contract fields — nothing to compare. */
@@ -111,6 +121,17 @@ export interface RectParityOptions {
    * tolerance belongs to the committed contract, not to the caller of a run.
    */
   tolerancePct?: number;
+}
+
+/**
+ * What one platform hands the table: its tree, and the window width judged
+ * for that tree (verify/scale.ts#windowWidth). Both tree-bearing arms of a
+ * leg's frame — decoded or not — carry exactly these two, so run/verify.ts
+ * passes the frame's measured half as it is.
+ */
+export interface RectLeg {
+  tree: UiNode;
+  window: WindowWidth;
 }
 
 const norm = (value: number, width: number): number => (value / width) * 100;
@@ -367,10 +388,10 @@ export function validateRectContract(contract: LayoutContract, opts: RectParityO
 
 export function compareRectParity(
   contract: LayoutContract,
-  trees: Partial<Record<Platform, UiNode>>,
+  legs: Partial<Record<Platform, RectLeg>>,
   opts: RectParityOptions = {},
 ): RectParityResult {
-  const platforms = (['android', 'ios'] as const).filter((p) => trees[p] !== undefined);
+  const platforms = (['android', 'ios'] as const).filter((p) => legs[p] !== undefined);
   if (platforms.length === 0) throw new Error('rect parity: no platform tree provided');
   const single = platforms.length === 1;
   // The aspect threshold defaults to the contract's width tolerance, so an
@@ -393,14 +414,25 @@ export function compareRectParity(
     );
   }
 
-  const widths = platforms.map((p) => ({ platform: p, ...inferScreenWidth(trees[p] as UiNode) }));
+  // A refused width fails the WHOLE table, as a failed scale fails the colour
+  // one: dropping the platform and printing a verdict over the other would
+  // read as a completed comparison, and a table that prints the deltas with
+  // a warning above them is the false WITHIN TOLERANCE this replaced.
+  const present = platforms.map((p) => ({ platform: p, leg: legs[p] as RectLeg }));
+  const widths: RectParityResult['widths'] = [];
   const widthOf: Partial<Record<Platform, number>> = {};
-  for (const w of widths) {
-    if (w.width <= 0) throw new Error(`rect parity: ${w.platform} tree has no usable width`);
-    widthOf[w.platform] = w.width;
-  }
   const rectsOf: Partial<Record<Platform, Map<string, Rect>>> = {};
-  for (const p of platforms) rectsOf[p] = collectRects(trees[p] as UiNode);
+  for (const { platform: p, leg } of present) {
+    const { window } = leg;
+    if (window.error !== undefined) throw new Error(`rect parity: ${p}: ${window.error}; failing closed.`);
+    widths.push({ platform: p, width: window.width, note: window.note });
+    widthOf[p] = window.width;
+  }
+  // Rects are in SCREEN coordinates; a window that starts inset (an Android
+  // window beside a left-hand nav bar or cutout, scale.ts#besideSystemBars)
+  // carries its left edge, and every x is measured from it — as the Figma
+  // frame's x is from the canvas's own edge.
+  for (const { platform: p, leg } of present) rectsOf[p] = fromWindowLeft(collectRects(leg.tree), leg.window.left);
 
   const entries: RectEntry[] = [];
   const missing: { id: string; absentOn: Platform[] }[] = [];
@@ -558,15 +590,9 @@ export function formatRectParity(r: RectParityResult): string {
     `widths: ${r.widths.map((w) => `${w.platform} ${g(w.width)}`).join('   ')}   figma frame ${g(r.frameWidth)}` +
       (r.frameWidthDeclared ? '' : ' (inferred from the widest anchor w — declare figma_frame_width)'),
   );
-  const unreliable = r.widths.filter((w) => !w.reliable).map((w) => w.platform);
-  if (unreliable.length > 0) {
-    lines.push(
-      `  ! ${unreliable.join(' + ')}: the widest rect does not start at x=0 — the width above is a`,
-      '    CONTENT width and every delta below is scaled wrong. Likely causes: the tree source',
-      '    surfaces no real window rect (iOS idb — prefer app.ios.treeSource: wda in averi.yaml),',
-      '    or the tree was filtered before it got here.',
-    );
-  }
+  // What the device screen said about each width (verify/scale.ts words it).
+  // A width it refused never gets here — the comparator threw.
+  for (const w of r.widths) if (w.note !== undefined) lines.push(`  ! ${w.platform}: ${w.note}`);
   // iOS reports points, the same unit as the Figma frame, so the two widths
   // compare directly (Android reports pixels — density, not bias — so it gets
   // no such line). Measured 2026-09-17 (finportal, iPhone 17 at 402 pt against a
@@ -575,7 +601,7 @@ export function formatRectParity(r: RectParityResult): string {
   // of width. Those rows are device geometry, not drift; say so once, up here.
   // Only a DECLARED figma_frame_width is a frame; the inferred fallback is the
   // widest anchor and would make this line assert a bias that is not there.
-  const ios = r.widths.find((w) => w.platform === 'ios' && w.reliable);
+  const ios = r.widths.find((w) => w.platform === 'ios');
   if (r.frameWidthDeclared && r.frameWidth > 0 && ios !== undefined && ios.width > 0) {
     const biasPct = (ios.width / r.frameWidth - 1) * 100;
     if (Math.abs(biasPct) > WIDTH_BIAS_NOTE_PCT) {
@@ -702,36 +728,40 @@ export interface RectExpectation {
   tolerancePct?: number;
 }
 
+/** The rects with `x` measured from the window's left edge (`WindowWidth.left`), unchanged when it is 0. */
+function fromWindowLeft(rects: Map<string, Rect>, left: number | undefined): Map<string, Rect> {
+  if (left === undefined || left === 0) return rects;
+  return new Map([...rects].map(([id, r]) => [id, { ...r, x: r.x - left }]));
+}
+
 /**
  * Single-element rect check, same normalization rules as the whole-screen
- * comparator. `y` is measured and reported but NEVER fails the assert —
+ * comparator. Unlike the table it gets no frame: the `rect` assert polls
+ * bare trees (Verifier.assertRect, through the tree poll — no capture), so
+ * its caller asks `windowWidth(tree, screen)` for each round's tree against
+ * the adapter's memoized screen. Same trust module, no second rule. `y` is measured and reported but NEVER fails the assert —
  * absolute y drifts with device aspect ratio alone; whole-screen gap rows
  * are the vertical-position check.
+ *
+ * `window` is `verify/scale.ts#windowWidth` for the tree the rect came from.
+ * A refused one fails the assert closed — the 0-wide tree (dividing by 0
+ * makes every delta NaN, and NaN > tol is false: a vacuous PASS) and, since
+ * 2026-10-07, a CONTENT width too, which until then PASSED with
+ * "(UNRELIABLE …)" in the detail.
  */
 export function evaluateRectAssert(
   rect: Rect,
   expected: RectExpectation,
-  tree: UiNode,
+  window: WindowWidth,
 ): { pass: boolean; detail: string } {
   const tolerancePct = expected.tolerancePct ?? DEFAULT_TOLERANCE_PCT;
-  const { width, reliable } = inferScreenWidth(tree);
-  // Fail closed on a degenerate width: dividing by 0 would make every delta
-  // NaN and NaN > tol is false — a silent vacuous PASS. This path is real:
-  // idb's iOS synthetic root is 0×0 when elements carry no frames.
-  if (width <= 0) {
-    return {
-      pass: false,
-      detail: failClosed(
-        'screen width could not be inferred (the widest rect in the tree is 0 wide — ' +
-          'idb on iOS can emit a 0×0 synthetic root when elements carry no frames)',
-        'geometry',
-      ),
-    };
-  }
+  if (window.error !== undefined) return { pass: false, detail: failClosed(window.error, 'geometry') };
+  const { width } = window;
   const parts: string[] = [];
   let pass = true;
   const checks: { field: 'x' | 'y' | 'w' | 'h'; raw: number; want?: number }[] = [
-    { field: 'x', raw: rect.x, want: expected.x },
+    // From the window's left edge, as the table measures it (fromWindowLeft).
+    { field: 'x', raw: rect.x - (window.left ?? 0), want: expected.x },
     { field: 'y', raw: rect.y, want: expected.y },
     { field: 'w', raw: rect.width, want: expected.w },
     { field: 'h', raw: rect.height, want: expected.h },
@@ -744,6 +774,6 @@ export function evaluateRectAssert(
     const suffix = field === 'y' ? ' (measured only, never fails)' : over ? ' OVER' : '';
     parts.push(`${field} ${raw.toFixed(1)} vs contract ${g(want)} → Δ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%${suffix}`);
   }
-  const widthNote = `screen width ${g(width)}${reliable ? '' : ' (UNRELIABLE: widest rect starts inset — filtered tree?)'}`;
+  const widthNote = `screen width ${g(width)}${window.note === undefined ? '' : ` (${window.note})`}`;
   return { pass, detail: `${parts.join(' · ')}; ${widthNote}` };
 }

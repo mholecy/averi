@@ -5,7 +5,6 @@ import {
   absentFromViewport,
   containsPoint,
   inferScreenSize,
-  inferScreenWidth,
   intersectsViewport,
   rectArea,
   rectsOverlap,
@@ -214,10 +213,6 @@ describe('inferScreenSize', () => {
   it('flags a filtered tree in the fallback path', () => {
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [node({ x: 16, y: 0, width: 370, height: 800 })]);
     expect(inferScreenSize(tree).reliable).toBe(false);
-  });
-
-  it('inferScreenWidth stays the width half of the same answer', () => {
-    expect(inferScreenWidth(treeWith())).toEqual({ width: 402, reliable: true });
   });
 });
 

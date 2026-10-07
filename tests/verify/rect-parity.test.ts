@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import type { UiNode } from '../../src/adapters/types.js';
 import {
   compareRectParity,
   evaluateRectAssert,
@@ -9,8 +8,51 @@ import {
   rectParityVerdict,
   validateRectContract,
 } from '../../src/verify/rect-parity.js';
-import { inferScreenWidth } from '../../src/ui-tree/geometry.js';
 import { parseLayoutContract, problemsThrownBy, type LayoutContract } from '../../src/verify/layout-contract.js';
+import { windowWidth } from '../../src/verify/scale.js';
+import type { DeviceScreen, Platform, Rect, UiNode } from '../../src/adapters/types.js';
+
+/**
+ * The device screen a fixture tree implies: its own root rect, when it has
+ * one — FakeAdapter's rule, so the witness agrees with the tree unless a test
+ * asks for a disagreement by passing a screen of its own.
+ */
+const screenOf = (tree: UiNode): DeviceScreen | undefined =>
+  tree.rect.width > 0 && tree.rect.height > 0 ? { width: tree.rect.width, height: tree.rect.height } : undefined;
+
+/**
+ * The comparator over trees, each judged by the one window-width owner
+ * (verify/scale.ts#windowWidth) as a leg's frame is — so the fixtures cannot
+ * drift from the derivation production uses.
+ */
+const compare = (
+  c: LayoutContract,
+  trees: Partial<Record<Platform, UiNode>>,
+  opts?: Parameters<typeof compareRectParity>[2],
+  screens: Partial<Record<Platform, DeviceScreen>> = {},
+) =>
+  compareRectParity(
+    c,
+    Object.fromEntries(
+      Object.entries(trees).map(([p, tree]) => [
+        p,
+        { tree, window: windowWidth(tree, screens[p as Platform] ?? screenOf(tree)) },
+      ]),
+    ),
+    opts,
+  );
+
+/** The `rect` assert primitive, its window judged the way Verifier judges it. */
+const assertRect = (
+  rect: Rect,
+  expected: Parameters<typeof evaluateRectAssert>[1],
+  tree: UiNode,
+  screen: DeviceScreen | undefined = screenOf(tree),
+) => evaluateRectAssert(rect, expected, windowWidth(tree, screen));
+
+/** …and as Verifier judges it when the device screen could not be read: no witness at all. */
+const assertRectUnwitnessed = (rect: Rect, expected: Parameters<typeof evaluateRectAssert>[1], tree: UiNode) =>
+  evaluateRectAssert(rect, expected, windowWidth(tree));
 
 /**
  * Synthetic fixtures modeled on the 2026 card run: figma frame 393,
@@ -66,7 +108,7 @@ const findAnchorRect = (tree: UiNode, id: string): UiNode => {
 
 describe('compareRectParity — normalization and width inference', () => {
   it('matched geometry across different screen widths passes (all deltas in % of width)', () => {
-    const r = compareRectParity(contract(), { android: androidTree(), ios: iosTree() });
+    const r = compare(contract(), { android: androidTree(), ios: iosTree() });
     expect(r.findings).toEqual([]);
     expect(r.missing).toEqual([]);
     expect(r.pass).toBe(true);
@@ -75,18 +117,19 @@ describe('compareRectParity — normalization and width inference', () => {
 
   it('screen width comes from the widest rect in the WHOLE tree, not from id-bearing nodes', () => {
     // id-bearing nodes end at 66 + 948 = 1014 px; only the id-less root spans 1080.
-    const r = compareRectParity(contract(), { android: androidTree(), ios: iosTree() });
+    const r = compare(contract(), { android: androidTree(), ios: iosTree() });
+    // Each witnessed by a device screen of the same size, so no note rides along.
     expect(r.widths).toEqual([
-      { platform: 'android', width: 1080, reliable: true },
-      { platform: 'ios', width: 393, reliable: true },
+      { platform: 'android', width: 1080 },
+      { platform: 'ios', width: 393 },
     ]);
-    expect(inferScreenWidth(androidTree())).toEqual({ width: 1080, reliable: true });
+    expect(windowWidth(androidTree(), { width: 1080, height: 2400 })).toEqual({ width: 1080 });
   });
 
   // Measured 2026-09-17 (finportal): iPhone 17 (402 pt) against a 375 pt Figma
   // frame — 13 deltas over 2 %, all aspect/type-size, none a defect.
   it('names an iOS device wider than the Figma frame by >5% as WIDTH BIAS, once, above the table', () => {
-    const r = compareRectParity(
+    const r = compare(
       { screen: 't', figma_frame_width: 375, anchors: [{ id: 'header', x: 24 }] },
       { ios: root(402, 874, [leaf('header', 24, 100, 354, 60)]) },
     );
@@ -96,7 +139,7 @@ describe('compareRectParity — normalization and width inference', () => {
   });
 
   it('prints NO width-bias note when figma_frame_width was inferred from anchor w — that is not a frame', () => {
-    const r = compareRectParity(
+    const r = compare(
       { screen: 't', anchors: [{ id: 'header', x: 24, w: 327 }] },
       { android: androidTree(), ios: root(402, 874, [leaf('header', 24, 100, 354, 60)]) },
     );
@@ -106,7 +149,7 @@ describe('compareRectParity — normalization and width inference', () => {
   });
 
   it('with android in the run, the width-bias note says android cannot be judged the same way', () => {
-    const r = compareRectParity(
+    const r = compare(
       { screen: 't', figma_frame_width: 375, anchors: [{ id: 'header', x: 24 }] },
       { android: androidTree(), ios: root(402, 874, [leaf('header', 24, 100, 354, 60)]) },
     );
@@ -114,26 +157,54 @@ describe('compareRectParity — normalization and width inference', () => {
   });
 
   it('prints no width-bias note when the device matches the frame', () => {
-    const out = formatRectParity(compareRectParity(contract(), { android: androidTree(), ios: iosTree() }));
+    const out = formatRectParity(compare(contract(), { android: androidTree(), ios: iosTree() }));
     expect(out).not.toContain('WIDTH-BIASED');
   });
 
-  it('flags a filtered tree (widest rect starts inset) as unreliable, with a warning in the output', () => {
+  // Until 2026-10-07 this was a warning paragraph above a table that went on
+  // to print deltas and a verdict (the parity review's P1).
+  it('fails the table closed on a filtered tree (widest rect starts inset) — a CONTENT width reaches no verdict', () => {
     const filtered = root(1000, 2400, [leaf('header', px(24), px(100), px(345), px(60))], 40);
-    const r = compareRectParity(
-      { screen: 't', figma_frame_width: 393, anchors: [{ id: 'header', x: 24 }] },
-      { android: filtered },
+    const message = thrownBy(() =>
+      compare({ screen: 't', figma_frame_width: 393, anchors: [{ id: 'header', x: 24 }] }, { android: filtered }),
     );
-    expect(r.widths[0].reliable).toBe(false);
-    const out = formatRectParity(r);
-    expect(out).toContain('CONTENT width');
-    expect(out).toContain('app.ios.treeSource: wda'); // names the real remediation
+    expect(message).toMatch(/^rect parity: android: screen width 1040 is a CONTENT width/);
+    expect(message).toContain('app.ios.treeSource: wda'); // names the real remediation
+    expect(message).toMatch(/; failing closed\.$/);
+  });
+
+  it('fails the whole table when ONE platform\'s width is refused, rather than a verdict over the other', () => {
+    const filtered = root(1000, 2400, [leaf('header', px(24), px(100), px(345), px(60))], 40);
+    expect(() =>
+      compare(contract(), { android: filtered, ios: iosTree() }),
+    ).toThrow(/^rect parity: android: screen width 1040 is a CONTENT width/);
+  });
+
+  it('prints what the device screen witnessed above the table: a window narrower than the screen', () => {
+    const r = compare(contract(), { android: androidTree(), ios: iosTree() }, undefined, {
+      ios: { width: 786, height: 1704 }, // twice the window: a half-width split view
+    });
+    expect(r.widths).toEqual([
+      { platform: 'android', width: 1080 },
+      { platform: 'ios', width: 393, note: expect.stringMatching(/^window 393 wide on a 786x1704 DEVICE screen/) },
+    ]);
+    expect(formatRectParity(r)).toMatch(/\n {2}! ios: window 393 wide on a 786x1704 DEVICE screen/);
+    // The deltas are still the window's: a split-view canvas is what the Figma frame describes.
+    expect(r.pass).toBe(true);
+  });
+
+  it('refuses a window WIDER than the device screen — a node that is not the window was counted as it', () => {
+    // A pixel-scale window in a point tree: the 2026-08-26 junk shape, 3x the panel.
+    const pixelScale = root(1179, 2556, [leaf('header', 72, 300, 1035, 180), leaf('card', 72, 540, 1035, 387)]);
+    expect(() =>
+      compare(contract(), { ios: pixelScale }, undefined, { ios: { width: 393, height: 852 } }),
+    ).toThrow(/^rect parity: ios: the tree's window is 1179 wide but the 393x852 device screen is 393 on the short side/);
   });
 
   it('falls back to the widest anchor w when figma_frame_width is not declared', () => {
     const c = contract();
     delete c.figma_frame_width;
-    const r = compareRectParity(c, { android: androidTree(), ios: iosTree() });
+    const r = compare(c, { android: androidTree(), ios: iosTree() });
     expect(r.frameWidth).toBe(345);
   });
 
@@ -141,14 +212,14 @@ describe('compareRectParity — normalization and width inference', () => {
     // No figma_frame_width, no anchor w → frameWidth 0 → with one platform
     // NOTHING would be compared; "WITHIN TOLERANCE" would be a lie.
     const c: LayoutContract = { screen: 't', anchors: [{ id: 'header', x: 24 }] };
-    expect(() => compareRectParity(c, { android: androidTree() })).toThrow(/figma_frame_width/);
+    expect(() => compare(c, { android: androidTree() })).toThrow(/figma_frame_width/);
   });
 
   it('two-platform + no frame width still compares android-vs-ios (no throw)', () => {
     const c: LayoutContract = { screen: 't', anchors: [{ id: 'pill', x: 24 }] };
     const android = root(1080, 2400, [leaf('pill', px(24), 300, px(345), px(60))]);
     const ios = root(393, 852, [leaf('pill', 44, 110, 345, 60)]); // x 11.2% vs android 6.1%
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.frameWidth).toBe(0);
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]).toMatchObject({ anchor: 'pill', field: 'x', comparison: 'android-vs-ios' });
@@ -159,7 +230,7 @@ describe('compareRectParity — finding semantics', () => {
   it('a 46-vs-24pt margin FAILS at 2% tolerance (the card-run bug)', () => {
     const android = androidTree();
     findAnchorRect(android, 'card').rect.x = px(46); // 46pt margin instead of 24
-    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    const r = compare(contract(), { android, ios: iosTree() });
     expect(r.pass).toBe(false);
     const x = r.findings.filter((f) => f.anchor === 'card' && f.field === 'x');
     expect(x.map((f) => f.comparison).sort()).toEqual(['android-vs-contract', 'android-vs-ios']);
@@ -172,7 +243,7 @@ describe('compareRectParity — finding semantics', () => {
     const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
     const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]); // 948/524 = 1.809
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 345/216 = 1.597
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     const aspect = r.findings.find((f) => f.field === 'aspect');
     expect(aspect).toBeDefined();
     expect(aspect).toMatchObject({ anchor: 'card', comparison: 'android-vs-ios' });
@@ -192,7 +263,7 @@ describe('compareRectParity — finding semantics', () => {
     const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors };
     const android = root(1080, 2400, [leaf('section', px(24), 300, px(345), 132)]); // 948/132 = 7.182
     const ios = root(402, 852, [leaf('section', 24, 110, 354, 44)]); //             354/44  = 8.045
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.findings.filter((f) => f.field === 'aspect')).toEqual([]);
     // The ratios are still measured and printed — "diff the numbers, not the
     // verdict" — but there is no spread: incomparable ratios have no distance.
@@ -213,7 +284,7 @@ describe('compareRectParity — finding semantics', () => {
     const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'card', x: 24, w: 345 }] };
     const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]);
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.findings.find((f) => f.field === 'aspect')?.delta).toBeCloseTo(11.7, 1);
   });
 
@@ -225,7 +296,7 @@ describe('compareRectParity — finding semantics', () => {
     };
     const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]);
-    expect(compareRectParity(c, { android, ios }).findings.some((f) => f.field === 'aspect')).toBe(true);
+    expect(compare(c, { android, ios }).findings.some((f) => f.field === 'aspect')).toBe(true);
   });
 
   it('tolerance_aspect_pct is a SEPARATE threshold and defaults to tolerance_pct', () => {
@@ -234,10 +305,10 @@ describe('compareRectParity — finding semantics', () => {
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 11.71% spread
     // Default: unchanged behaviour, the shape bug still fails at 2%.
     const dflt: LayoutContract = { screen: 't', figma_frame_width: 393, anchors };
-    expect(compareRectParity(dflt, { android, ios }).findings.some((f) => f.field === 'aspect')).toBe(true);
+    expect(compare(dflt, { android, ios }).findings.some((f) => f.field === 'aspect')).toBe(true);
     // Widening only the aspect knob leaves the width tolerance where it was.
     const loose: LayoutContract = { ...dflt, tolerance_aspect_pct: 15 };
-    const r = compareRectParity(loose, { android, ios });
+    const r = compare(loose, { android, ios });
     expect(r.findings.some((f) => f.field === 'aspect')).toBe(false);
     expect(r.tolerancePct).toBe(2.0);
   });
@@ -254,7 +325,7 @@ describe('compareRectParity — finding semantics', () => {
     };
     const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // 11.71% spread, under 15
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.aspectTolerancePct).toBe(15);
     expect(formatRectParity(r)).toContain('aspect: 15.00% ratio spread');
     // An aspect-only finding quotes the aspect threshold, never the width one.
@@ -269,7 +340,7 @@ describe('compareRectParity — finding semantics', () => {
     };
     const a2 = root(1080, 2400, [leaf('section', px(24), 300, 948, 132)]);
     const i2 = root(402, 852, [leaf('section', 24, 110, 354, 44)]); // 10.73% spread
-    const aspectOnly = compareRectParity(only, { android: a2, ios: i2 });
+    const aspectOnly = compare(only, { android: a2, ios: i2 });
     expect(aspectOnly.findings.map((f) => f.field)).toEqual(['aspect']);
     expect(rectParityVerdict(aspectOnly)).toContain('OVER 5.00% ratio spread');
     expect(rectParityVerdict(aspectOnly)).not.toContain('2.00%');
@@ -285,13 +356,13 @@ describe('compareRectParity — finding semantics', () => {
     };
     const android = root(1080, 2400, [leaf('card', px(46), 300, px(345), 524)]); // x is 5.6% off
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]); // aspect 11.71% off
-    const v = rectParityVerdict(compareRectParity(c, { android, ios }));
+    const v = rectParityVerdict(compare(c, { android, ios }));
     expect(v).toContain('2.00% of width / 5.00% ratio spread');
   });
 
   it('stays on ONE number while the two tolerances agree — existing reports are unchanged', () => {
     const c = contract();
-    const r = compareRectParity(c, { android: androidTree(), ios: iosTree() });
+    const r = compare(c, { android: androidTree(), ios: iosTree() });
     expect(r.aspectTolerancePct).toBe(r.tolerancePct);
     expect(formatRectParity(r)).not.toContain('ratio spread');
     expect(rectParityVerdict(r)).toContain('WITHIN TOLERANCE (2.00%)');
@@ -309,7 +380,7 @@ describe('compareRectParity — finding semantics', () => {
     };
     const android = root(1080, 2400, [leaf('section', px(24), 300, 948, 132)]);
     const ios = root(402, 852, [leaf('section', 24, 110, 354, 44)]);
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.pass).toBe(true);
     expect(formatRectParity(r)).not.toContain('15.00%');
     expect(rectParityVerdict(r)).toBe('rect parity: WITHIN TOLERANCE (2.00%) on all 1 anchor(s).');
@@ -326,7 +397,7 @@ describe('compareRectParity — finding semantics', () => {
     };
     const android = root(1080, 2400, [leaf('card', px(46), 300, px(345), 524)]); // x off by 5.6%
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 524 / (1080 / 393))]); // aspect matches
-    const v = rectParityVerdict(compareRectParity(c, { android, ios }));
+    const v = rectParityVerdict(compare(c, { android, ios }));
     // The aspect row WAS judged here (it simply passed), so two thresholds are
     // live and the width number says which quantity it bounds.
     expect(v).toContain('OVER 2.00% of width');
@@ -342,13 +413,13 @@ describe('compareRectParity — finding semantics', () => {
     };
     const android = root(1080, 2400, [leaf('card', px(24), 300, px(345), 524)]);
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 216)]);
-    expect(() => compareRectParity(c, { android, ios })).toThrow(/tolerance_aspect_pct/);
+    expect(() => compare(c, { android, ios })).toThrow(/tolerance_aspect_pct/);
   });
 
   it('absolute y is NEVER a finding source — both anchors shifted 10% stay a pass', () => {
     const android = androidTree();
     for (const id of ['header', 'card']) findAnchorRect(android, id).rect.y += 108; // 10% of 1080
-    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    const r = compare(contract(), { android, ios: iosTree() });
     expect(r.pass).toBe(true);
     expect(r.findings).toEqual([]);
     // ...but y is still measured and shown in the rows:
@@ -359,7 +430,7 @@ describe('compareRectParity — finding semantics', () => {
   it('vertical position IS judged via gap-to-previous — one anchor shifted 5% is a gap finding', () => {
     const android = androidTree();
     findAnchorRect(android, 'card').rect.y += 54; // 5% of 1080
-    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    const r = compare(contract(), { android, ios: iosTree() });
     expect(r.pass).toBe(false);
     expect(r.findings.some((f) => f.field === 'y')).toBe(false);
     const gaps = r.findings.filter((f) => f.field === 'gap');
@@ -374,7 +445,7 @@ describe('compareRectParity — finding semantics', () => {
     const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'pill' }] };
     const android = root(1080, 2400, [leaf('pill', px(24), 300, px(345), px(60))]);
     const ios = root(393, 852, [leaf('pill', 44, 110, 345, 60)]); // x 11.2% vs android 6.1%
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]).toMatchObject({ anchor: 'pill', field: 'x', comparison: 'android-vs-ios' });
     expect(r.findings[0].contract).toBeUndefined();
@@ -385,7 +456,7 @@ describe('compareRectParity — finding semantics', () => {
     const c: LayoutContract = { screen: 't', figma_frame_width: 393, anchors: [{ id: 'divider' }] };
     const android = root(1080, 2400, [leaf('divider', px(24), 300, 0, px(60))]); // zero width → ratio 0
     const ios = root(393, 852, [leaf('divider', 24, 110, 345, 60)]);
-    const r = compareRectParity(c, { android, ios });
+    const r = compare(c, { android, ios });
     expect(r.entries.some((e) => e.kind === 'field' && e.field === 'aspect')).toBe(false);
     expect(r.findings.every((f) => Number.isFinite(f.delta))).toBe(true);
   });
@@ -395,8 +466,8 @@ describe('compareRectParity — finding semantics', () => {
     delete c.tolerance_pct;
     const android = androidTree();
     findAnchorRect(android, 'card').rect.x = px(46);
-    expect(compareRectParity(c, { android, ios: iosTree() }).tolerancePct).toBe(2.0);
-    const loose = compareRectParity(c, { android, ios: iosTree() }, { tolerancePct: 10 });
+    expect(compare(c, { android, ios: iosTree() }).tolerancePct).toBe(2.0);
+    const loose = compare(c, { android, ios: iosTree() }, { tolerancePct: 10 });
     expect(loose.pass).toBe(true); // 5.6% < 10%
   });
 
@@ -407,12 +478,12 @@ describe('compareRectParity — finding semantics', () => {
     const c = contract();
     c.tolerance_pct = 5;
     delete c.tolerance_aspect_pct;
-    const r = compareRectParity(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 });
+    const r = compare(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 });
     expect(r.tolerancePct).toBe(50);
     expect(r.aspectTolerancePct).toBe(5);
     // … and to the default when the contract names neither.
     delete c.tolerance_pct;
-    expect(compareRectParity(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 }).aspectTolerancePct).toBe(2.0);
+    expect(compare(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 }).aspectTolerancePct).toBe(2.0);
   });
 });
 
@@ -434,7 +505,7 @@ describe('compareRectParity — missing anchors and duplicates', () => {
       leaf('c', px(24), px(560) + 54, px(345), px(60)), // 5% off — would be a gap finding without the reset
     ]);
     const ios = root(393, 852, [leaf('a', 24, 100, 345, 60), leaf('c', 24, 560, 345, 60)]); // no b
-    const r = compareRectParity(threeAnchorContract(), { android, ios });
+    const r = compare(threeAnchorContract(), { android, ios });
     expect(r.missing).toEqual([{ id: 'b', absentOn: ['ios'] }]);
     expect(r.pass).toBe(false);
     expect(r.findings).toEqual([]); // missing is a failure but NOT a parity delta
@@ -452,7 +523,7 @@ describe('compareRectParity — missing anchors and duplicates', () => {
       leaf('card', 500, 900, 100, 100), // garbage duplicate must be ignored
     ]);
     const ios = root(393, 852, [leaf('card', 24, 110, 345, 60)]);
-    expect(compareRectParity(c, { android, ios }).pass).toBe(true);
+    expect(compare(c, { android, ios }).pass).toBe(true);
   });
 });
 
@@ -462,7 +533,7 @@ describe('compareRectParity — single-platform mode', () => {
     c.anchors.push({ id: 'footer' });
     const android = androidTree();
     android.children.push(leaf('footer', 0, 2200, 1080, 100));
-    const r = compareRectParity(c, { android });
+    const r = compare(c, { android });
     expect(r.platforms).toEqual(['android']);
     expect(r.pass).toBe(true);
     expect(r.skipped).toEqual(['footer']);
@@ -479,7 +550,7 @@ describe('compareRectParity — single-platform mode', () => {
   it('single-platform findings never claim a cross-platform comparison', () => {
     const android = androidTree();
     findAnchorRect(android, 'card').rect.x = px(46);
-    const r = compareRectParity(contract(), { android });
+    const r = compare(contract(), { android });
     expect(r.pass).toBe(false);
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]).toMatchObject({ anchor: 'card', field: 'x', comparison: 'android-vs-contract' });
@@ -488,7 +559,7 @@ describe('compareRectParity — single-platform mode', () => {
 
 describe('formatRectParity / rectParityVerdict', () => {
   it('renders the fixed-width table with gap^ and aspect rows and a pass verdict', () => {
-    const r = compareRectParity(contract(), { android: androidTree(), ios: iosTree() });
+    const r = compare(contract(), { android: androidTree(), ios: iosTree() });
     const out = formatRectParity(r);
     expect(out).toContain('screen: test.screen   tolerance: 2.00% of screen width');
     expect(out).toContain('widths: android 1080   ios 393   figma frame 393');
@@ -502,7 +573,7 @@ describe('formatRectParity / rectParityVerdict', () => {
   it('renders findings with their numbers and the dispatch-then-re-measure close', () => {
     const android = androidTree();
     findAnchorRect(android, 'card').rect.x = px(46);
-    const r = compareRectParity(contract(), { android, ios: iosTree() });
+    const r = compare(contract(), { android, ios: iosTree() });
     const out = formatRectParity(r);
     expect(out).toContain('2 DELTA(S) OVER 2.00% — each is a code-fix finding carrying its numbers:');
     expect(out).toMatch(/card x: android-vs-contract \+5\.5\d% of width \(android 126\.0, ios 24\.0, contract 24\)/);
@@ -513,7 +584,7 @@ describe('formatRectParity / rectParityVerdict', () => {
   it('counts missing anchors in the verdict', () => {
     const ios = iosTree();
     ios.children.pop(); // drop card
-    const r = compareRectParity(contract(), { android: androidTree(), ios });
+    const r = compare(contract(), { android: androidTree(), ios });
     expect(rectParityVerdict(r)).toBe('rect parity: 1 MISSING anchor(s)');
   });
 });
@@ -542,7 +613,7 @@ describe('parseLayoutContract', () => {
 describe('evaluateRectAssert (the `rect` assert primitive)', () => {
   it('passes on matching geometry and reports every delta as a number', () => {
     const tree = androidTree();
-    const { pass, detail } = evaluateRectAssert(
+    const { pass, detail } = assertRect(
       findAnchorRect(tree, 'card').rect,
       { x: 24, y: 180, w: 345, h: 129, frameWidth: 393 },
       tree,
@@ -554,7 +625,7 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
 
   it('fails on an over-tolerance w/h and marks the offending field OVER', () => {
     const tree = androidTree();
-    const { pass, detail } = evaluateRectAssert(
+    const { pass, detail } = assertRect(
       findAnchorRect(tree, 'card').rect,
       { h: 100, frameWidth: 393 }, // measured 32.9% vs 25.4% → +7.4%
       tree,
@@ -565,7 +636,7 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
 
   it('y is measured and reported but never fails', () => {
     const tree = androidTree();
-    const { pass, detail } = evaluateRectAssert(
+    const { pass, detail } = assertRect(
       findAnchorRect(tree, 'card').rect,
       { x: 24, y: 1, frameWidth: 393 }, // y wildly off
       tree,
@@ -574,19 +645,29 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
     expect(detail).toContain('(measured only, never fails)');
   });
 
-  it('flags an unreliable (filtered) screen width in the detail', () => {
+  // Until 2026-10-07 this PASSED with "(UNRELIABLE …)" in the detail.
+  it('fails closed on an unreliable (filtered) screen width, in the png scale\'s own words', () => {
     const tree = root(1000, 2400, [leaf('card', 100, 200, 800, 100)], 40);
-    const { detail } = evaluateRectAssert(
+    const { pass, detail } = assertRect(
       findAnchorRect(tree, 'card').rect,
-      { x: 24, frameWidth: 393 },
+      { x: 100 * (393 / 1040), frameWidth: 393 }, // what the CONTENT width would have passed
       tree,
     );
-    expect(detail).toContain('UNRELIABLE');
+    expect(pass).toBe(false);
+    expect(detail).toMatch(/^screen width 1040 is a CONTENT width.*; failing closed, geometry unchecked$/);
+    expect(detail).not.toContain('Δ'); // no delta is computed against a refused width
+  });
+
+  it('names an unwitnessed width in the detail — the device screen could not be read', () => {
+    const tree = androidTree();
+    const { pass, detail } = assertRectUnwitnessed(findAnchorRect(tree, 'card').rect, { x: 24, frameWidth: 393 }, tree);
+    expect(pass).toBe(true);
+    expect(detail).toMatch(/screen width 1080 \(window width from the UI tree alone — no usable device screen size/);
   });
 
   it('fails closed when the screen width cannot be inferred (all-zero rects, the idb 0x0 root)', () => {
     const tree = n({ children: [leaf('card', 0, 0, 0, 0)] }); // every rect 0-sized
-    const { pass, detail } = evaluateRectAssert(
+    const { pass, detail } = assertRect(
       findAnchorRect(tree, 'card').rect,
       { x: 24, frameWidth: 393 },
       tree,
@@ -604,7 +685,8 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
  * width` is compared against a Figma FRAME, i.e. the app's canvas, which under
  * split view is the window and not the device screen
  * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). But it
- * shares `inferScreenWidth` with the png scale, so the geometry hardening
+ * shares the tree's window walk with the png scale (since 2026-10-07 through
+ * one owner, verify/scale.ts#windowWidth), so the geometry hardening
  * moved its numbers, and review 2026-08-27 rightly asked for that in a test
  * rather than in prose: on an iOS sheet the width was 804 with an UNRELIABLE
  * banner, and it is now the window's own 402.
@@ -614,11 +696,11 @@ describe('rect parity on the iOS filter-sheet shape', () => {
     const tree = parseWdaSourceValue(
       JSON.parse(await readFile(new URL('../fixtures/wda-source-filter-sheet.json', import.meta.url), 'utf8')),
     );
-    expect(inferScreenWidth(tree)).toEqual({ width: 402, reliable: true });
+    expect(windowWidth(tree, { width: 402, height: 874 })).toEqual({ width: 402 });
 
     // apply_button x=208 of a 402pt screen is 51.7%; against 804 it read 25.9%
     // and a contract authored at ~52% would have hard-FAILED on a correct app.
-    const { pass, detail } = evaluateRectAssert(
+    const { pass, detail } = assertRect(
       { x: 208, y: 791, width: 176, height: 44 },
       { x: 208, w: 176, frameWidth: 402 },
       tree,
@@ -658,7 +740,7 @@ describe('validateRectContract — the read-time diagnosis, without a tree', () 
 
   it('one owner — tolerance_aspect_pct: the validation message === the read-time message', () => {
     const c: LayoutContract = { ...contract(), tolerance_aspect_pct: '15' };
-    const readTime = thrownBy(() => compareRectParity(c, { android: androidTree(), ios: iosTree() }));
+    const readTime = thrownBy(() => compare(c, { android: androidTree(), ios: iosTree() }));
     expect(validateRectContract(c)).toEqual([readTime]);
   });
 
@@ -669,9 +751,9 @@ describe('validateRectContract — the read-time diagnosis, without a tree', () 
   it('under the comparator\'s options it still answers as the comparator does', () => {
     const opts = { tolerancePct: 5 };
     expect(validateRectContract(contract(), opts)).toEqual([]);
-    expect(() => compareRectParity(contract(), { android: androidTree(), ios: iosTree() }, opts)).not.toThrow();
+    expect(() => compare(contract(), { android: androidTree(), ios: iosTree() }, opts)).not.toThrow();
     const bad: LayoutContract = { ...contract(), tolerance_aspect_pct: 0 };
-    const readTime = thrownBy(() => compareRectParity(bad, { android: androidTree(), ios: iosTree() }, opts));
+    const readTime = thrownBy(() => compare(bad, { android: androidTree(), ios: iosTree() }, opts));
     expect(validateRectContract(bad, opts)).toEqual([readTime]);
   });
 
@@ -679,8 +761,8 @@ describe('validateRectContract — the read-time diagnosis, without a tree', () 
   // takes the contract's tolerance_pct, not the default (2).
   it('the aspect threshold the comparator reports falls back to the contract\'s tolerance_pct', () => {
     const trees = { android: androidTree(), ios: iosTree() };
-    expect(compareRectParity({ ...contract(), tolerance_pct: 5 }, trees).aspectTolerancePct).toBe(5);
-    expect(compareRectParity({ ...contract(), tolerance_pct: 5, tolerance_aspect_pct: 15 }, trees).aspectTolerancePct).toBe(15);
+    expect(compare({ ...contract(), tolerance_pct: 5 }, trees).aspectTolerancePct).toBe(5);
+    expect(compare({ ...contract(), tolerance_pct: 5, tolerance_aspect_pct: 15 }, trees).aspectTolerancePct).toBe(15);
   });
 
   // Deliberately not lifted: whether the run is single-platform is decided by
@@ -689,7 +771,7 @@ describe('validateRectContract — the read-time diagnosis, without a tree', () 
   it('does NOT report the single-platform "no frame width" refusal — that one depends on the run', () => {
     const c: LayoutContract = { screen: 't', anchors: [{ id: 'card' }] };
     expect(validateRectContract(c)).toEqual([]);
-    expect(() => compareRectParity(c, { android: androidTree() })).toThrow(/figma_frame_width/);
+    expect(() => compare(c, { android: androidTree() })).toThrow(/figma_frame_width/);
   });
 });
 
@@ -730,5 +812,32 @@ describe('problemsThrownBy — contract problems are collected, bugs propagate',
     expect(() => problemsThrownBy('rect parity: ', [problem('color parity: tolerance_de must be…')])).toThrow(
       'color parity: tolerance_de must be…',
     );
+  });
+});
+
+/**
+ * The parity code review's A1 (2026-10-07): an Android window beside a
+ * left-hand nav bar or cutout starts inset, and tree rects are in SCREEN
+ * coordinates — so x is measured from the window's left edge, as a Figma
+ * frame's x is from the canvas's edge. A 2400x1080 phone, notch on the left.
+ */
+describe('a window that starts inset: x is measured from its left edge', () => {
+  const ANDROID = { width: 1080, height: 2400, windowsBesideSystemBars: true };
+  const inset = (): UiNode =>
+    n({ role: 'container', rect: { x: 110, y: 0, width: 2290, height: 1080 }, children: [leaf('card', 110 + 100, 200, 1000, 100)] });
+
+  it('the rect assert: no x delta from the inset itself', () => {
+    const got = assertRect({ x: 210, y: 200, width: 1000, height: 100 }, { x: 100, w: 1000, frameWidth: 2290 }, inset(), ANDROID);
+    expect(got.pass).toBe(true);
+    expect(got.detail).toMatch(/^x 100\.0 vs contract 100 → Δ\+0\.00%/);
+  });
+
+  it('the table: the anchor\'s x is window-relative, and it is within tolerance', () => {
+    const r = compare({ screen: 't', figma_frame_width: 2290, anchors: [{ id: 'card', x: 100, w: 1000 }] }, { android: inset() }, undefined, {
+      android: ANDROID,
+    });
+    expect(r.widths).toEqual([{ platform: 'android', width: 2290, note: undefined }]);
+    expect(r.pass).toBe(true);
+    expect(r.entries).toContainEqual(expect.objectContaining({ kind: 'field', anchor: 'card', field: 'x', android: 100 }));
   });
 });

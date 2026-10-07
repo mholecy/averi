@@ -537,25 +537,41 @@ describe('AndroidAdapter interactions', () => {
     await expect(new AndroidAdapter().setClipboard('x')).rejects.toThrow(/not supported/);
   });
 
-  it('viewport parses wm size (Override beats Physical) and caches', async () => {
+  it('viewport parses wm size (Override beats Physical), says Android windows may sit beside system bars, and caches', async () => {
     const { fn, calls } = fakeExec({
       'adb -s emulator-5554 shell wm size': 'Physical size: 1080x2280\nOverride size: 1000x2000\n',
     });
     const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
-    expect(await adapter.viewport()).toEqual({ width: 1000, height: 2000 });
-    expect(await adapter.viewport()).toEqual({ width: 1000, height: 2000 });
+    const screen = { width: 1000, height: 2000, windowsBesideSystemBars: true };
+    expect(await adapter.viewport()).toEqual(screen);
+    expect(await adapter.viewport()).toEqual(screen);
     expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
   });
 
-  // adapters/types.ts promises the memo covers failure too: the layers above
-  // read viewport() per captured frame and per absent check, and a device
-  // that will not answer must not be re-asked on every one of them.
-  it('viewport memoizes a FAILED read as well — one shell-out, however many callers', async () => {
-    const { fn, calls } = fakeExec({ 'adb -s emulator-5554 shell wm size': 'error: device offline\n' });
+  // adapters/types.ts#viewport since the parity code review (A3, 2026-10-07):
+  // a FAILED read is not kept — one transient `wm size` failure used to strip
+  // the device-screen witness for the life of the server.
+  it('viewport does not memoize a FAILED read: the next call asks wm size again, and its success is kept', async () => {
+    const responses: Record<string, string> = { 'adb -s emulator-5554 shell wm size': 'error: device offline\n' };
+    const { fn, calls } = fakeExec(responses);
     const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
     await expect(adapter.viewport()).rejects.toThrow(/Cannot parse wm size output/);
-    await expect(adapter.viewport()).rejects.toThrow(/Cannot parse wm size output/);
-    expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
+    responses['adb -s emulator-5554 shell wm size'] = 'Physical size: 1080x2400\n';
+    expect(await adapter.viewport()).toMatchObject({ width: 1080, height: 2400 });
+    expect(await adapter.viewport()).toMatchObject({ width: 1080, height: 2400 });
+    expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(2);
+  });
+
+  it('viewport({ fresh: true }) reads wm size again and replaces the memo — a `wm size` override since the first read', async () => {
+    const responses: Record<string, string> = { 'adb -s emulator-5554 shell wm size': 'Physical size: 1080x2220\nOverride size: 720x1600\n' };
+    const { fn, calls } = fakeExec(responses);
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect(await adapter.viewport()).toMatchObject({ width: 720, height: 1600 });
+    responses['adb -s emulator-5554 shell wm size'] = 'Physical size: 1080x2220\n';
+    expect(await adapter.viewport()).toMatchObject({ width: 720, height: 1600 }); // memoized
+    expect(await adapter.viewport({ fresh: true })).toMatchObject({ width: 1080, height: 2220 });
+    expect(await adapter.viewport()).toMatchObject({ width: 1080, height: 2220 }); // the fresh read is the memo now
+    expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(2);
   });
 
   it('clearText moves to end, then one keyevent per call (batches drop events in the IME queue)', async () => {
