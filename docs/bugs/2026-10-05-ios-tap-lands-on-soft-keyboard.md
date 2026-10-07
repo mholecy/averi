@@ -545,3 +545,115 @@ element (K5b, K3 of the device check) and the accessory toolbar's Done (K4) — 
   the keyboard left as it was.
 - Android K6 unchanged: `⚠ tap: the soft keyboard covered id:"login_submit"; hidden before tapping`, `back` pressed once,
   with `keyboardDismiss` configured in the same averi.yaml.
+
+## Device check of the fix (stage B, 2026-10-07, `0036762`)
+
+**15:12–15:24 CEST**, `0036762` built (`npm run build`), driven with the handoff's `run-tools.mts` on this repo's
+`dist/` (server stderr captured). finportal only (`sk.finportal.myport`), iPhone 17 iOS 26.5 (`D34212DB-…`) and
+emulator-5554. Scratch copies of finportal's `averi.yaml` (`.env.averi` symlinked, never printed), nothing in finportal
+edited:
+- `wdacfg`: `treeSource: wda` with `keyboardDismiss: [{ tap: { id: login_title } }, { tap: { id: twofactor_title } }, { accessory: true }]`;
+- `accfg`: the same with `[{ accessory: true }]` only;
+- `absentcfg`: `[{ tap: { id: does_not_exist } }]`;
+- `nodcfg`: `treeSource: wda`, no list;
+- `idbcfg`: the three-entry list with no `treeSource` (idb);
+- `badcfg`: `[{ tap: { role: button } }, { accessory: false }]`.
+
+They all also carry the helper flows `fill_creds`, `submit_only`, `tap_submit_only`, `back_only`, `fill_code_dismiss`
+(`fill twofactor_code "1" dismissKeyboard: true`), `fill_code_empty_dismiss`, `fill_pw_dismiss` (`fill login_password
+$password, clear, dismissKeyboard: true`), `fill_user_dismiss` (Android) and `tap_support_text`. Ids were checked with
+`ui_snapshot` first: `login_title` and `twofactor_title` are both role `text` at `{36,291,330,24}`. **Real login submits:
+2** (B2 and B3). No 2FA code was completed. At most one digit was typed.
+
+Raising the keyboard used the stage A technique: toggle `AutomaticMinimizationEnabled` true → false, then a focus
+change (username, then password). New observation: **right after a `fill`, the first toggle + focus change never raised
+it** (3 of 3: S1, S13 and the idb run), **and a second toggle + focus change always did** (3 of 3). On 2FA, a tap on
+`twofactor_title` did not blur the field while the pad was parked (the code tap then opened the edit menu). A tap on
+the parked accessory `Done` (`{317,831}`) followed by toggle + code tap raised the pad.
+
+- **B1, config load: PASS.** `wdacfg` loads. Unknown flow → the flow list. `badcfg` is refused with both per-field
+  sentences:
+  `app.ios.keyboardDismiss.0.tap: a keyboard dismissal must be a non-interactive element (a title, a label) — role: button/textfield/switch/checkbox/radiobutton/slider names a control the tap would press`
+  / `app.ios.keyboardDismiss.1.accessory: accessory takes only true (the entry is opt-in; false reads like an override and would be none)`.
+  `idbcfg` printed the inert note on stderr **once** over two loads in one server:
+  `averi: …/idbcfg/averi.yaml: app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`.
+- **B2, guard via the configured tap: PASS (submit #1).** Setup: `fresh_launch` → `fill_creds` → band `{0,539,402,335}`
+  (Passwords bar), `login_submit` `{36,547,109,48}`, so the centre (91,571) is covered. MCP `tap id:login_submit` → `ok in 7.9s`:
+  `Tapped id:login_submit (the soft keyboard covered id:login_submit; hidden by tapping id:"login_title" before tapping)`.
+  4 s later `twofactor_screen` was up.
+  **Confirm looks:** the WDA xcodebuild log (one `FBCustomActions` burst per `/source`) shows **6 tree reads**: 225 /
+  225 nodes (first look, settled), 225 / 225 (second look, 300 ms later: still covering), then the title tap, then
+  162 / 162 (keyboard gone). So **the band was gone on the FIRST confirm look**, and the second
+  `KEYBOARD_HIDE_CONFIRM_LOOKS` slot was not used. Each read took ~0.85 s with the band up, ~0.55 s without it, plus
+  ~0.5 s between reads. That makes the 7.9 s mostly six reads.
+  Note: the MCP note quotes the target unquoted (`id:login_submit`) and the dismissal quoted (`id:"login_title"`). The
+  flow trace quotes both (B4b). Cosmetic.
+- **B3, full `run_flow login` with the list configured: PASS, plain (submit #2).** `ok in 26.7s`, trace
+  `… fill: id:"login_username" = *** (cleared) / fill: id:"login_password" = *** (cleared) / tap: id:"login_submit" /
+  optional: skipped text:"Not Now" (not present) / wait: state post_login_fork / flow login: done` — **no `⚠` line**
+  (the fills parked the keyboard, as in stage A's K2). Then `back_only` → login.
+- **B4, 2FA number pad.** After B2 the pad was up: band `{0,518,402,356}`, `role:toolbar` `{0,518,402,48}` (id
+  `Toolbar`), `Done` `{317,523,64,38}`. Back/Log in sit above it at y 451.
+  - (a) `fill_code_dismiss` (`"1"`, `dismissKeyboard: true`) → `fill: id:"twofactor_code" = 1`, **no `; keyboard hidden
+    …` suffix**: the idb HID typing parked the pad (`0 matches for role:keyboard`, `toolbar ×1` still in the tree, the
+    parked `Done` drawn at y 831), so nothing was tapped. As designed.
+  - (b) **A target under the pad does exist:** `twofactor_support_text` (the "If you have a problem logging into your
+    account…" label, role `text`) moves to `{16,575,370,40}` with the pad up, so its centre (201,595) is under the
+    band. **Accessory via the guard — PASS:** with `accfg`, MCP `tap id:twofactor_support_text` → `ok in 9.2s`,
+    `Tapped id:twofactor_support_text (the soft keyboard covered id:twofactor_support_text; hidden by tapping the
+    accessory toolbar's "Done" before tapping)`; then `0 matches for role:keyboard` and `twofactor_screen` back to h 874.
+    WDA reads: 199/200/200/199 (two looks), then Done, then 150/138: **gone on the first confirm look** again.
+    **Ordered list — PASS:** with `wdacfg` (whose first entry `login_title` is absent on 2FA), `run_flow tap_support_text`
+    → `⚠ tap: the soft keyboard covered id:"twofactor_support_text"; hidden by tapping id:"twofactor_title" before
+    tapping` / `tap: id:"twofactor_support_text"` / `flow tap_support_text: done` (9.6 s; first confirm look).
+  - **Accessory via `dismissKeyboard` — NOT reachable.** Every fill that types parks the pad, so the post-fill read sees
+    no band. A fill with `value: ""` (to focus without typing) failed: `Command failed (exit 1): idb ui text --udid …
+    ('Request was not sent',)`. That is a new defect, filed as
+    [2026-10-07-ios-fill-empty-value-fails-in-idb.md](2026-10-07-ios-fill-empty-value-fails-in-idb.md). The accessory
+    strategy is shown through the guard only (above).
+  - Then `back_only` → login, with the code not completed.
+- **B5, no usable dismissal (`absentcfg`).**
+  - (a) **PASS.** On 2FA with the pad up, both the MCP `tap id:twofactor_support_text` (4.6 s) and the flow (4.8 s) were
+    refused with `… on two looks 300ms apart; this adapter cannot hide it (… and so was the input-accessory toolbar's Done
+    — name them under app.ios.keyboardDismiss in averi.yaml …), and none of the configured dismissals is usable on this
+    screen (tap id:"does_not_exist": not found). Nothing was tapped …`. The flow logged `⚠ tap: the soft keyboard covered
+    id:"twofactor_support_text"; no dismissal, nothing sent` before the `✗`, and the band was unchanged afterwards. On login
+    with band `{0,566,402,308}` over the filled form, `tap_submit_only` was refused the same way (5.2 s, `⚠ tap: the soft
+    keyboard covered id:"login_submit"; no dismissal, nothing sent`, `(tap id:"does_not_exist": not found)`). No submit.
+  - (b) **The `⚠ fill … was left up` line was not observed.** With the band up before it, `fill_pw_dismiss` → `fill:
+    id:"login_password" = *** (cleared)`, no `⚠`, band `0 matches` afterwards: the fill's HID typing parked the keyboard
+    before the post-fill read. So nothing was left up and no warning was due. **No key was pressed: still on
+    `login_screen` 3 s later, `twofactor_screen` 0 matches.** (Before stage B this fill pressed `enter` and submitted,
+    per K5d.)
+- **B6, `dismissKeyboard` never presses enter: PASS.** `nodcfg`, band `{0,566,402,308}` up on the filled form →
+  `fill_pw_dismiss` → `fill: id:"login_password" = *** (cleared)` (7.0 s), no `⚠` (keyboard parked by the typing).
+  3 s later still on `login_screen`, with no 2FA. **Not submitted.** Under `idbcfg`, `fill_pw_dismiss` gave the same
+  plain line (3.2 s), and `login_submit` was still there with the form unchanged in the screenshot. Not submitted, twice.
+  Under idb the keyboard could not be raised first: the idb taps did not raise it after two toggles. That does not
+  matter for this check, because the code reads no band there.
+- **B7, Android regression (emulator-5554, `wdacfg` with the list): PASS.** `list_devices`: `emulator-5554` was the only
+  Android device. `fresh_launch` → `tap id:login_username` (Gboard up, `mInputShown=true`, screenshot) →
+  `tap_submit_only` with empty fields (submit disabled, no real submit), 11.4 s:
+  `⚠ tap: the soft keyboard covered id:"login_submit"; hidden before tapping` / `tap: id:"login_submit"` / `flow
+  tap_submit_only: done`. Then `mInputShown=false`, still on login. Focus again → `fill_user_dismiss` (`"averi"`,
+  `dismissKeyboard: true`) → `fill: id:"login_username" = averi (cleared)`, then `mInputShown=false`, still on login (back
+  pressed, no navigation). The fill line is as before stage B.
+
+| scenario | result |
+|---|---|
+| B1 config load / bad config / idb inert note | **PASS** |
+| B2 covered submit → `login_title` tapped → 2FA | **PASS** (7.9 s, gone on the 1st confirm look, submit #1) |
+| B3 `run_flow login` with the list | **PASS**, plain, no `⚠` (submit #2) |
+| B4a 2FA fill `"1"` + dismissKeyboard | nothing tapped (HID parked the pad), as designed |
+| B4b accessory via the guard (`twofactor_support_text` under the pad) | **PASS** (9.2 s, 1st confirm look); ordered list picks `twofactor_title` **PASS** |
+| B4 accessory via dismissKeyboard | not reachable (fill parks; `value: ""` hits an idb error, new note) |
+| B5a absent-only list → refused with the reason | **PASS** (2FA and login) |
+| B5b `⚠ fill … left up` | not observed: the typing parks the keyboard; no key pressed, no submit |
+| B6 no enter (wda, no list; idb) | **PASS**: no submit in either |
+| B7 Android | **PASS**: unchanged `hidden before tapping`, back on fill |
+
+Prefs: `com.apple.keyboard.preferences` dumped before and after. `AutomaticMinimizationEnabled` was `1` before and set
+back to `1`, and the dumps are identical. (averi itself re-enables `com.apple.Accessibility AutomationEnabled` /
+`ApplicationAccessibilityEnabled` before each launch, simulator-wide and not restored, by design and as stated on its
+stderr.) Afterwards ports 8100–8110 and 8199 were quiet, with no xcodebuild, WebDriverAgent or server of this run left. The
+only averi server alive was another session's (pid 84616, cwd finportal), and it was not touched.
