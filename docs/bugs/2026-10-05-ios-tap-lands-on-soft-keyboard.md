@@ -77,7 +77,7 @@ isolated. What matters is that averi does not look.
 On Android the same situation was fixed on 2026-10-03 (`KeyboardOracle` docs in `src/adapters/types.ts`, the
 finportal submit button under the IME). The iOS half was deferred as "nobody has needed it". This run needed it.
 
-## Change (proposed, not made)
+## Change (proposed 2026-10-05; superseded by the Fix sections below)
 
 1. **An iOS `KeyboardOracle` read from the tree** (WDA source): `state()` = the rect of the `Keyboard` element (and
    the AutoFill bar above it, if that is a separate node; check on device), `shown` only when that rect
@@ -234,7 +234,7 @@ id` `login_password` → `click`). Screens are 402 × 874 pt.
 | Extra `/source` cost per tap, median/p90 (K4) | login: up 0.873/0.983 s, down 0.592/0.614 s. 2FA: up 0.667/0.687 s, parked 0.750/0.782 s |
 | Non-submitting dismissal that works (K5) | an `idb ui tap` on a neutral, non-interactive point (the title). WDA `keyboard/dismiss` fails both ways, a swipe does nothing, and the return key submits |
 
-## Fix (stage A) — 2026-10-07, not yet device-checked
+## Fix (stage A) — 2026-10-07 (device-checked below, `6f41787`)
 
 **Shipped.** A tap on a resolved node whose centre lies under the on-screen keyboard is REFUSED on iOS `treeSource: wda`,
 and the refusal is visible in the trace. No device read is added and nothing is pressed. (Revised the same day after
@@ -416,7 +416,7 @@ Unexpected:
 - The `⚠` line's wording differs from the quote in the "Fix" section (see K2).
 - Submit #2 was spent because a pref toggle with no focus change does not raise the keyboard.
 
-## Fix (stage B) — 2026-10-07, not yet device-checked
+## Fix (stage B) — 2026-10-07 (device-checked below, `0036762`)
 
 **Shipped.** A covered target is no longer only refused: when `averi.yaml` names a dismissal, the guard taps it first.
 Every measured fact above is a rule, and nothing new is pressed: the only keys ever measured (return, `enter`) submit
@@ -441,8 +441,9 @@ element (K5b, K3 of the device check) and the accessory toolbar's Done (K4) — 
    crosses into interact/. The engine converts in its constructor and passes the list to every `tap:`, `fill:` and the
    post-fill dismissal (`GuardOptions.dismissals`); the MCP `tap` and `type_text` tools read it through
    `flow/load.ts#keyboardDismissalsFor` — the same config-optional policy as `iosTreeSourceFor` (android never reads the
-   config, ios without averi.yaml gets none, an invalid one throws). Only read under `treeSource: wda`: the idb tree
-   carries no band, so nothing is covered or dismissed there.
+   config, ios without averi.yaml gets none, an invalid one throws). Read under every tree source, but inert under
+   `treeSource: idb`: the idb tree carries no band, so nothing is covered or dismissed there (and the loader says so on
+   stderr).
 2. **The accessory button** (`ui-tree/soft-keyboard.ts#accessoryDismissButton`): the WDA parser now maps `Toolbar` to role
    `toolbar` (`adapters/wda-source.ts`; it fell through to `other`; not interactive, not structural, `role:toolbar`
    matches it). The rule: a `toolbar` under an `ofKeyboard` root (UIKit's input-host Window, where the 2FA fixture
@@ -530,7 +531,7 @@ element (K5b, K3 of the device check) and the accessory toolbar's Done (K4) — 
   ordered list cannot express.
 - The stage A residuals stand (parked accessory toolbar, idb, iPad split/floating, landscape, the second app window).
 
-**Device check expectations** (not yet run):
+**Device check expectations** (written before the run; results in the stage B device check below):
 - The full finportal `login` flow with `keyboardDismiss: [{ tap: { id: login_title } }]` configured and the band raised
   AFTER the last fill (the pref toggle plus a focus change, as in the stage A check): the trace shows
   `⚠ tap: the soft keyboard covered id:"login_submit"; hidden by tapping id:"login_title" before tapping` then

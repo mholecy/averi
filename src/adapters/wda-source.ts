@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectsOverlap, type Rect, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -313,7 +313,7 @@ const onScreen = (el: WdaElement, screen: Rect | undefined): boolean => {
   if (String(el.isVisible) !== '1') return false;
   const rect = usableRect(el.rect);
   if (rect === undefined) return false;
-  return screen === undefined || overlaps(rect, screen);
+  return screen === undefined || rectsOverlap(rect, screen);
 };
 
 /** The rect when it has positive area, else undefined — a missing or degenerate rect decides nothing here. */
@@ -323,8 +323,3 @@ const usableRect = (rect: Rect | undefined): Rect | undefined =>
 /** A band of its window: starts below the window's top edge and is under MAX_BAND_FRACTION of its height. */
 const isBand = (rect: Rect, screen: Rect): boolean =>
   rect.y > screen.y && rect.height < screen.height * MAX_BAND_FRACTION;
-
-/** Positive-area overlap — the arithmetic of ui-tree/geometry.ts#rectsOverlap, which this layer may not import. */
-const overlaps = (a: Rect, b: Rect): boolean =>
-  Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) > 0 &&
-  Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y) > 0;

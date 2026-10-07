@@ -1,4 +1,4 @@
-import { rectArea, zeroRect, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectsOverlap, zeroRect, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -324,8 +324,10 @@ export function visibleFractionInViewport(
  * `rectArea` lives beside `Rect` in adapters/types.ts since 2026-10-06 — the
  * idb tree source needs it too and may not import this layer — and is
  * re-exported here, where the rect arithmetic's callers look for it.
+ * `rectsOverlap` joined it on 2026-10-07 for the same reason: the WDA
+ * parser's keyboard band test (wda-source.ts) had a copy of its arithmetic.
  */
-export { rectArea };
+export { rectArea, rectsOverlap };
 
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.
@@ -355,24 +357,6 @@ export function clippedEdges(
  */
 export function sameRect(a: Rect, b: Rect): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
-}
-
-/**
- * Do two rects share any area at all? Positive area only: rects that merely
- * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —
- * do not overlap, and neither does a zero-area rect with anything. Added
- * 2026-10-06 for the pixel poll's soft-keyboard check (verify/pixel-poll.ts):
- * an element any part of which lies under the keyboard is measured as the
- * keyboard, so ANY overlap counts there, and an element sitting flush on top
- * of the keyboard's frame is not under it. Both rects in the same units —
- * the caller's to guarantee. `intersectsViewport` above is the same
- * arithmetic against a viewport anchored at the origin; the tap guard's
- * `covers` (interact/keyboard.ts) is point-in-rect, a different question.
- */
-export function rectsOverlap(a: Rect, b: Rect): boolean {
-  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-  return w > 0 && h > 0;
 }
 
 /**

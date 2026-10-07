@@ -57,6 +57,26 @@ export function rectArea(rect: Rect): number {
 }
 
 /**
+ * Do two rects share any area at all? Positive area only: rects that merely
+ * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —
+ * do not overlap, and neither does a zero-area rect with anything. Added
+ * 2026-10-06 for the pixel poll's soft-keyboard check (verify/pixel-poll.ts):
+ * an element any part of which lies under the keyboard is measured as the
+ * keyboard, so ANY overlap counts there, and an element sitting flush on top
+ * of the keyboard's frame is not under it. Both rects in the same units —
+ * the caller's to guarantee. ui-tree/geometry.ts's `intersectsViewport` is the
+ * same arithmetic against a viewport anchored at the origin; the tap guard's
+ * `covers` (interact/keyboard.ts) is point-in-rect, a different question.
+ * Moved here from ui-tree/geometry.ts (which re-exports it) on 2026-10-07:
+ * the WDA parser's keyboard band test needs it and may not import that layer.
+ */
+export function rectsOverlap(a: Rect, b: Rect): boolean {
+  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  return w > 0 && h > 0;
+}
+
+/**
  * The role of the ONE node per on-screen soft keyboard that a tree source
  * emits when its tree contains the keyboard (2026-10-07: the WDA source,
  * adapters/wda-source.ts#keyboardMarks). Its rect is the screen band the

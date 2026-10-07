@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { runIdb } from './idb.js';
+import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import type { Device, DeviceAdapter, Key, LaunchOptions, UiNode } from './types.js';
@@ -174,8 +175,8 @@ export class IosAdapter implements DeviceAdapter {
    * Regardless of the source because a `treeSource: wda` project's teardown
    * poisons idb for every other reader of the same simulator (another
    * project's averi on idb, idb by hand), and the write is idempotent and
-   * expected to be sub-second (not yet timed). Every launch, not once: each
-   * later teardown presumably writes 0 again. A deep link that cold-starts
+   * ≈0.27 s per key (device check I6). Every launch, not once: every WDA
+   * teardown writes 0 again (read back in device check I4). A deep link that cold-starts
    * the app (`openDeepLink`) is a launch too, so it writes first as well.
    *
    * The keys are simulator-wide and averi never restores them, so the first
@@ -197,7 +198,7 @@ export class IosAdapter implements DeviceAdapter {
       try {
         await this.simctl(['spawn', this.target(), 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000);
       } catch (e) {
-        const reason = (e instanceof Error ? e.message : String(e)).split('\n')[0];
+        const reason = errorMessage(e).split('\n')[0];
         console.error(
           `averi: could not set com.apple.Accessibility ${key} on ${this.target()} before ${what} (${reason}) — ` +
             'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +

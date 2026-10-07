@@ -62,16 +62,16 @@ the earlier notes.
   right before every `simctl launch`, on the plain and the `clearState` path alike, and before every `simctl openurl`
   (`openDeepLink`), since a deep link can cold-start the app.
   - On every tree source, not only `idb`: a `treeSource: wda` project's teardown is what poisons the simulator, and the
-    next reader may be another project's averi on idb, or idb by hand. The write is idempotent and expected to be
-    sub-second (not yet timed; the device check should time it).
+    next reader may be another project's averi on idb, or idb by hand. The write is idempotent and costs ≈0.27 s
+    per key (device check I6: median 0.273 s, p90 0.282 s; ≈0.55 s per launch).
   - **On by default, logged, not restored.** The suggestion above asked for the write to be opt-in "or at least
     logged". It is logged: the first successful write per adapter prints one stderr line saying the two keys were set
     to true on that simulator, that the change is simulator-wide and not restored. It is not opt-in, and there is no
     config switch, because the write was measured to cure (15/15) and nothing was measured to mind it; a switch is
     cheap to add once an app is found that does. averi does not restore the keys afterwards: restoring `0` is exactly
     the state that sticks.
-  - Before every launch, not once per simulator: a WDA attach cured only until the next launch (I2), so each later
-    teardown presumably writes `0` again. Measured per launch, inferred per teardown.
+  - Before every launch, not once per simulator: a WDA attach cured only until the next launch (I2), and every averi WDA
+    teardown was read back writing `0` again (device check I4).
   - A failed write never fails the launch. It is one `averi: could not set com.apple.Accessibility <key> …` line on
     stderr that names the way out (a simulator reboot) (the channel `wda.ts` already uses for a non-fatal note; no adapter-level note channel exists and none
     was added), and the second key is not attempted after the first fails.
@@ -87,15 +87,15 @@ the earlier notes.
 - ARCHITECTURE.md's iOS launch line and idb bullet say the same.
 
 **Deferred.**
-- The device check: the write cured 15 of 15 launches when made by hand; it has not yet been measured through
-  averi's own `launch_app`, nor through a `clearState` launch, nor with the `treeSource: wda` teardown and a later
-  idb launch in one averi session.
+- ~~The device check~~ — done: through averi's own `launch_app` (5/5), a `clearState` launch, a deep-link cold start
+  and a wda-then-idb session chain (3/3); see "## Device check of the fix" below.
 - Not measured on mp-native, nor on any VoiceOver-sensitive app. The keys are simulator-wide; an app that changes
   behaviour under accessibility automation would see it on every averi launch.
-- An app process that is ALREADY running stuck when averi first reads it. The write was only measured before a
-  launch; it is assumed not to wake a running process (the WDA attach does, until the next launch), so the error's
-  advice says to relaunch. A cure for the running process (a bare WDA attach, 1.9–2.2 s warm) stays an open option.
-- Whether every WDA teardown really rewrites `0` (inferred from I2, not read back per teardown).
+- An app process that is ALREADY running stuck when averi first reads it. Measured in the device check (I5): the
+  write does NOT wake it, and neither does a `launch_app` on it (same pid); terminate-then-launch does, so the error's
+  advice says that (79b458e). A cure for the running process in place (a bare WDA attach, 1.9–2.2 s warm) stays an
+  open option.
+- ~~Whether every WDA teardown really rewrites `0`~~ — settled: it does (device check I4).
 
 ## Device check of the fix (2026-10-07, `6f41787`)
 

@@ -43,7 +43,7 @@ adapter. Add a test that pins `fill { value: "", clear: true }` on iOS to cleari
 measured flow uses an empty value. It does block the obvious "focus without typing" probe, and it would block a "clear
 this field" step written as `value: ""`.
 
-## Fix (2026-10-07, branch `fix/ios-idb-and-keyboard-2026-10-07`, not device-checked)
+## Fix (2026-10-07, branch `fix/ios-idb-and-keyboard-2026-10-07`; device-checked below, `5786fc3`)
 
 The first suggestion: `IosAdapter.typeText` returns before idb on `''`, and the `DeviceAdapter.typeText` contract in
 `src/adapters/types.ts` now says that an empty string types nothing and does not fail. Not the second, because
@@ -68,8 +68,10 @@ A consequence in `flow/credentials.ts`, also from the review: now that `""` type
 credential whose variable is set but EMPTY (`PASSWORD=` in `.env.averi` parses to `""`; `expand` threw only on
 `undefined`) would have typed nothing, passed, printed `***` in the trace, and been rejected by the bank one screen
 later — the 2026-08-06 misdiagnosis shape the module exists to prevent. `expand` now refuses an empty value with
-`Environment variable X is set but empty (needed for credential "…" in environment "…") — set it in .env.averi …`,
-the unset message's shape. A literal `value: ""` in the YAML never passes through `expand` (`resolve` hands plain
+`Environment variable X is set but empty (needed for credential "…" in environment "…") — give it a value in
+.env.averi beside averi.yaml, or export it with one; an empty variable exported in the shell or CI shadows the value
+in .env.averi, so unset it there, and retry` (the shadowing tail added in review round 2: an exported variable wins
+over the file). A literal `value: ""` in the YAML never passes through `expand` (`resolve` hands plain
 strings through, `secret: false`), so "clear this field" stays writable — pinned at both the credentials and the
 engine level. Checked: `expand` has one caller (`resolve`, both the `$name` and the bare `${VAR}` paths), `resolve`
 has one (`engine.ts#resolveValue`, behind `type`, `type_pin` and `fill`), and `run/preflight.ts` calls
@@ -78,7 +80,7 @@ has one (`engine.ts#resolveValue`, behind `type`, `type_pin` and `fill`), and `r
 
 Checked and left alone: the read-back and the masked-length rule never ran for `''`; `dismissKeyboard: true` after an
 empty fill now runs instead of being skipped by the throw (it is keyboard.ts's and unchanged); the trace line reads
-`fill id:"x" = ` and `= (cleared)`, the tool answers `Typed 0 characters` and `Filled id:x (0 characters, cleared
+`fill id:"x" = ` and `=  (cleared)` (two spaces: the empty value between them), the tool answers `Typed 0 characters` and `Filled id:x (0 characters, cleared
 first)`; ARCHITECTURE.md lists `typeText` without semantics. The tests that pin `fillField` handing the `''` to the
 adapter are deliberate (said in a comment on each): the guard lives in one place, and a second one in `fillField`
 would read as the fix for a bug that is not there.
