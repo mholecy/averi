@@ -1,9 +1,25 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
+import { shellCommandLine, shellQuote } from './adb-shell.js';
 import { sleep } from '../util/sleep.js';
 import { zeroRect, type Device, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
+
+/**
+ * Characters typeText refuses (a key, not text, for `input text`) — see
+ * adb-shell.ts. A DEFENSIVE assert since the 2026-10-07 code review: the
+ * user-facing refusal, of every C0 control character and DEL on both
+ * platforms, is interact/type-text.ts's and comes before any device call;
+ * this one only stops a caller that bypasses interact/.
+ */
+const CONTROL_KEY_CHAR_RE = /[\u0000-\u001f\u007f]/;
+
+/** One adb call's options: its own budget, and a device other than the adapter's (listDevices). */
+interface AdbCallOptions {
+  timeoutMs?: number;
+  serial?: string;
+}
 
 /** uiautomator's "the app has no window yet" status — a transient, not a failure. */
 const NULL_ROOT_RE = /null root node/i;
@@ -103,9 +119,57 @@ export class AndroidAdapter implements DeviceAdapter {
     this.exec = opts.exec ?? defaultExec;
   }
 
-  private adb(args: string[], timeoutMs?: number) {
-    const target = this.serial ? ['-s', this.serial] : [];
-    return this.exec('adb', [...target, ...args], timeoutMs ? { timeoutMs } : undefined);
+  /**
+   * adb itself, for its own subcommands (`install`, `get-state`, `logcat`).
+   * NOT for anything the device's shell runs: that is `shell`, `execOut` or
+   * `rawShell` below — for `shell` adb joins the arguments with a space for
+   * the device's `sh -c` unescaped, so `shell` quotes them (adb-shell.ts);
+   * for `exec-out` adb escapes them itself (see execOut).
+   *
+   * `serial` overrides the adapter's own device for one call — listDevices
+   * asks each LISTED device by its id.
+   */
+  private adb(args: string[], opts: AdbCallOptions = {}) {
+    const serial = opts.serial ?? this.serial;
+    const target = serial ? ['-s', serial] : [];
+    return this.exec('adb', [...target, ...args], opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : undefined);
+  }
+
+  /**
+   * `adb shell <argv>`, the argv delivered to the device command word for
+   * word (2026-10-07): each word quoted for the device's sh by adb-shell.ts,
+   * so a deep link's `&`, an extra's space, a typed `$` or `'` reach the
+   * command as data and are never run. Every device command in this adapter
+   * goes through here, `execOut` (where adb quotes) or `rawShell` — none
+   * builds a `shell` argv of its own.
+   */
+  private shell(argv: readonly string[], opts: AdbCallOptions = {}) {
+    return this.adb(['shell', ...argv.map(shellQuote)], opts);
+  }
+
+  /**
+   * `adb exec-out <argv>` — the same device sh as `shell` (no pty,
+   * binary-safe stdout), but adb QUOTES this one itself: the client sends
+   * `"exec:" + argv[0] + " " + escape_arg(each further word)`
+   * (commandline.cpp, exec-in/exec-out; escape_arg in adb_utils.cpp
+   * single-quotes with '\''), whereas for `shell` it joins unescaped. So the
+   * argv goes to adb as it is — quoting it here would put literal quotes in
+   * the device command's arguments. The one word adb does not escape is the
+   * first, the command itself: always a constant here.
+   */
+  private execOut(argv: readonly string[], opts: AdbCallOptions = {}) {
+    return this.adb(['exec-out', ...argv], opts);
+  }
+
+  /**
+   * `adb shell <line>`, unquoted, for a command whose shell syntax is the point — a
+   * pipe, `|| true` — sent as ONE argument and run by the device's sh as
+   * written. The named exception to `shell`: the caller owns the line, and
+   * any word in it that did not come from this file goes through
+   * `shellCommandLine` first (isAppRunning).
+   */
+  private rawShell(line: string, opts: AdbCallOptions = {}) {
+    return this.adb(['shell', line], opts);
   }
 
   async listDevices(): Promise<Device[]> {
@@ -118,9 +182,7 @@ export class AndroidAdapter implements DeviceAdapter {
       const model = line.match(/model:(\S+)/)?.[1] ?? id;
       let osVersion = 'unknown';
       if (state === 'device') {
-        const prop = await this.exec('adb', [
-          '-s', id, 'shell', 'getprop', 'ro.build.version.release',
-        ]);
+        const prop = await this.shell(['getprop', 'ro.build.version.release'], { serial: id });
         osVersion = prop.stdout.toString('utf8').trim() || 'unknown';
       }
       devices.push({
@@ -135,27 +197,27 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async install(appPath: string): Promise<void> {
-    await this.adb(['install', '-r', appPath], 120_000);
+    await this.adb(['install', '-r', appPath], { timeoutMs: 120_000 });
   }
 
   async launch(packageName: string, opts: LaunchOptions = {}): Promise<void> {
-    if (opts.clearState) await this.adb(['shell', 'pm', 'clear', packageName]);
+    if (opts.clearState) await this.shell(['pm', 'clear', packageName]);
     if (opts.activity === undefined && opts.intent === undefined) {
       // monkey resolves the launcher activity for us, but picks ARBITRARILY
       // when the package declares several (LeakCanary adds one in debug
       // builds, so this may open LeakCanary) — set app.android.activity in
       // averi.yaml to pin the entry point.
-      await this.adb(['shell', 'monkey', '-p', packageName, '-c',
+      await this.shell(['monkey', '-p', packageName, '-c',
         'android.intent.category.LAUNCHER', '1']);
       return;
     }
-    const args = ['shell', 'am', 'start'];
+    const argv = ['am', 'start'];
     let component: string | undefined;
     if (opts.activity !== undefined) {
       // ".MainActivity" and "com.foo.MainActivity" both resolve against the
       // package; a full "pkg/Activity" component passes through unchanged.
       component = opts.activity.includes('/') ? opts.activity : `${packageName}/${opts.activity}`;
-      args.push('-n', component);
+      argv.push('-n', component);
     } else {
       // An intent with no activity is SCOPED TO THE PACKAGE: `-p <package>`
       // is parsed by Intent.parseCommandArgs (it calls setPackage) — the
@@ -172,15 +234,17 @@ export class AndroidAdapter implements DeviceAdapter {
       // contradict a `-p` for this one. The rule for which activity a launch
       // names (and when averi.yaml's applies) is flow/config.ts's
       // resolveLaunchActivity; this is only how the result is said in `am`.
-      args.push('-p', packageName);
+      argv.push('-p', packageName);
     }
     const intent = opts.intent ?? {};
-    if (intent.action !== undefined) args.push('-a', intent.action);
-    if (intent.data !== undefined) args.push('-d', intent.data);
-    if (intent.mimeType !== undefined) args.push('-t', intent.mimeType);
-    for (const category of intent.categories ?? []) args.push('-c', category);
-    for (const [key, value] of Object.entries(intent.extras ?? {})) args.push('--es', key, value);
-    await this.amStart(args, { packageName, component, intent: opts.intent });
+    // Data and extras are the user's (averi.yaml, launch_app) and may hold
+    // anything — `&`, spaces, quotes: `shell` delivers each as one word.
+    if (intent.action !== undefined) argv.push('-a', intent.action);
+    if (intent.data !== undefined) argv.push('-d', intent.data);
+    if (intent.mimeType !== undefined) argv.push('-t', intent.mimeType);
+    for (const category of intent.categories ?? []) argv.push('-c', category);
+    for (const [key, value] of Object.entries(intent.extras ?? {})) argv.push('--es', key, value);
+    await this.amStart(argv, { packageName, component, intent: opts.intent });
   }
 
   /**
@@ -230,13 +294,13 @@ export class AndroidAdapter implements DeviceAdapter {
    * either way; no import crosses the layer — only words do.
    */
   private async amStart(
-    args: string[],
+    argv: string[],
     launch: { packageName: string; component?: string; intent?: LaunchIntent },
   ): Promise<void> {
     let output: string;
     let cause: unknown;
     try {
-      const { stdout, stderr } = await this.adb(args);
+      const { stdout, stderr } = await this.shell(argv);
       output = `${stdout.toString('utf8')}\n${stderr}`;
     } catch (e) {
       if (!(e instanceof ExecError) || e.timedOut) throw e;
@@ -276,15 +340,17 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async terminate(packageName: string): Promise<void> {
-    await this.adb(['shell', 'am', 'force-stop', packageName]);
+    await this.shell(['am', 'force-stop', packageName]);
   }
 
   async openDeepLink(url: string): Promise<void> {
-    await this.adb(['shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', url]);
+    // The url as ONE word: before 2026-10-07 the device's sh cut it at the
+    // first `&` (and ran the rest), at a space, and expanded `$` — adb-shell.ts.
+    await this.shell(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url]);
   }
 
   async screenshot(): Promise<Buffer> {
-    const { stdout } = await this.adb(['exec-out', 'screencap', '-p']);
+    const { stdout } = await this.execOut(['screencap', '-p']);
     return stdout;
   }
 
@@ -293,7 +359,7 @@ export class AndroidAdapter implements DeviceAdapter {
     for (let attempt = 0; ; attempt++) {
       let raw: string;
       try {
-        raw = (await this.adb(['exec-out', 'uiautomator', 'dump', '/dev/tty'], DUMP_TIMEOUT_MS)).stdout.toString('utf8');
+        raw = (await this.execOut(['uiautomator', 'dump', '/dev/tty'], { timeoutMs: DUMP_TIMEOUT_MS })).stdout.toString('utf8');
       } catch (e) {
         // adb itself failing is the OTHER offline shape (exit 255, "device
         // '<id>' not found" / "device offline"); a dump that never returns is
@@ -348,7 +414,7 @@ export class AndroidAdapter implements DeviceAdapter {
     const id = this.serial ?? 'the default adb device';
     let state: string;
     try {
-      state = (await this.adb(['get-state'], 5_000)).stdout.toString('utf8').trim();
+      state = (await this.adb(['get-state'], { timeoutMs: 5_000 })).stdout.toString('utf8').trim();
     } catch (e) {
       // `adb get-state` on an offline/missing device exits 1 with
       // "error: device offline" / "error: device '<id>' not found" on stderr.
@@ -384,7 +450,7 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async tap(x: number, y: number): Promise<void> {
-    await this.adb(['shell', 'input', 'tap', String(x), String(y)]);
+    await this.shell(['input', 'tap', String(x), String(y)]);
   }
 
   private viewportPromise: Promise<{ width: number; height: number }> | undefined;
@@ -392,7 +458,7 @@ export class AndroidAdapter implements DeviceAdapter {
   /** Screen size in device pixels — the units uiautomator bounds use. */
   viewport(): Promise<{ width: number; height: number }> {
     this.viewportPromise ??= (async () => {
-      const { stdout } = await this.adb(['shell', 'wm', 'size']);
+      const { stdout } = await this.shell(['wm', 'size']);
       const raw = stdout.toString('utf8');
       // "Physical size: 1080x2280", optionally overridden ("Override size: ...")
       const m = raw.match(/Override size:\s*(\d+)x(\d+)/) ?? raw.match(/Physical size:\s*(\d+)x(\d+)/);
@@ -403,7 +469,7 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {
-    await this.adb(['shell', 'input', 'swipe',
+    await this.shell(['input', 'swipe',
       String(x), String(y), String(x), String(y), String(durationMs)]);
   }
 
@@ -412,7 +478,7 @@ export class AndroidAdapter implements DeviceAdapter {
     to: { x: number; y: number },
     durationMs = 300,
   ): Promise<void> {
-    await this.adb(['shell', 'input', 'swipe',
+    await this.shell(['input', 'swipe',
       String(from.x), String(from.y), String(to.x), String(to.y), String(durationMs)]);
   }
 
@@ -430,9 +496,20 @@ export class AndroidAdapter implements DeviceAdapter {
     // round-trip alone is NOT enough pacing on a loaded emulator — re-measured
     // the same evening after hours of uptime: per-char with no delay landed 5 of
     // 8, per-char with 300ms landed 8/8. 250ms keeps a 12-char value at ~3s.
+    //
+    // Each character is one quoted `shell` word; a space is `input text`'s
+    // own `%s`; a control character is refused up front — by interact/
+    // first (type-text.ts), here again defensively — see adb-shell.ts.
+    const control = text.match(CONTROL_KEY_CHAR_RE);
+    if (control !== null) {
+      throw new Error(
+        `typeText cannot type ${JSON.stringify(control[0])} on Android: \`input text\` may turn it into a key ` +
+          `event (a newline into ENTER, which submits the form mid-fill). Type the text without it and send ` +
+          `the key deliberately — pressKey('enter') (the \`press_key\` tool, \`key: enter\`); there is no tab key.`,
+      );
+    }
     for (const ch of text) {
-      const escaped = ch.replace(/([\\"'`$&*()[\]{}|;<>?~#])/, '\\$1').replace(/ /, '%s');
-      await this.adb(['shell', 'input', 'text', escaped]);
+      await this.shell(['input', 'text', ch === ' ' ? '%s' : ch]);
       await sleep(250);
     }
     // Force the IME to COMMIT the final composing character: GBoard holds the
@@ -442,13 +519,13 @@ export class AndroidAdapter implements DeviceAdapter {
     // deterministically (measured 2026-08-05: verified-8/submitted-7 with the
     // sleep; 8/8 submitted with the cursor nudge even when BACK follows
     // immediately).
-    await this.adb(['shell', 'input', 'keyevent', '21']); // DPAD_LEFT
-    await this.adb(['shell', 'input', 'keyevent', '22']); // DPAD_RIGHT
+    await this.shell(['input', 'keyevent', '21']); // DPAD_LEFT
+    await this.shell(['input', 'keyevent', '22']); // DPAD_RIGHT
     await sleep(150);
   }
 
   async pressKey(key: Key): Promise<void> {
-    await this.adb(['shell', 'input', 'keyevent', KEYCODES[key]]);
+    await this.shell(['input', 'keyevent', KEYCODES[key]]);
   }
 
   /**
@@ -490,7 +567,7 @@ export class AndroidAdapter implements DeviceAdapter {
   private async keyboardState(): Promise<SoftKeyboard> {
     let dump: string;
     try {
-      dump = (await this.adb(['shell', 'dumpsys', 'window', 'displays'], KEYBOARD_QUERY_TIMEOUT_MS)).stdout.toString('utf8');
+      dump = (await this.shell(['dumpsys', 'window', 'displays'], { timeoutMs: KEYBOARD_QUERY_TIMEOUT_MS })).stdout.toString('utf8');
     } catch {
       return { state: 'unknown' };
     }
@@ -550,7 +627,7 @@ export class AndroidAdapter implements DeviceAdapter {
     let out: string;
     try {
       out = (
-        await this.adb(['shell', INPUT_SHOWN_COMMAND], KEYBOARD_WITNESS_TIMEOUT_MS)
+        await this.rawShell(INPUT_SHOWN_COMMAND, { timeoutMs: KEYBOARD_WITNESS_TIMEOUT_MS })
       ).stdout.toString('utf8');
     } catch {
       return 'unknown';
@@ -564,9 +641,9 @@ export class AndroidAdapter implements DeviceAdapter {
     // the IME queue (measured 2026-08-05 — `input keyevent 67 67 67 67` on
     // the amount field landed only 3 of 4). MOVE_END first, then backspaces;
     // a forward-delete pass cleans up in case the cursor did not move.
-    await this.adb(['shell', 'input', 'keyevent', '123']); // KEYCODE_MOVE_END
-    for (let i = 0; i < count; i++) await this.adb(['shell', 'input', 'keyevent', '67']); // DEL
-    for (let i = 0; i < count; i++) await this.adb(['shell', 'input', 'keyevent', '112']); // FORWARD_DEL
+    await this.shell(['input', 'keyevent', '123']); // KEYCODE_MOVE_END
+    for (let i = 0; i < count; i++) await this.shell(['input', 'keyevent', '67']); // DEL
+    for (let i = 0; i < count; i++) await this.shell(['input', 'keyevent', '112']); // FORWARD_DEL
   }
 
   async setClipboard(_text: string): Promise<void> {
@@ -583,8 +660,9 @@ export class AndroidAdapter implements DeviceAdapter {
     // `appAlive: false` for an app alive on the expected screen). The exit code
     // cannot carry that distinction: exec.ts substitutes err.message when
     // stderr is empty, so ExecError.stderr is never blank (review 2026-09-18).
-    if (!/^[A-Za-z0-9_.]+$/.test(packageName)) throw new Error(`invalid Android package name: ${packageName}`);
-    const { stdout } = await this.adb(['shell', `pidof ${packageName} || true`]);
+    //
+    // rawShell (the `||` is the point), the name quoted into it — see adb-shell.ts.
+    const { stdout } = await this.rawShell(`${shellCommandLine(['pidof', packageName])} || true`);
     return stdout.toString('utf8').trim() !== '';
   }
 
@@ -605,9 +683,10 @@ export class AndroidAdapter implements DeviceAdapter {
 const INPUT_SHOWN_RE = /(?:^|\s)mInputShown=(true|false)(?=\s|$)/g;
 
 /**
- * ONE argument for `adb shell`: adb hands the string to the device's sh, and
- * execFile adds no host shell, so the pipe runs on the device. No quoting to
- * get wrong: `-w` needs none.
+ * A `rawShell` line (the adapter's named exception to quoted argv, adb-shell.ts):
+ * ONE argument for `adb shell`, run by the device's sh as written, so the
+ * pipe runs on the device. Every word in it is a constant that needs no
+ * quoting.
  */
 const INPUT_SHOWN_COMMAND = 'dumpsys input_method | grep -m1 -w mInputShown';
 

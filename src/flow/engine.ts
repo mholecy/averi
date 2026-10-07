@@ -1,6 +1,7 @@
 import type { IosTreeSourceKind } from '../adapters/ios-node.js';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
+import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
@@ -814,7 +815,7 @@ export class FlowEngine {
 
   private async runType(spec: StepPayload<'type'>): Promise<void> {
     const { value, secret } = this.resolveValue(spec.value);
-    await this.adapter.typeText(value);
+    await typeIntoFocused(this.adapter, value);
     this.log('type', secret ? '***' : value);
   }
 

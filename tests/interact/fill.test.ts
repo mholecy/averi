@@ -353,3 +353,67 @@ describe('fillField — resolution is the shared policy', () => {
     expect(fake.typed).toEqual([]);
   });
 });
+
+/**
+ * What text averi types (interact/type-text.ts, code review 2026-10-07): a
+ * value holding a control character is refused BEFORE any device call. The
+ * refusal used to be the Android adapter's alone — reached after the fill's
+ * focus tap and clear, so a refused value wiped the field and then failed —
+ * and iOS typed the characters. Every adapter method is recorded through a
+ * proxy, so "no device call" means none at all, a tree read included.
+ */
+describe('fillField refuses a control character before anything is sent', () => {
+  const recorded = (fake: FakeAdapter) => {
+    const calls: string[] = [];
+    const proxy = new Proxy(fake, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver);
+        if (typeof v !== 'function') return v;
+        return (...args: unknown[]) => {
+          calls.push(String(prop));
+          return (v as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    });
+    return { proxy, calls };
+  };
+  const cases: [string, string][] = [
+    ['\n', 'U+000A'],
+    ['\r', 'U+000D'],
+    ['\t', 'U+0009'],
+    ['\x1b', 'U+001B'],
+    ['\v', 'U+000B'],
+    ['\f', 'U+000C'],
+    ['\x00', 'U+0000'],
+    ['\x7f', 'U+007F'],
+  ];
+  for (const platform of ['android', 'ios'] as const) {
+    for (const [ch, code] of cases) {
+      it(`${platform}: ${code} with clear: true → refused, no tree read, no tap, no clear, nothing typed; the field keeps its text`, async () => {
+        const fake = formFake('9.99');
+        fake.platform = platform;
+        const { proxy, calls } = recorded(fake);
+        const fill = fillField(proxy, { id: 'amount_input' }, `ab${ch}cd`, { ...FAST, clear: true });
+        await expect(fill).rejects.toThrow(`cannot type ${code}`);
+        await expect(fill).rejects.toThrow(/pressKey\('enter'\)/);
+        expect(calls).toEqual([]);
+        expect(fake.taps).toEqual([]);
+        expect(fake.deletes).toEqual([]);
+        expect(fake.typed).toEqual([]);
+      });
+    }
+  }
+
+  it('the error names the character by code point and never quotes the value around it (values may be credentials)', async () => {
+    const fake = formFake();
+    await expect(fillField(fake, { id: 'amount_input' }, 'hunter2\n', FAST)).rejects.toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining('hunter2') }),
+    );
+  });
+
+  it('printable text — a space, non-ASCII, a C1-range letter — is typed as before', async () => {
+    const fake = formFake();
+    await fillField(fake, { id: 'amount_input' }, 'a b é\u0085', FAST);
+    expect(fake.typed).toEqual(['a b é\u0085']);
+  });
+});

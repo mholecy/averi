@@ -5,6 +5,7 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
+import { assertTypeable } from './type-text.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -59,6 +60,8 @@ export interface FillResult {
  * the "" — a no-op by its contract (DeviceAdapter.typeText), so the step
  * reads "clear this field" with clear and "focus without typing" without.
  * Errors carry LENGTHS only, never content — values may be credentials.
+ * A value holding a control character is refused before anything is sent
+ * (interact/type-text.ts — the one statement of what text averi types).
  *
  * The re-read between phases is resolveNow on a fresh tree — the one-shot
  * mode of the same policy that chose the field, so a poller never waits for
@@ -83,6 +86,9 @@ export async function fillField(
   value: string,
   opts: FillOptions,
 ): Promise<FillResult> {
+  // Before the field is resolved: a refused value must cost no keyboard
+  // dismissal, no focus tap and no clear (type-text.ts).
+  assertTypeable(value);
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
   const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);

@@ -449,6 +449,38 @@ describe('type_text with an empty text', () => {
   });
 });
 
+// interact/type-text.ts (code review 2026-10-07): the device check saw the
+// tool's selector tap go out before the Android adapter refused a tab. Now the
+// refusal comes first, on both platforms, with or without a selector.
+describe('type_text refuses a control character before anything is sent', () => {
+  const form = () => new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'amount_input', value: '2.50' })) }, 'form');
+
+  for (const p of ['android', 'ios'] as const) {
+    it(`${p}, with a selector and clear: no tap, no clear, nothing typed`, async () => {
+      const fake = form();
+      fake.platform = p;
+      const { call } = await connect({ [p]: fake });
+      const result = await call('type_text', { platform: p, selector: 'id:amount_input', text: 'tab\there', clear: true, configPath: missing() });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain('cannot type U+0009');
+      expect(result.text).toContain("pressKey('enter')");
+      expect(fake.taps).toEqual([]);
+      expect(fake.deletes).toEqual([]);
+      expect(fake.typed).toEqual([]);
+    });
+
+    it(`${p}, without a selector: nothing typed`, async () => {
+      const fake = form();
+      fake.platform = p;
+      const { call } = await connect({ [p]: fake });
+      const result = await call('type_text', { platform: p, text: 'x\x1by', configPath: missing() });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain('cannot type U+001B');
+      expect(fake.typed).toEqual([]);
+    });
+  }
+});
+
 describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_until, assert)', () => {
   const snapshot = async (platform: Platform, configPath: string) => {
     const harness = await connect();

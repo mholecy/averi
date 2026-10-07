@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { AdapterOpts, AdapterRegistry } from './registry.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { fillField } from '../interact/fill.js';
+import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { tapElement } from '../interact/tap.js';
@@ -398,7 +399,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const adapter = await registry.get(p, treeOptsOf(settings));
       if (selector === undefined) {
         if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
-        await adapter.typeText(value);
+        await typeIntoFocused(adapter, value);
         return text(`Typed ${value.length} characters`);
       }
       const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });

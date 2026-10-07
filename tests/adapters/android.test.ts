@@ -250,10 +250,11 @@ describe('AndroidAdapter interactions', () => {
       const fn = throwing(realShape('adb -s e shell pidof x || true', 1, 'error: device offline'));
       await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/device offline/);
     });
-    it('rejects a package name that could escape the shell', async () => {
+    // Quoted, no longer refused — see adb-shell.ts; pinned through a real sh in adb-shell.test.ts.
+    it('quotes a package name that could escape the shell, rather than refusing it', async () => {
       const { fn, calls } = fakeExec({});
-      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x; rm -rf /')).rejects.toThrow(/invalid Android package name/);
-      expect(calls).toEqual([]);
+      expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x; rm -rf /')).toBe(false);
+      expect(calls).toEqual(["adb -s e shell pidof 'x; rm -rf /' || true"]);
     });
   });
 
@@ -269,7 +270,8 @@ describe('AndroidAdapter interactions', () => {
     expect(calls).toEqual([
       'adb -s emulator-5554 shell input text a',
       'adb -s emulator-5554 shell input text %s',
-      'adb -s emulator-5554 shell input text \\$',
+      // quoted for the device's sh (adb-shell.ts), no longer backslash-escaped here
+      "adb -s emulator-5554 shell input text '$'",
       'adb -s emulator-5554 shell input text b',
       // DPAD_LEFT + DPAD_RIGHT: the cursor nudge that commits GBoard's trailing
       // composition span, so the last character survives a following BACK or tap.
