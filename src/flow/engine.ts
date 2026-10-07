@@ -782,8 +782,8 @@ export class FlowEngine {
     // On the oracle model both are absent and the line is as it was. A
     // dismissal that THROWS after tapping (AfterDismissalTap) gets its `⚠
     // fill` line before the `✗` through the guard's one catch
-    // (tracingGuardFailure) — not tracingDismissal, since the result has no
-    // `keyboardHidden` to trace: what it did is said on the fill line.
+    // (tracingGuardFailure) — not tracingDismissal: the result has no
+    // `keyboardHidden` to trace, only `hiddenBy` for the fill line.
     let closed: DismissResult = {};
     if (closeKeyboard) {
       closed = await this.tracingGuardFailure('⚠ fill', () =>
@@ -794,7 +794,7 @@ export class FlowEngine {
     this.log(
       'fill',
       `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}` +
-        (closed.hidden === undefined ? '' : `; keyboard hidden by ${closed.hidden}`),
+        (closed.hiddenBy === undefined ? '' : `; keyboard hidden by ${closed.hiddenBy}`),
     );
   }
 

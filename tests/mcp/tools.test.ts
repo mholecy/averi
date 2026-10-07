@@ -8,7 +8,7 @@ import { IdbEmptyTreeError } from '../../src/adapters/ios-tree-source.js';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
-import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
 
@@ -572,28 +572,8 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
  * tap on the title hides the keyboard).
  */
 describe('tap / type_text pass app.ios.keyboardDismiss to the guard', () => {
-  const iosLogin = (hides = true) => {
-    const fake = new FakeAdapter(
-      {
-        login: node({
-          role: 'container',
-          rect: { x: 0, y: 0, width: 402, height: 874 },
-          children: [
-            node({ role: 'text', identifier: 'login_title', label: 'Login', rect: { x: 36, y: 291, width: 330, height: 24 } }),
-            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 600, width: 222, height: 20 } }),
-            node({ role: 'button', identifier: 'login_submit', rect: { x: 36, y: 547, width: 141, height: 48 } }),
-            node({ role: 'keyboard', rect: { x: 0, y: 539, width: 402, height: 335 } }),
-          ],
-        }),
-      },
-      'login',
-      (id, self) => {
-        if (hides && id === 'login_title') self.live().children = self.live().children.filter((c) => c.role !== 'keyboard');
-      },
-    );
-    fake.keyboardAdvice = 'ADVICE';
-    return fake;
-  };
+  /** The password field under the band, so type_text's focus tap is the guarded one. */
+  const iosLogin = (hides = true) => iosLoginFake({ password: { x: 90, y: 600, width: 222, height: 20 }, onTap: hides ? hidesKeyboardOn('login_title') : undefined });
   const CONFIGURED = 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda, keyboardDismiss: [{ tap: { id: login_title } }, { accessory: true }] }\n';
 
   it('tap: the configured title is tapped first, the target after it, and the response says so', async () => {

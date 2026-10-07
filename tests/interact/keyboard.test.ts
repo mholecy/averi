@@ -22,7 +22,7 @@ import {
 } from '../../src/interact/keyboard.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { AmbiguityRefusal } from '../../src/interact/resolve.js';
-import { FakeAdapter, node, screen } from '../helpers/fake.js';
+import { dropBand, FakeAdapter, hidesKeyboardOn, IOS_LOGIN_BAND, iosLoginFake, node, screen } from '../helpers/fake.js';
 import { readFile } from 'node:fs/promises';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 
@@ -681,6 +681,8 @@ describe('the guard\'s window reading — geometry, with the frame when it cover
 
 describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved here from fill.ts 2026-10-04)', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
+  /** The policy the dismissals would be judged under — none is configured here, and the oracle path reads neither. */
+  const FIRST = { ambiguous: 'first' as const };
   const withOracle = (window: Parameters<FakeAdapter['attachKeyboard']>[0], witness?: Parameters<FakeAdapter['attachKeyboard']>[1]) => {
     const fake = new FakeAdapter({ s: screen() }, 's');
     fake.attachKeyboard(window, witness);
@@ -692,7 +694,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
       const fake = new FakeAdapter({ s: screen() }, 's');
       fake.platform = platform;
       const events = recorded(fake);
-      expect(await dismissKeyboard(fake)).toEqual({});
+      expect(await dismissKeyboard(fake, FIRST)).toEqual({});
       expect(events).toEqual(['read']);
       expect(fake.keys).toEqual([]);
       expect(fake.taps).toEqual([]);
@@ -705,14 +707,14 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     const ask = fake.attachedKeyboard.witness.bind(fake.attachedKeyboard);
     fake.attachedKeyboard.witness = async () => (order.push('witness?'), ask());
     fake.onKey = (key) => void order.push(`key:${key}`);
-    await dismissKeyboard(fake);
+    await dismissKeyboard(fake, FIRST);
     expect(order).toEqual(['witness?', 'key:back']);
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
   });
 
   it('window shown, witness DENIES (stale window state): nothing pressed, nothing waited for', async () => {
     const fake = withOracle({ state: 'shown', frame: FRAME }, 'hidden');
-    await dismissKeyboard(fake);
+    await dismissKeyboard(fake, FIRST);
     expect(fake.keys).toEqual([]);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
     expect(sleeps).toEqual([]);
@@ -720,7 +722,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
 
   it('window shown, witness cannot tell: back, as before the veto existed', async () => {
     const fake = withOracle({ state: 'shown', frame: FRAME }, 'unknown');
-    await dismissKeyboard(fake);
+    await dismissKeyboard(fake, FIRST);
     expect(fake.keys).toEqual(['back']);
   });
 
@@ -729,7 +731,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     ['unknown', 'back is pressed, as before 2026-10-03', ['back']],
   ] as const)('window %s: the witness is not asked, and %s', async (state, _what, keys) => {
     const fake = withOracle({ state }, 'hidden');
-    await dismissKeyboard(fake);
+    await dismissKeyboard(fake, FIRST);
     expect(fake.keys).toEqual(keys);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
   });
@@ -745,33 +747,9 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
  * target, takes a second look when it covers, and there is nothing to press.
  */
 describe('tapElement — an in-tree keyboard (no oracle) covering the target: a refusal, nothing sent (2026-10-07)', () => {
-  const BAND: Rect = { x: 0, y: 539, width: 402, height: 335 };
-  const SUBMIT: Rect = { x: 36, y: 547, width: 141, height: 48 };
-  const TITLE: Rect = { x: 36, y: 291, width: 330, height: 24 };
   /** The adapter's own sentence (DeviceAdapter.keyboardAdvice) — quoted, never composed, by the guard. */
   const ADVICE = 'no key hides it here, says the adapter';
-  const bandNode = (band: Rect) => node({ role: 'keyboard', rect: { ...band }, children: [node({ role: 'container', rect: { x: 0, y: 583, width: 402, height: 233 } })] });
-  function iosFake(band: Rect | null = BAND) {
-    const fake = new FakeAdapter(
-      {
-        login: node({
-          role: 'container',
-          rect: { x: 0, y: 0, width: 402, height: 874 },
-          children: [
-            node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect: { ...TITLE } }),
-            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 479, width: 222, height: 20 } }),
-            node({ role: 'button', identifier: 'login_submit', rect: { ...SUBMIT } }),
-            ...(band === null ? [] : [bandNode(band)]),
-          ],
-        }),
-      },
-      'login',
-    );
-    fake.platform = 'ios';
-    fake.keyboard = undefined; // as IosAdapter: no oracle
-    fake.keyboardAdvice = ADVICE;
-    return fake;
-  }
+  const iosFake = (band: Rect | null = IOS_LOGIN_BAND) => iosLoginFake({ band, keyboardAdvice: ADVICE });
   /** Let the Nth tree read (1-based) see the screen changed by `change` — the keyboard leaving, the target going — without touching the live screen's earlier reads. */
   const onRead = (fake: FakeAdapter, n: number, change: (live: UiNode) => void) => {
     let reads = 0;
@@ -780,9 +758,6 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       if (++reads === n) change(fake.live());
       return real();
     };
-  };
-  const dropBand = (live: UiNode) => {
-    live.children = live.children.filter((c) => c.role !== 'keyboard');
   };
   /** The refusal's shape; `configured` is the stage B clause — "no dismissal is configured", or the list that was and is not on screen. */
   const refusal = (configured: string) =>
@@ -1015,7 +990,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 
       it('dismissKeyboard under first: the same — the title, never the button', async () => {
         const fake = shared();
-        expect(await dismissKeyboard(fake, { ambiguous: 'first', dismissals: [BY_TEXT] })).toEqual({ hidden: 'tapping text:"Sign in"' });
+        expect(await dismissKeyboard(fake, { ambiguous: 'first', dismissals: [BY_TEXT] })).toEqual({ hiddenBy: 'tapping text:"Sign in"' });
         expect(fake.taps).toEqual(['login_heading']);
       });
 
@@ -1423,26 +1398,8 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
  * measured to SUBMIT the login from the password field (K5d).
  */
 describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
-  const BAND: Rect = { x: 0, y: 539, width: 402, height: 335 };
   const TITLE_TAP: KeyboardDismissal = { kind: 'tap', target: { id: 'login_title' } };
-  const withBand = (reactsTo = 'login_title') =>
-    new FakeAdapter(
-      {
-        login: node({
-          role: 'container',
-          rect: { x: 0, y: 0, width: 402, height: 874 },
-          children: [
-            node({ role: 'text', identifier: 'login_title', rect: { x: 36, y: 291, width: 330, height: 24 } }),
-            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 479, width: 222, height: 20 } }),
-            node({ role: 'keyboard', rect: { ...BAND } }),
-          ],
-        }),
-      },
-      'login',
-      (id, self) => {
-        if (id === reactsTo) self.live().children = self.live().children.filter((c) => c.role !== 'keyboard');
-      },
-    );
+  const withBand = (reactsTo = 'login_title') => iosLoginFake({ onTap: hidesKeyboardOn(reactsTo) });
   const FIRST = { ambiguous: 'first' as const };
 
   it('a band in the tree and a usable strategy: ONE tap at its centre, the hide delay, one re-read — the band gone, the result says what hid it; no key', async () => {
@@ -1452,12 +1409,33 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(events).toEqual(['read', 'tap:201,303', 'read']);
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS]);
     expect(fake.keys).toEqual([]);
-    expect(result).toEqual({ hidden: 'tapping id:"login_title"' });
+    expect(result).toEqual({ hiddenBy: 'tapping id:"login_title"' });
+  });
+
+  it('a tap strategy matching TWO neutral nodes: under `first` the first is tapped and the result says which; under `refuse` it is skipped with the count — a warning, no tap', async () => {
+    const BY_LABEL: KeyboardDismissal = { kind: 'tap', target: { text: 'Prihlásenie' } };
+    /** A second title with the same label, clear of the band, after the first in tree order. */
+    const twoTitles = () => {
+      const fake = withBand();
+      fake.live().children.push(node({ role: 'text', identifier: 'login_heading', label: 'Prihlásenie', rect: { x: 36, y: 330, width: 330, height: 24 } }));
+      return fake;
+    };
+    const first = twoTitles();
+    const events = recorded(first);
+    expect(await dismissKeyboard(first, { ambiguous: 'first', dismissals: [BY_LABEL] })).toEqual({ hiddenBy: 'tapping text:"Prihlásenie" (2 matches, the first)' });
+    expect(events).toEqual(['read', 'tap:201,303', 'read']);
+    expect(first.taps).toEqual(['login_title']);
+    const refuse = twoTitles();
+    expect(await dismissKeyboard(refuse, { ambiguous: 'refuse', dismissals: [BY_LABEL] })).toEqual({
+      warning: 'the soft keyboard is up and was left up: none of the configured dismissals is usable on this screen (tap text:"Prihlásenie": 2 matches) — the next tap under it will be refused',
+    });
+    expect(refuse.taps).toEqual([]);
+    expect(refuse.keys).toEqual([]);
   });
 
   it('no band in the tree (none on screen, the keyboard parked by the HID typing, an idb tree): one read, nothing tapped, nothing pressed, an empty result', async () => {
     const fake = withBand();
-    fake.live().children = fake.live().children.filter((c) => c.role !== 'keyboard');
+    dropBand(fake.live());
     const events = recorded(fake);
     expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] })).toEqual({});
     expect(events).toEqual(['read']);
@@ -1467,7 +1445,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
 
   it('a band and nothing usable: a WARNING, not a throw — none configured, or none on screen — and nothing is pressed or tapped', async () => {
     const none = withBand();
-    expect(await dismissKeyboard(none)).toEqual({ warning: 'the soft keyboard is up and was left up: no dismissal is configured — the next tap under it will be refused' });
+    expect(await dismissKeyboard(none, FIRST)).toEqual({ warning: 'the soft keyboard is up and was left up: no dismissal is configured — the next tap under it will be refused' });
     expect(await dismissKeyboard(none, { ...FIRST, dismissals: [] })).toEqual({ warning: 'the soft keyboard is up and was left up: no dismissal is configured — the next tap under it will be refused' });
     const absent = withBand();
     expect(await dismissKeyboard(absent, { ...FIRST, dismissals: [{ kind: 'tap', target: { id: 'twofactor_title' } }, { kind: 'accessory' }] })).toEqual({
@@ -1499,11 +1477,11 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     let reads = 0;
     const real = fake.uiTree.bind(fake);
     fake.uiTree = async () => {
-      if (++reads === 3) fake.live().children = fake.live().children.filter((c) => c.role !== 'keyboard'); // read 1: the band; read 2 (first confirm): still; read 3: gone
+      if (++reads === 3) dropBand(fake.live()); // read 1: the band; read 2 (first confirm): still; read 3: gone
       return real();
     };
     const events = recorded(fake);
-    expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] })).toEqual({ hidden: 'tapping id:"login_title"' });
+    expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] })).toEqual({ hiddenBy: 'tapping id:"login_title"' });
     expect(events).toEqual(['read', 'tap:201,303', 'read', 'read']);
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS, KEYBOARD_HIDE_DELAY_MS]);
   });
@@ -1511,14 +1489,14 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
   it('`enter` is never in the keys on this path, with or without a band or a strategy', async () => {
     for (const fake of [withBand(), withBand('nothing')]) {
       await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] }).catch(() => undefined);
-      await dismissKeyboard(fake).catch(() => undefined);
+      await dismissKeyboard(fake, FIRST).catch(() => undefined);
       expect(fake.keys).toEqual([]);
     }
   });
 
   it('the oracle path reads no dismissal and no tree: with them passed, Android presses back on the window state and taps nothing', async () => {
     const fake = withBand();
-    fake.attachKeyboard({ state: 'shown', frame: BAND }, 'shown');
+    fake.attachKeyboard({ state: 'shown', frame: IOS_LOGIN_BAND }, 'shown');
     const events = recorded(fake);
     expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] })).toEqual({});
     expect(events).toEqual(['keyboard?', 'witness?', 'key:back']);

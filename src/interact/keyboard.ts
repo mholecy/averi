@@ -520,6 +520,46 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
 });
 
 /**
+ * The message of a look that could not resolve the target after the guard
+ * had acted, or found the keyboard, on an earlier one — the one shape every
+ * such catch below wraps into its own KeyboardGuardError: a refusal's first
+ * line is the finding (and the trace's ✗ headline), so it is kept as is
+ * with `refused` in parentheses under it; any other error gets `failed`'s
+ * sentence over its headline and its further lines after it.
+ */
+function failedLookMessage(e: unknown, refused: string, failed: (headline: string) => string): string {
+  const message = errorMessage(e);
+  if (e instanceof AmbiguityRefusal) return `${message}\n(${refused})`;
+  const [headline, ...rest] = message.split('\n');
+  return [failed(headline), ...rest].join('\n');
+}
+
+/** One look after a dismissal tap: the keyboard gone, with what the caller returns, or still up, with what its refusal needs to say. */
+type ConfirmLook<T, S> = { gone: T } | { stillUp: S };
+
+/**
+ * The confirmation after the in-tree model's one dismissal tap, shared by
+ * the guard and `dismissKeyboard`: up to KEYBOARD_HIDE_CONFIRM_LOOKS looks,
+ * KEYBOARD_HIDE_DELAY_MS before each, so an animation caught mid-way is not
+ * a refusal (the constant's doc has the reason) — the first look that finds
+ * the keyboard gone answers, and only the LAST still-up look refuses, with
+ * the caller's AfterDismissalTap over what that look saw and how many looks
+ * there were. A look that throws (the target not coming back) ends it there.
+ */
+async function confirmAfterDismissalTap<T, S>(look: () => Promise<ConfirmLook<T, S>>, stillUp: (seen: S, looks: number) => AfterDismissalTap): Promise<T> {
+  for (let looks = 1; ; looks++) {
+    await sleep(KEYBOARD_HIDE_DELAY_MS);
+    const seen = await look();
+    if ('gone' in seen) return seen.gone;
+    if (looks < KEYBOARD_HIDE_CONFIRM_LOOKS) continue;
+    throw stillUp(seen.stillUp, looks);
+  }
+}
+
+/** What a dismissal tap's refusal says in both places: the tap cannot be untapped, and the screen is the reader's to look at. */
+const MAY_HAVE_CHANGED = 'That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot)';
+
+/**
  * resolveSettled, plus the one rule every tap on a resolved node shares
  * (2026-10-03): the point about to be tapped must not lie under the soft
  * keyboard. Used by tapElement (the flow `tap:` step and the MCP `tap` tool)
@@ -657,11 +697,11 @@ export async function resolveClearOfKeyboard(
       // screen (review round 2; the Android path's AfterKeyboardDismissal
       // does the same for its second look, with the key press to report).
       const saw = `the soft keyboard covered ${what} at (${at.x},${at.y}) on a first look`;
-      const [headline, ...rest] = errorMessage(e).split('\n');
-      const message =
-        e instanceof AmbiguityRefusal
-          ? `${errorMessage(e)}\n(This was the second look, after ${saw}. Nothing was pressed)`
-          : [`After ${saw}, the second look failed: ${headline}. Nothing was pressed; the screen is as the step found it`, ...rest].join('\n');
+      const message = failedLookMessage(
+        e,
+        `This was the second look, after ${saw}. Nothing was pressed`,
+        (headline) => `After ${saw}, the second look failed: ${headline}. Nothing was pressed; the screen is as the step found it`,
+      );
       throw new KeyboardWithoutDismissal(message, `${covered}; nothing sent, and the second look failed`, { cause: e });
     }
     const point = tapPoint(second.node);
@@ -700,38 +740,36 @@ export async function resolveClearOfKeyboard(
     const tapped = `${covered}; tapped ${picked.what} to hide it`;
     const at2 = tapPoint(picked.node);
     await adapter.tap(at2.x, at2.y);
-    for (let look = 1; ; look++) {
-      await sleep(KEYBOARD_HIDE_DELAY_MS);
-      let next: ResolvedSettled;
-      try {
-        next = await resolveSettled(adapter, target, opts);
-      } catch (e) {
-        // The target did not come back after the dismissal tap (or came back
-        // ambiguous). Something WAS tapped this time, so the wording is the
-        // Android path's, not the second look's: say what was tapped and that
-        // the screen may have changed.
-        const did = `tapping ${picked.what} at (${at2.x},${at2.y}) to hide the soft keyboard that covered ${what} at (${point.x},${point.y})`;
-        const hint = 'That tap may have changed the screen — check it (ui_snapshot / screenshot)';
-        const [headline, ...rest] = errorMessage(e).split('\n');
-        const message =
-          e instanceof AmbiguityRefusal
-            ? `${errorMessage(e)}\n(This was the look after ${did}. ${hint})`
-            : [`After ${did}: ${headline}. ${hint}`, ...rest].join('\n');
-        throw new AfterDismissalTap(message, `${tapped}, and the look after it failed`, { cause: e });
-      }
-      const pointNext = tapPoint(next.node);
-      const after = inTreeLook(windowOver((await readSoftKeyboard(adapter, next.tree, next.node)).keyboard, pointNext));
-      if (after.action === 'proceed') return withNote(next, `${covered}; hidden by tapping ${picked.what} before tapping`);
-      if (look < KEYBOARD_HIDE_CONFIRM_LOOKS) continue;
-      throw new AfterDismissalTap(
-        `Tapped ${picked.what} at (${at2.x},${at2.y}) to hide the soft keyboard covering ${what}, but it is still up: the band ` +
-          `${frameText(after.frame)} still contains the tap point (${pointNext.x},${pointNext.y}) on ${look} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; ` +
-          `nothing else was tapped. That tap may have changed the screen (the keyboard was raised again, or the element did something ` +
-          `of its own) — look at it (ui_snapshot / screenshot) before retrying. From the MCP tools: hide the keyboard another way, then tap ` +
-          `${what} again. In a flow: configure a dismissal that hides the keyboard on THIS screen, or lay the screen out so ${what} is not under it`,
-        `${tapped}, still covered`,
-      );
-    }
+    return confirmAfterDismissalTap<ResolvedClear, { frame: Rect; point: { x: number; y: number } }>(
+      async () => {
+        let next: ResolvedSettled;
+        try {
+          next = await resolveSettled(adapter, target, opts);
+        } catch (e) {
+          // The target did not come back after the dismissal tap (or came back
+          // ambiguous). Something WAS tapped this time, so the wording is the
+          // Android path's, not the second look's: say what was tapped and that
+          // the screen may have changed.
+          const did = `tapping ${picked.what} at (${at2.x},${at2.y}) to hide the soft keyboard that covered ${what} at (${point.x},${point.y})`;
+          const hint = 'That tap may have changed the screen — check it (ui_snapshot / screenshot)';
+          const message = failedLookMessage(e, `This was the look after ${did}. ${hint}`, (headline) => `After ${did}: ${headline}. ${hint}`);
+          throw new AfterDismissalTap(message, `${tapped}, and the look after it failed`, { cause: e });
+        }
+        const pointNext = tapPoint(next.node);
+        const after = inTreeLook(windowOver((await readSoftKeyboard(adapter, next.tree, next.node)).keyboard, pointNext));
+        return after.action === 'proceed'
+          ? { gone: withNote(next, `${covered}; hidden by tapping ${picked.what} before tapping`) }
+          : { stillUp: { frame: after.frame, point: pointNext } };
+      },
+      ({ frame, point: pointNext }, looks) =>
+        new AfterDismissalTap(
+          `Tapped ${picked.what} at (${at2.x},${at2.y}) to hide the soft keyboard covering ${what}, but it is still up: the band ` +
+            `${frameText(frame)} still contains the tap point (${pointNext.x},${pointNext.y}) on ${looks} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; ` +
+            `nothing else was tapped. ${MAY_HAVE_CHANGED} before retrying. From the MCP tools: hide the keyboard another way, then tap ` +
+            `${what} again. In a flow: configure a dismissal that hides the keyboard on THIS screen, or lay the screen out so ${what} is not under it`,
+          `${tapped}, still covered`,
+        ),
+    );
   }
   const backPressed = `${covered}; back pressed`;
   /** The input method's last word — the wording of a later failure depends on whether it could be asked. */
@@ -823,12 +861,7 @@ export async function resolveClearOfKeyboard(
         ? 'If no keyboard was really up at that moment (the input method could not be asked whether a keyboard was shown), '
         : 'If no keyboard was really up at that moment, ') +
       'back may have navigated away — check the screen (ui_snapshot / screenshot)';
-    const [headline, ...rest] = errorMessage(e).split('\n');
-    const message =
-      e instanceof AmbiguityRefusal
-        ? // A refusal's first line is the finding (and the trace's ✗ headline): kept as is, the context below it.
-          `${errorMessage(e)}\n(This was the second look, after ${did}. ${hint})`
-        : [`After ${did}: ${headline}. ${hint}`, ...rest].join('\n');
+    const message = failedLookMessage(e, `This was the second look, after ${did}. ${hint}`, (headline) => `After ${did}: ${headline}. ${hint}`);
     throw new AfterKeyboardDismissal(message, backPressed, { cause: e });
   }
   const point = tapPoint(second.node);
@@ -922,10 +955,7 @@ export async function resolveClearOfKeyboard(
  * and the witness query when that query says shown. The oracle path reads
  * none of `opts` and returns an empty result: Android is byte-identical.
  */
-export async function dismissKeyboard(
-  adapter: KeyboardAdapter,
-  opts?: { dismissals?: readonly KeyboardDismissal[]; ambiguous: Ambiguity },
-): Promise<DismissResult> {
+export async function dismissKeyboard(adapter: KeyboardAdapter, { dismissals = [], ambiguous }: DismissOptions): Promise<DismissResult> {
   const oracle = adapter.keyboard;
   if (oracle !== undefined) {
     const reading = windowAnywhere(await oracle.state());
@@ -935,37 +965,35 @@ export async function dismissKeyboard(
   }
   const tree = await adapter.uiTree();
   if (keyboardInTree(tree).state !== 'shown') return {};
-  const dismissals = opts?.dismissals ?? [];
-  // `opts` is defined whenever there is a dismissal to pick, and its
-  // `ambiguous` is required there: no default policy is written here.
-  const { picked, skipped } = opts !== undefined && dismissals.length > 0 ? pickDismissal(tree, dismissals, opts.ambiguous) : { picked: undefined, skipped: [] };
+  const { picked, skipped } = pickDismissal(tree, dismissals, ambiguous);
   if (picked === undefined) {
     return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, skipped)} — the next tap under it will be refused` };
   }
   const at = tapPoint(picked.node);
   await adapter.tap(at.x, at.y);
-  // The same confirmation as the guard's: up to KEYBOARD_HIDE_CONFIRM_LOOKS
-  // reads, KEYBOARD_HIDE_DELAY_MS apart, and only the last still-up read
-  // refuses.
-  for (let read = 1; ; read++) {
-    await sleep(KEYBOARD_HIDE_DELAY_MS);
-    const after = keyboardInTree(await adapter.uiTree());
-    if (after.state !== 'shown') return { hidden: `tapping ${picked.what}` };
-    if (read < KEYBOARD_HIDE_CONFIRM_LOOKS) continue;
-    throw new AfterDismissalTap(
-      `Tapped ${picked.what} at (${at.x},${at.y}) to hide the soft keyboard after the fill, but it is still up over ` +
-        `${frameText(after.frame)} on ${read} reads ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped. That tap may have changed ` +
-        `the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot). ` +
-        `In a flow: configure a dismissal that hides the keyboard on THIS screen, or drop dismissKeyboard from this fill`,
-      `the soft keyboard was up after the fill; tapped ${picked.what} to hide it, still up`,
-    );
-  }
+  // The same confirmation as the guard's, each look one tree read.
+  return confirmAfterDismissalTap<DismissResult, Rect>(
+    async () => {
+      const after = keyboardInTree(await adapter.uiTree());
+      return after.state !== 'shown' ? { gone: { hiddenBy: `tapping ${picked.what}` } } : { stillUp: after.frame };
+    },
+    (frame, reads) =>
+      new AfterDismissalTap(
+        `Tapped ${picked.what} at (${at.x},${at.y}) to hide the soft keyboard after the fill, but it is still up over ` +
+          `${frameText(frame)} on ${reads} reads ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped. ${MAY_HAVE_CHANGED}. ` +
+          `In a flow: configure a dismissal that hides the keyboard on THIS screen, or drop dismissKeyboard from this fill`,
+        `the soft keyboard was up after the fill; tapped ${picked.what} to hide it, still up`,
+      ),
+  );
 }
+
+/** What `dismissKeyboard` takes of the guard's options: the dismissals it may tap and the ambiguity policy they are judged under — no default policy is written here. The settle options are not among them: it resolves nothing. */
+export type DismissOptions = Pick<GuardOptions, 'dismissals' | 'ambiguous'>;
 
 /** What `dismissKeyboard` did, for the caller's trace: at most one of the two, and neither on the oracle path. */
 export interface DismissResult {
-  /** The in-tree keyboard was up and this hid it: `tapping id:"login_title"` — the flow's fill line appends `; keyboard hidden by ${hidden}`. */
-  hidden?: string;
+  /** The in-tree keyboard was up and this hid it: `tapping id:"login_title"`, the fragment the flow's fill line appends after `; keyboard hidden by ` — not a `keyboardHidden` sentence, so the engine's `⚠` tracing cannot take this result by mistake. */
+  hiddenBy?: string;
   /** The in-tree keyboard was up and nothing usable was configured: left up, said so — the flow logs it as a `⚠ fill` line. */
   warning?: string;
 }

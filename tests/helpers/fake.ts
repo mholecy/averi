@@ -1,5 +1,5 @@
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import type { Device, DeviceAdapter, Key, KeyboardOracle, KeyboardWitness, LaunchOptions, SoftKeyboard, UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type Device, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -33,6 +33,61 @@ export const sizeOnlyPng = (width: number, height: number): RgbaImage => ({ widt
 
 export const screen = (...children: UiNode[]): UiNode =>
   node({ role: 'container', rect: { x: 0, y: 0, width: 1000, height: 2000 }, children });
+
+/** The band the keyboard draws over on the measured iOS login (K1, with the AutoFill bar; docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md), in points. */
+export const IOS_LOGIN_BAND: Rect = { x: 0, y: 539, width: 402, height: 335 };
+
+/** The keyboard's band as the WDA source marks it (tests/adapters/wda-source-keyboard.test.ts pins the parser): a KEYBOARD_ROLE node over `band`, the keys inside it. */
+export const bandNode = (band: Rect = IOS_LOGIN_BAND): UiNode =>
+  node({ role: KEYBOARD_ROLE, rect: { ...band }, children: [node({ role: 'container', rect: { x: 0, y: 583, width: 402, height: 233 } })] });
+
+/** The keyboard leaving: the band is gone from `live` on the next read. */
+export const dropBand = (live: UiNode): void => {
+  live.children = live.children.filter((c) => c.role !== KEYBOARD_ROLE);
+};
+
+/** The app as measured (K5b): a tap on `id` hides the keyboard — for `FakeAdapter.onTap`. */
+export const hidesKeyboardOn =
+  (id: string): FakeAdapter['onTap'] =>
+  (tapped, self) => {
+    if (tapped === id) dropBand(self.live());
+  };
+
+/**
+ * The measured iOS login, in points: the title `login_title` above the
+ * keyboard, the password field (clear of the band unless `password` moves it
+ * under), `login_submit` at {36,547,141,48} (centre 107,571) under
+ * IOS_LOGIN_BAND (`band: null` is the same screen with the keyboard parked),
+ * on an adapter as IosAdapter: no oracle, and `keyboardAdvice` set to the
+ * sentence the refusals quote. `onTap` plays the app (`hidesKeyboardOn`).
+ */
+export function iosLoginFake({
+  band = IOS_LOGIN_BAND,
+  password = { x: 90, y: 479, width: 222, height: 20 },
+  keyboardAdvice = 'ADVICE',
+  onTap,
+}: { band?: Rect | null; password?: Rect; keyboardAdvice?: string; onTap?: FakeAdapter['onTap'] } = {}): FakeAdapter {
+  const fake = new FakeAdapter(
+    {
+      login: node({
+        role: 'container',
+        rect: { x: 0, y: 0, width: 402, height: 874 },
+        children: [
+          node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect: { x: 36, y: 291, width: 330, height: 24 } }),
+          node({ role: 'textfield', identifier: 'login_password', rect: { ...password } }),
+          node({ role: 'button', identifier: 'login_submit', rect: { x: 36, y: 547, width: 141, height: 48 } }),
+          ...(band === null ? [] : [bandNode(band)]),
+        ],
+      }),
+    },
+    'login',
+    onTap,
+  );
+  fake.platform = 'ios';
+  fake.keyboard = undefined; // as IosAdapter: no oracle
+  fake.keyboardAdvice = keyboardAdvice;
+  return fake;
+}
 
 /**
  * Programmable fake device: named screens, tap-driven transitions.

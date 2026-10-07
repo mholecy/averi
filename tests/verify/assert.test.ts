@@ -5,6 +5,7 @@ import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { KEYBOARD_ROLE } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 
@@ -1854,7 +1855,7 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
   };
   const iosFake = (band?: { x: number; y: number; width: number; height: number }) => {
     resetLayout();
-    const children = [node({ identifier: 'card', rect: { ...CARD } }), ...(band ? [node({ role: 'keyboard', rect: { ...band } })] : [])];
+    const children = [node({ identifier: 'card', rect: { ...CARD } }), ...(band ? [node({ role: KEYBOARD_ROLE, rect: { ...band } })] : [])];
     const fake = new FakeAdapter({ detail: screen(...children) }, 'detail');
     fake.platform = 'ios';
     fake.keyboard = undefined;
@@ -1896,7 +1897,7 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
 
   it('an element that IS the keyboard\'s UI (under an `ofKeyboard` root, inside the band) is not covered: measured, two captures', async () => {
     resetLayout();
-    const kbWindow = node({ role: 'container', ofKeyboard: true, rect: { x: 0, y: 0, width: 1000, height: 2000 }, children: [node({ identifier: 'card', rect: { ...CARD } }), node({ role: 'keyboard', rect: { ...COVERING } })] });
+    const kbWindow = node({ role: 'container', ofKeyboard: true, rect: { x: 0, y: 0, width: 1000, height: 2000 }, children: [node({ identifier: 'card', rect: { ...CARD } }), node({ role: KEYBOARD_ROLE, rect: { ...COVERING } })] });
     const fake = new FakeAdapter({ detail: screen(kbWindow) }, 'detail');
     fake.platform = 'ios';
     fake.keyboard = undefined;

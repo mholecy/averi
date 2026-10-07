@@ -13,7 +13,7 @@ import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type Step } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, idbContainerIdHint, resetClearStateCount, stepSummary, waitTimeoutHint, type TraceEntry } from '../../src/flow/engine.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -2515,25 +2515,8 @@ flows:
  */
 describe('tap: / fill: under the iOS in-tree keyboard — the ⚠ line says nothing was sent, before the ✗ (2026-10-07)', () => {
   function iosFake(band = true) {
-    const fake = new FakeAdapter(
-      {
-        login: node({
-          role: 'container',
-          rect: { x: 0, y: 0, width: 402, height: 874 },
-          children: [
-            node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect: { x: 36, y: 291, width: 330, height: 24 } }),
-            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 479, width: 222, height: 20 } }),
-            node({ role: 'button', identifier: 'login_submit', rect: { x: 36, y: 547, width: 141, height: 48 } }),
-            ...(band ? [node({ role: 'keyboard', rect: { x: 0, y: 539, width: 402, height: 335 } })] : []),
-          ],
-        }),
-      },
-      'login',
-    );
-    fake.platform = 'ios';
+    const fake = iosLoginFake(band ? {} : { band: null });
     fake.treeSourceKind = 'wda';
-    fake.keyboard = undefined; // as IosAdapter: no oracle
-    fake.keyboardAdvice = 'ADVICE'; // the adapter's own sentence, quoted by the refusal
     return fake;
   }
   const flow = (steps: string) =>
@@ -2628,9 +2611,7 @@ ${steps}
     /** The app as measured (K5b): a tap on the title hides the keyboard — the band is gone on the next read. */
     const hidingFake = () => {
       const fake = iosFake();
-      fake.onTap = (id, self) => {
-        if (id === 'login_title') self.live().children = self.live().children.filter((c) => c.role !== 'keyboard');
-      };
+      fake.onTap = hidesKeyboardOn('login_title');
       return fake;
     };
 
@@ -2676,6 +2657,14 @@ ${steps}
       ]);
       expect(fake.taps).toEqual(['login_password', 'login_title']);
       expect(fake.keys).toEqual([]);
+    });
+
+    it('the post-fill dismissal judges its strategies under the flow\'s `first` policy: a tap: { text } matching two neutral nodes taps the first, and the fill line says so', async () => {
+      const fake = hidingFake();
+      fake.live().children.push(node({ role: 'text', identifier: 'login_heading', label: 'Prihlásenie', rect: { x: 36, y: 330, width: 330, height: 24 } }));
+      const trace = await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }', '[{ tap: { text: Prihlásenie } }]'), fake, FAST).runFlow('f');
+      expect(trace[1]).toEqual({ action: 'fill', detail: 'id:"login_password" = secret; keyboard hidden by tapping text:"Prihlásenie" (2 matches, the first)' });
+      expect(fake.taps).toEqual(['login_password', 'login_title']);
     });
 
     it('fill … dismissKeyboard: true whose dismissal tap does not hide the keyboard: a ⚠ fill line naming the tap, then the ✗ (review round 1: the line was missing)', async () => {
