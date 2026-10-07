@@ -9,5 +9,13 @@ import { ExecError } from '../../src/adapters/exec.js';
  * device (2026-09-18 review, BLOCKER). Use this instead of the constructor
  * whenever a test needs "the command exited non-zero".
  */
-export const execErrorLikeExec = (cmd: string, code: number | null, stderr: string, timedOut = false): ExecError =>
-  new ExecError(cmd, code, stderr || `Command failed: ${cmd}\n`, timedOut);
+export const execErrorLikeExec = (
+  cmd: string,
+  code: number | null,
+  stderr: string,
+  opts: {
+    timedOut?: boolean;
+    /** What the command printed to stdout before failing (monkey's diagnosis lives there). */
+    stdout?: string;
+  } = {},
+): ExecError => new ExecError(cmd, code, stderr || `Command failed: ${cmd}\n`, opts.timedOut ?? false, Buffer.from(opts.stdout ?? ''));

@@ -243,7 +243,7 @@ describe('AndroidAdapter interactions', () => {
       await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/Command failed/);
     });
     it('a timeout propagates (device under load is not a dead app)', async () => {
-      const fn = throwing(realShape('adb -s e shell pidof x || true', null, '', true));
+      const fn = throwing(realShape('adb -s e shell pidof x || true', null, '', { timedOut: true }));
       await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/timed out/);
     });
     it('an adb-level error propagates (offline device is not a dead app)', async () => {
@@ -433,26 +433,16 @@ describe('AndroidAdapter interactions', () => {
       );
     });
 
-    // What a SUCCESSFUL am start may print. Every row is a launch that
-    // happened; failing one would break the hottest path in the tool.
-    it.each([
-      ['"Error" mid-line in the echoed intent data', 'Starting: Intent { act=android.intent.action.VIEW dat=app://x/Error/y pkg=md.bank.app }\n'],
-      ['a component named .ErrorActivity', 'Starting: Intent { cmp=md.bank.app/.ErrorActivity }\n'],
-      ['"Errors: none"', 'Starting: Intent { pkg=md.bank.app }\nErrors: none\n'],
-      ['a lowercase "error:" line that is not am\'s', 'Starting: Intent { pkg=md.bank.app }\nerror: could not set locale, continuing\n'],
-      ['a java.lang class mid-line', 'Starting: Intent { dat=app://x/java.lang.IllegalStateException pkg=md.bank.app }\n'],
-      // The narrowing, as a decision (2026-10-03): am's diagnoses start in
-      // column 0, and an "Exception in thread" line at exit 0 is left alone —
-      // see AM_ERROR_LINE_RE for why that is acceptable.
-      ['an indented "Error:" line', 'Starting: Intent { pkg=md.bank.app }\n  Error: something\n'],
-      ['an "Exception in thread" line at exit 0', 'Exception in thread "main" java.lang.IllegalArgumentException: Unknown option: --bogus\n'],
-    ])('a launch that printed %s resolves, on either stream', async (_what, printed) => {
+    // What a SUCCESSFUL am start may print — the row-per-case table is
+    // runStart's (tests/adapters/android-start.test.ts); this row only pins
+    // that the launch reads its am start through it.
+    it('a launch whose echoed intent has "Error" mid-line resolves', async () => {
+      const printed = 'Starting: Intent { act=android.intent.action.VIEW dat=app://x/Error/y pkg=md.bank.app }\n';
       await expect(amAnswers({ stdout: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toBeUndefined();
-      await expect(amAnswers({ stderr: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toBeUndefined();
     });
 
     it('a timed-out am start passes through as the timeout, whatever it had printed', async () => {
-      const timedOut = execErrorLikeExec('adb -s e shell am start', null, `${UNRESOLVED}\n`, true);
+      const timedOut = execErrorLikeExec('adb -s e shell am start', null, `${UNRESOLVED}\n`, { timedOut: true });
       await expect(amAnswers(timedOut).adapter.launch('md.bank.app', { intent: SEND })).rejects.toBe(timedOut);
     });
 
@@ -482,6 +472,64 @@ describe('AndroidAdapter interactions', () => {
       const offline = execErrorLikeExec('adb -s e shell am start', 255, "adb: device 'e' not found\n");
       const { adapter } = amAnswers(offline);
       await expect(adapter.launch('md.bank.app', { intent: SEND })).rejects.toBe(offline);
+    });
+  });
+
+  // 2026-10-07: openDeepLink and the monkey launch read their start through
+  // runStart too (android-start.ts) — the classification is pinned there;
+  // these pin that each caller uses it and what its refusal says.
+  describe('openDeepLink and the monkey launch — a start that started nothing throws', () => {
+    /** Every adb call answers with the given streams, or throws the given error. */
+    const answering = (answer: { stdout?: string; stderr?: string } | Error) => {
+      const fn: ExecFn = async () => {
+        if (answer instanceof Error) throw answer;
+        return { stdout: Buffer.from(answer.stdout ?? ''), stderr: answer.stderr ?? '' };
+      };
+      return new AndroidAdapter({ serial: 'e', exec: fn });
+    };
+    const messageOf = (starting: Promise<void>) => starting.then(() => 'resolved', (e: Error) => e.message);
+    const UNRESOLVED_VIEW =
+      'Error: Activity not started, unable to resolve Intent { act=android.intent.action.VIEW dat=nosuch://x flg=0x10000000 }';
+
+    it('a deep link nothing handles (am exits 0 with an Error line) → throws, naming the url and quoting am', async () => {
+      const adapter = answering({ stdout: 'Starting: Intent { act=android.intent.action.VIEW dat=nosuch://x }\n', stderr: `${UNRESOLVED_VIEW}\n` });
+      expect(await messageOf(adapter.openDeepLink('nosuch://x'))).toBe(
+        "Android opened nothing for nosuch://x — either no installed app has an activity whose intent filter " +
+          "matches it (action VIEW and the url's scheme / host / path), or the one that does refused it " +
+          "(not exported / permission — am's message below says which). Check the url, and that the app " +
+          `meant to handle it is installed. am start said: ${UNRESOLVED_VIEW}`,
+      );
+    });
+
+    it('a refusal at exit 0 has no cause, and no own `cause: undefined` either', async () => {
+      const error = await answering({ stderr: `${UNRESOLVED_VIEW}\n` }).openDeepLink('nosuch://x').catch((e: Error) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect(Object.hasOwn(error as Error, 'cause')).toBe(false);
+    });
+
+    it('a deep link that started an activity resolves; an adb failure passes through as it is', async () => {
+      await expect(answering({ stdout: 'Starting: Intent { act=android.intent.action.VIEW dat=bank://home }\n' }).openDeepLink('bank://home'))
+        .resolves.toBeUndefined();
+      const offline = execErrorLikeExec('adb -s e shell am start', 255, "adb: device 'e' not found\n");
+      await expect(answering(offline).openDeepLink('bank://home')).rejects.toBe(offline);
+    });
+
+    it("the monkey launch refused (exit 252, reason on stdout) → throws with monkey's reason and the way out", async () => {
+      const failure = execErrorLikeExec('adb -s e shell monkey', 252, '', { stdout: '** No activities found to run, monkey aborted.\n' });
+      const launching = answering(failure).launch('md.bank.app');
+      await expect(launching).rejects.toMatchObject({ cause: failure });
+      expect(await messageOf(launching)).toBe(
+        'monkey started nothing in md.bank.app — check that md.bank.app is installed and has a launcher ' +
+          'activity, or name the activity to start: `activity:` on the launch step / launch_app, or ' +
+          'app.android.activity in averi.yaml — or monkey itself could not run; its line says which. ' +
+          'monkey said: ** No activities found to run, monkey aborted.',
+      );
+    });
+
+    it('the monkey launch: exit 0 resolves; an adb failure passes through as it is', async () => {
+      await expect(answering({}).launch('md.bank.app')).resolves.toBeUndefined();
+      const offline = execErrorLikeExec('adb -s e shell monkey', 255, "adb: device 'e' not found\n");
+      await expect(answering(offline).launch('md.bank.app')).rejects.toBe(offline);
     });
   });
 
@@ -747,7 +795,7 @@ describe('AndroidAdapter.keyboard.state — is a soft keyboard shown, and which 
 
   it.each([
     ['adb exits non-zero', execErrorLikeExec('adb shell dumpsys window displays', 1, "error: device 'emulator-5554' not found")],
-    ['the call times out', execErrorLikeExec('adb shell dumpsys window displays', null, '', true)],
+    ['the call times out', execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true })],
     ['adb cannot be spawned', new Error('spawn adb ENOENT')],
   ])('a failing call does not throw into the tap — %s → unknown', async (_name, failure) => {
     const fn: ExecFn = async () => {
@@ -814,7 +862,7 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
   it.each([
     ['grep finds no line (exit 1 — an Android that does not print mInputShown)', execErrorLikeExec('adb shell dumpsys input_method | grep -m1 mInputShown', 1, '')],
     ['adb exits non-zero', execErrorLikeExec('adb shell …', 1, "error: device 'emulator-5554' not found")],
-    ['the call times out', execErrorLikeExec('adb shell …', null, '', true)],
+    ['the call times out', execErrorLikeExec('adb shell …', null, '', { timedOut: true })],
     ['adb cannot be spawned', new Error('spawn adb ENOENT')],
   ])('a failing call does not throw — %s → unknown', async (_name, failure) => {
     const fn: ExecFn = async () => {

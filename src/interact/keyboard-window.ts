@@ -385,7 +385,7 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
           // Android IME; `enter` may submit the form; and a flow has neither a
           // key step nor a coordinate tap.
           //
-          // A deliberate exception, 2026-10-03, of the kind amStart's comment
+          // A deliberate exception, 2026-10-03, of the kind launchRefused's comment
           // records in adapters/android.ts: this string names MCP tools
           // (ui_snapshot, press_key) and speaks of "a flow", vocabulary of the
           // two layers ABOVE interact. Kept, as in verify/capture.ts and

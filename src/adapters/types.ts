@@ -308,6 +308,11 @@ export interface DeviceAdapter {
   install(appPath: string): Promise<void>;
   launch(bundleId: string, opts?: LaunchOptions): Promise<void>;
   terminate(bundleId: string): Promise<void>;
+  /**
+   * Throws when the platform says nothing was opened — on Android an
+   * `am start` refusal (no app's intent filter matches the url, or the
+   * activity refused it; android-start.ts), since 2026-10-07.
+   */
   openDeepLink(url: string): Promise<void>;
 
   screenshot(): Promise<Buffer>; // PNG bytes

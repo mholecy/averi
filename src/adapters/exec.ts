@@ -28,11 +28,21 @@ export class ExecError extends Error {
      * FAILED" trailer) — callers that persist failure logs need both streams.
      */
     readonly stdout: Buffer = Buffer.alloc(0),
+    /**
+     * A line a reader of the failure adds to the message (android-start.ts's
+     * monkey stdout tail), and the error it re-reads as `cause`. It is given
+     * HERE, to a new error, never appended to a thrown one's `message`: V8
+     * writes `stack`'s header once, at construction, so a message extended
+     * afterwards is missing from every logged stack (code review, 2026-10-07).
+     */
+    options: { note?: string; cause?: unknown } = {},
   ) {
     super(
-      timedOut
+      (timedOut
         ? `Command timed out: ${command}`
-        : `Command failed (exit ${exitCode}): ${command}\n${stderr.trim()}`,
+        : `Command failed (exit ${exitCode}): ${command}\n${stderr.trim()}`) +
+        (options.note === undefined ? '' : `\n${options.note}`),
+      options.cause === undefined ? undefined : { cause: options.cause },
     );
     this.name = 'ExecError';
   }
