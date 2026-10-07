@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
+  containsPoint,
   inferScreenSize,
   inferScreenWidth,
   intersectsViewport,
   rectArea,
   rectsOverlap,
+  shadowing,
 } from '../../src/ui-tree/geometry.js';
-import type { UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
+import { node as uiNode } from '../helpers/fake.js';
 
 /**
  * Regression cover for docs/bugs/2026-08-26-ios-ocr-crop-scale.md: with a
@@ -287,5 +290,66 @@ describe('rectsOverlap — positive-area overlap only (the pixel poll\'s soft-ke
     expect(rectsOverlap(card, { x: 1014, y: 1979, width: 66, height: 132 })).toBe(false); // flush with the right edge
     expect(rectsOverlap(card, { x: 1014, y: 2111, width: 10, height: 10 })).toBe(false); // corner only
     expect(rectsOverlap(card, { x: 100, y: 2000, width: 0, height: 50 })).toBe(false); // zero-area, inside
+  });
+});
+
+describe('containsPoint — the tap guard\'s point-in-rect, here since 2026-10-07', () => {
+  const rect = { x: 10, y: 20, width: 30, height: 40 }; // x 10..39, y 20..59
+  it('left and top edges inclusive, right and bottom exclusive', () => {
+    expect(containsPoint(rect, { x: 10, y: 20 })).toBe(true); // top-left corner
+    expect(containsPoint(rect, { x: 39, y: 59 })).toBe(true); // last point inside
+    expect(containsPoint(rect, { x: 25, y: 40 })).toBe(true);
+    expect(containsPoint(rect, { x: 40, y: 40 })).toBe(false); // right edge
+    expect(containsPoint(rect, { x: 25, y: 60 })).toBe(false); // bottom edge
+    expect(containsPoint(rect, { x: 9, y: 40 })).toBe(false); // one left of the left edge
+    expect(containsPoint(rect, { x: 25, y: 19 })).toBe(false); // one above the top edge
+  });
+  it('false for a NaN coordinate or rect side, and for a zero-area rect even at its own origin', () => {
+    expect(containsPoint(rect, { x: Number.NaN, y: 40 })).toBe(false);
+    expect(containsPoint(rect, { x: 25, y: Number.NaN })).toBe(false);
+    expect(containsPoint({ ...rect, x: Number.NaN }, { x: 25, y: 40 })).toBe(false);
+    expect(containsPoint({ ...rect, height: Number.NaN }, { x: 25, y: 40 })).toBe(false);
+    expect(containsPoint({ x: 10, y: 20, width: 0, height: 0 }, { x: 10, y: 20 })).toBe(false);
+  });
+});
+
+describe('shadowing — the later content node drawn over a point (the dismissal picker\'s cover test, here since 2026-10-07)', () => {
+  const P = { x: 100, y: 100 };
+  /** A text node whose rect contains P, unless overridden. */
+  const text = (partial: Partial<UiNode> = {}): UiNode => uiNode({ role: 'text', rect: { x: 50, y: 50, width: 100, height: 100 }, ...partial });
+  const screen = (...children: UiNode[]): UiNode => uiNode({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children });
+  const fullScreen = (partial: Partial<UiNode> = {}): UiNode => uiNode({ role: 'other', rect: { x: 0, y: 0, width: 400, height: 800 }, ...partial });
+
+  it('nothing after the node: undefined — the ancestor, an earlier sibling and the node\'s own descendant all contain the point and none counts', () => {
+    const target = text({ label: 'title', children: [text({ label: 'inner' })] });
+    expect(shadowing(screen(text({ label: 'earlier' }), target), target, P)).toBeUndefined();
+  });
+
+  it('a later structural wrapper containing the point is not a cover (container or other), nor is a later zero-area node', () => {
+    const target = text({ label: 'title' });
+    const tree = screen(target, fullScreen(), fullScreen({ role: 'container' }), text({ rect: { x: 50, y: 50, width: 0, height: 100 } }));
+    expect(shadowing(tree, target, P)).toBeUndefined();
+  });
+
+  it('a later non-structural node containing the point is the cover; with several, the LAST in pre-order — a later Window\'s content included', () => {
+    const target = text({ label: 'title' });
+    const alert = text({ label: 'Session expired' });
+    const ok = uiNode({ role: 'button', label: 'OK', rect: { x: 90, y: 90, width: 20, height: 20 } });
+    expect(shadowing(screen(target, alert), target, P)).toBe(alert);
+    const tree = screen(target, alert, fullScreen({ children: [ok] }), text({ rect: { x: 200, y: 200, width: 10, height: 10 } }));
+    expect(shadowing(tree, target, P)).toBe(ok);
+  });
+
+  it('a later node that reaches the point only on its exclusive right/bottom edge is not a cover', () => {
+    const target = text({ label: 'title' });
+    expect(shadowing(screen(target, text({ rect: { x: 0, y: 0, width: 100, height: 100 } })), target, P)).toBeUndefined();
+  });
+
+  it('keyboard-owned later nodes are NOT exempt: the band, and a key over the point, are covers (review 2026-10-07)', () => {
+    const target = text({ label: 'title' });
+    const band = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: { x: 0, y: 50, width: 400, height: 335 } });
+    const key = uiNode({ role: 'button', label: 'q', ofKeyboard: true, rect: { x: 90, y: 90, width: 20, height: 20 } });
+    expect(shadowing(screen(target, fullScreen({ ofKeyboard: true, children: [band] })), target, P)).toBe(band);
+    expect(shadowing(screen(target, fullScreen({ ofKeyboard: true, children: [band, key] })), target, P)).toBe(key);
   });
 });

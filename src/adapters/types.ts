@@ -65,8 +65,9 @@ export function rectArea(rect: Rect): number {
  * keyboard, so ANY overlap counts there, and an element sitting flush on top
  * of the keyboard's frame is not under it. Both rects in the same units —
  * the caller's to guarantee. ui-tree/geometry.ts's `intersectsViewport` is the
- * same arithmetic against a viewport anchored at the origin; the tap guard's
- * `covers` (interact/keyboard.ts) is point-in-rect, a different question.
+ * same arithmetic against a viewport anchored at the origin; its
+ * `containsPoint` (the tap guard's, until 2026-10-07 interact/keyboard.ts's
+ * `inside`/`covers`) is point-in-rect, a different question.
  * Moved here from ui-tree/geometry.ts (which re-exports it) on 2026-10-07:
  * the WDA parser's keyboard band test needs it and may not import that layer.
  */
@@ -94,6 +95,16 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
  * which source it came from.
  */
 export const KEYBOARD_ROLE = 'keyboard';
+
+/**
+ * The roles every source gives its wrappers (Application, Window, Other,
+ * Cell; FrameLayout, View). Beside KEYBOARD_ROLE since 2026-10-07: it was
+ * `ui-tree/bare-tree.ts`'s, and `ui-tree/geometry.ts#shadowing` (a later
+ * structural wrapper contains every point and draws nothing) needed it too
+ * — a low-level module importing a higher sibling for one constant, so the
+ * constant moved to the one place both may read.
+ */
+export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'other']);
 
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {

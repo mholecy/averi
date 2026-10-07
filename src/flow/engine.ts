@@ -781,16 +781,14 @@ export class FlowEngine {
     // the masked-append one, so the next step's refusal is not a surprise.
     // On the oracle model both are absent and the line is as it was. A
     // dismissal that THROWS after tapping (AfterDismissalTap) gets its `⚠
-    // fill` line before the `✗`, as tracingDismissal gives the guard's —
-    // written out here because the result has no `keyboardHidden` to trace.
+    // fill` line before the `✗` through the guard's one catch
+    // (tracingGuardFailure) — not tracingDismissal, since the result has no
+    // `keyboardHidden` to trace: what it did is said on the fill line.
     let closed: DismissResult = {};
     if (closeKeyboard) {
-      try {
-        closed = await dismissKeyboard(this.adapter, { dismissals: this.dismissals, ambiguous: FLOW_AMBIGUITY });
-      } catch (e) {
-        if (e instanceof KeyboardGuardError) this.log('⚠ fill', e.traceLine);
-        throw e;
-      }
+      closed = await this.tracingGuardFailure('⚠ fill', () =>
+        dismissKeyboard(this.adapter, { dismissals: this.dismissals, ambiguous: FLOW_AMBIGUITY }),
+      );
     }
     if (closed.warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${closed.warning}`);
     this.log(
@@ -957,15 +955,26 @@ export class FlowEngine {
     action: '⚠ tap' | '⚠ fill',
     run: () => Promise<T>,
   ): Promise<T> {
-    let result: T;
+    const result = await this.tracingGuardFailure(action, run);
+    if (result.keyboardHidden !== undefined) this.log(action, result.keyboardHidden);
+    return result;
+  }
+
+  /**
+   * The failure half of `tracingDismissal`, on its own (2026-10-07, review
+   * of the stage B branch): any KeyboardGuardError's `traceLine`, logged as
+   * `action` BEFORE the error goes on to the step's `✗` line. The one catch
+   * for the guard's two steps above and for the post-fill `dismissKeyboard`
+   * (runFill), whose result has no `keyboardHidden` to trace — until then
+   * runFill carried a second copy of the catch.
+   */
+  private async tracingGuardFailure<T>(action: '⚠ tap' | '⚠ fill', run: () => Promise<T>): Promise<T> {
     try {
-      result = await run();
+      return await run();
     } catch (e) {
       if (e instanceof KeyboardGuardError) this.log(action, e.traceLine);
       throw e;
     }
-    if (result.keyboardHidden !== undefined) this.log(action, result.keyboardHidden);
-    return result;
   }
 
   private async matches(cond: Condition, tree: UiNode): Promise<boolean> {

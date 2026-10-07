@@ -467,9 +467,10 @@ element (K5b, K3 of the device check) and the accessory toolbar's Done (K4) — 
    centre clear of the band (`under the keyboard`: a configured element under it would be the very tap the guard
    refuses), inside the root's rect (`off screen at (x,y)`: WDA keeps off-screen nodes, a title scrolled above the
    viewport is still found) and not drawn over by later content (`covered by text "Session expired"`: `shadowing`, the
-   last non-structural, non-keyboard node after it in pre-order containing the point — an alert's or sheet's text, a
-   navigation bar's label; ancestors, earlier siblings, later structural wrappers never count); an `accessory` is
-   usable when `accessoryDismissButton` answers (`no accessory toolbar on screen` otherwise). None →
+   last non-structural node after it in pre-order containing the point — an alert's or sheet's text, a navigation
+   bar's label, a keyboard-owned node the band missed (not exempt since review round 2); ancestors, earlier siblings,
+   later structural wrappers never count); an `accessory` is usable when `accessoryDismissButton` answers (`no
+   accessory toolbar on screen` otherwise). None →
    `KeyboardWithoutDismissal` as before, the message now ending `…; this adapter cannot hide it (<advice>), and no
    dismissal is configured` or `…, and none of the configured dismissals is usable on this screen (tap
    id:"twofactor_title": not found; accessory: no accessory toolbar on screen)`; the `⚠ tap` trace line is unchanged

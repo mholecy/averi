@@ -1,4 +1,4 @@
-import { everyNode, type UiNode } from '../adapters/types.js';
+import { everyNode, STRUCTURAL_ROLES, type UiNode } from '../adapters/types.js';
 import { rectArea } from './geometry.js';
 
 /**
@@ -87,8 +87,9 @@ export function isBareTree(tree: UiNode): boolean {
   });
 }
 
-/** The roles every source gives its wrappers (Application, Window, Other, Cell; FrameLayout, View). */
-export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'other']);
+// STRUCTURAL_ROLES, the wrapper roles this rule reads, is defined beside
+// KEYBOARD_ROLE in adapters/types.ts since 2026-10-07 (geometry.ts's
+// `shadowing` reads it too).
 /** Roles that are decoration unless LABELLED: a splash image (identified or not), a spinner. */
 export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress']);
 /**

@@ -1,5 +1,5 @@
 import { rectArea, type DeviceAdapter, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
-import { STRUCTURAL_ROLES } from '../ui-tree/bare-tree.js';
+import { containsPoint, shadowing } from '../ui-tree/geometry.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, keyboardInTree, partOfKeyboard, readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
@@ -79,8 +79,8 @@ export interface ResolvedClear extends Resolved {
 /**
  * A failure of the keyboard guard that the caller must be able to SEE in a
  * trace: `traceLine` is the trace-sized sentence the flow engine logs as
- * `⚠ tap` / `⚠ fill` BEFORE the step's `✗` line (one tracing path for both
- * subclasses, flow/engine.ts#tracingDismissal).
+ * `⚠ tap` / `⚠ fill` BEFORE the step's `✗` line (one catch for every
+ * subclass, flow/engine.ts#tracingGuardFailure).
  */
 export class KeyboardGuardError extends Error {
   constructor(
@@ -222,41 +222,6 @@ interface DismissalPick {
   skipped: string[];
 }
 
-/** Is the point inside the rect — left and top inclusive, right and bottom exclusive, like `covers` and the Android frame test. */
-const inside = (rect: Rect, point: { x: number; y: number }): boolean =>
-  point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
-
-/**
- * The node DRAWN OVER `point` on top of `node`, if any (review round 1): the
- * last node in pre-order AFTER `node`'s subtree — later siblings and their
- * descendants are drawn over earlier ones, later Windows over earlier (UIKit
- * orders them by level) — that is content (not a structural wrapper: a
- * full-screen `Other` of a later Window contains every point and draws
- * nothing), has area and contains the point. The keyboard's own nodes are
- * NOT exempt: a strategy under the keyboard is caught first by the band
- * check (with its own reason), and a keyboard-owned node over the point
- * that the band missed is a real cover (review 2026-10-07). `undefined` when
- * nothing shadows the point. Ancestors and earlier siblings never count:
- * they are beneath. A heuristic, not a compositor — a transparent overlay
- * reads as cover, a label inside a sheet that does not contain the point
- * does not — but it refuses the measured kind of false target: an alert's
- * or a sheet's content over the title, a navigation bar's own label.
- */
-function shadowing(tree: UiNode, node: UiNode, point: { x: number; y: number }): UiNode | undefined {
-  let after = false;
-  let over: UiNode | undefined;
-  const walk = (n: UiNode): void => {
-    if (n === node) {
-      after = true; // the node's own subtree is the node
-      return;
-    }
-    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && inside(n.rect, point)) over = n;
-    for (const child of n.children) walk(child);
-  };
-  walk(tree);
-  return over;
-}
-
 /**
  * The FIRST configured dismissal that is usable, judged on one tree — the
  * one that found the keyboard covering, so no device read is spent on the
@@ -277,9 +242,10 @@ function shadowing(tree: UiNode, node: UiNode, point: { x: number; y: number }):
  * would be the very tap this guard refuses), inside the screen — the root's
  * rect, when it has one: a title scrolled above the viewport is still in
  * the tree, WDA keeps off-screen nodes — and not drawn over by later content
- * (`shadowing`: an alert, a sheet, a navigation bar's label). An `accessory`
- * is usable when `accessoryDismissButton` answers; that answer is under an
- * `ofKeyboard` root by construction, so no keyboard check is repeated here.
+ * (`shadowing`, ui-tree/geometry.ts: an alert, a sheet, a navigation bar's
+ * label). An `accessory` is usable when `accessoryDismissButton` answers;
+ * that answer is under an `ofKeyboard` root by construction, so no keyboard
+ * check is repeated here.
  */
 function pickDismissal(tree: UiNode, dismissals: readonly KeyboardDismissal[], ambiguous: Ambiguity): DismissalPick {
   const band = keyboardInTree(tree);
@@ -319,7 +285,7 @@ function pickDismissal(tree: UiNode, dismissals: readonly KeyboardDismissal[], a
       skipped.push(`${name}: under the keyboard`);
       continue;
     }
-    if (rectArea(tree.rect) > 0 && !inside(tree.rect, at)) {
+    if (rectArea(tree.rect) > 0 && !containsPoint(tree.rect, at)) {
       skipped.push(`${name}: off screen at (${at.x},${at.y})`);
       continue;
     }
@@ -377,7 +343,16 @@ type WindowReading = 'covering' | 'clear' | 'unknown';
 /** The guard's reading of one window state against the tap point, with the frame when it covers — so a message can quote it without a second look. */
 type CoverReading = { over: 'covering'; frame: Rect } | { over: 'clear' } | { over: 'unknown' };
 
-const covers = (keyboard: SoftKeyboard & { state: 'shown' }, point: { x: number; y: number }): boolean => inside(keyboard.frame, point);
+/**
+ * What `dismissal` decides for ONE call: press `back`, or press nothing.
+ * A decision, not a capability — `DismissalMeans` (ui-tree/soft-keyboard.ts,
+ * `'back' | 'none'`) says what the ADAPTER has to hide a keyboard with,
+ * fixed per adapter, and an adapter with `back` in hand still decides
+ * `nothing` here when the state is hidden or the witness denies the
+ * keyboard. Two literal sets on purpose: `none` is "no means", `nothing` is
+ * "do nothing this time".
+ */
+export type DismissalDecision = 'back' | 'nothing';
 
 /**
  * The dismissal's reading: a keyboard shown ANYWHERE is in the way — there is
@@ -389,11 +364,11 @@ const covers = (keyboard: SoftKeyboard & { state: 'shown' }, point: { x: number;
 const windowAnywhere = (keyboard: SoftKeyboard): WindowReading =>
   keyboard.state === 'shown' ? 'covering' : keyboard.state === 'hidden' ? 'clear' : 'unknown';
 
-/** The guard's reading: does the frame contain the point about to be tapped? Geometry only; the decisions below judge. */
+/** The guard's reading: does the frame contain the point about to be tapped? Geometry only (`containsPoint`, ui-tree/geometry.ts); the decisions below judge. */
 export const windowOver = (keyboard: SoftKeyboard, point: { x: number; y: number }): CoverReading =>
   keyboard.state === 'unknown'
     ? { over: 'unknown' }
-    : keyboard.state === 'shown' && covers(keyboard, point)
+    : keyboard.state === 'shown' && containsPoint(keyboard.frame, point)
       ? { over: 'covering', frame: keyboard.frame }
       : { over: 'clear' };
 
@@ -506,9 +481,9 @@ export function inTreeLook(window: CoverReading): { action: 'proceed' } | { acti
  *     window state after a navigation is where it was measured), and with
  *     nothing to wait for, a denied keyboard is simply left alone.
  */
-export function dismissal(window: 'clear' | 'unknown'): 'back' | 'nothing';
-export function dismissal(window: 'covering', witness: KeyboardWitness): 'back' | 'nothing';
-export function dismissal(window: WindowReading, witness?: KeyboardWitness): 'back' | 'nothing' {
+export function dismissal(window: 'clear' | 'unknown'): DismissalDecision;
+export function dismissal(window: 'covering', witness: KeyboardWitness): DismissalDecision;
+export function dismissal(window: WindowReading, witness?: KeyboardWitness): DismissalDecision {
   if (window !== 'covering') return window === 'unknown' ? 'back' : 'nothing';
   return witness === 'hidden' ? 'nothing' : 'back';
 }

@@ -1,4 +1,4 @@
-import { rectArea, rectsOverlap, zeroRect, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectsOverlap, STRUCTURAL_ROLES, zeroRect, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -13,7 +13,12 @@ import { rectArea, rectsOverlap, zeroRect, type Rect, type UiNode } from '../ada
  * selection, and the 2026-08-14 review (E2) had already asked for them to
  * join this module. tapPoint stays in selectors.ts on purpose: it is the
  * tap-target rule (where a resolved node is pressed), its importers include
- * interact/keyboard.ts, and the move deliberately left it alone.
+ * interact/keyboard.ts, and the move deliberately left it alone. Since
+ * 2026-10-07 the point-in-rect test (`containsPoint`) and the draw-order
+ * question (`shadowing`, at the end) are here too: the tap guard's
+ * dismissal picker had spelled both in interact/keyboard.ts, and the review
+ * of that branch sent them where the rect arithmetic is — a layer that may
+ * ask the tree anything, below the one that acts on it (ARCHITECTURE.md §2).
  */
 
 interface ScreenWidth {
@@ -330,6 +335,19 @@ export function visibleFractionInViewport(
 export { rectArea, rectsOverlap };
 
 /**
+ * Is the point inside the rect — left and top inclusive, right and bottom
+ * exclusive, like the Android frame test. The point-in-rect companion of
+ * `rectsOverlap` (two rects sharing area: a different question), and the
+ * ONE spelling of it: the tap guard asks it of the keyboard's frame and the
+ * tap point (interact/keyboard.ts#windowOver), the dismissal picker of the
+ * root's rect, and `shadowing` below of every candidate. Until 2026-10-07 it
+ * was interact/keyboard.ts's `inside`, with a `covers` wrapper beside it.
+ */
+export function containsPoint(rect: Rect, point: { x: number; y: number }): boolean {
+  return point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
+}
+
+/**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
  * the content exhausted is a missing-clearance bug, 'top' is a sticky header
@@ -368,4 +386,42 @@ export function sameRect(a: Rect, b: Rect): boolean {
  */
 export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;
+}
+
+// ─── Draw order ──────────────────────────────────────────────────────────────
+
+/**
+ * The node DRAWN OVER `point` on top of `node`, if any (review round 1): the
+ * last node in pre-order AFTER `node`'s subtree — later siblings and their
+ * descendants are drawn over earlier ones, later Windows over earlier (UIKit
+ * orders them by level) — that is content (not a structural wrapper: a
+ * full-screen `Other` of a later Window contains every point and draws
+ * nothing), has area and contains the point. The keyboard's own nodes are
+ * NOT exempt: a strategy under the keyboard is caught first by the band
+ * check (with its own reason), and a keyboard-owned node over the point
+ * that the band missed is a real cover (review 2026-10-07). `undefined` when
+ * nothing shadows the point. Ancestors and earlier siblings never count:
+ * they are beneath. A heuristic, not a compositor — a transparent overlay
+ * reads as cover, a label inside a sheet that does not contain the point
+ * does not — but it refuses the measured kind of false target: an alert's
+ * or a sheet's content over the title, a navigation bar's own label.
+ *
+ * Asked by the tap guard's dismissal picker (interact/keyboard.ts
+ * #pickDismissal). Here, not in soft-keyboard.ts, since 2026-10-07: it is
+ * a draw-order question over rects asked of any tree — the keyboard is one
+ * more thing that can be drawn over a point, not what the question is about.
+ */
+export function shadowing(tree: UiNode, node: UiNode, point: { x: number; y: number }): UiNode | undefined {
+  let after = false;
+  let over: UiNode | undefined;
+  const walk = (n: UiNode): void => {
+    if (n === node) {
+      after = true; // the node's own subtree is the node
+      return;
+    }
+    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && containsPoint(n.rect, point)) over = n;
+    for (const child of n.children) walk(child);
+  };
+  walk(tree);
+  return over;
 }

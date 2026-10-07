@@ -47,6 +47,25 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
 }
 
 /**
+ * Every node of the tree in pre-order with the two marks its ancestry gives
+ * it: whether it lies under (or is) an `ofKeyboard` root — the keyboard's
+ * own UI, keys and accessory toolbar alike — and whether it lies under (or
+ * is) the `KEYBOARD_ROLE` band node. The one walk `partOfKeyboard` and
+ * `accessoryDismissButton` share: until 2026-10-07 (review of the stage B
+ * branch) each carried the flags through a recursion of its own.
+ */
+function* markedNodes(
+  tree: UiNode,
+  ofKeyboard = false,
+  underBand = false,
+): Generator<{ node: UiNode; ofKeyboard: boolean; underBand: boolean }> {
+  const here = ofKeyboard || tree.ofKeyboard === true;
+  const banded = underBand || tree.role === KEYBOARD_ROLE;
+  yield { node: tree, ofKeyboard: here, underBand: banded };
+  for (const child of tree.children) yield* markedNodes(child, here, banded);
+}
+
+/**
  * Is `node` the keyboard's own UI — a key, the AutoFill bar, the accessory
  * toolbar's Done (review 2026-10-07)? True when it, or an ancestor of it in
  * `tree`, carries `ofKeyboard`. By identity: the node must be one of the
@@ -56,16 +75,8 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * tap on it is the thing the user does, not the thing the guard prevents.
  */
 export function partOfKeyboard(tree: UiNode, node: UiNode): boolean {
-  const walk = (n: UiNode, inside: boolean): boolean | undefined => {
-    const here = inside || n.ofKeyboard === true;
-    if (n === node) return here;
-    for (const child of n.children) {
-      const found = walk(child, here);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  return walk(tree, false) ?? false;
+  for (const marked of markedNodes(tree)) if (marked.node === node) return marked.ofKeyboard;
+  return false;
 }
 
 /**
@@ -98,31 +109,39 @@ export function partOfKeyboard(tree: UiNode, node: UiNode): boolean {
  * dismiss there either, so the two residuals agree.
  */
 export function accessoryDismissButton(tree: UiNode): UiNode | undefined {
-  const walk = (n: UiNode, ofKeyboard: boolean, underBand: boolean): UiNode | undefined => {
-    const here = ofKeyboard || n.ofKeyboard === true;
-    const banded = underBand || n.role === KEYBOARD_ROLE;
-    if (n.role === 'toolbar' && here && !banded && rectArea(n.rect) > 0) {
-      let last: UiNode | undefined;
-      for (const d of everyNode(n)) if (d.role === 'button' && rectArea(d.rect) > 0) last = d;
-      if (last !== undefined) return last;
-    }
-    for (const child of n.children) {
-      const found = walk(child, here, banded);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  return walk(tree, false, false);
+  for (const { node, ofKeyboard, underBand } of markedNodes(tree)) {
+    if (node.role !== 'toolbar' || !ofKeyboard || underBand || !(rectArea(node.rect) > 0)) continue;
+    let last: UiNode | undefined;
+    for (const d of everyNode(node)) if (d.role === 'button' && rectArea(d.rect) > 0) last = d;
+    if (last !== undefined) return last;
+  }
+  return undefined;
+}
+
+/**
+ * What the adapter has to hide a keyboard WITH — a capability, fixed per
+ * adapter, not a decision: `back` on the oracle's window model (a `back`
+ * hides it, witness-vetoed, interact/keyboard.ts), `none` on the in-tree
+ * model, where no key does and the configured dismissals are tried instead.
+ * The pixel poll words its remedy by it. What one call then DOES —
+ * interact/keyboard.ts#dismissal's `'back' | 'nothing'` — is a different
+ * question with its own literals, kept apart on purpose: with `back` in
+ * hand the decision is still `nothing` when the state is hidden or the
+ * witness denies the keyboard.
+ */
+export type DismissalMeans = 'back' | 'none';
+
+/** What the adapter can do about a covering keyboard, for the sentence that says so (the pixel poll's miss, the guard's refusal). */
+export interface KeyboardRemedy {
+  dismissal: DismissalMeans;
+  /** With `none`: the adapter's own sentence on why, and what works instead (`DeviceAdapter.keyboardAdvice`), when it has one. */
+  advice?: string;
 }
 
 /** One reading of the soft keyboard for one subject node, and what the adapter can do about a covering one. */
-export interface SoftKeyboardReading {
+export interface SoftKeyboardReading extends KeyboardRemedy {
   /** The keyboard's state and frame; `unknown` when the subject is part of the keyboard's own UI, whatever is on screen. */
   keyboard: SoftKeyboard;
-  /** `back`: the oracle's window model, a `back` hides it (witness-vetoed, interact/keyboard.ts). `none`: the in-tree model, nothing does. */
-  dismissal: 'back' | 'none';
-  /** With `none`: the adapter's own sentence on why, and what works instead (`DeviceAdapter.keyboardAdvice`), when it has one. */
-  advice?: string;
 }
 
 /**
