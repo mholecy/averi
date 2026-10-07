@@ -365,6 +365,6 @@ one happens by itself.
   0.8.1 the server stops its WebDriverAgent on SIGTERM/SIGINT/SIGHUP, waits for the port to go quiet and kills the
   listener if xcodebuild's teardown did not. An older server, a SIGKILL, or a second signal during that wait still
   leave one behind: `pkill -f WebDriverAgentRunner` before the first iOS call.
-- **A `${VAR}` is missing** — the error names the credential (and environment) that needed it;
+- **A `${VAR}` is missing or empty** — the error names the credential (and environment) that needed it;
   add the variable to `.env.averi`. Never ask the user for the value itself.
 - **Flow times out after a UI change** — fix the descriptor as part of the change; it's code.

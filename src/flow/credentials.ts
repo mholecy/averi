@@ -57,7 +57,8 @@ export interface Credentials {
    * `$name` → credentials[name] → `${VAR}` expansion from the env; a bare
    * `${VAR}` expands too; plain strings pass through. Throws SetupError —
    * which aborts the reach ladder rather than escalating it — for an
-   * undeclared credential or an unset variable, naming what to declare or set.
+   * undeclared credential or an unset or EMPTY variable, naming what to
+   * declare or set.
    */
   resolve(raw: string): ResolvedValue;
 }
@@ -103,14 +104,27 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
   const expand = (template: string, credential?: string): string =>
     template.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, variable: string) => {
       const value = env[variable];
-      if (value === undefined) {
+      // Unset and EMPTY are both refused (empty since 2026-10-07): a
+      // `PASSWORD=` line in .env.averi parses to "", and since the adapters
+      // type an empty string as a no-op on both platforms, a step that typed
+      // it would pass and the bank would reject the login one screen later —
+      // the 2026-08-06 misdiagnosis shape this module exists to prevent. A
+      // literal `value: ""` in the YAML never comes through here (resolve
+      // passes plain strings through), so "clear this field" stays writable.
+      if (value === undefined || value === '') {
         const forWhom =
           credential ?
             ` (needed for credential "${credential}"` +
             `${environment === undefined ? '' : ` in environment "${environment}"`})`
           : '';
+        // An exported variable wins over .env.averi (flow/load.ts#envBeside),
+        // so an empty one in the shell or CI shadows a real value in the file:
+        // "set it in .env.averi" would then change nothing — say so.
         throw new SetupError(
-          `Environment variable ${variable} is not set${forWhom} — set it in .env.averi beside averi.yaml, or export it, and retry`,
+          value === undefined ?
+            `Environment variable ${variable} is not set${forWhom} — set it in .env.averi beside averi.yaml, or export it, and retry`
+          : `Environment variable ${variable} is set but empty${forWhom} — give it a value in .env.averi beside averi.yaml, or export it with one; ` +
+              'an empty variable exported in the shell or CI shadows the value in .env.averi, so unset it there, and retry',
         );
       }
       return value;

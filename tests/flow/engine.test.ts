@@ -1837,6 +1837,45 @@ flows:
     expect(JSON.stringify(trace)).not.toContain('4321');
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = ***' });
   });
+
+  // 2026-10-07 (docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md):
+  // "" is typed as a no-op on both platforms now, so a credential whose
+  // variable is set but EMPTY (`TEST_PIN=` in .env.averi) must fail the step
+  // before the device is touched — it would otherwise pass as `***` and the
+  // bank would reject it one screen later. A literal "" is a different thing:
+  // a clear, or a focus without typing, and stays a passing step.
+  it('a credential whose variable is set but empty fails the fill before the field is tapped', async () => {
+    const cfgSecret = parseConfig(`
+app: { android: { package: md.bank.app } }
+credentials:
+  pin: \${TEST_PIN}
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: $pin, clear: true }
+`);
+    const fake = formFake();
+    await expect(new FlowEngine(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '' } }).runFlow('f')).rejects.toThrow(
+      /TEST_PIN is set but empty \(needed for credential "pin"\)/,
+    );
+    expect(fake.taps).toEqual([]);
+    expect(fake.typed).toEqual([]);
+  });
+
+  it('a literal value: "" is not a credential: with clear it clears the field and the step passes', async () => {
+    const cfgLiteral = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: "", clear: true }
+`);
+    const fake = formFake('9.99');
+    const trace = await new FlowEngine(cfgLiteral, fake, FAST).runFlow('f');
+    expect(fake.taps).toEqual(['amount_input']);
+    expect(fake.deletes).toEqual([4]); // "9.99".length
+    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" =  (cleared)' });
+  });
 });
 
 describe('assert step', () => {

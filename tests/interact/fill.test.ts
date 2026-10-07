@@ -144,8 +144,60 @@ describe('fillField — focus, clear, type, verify', () => {
     const real = fake.uiTree.bind(fake);
     fake.uiTree = async () => (reads++, real());
     await fillField(fake, { id: 'amount_input' }, '', FAST);
-    expect(fake.typed).toEqual(['']);
+    expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(reads).toBe(2); // the settle wait only — no value poll
+  });
+
+  // docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md: a `fill` with
+  // value "" is "clear this field" with clear and "focus without typing"
+  // without. On iOS it threw idb's bare error after the tap — and after the
+  // clear, so the field ended as asked and the step failed. The guard is the
+  // adapter's (DeviceAdapter.typeText: "" types nothing); what is pinned here
+  // is that the fill still hands "" over, clears, and asks nothing more.
+  it('value "" with clear: true clears the field and passes — the "" goes to the adapter, nothing is read back or retyped', async () => {
+    const fake = formFake('2.50');
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++, real());
+    const result = await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+    expect(fake.taps).toEqual(['amount_input']);
+    expect(fake.deletes).toEqual([4]); // "2.50".length
+    expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
+    expect(fake.focused?.value ?? '').toBe(''); // the fake appends the "" to a cleared (null) field: nothing held
+    expect(reads).toBe(4); // the settle wait, the post-focus read the loop counts from, the one that confirms the clear — no value poll
+    expect(result).toEqual({ note: undefined, warning: undefined });
+  });
+
+  it('value "" with clear: true clears what the field holds AFTER focus — a field that autofills on focus ends empty', async () => {
+    // A clear alone has no read-back to catch an autofill (review 2026-09-18
+    // measured Android populating a password field on focus), so the loop
+    // counts from a post-focus read, not the pre-tap tree that showed nothing.
+    const fake = formFake(null);
+    const origTap = fake.tap.bind(fake);
+    fake.tap = async (x: number, y: number) => {
+      await origTap(x, y);
+      if (fake.focused) fake.focused.value = '•'.repeat(20); // autofill on focus
+    };
+    await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([20]);
+    expect(fake.focused?.value ?? '').toBe('');
+  });
+
+  it('value "" without clear is the focus tap alone: nothing deleted, no post-focus re-read, and no append warning on a held masked field', async () => {
+    // The masked-append warning names a typing; a focus-only fill did none,
+    // so the post-focus re-read that feeds it (and the length rule, which an
+    // empty value never runs) is skipped too.
+    const fake = formFake('•'.repeat(20));
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++, real());
+    const result = await fillField(fake, { id: 'amount_input' }, '', FAST);
+    expect(fake.taps).toEqual(['amount_input']);
+    expect(fake.deletes).toEqual([]);
+    expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
+    expect(fake.focused?.value).toHaveLength(20);
+    expect(reads).toBe(2); // the settle wait only
+    expect(result).toEqual({ note: undefined, warning: undefined });
   });
 
   it("in 'refuse' mode a second match appearing MID-fill is a refusal in its own wording, not a device hint", async () => {

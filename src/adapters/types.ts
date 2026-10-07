@@ -311,6 +311,17 @@ export interface DeviceAdapter {
     to: { x: number; y: number },
     durationMs?: number,
   ): Promise<void>;
+  /**
+   * Type `text` into whatever is focused. An EMPTY string types nothing and
+   * does not fail: it is what a `fill` with `value: ""` hands over (a clear
+   * alone, or a focus without typing — interact/fill.ts skips the read-back
+   * for it), and the `type` step and the type_text tool pass their text
+   * through unexamined. Android meets this by a per-character loop that
+   * runs zero times; iOS returns before calling idb, which refuses
+   * `ui text ''` (2026-10-07, docs/bugs/2026-10-07-ios-fill-empty-value-
+   * fails-in-idb.md — until then the step threw idb's bare error after the
+   * focus tap, and after the clear).
+   */
   typeText(text: string): Promise<void>;
   /**
    * Clear up to `count` characters on EACH side of the cursor in the focused

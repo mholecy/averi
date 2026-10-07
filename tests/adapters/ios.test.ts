@@ -125,6 +125,22 @@ describe('IosAdapter interactions', () => {
     expect(calls.at(-1)?.full).toBe('idb ui key-sequence 76 76 76 --udid AAAA-1111');
   });
 
+  it('typeText hands the text to idb ui text', async () => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).typeText('alice');
+    expect(calls.at(-1)?.full).toBe('idb ui text alice --udid AAAA-1111');
+  });
+
+  // docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md: `idb ui text ''`
+  // is refused ("Request was not sent"), so a `fill` with value "" — a clear
+  // alone, or a focus without typing — threw after the focus tap and after the
+  // clear. The contract (DeviceAdapter.typeText) is that "" types nothing.
+  it('typeText with an empty string calls idb not at all — the contract Android meets with a zero-iteration loop', async () => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).typeText('');
+    expect(calls).toEqual([]);
+  });
+
   it('pressKey back is rejected with guidance, home uses the HOME button', async () => {
     const { fn, calls } = fakeExec({});
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });

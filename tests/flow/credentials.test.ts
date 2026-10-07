@@ -118,6 +118,23 @@ describe('Credentials.resolve — $name, ${VAR}, plain', () => {
     );
   });
 
+  // 2026-10-07: `PASSWORD=` in .env.averi parses to "", and the adapters type
+  // "" as a no-op (DeviceAdapter.typeText) — so an empty variable would have
+  // typed nothing, passed, and been rejected by the bank one screen later, the
+  // 2026-08-06 misdiagnosis shape. Refused like an unset one, saying which.
+  it('an EMPTY variable is refused like an unset one, saying it is set but empty', () => {
+    expect(() => resolveCredentials(cfg, { ...ENV, AVERI_TEST_EMPTY: '' }).resolve('${AVERI_TEST_EMPTY}')).toThrow(
+      'Environment variable AVERI_TEST_EMPTY is set but empty — give it a value in .env.averi beside averi.yaml, or export it with one; an empty variable exported in the shell or CI shadows the value in .env.averi, so unset it there, and retry',
+    );
+    expect(() => resolveCredentials(cfg, { ...ENV, AVERI_STARTERKIT_USERNAME: '' }, 'starterkit').resolve('$username')).toThrow(
+      'Environment variable AVERI_STARTERKIT_USERNAME is set but empty (needed for credential "username" in environment "starterkit") — give it a value in .env.averi beside averi.yaml, or export it with one; an empty variable exported in the shell or CI shadows the value in .env.averi, so unset it there, and retry',
+    );
+  });
+
+  it('a LITERAL empty string is a plain value, not a credential: it passes through — "clear this field" stays writable', () => {
+    expect(resolveCredentials(cfg, ENV).resolve('')).toEqual({ value: '', secret: false });
+  });
+
   it('expansion is lazy: a declared credential whose variable is unset fails only the step that uses it', () => {
     const creds = resolveCredentials(cfg, { AVERI_BANK_USERNAME: 'bank.user' }); // no pin
     expect(creds.resolve('$username').value).toBe('bank.user');

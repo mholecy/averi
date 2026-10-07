@@ -278,6 +278,19 @@ describe('AndroidAdapter interactions', () => {
     ]);
   });
 
+  // The iOS side of this (2026-10-07, docs/bugs/2026-10-07-ios-fill-empty-
+  // value-fails-in-idb.md) returns before idb; Android's loop already ran zero
+  // times for "" and passed, and still does — the commit nudge stays, as it
+  // was, so an empty fill on Android is unchanged by the iOS fix.
+  it('typeText with an empty string injects no character: the loop runs zero times, only the commit nudge is sent', async () => {
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('');
+    expect(calls).toEqual([
+      'adb -s emulator-5554 shell input keyevent 21',
+      'adb -s emulator-5554 shell input keyevent 22',
+    ]);
+  });
+
   it('launch with clearState clears app data first', async () => {
     const { fn, calls } = fakeExec({});
     await new AndroidAdapter({ serial: 'emulator-5554', exec: fn })

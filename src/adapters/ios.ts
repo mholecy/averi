@@ -276,6 +276,12 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   async typeText(text: string): Promise<void> {
+    // "" types nothing (the DeviceAdapter.typeText contract): idb refuses
+    // `ui text ''` with a bare `('Request was not sent',)` — measured
+    // 2026-10-07, docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md.
+    // Guarded here, once, because the refusal is idb's, a platform fact no
+    // caller owns, and every caller hands its text through unexamined.
+    if (text === '') return;
     await this.idbUi(['text', text]);
   }
 

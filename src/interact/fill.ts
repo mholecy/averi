@@ -54,6 +54,10 @@ export interface FillResult {
  *   mismatch throws instead of corrupting content the field came with.
  * Fields that never expose text (masked/password) verify as best-effort;
  * fields that expose BULLETS verify by length (see `landed`).
+ * An EMPTY value is the focus tap and the optional clear alone: nothing is
+ * read back, no append warning is raised, and the adapter is still handed
+ * the "" — a no-op by its contract (DeviceAdapter.typeText), so the step
+ * reads "clear this field" with clear and "focus without typing" without.
  * Errors carry LENGTHS only, never content — values may be credentials.
  *
  * The re-read between phases is resolveNow on a fresh tree — the one-shot
@@ -105,12 +109,15 @@ export async function fillField(
   let current: UiNode | undefined = node;
   let preLen = node.value?.length ?? 0; // what the field holds when typing starts (see `landed`)
   let warning: string | undefined;
-  if (!clear && (preLen === 0 || isMaskedValue(current?.value ?? ''))) {
+  if (value !== '' && !clear && (preLen === 0 || isMaskedValue(current?.value ?? ''))) {
     // The pre-tap read is stale for exactly the fields the length rule cares
     // about: Android autofill POPULATES a password field on focus, and a
     // re-entry screen CLEARS one on focus (review 2026-09-18 measured both as
     // false failures against a pre-tap `preLen`). Re-read after focus. Plain
-    // fields with content skip this — `includes` never uses preLen.
+    // fields with content skip this — `includes` never uses preLen. So does
+    // an empty value (2026-10-07): it is a focus without typing, which has no
+    // read-back to feed and nothing that could append, so the masked-append
+    // warning below would name a typing that never happened.
     const focused = await refetch();
     if (focused !== undefined) {
       current = focused;
@@ -124,6 +131,18 @@ export async function fillField(
     }
   }
   if (clear) {
+    if (value === '') {
+      // A clear ALONE has no read-back behind it, so what the loop counts
+      // must be what the field holds AFTER focus, not before the tap: a
+      // field that autofills on focus (Android, measured 2026-09-18) would
+      // otherwise read as empty from the pre-tap tree, be skipped, and keep
+      // the autofilled text — the one fill shape whose whole point is an
+      // empty field. A clear WITH a value needs no such read: its read-back
+      // compares the field to the value and wipes a mismatch before the
+      // retry. Same re-read as the `!clear` branch above (2026-10-07).
+      const focused = await refetch();
+      if (focused !== undefined) current = focused;
+    }
     for (let attempt = 0; ; attempt++) {
       const existing = current?.value?.length ?? 0;
       if (existing === 0) break;

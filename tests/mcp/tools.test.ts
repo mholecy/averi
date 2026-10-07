@@ -400,6 +400,39 @@ describe('launch_app — the entry activity', () => {
   });
 });
 
+// docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md: `text: ""` is a
+// legal call on both of the tool's paths — with a selector it is a clear
+// alone or a focus without typing; without one it is a no-op — and the
+// handler hands the "" to the adapter on both, which is why the guard lives
+// in IosAdapter.typeText (idb refuses `ui text ''`) and not in fillField:
+// a fill-only skip would have left the selector-less path throwing idb's
+// bare error. Pinned here: the response, and that "" reaches the adapter.
+describe('type_text with an empty text', () => {
+  const form = () => new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'amount_input', value: '2.50' })) }, 'form');
+
+  it('without a selector: the adapter is handed "", and the response counts 0 characters', async () => {
+    const fake = form();
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', text: '', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Typed 0 characters');
+    expect(fake.typed).toEqual(['']);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('with a selector and clear: the field is focused and cleared, the "" handed over, and the response says so', async () => {
+    const fake = form();
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', selector: 'id:amount_input', text: '', clear: true, configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Filled id:amount_input (0 characters, cleared first)');
+    expect(fake.taps).toEqual(['amount_input']);
+    expect(fake.deletes).toEqual([4]);
+    expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
+    expect(fake.focused?.value ?? '').toBe(''); // the fake appends the "" to a cleared (null) field: nothing held
+  });
+});
+
 describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_until, assert)', () => {
   const snapshot = async (platform: Platform, configPath: string) => {
     const harness = await connect();
