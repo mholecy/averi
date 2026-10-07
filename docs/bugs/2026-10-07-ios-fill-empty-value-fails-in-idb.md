@@ -90,3 +90,59 @@ field), `tests/mcp/tools.test.ts` (both `type_text` paths with `text: ""`), `tes
 empty variable's message; a literal `''` passes through) and `tests/flow/engine.test.ts` (an empty `TEST_PIN` fails
 the fill before the tap; a literal `value: ""` with clear clears and passes). The B4 probe — `fill: { id:
 twofactor_code, value: "", dismissKeyboard: true }` — is the device check to run.
+
+## Device check of the fix (2026-10-07, `5786fc3`)
+
+finportal, iPhone 17 iOS 26.5 (`D34212DB-…`) and `emulator-5554` (the only Android device attached). The run used
+`dist/` built from `5786fc3` through `run-tools.mts`. The config was a scratch copy of the stage B `wdacfg` (`treeSource:
+wda`, `keyboardDismiss: [login_title, twofactor_title, accessory]`, with `.env.averi` symlinked), plus helper flows
+`fill_code_one`, `fill_code_empty_clear`, `fill_user_empty_clear`, `fill_user_bare_empty_var` (`value:
+"${AVERI_EMPTY_PROBE}"`) and `fill_user_cred_empty_var` (`value: $probe`, with a base credential `probe:
+${AVERI_EMPTY_PROBE}`). A second copy, `cfg-acc`, keeps only `- accessory: true` in the list. Nothing in finportal was
+edited. **Real login submits: 1** (`fill_creds` → `submit_only` → 2FA). No 2FA code was completed, and at most one
+digit was typed and then cleared. Server stderr held only the `.env.averi` keys line. The string `Request was not
+sent` appears in no output.
+
+- **E1, the B4 probe `fill: { id: twofactor_code, value: "", dismissKeyboard: true }`: PASS, three times.**
+  - (a) The pad was parked by the `fill_creds` HID typing (`0 matches for role:keyboard`, toolbar parked) and the field
+    was still focused: `ok in 6.4s`, `fill: id:"twofactor_code" = ` with no suffix. The focus tap on the focused field
+    opened the "AutoFill" edit menu, and no keyboard came up, so there was nothing to hide. As designed.
+  - (b) Tap on the parked `Done`, then the pref toggle (`AutomaticMinimizationEnabled` true → false), then the probe. Its
+    focus tap raised the pad: `ok in 6.3s`, `fill: id:"twofactor_code" = ; keyboard hidden by tapping
+    id:"twofactor_title"`. After it: `0 matches for role:keyboard`, `0 matches for role:toolbar`, and the field was
+    unfocused. With the full list, `login_title` is absent on 2FA, so the second entry was used.
+  - (c) Same probe with `cfg-acc` (accessory only). The pad was down and the field unfocused before it: `ok in 4.2s`,
+    `fill: id:"twofactor_code" = ; keyboard hidden by tapping the accessory toolbar's "Done"`. Then `0 matches for
+    role:keyboard` / `role:toolbar`, and the screenshot shows no pad. **This is the first device run of the accessory
+    strategy through `dismissKeyboard`**, which stage B could not reach.
+  - That a focus without typing leaves the pad UP was confirmed separately in E3a: a `keyboard` node and a `Toolbar`
+    were present, and the screenshot shows the number pad with `Done`.
+- **E2, clear: PASS.** `fill_code_one` → `fill: id:"twofactor_code" = 1`, then `value: "1"`. `fill_code_empty_clear`
+  → `ok in 5.1s`, `fill: id:"twofactor_code" =  (cleared)`, then `value: null`. The screenshot shows an empty field
+  and "Log in" disabled. Then `back_only` → `login_screen`.
+- **E3, MCP `type_text` with `text: ""`: PASS.** With selector `id:twofactor_code` → `Filled id:twofactor_code (0
+  characters)` (4.3 s), and the pad stayed up. Without a selector, with the field focused → `Typed 0 characters` (0.2
+  s). With selector plus `clear: true` → `Filled id:twofactor_code (0 characters, cleared first)`.
+- **E4, empty or unset variable: PASS, before any tap** (0.1 s each; the username field's value was unchanged before
+  and after). With `AVERI_EMPTY_PROBE=` exported empty in the driver's environment (it is not in `.env.averi`):
+  - bare `${VAR}`: `Environment variable AVERI_EMPTY_PROBE is set but empty — give it a value in .env.averi beside
+    averi.yaml, or export it with one; an empty variable exported in the shell or CI shadows the value in .env.averi, so
+    unset it there, and retry`
+  - credential: `Environment variable AVERI_EMPTY_PROBE is set but empty (needed for credential "probe") — …` (same
+    tail)
+  - The trace was `flow …: start` / `✗ fill id:"login_username": failed — <same message>`.
+
+  With the variable unset: `Environment variable AVERI_EMPTY_PROBE is not set — set it in .env.averi beside averi.yaml,
+  or export it, and retry`, and `… is not set (needed for credential "probe") — …`. No `in environment "…"` part was
+  printed, because no environment was selected (base credentials).
+- **E5, Android regression: PASS.** After `fresh_launch` (finportal, clearState) the fields were empty. (a)
+  `fill_user_empty_clear` on the empty field → `ok in 7.4s`, `fill: id:"login_username" =  (cleared)`, `value: null`.
+  (b) After `type_text id:login_username "averi"` (`value: "averi"`), the same flow → `ok in 10.1s`, `= 
+  (cleared)`, `value: null`. The screenshot shows both fields empty and Gboard up. No submit.
+- Cosmetic: the trace line for a cleared empty fill has two spaces, `=  (cleared)`, where the Fix section above says
+  `= (cleared)`. That comes from the `= ${value}` + ` (cleared)` join. It appears on both platforms and is harmless.
+
+Cleanup: `AutomaticMinimizationEnabled` was set back to `1`, and the `com.apple.keyboard.preferences` dumps before and
+after are identical. No xcodebuild, WebDriverAgent or server from this run is left. Ports 8100–8110 and 8199 are quiet.
+The other session's `npm exec averi@0.9.0` (pid 703/1199) was not touched. The iOS app is on the login screen; Android
+is on the login screen with empty fields.
