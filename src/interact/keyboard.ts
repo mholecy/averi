@@ -1,9 +1,20 @@
-import type { DeviceAdapter, KeyboardWitness, Rect, SoftKeyboard } from '../adapters/types.js';
-import { tapPoint } from '../ui-tree/selectors.js';
-import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
+import { rectArea, type DeviceAdapter, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
+import { STRUCTURAL_ROLES } from '../ui-tree/bare-tree.js';
+import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
+import { accessoryDismissButton, keyboardInTree, partOfKeyboard, readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import { errorMessage } from '../util/error-message.js';
-import { AmbiguityRefusal, describeTarget, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type Target } from './resolve.js';
+import {
+  AmbiguityRefusal,
+  describeTarget,
+  findTarget,
+  resolveSettled,
+  type Ambiguity,
+  type Resolved,
+  type ResolvedSettled,
+  type SettleOptions,
+  type Target,
+} from './resolve.js';
 
 /**
  * Pause between the `back` that hides the keyboard and the re-resolution.
@@ -16,6 +27,22 @@ import { AmbiguityRefusal, describeTarget, resolveSettled, type Resolved, type R
  * calling it settled.
  */
 export const KEYBOARD_HIDE_DELAY_MS = 300;
+
+/**
+ * How many looks the in-tree model takes for the keyboard to be GONE after a
+ * dismissal tap (stage B, review round 1): the delay above is an Android
+ * floor, "not the whole wait" — on Android the settle poll's own reads sit
+ * on top of it, and a hide animation caught mid-way must not fail a fill the
+ * blind `enter` used to pass. So after the tap the guard resolves the
+ * target and reads the band up to this many times, KEYBOARD_HIDE_DELAY_MS
+ * apart (each look is a settled resolution, two agreeing reads), and
+ * `dismissKeyboard` re-reads the tree the same number of times; only the
+ * LAST still-covering look refuses. Two, not more: a keyboard still up a
+ * second or so after a tap meant to hide it is not animating. Unmeasured on
+ * iOS — the animation's length is not in the bug note; the figure is the
+ * stage A second look's shape, applied once more.
+ */
+export const KEYBOARD_HIDE_CONFIRM_LOOKS = 2;
 
 /**
  * The vetoed path's bounded re-check (2026-10-04, after review): when the
@@ -125,6 +152,191 @@ export class KeyboardWithoutDismissal extends KeyboardGuardError {
   }
 }
 
+/**
+ * Anything that went wrong AFTER the in-tree guard tapped a configured
+ * dismissal (stage B, 2026-10-07) — the sibling of AfterKeyboardDismissal
+ * for the in-tree model: there the irreversible side effect is a `back`,
+ * here it is ONE tap on an element the config named (or the accessory
+ * toolbar's button). The tap cannot be taken back, and whether it hid the
+ * keyboard, did something of its own, or both, is only known from the look
+ * after it: still covered → this, with the band; the target not coming back
+ * → this, wrapping the resolution's error as `cause`. Never a second
+ * strategy after a tap: a tap that did not hide the keyboard has changed
+ * the screen in a way this layer cannot judge, and a second one would
+ * compound it. The message says the screen may have changed; `traceLine`
+ * says which strategy was tapped.
+ */
+export class AfterDismissalTap extends KeyboardGuardError {
+  constructor(message: string, traceLine: string, options?: ErrorOptions) {
+    super(message, traceLine, options);
+    this.name = 'AfterDismissalTap';
+  }
+}
+
+/**
+ * One way to hide the in-tree keyboard without submitting (stage B,
+ * 2026-10-07), tried by the guard only where the oracle-less branch would
+ * otherwise refuse — never on an adapter with an oracle, whose `back` is the
+ * dismissal. The config's vocabulary (`app.ios.keyboardDismiss`,
+ * flow/config.ts) is converted to this before it crosses into interact/,
+ * which knows neither the YAML nor the platform:
+ * - `tap`: a target of the app's own — a neutral, non-interactive element
+ *   such as the screen's title, which was measured to hide the keyboard
+ *   without a side effect (K5b: `idb ui tap` on the "Prihlásenie" title,
+ *   empty form and filled form alike; the device check's `title_then_submit`
+ *   reached 2FA). What is neutral is the app's business, hence config.
+ * - `accessory`: the input-accessory toolbar's trailing button — the app's
+ *   "Done" above a number pad (ui-tree/soft-keyboard.ts#accessoryDismissButton),
+ *   measured to hide the 2FA pad (K4). Generic in shape, so it needs no
+ *   selector, but opt-in like the rest: a toolbar button is the app's, and
+ *   only the author knows it is a dismissal.
+ */
+export type KeyboardDismissal = { kind: 'tap'; target: Target } | { kind: 'accessory' };
+
+/** The guard's options: the settle options every resolution takes, plus the dismissals it may tap, in order of preference. */
+export interface GuardOptions extends SettleOptions {
+  /**
+   * Tried in order on the tree of the look that found the keyboard covering;
+   * the FIRST whose element is on screen and usable is tapped, once. Absent
+   * or empty: the guard refuses a covered target as it did before stage B.
+   * Read only on the oracle-less branch — an adapter with an oracle never
+   * sees them, so an Android run with dismissals configured is the same run.
+   */
+  dismissals?: readonly KeyboardDismissal[];
+}
+
+/** A dismissal as the refusal's list names it: `tap id:"login_title"`, `accessory`. */
+const describeDismissal = (d: KeyboardDismissal): string => (d.kind === 'tap' ? `tap ${describeTarget(d.target)}` : 'accessory');
+
+/** The strategy the guard picked: what it will tap, and the words the note and the trace use for it. */
+interface PickedDismissal {
+  node: UiNode;
+  /** `id:"login_title"` for a tap (with `(N matches, the first)` under `first` mode when several did); `the accessory toolbar's "Done"` for the accessory button. */
+  what: string;
+}
+
+/** What pickDismissal decided: the first usable strategy, if any, and why every strategy before it — or every one — was passed over. */
+interface DismissalPick {
+  picked?: PickedDismissal;
+  /** One line per skipped strategy, `tap id:"x": not found` — the refusal and the warning print them, so "absent" and "unusable" are told apart. */
+  skipped: string[];
+}
+
+/** Is the point inside the rect — left and top inclusive, right and bottom exclusive, like `covers` and the Android frame test. */
+const inside = (rect: Rect, point: { x: number; y: number }): boolean =>
+  point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
+
+/**
+ * The node DRAWN OVER `point` on top of `node`, if any (review round 1): the
+ * last node in pre-order AFTER `node`'s subtree — later siblings and their
+ * descendants are drawn over earlier ones, later Windows over earlier (UIKit
+ * orders them by level) — that is content (not a structural wrapper: a
+ * full-screen `Other` of a later Window contains every point and draws
+ * nothing), has area and contains the point. The keyboard's own nodes are
+ * NOT exempt: a strategy under the keyboard is caught first by the band
+ * check (with its own reason), and a keyboard-owned node over the point
+ * that the band missed is a real cover (review 2026-10-07). `undefined` when
+ * nothing shadows the point. Ancestors and earlier siblings never count:
+ * they are beneath. A heuristic, not a compositor — a transparent overlay
+ * reads as cover, a label inside a sheet that does not contain the point
+ * does not — but it refuses the measured kind of false target: an alert's
+ * or a sheet's content over the title, a navigation bar's own label.
+ */
+function shadowing(tree: UiNode, node: UiNode, point: { x: number; y: number }): UiNode | undefined {
+  let after = false;
+  let over: UiNode | undefined;
+  const walk = (n: UiNode): void => {
+    if (n === node) {
+      after = true; // the node's own subtree is the node
+      return;
+    }
+    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && inside(n.rect, point)) over = n;
+    for (const child of n.children) walk(child);
+  };
+  walk(tree);
+  return over;
+}
+
+/**
+ * The FIRST configured dismissal that is usable, judged on one tree — the
+ * one that found the keyboard covering, so no device read is spent on the
+ * choice — and no wait: a dismissal that is not there now is not there.
+ * Every strategy passed over gets a reason (`DismissalPick.skipped`).
+ *
+ * A `tap` strategy is usable when its target matches a NON-INTERACTIVE node
+ * with area (review round 1: the resolution policy prefers the sole
+ * interactive match, so `tap: { text: "Sign in" }` on a screen with a title
+ * and a button so labelled would have tapped the BUTTON — the one thing a
+ * dismissal must never do; interactive matches are dropped here before any
+ * choice, and a spec that matches only controls is reported as such), is
+ * unambiguous under the caller's `refuse` mode (the guard must not pick one
+ * of two titles; under `first` the first is taken, as a flow step would,
+ * and the choice is said in `what`), is not the keyboard's own UI
+ * (`partOfKeyboard`: a tap on a key or on Done is what `accessory` is for),
+ * has its centre clear of the band (a configured element under the keyboard
+ * would be the very tap this guard refuses), inside the screen — the root's
+ * rect, when it has one: a title scrolled above the viewport is still in
+ * the tree, WDA keeps off-screen nodes — and not drawn over by later content
+ * (`shadowing`: an alert, a sheet, a navigation bar's label). An `accessory`
+ * is usable when `accessoryDismissButton` answers; that answer is under an
+ * `ofKeyboard` root by construction, so no keyboard check is repeated here.
+ */
+function pickDismissal(tree: UiNode, dismissals: readonly KeyboardDismissal[], ambiguous: Ambiguity): DismissalPick {
+  const band = keyboardInTree(tree);
+  const skipped: string[] = [];
+  for (const d of dismissals) {
+    const name = describeDismissal(d);
+    if (d.kind === 'accessory') {
+      const button = accessoryDismissButton(tree);
+      if (button !== undefined) {
+        return { picked: { node: button, what: `the accessory toolbar's ${button.label === null ? 'button' : JSON.stringify(button.label)}` }, skipped };
+      }
+      skipped.push(`${name}: no accessory toolbar on screen`);
+      continue;
+    }
+    const matches = findTarget(tree, d.target).filter((n) => rectArea(n.rect) > 0);
+    const neutral = matches.filter((n) => !isInteractive(n));
+    if (neutral.length === 0) {
+      skipped.push(
+        matches.length === 0
+          ? `${name}: not found`
+          : `${name}: only interactive ${matches.length === 1 ? 'match' : 'matches'} (${matches.map((n) => n.role).join(', ')}) — a dismissal must be a non-interactive element`,
+      );
+      continue;
+    }
+    if (neutral.length > 1 && ambiguous === 'refuse') {
+      skipped.push(`${name}: ${neutral.length} matches`);
+      continue;
+    }
+    const node = neutral[0];
+    const what = neutral.length > 1 ? `${describeTarget(d.target)} (${neutral.length} matches, the first)` : describeTarget(d.target);
+    if (partOfKeyboard(tree, node)) {
+      skipped.push(`${name}: the keyboard's own control`);
+      continue;
+    }
+    const at = tapPoint(node);
+    if (windowOver(band, at).over === 'covering') {
+      skipped.push(`${name}: under the keyboard`);
+      continue;
+    }
+    if (rectArea(tree.rect) > 0 && !inside(tree.rect, at)) {
+      skipped.push(`${name}: off screen at (${at.x},${at.y})`);
+      continue;
+    }
+    const over = shadowing(tree, node, at);
+    if (over !== undefined) {
+      skipped.push(`${name}: covered by ${over.role}${over.label === null ? '' : ` ${JSON.stringify(over.label)}`}`);
+      continue;
+    }
+    return { picked: { node, what }, skipped };
+  }
+  return { skipped };
+}
+
+/** The sentence a refusal or a warning ends with when nothing was picked: which strategies there were and why each was passed over. */
+const nothingPicked = (dismissals: readonly KeyboardDismissal[], skipped: readonly string[]): string =>
+  dismissals.length === 0 ? 'no dismissal is configured' : `none of the configured dismissals is usable on this screen (${skipped.join('; ')})`;
+
 // ─── The decisions, one per phase ────────────────────────────────────────────
 //
 // 2026-10-05 (verification pass, V1). Until this date the four moments at
@@ -165,11 +377,7 @@ type WindowReading = 'covering' | 'clear' | 'unknown';
 /** The guard's reading of one window state against the tap point, with the frame when it covers — so a message can quote it without a second look. */
 type CoverReading = { over: 'covering'; frame: Rect } | { over: 'clear' } | { over: 'unknown' };
 
-const covers = (keyboard: SoftKeyboard & { state: 'shown' }, point: { x: number; y: number }): boolean =>
-  point.x >= keyboard.frame.x &&
-  point.x < keyboard.frame.x + keyboard.frame.width &&
-  point.y >= keyboard.frame.y &&
-  point.y < keyboard.frame.y + keyboard.frame.height;
+const covers = (keyboard: SoftKeyboard & { state: 'shown' }, point: { x: number; y: number }): boolean => inside(keyboard.frame, point);
 
 /**
  * The dismissal's reading: a keyboard shown ANYWHERE is in the way — there is
@@ -270,8 +478,10 @@ export function afterBack(window: CoverReading): { action: 'proceed' } | { actio
  *     (`partOfKeyboard`, read as unknown): the guard's fail-open rule, as
  *     everywhere.
  *   covering                                  → refuse (with the band)
- *     First look: the second look. Second look: tap nothing, press nothing —
- *     KeyboardWithoutDismissal.
+ *     First look: the second look. Second look: a configured dismissal
+ *     (stage B) when one is usable, else tap nothing, press nothing —
+ *     KeyboardWithoutDismissal. Third look (after the dismissal tap): tap
+ *     nothing more — AfterDismissalTap.
  */
 export function inTreeLook(window: CoverReading): { action: 'proceed' } | { action: 'refuse'; frame: Rect } {
   return window.over === 'covering' ? { action: 'refuse', frame: window.frame } : { action: 'proceed' };
@@ -305,8 +515,8 @@ export function dismissal(window: WindowReading, witness?: KeyboardWitness): 'ba
 
 // ─── The callers ─────────────────────────────────────────────────────────────
 
-/** The adapter surface the guard and the dismissal need: the oracle, when there is one, and the key. */
-type KeyboardAdapter = Pick<DeviceAdapter, 'keyboard' | 'pressKey'>;
+/** The adapter surface the dismissal needs: the oracle and the key (the window model), or the tree and the tap (the in-tree model, stage B). */
+type KeyboardAdapter = Pick<DeviceAdapter, 'keyboard' | 'pressKey' | 'uiTree' | 'tap'>;
 
 /**
  * THE ONE `back` averi sends for keyboard reasons (2026-10-04): the tap
@@ -355,10 +565,23 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
  *   Inside it, no oracle (iOS: the keyboard is part of the tree): wait out
  *   a hide animation (KEYBOARD_HIDE_DELAY_MS), resolve AGAIN and read again
  *   (`inTreeLook`): clear now — the node of that look, with a note that
- *   the keyboard left; still covering — KeyboardWithoutDismissal, nothing
- *   tapped, nothing pressed, since the adapter has no dismissal (its own
- *   sentence says why). Before 2026-10-07 the oracle-less adapter returned
- *   the node unguarded, and the measured tap went into the AutoFill bar.
+ *   the keyboard left; still covering — since stage B (2026-10-07, the same
+ *   day) the configured dismissals (`GuardOptions.dismissals`,
+ *   `pickDismissal`) are judged on that second look's tree: none usable —
+ *   KeyboardWithoutDismissal, nothing tapped, nothing pressed, the message
+ *   naming the configured list (or that none is configured) beside the
+ *   adapter's own sentence on why it cannot hide the keyboard itself; one
+ *   usable — ONE tap at its centre, the hide delay, a THIRD look resolved
+ *   with the same options, and the band read off it: clear — the node of
+ *   that look with the note `…; hidden by tapping <strategy> before
+ *   tapping`; still covering, or the target not coming back —
+ *   AfterDismissalTap, never a second strategy (its class says why). The
+ *   dismissal tap is the in-tree model's one side effect, as `back` is the
+ *   window model's: measured non-submitting (a neutral title, the
+ *   accessory Done), where the keyboard's own return key and the blind
+ *   `enter` submit (K5d). Before 2026-10-07 the oracle-less adapter
+ *   returned the node unguarded, and the measured tap went into the
+ *   AutoFill bar.
  *   Inside it, with the oracle:
  *   (or hidden, or unknown): done, the node as resolved (the fail-open
  *   rule, below).
@@ -417,9 +640,9 @@ const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => 
  * four phases — see the note above the decisions.
  */
 export async function resolveClearOfKeyboard(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>,
   target: Target,
-  opts: SettleOptions,
+  opts: GuardOptions,
 ): Promise<ResolvedClear> {
   const first = await resolveSettled(adapter, target, opts);
   const at = tapPoint(first.node);
@@ -466,18 +689,71 @@ export async function resolveClearOfKeyboard(
     const point = tapPoint(second.node);
     const look = inTreeLook(windowOver((await readSoftKeyboard(adapter, second.tree, second.node)).keyboard, point));
     if (look.action === 'proceed') return withNote(second, `${covered}; gone on the second look`);
-    // Names MCP tools and "a flow" — the deliberate exception recorded at
-    // the "back did not close it" error below. The platform's facts (why no
-    // key hides it, what was measured to) are the adapter's sentence, quoted.
-    const cannot = reading.advice === undefined ? 'this adapter cannot hide it' : `this adapter cannot hide it (${reading.advice})`;
-    throw new KeyboardWithoutDismissal(
-      `The soft keyboard covers ${what}: the band it draws over ${frameText(look.frame)} contains the tap point ` +
-        `(${point.x},${point.y}) on two looks ${KEYBOARD_HIDE_DELAY_MS}ms apart, and ${cannot}. Nothing was tapped: ` +
-        `the tap would have pressed the keyboard and been reported done. From the MCP tools: hide the keyboard first, ` +
-        `then tap ${what} again. In a flow: hide it with a step before this one (a tap: on an element the keyboard ` +
-        `does not cover), or lay the screen out so ${what} is not under the keyboard`,
-      `${covered}; no dismissal, nothing sent`,
-    );
+    // Stage B (2026-10-07): the configured dismissals, judged on the second
+    // look's tree — the one that just read the keyboard covering. None
+    // configured, or none usable on this screen: the refusal, as stage A.
+    const dismissals = opts.dismissals ?? [];
+    const { picked, skipped } = dismissals.length === 0 ? { picked: undefined, skipped: [] } : pickDismissal(second.tree, dismissals, opts.ambiguous);
+    if (picked === undefined) {
+      // Names MCP tools and "a flow" — the deliberate exception recorded at
+      // the "back did not close it" error below. The platform's facts (why
+      // no key hides it, what was measured to, and where a dismissal is
+      // configured) are the adapter's sentence, quoted; this layer says only
+      // that it has none to tap, and why each configured one was passed over.
+      const cannot = reading.advice === undefined ? 'this adapter cannot hide it' : `this adapter cannot hide it (${reading.advice})`;
+      throw new KeyboardWithoutDismissal(
+        `The soft keyboard covers ${what}: the band it draws over ${frameText(look.frame)} contains the tap point ` +
+          `(${point.x},${point.y}) on two looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; ${cannot}, and ${nothingPicked(dismissals, skipped)}. Nothing was tapped: ` +
+          `the tap would have pressed the keyboard and been reported done. From the MCP tools: hide the keyboard first, ` +
+          `then tap ${what} again. In a flow: hide it with a step before this one (a tap: on an element the keyboard ` +
+          `does not cover), configure a dismissal for the guard to tap, or lay the screen out so ${what} is not under the keyboard`,
+        `${covered}; no dismissal, nothing sent`,
+      );
+    }
+    // ONE tap on the strategy's element — the in-tree model's one side
+    // effect, and like the oracle's one `back` never repeated: whatever the
+    // looks after it find, no second strategy is tapped. Then the same wait
+    // and the same look as after a `back`: the hide animation, the target
+    // resolved AGAIN with the same options (the keyboard-avoiding layout
+    // moves things when the keyboard goes — the 2FA screen grows from h 518
+    // back to 874), and the band read off that look — up to
+    // KEYBOARD_HIDE_CONFIRM_LOOKS times, so an animation caught mid-way is
+    // not a refusal (its doc has the reason).
+    const tapped = `${covered}; tapped ${picked.what} to hide it`;
+    const at2 = tapPoint(picked.node);
+    await adapter.tap(at2.x, at2.y);
+    for (let look = 1; ; look++) {
+      await sleep(KEYBOARD_HIDE_DELAY_MS);
+      let next: ResolvedSettled;
+      try {
+        next = await resolveSettled(adapter, target, opts);
+      } catch (e) {
+        // The target did not come back after the dismissal tap (or came back
+        // ambiguous). Something WAS tapped this time, so the wording is the
+        // Android path's, not the second look's: say what was tapped and that
+        // the screen may have changed.
+        const did = `tapping ${picked.what} at (${at2.x},${at2.y}) to hide the soft keyboard that covered ${what} at (${point.x},${point.y})`;
+        const hint = 'That tap may have changed the screen — check it (ui_snapshot / screenshot)';
+        const [headline, ...rest] = errorMessage(e).split('\n');
+        const message =
+          e instanceof AmbiguityRefusal
+            ? `${errorMessage(e)}\n(This was the look after ${did}. ${hint})`
+            : [`After ${did}: ${headline}. ${hint}`, ...rest].join('\n');
+        throw new AfterDismissalTap(message, `${tapped}, and the look after it failed`, { cause: e });
+      }
+      const pointNext = tapPoint(next.node);
+      const after = inTreeLook(windowOver((await readSoftKeyboard(adapter, next.tree, next.node)).keyboard, pointNext));
+      if (after.action === 'proceed') return withNote(next, `${covered}; hidden by tapping ${picked.what} before tapping`);
+      if (look < KEYBOARD_HIDE_CONFIRM_LOOKS) continue;
+      throw new AfterDismissalTap(
+        `Tapped ${picked.what} at (${at2.x},${at2.y}) to hide the soft keyboard covering ${what}, but it is still up: the band ` +
+          `${frameText(after.frame)} still contains the tap point (${pointNext.x},${pointNext.y}) on ${look} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; ` +
+          `nothing else was tapped. That tap may have changed the screen (the keyboard was raised again, or the element did something ` +
+          `of its own) — look at it (ui_snapshot / screenshot) before retrying. From the MCP tools: hide the keyboard another way, then tap ` +
+          `${what} again. In a flow: configure a dismissal that hides the keyboard on THIS screen, or lay the screen out so ${what} is not under it`,
+        `${tapped}, still covered`,
+      );
+    }
   }
   const backPressed = `${covered}; back pressed`;
   /** The input method's last word — the wording of a later failure depends on whether it could be asked. */
@@ -623,14 +899,36 @@ export async function resolveClearOfKeyboard(
  * decision is `dismissal` above, and this file is where the one `back`
  * lives — fill.ts had kept a second copy of the `unknown → back` rule.
  *
- * An adapter WITHOUT the oracle takes the blind in-tree dismissal, asking
- * nothing — what the platform branch this replaced did; which key that is,
- * and why the oracle's presence or absence decides it, is stated once on
- * KeyboardOracle (adapters/types.ts). Still blind on 2026-10-07, when the
- * tap guard above started reading the in-tree keyboard: `enter` from a
- * field was measured to SUBMIT the finportal login (K5d), so reading the
- * tree here would only tell when NOT to press it — a change left to stage B
- * with the dismissal itself, and recorded as a residual in the bug note.
+ * An adapter WITHOUT the oracle (iOS) reads the keyboard from ONE tree read
+ * and presses no key — since stage B, 2026-10-07. Until then it pressed
+ * `enter` blind, asking nothing, which `KeyboardOracle` (adapters/types.ts)
+ * recorded as the in-tree model's dismissal; that key was then measured to
+ * SUBMIT the finportal login from the password field (K5d, the bug note),
+ * so a `fill { dismissKeyboard: true }` on iOS was a submit nobody asked
+ * for. A DELIBERATE behaviour change, on purpose in both directions: with
+ * a band in the tree the guard's configured dismissals are tried
+ * (`pickDismissal`, the same rule as the tap guard's — the first usable one
+ * is tapped once, then one re-read confirms the band is gone, and a band
+ * still up is AfterDismissalTap, since the tap had an effect this layer
+ * cannot judge); with NO band — none on screen, the keyboard parked by the
+ * HID typing the fill just did (the device check: every `fill` parks it),
+ * or an idb tree, which never carries one — nothing is pressed and nothing
+ * is tapped. Under `treeSource: idb` the step is therefore a no-op: the
+ * tree cannot see the keyboard, and the only blind key submits. Better a
+ * keyboard left up, which the NEXT step's guard refuses to tap through
+ * (and the pixel asserts fail closed on), than a form submitted.
+ *
+ * A band with no usable dismissal — none configured, or none on this screen
+ * — is a WARNING returned, not a throw: on Android this function is best
+ * effort too (the witness's veto leaves a keyboard up silently, and no
+ * read after the `back` confirms it went), the flow author who wrote
+ * `dismissKeyboard: true` for Android's sake must not lose the iOS leg
+ * over it, and what the keyboard would harm — the next tap, the next pixel
+ * assert — is guarded in its own place and refuses there with the full
+ * message. The warning makes the trace say the keyboard was left up, so
+ * that refusal is not a surprise. A dismissal that WAS tapped and did not
+ * hide the keyboard throws (AfterDismissalTap): that is not "nothing
+ * done", the screen was touched.
  *
  * With the oracle (Android), since 2026-10-03: `back` is pressed only if the
  * window state does not say the keyboard is HIDDEN. Before that date it was
@@ -643,12 +941,53 @@ export async function resolveClearOfKeyboard(
  * - hidden  → nothing: there is nothing to dismiss;
  * - unknown → back, exactly as before, the witness not asked.
  * One oracle query per dismissal (its cost: AndroidAdapter's keyboardState),
- * and the witness query when that query says shown.
+ * and the witness query when that query says shown. The oracle path reads
+ * none of `opts` and returns an empty result: Android is byte-identical.
  */
-export async function dismissKeyboard(adapter: KeyboardAdapter): Promise<void> {
+export async function dismissKeyboard(
+  adapter: KeyboardAdapter,
+  opts?: { dismissals?: readonly KeyboardDismissal[]; ambiguous: Ambiguity },
+): Promise<DismissResult> {
   const oracle = adapter.keyboard;
-  if (oracle === undefined) return adapter.pressKey('enter');
-  const reading = windowAnywhere(await oracle.state());
-  const decision = reading === 'covering' ? dismissal(reading, await oracle.witness()) : dismissal(reading);
-  if (decision === 'back') await pressBack(adapter);
+  if (oracle !== undefined) {
+    const reading = windowAnywhere(await oracle.state());
+    const decision = reading === 'covering' ? dismissal(reading, await oracle.witness()) : dismissal(reading);
+    if (decision === 'back') await pressBack(adapter);
+    return {};
+  }
+  const tree = await adapter.uiTree();
+  if (keyboardInTree(tree).state !== 'shown') return {};
+  const dismissals = opts?.dismissals ?? [];
+  // `opts` is defined whenever there is a dismissal to pick, and its
+  // `ambiguous` is required there: no default policy is written here.
+  const { picked, skipped } = opts !== undefined && dismissals.length > 0 ? pickDismissal(tree, dismissals, opts.ambiguous) : { picked: undefined, skipped: [] };
+  if (picked === undefined) {
+    return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, skipped)} — the next tap under it will be refused` };
+  }
+  const at = tapPoint(picked.node);
+  await adapter.tap(at.x, at.y);
+  // The same confirmation as the guard's: up to KEYBOARD_HIDE_CONFIRM_LOOKS
+  // reads, KEYBOARD_HIDE_DELAY_MS apart, and only the last still-up read
+  // refuses.
+  for (let read = 1; ; read++) {
+    await sleep(KEYBOARD_HIDE_DELAY_MS);
+    const after = keyboardInTree(await adapter.uiTree());
+    if (after.state !== 'shown') return { hidden: `tapping ${picked.what}` };
+    if (read < KEYBOARD_HIDE_CONFIRM_LOOKS) continue;
+    throw new AfterDismissalTap(
+      `Tapped ${picked.what} at (${at.x},${at.y}) to hide the soft keyboard after the fill, but it is still up over ` +
+        `${frameText(after.frame)} on ${read} reads ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped. That tap may have changed ` +
+        `the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot). ` +
+        `In a flow: configure a dismissal that hides the keyboard on THIS screen, or drop dismissKeyboard from this fill`,
+      `the soft keyboard was up after the fill; tapped ${picked.what} to hide it, still up`,
+    );
+  }
+}
+
+/** What `dismissKeyboard` did, for the caller's trace: at most one of the two, and neither on the oracle path. */
+export interface DismissResult {
+  /** The in-tree keyboard was up and this hid it: `tapping id:"login_title"` — the flow's fill line appends `; keyboard hidden by ${hidden}`. */
+  hidden?: string;
+  /** The in-tree keyboard was up and nothing usable was configured: left up, said so — the flow logs it as a `⚠ fill` line. */
+  warning?: string;
 }

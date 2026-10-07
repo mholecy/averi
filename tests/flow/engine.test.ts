@@ -1729,6 +1729,7 @@ flows:
 
   it('the ⚠ fill warning is in the trace even when dismissing the keyboard then throws (review 2026-10-03)', async () => {
     const fake = formFake('•'.repeat(20));
+    fake.attachKeyboard(); // an Android fake (window state unknown → back): the in-tree model presses no key since stage B
     appendBullets(fake);
     fake.pressKey = async () => {
       throw new Error('idb ui key: timed out');
@@ -2510,8 +2511,8 @@ ${steps}
     const error = (await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error).toBeInstanceOf(FlowError);
     expect(error.message).toMatch(/^The soft keyboard covers id:"login_submit": the band it draws over \[0,539\]\[402,874\] contains the tap point \(107,571\)/);
-    expect(error.message).toMatch(/on two looks 300ms apart, and this adapter cannot hide it \(ADVICE\)\. Nothing was tapped/);
-    expect(error.message).toMatch(/In a flow: hide it with a step before this one \(a tap: on an element the keyboard does not cover\), or lay the screen out so id:"login_submit" is not under the keyboard$/);
+    expect(error.message).toMatch(/on two looks 300ms apart; this adapter cannot hide it \(ADVICE\), and no dismissal is configured\. Nothing was tapped/);
+    expect(error.message).toMatch(/In a flow: hide it with a step before this one \(a tap: on an element the keyboard does not cover\), configure a dismissal for the guard to tap, or lay the screen out so id:"login_submit" is not under the keyboard$/);
     expect(error.trace.slice(1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
       { action: '✗ tap id:"login_submit"', detail: expect.stringMatching(/^failed — The soft keyboard covers id:"login_submit"/) },
@@ -2568,5 +2569,135 @@ ${steps}
       { action: 'optional', detail: expect.stringMatching(/^skipped id:"login_submit" \(The soft keyboard covers id:"login_submit"/) },
     ]);
     expect(fake.taps).toEqual([]);
+  });
+
+  /**
+   * Stage B (2026-10-07): `app.ios.keyboardDismiss` reaches the guard through
+   * the engine — converted once in the constructor, passed to every tap and
+   * fill and to the post-fill dismissal. The policy is pinned in
+   * tests/interact/keyboard.test.ts; here the STEP and its trace lines.
+   */
+  describe('with app.ios.keyboardDismiss configured (stage B)', () => {
+    const configured = (steps: string, dismiss = '[{ tap: { id: login_title } }, { accessory: true }]') =>
+      parseConfig(`
+app: { ios: { bundleId: sk.finportal.myport, treeSource: wda, keyboardDismiss: ${dismiss} } }
+flows:
+  f:
+    steps:
+${steps}
+`);
+    /** The app as measured (K5b): a tap on the title hides the keyboard — the band is gone on the next read. */
+    const hidingFake = () => {
+      const fake = iosFake();
+      fake.onTap = (id, self) => {
+        if (id === 'login_title') self.live().children = self.live().children.filter((c) => c.role !== 'keyboard');
+      };
+      return fake;
+    };
+
+    it('a tap: under the band: the title tapped first, then the target — ONE ⚠ tap line naming the strategy, before the tap line', async () => {
+      const fake = hidingFake();
+      const trace = await new FlowEngine(configured('      - tap: { id: login_submit }'), fake, FAST).runFlow('f');
+      expect(trace).toEqual([
+        { action: 'flow f', detail: 'start' },
+        { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; hidden by tapping id:"login_title" before tapping' },
+        { action: 'tap', detail: 'id:"login_submit"' },
+        { action: 'flow f', detail: 'done' },
+      ]);
+      expect(fake.taps).toEqual(['login_title', 'login_submit']);
+      expect(fake.tapPoints).toEqual([{ x: 201, y: 303 }, { x: 107, y: 571 }]);
+      expect(fake.keys).toEqual([]);
+    });
+
+    it('a tap: whose dismissal does not hide the keyboard: ⚠ tap … still covered, then the ✗ naming the tap that was sent; the target untapped', async () => {
+      const fake = iosFake(); // the band stays
+      const error = (await new FlowEngine(configured('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+      expect(error.trace.slice(1)).toEqual([
+        { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; tapped id:"login_title" to hide it, still covered' },
+        { action: '✗ tap id:"login_submit"', detail: expect.stringMatching(/^failed — Tapped id:"login_title" at \(201,303\) to hide the soft keyboard covering id:"login_submit", but it is still up/) },
+      ]);
+      expect(fake.taps).toEqual(['login_title']);
+    });
+
+    it('a tap: with every configured dismissal absent from the screen: the refusal lists them', async () => {
+      const fake = iosFake();
+      const error = (await new FlowEngine(configured('      - tap: { id: login_submit }', '[{ tap: { id: twofactor_title } }, { accessory: true }]'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+      expect(error.message).toMatch(/and none of the configured dismissals is usable on this screen \(tap id:"twofactor_title": not found; accessory: no accessory toolbar on screen\)\. Nothing was tapped/);
+      expect(error.trace[1]).toEqual({ action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' });
+      expect(fake.taps).toEqual([]);
+    });
+
+    it('fill … dismissKeyboard: true with the band up after typing: the configured title is tapped, and the fill line says what hid the keyboard; no enter', async () => {
+      const fake = hidingFake();
+      const trace = await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      expect(trace).toEqual([
+        { action: 'flow f', detail: 'start' },
+        { action: 'fill', detail: 'id:"login_password" = secret; keyboard hidden by tapping id:"login_title"' },
+        { action: 'flow f', detail: 'done' },
+      ]);
+      expect(fake.taps).toEqual(['login_password', 'login_title']);
+      expect(fake.keys).toEqual([]);
+    });
+
+    it('fill … dismissKeyboard: true whose dismissal tap does not hide the keyboard: a ⚠ fill line naming the tap, then the ✗ (review round 1: the line was missing)', async () => {
+      const fake = iosFake(); // the band stays
+      const error = (await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.trace.slice(1)).toEqual([
+        { action: '⚠ fill', detail: 'the soft keyboard was up after the fill; tapped id:"login_title" to hide it, still up' },
+        { action: '✗ fill id:"login_password"', detail: expect.stringMatching(/^failed — Tapped id:"login_title" at \(201,303\) to hide the soft keyboard after the fill, but it is still up/) },
+      ]);
+      expect(fake.taps).toEqual(['login_password', 'login_title']);
+    });
+
+    it('…and inside optional: the skip quotes that headline, never "(not present)" — a tap was sent', async () => {
+      const fake = iosFake();
+      const trace = await new FlowEngine(configured('      - optional:\n          - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      expect(trace.slice(1, -1)).toEqual([
+        { action: '⚠ fill', detail: 'the soft keyboard was up after the fill; tapped id:"login_title" to hide it, still up' },
+        { action: 'optional', detail: expect.stringMatching(/^skipped step \(Tapped id:"login_title" at \(201,303\) to hide the soft keyboard after the fill/) },
+      ]);
+    });
+
+    it('fill … dismissKeyboard: true with the band up and nothing configured: a ⚠ fill line that the keyboard was left up, the fill line as before, and NO enter (the blind key submitted, K5d)', async () => {
+      const fake = iosFake();
+      const trace = await new FlowEngine(flow('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      expect(trace).toEqual([
+        { action: 'flow f', detail: 'start' },
+        { action: '⚠ fill', detail: 'id:"login_password": the soft keyboard is up and was left up: no dismissal is configured — the next tap under it will be refused' },
+        { action: 'fill', detail: 'id:"login_password" = secret' },
+        { action: 'flow f', detail: 'done' },
+      ]);
+      expect(fake.keys).toEqual([]);
+      expect(fake.taps).toEqual(['login_password']);
+    });
+
+    it('fill … dismissKeyboard: true with no band (the HID typing parked the keyboard, or an idb tree): nothing pressed, nothing tapped, the fill line as before', async () => {
+      const fake = iosFake(false);
+      const trace = await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      expect(trace.map((t) => t.action)).toEqual(['flow f', 'fill', 'flow f']);
+      expect(trace[1].detail).toBe('id:"login_password" = secret');
+      expect(fake.keys).toEqual([]);
+      expect(fake.taps).toEqual(['login_password']);
+    });
+
+    it('the measured flow: fill, fill, tap login_submit under the band — passes with the title tapped between the last fill and the submit, by the guard', async () => {
+      const fake = hidingFake();
+      fake.live().children.splice(1, 0, node({ role: 'textfield', identifier: 'login_username', rect: { x: 90, y: 400, width: 222, height: 20 } }));
+      const trace = await new FlowEngine(
+        configured('      - fill: { id: login_username, value: user }\n      - fill: { id: login_password, value: secret }\n      - tap: { id: login_submit }'),
+        fake,
+        FAST,
+      ).runFlow('f');
+      expect(trace.map((t) => `${t.action}: ${t.detail}`)).toEqual([
+        'flow f: start',
+        'fill: id:"login_username" = user',
+        'fill: id:"login_password" = secret',
+        '⚠ tap: the soft keyboard covered id:"login_submit"; hidden by tapping id:"login_title" before tapping',
+        'tap: id:"login_submit"',
+        'flow f: done',
+      ]);
+      expect(fake.taps).toEqual(['login_username', 'login_password', 'login_title', 'login_submit']);
+    });
   });
 });

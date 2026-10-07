@@ -8,7 +8,7 @@ import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } f
 import { tapElement } from '../interact/tap.js';
 import { fillText, launchText, snapshotNote, tapText } from './tool-text.js';
 import type { AveriConfig } from '../flow/config.js';
-import { appBuildPath, iosTreeSourceFor, loadProjectConfig } from '../flow/load.js';
+import { appBuildPath, iosTreeSourceFor, keyboardDismissalsFor, loadProjectConfig } from '../flow/load.js';
 import { assertSpecSchema } from '../verify/assert.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
@@ -300,7 +300,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
         'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id. ' +
         'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait. ' +
-        'iOS wda with the software keyboard up: one node has role "keyboard" — its rect is the band the keyboard covers (keys, AutoFill bar, accessory toolbar slot), where a tap is refused — and the two Windows that ARE the keyboard\'s UI carry "ofKeyboard": true (their descendants — keys, Done, the Passwords bar — are tappable).',
+        'iOS wda with the software keyboard up: one node has role "keyboard" — its rect is the band the keyboard covers (keys, AutoFill bar, accessory toolbar slot), where a tap is refused — and the two Windows that ARE the keyboard\'s UI carry "ofKeyboard": true (their descendants — keys, Done, the Passwords bar — are tappable); an input-accessory toolbar (the Done above a number pad) has role "toolbar".',
       inputSchema: {
         platform,
         filter: z.string().optional().describe('Selector to filter nodes'),
@@ -331,7 +331,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'if it never does — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes; ' +
         'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector. ' +
         'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given. ' +
-        'On iOS with treeSource: wda a target COVERED by the on-screen keyboard (its band: keys, AutoFill bar, accessory toolbar slot) is REFUSED — nothing is tapped or pressed, since no non-submitting dismissal exists; hide it first (tap a neutral, non-interactive element such as a title), then tap again. ' +
+        'On iOS with treeSource: wda a target COVERED by the on-screen keyboard (its band: keys, AutoFill bar, accessory toolbar slot) is hidden first by tapping the first entry of averi.yaml app.ios.keyboardDismiss that is on screen (a tap: on a neutral element such as the title, or accessory: true for the input-accessory toolbar\'s Done), the element found again, then tapped — the response says so; with none configured or none on screen the tap is REFUSED, nothing tapped or pressed, since no key hides the keyboard without submitting: hide it yourself (tap a neutral, non-interactive element such as a title), then tap again. ' +
         "The keyboard's own controls — a key, the toolbar's Done, the Passwords bar, dictation — are tappable as always. With treeSource: idb the tree carries no keyboard and the tap is sent as before.",
       inputSchema: {
         platform,
@@ -344,7 +344,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, selector, x, y, configPath: cp }) => {
       const adapter = await registry.get(p, await treeOpts(p, cp));
       if (selector !== undefined) {
-        const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse' });
+        const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse', dismissals: await keyboardDismissalsFor(p, cp) });
         return text(tapText(selector, note));
       }
       if (x === undefined || y === undefined) {
@@ -380,7 +380,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         `then verifies the text landed and retries a dropped clear-fill once. The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
         'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first). ' +
         'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting an unverified fill. Without selector: types into whatever is focused. ' +
-        'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android and refused on iOS (treeSource: wda; nothing typed).',
+        'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android, and on iOS (treeSource: wda) hidden by the first on-screen entry of averi.yaml app.ios.keyboardDismiss then refocused, or refused with none (nothing typed). The keyboard is NOT dismissed after typing here (a flow\'s fill: has dismissKeyboard for that).',
       inputSchema: {
         platform,
         text: z.string(),
@@ -396,7 +396,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         await adapter.typeText(value);
         return text(`Typed ${value.length} characters`);
       }
-      const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear });
+      const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: await keyboardDismissalsFor(p, cp) });
       return text(fillText(selector, { length: value.length, cleared: clear === true, note, warning }));
     },
   );

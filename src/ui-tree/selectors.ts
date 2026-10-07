@@ -160,7 +160,7 @@ export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
  * decorative text (e.g. on iOS a field's title and error label share the
  * field's accessibilityIdentifier).
  */
-const INTERACTIVE_ROLES = new Set([
+export const INTERACTIVE_ROLES: ReadonlySet<string> = new Set([
   'button',
   'textfield',
   'switch',

@@ -1,12 +1,13 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseConfig } from '../../src/flow/config.js';
 import {
   appBuildPath,
   envBeside,
   iosTreeSourceFor,
+  keyboardDismissalsFor,
   loadConfig,
   loadConfigIfPresent,
   loadProjectConfig,
@@ -308,5 +309,60 @@ describe('iosTreeSourceFor — the config-optional tree tools\' policy', () => {
   it('ios: the configured kind, or undefined when the config names none', async () => {
     expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n'))).toBe('wda');
     expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toBeUndefined();
+  });
+
+  /** Stage B (2026-10-07): the same policy for `app.ios.keyboardDismiss`, read by the tap and type_text tools. */
+  describe('keyboardDismissalsFor — the same policy for the keyboard guard\'s dismissals', () => {
+    const CONFIGURED = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ tap: { id: login_title } }, { accessory: true }] }\n';
+
+    it('android never reads the config: an invalid one is no error, a valid one with dismissals gives none', async () => {
+      expect(await keyboardDismissalsFor('android', await write(INVALID))).toBeUndefined();
+      expect(await keyboardDismissalsFor('android', await write(CONFIGURED))).toBeUndefined();
+    });
+
+    it('ios: the invalid averi.yaml throws naming the file; a missing one is undefined', async () => {
+      const path = await write(INVALID);
+      await expect(keyboardDismissalsFor('ios', path)).rejects.toThrow(path);
+      expect(await keyboardDismissalsFor('ios', join(dir, 'no-such.yaml'))).toBeUndefined();
+    });
+
+    it('ios: the configured list in the guard\'s vocabulary, in order, or undefined when the config names none', async () => {
+      expect(await keyboardDismissalsFor('ios', await write(CONFIGURED))).toEqual([{ kind: 'tap', target: { id: 'login_title' } }, { kind: 'accessory' }]);
+      expect(await keyboardDismissalsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toBeUndefined();
+    });
+
+    /** Review round 1: the key under the default tree source is inert — said on stderr once per file, by every loader. */
+    describe('the inert-key note', () => {
+      const INERT = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ accessory: true }] }\n';
+      let stderr: ReturnType<typeof vi.spyOn>;
+      beforeEach(() => {
+        stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      });
+      afterEach(() => {
+        stderr.mockRestore();
+      });
+      const notes = () => stderr.mock.calls.map((c: unknown[]) => String(c[0])).filter((line: string) => line.includes('keyboardDismiss'));
+
+      it('the strict loader says it once per file, naming the file, and not again on a re-load', async () => {
+        const path = await write(INERT);
+        await loadConfig(path);
+        await loadConfig(path);
+        expect(notes()).toEqual([`averi: ${path}: app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`]);
+      });
+
+      it('the lenient loader (the config-optional tools) says it too; a config with treeSource: wda, or without the key, says nothing', async () => {
+        const path = await write(INERT);
+        await loadConfigIfPresent(path);
+        expect(notes()).toHaveLength(1);
+        await loadConfig(await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda, keyboardDismiss: [{ accessory: true }] }\n'));
+        await loadConfig(await write('app:\n  ios: { bundleId: md.bank.app, treeSource: idb }\n'));
+        expect(notes()).toHaveLength(1);
+      });
+
+      it('android calls through the lenient loader never load the file, so never say it', async () => {
+        await keyboardDismissalsFor('android', await write(INERT));
+        expect(notes()).toEqual([]);
+      });
+    });
   });
 });

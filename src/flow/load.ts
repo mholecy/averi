@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { Platform } from '../adapters/types.js';
 import type { IosTreeSourceKind } from '../adapters/ios-node.js';
-import { parseConfig, type AveriConfig } from './config.js';
+import type { KeyboardDismissal } from '../interact/keyboard.js';
+import { inertKeyboardDismissNote, keyboardDismissals, parseConfig, type AveriConfig } from './config.js';
 import type { EnvValues } from './credentials.js';
 
 /**
@@ -58,8 +59,28 @@ export function configDir(configPath: string): string {
 }
 
 export async function loadConfig(path: string): Promise<AveriConfig> {
-  return resolveBuildPaths(parseConfig(await readFile(path, 'utf8'), path), path);
+  return loaded(path, parseConfig(await readFile(path, 'utf8'), path));
 }
+
+/**
+ * Every successful load of a config file comes through here — the strict
+ * loader and the lenient one alike: the build paths resolved against the
+ * file, and the one load-time NOTE a parsed config can carry
+ * (`inertKeyboardDismissNote`, review round 1) said on stderr, once per
+ * file and sentence, like the `.env.averi` announcement below. A note, not a
+ * parse error: the config is valid, it merely cannot act as written.
+ */
+function loaded(path: string, cfg: AveriConfig): AveriConfig {
+  const note = inertKeyboardDismissNote(cfg);
+  if (note !== undefined && !noted.has(`${path}\n${note}`)) {
+    noted.add(`${path}\n${note}`);
+    console.error(`averi: ${path}: ${note}`);
+  }
+  return resolveBuildPaths(cfg, path);
+}
+
+/** The load-time notes already said, per file — log-only state, as `announced` is. */
+const noted = new Set<string>();
 
 /**
  * All project configuration lives with the project, not with averi: averi.yaml
@@ -145,6 +166,26 @@ export async function iosTreeSourceFor(
 }
 
 /**
+ * The keyboard dismissals (`app.ios.keyboardDismiss`, stage B 2026-10-07)
+ * for the config-optional tools whose taps go through the keyboard guard —
+ * `tap` and `type_text` — under the SAME policy as `iosTreeSourceFor`,
+ * pinned the same way: android never reads the config (its guard is the
+ * oracle's and never looks at a dismissal), ios with no averi.yaml gets
+ * `undefined` (a covered target is refused, stage A), ios with an invalid
+ * one throws. The conversion is flow/config.ts#keyboardDismissals, the one
+ * owner. A second read of the same small file beside `iosTreeSourceFor` on
+ * one tool call, accepted: the two answer different questions, and one
+ * loader returning both would make every caller of either carry the other.
+ */
+export async function keyboardDismissalsFor(
+  platform: Platform,
+  configPath?: string,
+): Promise<readonly KeyboardDismissal[] | undefined> {
+  if (platform === 'android') return undefined;
+  return keyboardDismissals(await loadConfigIfPresent(projectConfigPath(configPath)));
+}
+
+/**
  * loadConfig for tools that predate averi.yaml and must keep working without
  * one (ui_snapshot, tap, ...): a MISSING file is `undefined`, but a
  * present-and-invalid file still throws — silently ignoring a broken config
@@ -158,7 +199,7 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  return resolveBuildPaths(parseConfig(raw, path), path);
+  return loaded(path, parseConfig(raw, path));
 }
 
 /**

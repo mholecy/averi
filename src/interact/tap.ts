@@ -1,7 +1,7 @@
 import type { DeviceAdapter } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { resolveClearOfKeyboard } from './keyboard.js';
-import type { SettleOptions, Target } from './resolve.js';
+import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
+import type { Target } from './resolve.js';
 
 /**
  * Wait for the target to appear and settle (resolveSettled: one policy for
@@ -12,8 +12,10 @@ import type { SettleOptions, Target } from './resolve.js';
  * Since 2026-10-03 the node comes from resolveClearOfKeyboard (keyboard.ts):
  * on an adapter with a keyboard oracle (Android) a target under the soft
  * keyboard is not tapped where it stands — the keyboard is hidden and the
- * target resolved again first. This function knows nothing of how that is
- * decided. When that
+ * target resolved again first; on one without (iOS, since 2026-10-07) the
+ * in-tree keyboard is read, a covered target is refused, or — stage B, the
+ * same day — hidden with one of the caller's `dismissals` (GuardOptions)
+ * first. This function knows nothing of how that is decided. When that
  * happened the note says so, and `keyboardHidden` carries the sentence alone
  * for the one caller that prints no notes (the flow trace's `⚠ tap`).
  *
@@ -28,7 +30,7 @@ import type { SettleOptions, Target } from './resolve.js';
 export async function tapElement(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>,
   target: Target,
-  opts: SettleOptions,
+  opts: GuardOptions,
 ): Promise<{ note?: string; keyboardHidden?: string }> {
   const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);
   const point = tapPoint(node);

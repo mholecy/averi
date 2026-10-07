@@ -56,7 +56,8 @@ export class FakeAdapter implements DeviceAdapter {
   constructor(
     private screens: Record<string, UiNode>,
     start: string,
-    private onTap: (id: string, self: FakeAdapter) => void = () => {},
+    /** Reassignable, like `onKey`: a test may script the app's reaction after building the fake (a dismissal tap that hides the keyboard, stage B). */
+    public onTap: (id: string, self: FakeAdapter) => void = () => {},
   ) {
     this.current = start;
   }

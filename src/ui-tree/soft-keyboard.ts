@@ -11,8 +11,12 @@ import { everyNode, KEYBOARD_ROLE, rectArea, type DeviceAdapter, type SoftKeyboa
  * the tap guard (interact/keyboard.ts) and the pixel poll (verify/
  * pixel-poll.ts) both ask `readSoftKeyboard` of the tree they already hold,
  * so neither pays a device read for the answer (a WDA `/source` is
- * 0.6–0.98 s, measured that day). Like `read-tree.ts#pollTree`, this module
- * takes the adapter and calls its interface, never a platform command.
+ * 0.6–0.98 s, measured that day). Since stage B (the same day) it also
+ * answers "which of the keyboard's own controls hides it" —
+ * `accessoryDismissButton`, the app's input-accessory toolbar's trailing
+ * button — for the guard's configured dismissals (interact/keyboard.ts).
+ * Like `read-tree.ts#pollTree`, this module takes the adapter and calls
+ * its interface, never a platform command.
  */
 
 /**
@@ -28,9 +32,12 @@ import { everyNode, KEYBOARD_ROLE, rectArea, type DeviceAdapter, type SoftKeyboa
  *   the mark whatever the screen shows, a WDA tree without it has no
  *   keyboard on screen, and the tree cannot say which source produced it.
  *   Both callers fail open on `unknown` and on `hidden` alike, so the
- *   distinction costs nothing there; it matters to `dismissKeyboard`'s
- *   `hidden → nothing` row, which this reading therefore never feeds
- *   (stage A leaves the in-tree dismissal blind, as it was).
+ *   distinction costs nothing there. Since stage B (2026-10-07) the
+ *   in-tree `dismissKeyboard` reads it too, and acts only on `shown`: on
+ *   `unknown` it does nothing — an idb tree reads `unknown` whatever the
+ *   screen shows, and a blind key there was measured to submit (K5d), so
+ *   "cannot see a keyboard" means "press nothing", the opposite of the
+ *   oracle's `unknown → back` row (interact/keyboard.ts has both reasons).
  */
 export function keyboardInTree(tree: UiNode): SoftKeyboard {
   for (const n of everyNode(tree)) {
@@ -59,6 +66,53 @@ export function partOfKeyboard(tree: UiNode, node: UiNode): boolean {
     return undefined;
   };
   return walk(tree, false) ?? false;
+}
+
+/**
+ * The input-accessory toolbar's trailing button — the app's own "Done" above
+ * a number pad — when the keyboard's UI on screen has one (stage B,
+ * 2026-10-07). Measured on the 2FA screen (docs/bugs/2026-10-05-ios-tap-
+ * lands-on-soft-keyboard.md, K4 and the device check): a tap on that
+ * Button {317,523,64,38} hid the pad without submitting, both by hand and
+ * through the `tap` tool; it is the one GENERIC non-submitting dismissal
+ * seen, the keyboard's own return key having submitted (K5d) and WDA's
+ * keyboard/dismiss having failed (K5a).
+ *
+ * The rule, over the normalized tree: a node of role `toolbar` (the WDA
+ * source's `Toolbar` type, adapters/wda-source.ts) that lies under an
+ * `ofKeyboard` root — the input-host Window, where UIKit puts an
+ * `inputAccessoryView` beside its `inputView` placeholder — with positive
+ * area, and NOT under the `KEYBOARD_ROLE` band node: the band holds the
+ * keys, the Passwords bar and the `done` RETURN key (a Button inside the
+ * `Keyboard` element, y 752 in the login fixtures), none of which is an
+ * accessory and one of which submits. In the 2FA fixture the Toolbar sits
+ * in a different Window than the band, so the exclusion costs nothing
+ * there and protects against a layout that nests one. Of the toolbar's
+ * buttons the LAST in pre-order: a UIToolbar lays its items leading to
+ * trailing, and the dismiss item is the trailing one by convention (the
+ * measured toolbar has a flexible space then "Done"). The button must have
+ * area too, or its centre is no tap point. Nothing in the login fixtures
+ * (no Toolbar at all) and nothing in the parked 2FA fixture: its Toolbar
+ * Window holds no `inputView` and is not marked `ofKeyboard` (the stage A
+ * residual on keyboardMarks) — with no band on screen there is nothing to
+ * dismiss there either, so the two residuals agree.
+ */
+export function accessoryDismissButton(tree: UiNode): UiNode | undefined {
+  const walk = (n: UiNode, ofKeyboard: boolean, underBand: boolean): UiNode | undefined => {
+    const here = ofKeyboard || n.ofKeyboard === true;
+    const banded = underBand || n.role === KEYBOARD_ROLE;
+    if (n.role === 'toolbar' && here && !banded && rectArea(n.rect) > 0) {
+      let last: UiNode | undefined;
+      for (const d of everyNode(n)) if (d.role === 'button' && rectArea(d.rect) > 0) last = d;
+      if (last !== undefined) return last;
+    }
+    for (const child of n.children) {
+      const found = walk(child, here, banded);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
+  return walk(tree, false, false);
 }
 
 /** One reading of the soft keyboard for one subject node, and what the adapter can do about a covering one. */

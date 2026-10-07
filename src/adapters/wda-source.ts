@@ -46,6 +46,20 @@ const ROLE_MAP: Record<string, string> = {
   Alert: 'container',
   Keyboard: 'container',
   StatusBar: 'container',
+  // `Toolbar` is `toolbar` (stage B, 2026-10-07): an app's
+  // `inputAccessoryView` arrives as a `Toolbar` element in the input-host
+  // Window (the 2FA fixtures: "Toolbar" {0,518,402,48} holding the "Done"
+  // Button), and ui-tree/soft-keyboard.ts#accessoryDismissButton finds the
+  // dismissal by that role. Until then the type fell through to `other`.
+  // Not interactive (ui-tree/selectors.ts: a selector never prefers it).
+  // Non-structural in ui-tree/bare-tree.ts, where `other` IS structural: as
+  // `other` a Toolbar counted as content only when labelled and not
+  // screen-sized; as `toolbar` it always does — a toolbar on screen is
+  // rendered UI, labelled or not. `role:toolbar` now matches it where
+  // `role:other` did. Here and not in the shared IOS_ROLE_MAP: the element
+  // was measured through WDA only, and idb's flat AX list, which never
+  // carries the keyboard, has not been seen to carry a Toolbar either.
+  Toolbar: 'toolbar',
 };
 
 /**

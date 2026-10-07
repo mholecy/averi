@@ -153,9 +153,12 @@ export type SoftKeyboard =
  * if any, is part of the tree — on iOS its keys are nodes, and the
  * covered-target problem has a different shape: since 2026-10-07 the tree
  * that resolved the target is read for a `KEYBOARD_ROLE` node (the WDA
- * source emits one per on-screen keyboard), a covered tap point is REFUSED,
- * and nothing is pressed — there is no non-submitting dismissal to try
- * (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, "Fix (stage A)").
+ * source emits one per on-screen keyboard), a covered tap point is REFUSED
+ * unless the config names a dismissal to tap first (stage B, the same day:
+ * `app.ios.keyboardDismiss`, a neutral element or the accessory toolbar's
+ * button — interact/keyboard.ts#KeyboardDismissal), and no KEY is pressed —
+ * there is no non-submitting key to press
+ * (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, "Fix (stage A)" and "Fix (stage B)").
  * Until 2026-10-04 both methods sat on `DeviceAdapter`, iOS returned a
  * constant from each without a device query, and the fake carried the
  * simulation of both for a feature one adapter has.
@@ -167,15 +170,19 @@ export type SoftKeyboard =
  * `back` hides, and interact/keyboard.ts — the one owner of what to DO about
  * the answers — presses that `back` only through an adapter that has one,
  * witness-vetoed. Its absence asserts the IN-TREE model (iOS: the keys are
- * nodes): nothing to observe, no `back` to press, and the blind dismissal
- * after a fill is `enter`, pressed asking nothing. That cuts both ways: a
- * NEW adapter that ships without an oracle gets the same blind dismissal,
- * and that key may SUBMIT a form — a platform where that is wrong adds the
- * oracle rather than a platform branch in interact/. Not a dismiss-key
- * property on the adapter (judged 2026-10-05): the guard's `back` must stay
- * bound to the window model, or an oracle whose key were the in-tree one
- * would submit forms under a covering keyboard, and "back was pressed (it
- * may have navigated)" would be false.
+ * nodes): nothing to observe, no `back` to press, and the dismissal after a
+ * fill — since stage B, 2026-10-07 — is one tap on a configured element
+ * when the tree shows a keyboard band, and NOTHING otherwise. Until that
+ * day it was `enter`, pressed blind, which was then measured to SUBMIT the
+ * form from the field (K5d in the bug note) — so a NEW adapter that ships
+ * without an oracle now gets a dismissal that presses nothing unless its
+ * tree source marks the band and the config names an element; a platform
+ * whose keyboard is a window `back` hides adds the oracle rather than a
+ * platform branch in interact/. Not a dismiss-key property on the adapter
+ * (judged 2026-10-05): the guard's `back` must stay bound to the window
+ * model, or an oracle whose key were the in-tree one would submit forms
+ * under a covering keyboard, and "back was pressed (it may have
+ * navigated)" would be false.
  *
  * Both methods NEVER throw and never guess: a command that fails, times out or
  * prints something unrecognised is `unknown`, and callers behave as before the
@@ -319,9 +326,11 @@ export interface DeviceAdapter {
    * whose keyboard is a separate window that `back` hides (Android), absent
    * where it is part of the tree (iOS). Absent means: no device is queried,
    * the tap guard reads the keyboard from the tree that resolved the target
-   * (`KEYBOARD_ROLE`; a covered point is refused, nothing is pressed — since
-   * 2026-10-07, before that taps were unguarded), and the blind dismissal
-   * key is `enter`.
+   * (`KEYBOARD_ROLE`; a covered point is hidden first by a configured
+   * dismissal tap or refused, nothing is pressed — since 2026-10-07, before
+   * that taps were unguarded), and the post-fill dismissal taps a configured
+   * element when the tree shows a band, else nothing (stage B; until then
+   * a blind `enter`, which submitted).
    */
   readonly keyboard?: KeyboardOracle;
   /**

@@ -311,7 +311,9 @@ and one helper owns the oracle-or-tree switch.)
 - **Stage B, a dismissal.** The only non-submitting dismissal measured (K5b) is a tap on a neutral point, which is
   app-specific; `dismissKeyboard` / `fill { dismissKeyboard: true }` on iOS still presses `enter` blind (K5d: submits).
   A generic candidate (the toolbar's Done or the keyboard's `Hide keyboard` key when present — both now resolve as
-  tappable — or a `dismissKeyboard: { tap: <element> }` option) needs its own measurement.
+  tappable — or a `dismissKeyboard: { tap: <element> }` option) needs its own measurement. **Done the same day — "Fix
+  (stage B)" below: a configured `app.ios.keyboardDismiss` list (a neutral tap, the accessory Done); `enter` is no longer
+  pressed.**
 - **An accessory toolbar alone** (2FA-0: `Toolbar` on screen at 826–874, `isVisible=1`, keyboard parked below the
   screen) marks no band; a target under it is tapped as before.
 - **`treeSource: idb`** has no keyboard in its tree: no band, no marks, no refusal — the pre-fix behaviour, fail-open.
@@ -413,3 +415,133 @@ Unexpected:
   lands on the keyboard) needs a keyboard raised *after* the last typing.
 - The `⚠` line's wording differs from the quote in the "Fix" section (see K2).
 - Submit #2 was spent because a pref toggle with no focus change does not raise the keyboard.
+
+## Fix (stage B) — 2026-10-07, not yet device-checked
+
+**Shipped.** A covered target is no longer only refused: when `averi.yaml` names a dismissal, the guard taps it first.
+Every measured fact above is a rule, and nothing new is pressed: the only keys ever measured (return, `enter`) submit
+(K5d) and stay unpressed; the only things measured to hide the keyboard without submitting — a tap on a neutral
+element (K5b, K3 of the device check) and the accessory toolbar's Done (K4) — are what the config may name.
+
+1. **Config: `app.ios.keyboardDismiss`** (`src/flow/config.ts`, strict schema, `KeyboardDismissStrategy`) — an ordered,
+   opt-in list, at least one entry when present:
+   ```yaml
+   app:
+     ios:
+       bundleId: sk.finportal.myport
+       treeSource: wda
+       keyboardDismiss:
+         - tap: { id: login_title }        # an element spec with a selector: a neutral element whose tap hides the keyboard
+         - tap: { id: twofactor_title }
+         - accessory: true                 # the input-accessory toolbar's trailing button (the "Done" above the 2FA pad)
+   ```
+   Opt-in and app-specific on purpose: what is neutral is the app's business, and a wrong choice is a tap on something.
+   `flow/config.ts#keyboardDismissals` converts it ONCE into interact/'s vocabulary
+   (`interact/keyboard.ts#KeyboardDismissal`: `{ kind: 'tap', target }` | `{ kind: 'accessory' }`), so no config type
+   crosses into interact/. The engine converts in its constructor and passes the list to every `tap:`, `fill:` and the
+   post-fill dismissal (`GuardOptions.dismissals`); the MCP `tap` and `type_text` tools read it through
+   `flow/load.ts#keyboardDismissalsFor` — the same config-optional policy as `iosTreeSourceFor` (android never reads the
+   config, ios without averi.yaml gets none, an invalid one throws). Only read under `treeSource: wda`: the idb tree
+   carries no band, so nothing is covered or dismissed there.
+2. **The accessory button** (`ui-tree/soft-keyboard.ts#accessoryDismissButton`): the WDA parser now maps `Toolbar` to role
+   `toolbar` (`adapters/wda-source.ts`; it fell through to `other`; not interactive, not structural, `role:toolbar`
+   matches it). The rule: a `toolbar` under an `ofKeyboard` root (UIKit's input-host Window, where the 2FA fixture
+   holds the Toolbar beside `inputView`), with positive area, NOT under the `keyboard` band node — which excludes the
+   keyboard's own `done` RETURN key (`id:Done` at {300,752} in the login fixtures, a Button inside `Keyboard`; it
+   SUBMITS) and the Passwords bar — and its last pre-order `button` with area (a UIToolbar lays items leading to
+   trailing). On the fixtures: 2FA-up → Done {317,523,64,38}; the login fixtures → none (no Toolbar at all); the parked
+   2FA fixture → none: its Toolbar Window holds no `inputView` and is not marked `ofKeyboard` (the stage A residual), and
+   with no band on screen there is nothing to dismiss there either, so the two residuals agree.
+3. **The guard protocol** (`interact/keyboard.ts#resolveClearOfKeyboard`, oracle-less branch; the Android branch is untouched
+   and reads no dismissal — pinned: the event log with dismissals configured is byte-identical to the log without):
+   after stage A's second look still covers, `pickDismissal` judges the configured list on THAT look's tree (no read of
+   its own, no wait), and every strategy passed over gets a reason. A `tap` is usable when its target matches a
+   NON-INTERACTIVE node with area — review round 1: the resolution policy prefers the sole interactive match, so
+   `tap: { text: "Sign in" }` on a screen where a title and a BUTTON share the label would have tapped the button; now
+   interactive matches are dropped before any choice (`only interactive match (button) — a dismissal must be a
+   non-interactive element`), and the schema refuses `role: button` and the other interactive roles outright — is
+   unambiguous under the caller's `refuse` mode (the MCP tools: `2 matches` counts as absent; flows take the first and
+   say `(2 matches, the first)` in the note), is not the keyboard's own UI (`partOfKeyboard`: `the keyboard's own
+   control` — the return key is a Button, so it is already dropped as interactive, pinned on both login dumps), has its
+   centre clear of the band (`under the keyboard`: a configured element under it would be the very tap the guard
+   refuses), inside the root's rect (`off screen at (x,y)`: WDA keeps off-screen nodes, a title scrolled above the
+   viewport is still found) and not drawn over by later content (`covered by text "Session expired"`: `shadowing`, the
+   last non-structural, non-keyboard node after it in pre-order containing the point — an alert's or sheet's text, a
+   navigation bar's label; ancestors, earlier siblings, later structural wrappers never count); an `accessory` is
+   usable when `accessoryDismissButton` answers (`no accessory toolbar on screen` otherwise). None →
+   `KeyboardWithoutDismissal` as before, the message now ending `…; this adapter cannot hide it (<advice>), and no
+   dismissal is configured` or `…, and none of the configured dismissals is usable on this screen (tap
+   id:"twofactor_title": not found; accessory: no accessory toolbar on screen)`; the `⚠ tap` trace line is unchanged
+   (`…; no dismissal, nothing sent`). One → ONE `adapter.tap` at its centre, then up to `KEYBOARD_HIDE_CONFIRM_LOOKS`
+   (2) looks `KEYBOARD_HIDE_DELAY_MS` apart, each a `resolveSettled` with the same options with the band read off it
+   (review round 1: the 300 ms is an Android floor, and an iOS hide animation caught mid-way must not fail what the
+   blind `enter` passed): clear → the tap, note and `⚠ tap` line `the soft keyboard covered id:"login_submit"; hidden
+   by tapping id:"login_title" before tapping`; still covering on the last look → `AfterDismissalTap` (a
+   `KeyboardGuardError`, the in-tree sibling of `AfterKeyboardDismissal`), trace line `…; tapped id:"login_title" to
+   hide it, still covered`, message saying the screen may have changed; a look that cannot resolve the target is
+   wrapped the same way the Android second look is (`After tapping id:"login_title" at (201,303) to hide the soft
+   keyboard that covered … : Timed out … That tap may have changed the screen`, trace line `…; tapped …, and the look
+   after it failed`, the cause kept). NEVER a second strategy after a tap: the tap had an effect this layer cannot
+   judge. `IosAdapter.keyboardAdvice` now also says where the measured dismissals are configured, so the refusal points
+   at the fix without interact/ naming an iOS config key.
+4. **`dismissKeyboard` / `fill { dismissKeyboard: true }`** (`interact/keyboard.ts#dismissKeyboard`, the in-tree model):
+   **`enter` is never pressed any more** — a deliberate behaviour change, since the blind key was measured to submit
+   (K5d). **Migration:** a flow that relied on that `enter` to SUBMIT (a search field, a form without a button) taps the
+   app's own submit/search control. The keyboard's return key (`tap: { id: Done }` / `tap: { label: search }`; the label
+   follows the field's return-key type) is the keyboard's own control and passes the guard, but only while the keyboard
+   is visibly up (`ui_snapshot` shows the `keyboard` band): after a `fill` it is usually parked below the screen
+   (device check, 2026-10-07) with its keys still in the tree, and a tap there would land off screen (review round 2). ONE `uiTree()` read: a band → the same strategy pick, one tap, then up to two re-reads 300 ms apart
+   to confirm (still up on the last → `AfterDismissalTap`, trace line `the soft keyboard was up after the fill; tapped …
+   to hide it, still up`, which the engine logs as `⚠ fill` before the `✗`, and which an `optional:` skip quotes rather
+   than "not present" — review round 1); the fill line then reads `fill: id:"login_password" = ***; keyboard hidden by
+   tapping id:"login_title"`. No band — none
+   on screen, the keyboard parked by the HID typing the fill just did (every `fill` parks it, the device check), or an
+   idb tree — nothing is pressed or tapped, so under `treeSource: idb` the option is a no-op. A band with no usable
+   strategy is a WARNING, not a throw: `⚠ fill: id:"login_password": the soft keyboard is up and was left up: no
+   dismissal is configured — the next tap under it will be refused` (or the configured list with each entry's reason).
+   The key set under `treeSource: idb` (the default) is inert — the idb tree carries no keyboard — and
+   `flow/load.ts` says so on stderr once per file (`inertKeyboardDismissNote`); every bad entry is refused with a
+   sentence naming the field and the rule (`each entry is { tap: <element spec> } or { accessory: true }`,
+   `accessory takes only true`, the interactive-role rule). Decided against a
+   refusal because the Android dismissal is best effort too (the witness's veto leaves a keyboard up silently and no
+   read confirms the `back`), a `dismissKeyboard: true` written for Android must not fail the iOS leg when the next
+   step is not even under the keyboard, and whatever the keyboard would harm — the next tap, a pixel assert — is
+   guarded in its own place and refuses there with the full message; the warning makes that refusal no surprise. A
+   dismissal that WAS tapped and did not hide the keyboard throws: the screen was touched.
+5. **Tests** (87 new, 1473 total; 29 mutants of the rule killed on an rsync copy — the band skip, the keyboard-side skip,
+   the confirming looks, the blind `enter`, the band and `ofKeyboard` halves of the accessory rule, the last-button choice,
+   the engine's and the tools' plumbing, the android policy, the confirming re-read, the hide delay, the second look's
+   tree, the oracle path's empty result, and after review round 1 the interactive filter, the off-screen and shadowing
+   checks, the look and read counts, the engine's `⚠ fill` on a failed dismissal, the optional headline, the schema's
+   interactive-role rule, the inert note, the first-mode note): `tests/interact/keyboard.test.ts` (the protocol on the synthetic login and on the real
+   dumps — K1 with the title configured, swapped for K3 after the tap; the 2FA pad with `accessory`, a target constructed
+   under the band since the real submit sits above it at 451, swapped for the parked dump; the return key never chosen;
+   Android byte-identical; the in-tree `dismissKeyboard` rows), `tests/ui-tree/soft-keyboard.test.ts` and
+   `tests/adapters/wda-source-keyboard.test.ts` (the accessory rule, synthetic and on the five dumps; the `toolbar`
+   role), `tests/flow/config.test.ts` (accept/reject, the conversion), `tests/flow/load.test.ts` (the tool policy),
+   `tests/flow/engine.test.ts` (the trace lines for `tap:` and `fill:`, the measured flow passing with the title tapped
+   by the guard), `tests/mcp/tools.test.ts` (`tap`/`type_text` pass the config's list; android never reads it).
+
+**Deferred (recorded, not built).**
+- **An automatic neutral-point heuristic** (tap "somewhere harmless" without config): what is harmless is the app's, and
+  a wrong guess is a tap on something; the config is one line.
+- **A per-step `dismissKeyboard: { tap: <element> }`**: the per-app list covers every measured screen; a per-step form
+  would be a second vocabulary for the same thing. Revisit if one app needs a different dismissal per screen that the
+  ordered list cannot express.
+- The stage A residuals stand (parked accessory toolbar, idb, iPad split/floating, landscape, the second app window).
+
+**Device check expectations** (not yet run):
+- The full finportal `login` flow with `keyboardDismiss: [{ tap: { id: login_title } }]` configured and the band raised
+  AFTER the last fill (the pref toggle plus a focus change, as in the stage A check): the trace shows
+  `⚠ tap: the soft keyboard covered id:"login_submit"; hidden by tapping id:"login_title" before tapping` then
+  `tap: id:"login_submit"` and the flow ends on `twofactor_screen` (one real submit). With the keyboard parked by the
+  fills, no `⚠` line and the flow passes as in the stage A check's K2.
+- A 2FA accessory dismissal through the guard: `twofactor_code` focused with the pad up (`role:keyboard`
+  `{0,518,402,356}`), `fill: { id: twofactor_code, value: "1", dismissKeyboard: true }` with `accessory: true` configured
+  → the fill line ends `; keyboard hidden by tapping the accessory toolbar's "Done"`, and afterwards `0 matches for
+  role:keyboard`; no code completed. For the guard itself a target under the pad is needed — on this screen the layout
+  moves the buttons above it, so the check is the `dismissKeyboard` one unless a covered element is found.
+- `treeSource: idb` with `dismissKeyboard: true` on the password fill: no `enter`, no submit, the fill line unchanged,
+  the keyboard left as it was.
+- Android K6 unchanged: `⚠ tap: the soft keyboard covered id:"login_submit"; hidden before tapping`, `back` pressed once,
+  with `keyboardDismiss` configured in the same averi.yaml.

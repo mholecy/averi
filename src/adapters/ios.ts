@@ -316,13 +316,19 @@ export class IosAdapter implements DeviceAdapter {
    * hid it and submitted nothing, twice; and there is no back key
    * (`pressKey('back')` throws above). The simulator shows no software
    * keyboard while it believes a hardware keyboard is typing, which is the
-   * other way the target is clear.
+   * other way the target is clear. Since stage B (the same day) the
+   * sentence also says where the measured dismissal is configured —
+   * `app.ios.keyboardDismiss` in averi.yaml (flow/config.ts), which the
+   * guard taps before a covered target — so the refusals above this layer
+   * point at the fix without naming an iOS config key themselves.
    */
   readonly keyboardAdvice =
     'the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, ' +
     "the return key submits from the field, WebDriverAgent's keyboard/dismiss fails and a swipe does nothing; " +
     'a tap on a neutral, non-interactive element (a title label) was measured to hide it without submitting, ' +
-    'and typing with a hardware keyboard keeps the software keyboard from showing';
+    'and so was the input-accessory toolbar\'s Done — name them under app.ios.keyboardDismiss in averi.yaml ' +
+    '(tap: { id: <title> }, accessory: true) and the guard taps the first one on screen before a covered target; ' +
+    'typing with a hardware keyboard keeps the software keyboard from showing';
 
   async setClipboard(text: string): Promise<void> {
     const env = await this.detectEnv();

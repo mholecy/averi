@@ -5,7 +5,7 @@ import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.
 import { resolveNow } from '../../src/interact/resolve.js';
 import { findAll, isInteractive, tapPoint } from '../../src/ui-tree/selectors.js';
 import { isBareTree } from '../../src/ui-tree/bare-tree.js';
-import { keyboardInTree, partOfKeyboard } from '../../src/ui-tree/soft-keyboard.js';
+import { accessoryDismissButton, keyboardInTree, partOfKeyboard } from '../../src/ui-tree/soft-keyboard.js';
 
 /**
  * WDA `GET /source?format=json` of finportal's MyPort (`sk.finportal.myport`)
@@ -102,7 +102,55 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
   it('the parked Keyboard element and its keys are still in the tree, as containers and others — nothing is dropped', () => {
     const keyboard = [...everyNode(TWOFA_PARKED)].find((n) => n.rect.y === 891 && n.rect.height === 233 && n.children.length === 1);
     expect(keyboard).toMatchObject({ role: 'container' });
-    expect(only(TWOFA_PARKED, 'id:Toolbar')).toMatchObject({ role: 'other', rect: { x: 0, y: 826, width: 402, height: 48 } });
+    expect(only(TWOFA_PARKED, 'id:Toolbar')).toMatchObject({ role: 'toolbar', rect: { x: 0, y: 826, width: 402, height: 48 } });
+  });
+
+  /**
+   * Stage B (2026-10-07): the app's `inputAccessoryView` is a `Toolbar`
+   * element, now role `toolbar` (it fell through to `other` before), and
+   * its trailing Button is the generic non-submitting dismissal measured on
+   * the 2FA pad (K4; the device check's `tap text:"Done"` hid it).
+   */
+  describe('the accessory toolbar: role `toolbar`, and accessoryDismissButton finds its trailing button', () => {
+    it('both 2FA dumps carry one Toolbar, role toolbar — matched by role:toolbar, not interactive, not preferred', () => {
+      for (const tree of [TWOFA_TOOLBAR, TWOFA_PARKED]) {
+        const toolbar = findAll(tree, 'role:toolbar');
+        expect(toolbar).toHaveLength(1);
+        expect(toolbar[0]).toMatchObject({ identifier: 'Toolbar', label: 'Toolbar', role: 'toolbar' });
+        expect(isInteractive(toolbar[0])).toBe(false);
+      }
+      for (const tree of [LOGIN_BAR, LOGIN_NO_BAR, LOGIN_NONE]) expect(findAll(tree, 'role:toolbar')).toEqual([]);
+    });
+
+    it('2FA pad up: the Done {317,523,64,38} in the input-host Window — the one marked ofKeyboard beside the band\'s', () => {
+      const done = accessoryDismissButton(TWOFA_TOOLBAR);
+      expect(done).toMatchObject({ role: 'button', label: 'Done', rect: { x: 317, y: 523, width: 64, height: 38 } });
+      expect(done).toBe(only(TWOFA_TOOLBAR, 'label:Done')); // the tree's own node, by identity
+      expect(partOfKeyboard(TWOFA_TOOLBAR, done!)).toBe(true);
+    });
+
+    it.each([
+      ['login with the Passwords bar (K1): no Toolbar at all — and the keyboard\'s own `done` return key is not an accessory', LOGIN_BAR],
+      ['login without the bar (K2): the same', LOGIN_NO_BAR],
+      ['nothing focused (K3)', LOGIN_NONE],
+    ])('%s → nothing', (_name, tree) => {
+      expect(accessoryDismissButton(tree)).toBeUndefined();
+    });
+
+    it('the login dumps DO hold a `done` Button — the return key inside the Keyboard, which SUBMITS (K5d) — and it is never the answer', () => {
+      for (const tree of [LOGIN_BAR, LOGIN_NO_BAR]) {
+        const returnKey = only(tree, 'id:Done');
+        expect(returnKey).toMatchObject({ role: 'button', label: 'done', rect: { x: 300, y: 752, width: 100, height: 54 } });
+        expect(partOfKeyboard(tree, returnKey)).toBe(true);
+        expect(accessoryDismissButton(tree)).toBeUndefined();
+      }
+    });
+
+    it('2FA parked: the Toolbar is on screen (826–874) but its Window holds no inputView and is not ofKeyboard (the stage A residual) → nothing; with no band there is nothing to dismiss either', () => {
+      expect(accessoryDismissButton(TWOFA_PARKED)).toBeUndefined();
+      expect(partOfKeyboard(TWOFA_PARKED, only(TWOFA_PARKED, 'label:Done'))).toBe(false);
+      expect(keyboardInTree(TWOFA_PARKED)).toEqual({ state: 'unknown' });
+    });
   });
 
   it('the `Keyboard` element itself stays a container, and its keys stay `other` — only the band node changes role', () => {

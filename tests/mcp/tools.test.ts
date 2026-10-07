@@ -530,6 +530,87 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
   });
 });
 
+/**
+ * Stage B (2026-10-07): the tap and type_text tools hand averi.yaml's
+ * `app.ios.keyboardDismiss` to the keyboard guard (flow/load.ts#
+ * keyboardDismissalsFor, the same config-optional policy as the tree
+ * source). The measured iOS login in points: `login_submit` under the band
+ * the WDA source marks, the title above it; the fake plays the app (K5b: a
+ * tap on the title hides the keyboard).
+ */
+describe('tap / type_text pass app.ios.keyboardDismiss to the guard', () => {
+  const iosLogin = (hides = true) => {
+    const fake = new FakeAdapter(
+      {
+        login: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 402, height: 874 },
+          children: [
+            node({ role: 'text', identifier: 'login_title', label: 'Login', rect: { x: 36, y: 291, width: 330, height: 24 } }),
+            node({ role: 'textfield', identifier: 'login_password', rect: { x: 90, y: 600, width: 222, height: 20 } }),
+            node({ role: 'button', identifier: 'login_submit', rect: { x: 36, y: 547, width: 141, height: 48 } }),
+            node({ role: 'keyboard', rect: { x: 0, y: 539, width: 402, height: 335 } }),
+          ],
+        }),
+      },
+      'login',
+      (id, self) => {
+        if (hides && id === 'login_title') self.live().children = self.live().children.filter((c) => c.role !== 'keyboard');
+      },
+    );
+    fake.keyboardAdvice = 'ADVICE';
+    return fake;
+  };
+  const CONFIGURED = 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda, keyboardDismiss: [{ tap: { id: login_title } }, { accessory: true }] }\n';
+
+  it('tap: the configured title is tapped first, the target after it, and the response says so', async () => {
+    const fake = iosLogin();
+    const { call } = await connect({ ios: fake });
+    const result = await call('tap', { platform: 'ios', selector: 'id:login_submit', configPath: await file('averi.yaml', CONFIGURED) });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Tapped id:login_submit (the soft keyboard covered id:login_submit; hidden by tapping id:"login_title" before tapping)');
+    expect(fake.taps).toEqual(['login_title', 'login_submit']);
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('tap: without the key in averi.yaml the covered target is refused, saying no dismissal is configured — and nothing is tapped', async () => {
+    const fake = iosLogin();
+    const { call } = await connect({ ios: fake });
+    const result = await call('tap', { platform: 'ios', selector: 'id:login_submit', configPath: await file('averi.yaml', 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n') });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('this adapter cannot hide it (ADVICE), and no dismissal is configured');
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('tap: a dismissal that does not hide the keyboard fails the call naming the tap that was sent, and the target is not tapped', async () => {
+    const fake = iosLogin(false);
+    const { call } = await connect({ ios: fake });
+    const result = await call('tap', { platform: 'ios', selector: 'id:login_submit', configPath: await file('averi.yaml', CONFIGURED) });
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/^Tapped id:"login_title" at \(201,303\) to hide the soft keyboard covering id:login_submit, but it is still up/);
+    expect(fake.taps).toEqual(['login_title']);
+  });
+
+  it('type_text: the focus tap on a field under the band goes through the same dismissal, then the text is typed', async () => {
+    const fake = iosLogin();
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', selector: 'id:login_password', text: 'secret', configPath: await file('averi.yaml', CONFIGURED) });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Filled id:login_password (6 characters) (the soft keyboard covered id:login_password; hidden by tapping id:"login_title" before tapping)');
+    expect(fake.taps).toEqual(['login_title', 'login_password']);
+    expect(fake.typed).toEqual(['secret']);
+    expect(fake.keys).toEqual([]); // nothing dismissed AFTER typing: the tool has no dismissKeyboard
+  });
+
+  it('android: the config is not read for the dismissals either — a present-but-invalid averi.yaml does not break an android tap', async () => {
+    const fake = home();
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:home_root', configPath: await invalidConfig() });
+    expect(result.isError).toBe(false);
+    expect(fake.taps).toEqual(['home_root']);
+  });
+});
+
 describe('assert — results always, health only with a loadable averi.yaml', () => {
   const run = async (configPath: string) => {
     const { call } = await connect();

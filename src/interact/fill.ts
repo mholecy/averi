@@ -3,8 +3,8 @@ import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { resolveClearOfKeyboard } from './keyboard.js';
-import { describeTarget, resolveNow, type SettleOptions, type Target } from './resolve.js';
+import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
+import { describeTarget, resolveNow, type Target } from './resolve.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -18,7 +18,8 @@ export const DEFAULT_FOCUS_DELAY_MS = 350;
  */
 export const DEFAULT_VALUE_POLL_MS = 400;
 
-export interface FillOptions extends SettleOptions {
+/** The guard's options (the focus tap goes through resolveClearOfKeyboard, dismissals included) plus the fill's own. */
+export interface FillOptions extends GuardOptions {
   /** Delete the field's current content before typing — typing otherwise APPENDS. */
   clear?: boolean;
 }
@@ -26,7 +27,7 @@ export interface FillOptions extends SettleOptions {
 export interface FillResult {
   /** How the field was chosen when several nodes matched (see resolveNow). */
   note?: string;
-  /** The soft keyboard covered the field and was hidden before the focus tap (keyboard.ts) — the sentence, also in `note`. */
+  /** The soft keyboard covered the field and was hidden before the focus tap (keyboard.ts: `back`, or a configured dismissal tapped) — the sentence, also in `note`. */
   keyboardHidden?: string;
   /** The fill was legal but suspicious — a masked field already held text and `clear` is off. */
   warning?: string;

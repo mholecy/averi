@@ -4,7 +4,7 @@ import { fillField } from '../interact/fill.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
-import { dismissKeyboard, KeyboardGuardError } from '../interact/keyboard.js';
+import { dismissKeyboard, KeyboardGuardError, type DismissResult, type KeyboardDismissal } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec as describeSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
@@ -18,6 +18,7 @@ import {
   resolveLaunchActivity,
   flowIsDestructive,
   flowItselfIsDestructive,
+  keyboardDismissals,
   SetupError,
   type AveriConfig,
   type Condition,
@@ -209,6 +210,15 @@ export class FlowEngine {
   private readonly assertTimeoutMs: number | undefined;
   private readonly pinKeyDelayMs: number;
   private readonly credentials: Credentials;
+  /**
+   * `app.ios.keyboardDismiss` in interact/'s vocabulary (flow/config.ts#
+   * keyboardDismissals), converted once here and handed to every tap and
+   * fill — and to the post-fill dismissal — as `GuardOptions.dismissals`.
+   * The engine never branches on the platform for it: interact/ reads the
+   * list only where the adapter has no keyboard oracle, so on Android it is
+   * carried and never read.
+   */
+  private readonly dismissals: readonly KeyboardDismissal[] | undefined;
 
   constructor(
     private readonly cfg: AveriConfig,
@@ -229,6 +239,7 @@ export class FlowEngine {
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
+    this.dismissals = keyboardDismissals(cfg);
   }
 
   /** Detect → run reach flows → confirm. Idempotent. */
@@ -753,17 +764,40 @@ export class FlowEngine {
         clear,
         timeoutMs: this.tapTimeoutMs,
         pollMs: this.pollMs,
+        dismissals: this.dismissals,
         // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
         // tests mock util/sleep instead of threading a test-only option here.
       }),
     );
-    // The warnings are logged BEFORE the keyboard is dismissed: a pressKey that
-    // throws must not take the masked-append warning down with it. The
-    // keyboard line (tracingDismissal's) comes first: it happened first,
-    // before the focus tap.
+    // The warnings are logged BEFORE the keyboard is dismissed: a dismissal
+    // that throws (a `back` the device refuses, a dismissal tap that does
+    // not hide the keyboard) must not take the masked-append warning down
+    // with it. The keyboard line (tracingDismissal's) comes first: it
+    // happened first, before the focus tap.
     if (warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${warning}`);
-    if (closeKeyboard) await dismissKeyboard(this.adapter);
-    this.log('fill', `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}`);
+    // What the dismissal did (stage B, 2026-10-07): on the in-tree model it
+    // may tap a configured element — said on the fill line, since the step
+    // did it — or leave the keyboard up with a reason, a `⚠ fill` line like
+    // the masked-append one, so the next step's refusal is not a surprise.
+    // On the oracle model both are absent and the line is as it was. A
+    // dismissal that THROWS after tapping (AfterDismissalTap) gets its `⚠
+    // fill` line before the `✗`, as tracingDismissal gives the guard's —
+    // written out here because the result has no `keyboardHidden` to trace.
+    let closed: DismissResult = {};
+    if (closeKeyboard) {
+      try {
+        closed = await dismissKeyboard(this.adapter, { dismissals: this.dismissals, ambiguous: FLOW_AMBIGUITY });
+      } catch (e) {
+        if (e instanceof KeyboardGuardError) this.log('⚠ fill', e.traceLine);
+        throw e;
+      }
+    }
+    if (closed.warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${closed.warning}`);
+    this.log(
+      'fill',
+      `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}` +
+        (closed.hidden === undefined ? '' : `; keyboard hidden by ${closed.hidden}`),
+    );
   }
 
   private async runAssert(specs: StepPayload<'assert'>): Promise<void> {
@@ -851,7 +885,11 @@ export class FlowEngine {
       // presence poll has passed; a tap that fails AFTER it (the element was
       // there — e.g. the keyboard over it would not close, and `back` was
       // pressed) says its own headline instead (review 2026-10-03: such a
-      // skip read "(not present)").
+      // skip read "(not present)"). The other step kinds have no presence
+      // poll, so for them a KeyboardGuardError is the one failure known to
+      // have found the element — a fill whose dismissal tap did not hide
+      // the keyboard sent a tap, and "(not present)" would hide that
+      // (stage B review).
       let present = false;
       try {
         if (tap) {
@@ -869,7 +907,7 @@ export class FlowEngine {
           await this.runStep(s); // swallowDepth > 0: no ✗ line, the failure is logged as skipped below
         }
       } catch (e) {
-        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (${present ? headline(e) : 'not present'})`);
+        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (${present || e instanceof KeyboardGuardError ? headline(e) : 'not present'})`);
       }
     }
   }
@@ -893,7 +931,7 @@ export class FlowEngine {
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
     await this.tracingDismissal('⚠ tap', () =>
-      tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs }),
+      tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs, dismissals: this.dismissals }),
     );
     if (!quiet) this.log('tap', describeSpec(spec));
   }
@@ -904,7 +942,9 @@ export class FlowEngine {
    * whatever the step logs next:
    * - the step succeeded after the guard pressed `back`: the sentence the
    *   result carries ("…; hidden before tapping", or "…; back pressed; the
-   *   keyboard's state afterwards could not be read");
+   *   keyboard's state afterwards could not be read") — or, on the in-tree
+   *   model since stage B (2026-10-07), after it tapped a configured
+   *   dismissal ("…; hidden by tapping id:"login_title" before tapping");
    * - the step FAILED after it: the attempt ("…; back pressed"), BEFORE the
    *   step's `✗` line — the key press happened whether or not the step
    *   survived it, and if no keyboard was really up it navigated. Without

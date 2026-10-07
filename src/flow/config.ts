@@ -1,14 +1,16 @@
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent, Platform } from '../adapters/types.js';
-import { IOS_TREE_SOURCE_KINDS, type IosTreeSourceKind } from '../adapters/ios-node.js';
+import { DEFAULT_IOS_TREE_SOURCE, IOS_TREE_SOURCE_KINDS, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
   elementSpecSchema,
   hasSelector,
   type ElementSpec,
 } from '../ui-tree/element-spec.js';
+import { INTERACTIVE_ROLES } from '../ui-tree/selectors.js';
 import { elementAssertSchema, type ElementAssert } from '../verify/element-assert.js';
+import type { KeyboardDismissal } from '../interact/keyboard.js';
 
 /**
  * Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4), the types it
@@ -34,6 +36,43 @@ export interface FillSpec extends ElementSpec {
   /** Delete the field's current content before typing (opt-in: pre-filled login fields must survive). */
   clear?: boolean;
   dismissKeyboard?: boolean;
+}
+
+/**
+ * One entry of `app.ios.keyboardDismiss` (stage B, 2026-10-07): how the
+ * guard may hide the iOS soft keyboard when it covers a tap target, and how
+ * `fill { dismissKeyboard: true }` hides it after typing. Either a `tap` on
+ * an element of the app's that hides the keyboard without a side effect —
+ * the screen title was measured to (docs/bugs/2026-10-05-ios-tap-lands-on-
+ * soft-keyboard.md, K5b) — or `accessory: true`, the input-accessory
+ * toolbar's trailing button (the app's "Done" above a number pad, K4). The
+ * list is ordered: the first entry whose element is on screen is used.
+ * Opt-in and app-specific on purpose: which element is neutral is the
+ * app's business, and the keyboard's own return key SUBMITS (K5d). A `tap`
+ * must resolve to a NON-INTERACTIVE element: the guard drops interactive
+ * matches (interact/keyboard.ts#pickDismissal — a title and a button sharing
+ * a label must never tap the button), and a spec that names an interactive
+ * `role:` outright is refused at parse time, where the author reads it.
+ */
+export type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
+
+/**
+ * `app.ios.keyboardDismiss` set where it cannot act (review round 1): the
+ * idb tree carries no keyboard, so under `treeSource: idb` — the default —
+ * nothing is ever covered or dismissed and the list is inert. The sentence
+ * the loader prints once per config (flow/load.ts), so a project that set
+ * the key and forgot the tree source is told at load time rather than by a
+ * tap that went into the keys. Pure: config in, sentence or nothing out.
+ */
+export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
+  const ios = cfg.app.ios;
+  if (ios?.keyboardDismiss === undefined) return undefined;
+  const kind = ios.treeSource ?? DEFAULT_IOS_TREE_SOURCE;
+  if (kind === 'wda') return undefined;
+  return (
+    `app.ios.keyboardDismiss is set but app.ios.treeSource is ${kind}${ios.treeSource === undefined ? ' (the default)' : ''}: ` +
+    `the ${kind} tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`
+  );
 }
 
 export interface TapSpec extends ElementSpec {
@@ -105,6 +144,33 @@ const condition: z.ZodType<Condition> = z.lazy(() =>
 );
 
 const timeout = z.union([z.number(), z.string()]);
+
+/**
+ * See KeyboardDismissStrategy. One object with both keys optional and
+ * exactly one required, rather than a `z.union` of the two shapes (review
+ * round 1): a union reports every bad entry as one bare "Invalid input" at
+ * `keyboardDismiss.0`, where this form keeps each field's own message and
+ * path — `tap` needs a selector, `tap` must not name an interactive role,
+ * `accessory` takes only true, and the entry needs one of the two. The
+ * transform narrows the parsed object back to the union the type promises.
+ */
+const keyboardDismissStrategy = z
+  .object({
+    tap: elementSpecObject
+      .refine(hasSelector, { message: 'tap needs at least one of: id, text, role, label' })
+      .refine((s) => s.role === undefined || !INTERACTIVE_ROLES.has(s.role), {
+        message: `a keyboard dismissal must be a non-interactive element (a title, a label) — role: ${[...INTERACTIVE_ROLES].join('/')} names a control the tap would press`,
+      })
+      .optional(),
+    accessory: z
+      .literal(true, { errorMap: () => ({ message: 'accessory takes only true (the entry is opt-in; false reads like an override and would be none)' }) })
+      .optional(),
+  })
+  .strict()
+  .refine((e) => (e.tap === undefined) !== (e.accessory === undefined), {
+    message: 'each entry is { tap: <element spec> } or { accessory: true }',
+  })
+  .transform((e): KeyboardDismissStrategy => (e.tap !== undefined ? { tap: e.tap } : { accessory: true }));
 
 /** Android-only `am start` parameters — see LaunchIntent in adapters/types.ts. */
 const launchIntent: z.ZodType<LaunchIntent> = z
@@ -260,6 +326,16 @@ const configSchema = z
              * tree-source seam's (adapters/ios-node.ts), spelled once.
              */
             treeSource: z.enum(IOS_TREE_SOURCE_KINDS).optional(),
+            /**
+             * How to hide the soft keyboard when it covers a tap target, in
+             * order of preference (stage B, 2026-10-07; see
+             * KeyboardDismissStrategy). Without it a covered target is
+             * refused (stage A) and `fill { dismissKeyboard: true }` leaves
+             * the keyboard up with a warning. Only read under `treeSource:
+             * wda` — idb's tree carries no keyboard, so nothing is ever
+             * covered or dismissed there.
+             */
+            keyboardDismiss: z.array(keyboardDismissStrategy).min(1).optional(),
           })
           .strict()
           .optional(),
@@ -308,6 +384,24 @@ const configSchema = z
   .strict();
 
 export type AveriConfig = z.infer<typeof configSchema>;
+
+/**
+ * `app.ios.keyboardDismiss` in the interaction module's vocabulary
+ * (interact/keyboard.ts#KeyboardDismissal) — the one conversion, done once
+ * per engine (FlowEngine's constructor) and once per config-optional tool
+ * call (flow/load.ts#keyboardDismissalsFor), so no config type crosses into
+ * interact/ and no interact type is spelled in YAML. `undefined` when the
+ * config, its iOS section or the key is absent: the guard then has nothing
+ * to tap, exactly stage A. Not platform-gated here: the engine passes it to
+ * every tap and fill, and interact/ reads it only on the oracle-less
+ * branch, which Android never takes — the same shape as `treeSource`, which
+ * the registry reads for the iOS adapter only.
+ */
+export function keyboardDismissals(cfg: AveriConfig | undefined): readonly KeyboardDismissal[] | undefined {
+  const configured = cfg?.app.ios?.keyboardDismiss;
+  if (configured === undefined) return undefined;
+  return configured.map((s): KeyboardDismissal => ('tap' in s ? { kind: 'tap', target: s.tap } : { kind: 'accessory' }));
+}
 
 export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfig {
   const raw = parseYaml(yamlText);

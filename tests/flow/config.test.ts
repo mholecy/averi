@@ -3,6 +3,8 @@ import {
   childSteps,
   flowIsDestructive,
   flowItselfIsDestructive,
+  inertKeyboardDismissNote,
+  keyboardDismissals,
   resolveLaunchActivity,
   launchConsultsConfigActivity,
   parseConfig,
@@ -211,6 +213,74 @@ flows:
     // `auto` is explicitly deferred (plan, decision 3) — it must not parse yet
     expect(() => parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: auto }\n'))
       .toThrow(/Invalid averi\.yaml/);
+  });
+
+  /**
+   * Stage B (2026-10-07): `app.ios.keyboardDismiss`, the ordered, opt-in
+   * list the keyboard guard taps from (docs/bugs/2026-10-05-ios-tap-lands-
+   * on-soft-keyboard.md, "Fix (stage B)").
+   */
+  describe('app.ios.keyboardDismiss', () => {
+    const ios = (rest: string) => `app:\n  ios:\n    bundleId: md.bank.app\n${rest}`;
+
+    it('accepts an ordered list of tap element specs and accessory: true, and converts it in order to the guard\'s vocabulary', () => {
+      const cfg = parseConfig(ios('    keyboardDismiss:\n      - tap: { id: login_title }\n      - tap: { text: "Prihlásenie", role: text }\n      - accessory: true\n'));
+      expect(cfg.app.ios?.keyboardDismiss).toEqual([{ tap: { id: 'login_title' } }, { tap: { text: 'Prihlásenie', role: 'text' } }, { accessory: true }]);
+      expect(keyboardDismissals(cfg)).toEqual([
+        { kind: 'tap', target: { id: 'login_title' } },
+        { kind: 'tap', target: { text: 'Prihlásenie', role: 'text' } },
+        { kind: 'accessory' },
+      ]);
+    });
+
+    it('is optional, and absent converts to undefined — the guard then has nothing to tap (stage A); so does no config and no ios section', () => {
+      expect(parseConfig(VALID).app.ios?.keyboardDismiss).toBeUndefined();
+      expect(keyboardDismissals(parseConfig(VALID))).toBeUndefined();
+      expect(keyboardDismissals(undefined)).toBeUndefined();
+      expect(keyboardDismissals(parseConfig('app:\n  android: { package: md.bank.app }\n'))).toBeUndefined();
+    });
+
+    it.each([
+      ['an empty list', '    keyboardDismiss: []\n', /keyboardDismiss: Array must contain at least 1 element/],
+      ['a tap without a selector field', '    keyboardDismiss:\n      - tap: { timeout: 2s }\n', /keyboardDismiss\.0\.tap: Unrecognized key/],
+      ['a tap with no field at all', '    keyboardDismiss:\n      - tap: {}\n', /keyboardDismiss\.0\.tap: tap needs at least one of: id, text, role, label/],
+      ['a tap with a non-selector key', '    keyboardDismiss:\n      - tap: { id: x, value: y }\n', /keyboardDismiss\.0\.tap: Unrecognized key/],
+      ['a tap naming an interactive role (it would press a control — review round 1)', '    keyboardDismiss:\n      - tap: { role: button }\n', /keyboardDismiss\.0\.tap: a keyboard dismissal must be a non-interactive element \(a title, a label\) — role: button\/textfield\/switch\/checkbox\/radiobutton\/slider names a control the tap would press/],
+      ['a tap naming textfield', '    keyboardDismiss:\n      - tap: { id: x, role: textfield }\n', /a keyboard dismissal must be a non-interactive element/],
+      ['a tap given as a selector string', '    keyboardDismiss:\n      - tap: "id:x"\n', /keyboardDismiss\.0\.tap: Expected object, received string/],
+      ['accessory: false (opt-in only; false reads like an override and would be none)', '    keyboardDismiss:\n      - accessory: false\n', /keyboardDismiss\.0\.accessory: accessory takes only true/],
+      ['an entry with both forms', '    keyboardDismiss:\n      - { tap: { id: x }, accessory: true }\n', /keyboardDismiss\.0: each entry is \{ tap: <element spec> \} or \{ accessory: true \}/],
+      ['an empty entry', '    keyboardDismiss:\n      - {}\n', /keyboardDismiss\.0: each entry is \{ tap: <element spec> \} or \{ accessory: true \}/],
+      ['an unknown strategy', '    keyboardDismiss:\n      - swipe: down\n', /keyboardDismiss\.0: Unrecognized key\(s\) in object: 'swipe'/],
+      ['a bare string', '    keyboardDismiss:\n      - login_title\n', /keyboardDismiss\.0: Expected object, received string/],
+      ['not a list', '    keyboardDismiss: { tap: { id: x } }\n', /keyboardDismiss: Expected array, received object/],
+      ['the key on the android section', '    keyboardDismiss:\n      - accessory: true\n  android: { package: md.bank.app, keyboardDismiss: [] }\n', /android: Unrecognized key\(s\) in object: 'keyboardDismiss'/],
+    ])('rejects %s — with a message that names the field and the rule', (_name, rest, message) => {
+      expect(() => parseConfig(ios(rest))).toThrow(/Invalid averi\.yaml/);
+      expect(() => parseConfig(ios(rest))).toThrow(message);
+    });
+
+    it('a tap naming a non-interactive role (text, image) is accepted — the rule is about controls', () => {
+      expect(parseConfig(ios('    keyboardDismiss:\n      - tap: { role: text, text: "Login" }\n')).app.ios?.keyboardDismiss).toEqual([{ tap: { role: 'text', text: 'Login' } }]);
+    });
+
+    /** Review round 1: the key under the default tree source cannot act — said once at load time (flow/load.ts), decided here. */
+    describe('inertKeyboardDismissNote — the key set where the tree carries no keyboard', () => {
+      const LIST = '    keyboardDismiss:\n      - accessory: true\n';
+      it('treeSource omitted (idb, the default): the note names the default and the fix', () => {
+        expect(inertKeyboardDismissNote(parseConfig(ios(LIST)))).toBe(
+          'app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply',
+        );
+      });
+      it('treeSource: idb written out: the note, without "(the default)"', () => {
+        expect(inertKeyboardDismissNote(parseConfig(ios(`${LIST}    treeSource: idb\n`)))).toMatch(/^app\.ios\.keyboardDismiss is set but app\.ios\.treeSource is idb: /);
+      });
+      it('treeSource: wda, or no keyboardDismiss, or no ios section: nothing', () => {
+        expect(inertKeyboardDismissNote(parseConfig(ios(`${LIST}    treeSource: wda\n`)))).toBeUndefined();
+        expect(inertKeyboardDismissNote(parseConfig(ios('')))).toBeUndefined();
+        expect(inertKeyboardDismissNote(parseConfig('app:\n  android: { package: md.bank.app }\n'))).toBeUndefined();
+      });
+    });
   });
 
   it('accepts absent inside detect conditions, only next to element', () => {
