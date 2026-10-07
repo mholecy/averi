@@ -44,7 +44,7 @@ decor tree is "a tree" here, as `isBareTree`'s docblock already notes for loadin
 - Or, for a destructive rung only, treat a bare tree (`isBareTree`) on the second look like an unreadable one, so the
   look keeps polling, or refuses, until the app has rendered something. Only the destructive path pays the cost.
 
-## Fix (2026-10-07, branch `fix/android-second-look-decor-2026-10-07`; not yet device-checked)
+## Fix (2026-10-07, branch `fix/android-second-look-decor-2026-10-07`; device-checked 2026-10-07 on `06c74a0`, see below)
 
 The second suggestion, widened to cover the WDA splash, where the ENTRY probe was the one that read the bare tree.
 
@@ -82,3 +82,45 @@ The second suggestion, widened to cover the WDA splash, where the ENTRY probe wa
 - **Out of scope, pre-existing:** an `absent: true` detect answers `yes` on a bare tree, because nothing in a bare
   tree matches. The bare answer is asked only of a tree that missed.
 - Pinned in `tests/flow/bare-tree-ladder.test.ts`, through the real uiautomator and WDA parsers.
+
+## Device check (2026-10-07)
+
+**Measured 2026-10-07 19:32–19:37 CEST (17:32–17:37 UTC)**, averi built from `06c74a0` (`npm run build`, driven
+through the handoff's `run-tools.mts`), finportal `sk.finportal.myport` debug build with Metro up (port 8081),
+`emulator-5554` (sdk_gphone64_arm64, Android 13) and `iPhone 17` (`D34212DB-…`, iOS 26.5, `treeSource: wda`). No
+login was submitted. `ensure_state` was called right after `launch_app` returned in every cold-launch row (0.1–0.2 s; the "< 1 s" in A7–A8 is what that scenario asked for).
+
+**The transient had to be provoked on Android.** On an idle emulator a cold launch now renders `login_screen` before
+the first `uiautomator dump` returns (raw `am force-stop` + `am start` + dump loop: first read at +4.2 s was already
+`login_screen`; after `pm clear`: decor at +2.6 s, `login_screen` at +4.9 s). So rows A1–A3 below never reached the
+second look. The bug's timeline was reproduced by loading the emulator's 4 CPUs with busy `sh` loops (killed
+afterwards):
+
+| load | raw timeline after `am start` |
+|---|---|
+| 8 loops | +3.3 s decor (6 nodes), +5.5 s decor, +9.5 s `login_screen` |
+| 16 loops | +2.5 s null root, +5.2 / +7.8 / +10.4 s decor (6 nodes), +13.9 s decor (16 nodes), +16.2 s `login_screen` |
+
+| # | scenario | outcome | duration of `ensure_state` | key trace lines | verdict |
+|---|---|---|---|---|---|
+| A1–A3 | 1: Android, `terminate_app` → `launch_app` → `ensure_state logged_out` from the login screen, idle emulator, 3× | no wipe, `state logged_out: already active` | 5.2 s, 5.2 s, 5.2 s | `state logged_out: already active` only (the entry read found `login_screen`) | PASS (transient not present) |
+| A4–A6 | 1: same, 8 load loops, 3× | no wipe, already active | 10.5 s, 10.6 s, 10.1 s | `⚠ detect: element id:"login_screen" treated as not detected — every UI tree read was bare, the last one 6 nodes (roles: container ×5, other ×1) of only wrappers and unlabeled decoration` then `state logged_out: already active` | PASS |
+| A7–A8 | 2: same, 16 load loops (null root → decor → login), `ensure_state` < 1 s after `launch_app`, 2× | no wipe, already active | 15.8 s, 16.5 s | `⚠ detect: element id:"login_screen" treated as not detected — last UI tree read failed: device emulator-5554 is still settling: uiautomator has no window to dump yet (cold launch or animation; read once). … (uiautomator dump returned no XML: ERROR: null root node returned by UiTestAutomationBridge.)` then `state logged_out: already active` | PASS |
+| A9 | 3: Android, `ensure_state logged_in` cold | not run | — | the app is logged out, so after `open_app` lands on `login_screen` the ladder's next rung `login` fills and submits real credentials | NOT RUN (needs a login submit; the cheap rung's no-wait path is pinned in `tests/flow/bare-tree-ladder.test.ts` only) |
+| A10 | 4: Android, a rendered off-state screen: `run_flow open_forgot` (the tree holds `forgot_overlay`/`forgot_modal`…, no `login_screen`), then `ensure_state logged_out` (warm, idle emulator) | judged rendered: no ⚠ detect line, no second look, the rung ran at once with its warning | 9.1 s (the wipe plus `fresh_launch`'s `wait` step, timeout 90 s, ending on `login_screen`) | `⚠ reach fresh_launch: this rung is DESTRUCTIVE — …`, `launch: sk.finportal.myport/.MainActivity (state cleared)`, `⚠ clearState: app state wiped (data container deleted) — … (1 this session)`, `state logged_out: reached after fresh_launch` | PASS |
+| I1–I3 | 5: iOS, `terminate_app` → `launch_app` → `ensure_state logged_out` from the login screen, 3× | no wipe, already active | 4.8 s, 3.9 s, 3.9 s | I1: `state logged_out: already active` only; I2, I3: `⚠ detect: element id:"login_screen" treated as not detected — every UI tree read was bare, the last one 7 nodes (roles: container ×6, image ×1) of only wrappers and unlabeled decoration` then `state logged_out: already active` | PASS |
+
+- Before the fix, I2/I3 (the WDA splash on the ENTRY probe) and A4–A8 (decor, or null root then decor) are the
+  runs that would have wiped — deduced from the code, the old build was not re-run: the entry probe or the 5 s
+  second look read a bare tree as "no".
+- `launch_app` on iOS printed the accessibility write on stderr before the launch: `averi: set com.apple.Accessibility
+  AutomationEnabled and ApplicationAccessibilityEnabled to true on D34212DB-… (simulator-wide, not restored; …)`. No
+  stuck idb tree was seen; every tree read here went through WDA.
+- The cost row (a cold launch onto a rendered screen outside the state, paying the full 20 s look) could not be
+  produced: a finportal cold launch always lands on `login_screen` while logged out. A10 shows only the warm side: a
+  rendered entry probe gets no second look.
+- No ⛔ refusal was provoked (covered by unit tests).
+- **Margin.** Under 16 load loops the state appeared at +16.2 s raw and the call took up to 16.5 s, inside the 20 s
+  window but with ~4 s to spare; the 2026-10-06 timeline (`login_screen` at +18.3 s) had less. A slower launch than
+  that is refused, not wiped, as the Fix says; nothing new.
+- Left: Android on `login_screen` (after A10's wipe, logged out as before), iOS on `login_screen`. No new defect.
