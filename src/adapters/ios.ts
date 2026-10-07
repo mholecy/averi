@@ -154,7 +154,65 @@ export class IosAdapter implements DeviceAdapter {
       );
     }
     if (opts.clearState) await this.clearAppData(bundleId);
+    await this.enableAccessibilityAutomation(`launching ${bundleId}`);
     await this.simctl(['launch', this.target(), bundleId]);
+  }
+
+  /** The simulator-wide write below is announced once per adapter, not per launch. */
+  private accessibilityAutomationAnnounced = false;
+
+  /**
+   * Before EVERY launch, on EVERY tree source: write the simulator's
+   * `com.apple.Accessibility` `AutomationEnabled` and
+   * `ApplicationAccessibilityEnabled` to true. Measured 2026-10-07
+   * (docs/bugs/2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md):
+   * one WebDriverAgent start and stop leaves both keys at 0, and from then
+   * on every app process launched on that simulator starts with an empty
+   * `idb ui describe-all` tree (15/15; a never-WDA simulator 0/30) until a
+   * reboot. Writing both true before the launch made 15/15 healthy; deleting
+   * them did not help, and a WDA attach cures only until the next launch.
+   * Regardless of the source because a `treeSource: wda` project's teardown
+   * poisons idb for every other reader of the same simulator (another
+   * project's averi on idb, idb by hand), and the write is idempotent and
+   * expected to be sub-second (not yet timed). Every launch, not once: each
+   * later teardown presumably writes 0 again. A deep link that cold-starts
+   * the app (`openDeepLink`) is a launch too, so it writes first as well.
+   *
+   * The keys are simulator-wide and averi never restores them, so the first
+   * successful write per adapter says so on stderr — the finding asked for
+   * the write to be at least logged; it is on by default, without a config
+   * switch, because it was measured to cure and not measured to harm (not
+   * measured on mp-native or VoiceOver-sensitive apps). `defaults write`
+   * takes one key per call, so two calls, each under 10 s rather than the
+   * 30 s default: a simulator that cannot answer a `defaults write` in 10 s
+   * fails the launch that follows anyway, and should not hold it for a
+   * minute first. A failed write never fails the launch — the app still
+   * launches, idb may just read an empty tree — and stderr is the channel
+   * this adapter's layer already uses for a non-fatal note (wda.ts); the
+   * first failure ends the pair, since the second write would fail the same
+   * way and one line says it.
+   */
+  private async enableAccessibilityAutomation(what: string): Promise<void> {
+    for (const key of ['AutomationEnabled', 'ApplicationAccessibilityEnabled']) {
+      try {
+        await this.simctl(['spawn', this.target(), 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000);
+      } catch (e) {
+        const reason = (e instanceof Error ? e.message : String(e)).split('\n')[0];
+        console.error(
+          `averi: could not set com.apple.Accessibility ${key} on ${this.target()} before ${what} (${reason}) — ` +
+            'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
+            `if it does, reboot the simulator (xcrun simctl shutdown ${this.udid ?? '<udid>'} && xcrun simctl boot ${this.udid ?? '<udid>'})`,
+        );
+        return;
+      }
+    }
+    if (!this.accessibilityAutomationAnnounced) {
+      this.accessibilityAutomationAnnounced = true;
+      console.error(
+        `averi: set com.apple.Accessibility AutomationEnabled and ApplicationAccessibilityEnabled to true on ${this.target()} ` +
+          '(simulator-wide, not restored; before every launch, so an earlier WebDriverAgent session cannot leave idb reading an empty tree)',
+      );
+    }
   }
 
   async terminate(bundleId: string): Promise<void> {
@@ -163,6 +221,8 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   async openDeepLink(url: string): Promise<void> {
+    // A link can cold-start the app: that is a launch (enableAccessibilityAutomation).
+    await this.enableAccessibilityAutomation(`opening ${url}`);
     await this.simctl(['openurl', this.target(), url]);
   }
 

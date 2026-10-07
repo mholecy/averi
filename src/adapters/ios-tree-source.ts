@@ -124,6 +124,15 @@ function idbTree(elements: IdbElement[]): UiNode {
  * quotes it on timeout, the detect probe says so, and the ladder refuses a
  * destructive rung on a probe that never read a tree (flow/engine.ts).
  *
+ * The measured trigger (2026-10-07, docs/bugs/2026-10-07-one-wda-session-
+ * makes-idb-stick-until-reboot.md) is an earlier WebDriverAgent session on
+ * the simulator: its teardown leaves every LATER app launch with this tree
+ * until a reboot. IosAdapter.launch re-enables accessibility automation
+ * before each launch (and deep link), so the advice names a relaunch through
+ * averi — hedged until that is device-checked — then a reboot; this error is
+ * what an already-running stuck process, or a launch averi did not make,
+ * still reads.
+ *
  * The signature is deliberately narrow — no element with positive area, NOT
  * ui-tree/bare-tree.ts's `isBareTree`. A full-frame `Application` alone is
  * idb's normal launch transient and must stay a tree, and so must the other
@@ -140,7 +149,12 @@ export class IdbEmptyTreeError extends Error {
     super(
       `idb returned an empty accessibility tree (${describeEmptyPayload(types)})\n` +
         'The app may still be rendered: idb can stay stuck like this for minutes on a rendered screen. ' +
-        'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app — ' +
+        'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app. ' +
+        'The measured trigger is an earlier WebDriverAgent session on this simulator (e.g. treeSource: wda; ' +
+        'likely any XCTest-based driver): every app launched after it starts with an empty idb tree. ' +
+        'averi re-enables accessibility automation before each launch_app, so relaunching the app through averi ' +
+        "(launch_app, or a flow's launch) should clear it; if it does not, or the stderr said that write failed, " +
+        'reboot the simulator (`xcrun simctl shutdown <udid> && xcrun simctl boot <udid>`); ' +
         'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
     );
     this.name = 'IdbEmptyTreeError';

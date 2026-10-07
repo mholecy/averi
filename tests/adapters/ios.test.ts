@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
@@ -221,5 +224,94 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     expect(await adapter.listDevices()).toHaveLength(3);
     await expect(adapter.uiTree()).rejects.toThrow(/no tree source/);
     await expect(adapter.dispose()).resolves.toBeUndefined();
+  });
+});
+
+// docs/bugs/2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md: one
+// WebDriverAgent start and stop leaves the simulator's com.apple.Accessibility
+// AutomationEnabled/ApplicationAccessibilityEnabled at 0, and every LATER app
+// launch starts with an empty idb tree until a reboot (15/15; a never-WDA
+// simulator 0/30). Writing both true before the launch made 15/15 healthy, so
+// launch writes them before every `simctl launch`, whatever the tree source.
+describe('IosAdapter re-enables accessibility automation before every launch and deep link', () => {
+  const WRITES = [
+    'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility AutomationEnabled -bool true',
+    'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true',
+  ];
+  const simctlCalls = (calls: { full: string }[]) => calls.map((c) => c.full).filter((f) => f.startsWith('xcrun simctl'));
+  let stderr: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('a plain launch: both defaults writes on the target simulator, then the launch, in that order', async () => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).launch('com.app');
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+  });
+
+  it('the same on a WDA-source adapter — a wda project\'s teardown poisons idb for every other reader of the simulator', async () => {
+    const { fn, calls } = fakeExec({});
+    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), dispose: () => Promise.resolve() };
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+  });
+
+  it('a clearState launch: terminate and wipe first, the writes right before the launch', async () => {
+    const container = await mkdtemp(join(tmpdir(), 'averi-test-container-'));
+    try {
+      await writeFile(join(container, 'Library'), '');
+      const { fn, calls } = fakeExec({ 'xcrun simctl get_app_container AAAA-1111 com.app data': `${container}\n` });
+      await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).launch('com.app', { clearState: true });
+      expect(simctlCalls(calls)).toEqual([
+        'xcrun simctl terminate AAAA-1111 com.app',
+        'xcrun simctl get_app_container AAAA-1111 com.app data',
+        ...WRITES,
+        'xcrun simctl launch AAAA-1111 com.app',
+      ]);
+      expect(await readdir(container)).toEqual([]); // the wipe still happened
+    } finally {
+      await rm(container, { recursive: true, force: true });
+    }
+  });
+
+  it('a deep link writes first too — `simctl openurl` can cold-start the app, which is a launch', async () => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).openDeepLink('myapp://home');
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl openurl AAAA-1111 myapp://home']);
+  });
+
+  it('the simulator-wide write is announced on stderr once per adapter, not per launch', async () => {
+    const { fn } = fakeExec({});
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    await adapter.launch('com.app');
+    await adapter.launch('com.app');
+    await adapter.openDeepLink('myapp://home');
+    expect(stderr).toHaveBeenCalledTimes(1);
+    expect(stderr.mock.calls[0]?.[0]).toBe(
+      'averi: set com.apple.Accessibility AutomationEnabled and ApplicationAccessibilityEnabled to true on AAAA-1111 ' +
+        '(simulator-wide, not restored; before every launch, so an earlier WebDriverAgent session cannot leave idb reading an empty tree)',
+    );
+  });
+
+  it('a failed write does not fail the launch: the second key is not tried, one stderr line naming the way out, the launch still runs', async () => {
+    const { fn, calls } = fakeExec({});
+    const writes: string[] = [];
+    const failing: ExecFn = (cmd, args, opts) => {
+      if (!args.includes('defaults')) return fn(cmd, args, opts);
+      writes.push(args.join(' '));
+      return Promise.reject(new Error('Command failed (exit 1): xcrun simctl spawn …\nUnable to boot'));
+    };
+    await new IosAdapter({ udid: 'AAAA-1111', exec: failing }).launch('com.app');
+    expect(writes).toHaveLength(1); // the first failure ends the pair
+    expect(simctlCalls(calls)).toEqual(['xcrun simctl launch AAAA-1111 com.app']);
+    expect(stderr).toHaveBeenCalledTimes(1); // the failure line, and no success announcement
+    expect(stderr.mock.calls[0]?.[0]).toBe(
+      'averi: could not set com.apple.Accessibility AutomationEnabled on AAAA-1111 before launching com.app ' +
+        '(Command failed (exit 1): xcrun simctl spawn …) — idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
+        'if it does, reboot the simulator (xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111)',
+    );
   });
 });
