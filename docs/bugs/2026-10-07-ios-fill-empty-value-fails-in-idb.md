@@ -55,6 +55,12 @@ a platform fact, so the guard sits where the platform lives; `fillField` still h
 unchanged: its per-character loop already ran zero times for `''` (the DPAD commit nudge is still sent, as before —
 pinned, so the two adapters' empty-string behaviour is a decision, not an accident).
 
+Follow-up (2026-10-07, later, branch `architecture/keyboard-model-2026-10-07`): the Android nudge no longer goes out
+for `''` — `AndroidAdapter.typeText` returns before the loop, as iOS returns before idb, and the pin now expects no
+device call. The contract sentence "an empty string types nothing" was not true of two key events and a 150 ms sleep
+sent to commit a composition that did not exist; the device-checked behaviour above (E5) is unaffected, since nothing
+observable rested on the nudge.
+
 Two more lines in `interact/fill.ts`, one per shape of the empty fill (both from the review of this fix):
 - `value: ""` WITHOUT clear — the focus-only probe — skips the post-focus re-read that feeds the masked-append
   warning. A focus-only `fill` on a password field that already held text would otherwise have warned `typing

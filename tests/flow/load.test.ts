@@ -6,8 +6,7 @@ import { parseConfig } from '../../src/flow/config.js';
 import {
   appBuildPath,
   envBeside,
-  iosTreeSourceFor,
-  keyboardDismissalsFor,
+  iosToolSettingsFor,
   loadConfig,
   loadConfigIfPresent,
   loadProjectConfig,
@@ -273,7 +272,15 @@ app:
   });
 });
 
-describe('iosTreeSourceFor — the config-optional tree tools\' policy', () => {
+/**
+ * One lookup for both fields since K3 (2026-10-07): the pins below were
+ * `iosTreeSourceFor`'s and `keyboardDismissalsFor`'s, moved here and each
+ * at least as strong — every row that read one field now pins the WHOLE
+ * two-field result, so a value leaking from one field into the other
+ * fails. The policy (android never reads, missing → undefined, invalid →
+ * throws) is written once and so pinned once per field.
+ */
+describe('iosToolSettingsFor — the config-optional tools\' policy', () => {
   let dir: string;
   const write = async (content: string) => {
     dir = await mkdtemp(join(tmpdir(), 'averi-tree-source-'));
@@ -286,49 +293,55 @@ describe('iosTreeSourceFor — the config-optional tree tools\' policy', () => {
   });
 
   const INVALID = 'flows: 12\n';
+  const NONE = { treeSource: undefined, dismissals: undefined };
 
   it('android never reads the config: a present-but-invalid averi.yaml is not an error', async () => {
-    expect(await iosTreeSourceFor('android', await write(INVALID))).toBeUndefined();
+    expect(await iosToolSettingsFor('android', await write(INVALID))).toEqual(NONE);
   });
 
   it('android gets no kind even from a valid config that names one', async () => {
     const path = await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
-    expect(await iosTreeSourceFor('android', path)).toBeUndefined();
+    expect(await iosToolSettingsFor('android', path)).toEqual(NONE);
   });
 
   it('ios: the same invalid averi.yaml throws, naming the file', async () => {
     const path = await write(INVALID);
-    await expect(iosTreeSourceFor('ios', path)).rejects.toThrow(path);
+    await expect(iosToolSettingsFor('ios', path)).rejects.toThrow(path);
   });
 
   it('ios: a missing averi.yaml is undefined — the registry\'s default applies', async () => {
     await write(INVALID); // a real directory, with the file under another name
-    expect(await iosTreeSourceFor('ios', join(dir, 'no-such.yaml'))).toBeUndefined();
+    expect(await iosToolSettingsFor('ios', join(dir, 'no-such.yaml'))).toEqual(NONE);
   });
 
-  it('ios: the configured kind, or undefined when the config names none', async () => {
-    expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n'))).toBe('wda');
-    expect(await iosTreeSourceFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toBeUndefined();
+  it('ios: the configured kind (and no dismissals, none being configured), or undefined when the config names none', async () => {
+    expect(await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n'))).toEqual({ treeSource: 'wda', dismissals: undefined });
+    expect(await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toEqual(NONE);
   });
 
   /** Stage B (2026-10-07): the same policy for `app.ios.keyboardDismiss`, read by the tap and type_text tools. */
-  describe('keyboardDismissalsFor — the same policy for the keyboard guard\'s dismissals', () => {
+  describe('the dismissals half — the same policy for the keyboard guard\'s dismissals', () => {
     const CONFIGURED = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ tap: { id: login_title } }, { accessory: true }] }\n';
 
     it('android never reads the config: an invalid one is no error, a valid one with dismissals gives none', async () => {
-      expect(await keyboardDismissalsFor('android', await write(INVALID))).toBeUndefined();
-      expect(await keyboardDismissalsFor('android', await write(CONFIGURED))).toBeUndefined();
+      expect(await iosToolSettingsFor('android', await write(INVALID))).toEqual(NONE);
+      expect(await iosToolSettingsFor('android', await write(CONFIGURED))).toEqual(NONE);
     });
 
     it('ios: the invalid averi.yaml throws naming the file; a missing one is undefined', async () => {
       const path = await write(INVALID);
-      await expect(keyboardDismissalsFor('ios', path)).rejects.toThrow(path);
-      expect(await keyboardDismissalsFor('ios', join(dir, 'no-such.yaml'))).toBeUndefined();
+      await expect(iosToolSettingsFor('ios', path)).rejects.toThrow(path);
+      expect(await iosToolSettingsFor('ios', join(dir, 'no-such.yaml'))).toEqual(NONE);
     });
 
-    it('ios: the configured list in the guard\'s vocabulary, in order, or undefined when the config names none', async () => {
-      expect(await keyboardDismissalsFor('ios', await write(CONFIGURED))).toEqual([{ kind: 'tap', target: { id: 'login_title' } }, { kind: 'accessory' }]);
-      expect(await keyboardDismissalsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toBeUndefined();
+    it('ios: the configured list in the guard\'s vocabulary, in order (and no kind, none being configured), or undefined when the config names none', async () => {
+      expect(await iosToolSettingsFor('ios', await write(CONFIGURED))).toEqual({ treeSource: undefined, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }, { kind: 'accessory' }] });
+      expect(await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toEqual(NONE);
+    });
+
+    it('ios: both fields come from the one load — a config naming both gives both', async () => {
+      const both = await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda, keyboardDismiss: [{ accessory: true }] }\n'));
+      expect(both).toEqual({ treeSource: 'wda', dismissals: [{ kind: 'accessory' }] });
     });
 
     /** Review round 1: the key under the default tree source is inert — said on stderr once per file, by every loader. */
@@ -360,7 +373,7 @@ describe('iosTreeSourceFor — the config-optional tree tools\' policy', () => {
       });
 
       it('android calls through the lenient loader never load the file, so never say it', async () => {
-        await keyboardDismissalsFor('android', await write(INERT));
+        await iosToolSettingsFor('android', await write(INERT));
         expect(notes()).toEqual([]);
       });
     });

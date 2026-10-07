@@ -13,7 +13,7 @@ import { rectArea, rectsOverlap, STRUCTURAL_ROLES, zeroRect, type Rect, type UiN
  * selection, and the 2026-08-14 review (E2) had already asked for them to
  * join this module. tapPoint stays in selectors.ts on purpose: it is the
  * tap-target rule (where a resolved node is pressed), its importers include
- * interact/keyboard.ts, and the move deliberately left it alone. Since
+ * the interact/keyboard*.ts modules, and the move deliberately left it alone. Since
  * 2026-10-07 the point-in-rect test (`containsPoint`) and the draw-order
  * question (`shadowing`, at the end) are here too: the tap guard's
  * dismissal picker had spelled both in interact/keyboard.ts, and the review
@@ -339,7 +339,7 @@ export { rectArea, rectsOverlap };
  * exclusive, like the Android frame test. The point-in-rect companion of
  * `rectsOverlap` (two rects sharing area: a different question), and the
  * ONE spelling of it: the tap guard asks it of the keyboard's frame and the
- * tap point (interact/keyboard.ts#windowOver), the dismissal picker of the
+ * tap point (interact/keyboard-model.ts#keyboardOver), the dismissal picker of the
  * root's rect, and `shadowing` below of every candidate. Until 2026-10-07 it
  * was interact/keyboard.ts's `inside`, with a `covers` wrapper beside it.
  */
@@ -406,7 +406,7 @@ export function rectText(r: Rect): string {
  * does not — but it refuses the measured kind of false target: an alert's
  * or a sheet's content over the title, a navigation bar's own label.
  *
- * Asked by the tap guard's dismissal picker (interact/keyboard.ts
+ * Asked by the tap guard's dismissal picker (interact/keyboard-in-tree.ts
  * #pickDismissal). Here, not in soft-keyboard.ts, since 2026-10-07: it is
  * a draw-order question over rects asked of any tree — the keyboard is one
  * more thing that can be drawn over a point, not what the question is about.

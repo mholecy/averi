@@ -280,15 +280,13 @@ describe('AndroidAdapter interactions', () => {
 
   // The iOS side of this (2026-10-07, docs/bugs/2026-10-07-ios-fill-empty-
   // value-fails-in-idb.md) returns before idb; Android's loop already ran zero
-  // times for "" and passed, and still does — the commit nudge stays, as it
-  // was, so an empty fill on Android is unchanged by the iOS fix.
-  it('typeText with an empty string injects no character: the loop runs zero times, only the commit nudge is sent', async () => {
+  // times for "" and passed, but the commit nudge (DPAD_LEFT, DPAD_RIGHT, a
+  // sleep) still went out — pinned as a decision when the iOS fix landed, and
+  // corrected later that day: the contract says "" types nothing on both.
+  it('typeText with an empty string sends nothing: neither a character nor the commit nudge', async () => {
     const { fn, calls } = fakeExec({});
     await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('');
-    expect(calls).toEqual([
-      'adb -s emulator-5554 shell input keyevent 21',
-      'adb -s emulator-5554 shell input keyevent 22',
-    ]);
+    expect(calls).toEqual([]);
   });
 
   it('launch with clearState clears app data first', async () => {
@@ -558,6 +556,29 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
         'adb -s emulator-5554 shell input keyevent 21',
         'adb -s emulator-5554 shell input keyevent 22',
       ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The "" pin above sees adb calls only; this one sees the 150ms settle, so
+  // an early return that drops the key events but keeps the sleep still fails.
+  it('waits for nothing on an empty string: no pacing, no settle after a nudge that is not sent', async () => {
+    vi.useFakeTimers();
+    try {
+      const { fn, calls } = fakeExec({});
+      const waits: number[] = [];
+      const spy = vi.spyOn(global, 'setTimeout').mockImplementation(((cb: () => void, ms?: number) => {
+        waits.push(ms ?? 0);
+        cb();
+        return 0 as unknown as NodeJS.Timeout;
+      }) as typeof setTimeout);
+
+      await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('');
+      spy.mockRestore();
+
+      expect(waits).toEqual([]);
+      expect(calls).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

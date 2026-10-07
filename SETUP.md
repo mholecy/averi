@@ -227,8 +227,10 @@ step reference is in the skill you installed in step 3.
 > submit — a title or label, never a button — or the Done toolbar above a number pad); then
 > averi taps that first. No key hides the iOS keyboard without submitting, so there is no
 > default, and `fill: { …, dismissKeyboard: true }` on iOS no longer presses `enter` (it
-> submitted the form): it taps the configured dismissal, or leaves the keyboard up with a `⚠`
-> line. A flow that relied on that `enter` to submit (a search field) taps the app's own
+> submitted the form): it does nothing when the fill has already parked the keyboard (the usual
+> case — typing through the hardware keyboard parks it), taps the configured dismissal when the
+> keyboard is still up, and otherwise leaves it up with a `⚠` line. A flow that relied on that
+> `enter` to submit (a search field) taps the app's own
 > submit/search control instead. The keyboard's return key (e.g. `tap: { label: search }`) works
 > only while the software keyboard is visibly up (`ui_snapshot` shows the `keyboard` band): after
 > a `fill` it is usually parked below the screen, where its keys are still in the tree.

@@ -417,6 +417,13 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async typeText(text: string): Promise<void> {
+    // "" types nothing (the DeviceAdapter.typeText contract), on this side
+    // too: the loop below already ran zero times for it, but the commit
+    // nudge after it — two key events and a sleep for a composition that
+    // does not exist — still went to the device (until 2026-10-07; it was
+    // pinned as a decision when the iOS guard landed, and the review that
+    // day found the contract's "types nothing" was false of it).
+    if (text === '') return;
     // One `input text` call PER CHARACTER, with explicit pacing. Bulk injection
     // races Compose's async text state and silently drops most characters
     // (measured 2026-08-05 on the login username field: 3 of 11 landed). The adb

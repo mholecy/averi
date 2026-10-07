@@ -7,8 +7,9 @@ import { INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
 /**
  * The soft-keyboard guard driven END TO END through the real AndroidAdapter
  * over a scripted adb: the two scenarios that prove the words cross the layer
- * — interact/keyboard.ts's protocol (tests/interact/keyboard.test.ts, on the
- * fake) becomes this exact sequence of adb calls, with the adapter's own
+ * — the window keyboard model's protocol (interact/keyboard-window.ts;
+ * tests/interact/keyboard-window.test.ts, on the fake) becomes this exact
+ * sequence of adb calls, with the adapter's own
  * parsers (tests/adapters/android.test.ts) reading real dump lines in between.
  * One file, two scenarios, deliberately: the adapter tests assert adb
  * behaviour and the interact tests assert the protocol; pinning the guard's

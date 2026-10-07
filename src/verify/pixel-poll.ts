@@ -3,7 +3,7 @@ import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import { readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
@@ -121,9 +121,15 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  * No extra read: the tree is the one the round found the element in. An
  * element that IS the keyboard's UI (a key, the toolbar's Done — `ofKeyboard`
  * on its Window) reads as not covered. The remedy sentence differs: with no
- * dismissal on the adapter the miss says it cannot hide the keyboard and
- * quotes the adapter's own sentence on why (`DeviceAdapter.keyboardAdvice`)
- * rather than naming `back` or the fill's `dismissKeyboard`. An idb tree
+ * dismissal on the adapter the miss names the flow's two ways to hide it
+ * first (a `tap:` step the author adds on an element that hides it — such
+ * as the one configured for the guard, which taps it only before a covered
+ * TAP, never before an assert — or `dismissKeyboard: true` on a fill that
+ * leaves it up; flow facts, worded here and not borrowed from the guard's
+ * refusal, which has its own tap to offer), says the adapter cannot hide
+ * the keyboard on its own (`cannotHide`, the one phrase the guard uses) and
+ * quotes the adapter's sentence on why and where the dismissal is
+ * configured (`DeviceAdapter.keyboardAdvice`) — never `back`. An idb tree
  * carries no band and reads `unknown`: the pre-2026-10-07 behaviour,
  * silently, as the Android residuals above.
  *
@@ -281,17 +287,31 @@ class PixelPollMemory {
    * (`dismissal: 'back'`, the oracle's window model), names the fill option
    * (`dismissKeyboard`, flow/config.ts) and `back` — not "tap a field above",
    * which keeps the keyboard up (review 2026-10-06). When it has none
-   * (`'none'`, the in-tree model, 2026-10-07) it says so and quotes the
-   * adapter's own sentence on why and what works instead (`advice`,
-   * `DeviceAdapter.keyboardAdvice`) — no platform fact of this module's.
-   * Both come as the reading's `KeyboardRemedy` (ui-tree/soft-keyboard.ts).
+   * (`'none'`, the in-tree model, 2026-10-07) it names the flow's two ways:
+   * a `tap:` step the AUTHOR adds on an element that hides the keyboard
+   * (such as the one configured for the guard to tap — configuring it is
+   * not enough here: the guard taps it only before a covered tap, and before
+   * an assert nothing does), or `dismissKeyboard: true` on a fill that
+   * LEAVES it up. Not the fill option alone: it taps only on a band read
+   * right after the fill, and HID typing usually parks the keyboard (no
+   * band, a no-op — the 2026-10-05 bug note's device check), while a
+   * covered miss here means a tap or an autofocus raised it, with or
+   * without a fill before. Flow facts, not platform ones; the sentence is
+   * this module's, not the guard's (whose refusal can offer its own tap and
+   * a re-layout, and names no fill option). It then adds `cannotHide`
+   * (ui-tree/soft-keyboard.ts): the one phrase the guard uses too, then the
+   * adapter's sentence on why and where that dismissal is configured
+   * (`advice`, `DeviceAdapter.keyboardAdvice`) — no platform fact of this
+   * module's. Both come as the reading's `KeyboardRemedy`
+   * (ui-tree/soft-keyboard.ts).
    */
   covered(rect: Rect, keyboard: Rect, { dismissal, advice }: KeyboardRemedy): PollVerdict {
     const reason =
       `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)}) — ` +
       (dismissal === 'back'
         ? 'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run'
-        : `hide it first and re-run; this adapter cannot hide it${advice === undefined ? '' : ` (${advice})`}`);
+        : 'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the one configured for the guard to tap, ' +
+          `before this assert, or \`dismissKeyboard: true\` on a fill that leaves it up); ${cannotHide(advice)}`);
     const detail = failClosed(reason, this.unchecked);
     this.lastCovered = detail;
     this.coverCleared = false;

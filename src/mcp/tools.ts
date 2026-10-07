@@ -8,7 +8,7 @@ import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } f
 import { tapElement } from '../interact/tap.js';
 import { fillText, launchText, snapshotNote, tapText } from './tool-text.js';
 import type { AveriConfig } from '../flow/config.js';
-import { appBuildPath, iosTreeSourceFor, keyboardDismissalsFor, loadProjectConfig } from '../flow/load.js';
+import { appBuildPath, iosToolSettingsFor, loadProjectConfig, type IosToolSettings } from '../flow/load.js';
 import { assertSpecSchema } from '../verify/assert.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
@@ -107,11 +107,14 @@ const iosOpts = (cfg: AveriConfig | undefined): AdapterOpts => ({
  * registry.get opts for the tree-reading tools that work without averi.yaml.
  * The policy — android never reads the config, ios fails loudly on an
  * invalid one, a missing one means the default — is
- * flow/load.ts#iosTreeSourceFor; this only wraps its answer.
+ * flow/load.ts#iosToolSettingsFor; this only wraps the tree-source half of
+ * its answer. A tool that also needs the dismissals (tap, type_text) calls
+ * the lookup itself, once, and hands this its settings, so one call reads
+ * averi.yaml once (pinned in tests/mcp/tools.test.ts).
  */
-const treeOpts = async (p: Platform, configPath?: string): Promise<AdapterOpts> => ({
-  treeSource: await iosTreeSourceFor(p, configPath),
-});
+const treeOptsOf = (settings: IosToolSettings): AdapterOpts => ({ treeSource: settings.treeSource });
+/** The tree-only tools' form (ui_snapshot, scroll_until, assert): one lookup, its tree-source half. */
+const lookupTreeOpts = async (p: Platform, configPath?: string): Promise<AdapterOpts> => treeOptsOf(await iosToolSettingsFor(p, configPath));
 
 const text = (value: unknown) => ({
   content: [
@@ -308,7 +311,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, filter, configPath: cp }) => {
-      const tree = await (await registry.get(p, await treeOpts(p, cp))).uiTree({ settle: true });
+      const tree = await (await registry.get(p, await lookupTreeOpts(p, cp))).uiTree({ settle: true });
       // An empty filter string is no filter, as `filter ? … : tree` always read it.
       const selector = filter || undefined;
       const matched = selector === undefined ? undefined : findAll(tree, selector).map(stripChildren);
@@ -342,9 +345,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, selector, x, y, configPath: cp }) => {
-      const adapter = await registry.get(p, await treeOpts(p, cp));
+      const settings = await iosToolSettingsFor(p, cp);
+      const adapter = await registry.get(p, treeOptsOf(settings));
       if (selector !== undefined) {
-        const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse', dismissals: await keyboardDismissalsFor(p, cp) });
+        const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse', dismissals: settings.dismissals });
         return text(tapText(selector, note));
       }
       if (x === undefined || y === undefined) {
@@ -390,13 +394,14 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, text: value, selector, clear, configPath: cp }) => {
-      const adapter = await registry.get(p, await treeOpts(p, cp));
+      const settings = await iosToolSettingsFor(p, cp);
+      const adapter = await registry.get(p, treeOptsOf(settings));
       if (selector === undefined) {
         if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
         await adapter.typeText(value);
         return text(`Typed ${value.length} characters`);
       }
-      const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: await keyboardDismissalsFor(p, cp) });
+      const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });
       return text(fillText(selector, { length: value.length, cleared: clear === true, note, warning }));
     },
   );
@@ -422,7 +427,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, configPath: cp }) => {
-      const adapter = await registry.get(p, await treeOpts(p, cp));
+      const adapter = await registry.get(p, await lookupTreeOpts(p, cp));
       const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs });
       return text(`Element ${selector} ${describeScrollResult(result)}`);
     },
@@ -496,7 +501,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const specs = parseAsserts(asserts);
       // Lenient load: assert works configless, but a broken averi.yaml (or a
       // wda treeSource it declares) must not be silently ignored here.
-      const adapter = await registry.get(p, await treeOpts(p, cp));
+      const adapter = await registry.get(p, await lookupTreeOpts(p, cp));
       return text(await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), configPath: cp }));
     },
   );

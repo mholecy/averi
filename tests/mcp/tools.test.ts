@@ -33,6 +33,22 @@ import { TOOL_NAMES } from '../helpers/tool-names.js';
 // Date.now still advances and nothing spins.
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
+// File reads are COUNTED, never changed: the real readFile answers, and the
+// path of every call is kept, so "a tap reads averi.yaml once" (K3,
+// 2026-10-07) can be pinned on the file system rather than on stderr, where
+// the loader's once-per-file memo hides a second load.
+const reads = vi.hoisted(() => ({ paths: [] as string[] }));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs/promises')>();
+  const readFile: typeof real.readFile = ((...args: Parameters<typeof real.readFile>) => {
+    reads.paths.push(String(args[0]));
+    return real.readFile(...args);
+  }) as typeof real.readFile;
+  return { ...real, readFile };
+});
+/** How many times THIS config file was read since the last reset — the exact path the tool was given, not any averi.yaml. */
+const configReads = (configPath: string) => reads.paths.filter((p) => p === configPath).length;
+
 let dir: string;
 const closers: (() => Promise<void>)[] = [];
 beforeEach(async () => {
@@ -566,8 +582,8 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
 /**
  * Stage B (2026-10-07): the tap and type_text tools hand averi.yaml's
  * `app.ios.keyboardDismiss` to the keyboard guard (flow/load.ts#
- * keyboardDismissalsFor, the same config-optional policy as the tree
- * source). The measured iOS login in points: `login_submit` under the band
+ * iosToolSettingsFor, the one config-optional lookup, which also gives the
+ * tree source). The measured iOS login in points: `login_submit` under the band
  * the WDA source marks, the title above it; the fake plays the app (K5b: a
  * tap on the title hides the keyboard).
  */
@@ -591,7 +607,7 @@ describe('tap / type_text pass app.ios.keyboardDismiss to the guard', () => {
     const { call } = await connect({ ios: fake });
     const result = await call('tap', { platform: 'ios', selector: 'id:login_submit', configPath: await file('averi.yaml', 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n') });
     expect(result.isError).toBe(true);
-    expect(result.text).toContain('this adapter cannot hide it (ADVICE), and no dismissal is configured');
+    expect(result.text).toContain('this adapter cannot hide it on its own (ADVICE), and no dismissal is configured');
     expect(fake.taps).toEqual([]);
   });
 
@@ -615,12 +631,34 @@ describe('tap / type_text pass app.ios.keyboardDismiss to the guard', () => {
     expect(fake.keys).toEqual([]); // nothing dismissed AFTER typing: the tool has no dismissKeyboard
   });
 
-  it('android: the config is not read for the dismissals either — a present-but-invalid averi.yaml does not break an android tap', async () => {
+  it('android: the config is not read for the dismissals either — a present-but-invalid averi.yaml does not break an android tap, and the file is not read at all', async () => {
     const fake = home();
     const { call } = await connect({ android: fake });
-    const result = await call('tap', { platform: 'android', selector: 'id:home_root', configPath: await invalidConfig() });
+    const configPath = await invalidConfig();
+    reads.paths.length = 0;
+    const result = await call('tap', { platform: 'android', selector: 'id:home_root', configPath });
     expect(result.isError).toBe(false);
     expect(fake.taps).toEqual(['home_root']);
+    expect(configReads(configPath)).toBe(0);
+  });
+
+  /**
+   * K3 (2026-10-07): the tree source and the dismissals come from ONE load
+   * per call. Until then each tool call read and parsed averi.yaml twice —
+   * once for the registry's tree source, once for the guard's dismissals —
+   * and the loader's inert-note memo hid the second load on stderr, which
+   * is why this counts reads of the file itself.
+   */
+  it('tap and type_text read averi.yaml ONCE per call: the tree source and the dismissals come from one load', async () => {
+    const fake = iosLogin();
+    const { call } = await connect({ ios: fake });
+    const configPath = await file('averi.yaml', CONFIGURED);
+    reads.paths.length = 0;
+    expect((await call('tap', { platform: 'ios', selector: 'id:login_submit', configPath })).isError).toBe(false);
+    expect(configReads(configPath)).toBe(1);
+    reads.paths.length = 0;
+    expect((await call('type_text', { platform: 'ios', selector: 'id:login_password', text: 'secret', configPath })).isError).toBe(false);
+    expect(configReads(configPath)).toBe(1);
   });
 });
 
@@ -741,7 +779,7 @@ describe('verify', () => {
 
 describe('tap and type_text under the Android soft keyboard', () => {
   const KEYBOARD = { x: 0, y: 1285, width: 1080, height: 935 };
-  /** The measured login screen (see tests/interact/keyboard.test.ts); back hides the keyboard and the button moves down. */
+  /** The measured login screen (see tests/interact/keyboard-window.test.ts); back hides the keyboard and the button moves down. */
   function loginFake() {
     const submit = nodeAt('button', 'login_submit', { x: 99, y: 1400, width: 300, height: 132 });
     const otp = nodeAt('textfield', 'login_otp', { x: 99, y: 1600, width: 882, height: 132 });

@@ -1840,7 +1840,8 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
   const BELOW = { x: 0, y: 1285, width: 1000, height: 715 };
   const COVERED =
     'the soft keyboard covers the element (element 100,200 800x100, keyboard 0,250 1000x1750) — ' +
-    'hide it first and re-run; this adapter cannot hide it (ADVICE)';
+    'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the one configured for the guard to tap, before this assert, ' +
+    'or `dismissKeyboard: true` on a fill that leaves it up); this adapter cannot hide it on its own (ADVICE)';
   const fill = (p: PNG, hex: string): void => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     for (let y = CARD.y; y < CARD.y + CARD.height; y++) {

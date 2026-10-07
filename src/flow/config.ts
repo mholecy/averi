@@ -50,7 +50,7 @@ export interface FillSpec extends ElementSpec {
  * Opt-in and app-specific on purpose: which element is neutral is the
  * app's business, and the keyboard's own return key SUBMITS (K5d). A `tap`
  * must resolve to a NON-INTERACTIVE element: the guard drops interactive
- * matches (interact/keyboard.ts#pickDismissal — a title and a button sharing
+ * matches (interact/keyboard-in-tree.ts#pickDismissal — a title and a button sharing
  * a label must never tap the button), and a spec that names an interactive
  * `role:` outright is refused at parse time, where the author reads it.
  */
@@ -390,7 +390,7 @@ export type AveriConfig = z.infer<typeof configSchema>;
  * `app.ios.keyboardDismiss` in the interaction module's vocabulary
  * (interact/keyboard.ts#KeyboardDismissal) — the one conversion, done once
  * per engine (FlowEngine's constructor) and once per config-optional tool
- * call (flow/load.ts#keyboardDismissalsFor), so no config type crosses into
+ * call (flow/load.ts#iosToolSettingsFor), so no config type crosses into
  * interact/ and no interact type is spelled in YAML. `undefined` when the
  * config, its iOS section or the key is absent: the guard then has nothing
  * to tap, exactly stage A. Not platform-gated here: the engine passes it to

@@ -13,7 +13,7 @@ import { vi } from 'vitest';
  * deterministically. One copy (2026-10-05) for the verify, run, mcp and
  * ui-tree/interact tests that touch the deadline loop; before, the capture,
  * assert and run/verify tests each carried their own and had drifted on the
- * clock rule. fill.test.ts and keyboard.test.ts keep a no-yield recorder of
+ * clock rule. fill.test.ts and the two keyboard-*.test.ts keep a no-yield recorder of
  * their own on purpose (their fakes never react on a timer).
  */
 export const sleeps: number[] = [];

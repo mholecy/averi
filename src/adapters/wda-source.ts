@@ -238,8 +238,10 @@ export const MAX_BAND_FRACTION = 0.6;
  * than one band-bearing ancestor were not measured (the first on-screen
  * Keyboard's band is the one `keyboardInTree` reads).
  *
- * The rect tests are written here rather than imported from
- * ui-tree/geometry.ts: adapters/ sits below ui-tree/ (ARCHITECTURE.md §2).
+ * `rectsOverlap` comes from adapters/types.ts, not ui-tree/geometry.ts:
+ * adapters/ sits below ui-tree/ (ARCHITECTURE.md §2). The band-shape tests
+ * (`usableRect`, `isBand`, below) are this file's own — nothing above
+ * asks them.
  */
 function keyboardMarks(root: WdaElement): KeyboardMarks {
   const bands = new Set<WdaElement>();

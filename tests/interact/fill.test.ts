@@ -303,8 +303,8 @@ describe('fillField — masked fields verify by length', () => {
 });
 
 // The dismissal itself (`dismissKeyboard`) is keyboard.ts's since 2026-10-04 and
-// is pinned in tests/interact/keyboard.test.ts. What stays here is the seam
-// between the two calls.
+// is pinned per model in tests/interact/keyboard-window.test.ts and
+// keyboard-in-tree.test.ts. What stays here is the seam between the two calls.
 describe('fillField and the keyboard dismissal are two calls', () => {
   it('fillField itself never presses a key — the caller dismisses after it has the warning in hand', async () => {
     const fake = formFake();

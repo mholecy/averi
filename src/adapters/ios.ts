@@ -305,7 +305,8 @@ export class IosAdapter implements DeviceAdapter {
   // cover" is a tree question, answered since 2026-10-07 by the WDA source
   // (wda-source.ts#keyboardMarks: the band the keyboard draws over, and the
   // Windows that are its own UI) and read by ui-tree/soft-keyboard.ts off
-  // the tree that resolved the target; interact/keyboard.ts queries no
+  // the tree that resolved the target; the in-tree keyboard model (interact/
+  // keyboard-in-tree.ts, what an adapter without the oracle gets) queries no
   // device here and presses no key — a covered target is refused, with the
   // sentence below. The idb source carries no keyboard, so under it the
   // guard is as it was. Until 2026-10-04 this class answered `unknown` from

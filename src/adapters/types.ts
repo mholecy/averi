@@ -195,12 +195,13 @@ export type SoftKeyboard =
  * simulation of both for a feature one adapter has.
  *
  * Two kinds of keyboard, one fact with two halves — stated in full here,
- * beside the capability; interact/keyboard.ts#dismissKeyboard points here
- * and ARCHITECTURE §3 repeats the short form. Providing an oracle asserts
- * the WINDOW model: the keyboard it describes is a separate window that
- * `back` hides, and interact/keyboard.ts — the one owner of what to DO about
- * the answers — presses that `back` only through an adapter that has one,
- * witness-vetoed. Its absence asserts the IN-TREE model (iOS: the keys are
+ * beside the capability; the in-tree dismissal (interact/keyboard-in-tree.ts)
+ * points here and ARCHITECTURE §3 repeats the short form. Providing an
+ * oracle asserts the WINDOW model: the keyboard it describes is a separate
+ * window that `back` hides, and interact/keyboard-window.ts — the model an
+ * adapter with the oracle gets (interact/keyboard.ts#keyboardModel chooses,
+ * once), the one owner of what to DO about the answers — presses that
+ * `back` only through such an adapter, witness-vetoed. Its absence asserts the IN-TREE model (iOS: the keys are
  * nodes): nothing to observe, no `back` to press, and the dismissal after a
  * fill — since stage B, 2026-10-07 — is one tap on a configured element
  * when the tree shows a keyboard band, and NOTHING otherwise. Until that
@@ -231,7 +232,7 @@ export interface KeyboardOracle {
    * centre presses a keyboard key (measured 2026-10-03, finportal login: the
    * submit button at (249,1466) under an IME frame starting at y=1285; one
    * stray character went into the password field, nothing was submitted, the
-   * tap was reported done). What to DO about it is interact/keyboard.ts's
+   * tap was reported done). What to DO about it is interact/keyboard-window.ts's
    * policy; this method only answers.
    */
   state(): Promise<SoftKeyboard>;
@@ -241,7 +242,7 @@ export interface KeyboardOracle {
    * first answer can be stale: measured that day on Android 13, right after
    * a tap that navigated away the window state still read "shown" with the
    * full frame for a few seconds, while the input method itself already said
-   * it was not. interact/keyboard.ts asks this immediately before it presses
+   * it was not. interact/keyboard-window.ts asks this immediately before it presses
    * `back` for keyboard reasons, and only then — never on an ordinary tap.
    *
    * A method of its own rather than an option on `state()`: the caller needs
@@ -347,11 +348,13 @@ export interface DeviceAdapter {
    * does not fail: it is what a `fill` with `value: ""` hands over (a clear
    * alone, or a focus without typing — interact/fill.ts skips the read-back
    * for it), and the `type` step and the type_text tool pass their text
-   * through unexamined. Android meets this by a per-character loop that
-   * runs zero times; iOS returns before calling idb, which refuses
-   * `ui text ''` (2026-10-07, docs/bugs/2026-10-07-ios-fill-empty-value-
-   * fails-in-idb.md — until then the step threw idb's bare error after the
-   * focus tap, and after the clear).
+   * through unexamined. Both adapters return before any device command:
+   * iOS before calling idb, which refuses `ui text ''` (2026-10-07,
+   * docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md — until then
+   * the step threw idb's bare error after the focus tap, and after the
+   * clear); Android before its per-character loop, whose composing-commit
+   * nudge (two DPAD key events and a sleep) otherwise still went out for
+   * nothing (until later that day).
    */
   typeText(text: string): Promise<void>;
   /**
@@ -379,13 +382,15 @@ export interface DeviceAdapter {
    * The in-tree model's one sentence (2026-10-07): why THIS adapter cannot
    * hide a soft keyboard that covers a target, and what was measured to work
    * instead. Set only by an adapter WITHOUT the oracle (iOS: `IosAdapter`),
-   * quoted verbatim — in parentheses, after "this adapter cannot hide it" —
-   * by the refusals in interact/keyboard.ts and verify/pixel-poll.ts, which
-   * own the generic halves of their sentences and no platform fact. The
-   * adapter owns it for the reason it owns the blind dismissal key: the
-   * facts (which key submits, which endpoint fails) are the platform's, and
-   * the layers above are platform-agnostic (ARCHITECTURE.md §2). Absent, the
-   * refusal says only that the adapter cannot hide it.
+   * quoted verbatim — in parentheses, after "this adapter cannot hide it on
+   * its own" (`ui-tree/soft-keyboard.ts#cannotHide`, the one phrase: the
+   * advice is what DOES work) — by the refusals in interact/keyboard-in-tree.ts and
+   * verify/pixel-poll.ts, which own the generic halves of their sentences
+   * and no platform fact. The adapter owns it because its facts are the
+   * platform's — which key submits, which endpoint fails, which config key
+   * names the measured dismissal — and the layers above are
+   * platform-agnostic (ARCHITECTURE.md §2). Absent, the refusal says only
+   * that the adapter cannot hide it on its own.
    */
   readonly keyboardAdvice?: string;
   setClipboard(text: string): Promise<void>;

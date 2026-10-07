@@ -14,14 +14,15 @@ import { everyNode, KEYBOARD_ROLE, rectArea, type DeviceAdapter, type SoftKeyboa
  * 0.6–0.98 s, measured that day). Since stage B (the same day) it also
  * answers "which of the keyboard's own controls hides it" —
  * `accessoryDismissButton`, the app's input-accessory toolbar's trailing
- * button — for the guard's configured dismissals (interact/keyboard.ts).
+ * button — for the in-tree model's configured dismissals (interact/
+ * keyboard-in-tree.ts).
  * Like `read-tree.ts#pollTree`, this module takes the adapter and calls
  * its interface, never a platform command.
  */
 
 /**
  * The band: a `SoftKeyboard`, the oracle's own type, so the callers feed it
- * to the same geometry (`windowOver`, `rectsOverlap`) as the Android
+ * to the same geometry (`keyboardOver`, `rectsOverlap`) as the Android
  * reading. Two of its three states can occur:
  * - `shown` with the band as `frame`: the first `KEYBOARD_ROLE` node in
  *   pre-order with a positive-area rect (a copy — nodes are mutated
@@ -37,7 +38,8 @@ import { everyNode, KEYBOARD_ROLE, rectArea, type DeviceAdapter, type SoftKeyboa
  *   `unknown` it does nothing — an idb tree reads `unknown` whatever the
  *   screen shows, and a blind key there was measured to submit (K5d), so
  *   "cannot see a keyboard" means "press nothing", the opposite of the
- *   oracle's `unknown → back` row (interact/keyboard.ts has both reasons).
+ *   oracle's `unknown → back` row (interact/keyboard-window.ts#dismissal and
+ *   keyboard-in-tree.ts's `dismiss` have the two reasons).
  */
 export function keyboardInTree(tree: UiNode): SoftKeyboard {
   for (const n of everyNode(tree)) {
@@ -121,10 +123,10 @@ export function accessoryDismissButton(tree: UiNode): UiNode | undefined {
 /**
  * What the adapter has to hide a keyboard WITH — a capability, fixed per
  * adapter, not a decision: `back` on the oracle's window model (a `back`
- * hides it, witness-vetoed, interact/keyboard.ts), `none` on the in-tree
+ * hides it, witness-vetoed, interact/keyboard-window.ts), `none` on the in-tree
  * model, where no key does and the configured dismissals are tried instead.
  * The pixel poll words its remedy by it. What one call then DOES —
- * interact/keyboard.ts#dismissal's `'back' | 'nothing'` — is a different
+ * interact/keyboard-window.ts#dismissal's `'back' | 'nothing'` — is a different
  * question with its own literals, kept apart on purpose: with `back` in
  * hand the decision is still `nothing` when the state is hidden or the
  * witness denies the keyboard.
@@ -138,6 +140,21 @@ export interface KeyboardRemedy {
   advice?: string;
 }
 
+/**
+ * The generic half of the in-tree model's sentence, written once for the
+ * guard's refusal (interact/keyboard-in-tree.ts, KeyboardWithoutDismissal) and the
+ * pixel poll's covered miss (verify/pixel-poll.ts) — here, the lowest layer
+ * both import, as the review of 2026-10-07 asked, so "one phrase" holds by
+ * construction and not by two matching literals. "On its own", because the
+ * `advice` that follows it is what DOES work.
+ */
+export const CANNOT_HIDE = 'this adapter cannot hide it on its own';
+
+/** `CANNOT_HIDE`, then the adapter's `advice` in parentheses when it has one — the one composition both sentences use. */
+export function cannotHide(advice: string | undefined): string {
+  return advice === undefined ? CANNOT_HIDE : `${CANNOT_HIDE} (${advice})`;
+}
+
 /** One reading of the soft keyboard for one subject node, and what the adapter can do about a covering one. */
 export interface SoftKeyboardReading extends KeyboardRemedy {
   /** The keyboard's state and frame; `unknown` when the subject is part of the keyboard's own UI, whatever is on screen. */
@@ -145,14 +162,23 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
 }
 
 /**
- * THE one place the two models meet (review 2026-10-07): the adapter's
- * oracle when it has one — one `state()` query, the Android cost pinned on
- * `AndroidAdapter.keyboardState` — else the tree the caller already holds.
- * Never both: an adapter with the oracle is not read from the tree (the
- * Android tree carries no marks, and two readings of one keyboard would
- * need a rule for their disagreement), and an adapter without one asks no
- * device. Before this helper the switch was written in interact/keyboard.ts
- * and verify/pixel-poll.ts separately.
+ * THE one switch between the two models for READING the keyboard for a
+ * SUBJECT — the guard's every look and the pixel poll's round (review
+ * 2026-10-07): the adapter's oracle when it has one — one `state()` query,
+ * the Android cost pinned on `AndroidAdapter.keyboardState` — else the tree
+ * the caller already holds. Never both: an adapter with the oracle is not
+ * read from the tree (the Android tree carries no marks, and two readings
+ * of one keyboard would need a rule for their disagreement), and an adapter
+ * without one asks no device. Before this helper the switch was written in
+ * interact/keyboard.ts and verify/pixel-poll.ts separately. The ACTING
+ * half — what to do about a covering keyboard — has its own one switch over
+ * the same fact, `interact/keyboard.ts#keyboardModel`, in the layer that
+ * acts; the two cannot be one, because the pixel poll (verify/) reads the
+ * keyboard too and may not import interact/ (ARCHITECTURE.md §2). Every look
+ * the guard takes reads through here, so the guard and the poll see one
+ * keyboard by construction. The dismissal after a fill does not: it has no
+ * subject, and each model's `dismiss` reads its own source — the oracle's
+ * `state()`, `keyboardInTree` on the tree it read.
  *
  * `subject` is the node the caller is about to act on or measure: when it
  * is the keyboard's own UI (`partOfKeyboard`) the reading is `unknown` —

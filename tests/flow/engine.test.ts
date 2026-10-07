@@ -2089,7 +2089,7 @@ flows:
 
 describe('tap: / fill: under the Android soft keyboard — the one trace line that says the keyboard was hidden', () => {
   // The measured screen (finportal login, 1080x2220, 2026-10-03); the policy
-  // itself is pinned in tests/interact/keyboard.test.ts. Here: the STEP, and
+  // itself is pinned in tests/interact/keyboard-window.test.ts. Here: the STEP, and
   // the trace it writes.
   const KEYBOARD = { x: 0, y: 1285, width: 1080, height: 935 };
   function loginFake() {
@@ -2510,7 +2510,7 @@ flows:
  * on-soft-keyboard.md): the WDA source marks the band the keyboard covers
  * (role `keyboard`), the adapter has no oracle, and the guard REFUSES a
  * target under it — nothing to press. The policy is pinned in
- * tests/interact/keyboard.test.ts; here: the STEP, and the trace it writes
+ * tests/interact/keyboard-in-tree.test.ts; here: the STEP, and the trace it writes
  * through the same `tracingDismissal` path as every KeyboardGuardError.
  */
 describe('tap: / fill: under the iOS in-tree keyboard — the ⚠ line says nothing was sent, before the ✗ (2026-10-07)', () => {
@@ -2533,7 +2533,7 @@ ${steps}
     const error = (await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
     expect(error).toBeInstanceOf(FlowError);
     expect(error.message).toMatch(/^The soft keyboard covers id:"login_submit": the band it draws over \[0,539\]\[402,874\] contains the tap point \(107,571\)/);
-    expect(error.message).toMatch(/on two looks 300ms apart; this adapter cannot hide it \(ADVICE\), and no dismissal is configured\. Nothing was tapped/);
+    expect(error.message).toMatch(/on two looks 300ms apart; this adapter cannot hide it on its own \(ADVICE\), and no dismissal is configured\. Nothing was tapped/);
     expect(error.message).toMatch(/In a flow: hide it with a step before this one \(a tap: on an element the keyboard does not cover\), configure a dismissal for the guard to tap, or lay the screen out so id:"login_submit" is not under the keyboard$/);
     expect(error.trace.slice(1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
@@ -2597,7 +2597,7 @@ ${steps}
    * Stage B (2026-10-07): `app.ios.keyboardDismiss` reaches the guard through
    * the engine — converted once in the constructor, passed to every tap and
    * fill and to the post-fill dismissal. The policy is pinned in
-   * tests/interact/keyboard.test.ts; here the STEP and its trace lines.
+   * tests/interact/keyboard-in-tree.test.ts; here the STEP and its trace lines.
    */
   describe('with app.ios.keyboardDismiss configured (stage B)', () => {
     const configured = (steps: string, dismiss = '[{ tap: { id: login_title } }, { accessory: true }]') =>

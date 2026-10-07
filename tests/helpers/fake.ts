@@ -318,3 +318,26 @@ export class FakeKeyboard implements KeyboardOracle {
     return this.witnessAnswers.next();
   }
 }
+
+/** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll — the two keyboard-*.test.ts files share it (fill.test.ts keeps an identical one of its own). */
+export const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
+
+/** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `key:back`, `tap:x,y`. */
+export function recorded(fake: FakeAdapter): string[] {
+  const events: string[] = [];
+  const wrap = <T extends object, K extends keyof T>(on: T, name: K, label: (...args: never[]) => string) => {
+    const real = (on[name] as (...args: unknown[]) => Promise<unknown>).bind(on);
+    (on as unknown as Record<string, unknown>)[name as string] = async (...args: unknown[]) => {
+      events.push((label as (...a: unknown[]) => string)(...args));
+      return real(...args);
+    };
+  };
+  wrap(fake, 'uiTree', () => 'read');
+  if (fake.keyboard !== undefined) {
+    wrap(fake.keyboard, 'state', () => 'keyboard?');
+    wrap(fake.keyboard, 'witness', () => 'witness?');
+  }
+  wrap(fake, 'pressKey', (key: string) => `key:${key}`);
+  wrap(fake, 'tap', (x: number, y: number) => `tap:${x},${y}`);
+  return events;
+}

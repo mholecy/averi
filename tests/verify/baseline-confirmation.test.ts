@@ -24,7 +24,7 @@ import { captureBaselineFrame, captureFrame } from '../../src/verify/capture.js'
  * The sleep mock here does NOT yield a macrotask, unlike
  * tests/helpers/sleep-recorder.ts: the grid is ~10 000 runs, and a
  * setTimeout(0) per sleep would cost the suite tens of seconds. Nothing on
- * this path reacts on a timer (fill.test.ts and keyboard.test.ts keep a
+ * this path reacts on a timer (fill.test.ts and the two keyboard-*.test.ts keep a
  * no-yield recorder for the same reason).
  */
 /**

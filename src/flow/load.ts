@@ -16,7 +16,7 @@ import type { EnvValues } from './credentials.js';
  * `.env.averi` reading that used to keep module-level state and write
  * `process.env` is one function here that returns a value instead
  * (`envBeside`, below). The MCP path policies (`appBuildPath`,
- * `iosTreeSourceFor`) stay beside the loaders they wrap: which file is read
+ * `iosToolSettingsFor`) stay beside the loaders they wrap: which file is read
  * and when its absence is tolerated is config policy, not the MCP layer's.
  */
 
@@ -142,47 +142,58 @@ export function appBuildPath(cfg: AveriConfig, platform: Platform): string {
 }
 
 /**
- * The iOS tree-source kind for tree-reading tools that predate averi.yaml and
- * must keep working without one (ui_snapshot, tap, type_text, scroll_until,
- * assert). A policy in three parts, each pinned (tests/flow/load.test.ts,
- * and through the protocol in tests/mcp/tools.test.ts):
- *
- * - android never reads the config. It has no tree source, and an invalid
- *   averi.yaml must not break android calls on these config-blind tools.
- * - ios with NO averi.yaml → `undefined`: the registry's default (idb).
- * - ios with a present-but-invalid averi.yaml throws — see loadConfigIfPresent.
- *
- * Returns the kind, not registry options: until 2026-10-03 this was
- * `loadIosOpts` in the MCP layer, but which file is read and when its absence
- * is tolerated is config policy; only the wrapping into the registry's
- * options is the MCP layer's.
+ * What averi.yaml gives the iOS side of a config-optional tool, read once:
+ * the tree-source kind (every tree-reading tool) and the keyboard guard's
+ * dismissals (`tap` and `type_text`, whose taps go through the guard).
+ * Both `undefined` for android, which reads no config.
  */
-export async function iosTreeSourceFor(
-  platform: Platform,
-  configPath?: string,
-): Promise<IosTreeSourceKind | undefined> {
-  if (platform === 'android') return undefined;
-  return (await loadConfigIfPresent(projectConfigPath(configPath)))?.app.ios?.treeSource;
+export interface IosToolSettings {
+  /** `app.ios.treeSource` — the registry's default (idb) when undefined. */
+  treeSource: IosTreeSourceKind | undefined;
+  /** `app.ios.keyboardDismiss` in the guard's vocabulary (flow/config.ts#keyboardDismissals) — stage A, a covered target refused, when undefined. */
+  dismissals: readonly KeyboardDismissal[] | undefined;
 }
 
 /**
- * The keyboard dismissals (`app.ios.keyboardDismiss`, stage B 2026-10-07)
- * for the config-optional tools whose taps go through the keyboard guard —
- * `tap` and `type_text` — under the SAME policy as `iosTreeSourceFor`,
- * pinned the same way: android never reads the config (its guard is the
- * oracle's and never looks at a dismissal), ios with no averi.yaml gets
- * `undefined` (a covered target is refused, stage A), ios with an invalid
- * one throws. The conversion is flow/config.ts#keyboardDismissals, the one
- * owner. A second read of the same small file beside `iosTreeSourceFor` on
- * one tool call, accepted: the two answer different questions, and one
- * loader returning both would make every caller of either carry the other.
+ * The iOS settings for tools that predate averi.yaml and must keep working
+ * without one (ui_snapshot, tap, type_text, scroll_until, assert). A policy
+ * in three parts, written here ONCE for both fields, each part pinned
+ * (tests/flow/load.test.ts, and through the protocol in
+ * tests/mcp/tools.test.ts):
+ *
+ * - android never reads the config. It has no tree source, its keyboard
+ *   guard is the oracle's and never looks at a dismissal, and an invalid
+ *   averi.yaml must not break android calls on these config-blind tools.
+ * - ios with NO averi.yaml → both `undefined`: the registry's default (idb)
+ *   and stage A for the guard.
+ * - ios with a present-but-invalid averi.yaml throws — see loadConfigIfPresent.
+ *
+ * Returns the settings, not registry options: until 2026-10-03 this was
+ * `loadIosOpts` in the MCP layer, but which file is read and when its absence
+ * is tolerated is config policy; only the wrapping into the registry's
+ * options is the MCP layer's. The conversion of the dismissals is
+ * flow/config.ts#keyboardDismissals, the one owner. A caller that needs only
+ * the tree source ignores the other field.
+ *
+ * One lookup, not two (2026-10-07, K3; until then `iosTreeSourceFor` and
+ * `keyboardDismissalsFor`, each with its own copy of the policy and its own
+ * loadConfigIfPresent): the stage B doc had ACCEPTED a second read of the
+ * same file on one `tap`/`type_text` call because "one loader returning
+ * both would make every caller of either carry the other". That held in
+ * ONE direction only. Every caller that needs the dismissals (tap,
+ * type_text) also needs the tree source, so nothing carries the dismissals
+ * for nothing; the tree-only tools (ui_snapshot, scroll_until, assert) DO
+ * now get dismissals they throw away — a pure map
+ * (`keyboardDismissals`) over a config already loaded and validated, hidden
+ * behind the MCP layer's tree-only wrapper. Against that, the cost of two
+ * lookups was real: the file was read and parsed twice per call, and
+ * `loaded` ran twice, its inert-note memo hiding the second stderr line.
+ * Reversed; the once-per-call read is pinned in tests/mcp/tools.test.ts.
  */
-export async function keyboardDismissalsFor(
-  platform: Platform,
-  configPath?: string,
-): Promise<readonly KeyboardDismissal[] | undefined> {
-  if (platform === 'android') return undefined;
-  return keyboardDismissals(await loadConfigIfPresent(projectConfigPath(configPath)));
+export async function iosToolSettingsFor(platform: Platform, configPath?: string): Promise<IosToolSettings> {
+  if (platform === 'android') return { treeSource: undefined, dismissals: undefined };
+  const cfg = await loadConfigIfPresent(projectConfigPath(configPath));
+  return { treeSource: cfg?.app.ios?.treeSource, dismissals: keyboardDismissals(cfg) };
 }
 
 /**
