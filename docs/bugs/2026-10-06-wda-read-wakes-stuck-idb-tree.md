@@ -58,3 +58,56 @@ waiting was not measured to end the episode within 9 min.
 - So the lower bound measured here is **18 min continuously stuck with no recovery**, against 2.5–4 min in the
   earlier notes.
 - A WDA read at 00:28 ended it on the next idb read (14 elements, `MyPort`, `English`, …, `Login`).
+
+## Measured 2026-10-07 (pre-fix)
+
+**09:27–09:42 CEST**, averi `f76cb9d` (built, not used: Part I ran no averi call), finportal `sk.finportal.myport`
+(debug build, Metro up), `iPhone 17` iOS 26.5 (`D34212DB-…`). No other session's WDA, `xcodebuild`, Maestro or gate
+was running. Tree read only with `idb ui describe-all --json`, app driven only with `xcrun simctl`. WDA hand-started
+on port 8199 (`xcodebuild test-without-building` on `averi-wda`'s prebuilt `.xctestrun`), `/status` only, no
+`/source`, no session. Each read logged its element count, its shape, and whether the companion log shows
+`Process N (launchctl) exited` between `accessibility_info called` and `succeeded`.
+
+- **The signature holds without exception.** 55 stuck reads and 101 healthy reads were taken. Every stuck read was a lone
+  0×0 `Application` with the launchctl line, in 159–205 ms. Every healthy read had no launchctl line and took 25–110 ms.
+- **I0.** 3 launches × reads at +1, +5 and +15 s: 9 of 9 stuck.
+- **I1, a bare attach (`/status` only).** 3 episodes. The read right after `/status` answered (≈0.1 s later) was
+  already full: 14 elements (`MyPort`, `Slovensky`, `Česky`, `English`, …). It was still full 5 s later. 3 of 3 cured.
+- **I1b, the attach stopped before the read.** Start, wait for `/status`, `kill -TERM` the process group, port
+  quiet, no `WebDriverAgentRunner` left, then read: 14 elements at once and 5 s later. 3 of 3 cured. The attach does
+  not have to stay up.
+- **I2, a relaunch after a cure, WDA stopped.** 5 launches × 3 reads: 15 of 15 stuck. The cure does not survive a
+  relaunch.
+- **I3, WDA kept running.** 5 launches × 3 reads: 15 of 15 healthy. At +1 s the tree was the Expo bundle screen
+  (`MyPort`, `Downloading 100%…`, 2 elements). From +5 s it was the login screen (14). A running WDA prevents
+  the re-stick.
+- **I4, a WDA-free simulator.** A new `kb-idb-probe` (iPhone 17, iOS 26.5) was created, booted, given
+  `ios/build/MyPort.app` and never shown WDA. 10 launches × 3 reads: **0 of 30 stuck**. The +1 s reads were a lone
+  `Application` with a real frame, the bundle screen, or the full form, and they were healthy from +5 s.
+  - **On the same probe, one WDA start and stop (I4b), then 5 launches × 3 reads: 15 of 15 stuck**, with the same
+    signature. One WDA session is the trigger.
+  - **After `simctl shutdown` + `boot` of the probe (I4r):** 3 launches × 3 reads, 9 of 9 healthy. A reboot clears it.
+  - Probe deleted afterwards (`simctl delete`). The original simulator was not erased.
+- **I5, accessibility defaults.**
+  - Recorded first, on the original simulator: `AutomationEnabled = 0`, `ApplicationAccessibilityEnabled = 0` (both
+    present; the full dump is 13 keys).
+  - With both written `-bool true`: 5 launches × 3 reads, **15 of 15 healthy**.
+  - Restored to `false`. A re-read was identical to the recorded dump, and a control launch was stuck again (2 of 2).
+  - On the probe after its WDA run, the same two keys read `0`. **Deleting them** (absent, as on a never-WDA simulator)
+    did not help: 9 of 9 stuck. So the WDA teardown leaves state behind that the keys' absence does not undo, a
+    value of `1` overrides it, and a reboot clears it.
+- **I6, warm start.** Spawn to `/status` took 1.9 s (7 times), 2.2 s (twice), and 3.2 s (first run on the fresh
+  probe). Nothing was built: the `xcodebuild` log shows `ServerURLHere` and then `** BUILD INTERRUPTED **` on kill,
+  with no compile step.
+
+| question | answer |
+|---|---|
+| Still reproduces (I0) | yes, 9/9 reads over 3 launches |
+| Bare attach without `/source` cures (I1), and must it stay up (I1b) | yes, 3/3, at the first read after `/status`; no, starting and stopping it cures too, 3/3 |
+| Cure survives relaunch (I2) | no, 15/15 stuck after 5 relaunches |
+| Running WDA prevents re-stick (I3) | yes, 15/15 healthy over 5 relaunches |
+| WDA-free simulator sticks (I4) | no, 0/30; after ONE WDA start+stop, 15/15; after a reboot, 0/9 |
+| Accessibility defaults prevent it (I5) | `AutomationEnabled` + `ApplicationAccessibilityEnabled` = `true`: yes, 15/15 healthy; deleting the keys: no |
+| WDA warm-start seconds (I6) | 1.9–2.2 s (3.2 s first time on a new simulator), no build |
+
+The trigger is the subject of [2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md](2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md).

@@ -108,3 +108,128 @@ point (for example the `login_title` label) between the last fill and the submit
 Simulator showing its software keyboard (fresh boot, or after a `clearState` launch), finportal `login` flow via the
 handoff's driver. The failure is intermittent by nature: the simulator decides whether the keyboard is shown, and
 nothing in averi's trace shows which state the run was in. Take a `screenshot` straight after the flow fails.
+
+## Measured 2026-10-07 (pre-fix)
+
+**09:42–09:50 CEST**, averi `f76cb9d`, finportal `sk.finportal.myport`, `iPhone 17` iOS 26.5 (`D34212DB-…`). WDA
+was hand-started on port 8199 for K1–K5, and the raw `/source?format=json` was saved per step (`source-K1.json`,
+`source-K3.json`, `source-K5b.json`, `source-K5d.json` in the run's scratch dir; they are the fixture candidates).
+The software keyboard was up on its own after a launch. The field was focused through a WDA session (`accessibility
+id` `login_password` → `click`). Screens are 402 × 874 pt.
+
+- **K3, nothing focused (login screen after launch).** No `Keyboard` node anywhere. `Application` has a single
+  `Window`, and the tree has 159 nodes.
+- **K1, `login_password` focused, keyboard and "Passwords" bar visible.**
+  - `Application` now has **three** `Window`s. Window #1 is `isVisible=0` and holds an `inputView` `{y:539,h:335}`.
+    Window #2 (`isVisible=1`) holds the keyboard:
+    ```
+    Window {0,0,402,874}
+      Other {0,0,402,874}
+        Other {x:0, y:539, w:402, h:335}            ← union of everything below, reaches the screen bottom
+          Other  SystemInputAssistantView {y:539, h:44}
+            … Other "Typing Predictions" > Button "Passwords" {x:30, y:539, w:342, h:44} > Image kb-autofill-key
+          Other {y:539, h:335} isVisible=0
+          Other {y:583, h:233} > Keyboard {x:0, y:583, w:402, h:233} isVisible=1   (35 Key children)
+          Other {y:583, h:291} > Button "dictation" {x:325, y:805, w:69, h:70}
+    ```
+  - **The AutoFill bar is NOT inside the `Keyboard` rect.** It is a separate sibling node 44 pt high, directly
+    above it, at 539–583. The `Keyboard` rect alone (583–816) misses both the bar and the dictation row
+    (805–875). The common parent `Other {y:539, h:335}` covers 539–874, which matches the screenshot's keyboard top
+    (≈540 pt).
+  - `login_submit` is at `{x:36, y:547, w:141, h:48}`. Its centre (106, 571) lies in the bar and is above the
+    `Keyboard` rect, so a `Keyboard`-only oracle would call the target clear.
+- **K2, the parked keyboard: not measured in the first pass** (measured in the second pass, below). This Xcode install has no `Simulator.app` (`open -a Simulator`:
+  "Unable to find application named 'Simulator'"; the simulator runs headless), so ⌘K could not be sent. An `idb ui
+  key 225` (Left Shift HID) and `idb ui text` typing did not hide the software keyboard either. The only data point
+  for the parked state is still the 2026-10-05 one above (`UIKeyboardLayoutStar Preview` at `y: 874`).
+- **K5, dismissals** (screenshot after each; dummy values `kbprobe`/`x1` typed by `idb ui text`, so a submit is visible):
+  - (a) `POST /session {"capabilities":{}}` → `POST /session/<id>/wda/keyboard/dismiss`, with `{}` and with
+    `{"keyNames":["Hide keyboard"]}`: both `invalid element state`, "Did not know how to dismiss the keyboard. Try to
+    dismiss it in the way supported by your application under test." The keyboard stayed up. Creating and deleting
+    the session did not relaunch the app (the app pid was 85156 throughout).
+  - (b) `idb ui tap 85 303` on the "Prihlásenie" title: **hidden, not submitted.** This was confirmed on the empty form
+    and on the filled form (Submit enabled, fields kept, no error). Afterwards the keyboard's Window is gone from the
+    tree (two `Window`s, no `Keyboard` node).
+  - (c) `idb ui swipe 200 330 200 520` on the form: keyboard stays up, nothing submitted.
+  - (d) the keyboard's ✓ return key (`idb ui tap 350 774`): **submitted.** The dummy login came back "Nesprávne meno
+    alebo heslo, alebo je účet dočasne zablokovaný. Skúste to o chvíľu." with the fields cleared.
+- **K4, cost of one `/source`** (10 × `curl -w %{time_total}`, login screen): keyboard up, median 0.873 s, p90
+  0.983 s. Keyboard down, median 0.592 s, p90 0.614 s. The keyboard adds ≈0.28 s, about 35 Key nodes plus the
+  input windows. The 2FA screen is in the second pass.
+- **K6, the bug's baseline.** Hand WDA stopped (port quiet). `run_flow login` × 3 through the driver: **✗ 3 of 3**,
+  `Timed out after 45000ms waiting for state post_login_fork`, 68–69 s each. The trace is identical to the claim
+  above (`fill` ×2, `tap: id:"login_submit"`, `optional: skipped text:"Not Now"`, then the wait fails). Every
+  post-run screenshot shows the password field focused with the caret after 16 masked characters, the software
+  keyboard up and the Passwords bar visible. `tap: id:"login_submit"` reports done while nothing was submitted.
+  averi's own WDA exited with the driver.
+- **After K6: one real submit.** The K5(b) neutral tap hid the keyboard, and an `idb ui tap 90 571` hit Submit with
+  the credentials averi had filled. The app answered "Nesprávne meno alebo heslo, alebo je účet dočasne
+  zablokovaný" and kept the fields. Further attempts were paused, so as not to lock the account.
+
+## Measured 2026-10-07, second pass (after the owner asked for a retry)
+
+**10:54–10:57 CEST**, same simulator, ≈65 min after the failed submit. The driver ran `run_flow login`, then
+`tap text:"Prihlásenie"`, `tap id:"login_submit"` and `ui_snapshot`.
+
+- **`run_flow login` passed this time** (27.1 s): `fill` ×2, `tap: id:"login_submit"`, `wait: state
+  post_login_fork`, `flow login: done`, and it stopped on `twofactor_screen`. The credentials are good. The
+  09:50 rejection was therefore temporary: a lockout or the backend, cause unknown. The driver's next steps found the
+  2FA screen instead of the login form (`text:"Prihlásenie"` matched 2 elements, `twofactor_title` and an unnamed one,
+  and `login_submit` timed out). No code was typed.
+- **Why it passed (the keyboard on the login screen):** after `twofactor_back` → `login_password` focused, the
+  software keyboard was **up but without the Passwords bar**. There was no `SystemInputAssistantView` node, `Keyboard
+  {x:0, y:583, w:402, h:233}` was `isVisible=1` with a `Done` key `{y:752}`, plus `dictation {y:805}`. Window
+  count: 3. So the bar comes and goes. With it, the keyboard area starts at 539 and covers Submit's centre (571).
+  Without it, the area starts at 583 and Submit's centre is clear. That is the intermittency in "What happened" above,
+  and the bar's presence was not controlled here (in K6 it was present with filled fields; here it was absent with
+  filled fields).
+- **K2, the parked keyboard, measured on the 2FA screen** (`twofactor_code` focused, caret visible, no software
+  keyboard on screen, only a "Done" bar at the bottom):
+  ```
+  Window#1 isVisible=0
+    Other {y:826, h:48} isVisible=0
+      Toolbar "Toolbar" {x:0, y:826, w:402, h:48} isVisible=1   > … > Button "Done" {x:317, y:831, w:64, h:38} isVisible=1
+  Window#2 isVisible=0
+    Other {y:826, h:298} isVisible=0
+      Other {y:891, h:233} > Keyboard {x:0, y:891, w:402, h:233} isVisible=0   (12 Key children, "1" at y 898, isVisible=0)
+  ```
+  - The parked `Keyboard` sits **below the screen (y 891 > 874) with `isVisible=0`**, and so do its keys. So
+    "intersects the screen" and `isVisible` agree.
+  - The app's input-accessory **Toolbar ("Done") is on screen at 826–874 and `isVisible=1`**, although its Window
+    is `isVisible=0`. `twofactor_screen` shrinks to `h: 826` to make room. An oracle that looks only at `Keyboard`
+    misses this 48 pt band. A target there would be under the toolbar.
+  - On this screen an `idb ui tap` into the focused field did not raise the software keyboard. It only showed an
+    "AutoFill" edit-menu callout. The parked state could not be produced on the login screen, where the keyboard
+    showed again (above).
+- **K4 on the 2FA screen, keyboard parked:** 10 × `/source`, median 0.750 s, p90 0.782 s.
+- **The 2FA screen with the keyboard up (11:05).** The owner tapped into `login_password` in the simulator and the
+  software keyboard came up (no Passwords bar). A neutral tap and an `idb ui tap` on Submit led to 2FA, and there the
+  number pad was up with the "Done" toolbar above it:
+  ```
+  Window#1 isVisible=0
+    Other {y:518, h:356} isVisible=0
+      Toolbar "Toolbar" {x:0, y:518, w:402, h:48} isVisible=1  > … > Button "Done" {x:317, y:523, w:64, h:38} isVisible=1
+      Other "inputView" {y:566, h:308} isVisible=0
+  Window#2 isVisible=1
+    Other {y:518, h:356} isVisible=1              ← union, 518–874
+      Other {y:518, h:48} isVisible=0             ← the toolbar's slot
+      Other {y:566, h:308} isVisible=1
+      Other {y:583, h:233} > Keyboard {x:0, y:583, w:402, h:233} isVisible=1
+      Other {y:583, h:291} > Button "dictation" {y:805}
+  ```
+  - `twofactor_screen` shrinks to `h: 518`.
+  - Covered area: **518–874**. `Keyboard` alone covers only 583–816. The toolbar (518–566) sits in a *different*
+    Window than the `Keyboard`, and that Window is `isVisible=0` while the Toolbar is `isVisible=1`. In Window#2 the
+    common parent `Other {0,518,402,356}` spans the whole area, toolbar slot included.
+  - **K4, 2FA keyboard up:** median 0.667 s, p90 0.687 s. That is faster than the parked read (0.750 s), so on this
+    screen the keyboard adds nothing measurable.
+
+### Answers (both passes)
+
+| question | answer |
+|---|---|
+| AutoFill bar inside `Keyboard` rect? (K1) | **no**: a separate `SystemInputAssistantView` sibling at y 539–583, above `Keyboard` 583–816. The dictation button reaches 805–875, and the common parent `Other {0,539,402,335}` covers 539–874. The bar is not always there: it was absent in the second pass with filled fields, and then Submit's centre (571) was clear and `login` passed |
+| Parked keyboard: rect and `isVisible` (K2) | (2FA) `Keyboard {0,891,402,233}` with `isVisible=0`, keys `isVisible=0`. **But** an input-accessory `Toolbar` "Done" `{0,826,402,48}` stays on screen with `isVisible=1`. After a neutral-tap dismissal there is no `Keyboard` node at all. With an accessory bar the covered area grows: 2FA keyboard up covers 518–874 (`Toolbar` 518–566 in another Window + `Keyboard` 583–816) |
+| `Keyboard` node present with nothing focused? (K3) | no, a single `Window` and no `Keyboard` |
+| Extra `/source` cost per tap, median/p90 (K4) | login: up 0.873/0.983 s, down 0.592/0.614 s. 2FA: up 0.667/0.687 s, parked 0.750/0.782 s |
+| Non-submitting dismissal that works (K5) | an `idb ui tap` on a neutral, non-interactive point (the title). WDA `keyboard/dismiss` fails both ways, a swipe does nothing, and the return key submits |
