@@ -80,9 +80,9 @@ the earlier notes.
     write is tried once, leaves the launch running and prints one stderr line and no announcement.
 - **The error's advice.** `IdbEmptyTreeError` (`src/adapters/ios-tree-source.ts`) keeps its first line (what a trace
   quotes) and now names, after it, the measured trigger (an earlier WebDriverAgent session on this simulator, e.g.
-  `treeSource: wda`; "likely any XCTest-based driver" is stated as unmeasured) and three ways out in order of cost: a
-  relaunch through averi (`launch_app`, or a flow's launch — the write above runs; "should clear it" until the device
-  check), a simulator reboot (`xcrun simctl shutdown <udid> && xcrun simctl boot
+  `treeSource: wda`; "likely any XCTest-based driver" is stated as unmeasured) and three ways out in order of cost:
+  terminate the app and launch it again through averi (`terminate_app`, then `launch_app` — corrected after the device
+  check below: a `launch_app` on the running stuck app keeps its pid and stays stuck), a simulator reboot (`xcrun simctl shutdown <udid> && xcrun simctl boot
   <udid>`), and `app.ios.treeSource: wda`.
 - ARCHITECTURE.md's iOS launch line and idb bullet say the same.
 
@@ -96,3 +96,66 @@ the earlier notes.
   launch; it is assumed not to wake a running process (the WDA attach does, until the next launch), so the error's
   advice says to relaunch. A cure for the running process (a bare WDA attach, 1.9–2.2 s warm) stays an open option.
 - Whether every WDA teardown really rewrites `0` (inferred from I2, not read back per teardown).
+
+## Device check of the fix (2026-10-07, `6f41787`)
+
+**12:50–12:58 CEST**, branch `fix/ios-idb-and-keyboard-2026-10-07` at `6f41787`, `npm run build`, driver = the handoff's
+`run-tools.mts` (plus `sleep`/`sh` pseudo-steps) on this repo's `dist/`. finportal `sk.finportal.myport`, iPhone 17 iOS 26.5
+(`D34212DB-…`). idb scenarios ran on a scratch copy of finportal's `averi.yaml` with `app.ios.treeSource: idb` (no
+`.env.averi`). "Poison" = hand-started WDA on 8199 → `/status` → stop (port quiet), as in the measurement handoff §1.1. The
+stuck signature was the same as before (lone 0×0 `Application`, `launchctl` exit inside `accessibility_info`, 170–200 ms).
+
+- **I0, before:** `AutomationEnabled=0`, `ApplicationAccessibilityEnabled=0`.
+- **I1, precondition:** poison → `simctl terminate` + `simctl launch` → idb at +5 s: `1 STUCK(lone 0x0 Application)
+  launchctl=1 … 192ms`. Holds.
+- **I2, cure through `launch_app` — PASS 5/5.** One server, 5 × (poison → `launch_app` → idb read + `ui_snapshot
+  role:button` at +5 s). Every poison read both keys back as `0`, every `launch_app` left them `1`, every read was
+  healthy (`14 OK ["MyPort","Slovensky","Česky","English"] launchctl=0 … 70–80ms`, 6 buttons in `ui_snapshot`). The stderr
+  announcement came **once per server**:
+  `averi: set com.apple.Accessibility AutomationEnabled and ApplicationAccessibilityEnabled to true on D34212DB-… (simulator-wide, not restored; before every launch, so an earlier WebDriverAgent session cannot leave idb reading an empty tree)`.
+  `launch_app` took 0.8–0.9 s.
+- **I3, `clearState` path — PASS.** Poison → `run_flow fresh_launch`. Afterwards idb read `14 OK`, and `ui_snapshot
+  role:button` returned all 6 buttons (`lang_*`, `login_password_toggle`, `login_submit`, `login_forgot`). The flow itself
+  failed (`Timed out after 90000ms waiting for element id:"login_screen"`), as expected: idb cannot see an RN container
+  `testID`, which is why finportal is on `wda`. This is not a regression.
+- **I4, realistic chain — PASS 3/3.** Each cycle was a server on finportal's real config (`wda`) running `launch_app`
+  (0.8 s) + `ui_snapshot id:login_submit` (2.7–3.3 s), closed. Then port 8100–8110 was quiet, no runner was left, and
+  **`AutomationEnabled` read `0` again** (averi's own WDA teardown rewrites it). A new server on the idb config then ran
+  `launch_app` + read at +5 s: `14 OK … launchctl=0`, 6 buttons.
+- **I5, an already-running stuck process.** Poison → hand `simctl launch` (stuck at +5 s) → idb-config `ui_snapshot` with
+  no launch: `ERROR in 0.4s`, verbatim:
+  ```
+  idb returned an empty accessibility tree (only a 0×0 Application)
+  The app may still be rendered: idb can stay stuck like this for minutes on a rendered screen. Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app. The measured trigger is an earlier WebDriverAgent session on this simulator (e.g. treeSource: wda; likely any XCTest-based driver): every app launched after it starts with an empty idb tree. averi re-enables accessibility automation before each launch_app, so relaunching the app through averi (launch_app, or a flow's launch) should clear it; if it does not, or the stderr said that write failed, reboot the simulator (`xcrun simctl shutdown <udid> && xcrun simctl boot <udid>`); app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead
+  ```
+  - **The deferred question: the keys written by hand to a running stuck process, with no relaunch, do NOT cure it.**
+    Reads at +0, +5, +15 and +45 s were all `STUCK … launchctl=1`.
+  - **New defect: the advice's "launch_app … should clear it" is false for this case.** On a fresh stuck process
+    (pid 40003), `launch_app` wrote the keys (now `1`) but kept **the same pid 40003**, because `simctl launch` only
+    foregrounds a running app. The read at +5 s was still `STUCK`. Only `terminate_app` + `launch_app` (new pid 40356)
+    gave `14 OK`. A flow's plain `launch: { clearState: false }` is the same call. See
+    [2026-10-07-idb-empty-tree-advice-relaunch-does-not-restart.md](2026-10-07-idb-empty-tree-advice-relaunch-does-not-restart.md).
+  - In passing: a WDA start → `/status` → stop also cured that running process at once. That is the 2026-10-06
+    finding, and it contaminated a first attempt at this step, which was then redone.
+- **I6, timing.** 10 × `simctl spawn … defaults write com.apple.Accessibility AutomationEnabled -bool true`, sorted:
+  0.265, 0.272 ×4, 0.274, 0.276, 0.278, 0.282, 0.297 s, so **median 0.273 s, p90 0.282 s**. Two writes cost ≈0.55 s per
+  launch. A bare `simctl launch` measured 0.233–0.258 s (5×), and `launch_app` now takes 0.8–0.9 s, so the fix
+  adds ≈0.55 s per iOS launch. There is no recorded pre-fix `launch_app` figure, so the bare launch is the baseline.
+- **I7, deep link — PASS (with a system prompt).** finportal's scheme is `myport` (app.json / Info.plist). Terminate →
+  poison (keys `0`, app not running) → `open_deep_link myport://` (0.8 s, keys → `1`). iOS showed the system prompt
+  "Open in “MyPort”?" and the app had not started yet. idb read the prompt (`4 OK [" ","Open in “MyPort”?","Cancel","Open"]`).
+  `tap text:"Open"` cold-started the app, and the read at +5 s was `14 OK … launchctl=0`. The write lands before the
+  prompt, and the keys were still `1` when the app started.
+- **After:** the keys read `1` at the end of Part I. At the very end of the run (after the Part K WDA sessions) they read
+  `0`, `0` again: every WDA teardown rewrites `0`, which settles the last deferred bullet (read back after the hand WDA
+  in all 7 poisons and after averi's own WDA in I4 ×3).
+
+| scenario | result |
+|---|---|
+| I1 precondition (poison → stuck) | holds |
+| I2 poison → `launch_app` ×5 | **PASS** 5/5 healthy; announcement once per server |
+| I3 poison → `fresh_launch` (clearState) | **PASS** healthy tree (flow's wait fails by design on idb) |
+| I4 wda session → new idb session ×3 | **PASS** 3/3 |
+| I5 running stuck process | error text as shipped; hand key write does **not** cure a running process; **`launch_app` does not either (same pid): new defect** |
+| I6 write cost | median 0.273 s, p90 0.282 s per key; ≈+0.55 s per launch |
+| I7 deep link | **PASS** after the system "Open" prompt |

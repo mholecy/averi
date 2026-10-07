@@ -235,16 +235,18 @@ describe('IdbTreeSource — an empty tree is a read error, not a screen on which
     expect(error).toBeInstanceOf(IdbEmptyTreeError);
     // The cause alone on the first line (what a trace quotes), the advice beneath it:
     // the trigger (an earlier WDA session — docs/bugs/2026-10-07-one-wda-session-
-    // makes-idb-stick-until-reboot.md), then the ways out in order of cost, the relaunch hedged
-    // until it is device-checked.
+    // makes-idb-stick-until-reboot.md), then the ways out in order of cost: terminate-then-launch
+    // (a launch_app on the running app keeps the stuck pid — docs/bugs/2026-10-07-idb-empty-tree-
+    // advice-relaunch-does-not-restart.md), a reboot, the WDA source.
     expect((error as Error).message).toBe(
       'idb returned an empty accessibility tree (only a 0×0 Application)\n' +
         'The app may still be rendered: idb can stay stuck like this for minutes on a rendered screen. ' +
         'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app. ' +
         'The measured trigger is an earlier WebDriverAgent session on this simulator (e.g. treeSource: wda; ' +
         'likely any XCTest-based driver): every app launched after it starts with an empty idb tree. ' +
-        'averi re-enables accessibility automation before each launch_app, so relaunching the app through averi ' +
-        "(launch_app, or a flow's launch) should clear it; if it does not, or the stderr said that write failed, " +
+        'averi re-enables accessibility automation before each launch, but only a NEW app process picks it up: ' +
+        'terminate the app and launch it again through averi (terminate_app, then launch_app) — a launch_app on the ' +
+        'running app keeps the same stuck process; if that does not clear it, or the stderr said that write failed, ' +
         'reboot the simulator (`xcrun simctl shutdown <udid> && xcrun simctl boot <udid>`); ' +
         'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
     );

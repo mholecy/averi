@@ -128,10 +128,13 @@ function idbTree(elements: IdbElement[]): UiNode {
  * makes-idb-stick-until-reboot.md) is an earlier WebDriverAgent session on
  * the simulator: its teardown leaves every LATER app launch with this tree
  * until a reboot. IosAdapter.launch re-enables accessibility automation
- * before each launch (and deep link), so the advice names a relaunch through
- * averi — hedged until that is device-checked — then a reboot; this error is
- * what an already-running stuck process, or a launch averi did not make,
- * still reads.
+ * before each launch (and deep link) — device-checked 2026-10-07, 5/5 — so
+ * this error is what an already-running stuck process, or a launch averi did
+ * not make, still reads. For that process the write is too late: neither the
+ * keys alone nor a `launch_app` on the running app (same pid) cured it; a
+ * terminate and a new launch did (docs/bugs/2026-10-07-idb-empty-tree-advice-
+ * relaunch-does-not-restart.md). Hence the advice names terminate-then-launch,
+ * then a reboot.
  *
  * The signature is deliberately narrow — no element with positive area, NOT
  * ui-tree/bare-tree.ts's `isBareTree`. A full-frame `Application` alone is
@@ -152,8 +155,9 @@ export class IdbEmptyTreeError extends Error {
         'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app. ' +
         'The measured trigger is an earlier WebDriverAgent session on this simulator (e.g. treeSource: wda; ' +
         'likely any XCTest-based driver): every app launched after it starts with an empty idb tree. ' +
-        'averi re-enables accessibility automation before each launch_app, so relaunching the app through averi ' +
-        "(launch_app, or a flow's launch) should clear it; if it does not, or the stderr said that write failed, " +
+        'averi re-enables accessibility automation before each launch, but only a NEW app process picks it up: ' +
+        'terminate the app and launch it again through averi (terminate_app, then launch_app) — a launch_app on the ' +
+        'running app keeps the same stuck process; if that does not clear it, or the stderr said that write failed, ' +
         'reboot the simulator (`xcrun simctl shutdown <udid> && xcrun simctl boot <udid>`); ' +
         'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
     );

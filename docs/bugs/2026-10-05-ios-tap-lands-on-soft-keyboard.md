@@ -289,8 +289,8 @@ and one helper owns the oracle-or-tree switch.)
    resolve the target (timeout, ambiguity, a dead read) is wrapped the same way the Android second look is
    (`After the soft keyboard covered X at (x,y) on a first look, the second look failed: …. Nothing was pressed`,
    trace line `…; nothing sent, and the second look failed`, the original error as `cause`). The flow engine's existing
-   `tracingDismissal` path prints `⚠ tap id:"login_submit" — the soft keyboard covered id:"login_submit"; no
-   dismissal, nothing sent` before the `✗ tap` line; the message quotes the band and the point ("on two looks 300ms
+   `tracingDismissal` path prints `⚠ tap: the soft keyboard covered id:"login_submit"; no dismissal, nothing sent`
+   (the Android line's shape; quoted from the device check below) before the `✗ tap` line; the message quotes the band and the point ("on two looks 300ms
    apart") and says "this adapter cannot hide it (…)" quoting the ADAPTER's own sentence — `DeviceAdapter.keyboardAdvice`,
    set by `IosAdapter` from the K5 measurements (no back key, return submits, WDA `keyboard/dismiss` fails, swipe does
    nothing; a tap on a neutral element hid it; a hardware keyboard keeps it from showing) — so interact/ and verify/
@@ -325,6 +325,91 @@ and one helper owns the oracle-or-tree switch.)
   flush with that window's bottom, under 60 % of its height, starting below its top) gets that window marked as the
   keyboard's, and targets in it are tapped unguarded — the pre-fix behaviour, for that window only (review round 3
   constructed it on K1; no measured app does this).
-- **The device check** of the fix is pending: expected on the finportal `login` flow with the keyboard up, a `⚠ tap`
-  refusal naming `[0,539][402,874]` (or `[0,566][402,874]`) and `(107,571)` instead of a 45 s timeout; with a
-  `tap: { id: login_title }` added before the submit, a pass; and `tap text:"Done"` on the 2FA number pad hiding it.
+- **The device check** — done 2026-10-07, see the next section. Expected was, on the finportal `login` flow with the
+  keyboard up, a `⚠ tap` refusal naming `[0,539][402,874]` (or `[0,566][402,874]`) and the submit's centre ((107,571)
+  in the Slovak UI, (91,571) in the English one) instead of a 45 s timeout; with a `tap: { id: login_title }` before
+  the submit, a pass; and `tap text:"Done"` on the 2FA number pad hiding it.
+
+## Device check of the fix (2026-10-07, `6f41787`)
+
+**13:00–13:10 CEST**, `6f41787` built, run with the handoff's driver on this repo's `dist/`. finportal's real config
+(`treeSource: wda`) on iPhone 17 iOS 26.5 (`D34212DB-…`). For the submit-free steps, a scratch copy of it adds five
+helper flows: `fill_creds` (the `login` flow's two `fill`s), `submit_only` (`tap login_submit` + `wait
+post_login_fork`), `title_then_submit`, `back_only` and `tap_submit_only`. Its `.env.averi` is a symlink to finportal's.
+The scratch copy lives in the run's scratch dir and nothing in finportal was edited. Real login submits: **3** (listed
+below). No 2FA code was completed.
+
+**Raising the software keyboard without Simulator.app (setup, not part of the fix).** After a cold launch and a focus
+tap, the keyboard was parked: `UIKeyboardLayoutStar Preview` at y 952, Passwords bar at 874, and **no `keyboard` node**
+(correct: nothing on screen). ⌘K is not available. What raised it was writing `com.apple.keyboard.preferences
+AutomaticMinimizationEnabled` (recorded `1`) to `false`, or toggling it `true` → `false`, followed by a **focus change**
+(tap another field, then the target field). A tap on the field that already had focus only opened the edit menu ("Select
+All / AutoFill"). The pref was restored to `1` at the end.
+- **Any `fill` parks the keyboard again.** `fill` types with `idb ui text` (HID), and iOS then treats a hardware keyboard
+  as attached. Measured: keyboard band up → `fill_creds` → `0 matches for role:keyboard`. Also after `type_text "a"` and
+  after every later focus, until the next pref toggle. This probably explains the pre-fix second pass that "passed": at
+  the moment of the submit tap, the keyboard was parked by the `fill`s just before it.
+
+Results:
+- **K1, band — PASS.** `fresh_launch` → toggle → `tap id:login_password`: `ui_snapshot role:keyboard` returned one node,
+  `{x:0, y:539, w:402, h:335}`, with the Passwords bar visible in the screenshot. In the K2 setup below, without the bar,
+  it was `{0,566,402,308}`. The full snapshot carried `"ofKeyboard": true` twice. `login_submit` = `{36,547,109,48}`
+  (English UI, so 109 wide and not 141, which puts the centre at (91,571) and not (107,571)).
+- **K2 as written (`run_flow login` with the band up) — not reproducible here; submit #1.** The keyboard was up
+  (`[0,539][402,874]`) when the flow started. The flow's `fill`s parked it, `tap: id:"login_submit"` found no band and
+  tapped, and the flow ended on `twofactor_screen` (`flow login: done`, 22.4 s). The guard was right not to refuse:
+  nothing covered the button. The second allowed run was not spent, because it would end the same way.
+- **K2 via `submit_only`, band up over the filled form — PASS** (after one failed attempt, **submit #2**: the toggle without
+  a focus change did not raise the keyboard, and the submit went through to 2FA). With the band up,
+  `run_flow submit_only` returned `ERROR in 4.7s`, trace:
+  ```
+  flow submit_only: start
+  ⚠ tap: the soft keyboard covered id:"login_submit"; no dismissal, nothing sent
+  ✗ tap id:"login_submit": failed — The soft keyboard covers id:"login_submit": the band it draws over [0,566][402,874] contains the tap point (91,571) on two looks 300ms apart, and this adapter cannot hide it (the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, the return key submits from the field, WebDriverAgent's keyboard/dismiss fails and a swipe does nothing; a tap on a neutral, non-interactive element (a title label) was measured to hide it without submitting, and typing with a hardware keyboard keeps the software keyboard from showing). Nothing was tapped: the tap would have pressed the keyboard and been reported done. From the MCP tools: hide the keyboard first, then tap id:"login_submit" again. In a flow: hide it with a step before this one (a tap: on an element the keyboard does not cover), or lay the screen out so id:"login_submit" is not under the keyboard
+  ```
+  This fails in seconds, not in 45 s. The `⚠` line reads `⚠ tap: the soft keyboard covered id:"login_submit"; no
+  dismissal, nothing sent`, the Android shape. (The "Fix" section above first quoted it as `⚠ tap id:"login_submit"
+  — …`; corrected to the measured line.)
+  The MCP `tap id:login_submit` right after gave the same refusal in 4.8 s. The screen stayed on the login form with
+  the fields filled.
+- **K3, workaround — PASS (submit #3).** With the band still `[0,566][402,874]`, `title_then_submit` (`tap
+  id:login_title` → `tap id:login_submit` → `wait post_login_fork`) passed in 7.9 s and stopped on the 2FA screen.
+- **K4, 2FA number pad — PASS.** After K3 the pad was up: `role:keyboard` `{0,518,402,356}` and `Done` `{317,523,64,38}`.
+  `tap text:"Done"` → `Tapped`, then `0 matches for role:keyboard`, and no `Done` in the tree. `tap id:twofactor_code`
+  raised the pad again (`{0,518,402,356}`, no toggle needed). `tap label:"1"` (the key at `{4,590}`) → `Tapped`, and
+  `twofactor_code` `value: "1"`: the digit landed and was not refused. Then `Done` and `twofactor_back` went back to
+  login, with the code not completed.
+  - Negative control: with the pad up, the keyboard-avoiding layout moves `twofactor_back`/`twofactor_submit` to
+    y 451–499, above the band (`twofactor_screen` h 518). `run_flow back_only` therefore tapped `twofactor_back` with no
+    refusal, and color/ocr asserts on `twofactor_submit` measured it (`sampled #FAFAFA`, ocr `read "Log in"`). Both are
+    correct: nothing was covered.
+- **K5, pixel guard — PASS** (same state as K2, band `0,566 402x308`):
+  - `color` on `login_submit`: `FAIL … — the soft keyboard covers the element (element 36,547 109x48, keyboard 0,566
+    402x308) — hide it first and re-run; this adapter cannot hide it (…the iOS advice above…); failing closed, color
+    unchecked` (6.9 s with `timeout: 6s`).
+  - `ocr` on `login_submit`: the same sentence, ending `rendered text unchecked` (6.9 s).
+  - `color` on `login_title` (above the band): `PASS … sampled #FFFFFF (dominant, 100% of region) … dE00 0.00` (5.0 s).
+  - `ocr` on `login_title`: `PASS … read "Login"` (5.3 s).
+- **K6, Android regression (emulator-5554) — PASS.** `list_devices`: `emulator-5554` booted, and no physical device.
+  `fresh_launch` → `tap id:login_username` (Gboard up over Submit, screenshot) → `tap_submit_only` with the fields **empty**
+  (Submit disabled, so no real submit), 9.7 s:
+  `⚠ tap: the soft keyboard covered id:"login_submit"; hidden before tapping` / `tap: id:"login_submit"` /
+  `flow tap_submit_only: done`. Afterwards the IME was hidden and the login screen was unchanged.
+
+| scenario | result |
+|---|---|
+| K1 band on login | **PASS**: `[0,539][402,874]` with the Passwords bar, `[0,566][402,874]` without; `ofKeyboard` ×2 |
+| K2 `run_flow login` | not reproducible: `fill` (HID) parks the keyboard, so the submit was clear and tapped (submit #1) |
+| K2 refusal (submit_only + MCP tap, band up) | **PASS**: refused in 4.7 / 4.8 s, nothing sent |
+| K3 title → submit | **PASS**: 2FA (submit #3) |
+| K4 Done / digit | **PASS**: Done hides the pad; `1` lands |
+| K5 pixel guard | **PASS**: covered → fail closed with the iOS advice; title → measured PASS |
+| K6 Android | **PASS**: unchanged `hidden before tapping` line |
+
+Unexpected:
+- The guard can only fire on iOS if the software keyboard is still up at the tap. Every `fill`/`type_text` types through
+  HID and parks it, so on a flow that fills right before the submit (finportal `login`), the guard sees no band in
+  this setup. That is the honest result and not a false pass. It does mean the bug's original symptom (a tap that
+  lands on the keyboard) needs a keyboard raised *after* the last typing.
+- The `⚠` line's wording differs from the quote in the "Fix" section (see K2).
+- Submit #2 was spent because a pref toggle with no focus change does not raise the keyboard.
