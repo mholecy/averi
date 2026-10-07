@@ -8,7 +8,7 @@ import {
 } from '../flow/config.js';
 import { configDir, loadProjectConfig, projectConfigPath } from '../flow/load.js';
 import { refuseUnknownEnvironment } from './preflight.js';
-import { FlowEngine, type TraceEntry } from '../flow/engine.js';
+import { FlowEngine, type EngineContext, type RunRequest } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { appHealth, assertSummary, formatAsserts, formatTrace } from './verify.js';
@@ -51,27 +51,37 @@ export type ResolveAdapterFor = (cfg: AveriConfig) => Promise<DeviceAdapter>;
 export const baselineDirFor = (configPath?: string): string =>
   resolve(configDir(projectConfigPath(configPath)), DEFAULT_BASELINE_DIR);
 
-interface EngineCall {
+/**
+ * The session class, re-exported for the MCP layer: mcp/ makes one session
+ * per server and hands it down, and run/ is the layer it delegates to
+ * (ARCHITECTURE.md §2) — so mcp/ does not import flow/engine.ts for it.
+ */
+export { EngineSession } from '../flow/engine.js';
+
+/** An ensure_state / run_flow call: the config to load, and the engine context (environment, session — flow/engine.ts#EngineContext). */
+interface EngineCall extends EngineContext {
   configPath?: string;
-  environment?: string;
 }
 
 /**
  * The sequence ensure_state and run_flow share: config, the environment
- * pre-flight (`refuseUnknownEnvironment`), adapter, engine, the trace, then
- * the health line — in that order, each step only if the one before it
- * succeeded (a failing flow throws its own trace; there is no health line on
- * a failure, as there never was).
+ * pre-flight (`refuseUnknownEnvironment`), adapter, ONE engine run, the
+ * trace, then the health line — in that order, each step only if the one
+ * before it succeeded (a failing flow throws its own trace; there is no
+ * health line on a failure, as there never was). The run is handed in as
+ * what to run, not as a callback over an engine (2026-10-07): the engine
+ * has one entry, and every tool that runs it — these two and verify's legs
+ * — names a state, a flow or both.
  */
 async function runOnEngine(
   call: EngineCall,
   resolveAdapter: ResolveAdapterFor,
-  run: (engine: FlowEngine) => Promise<TraceEntry[]>,
+  request: RunRequest,
 ): Promise<{ adapter: DeviceAdapter; text: string }> {
   const { cfg, env } = await loadProjectConfig(call.configPath);
   refuseUnknownEnvironment(cfg, env, call.environment);
   const adapter = await resolveAdapter(cfg);
-  const trace = await run(new FlowEngine(cfg, adapter, { env, environment: call.environment }));
+  const trace = await FlowEngine.run(cfg, adapter, { env, environment: call.environment, session: call.session }, request);
   return { adapter, text: formatTrace(trace) + (await appHealth(adapter, cfg)) };
 }
 
@@ -80,7 +90,7 @@ export async function runEnsureState(
   call: EngineCall & { state: string },
   resolveAdapter: ResolveAdapterFor,
 ): Promise<{ text: string; shot: Buffer }> {
-  const { adapter, text } = await runOnEngine(call, resolveAdapter, (engine) => engine.ensureState(call.state));
+  const { adapter, text } = await runOnEngine(call, resolveAdapter, { state: call.state });
   const frame = await captureFrame(adapter);
   const unsettled = unsettledNote(frame);
   return { text: unsettled === undefined ? text : `${text}\n${unsettled}`, shot: frame.shot };
@@ -91,7 +101,7 @@ export async function runNamedFlow(
   call: EngineCall & { flow: string },
   resolveAdapter: ResolveAdapterFor,
 ): Promise<string> {
-  return (await runOnEngine(call, resolveAdapter, (engine) => engine.runFlow(call.flow))).text;
+  return (await runOnEngine(call, resolveAdapter, { flow: call.flow })).text;
 }
 
 export interface AssertCall {

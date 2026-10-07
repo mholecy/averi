@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // The one sleep owner as a zero-delay macrotask yield, as in engine.test.ts:
 // every poll cadence collapses to one event-loop turn; deadlines are
@@ -9,7 +9,7 @@ import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, resetClearStateCount, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, EngineSession, type TraceEntry } from '../../src/flow/engine.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
@@ -57,7 +57,11 @@ flows:
 /** The second look runs over ensureTimeoutMs; tapTimeoutMs, its window before 2026-10-07, is kept far shorter so a test can tell them apart. */
 const FAST = {
   pollMs: 5, tapTimeoutMs: 60, waitTimeoutMs: 60, ensureTimeoutMs: 1000, optionalTimeoutMs: 30,
-  assertTimeoutMs: 60, reachRecheckMs: 40, pinKeyDelayMs: 1, env: {},
+  assertTimeoutMs: 60, reachRecheckMs: 40, pinKeyDelayMs: 1, env: {},  // A fresh session at every use — a spread or a direct pass — so no test
+  // inherits another's wipe count (EngineOptions.session is required).
+  get session() {
+    return new EngineSession();
+  },
 };
 
 /** What the Android adapter throws for uiautomator's null root on a poller's read (adapters/android.ts, diagnoseDumpFailure). */
@@ -149,10 +153,6 @@ const failure = async (run: Promise<unknown>): Promise<FlowError> => {
 const actions = (trace: TraceEntry[]) => trace.map((t) => t.action);
 const clearStateLaunches = (fake: FakeAdapter) => fake.launches.filter((l) => l.clearState === true);
 
-beforeEach(() => {
-  resetClearStateCount();
-});
-
 describe('the fixtures are the shapes the rule is about', () => {
   it('the decor and the WDA splash are bare; the login and home screens are not', () => {
     expect(isBareTree(ANDROID_DECOR)).toBe(true);
@@ -167,7 +167,7 @@ describe('the fixtures are the shapes the rule is about', () => {
 describe('a cold launch\'s bare trees are not "not in state": the ladder looks again before a DESTRUCTIVE rung', () => {
   it('Android, the measured shape: null root → decor → login_screen inside the second look — nothing is wiped, "already active"', async () => {
     const { fake } = timeline((ms) => (ms < 30 ? ANDROID_NULL_ROOT : ms < 150 ? ANDROID_DECOR : ANDROID_LOGIN));
-    const trace = await new FlowEngine(CFG, fake, FAST).ensureState('logged_out');
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out' });
     expect(fake.launches).toEqual([]);
     expect(trace).toContainEqual({ action: 'state logged_out', detail: 'already active' });
     expect(actions(trace)).not.toContain('⚠ reach fresh_launch');
@@ -175,7 +175,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
 
   it('iOS WDA: the ENTRY probe reads the 7-node splash — bare, not "no" — and the second look finds the login; nothing is wiped', async () => {
     const { fake } = timeline((ms) => (ms < 150 ? WDA_SPLASH : WDA_LOGIN), 'ios');
-    const trace = await new FlowEngine(CFG, fake, FAST).ensureState('logged_out');
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out' });
     expect(fake.launches).toEqual([]);
     expect(trace).toContainEqual({ action: 'state logged_out', detail: 'already active' });
     // The entry probe says what it read, the way an unreadable one does.
@@ -190,14 +190,14 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
   it('the window is ensureTimeoutMs, not tapTimeoutMs: a state rendered after the settle budget but inside the ensure budget is found', async () => {
     // Decor for 250 ms against a 60 ms tapTimeoutMs and a 1 s ensureTimeoutMs.
     const { fake } = timeline((ms) => (ms < 250 ? ANDROID_DECOR : ANDROID_LOGIN));
-    const trace = await new FlowEngine(CFG, fake, FAST).ensureState('logged_out');
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out' });
     expect(clearStateLaunches(fake)).toEqual([]);
     expect(trace).toContainEqual({ action: 'state logged_out', detail: 'already active' });
   });
 
   it('bare for the whole window: ⛔ with the bare wording, nothing launches', async () => {
     const { fake, state } = timeline(() => ANDROID_DECOR);
-    const error = await failure(new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }).ensureState('logged_out'));
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
     expect(fake.launches).toEqual([]);
     expect(state.reads).toBeGreaterThan(2); // the second look polled, it did not give up after one more read
     const refused = error.trace.find((t) => t.action === '⛔ reach fresh_launch');
@@ -215,7 +215,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
 
   it('bare reads, then failing ones: the probe answers bare, and its trace line is the bare one alone — no read-error line beside it', async () => {
     const { fake } = timeline((ms) => (ms < 40 ? ANDROID_DECOR : ANDROID_NULL_ROOT));
-    const error = await failure(new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }).ensureState('logged_out'));
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
     expect(fake.launches).toEqual([]);
     expect(error.trace.find((t) => t.action === '⛔ reach fresh_launch')?.detail).toContain('never read a RENDERED UI tree');
     expect(error.trace.filter((t) => t.detail?.includes('last UI tree read failed') === true)).toEqual([]);
@@ -227,7 +227,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
   // so each mixed order below was worded with something false.
   it('mixed, bare entry then a second look whose every read failed: the refusal names the bare tree AND the failure — not "never read a UI tree"', async () => {
     const { fake } = timeline((_, read) => (read === 0 ? ANDROID_DECOR : ANDROID_NULL_ROOT));
-    const error = await failure(new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }).ensureState('logged_out'));
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
     expect(fake.launches).toEqual([]);
     expect(error.trace.find((t) => t.action === '⛔ reach fresh_launch')?.detail).toBe(
       'refused: the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
@@ -241,7 +241,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
 
   it('mixed, failed entry read then a bare second look: the refusal is the bare one — "every UI tree read", not "every read", and no read-error clause', async () => {
     const { fake } = timeline((_, read) => (read === 0 ? ANDROID_NULL_ROOT : ANDROID_DECOR));
-    const error = await failure(new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }).ensureState('logged_out'));
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
     expect(fake.launches).toEqual([]);
     expect(error.trace.find((t) => t.action === '⛔ reach fresh_launch')?.detail).toBe(
       'refused: the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
@@ -255,7 +255,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
   it('bare, then a RENDERED tree outside the state: the second look answers "no" and the destructive rung runs, with its warning', async () => {
     const { fake } = timeline((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
     // The call still fails: fresh_launch does not move the fake to the login.
-    const error = await failure(new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }).ensureState('logged_out'));
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);
     expect(error.trace).toContainEqual(expect.objectContaining({ action: '⚠ reach fresh_launch', detail: expect.stringMatching(/^this rung is DESTRUCTIVE/) }));
     expect(actions(error.trace)).not.toContain('⛔ reach fresh_launch');
@@ -264,7 +264,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
   it('ONE rendered read among bare ones is knowledge: the probe answers "no", not bare — the rung runs', async () => {
     // Entry: decor. Second look: decor, decor, the home screen once, decor to the deadline.
     const { fake } = timeline((_, read) => (read === 3 ? ANDROID_HOME : ANDROID_DECOR));
-    const error = await failure(new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }).ensureState('logged_out'));
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);
     expect(actions(error.trace)).not.toContain('⛔ reach fresh_launch');
     // Before the rung, only the entry probe was bare; a bare second look would have said so too.
@@ -283,9 +283,8 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
       relaunched = true;
       return launch(appId, opts);
     };
-    const engine = new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 5000 });
     const started = Date.now();
-    const trace = await engine.ensureState('logged_out_cheap_first');
+    const trace = await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 5000 }, { state: 'logged_out_cheap_first' });
     expect(readsBeforeLaunch).toBe(1); // the entry probe's single read, nothing more
     expect(Date.now() - started).toBeLessThan(2500); // nowhere near the 5 s window
     expect(clearStateLaunches(fake)).toEqual([]);
@@ -297,7 +296,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
 describe('a state with no reach flows says honestly that a bare read could not check it', () => {
   it('"could not be checked", with the tree\'s shape — not "Not in state"', async () => {
     const { fake } = timeline(() => WDA_SPLASH, 'ios');
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('no_reach'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'no_reach' }));
     expect(error.message.split('\n')[0]).toBe(
       'State "no_reach" could not be checked (every UI tree read was bare, the last one 7 nodes (roles: container ×6, image ×1) ' +
         'of only wrappers and unlabeled decoration) and it has no reach flows',

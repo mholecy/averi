@@ -301,6 +301,72 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(result.isError).toBe(false);
     expect(result.text).toContain('environment staging');
   });
+
+  /**
+   * The `⚠ clearState` line's running count is the SESSION's — the server's,
+   * shared by every tool that runs the engine. Until 2026-10-07 it was a
+   * module-level `let` in flow/engine.ts: a second server in the same process
+   * (every test file, and anything that embeds createAveriServer) continued
+   * the first one's count, and the engine's tests reset it by hand.
+   */
+  // The pre-flight (run/preflight.ts#refuseUnknownEnvironment) through the
+  // protocol: each engine tool answers isError, naming the environment.
+  it.each(['run_flow', 'ensure_state', 'verify'])('%s: an `environment` averi.yaml does not declare is an error naming it', async (tool) => {
+    const { call, bound } = await connect();
+    const result = await call(tool, {
+      platform: 'android',
+      platforms: ['android'],
+      flow: 'touch_home',
+      state: 'home',
+      environment: 'nope',
+      configPath: await validConfig(),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Unknown environment "nope"');
+    expect(bound()).toEqual([]); // refused before any device
+  });
+
+  it('the clearState count belongs to the server: its three engine tools share it, both verify legs too, a second server starts at 1', async () => {
+    const configPath = await file(
+      'averi.yaml',
+      VALID_CONFIG.replace(
+        'states:\n',
+        'states:\n  wiped:\n    detect: { element: { id: login_root } }\n    reach: [wipe]\n',
+      ) + '  wipe:\n    steps:\n      - launch: { clearState: true }\n',
+    );
+    // A device whose wipe lands on the login screen, so `wiped` is reached by its one rung.
+    resetLayout();
+    const wipeable = () => {
+      const fake = new FakeAdapter(
+        {
+          // Rendered, not bare: a labeled control, so the ladder may run its destructive rung.
+          home: screen(el({ role: 'container', identifier: 'home_root' }), el({ role: 'button', label: 'Settings' })),
+          login: screen(el({ role: 'container', identifier: 'login_root' }), el({ role: 'button', label: 'Log in' })),
+        },
+        'home',
+      );
+      const launch = fake.launch.bind(fake);
+      fake.launch = async (appId, opts) => {
+        await launch(appId, opts);
+        if (opts?.clearState === true) fake.current = 'login';
+      };
+      return fake;
+    };
+    const counts = (text: string) => [...text.matchAll(/\((\d+) this session\)/g)].map((m) => Number(m[1]));
+    const first = await connect({ android: wipeable(), ios: wipeable() });
+    const ensured = await first.call('ensure_state', { platform: 'android', state: 'wiped', configPath });
+    expect(ensured.isError).toBe(false);
+    expect(counts(ensured.text)).toEqual([1]);
+    const flow = await first.call('run_flow', { platform: 'android', flow: 'wipe', configPath });
+    expect(counts(flow.text)).toEqual([2]);
+    // Two legs, run concurrently: one wipe each, both counted in the one session.
+    const verify = await first.call('verify', { platforms: ['android', 'ios'], flow: 'wipe', configPath });
+    expect(counts(verify.text).sort()).toEqual([3, 4]);
+
+    const second = await connect();
+    const fresh = await second.call('run_flow', { platform: 'android', flow: 'wipe', configPath });
+    expect(counts(fresh.text)).toEqual([1]);
+  });
 });
 
 describe('install_app — which build', () => {

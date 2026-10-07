@@ -5,6 +5,7 @@ import { PNG } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
+import { EngineSession } from '../../src/flow/engine.js';
 import {
   appHealth,
   assertSummary,
@@ -68,6 +69,9 @@ const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => (
   specs: [],
   baselineDir: '/tmp/averi-test-baselines',
   ...over,
+  // Required by the run (a forgotten one reset the count per call); each
+  // request is a session of its own unless the test hands one in.
+  session: over.session ?? new EngineSession(),
 });
 
 const contract = (anchors: LayoutContract['anchors']): LayoutContract => ({ screen: 's', anchors });
@@ -977,6 +981,85 @@ describe('flow composition', () => {
       async () => fake('android'),
     );
     expect(out.sections[0]).toContain('FAILED: Unknown flow "nonexistent"');
+  });
+
+  /**
+   * One leg is ONE engine run (2026-10-07, flow-engine review candidate 1).
+   * Until then the leg called the engine's two entries in turn, each of which
+   * started its own trace: a flow that failed after the state was ensured
+   * threw a FlowError carrying the FLOW's steps only, so the FAILED section
+   * had no `state ready: already active` line — and after a ladder, no
+   * `⚠ clearState` line for the wipe the call had already paid for.
+   */
+  it('a flow that fails after the state was ensured keeps the state\'s lines in the FAILED section', async () => {
+    const wiping = parseConfig(
+      [
+        'app:',
+        '  android: { package: com.example.app }',
+        'states:',
+        '  ready:',
+        '    detect: { element: { id: card } }',
+        '    reach: [cold]',
+        'flows:',
+        '  cold:',
+        '    steps:',
+        '      - launch: { clearState: true }',
+      ].join('\n'),
+    );
+    // Not in the state until the wipe: the leg's run climbs the ladder first.
+    // A RENDERED screen without the card — not a bare tree, which the ladder
+    // would refuse to wipe on (UnreadTreeRefusal).
+    const login = node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 100, height: 200 },
+      children: [node({ identifier: 'login_button', label: 'Log in', rect: { x: 10, y: 10, width: 40, height: 40 } })],
+    });
+    const adapter = new FakeAdapter({ s: SCREEN, login }, 'login');
+    adapter.platform = 'android';
+    adapter.nextScreenshot = whitePng();
+    const launch = adapter.launch.bind(adapter);
+    adapter.launch = async (appId, opts) => {
+      await launch(appId, opts);
+      adapter.current = 's';
+    };
+    const out = await runVerification(
+      request({ platforms: ['android'], cfg: wiping, state: 'ready', flow: 'nonexistent' }),
+      async () => adapter,
+    );
+    const section = out.sections[0];
+    expect(section).toContain('FAILED: Unknown flow "nonexistent"');
+    expect(section).toContain('Steps that ran before the failure:');
+    expect(section).toContain('⚠ clearState: app state wiped');
+    expect(section).toContain('state ready: reached');
+  });
+
+  it('a state and a flow in one leg open with ONE environment line', async () => {
+    const cfg = parseConfig(
+      [
+        'app:',
+        '  android: { package: com.example.app }',
+        'credentials:',
+        '  username: plain-user',
+        'environments:',
+        '  staging:',
+        '    credentials:',
+        '      username: staging-user',
+        'states:',
+        '  ready:',
+        '    detect: { element: { id: card } }',
+        'flows:',
+        '  open_card:',
+        '    steps:',
+        '      - tap: { id: card }',
+      ].join('\n'),
+    );
+    const out = await runVerification(
+      request({ platforms: ['android'], cfg, state: 'ready', flow: 'open_card', environment: 'staging' }),
+      async () => fake('android'),
+    );
+    const section = out.sections[0];
+    expect(section.split('\n').filter((l) => l.startsWith('environment staging'))).toHaveLength(1);
+    expect(section.indexOf('environment staging')).toBeLessThan(section.indexOf('state ready'));
   });
 });
 

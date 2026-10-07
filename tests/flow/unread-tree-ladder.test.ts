@@ -7,7 +7,7 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setT
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, idbContainerIdHint, resetClearStateCount, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, EngineSession, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
 
 /**
@@ -92,7 +92,11 @@ flows:
 
 const FAST = {
   pollMs: 5, tapTimeoutMs: 60, waitTimeoutMs: 60, ensureTimeoutMs: 60, optionalTimeoutMs: 30,
-  assertTimeoutMs: 60, reachRecheckMs: 40, pinKeyDelayMs: 1, env: {},
+  assertTimeoutMs: 60, reachRecheckMs: 40, pinKeyDelayMs: 1, env: {},  // A fresh session at every use — a spread or a direct pass — so no test
+  // inherits another's wipe count (EngineOptions.session is required).
+  get session() {
+    return new EngineSession();
+  },
 };
 
 /** The two readable screens: the PIN screen (rendered, NOT logged in) and the logged-in home. */
@@ -153,13 +157,12 @@ const clearStateLaunches = (fake: FakeAdapter) => fake.launches.filter((l) => l.
 
 beforeEach(() => {
   resetLayout();
-  resetClearStateCount();
 });
 
 describe('the ladder refuses a DESTRUCTIVE rung when the probe right before it never read a tree', () => {
   it('the stuck loop: mp-native\'s three-rung ladder runs its cheap rungs, refuses the clearState login with ⛔, and throws the refusal', async () => {
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('logged_in'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'logged_in' }));
 
     expect(clearStateLaunches(fake)).toEqual([]);
     // The cheap rungs still ran: dismiss (its optional tap skipped) and login_registered's relaunch.
@@ -189,7 +192,7 @@ describe('the ladder refuses a DESTRUCTIVE rung when the probe right before it n
     // the outer ladder to reopen_cards would treat that refusal as a failed
     // cheap rung.
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('cards'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'cards' }));
 
     expect(error.message).toMatch(/^Refused to run reach flow "login" for state "logged_in"/);
     expect(clearStateLaunches(fake)).toEqual([]);
@@ -207,7 +210,7 @@ describe('the ladder refuses a DESTRUCTIVE rung when the probe right before it n
   it('a nested refusal in a MIDDLE rung: no rung after it runs, and no "escalating to" line follows the ⛔', async () => {
     // cards_three: [relaunch, goto_cards (requires logged_in), reopen_cards].
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('cards_three'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'cards_three' }));
     expect(error.message).toMatch(/^Refused to run reach flow "login" for state "logged_in"/);
     const refusedAt = actions(error.trace).indexOf('⛔ reach login');
     expect(refusedAt).toBeGreaterThan(-1);
@@ -220,7 +223,7 @@ describe('the ladder refuses a DESTRUCTIVE rung when the probe right before it n
 
   it('a single-rung `reach: [login]` behind an unreadable entry probe is refused — nothing launches', async () => {
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('login_only'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'login_only' }));
     expect(error.message).toMatch(/^Refused to run reach flow "login" for state "login_only"/);
     expect(fake.launches).toEqual([]);
     // The entry probe and its second look both failed to read.
@@ -229,7 +232,7 @@ describe('the ladder refuses a DESTRUCTIVE rung when the probe right before it n
 
   it('an explicit run_flow of the destructive flow is never refused — the rule is the ladder\'s', async () => {
     const { fake } = stuckIdb(always);
-    await failure(new FlowEngine(CFG, fake, FAST).runFlow('login')); // its wait still times out on the stuck tree
+    await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'login' })); // its wait still times out on the stuck tree
     expect(clearStateLaunches(fake)).toHaveLength(1);
   });
 });
@@ -238,7 +241,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
   it('transient: one failed read, then good reads off the state — the destructive rung runs, with its warning and no ⛔', async () => {
     const { fake } = stuckIdb((read) => read === 0);
     // The call still fails: login's own wait times out, since the fake does not log in.
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('login_only'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'login_only' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);
     expect(error.trace).toContainEqual(expect.objectContaining({ action: '⚠ reach login', detail: expect.stringMatching(/^this rung is DESTRUCTIVE/) }));
     expect(actions(error.trace)).not.toContain('⛔ reach login');
@@ -246,7 +249,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
 
   it('the second look reads the state: nothing runs, and the call succeeds as "already active"', async () => {
     const { fake } = stuckIdb((read) => read === 0, 'home');
-    const trace = await new FlowEngine(CFG, fake, FAST).ensureState('login_only');
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'login_only' });
     expect(fake.launches).toEqual([]);
     expect(trace).toContainEqual({ action: 'state login_only', detail: 'already active' });
     expect(actions(trace)).not.toContain('⚠ reach login');
@@ -267,7 +270,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
       state.stuck = () => Date.now() - at < 100;
       return launch(appId, opts);
     };
-    const trace = await new FlowEngine(CFG, fake, { ...FAST, ensureTimeoutMs: 1000 }).ensureState('relaunch_then_login');
+    const trace = await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 1000 }, { state: 'relaunch_then_login' });
     expect(clearStateLaunches(fake)).toEqual([]);
     expect(fake.launches).toHaveLength(1);
     expect(trace).toContainEqual({ action: 'state relaunch_then_login', detail: 'reached after relaunch' });
@@ -276,7 +279,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
 
   it('persistent: every read fails through the second look — refused (the stuck loop and the single-rung case above)', async () => {
     const { fake, state } = stuckIdb(always);
-    await failure(new FlowEngine(CFG, fake, FAST).ensureState('login_only'));
+    await failure(FlowEngine.run(CFG, fake, FAST, { state: 'login_only' }));
     expect(fake.launches).toEqual([]);
     expect(state.reads).toBeGreaterThan(2); // the window polled, it did not give up after one more read
   });
@@ -285,7 +288,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
 describe('Android: the cost of the rule on uiautomator\'s cold-launch null root', () => {
   it('a device that stays unreadable through the second look is refused — no clearState launch', async () => {
     const fake = settlingAndroid(Number.POSITIVE_INFINITY);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('login_only'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'login_only' }));
     expect(clearStateLaunches(fake)).toEqual([]);
     expect(fake.launches).toEqual([]);
     expect(error.message).toMatch(
@@ -295,14 +298,14 @@ describe('Android: the cost of the rule on uiautomator\'s cold-launch null root'
 
   it('a device that recovers inside the second look runs the rung, as before the rule', async () => {
     const fake = settlingAndroid(2);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('login_only'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'login_only' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);
     expect(actions(error.trace)).not.toContain('⛔ reach login');
   });
 
   it('a device that recovers onto the state is already there — nothing runs', async () => {
     const fake = settlingAndroid(1, 'home');
-    const trace = await new FlowEngine(CFG, fake, FAST).ensureState('login_only');
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'login_only' });
     expect(fake.launches).toEqual([]);
     expect(trace).toContainEqual({ action: 'state login_only', detail: 'already active' });
   });
@@ -317,12 +320,12 @@ states:
   bare: { detect: { element: { id: nav.tab_transactions } } }
 `);
     const { fake } = stuckIdb(always);
-    const unread = await failure(new FlowEngine(cfg, fake, FAST).ensureState('bare'));
+    const unread = await failure(FlowEngine.run(cfg, fake, FAST, { state: 'bare' }));
     expect(unread.message).toMatch(
       /^State "bare" could not be checked \(last UI tree read failed: idb returned an empty accessibility tree \(only a 0×0 Application\)\) and it has no reach flows\n/,
     );
     const { fake: readable } = stuckIdb(() => false);
-    const missed = await failure(new FlowEngine(cfg, readable, FAST).ensureState('bare'));
+    const missed = await failure(FlowEngine.run(cfg, readable, FAST, { state: 'bare' }));
     expect(missed.message).toMatch(/^Not in state "bare" and it has no reach flows/);
   });
 });
@@ -335,7 +338,7 @@ describe('only the probe IMMEDIATELY before the destructive rung decides', () =>
       state.stuck = () => false; // the relaunch wakes idb
       return launch(appId, opts);
     };
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('relaunch_then_login'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'relaunch_then_login' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);
     expect(error.trace).toContainEqual(expect.objectContaining({ action: '⚠ reach login', detail: expect.stringMatching(/^this rung is DESTRUCTIVE/) }));
     expect(actions(error.trace)).not.toContain('⛔ reach login');
@@ -349,7 +352,7 @@ describe('only the probe IMMEDIATELY before the destructive rung decides', () =>
       state.stuck = (read) => read !== first; // exactly the first read after the relaunch is readable
       return launch(appId, opts);
     };
-    await failure(new FlowEngine(CFG, fake, FAST).ensureState('relaunch_then_login'));
+    await failure(FlowEngine.run(CFG, fake, FAST, { state: 'relaunch_then_login' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);
   });
 
@@ -360,7 +363,7 @@ describe('only the probe IMMEDIATELY before the destructive rung decides', () =>
       state.stuck = always; // the relaunch lands on the stuck tree
       return launch(appId, opts);
     };
-    const error = await failure(new FlowEngine(CFG, fake, FAST).ensureState('relaunch_then_login'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'relaunch_then_login' }));
     expect(clearStateLaunches(fake)).toEqual([]);
     expect(fake.launches).toHaveLength(1); // relaunch ran
     expect(actions(error.trace)).toContain('⛔ reach login');
@@ -371,7 +374,7 @@ describe('only the probe IMMEDIATELY before the destructive rung decides', () =>
 describe('waits and asserts on the stuck tree fail closed', () => {
   it('a wait on an ABSENT condition times out instead of passing, quoting the empty-tree read error', async () => {
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).runFlow('wait_modal_gone'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'wait_modal_gone' }));
     expect(error.message).toMatch(
       /^Timed out after 60ms waiting for state modal_gone\n {2}\(last UI tree read failed: idb returned an empty accessibility tree/,
     );
@@ -379,7 +382,7 @@ describe('waits and asserts on the stuck tree fail closed', () => {
 
   it('an absent assert fails as "could not verify", not PASS', async () => {
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).runFlow('assert_modal_absent'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'assert_modal_absent' }));
     expect(error.message).toMatch(
       /FAIL element id:"some_modal" is absent — could not verify within 60ms \(last UI tree read failed: idb returned an empty accessibility tree/,
     );
@@ -387,7 +390,7 @@ describe('waits and asserts on the stuck tree fail closed', () => {
 
   it('an id wait under idb names the empty read, not the container-id hint — the reads are the story', async () => {
     const { fake } = stuckIdb(always);
-    const error = await failure(new FlowEngine(CFG, fake, FAST).runFlow('wait_login_screen'));
+    const error = await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'wait_login_screen' }));
     expect(error.message).toMatch(/last UI tree read failed: idb returned an empty accessibility tree/);
     expect(error.message).not.toContain(idbContainerIdHint('login_screen'));
     expect(error.message).not.toContain('no tree read contained');

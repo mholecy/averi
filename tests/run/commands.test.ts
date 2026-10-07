@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AveriConfig } from '../../src/flow/config.js';
+import { EngineSession } from '../../src/flow/engine.js';
 import {
   baselineDirFor,
   launchActivityFor,
@@ -94,7 +95,7 @@ describe('runEnsureState', () => {
       return shot;
     };
     const { resolve, resolvedWith } = resolver(fake);
-    const out = await runEnsureState({ state: 'home', configPath: await validConfig() }, resolve);
+    const out = await runEnsureState({ session: new EngineSession(), state: 'home', configPath: await validConfig() }, resolve);
     expect(out.text).toMatch(/home[\s\S]*\nappAlive: true$/);
     expect(out.shot).toEqual(frame('c'));
     expect(fake.screenshots).toEqual(frames);
@@ -110,7 +111,7 @@ describe('runEnsureState', () => {
       fake.screenshots.push(shot);
       return shot;
     };
-    const out = await runEnsureState({ state: 'home', configPath: await validConfig() }, resolver(fake).resolve);
+    const out = await runEnsureState({ session: new EngineSession(), state: 'home', configPath: await validConfig() }, resolver(fake).resolve);
     expect(out.text).toMatch(/\nappAlive: true\n⚠ frame: /);
     expect(out.text.split('\n').at(-1)).toBe('⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available');
     expect(out.shot).toEqual(frame('moving 5'));
@@ -118,7 +119,7 @@ describe('runEnsureState', () => {
 
   it('runs in the environment the call names: the trace opens with it', async () => {
     const out = await runEnsureState(
-      { state: 'home', environment: 'staging', configPath: await validConfig() },
+      { session: new EngineSession(), state: 'home', environment: 'staging', configPath: await validConfig() },
       resolver(home()).resolve,
     );
     expect(out.text).toContain('environment staging');
@@ -128,7 +129,7 @@ describe('runEnsureState', () => {
   it('a missing or invalid averi.yaml fails before the adapter is resolved', async () => {
     for (const configPath of [missing(), await invalidConfig()]) {
       const { resolve, resolvedWith } = resolver(home());
-      await expect(runEnsureState({ state: 'home', configPath }, resolve)).rejects.toThrow();
+      await expect(runEnsureState({ session: new EngineSession(), state: 'home', configPath }, resolve)).rejects.toThrow();
       expect(resolvedWith).toEqual([]);
     }
   });
@@ -136,7 +137,7 @@ describe('runEnsureState', () => {
   it('an unknown state is the engine\'s error, and no frame is captured for it', async () => {
     const fake = home();
     await expect(
-      runEnsureState({ state: 'nowhere', configPath: await validConfig() }, resolver(fake).resolve),
+      runEnsureState({ session: new EngineSession(), state: 'nowhere', configPath: await validConfig() }, resolver(fake).resolve),
     ).rejects.toThrow(/nowhere/);
     expect(fake.screenshots).toEqual([]);
   });
@@ -146,7 +147,7 @@ describe('runNamedFlow', () => {
   it('runs the flow on the resolved adapter and returns the trace with the health line', async () => {
     const fake = home();
     const { resolve, resolvedWith } = resolver(fake);
-    const text = await runNamedFlow({ flow: 'open_menu', configPath: await validConfig() }, resolve);
+    const text = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath: await validConfig() }, resolve);
     expect(fake.taps).toEqual(['menu_button']);
     expect(text).toMatch(/menu_button[\s\S]*\nappAlive: true$/);
     expect(resolvedWith).toHaveLength(1);
@@ -155,10 +156,10 @@ describe('runNamedFlow', () => {
 
   it('runs in the environment the call names; without one the trace names none', async () => {
     const configPath = await validConfig();
-    const named = await runNamedFlow({ flow: 'open_menu', environment: 'staging', configPath }, resolver(home()).resolve);
+    const named = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', environment: 'staging', configPath }, resolver(home()).resolve);
     expect(named).toContain('environment staging');
     expect(named).toContain('overrides: username');
-    const plain = await runNamedFlow({ flow: 'open_menu', configPath }, resolver(home()).resolve);
+    const plain = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath }, resolver(home()).resolve);
     expect(plain).not.toContain('environment');
   });
 
@@ -167,7 +168,7 @@ describe('runNamedFlow', () => {
   it('an environment averi.yaml does not declare is refused, naming the known ones — before the adapter is resolved', async () => {
     const r = resolver(home());
     await expect(
-      runNamedFlow({ flow: 'open_menu', environment: 'nope', configPath: await validConfig() }, r.resolve),
+      runNamedFlow({ session: new EngineSession(), flow: 'open_menu', environment: 'nope', configPath: await validConfig() }, r.resolve),
     ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
     expect(r.resolvedWith).toEqual([]);
   });
@@ -175,7 +176,7 @@ describe('runNamedFlow', () => {
   it('ensure_state takes the same pre-flight: no adapter is resolved for an undeclared environment', async () => {
     const r = resolver(home());
     await expect(
-      runEnsureState({ state: 'home', environment: 'nope', configPath: await validConfig() }, r.resolve),
+      runEnsureState({ session: new EngineSession(), state: 'home', environment: 'nope', configPath: await validConfig() }, r.resolve),
     ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
     expect(r.resolvedWith).toEqual([]);
   });
@@ -183,13 +184,13 @@ describe('runNamedFlow', () => {
   it('the health line is the app\'s: a dead app is reported, not thrown', async () => {
     const fake = home();
     fake.appRunning = false;
-    const text = await runNamedFlow({ flow: 'open_menu', configPath: await validConfig() }, resolver(fake).resolve);
+    const text = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath: await validConfig() }, resolver(fake).resolve);
     expect(text).toContain('appAlive: false — md.bank.app is not running!');
   });
 
   it('a missing averi.yaml fails before the adapter is resolved', async () => {
     const { resolve, resolvedWith } = resolver(home());
-    await expect(runNamedFlow({ flow: 'open_menu', configPath: missing() }, resolve)).rejects.toThrow();
+    await expect(runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath: missing() }, resolve)).rejects.toThrow();
     expect(resolvedWith).toEqual([]);
   });
 });

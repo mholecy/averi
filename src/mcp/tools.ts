@@ -16,6 +16,7 @@ import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parit
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import {
   baselineDirFor,
+  EngineSession,
   launchActivityFor,
   runAsserts,
   runEnsureState,
@@ -174,6 +175,13 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   const server = new McpServer({ name: 'averi', version });
 
   const registerTool: typeof server.registerTool = server.registerTool.bind(server);
+
+  // The session's state that outlives one engine run — the clearState count
+  // (flow/engine.ts#EngineSession, made through run/commands.ts). One per server: the server IS the
+  // session. Every tool that runs the engine (ensure_state, run_flow, verify)
+  // hands it down; until 2026-10-07 it was a module global in the engine,
+  // shared by every server in the process.
+  const session = new EngineSession();
 
   registerTool(
     'list_devices',
@@ -460,7 +468,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, state, configPath: cp, environment: envName }) => {
       const { text: report, shot } = await runEnsureState(
-        { state, configPath: cp, environment: envName },
+        { state, configPath: cp, environment: envName, session },
         (cfg) => registry.get(p, iosOpts(cfg)),
       );
       return { content: [...text(report).content, image(shot)] };
@@ -481,7 +489,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, flow, configPath: cp, environment: envName }) => {
       return text(
-        await runNamedFlow({ flow, configPath: cp, environment: envName }, (cfg) => registry.get(p, iosOpts(cfg))),
+        await runNamedFlow({ flow, configPath: cp, environment: envName, session }, (cfg) => registry.get(p, iosOpts(cfg))),
       );
     },
   );
@@ -552,6 +560,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           flow,
           contractPath,
           environment: envName,
+          session,
           baselineDir: baselineDirFor(cp),
         },
         // Only the ios leg has a treeSource; the registry normalizes it away

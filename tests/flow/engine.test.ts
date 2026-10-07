@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // The one sleep owner (util/sleep.ts) is a zero-delay macrotask yield here,
 // not a wait: every poll cadence and the fill's 350 ms focus delay collapse to
@@ -10,8 +10,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // slower, with every test green either way.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import type { UiNode } from '../../src/adapters/types.js';
-import { parseConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, idbContainerIdHint, resetClearStateCount, stepSummary, waitTimeoutHint, type TraceEntry } from '../../src/flow/engine.js';
+import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
+import { FlowEngine, EngineSession, FlowError, idbContainerIdHint, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
@@ -60,7 +60,14 @@ const TEST_ENV = { TEST_USER: 'alice@bank.md', TEST_PASSWORD: 'hunter2secret', T
 /** TEST_ENV without the named variables — for the "variable is not set" cases. */
 const envWithout = (...names: string[]) =>
   Object.fromEntries(Object.entries(TEST_ENV).filter(([k]) => !names.includes(k)));
-const FAST = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1, env: TEST_ENV };
+const FAST = {
+  pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs: 300, optionalTimeoutMs: 50, assertTimeoutMs: 100, pinKeyDelayMs: 1, env: TEST_ENV,
+  // A fresh session at every use — a spread or a direct pass — so no test
+  // inherits another's wipe count (EngineOptions.session is required).
+  get session() {
+    return new EngineSession();
+  },
+};
 
 function buildScreens() {
   resetLayout();
@@ -89,14 +96,10 @@ function buildScreens() {
   };
 }
 
-beforeEach(() => {
-  resetClearStateCount();
-});
-
-describe('ensureState', () => {
+describe('run({ state }) — ensuring a state', () => {
   it('is a no-op when the state is already active', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const trace = await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
+    const trace = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' });
     expect(fake.taps).toEqual([]);
     expect(trace).toEqual([{ action: 'state logged_in', detail: 'already active' }]);
   });
@@ -110,7 +113,7 @@ describe('ensureState', () => {
         if (entered === '1234') self.current = 'dashboard';
       }
     });
-    const trace = await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
+    const trace = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' });
     expect(fake.taps).toEqual(['pin_key_1', 'pin_key_2', 'pin_key_3', 'pin_key_4']);
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
   });
@@ -124,7 +127,7 @@ describe('ensureState', () => {
         if (setupTaps === 8) self.current = 'dashboard'; // 4 digits × 2 rounds
       }
     });
-    await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
+    await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' });
     expect(fake.typed).toEqual(['alice@bank.md', 'hunter2secret']);
     expect(setupTaps).toBe(8);
   });
@@ -161,7 +164,7 @@ flows:
         if (entered === '1234') self.current = 'dashboard';
       }
     });
-    await new FlowEngine(cfg, fake, FAST).runFlow('enter_pin');
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'enter_pin' });
     expect(fake.taps).toEqual(['key_1', 'key_2', 'key_3', 'key_4']);
   });
 
@@ -194,7 +197,7 @@ flows:
       await origType(text);
       if (fake.typed.length === 9) fake.current = 'dashboard';
     };
-    const trace = await new FlowEngine(cfg, fake, { ...FAST, env: { ...TEST_ENV, TEST_SMS: '111-111-111' } }).runFlow('enter_otp');
+    const trace = await FlowEngine.run(cfg, fake, { ...FAST, env: { ...TEST_ENV, TEST_SMS: '111-111-111' } }, { flow: 'enter_otp' });
     expect(fake.typed).toEqual(['1', '1', '1', '1', '1', '1', '1', '1', '1']);
     expect(trace).toContainEqual({ action: 'type_pin', detail: '9 digits' });
   });
@@ -222,7 +225,7 @@ flows:
       }
       if (id === 'promo_close') self.current = 'dashboard';
     });
-    await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
+    await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' });
     expect(fake.taps).toContain('promo_close');
   });
 
@@ -250,7 +253,7 @@ flows:
       - optional:
           - tap: { id: promo_close }
 `);
-    await new FlowEngine(cfg, fake, FAST).runFlow('dismiss');
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'dismiss' });
     expect(fake.taps).toEqual(['promo_close']);
   });
 
@@ -272,7 +275,7 @@ flows:
       - optional:
           - tap: { id: promo_close }
 `);
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('dismiss');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'dismiss' });
     expect(fake.taps).toEqual([]);
     expect(reads).toBe(1);
     expect(trace.some((t) => t.action === 'optional' && t.detail?.includes('skipped'))).toBe(true);
@@ -309,11 +312,11 @@ flows:
 `);
 
     const overridden = lateFake();
-    await new FlowEngine(flow('{ id: promo_close, timeout: 2s }'), overridden, FAST).runFlow('dismiss');
+    await FlowEngine.run(flow('{ id: promo_close, timeout: 2s }'), overridden, FAST, { flow: 'dismiss' });
     expect(overridden.taps).toEqual(['promo_close']);
 
     const defaulted = lateFake();
-    const trace = await new FlowEngine(flow('{ id: promo_close }'), defaulted, FAST).runFlow('dismiss');
+    const trace = await FlowEngine.run(flow('{ id: promo_close }'), defaulted, FAST, { flow: 'dismiss' });
     expect(defaulted.taps).toEqual([]);
     expect(trace.some((t) => t.action === 'optional' && t.detail?.includes('skipped'))).toBe(true);
   });
@@ -331,7 +334,7 @@ flows:
     steps:
       - tap: { id: promo_close, timeout: 2s }
 `);
-    await new FlowEngine(cfg, fake, FAST).runFlow('slow');
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'slow' });
     expect(fake.taps).toEqual(['promo_close']);
   });
 });
@@ -367,7 +370,7 @@ flows:
     const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
       if (id === 'not_now') self.current = 'dashboard';
     });
-    const trace = await new FlowEngine(cfg, fake, FAST).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { state: 'logged_in' });
     expect(fake.taps).toEqual(['not_now']);
     expect(fake.launches).toEqual([]); // no clearState → no burned device registration
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after dismiss_prompt' });
@@ -375,8 +378,7 @@ flows:
 
   it('escalates to the next flow when the cheap one did not get there', async () => {
     const fake = new FakeAdapter(screens(), 'biometrics_prompt'); // tapping changes nothing
-    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
+    await expect(FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/Timed out/);
     // Twice: once as rung 1, once in the recovery pass after the final wait
     // timed out (see 'the ladder gets one recovery pass' below).
     expect(fake.taps).toEqual(['not_now', 'not_now']);
@@ -392,8 +394,7 @@ flows:
     // already-registered device" — only the config can — so the fix is to
     // announce the cost while a human watching the run can still interrupt.
     const fake = new FakeAdapter(screens(), 'biometrics_prompt');
-    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     const trace = (error as FlowError).trace;
     const warned = trace.findIndex((t) => t.detail?.includes('this rung is DESTRUCTIVE') === true);
     const wiped = trace.findIndex((t) => t.detail?.includes('app state wiped') === true);
@@ -409,7 +410,7 @@ flows:
     const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
       if (id === 'not_now') self.current = 'dashboard';
     });
-    const trace = await new FlowEngine(cfg, fake, FAST).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { state: 'logged_in' });
     expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
   });
 
@@ -459,7 +460,7 @@ flows:
       const fake = new FakeAdapter(screens2(), 'dashboard', (id, self) => {
         if (id === 'tab_payments') self.current = 'transfers';
       });
-      const trace = await new FlowEngine(cfg2, fake, FAST).ensureState('transfers');
+      const trace = await FlowEngine.run(cfg2, fake, FAST, { state: 'transfers' });
       expect(fake.launches).toEqual([]);
       expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
       expect(trace).toContainEqual({ action: 'state logged_in', detail: 'already active' });
@@ -470,8 +471,7 @@ flows:
       // nested ladder → `login`. The warning belongs to `login`, right before
       // its launch — not to `goto_transfers`, whose own steps are one tap.
       const fake = new FakeAdapter(screens2(), 'biometrics_prompt'); // tapping changes nothing
-      const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-      const error = await engine.ensureState('transfers').catch((e: unknown) => e);
+      const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'transfers' }).catch((e: unknown) => e);
       const trace = (error as FlowError).trace;
       const warnings = destructiveWarnings(trace);
       expect(warnings.map((t) => t.action)).toEqual(['⚠ reach login']);
@@ -500,7 +500,7 @@ flows:
         const fake = new FakeAdapter(screens3(), 'dashboard', (id, self) => {
           if (id === 'tab_payments') self.current = 'transfers';
         });
-        const trace = await new FlowEngine(cfg3, fake, FAST).runFlow('goto_swift');
+        const trace = await FlowEngine.run(cfg3, fake, FAST, { flow: 'goto_swift' });
         expect(fake.launches).toEqual([]);
         expect(trace.some((t) => t.detail?.includes('DESTRUCTIVE') === true)).toBe(false);
         expect(trace).toContainEqual({ action: 'state logged_in', detail: 'already active' });
@@ -508,8 +508,7 @@ flows:
 
       it('warns only on the login when logged out', async () => {
         const fake = new FakeAdapter(screens3(), 'biometrics_prompt'); // tapping changes nothing
-        const engine = new FlowEngine(cfg3, fake, { ...FAST, reachRecheckMs: 20 });
-        const error = await engine.runFlow('goto_swift').catch((e: unknown) => e);
+        const error = await FlowEngine.run(cfg3, fake, { ...FAST, reachRecheckMs: 20 }, { flow: 'goto_swift' }).catch((e: unknown) => e);
         const trace = (error as FlowError).trace;
         expect(destructiveWarnings(trace).map((t) => t.action)).toEqual(['⚠ reach login']);
       });
@@ -522,8 +521,7 @@ flows:
     // only works on the runs that did not need it.
     const noPrompt = { ...screens(), biometrics_prompt: screen(el({ role: 'text', identifier: 'something_else' })) };
     const fake = new FakeAdapter(noPrompt, 'biometrics_prompt');
-    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
+    await expect(FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/Timed out/);
     // it did not stop at the failed rung — login ran
     expect(fake.launches).toEqual([
       { appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined },
@@ -533,8 +531,7 @@ flows:
   it('does not swallow the failed rung — the trace names it and the escalation', async () => {
     const noPrompt = { ...screens(), biometrics_prompt: screen(el({ role: 'text', identifier: 'something_else' })) };
     const fake = new FakeAdapter(noPrompt, 'biometrics_prompt');
-    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     const entry = (error as FlowError).trace.find((t) => t.action.startsWith('\u26a0 reach'));
     expect(entry?.action).toBe('\u26a0 reach dismiss_prompt');
     expect(entry?.detail).toMatch(/failed, escalating to login — /);
@@ -563,7 +560,7 @@ flows:
     const fake = new FakeAdapter(screens(), 'biometrics_prompt', (id, self) => {
       if (id === 'not_now') self.current = 'dashboard';
     });
-    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(fake.launches).toEqual([]);
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after dismiss_prompt' });
   });
@@ -589,8 +586,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = new FakeAdapter(screens(), 'biometrics_prompt');
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Unknown credential "\$nonexistent"/);
+    await expect(FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/Unknown credential "\$nonexistent"/);
     expect(fake.launches).toEqual([]);
   });
 
@@ -613,8 +609,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = new FakeAdapter(screens(), 'biometrics_prompt');
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/AVERI_TEST_MISSING_VAR is not set/);
+    await expect(FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/AVERI_TEST_MISSING_VAR is not set/);
     expect(fake.launches).toEqual([]);
   });
 
@@ -630,7 +625,7 @@ flows:
         return orig();
       };
     });
-    const trace = await new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 200 }).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 200 }, { state: 'logged_in' });
     expect(fake.launches).toEqual([]);
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after dismiss_prompt' });
   });
@@ -680,7 +675,7 @@ flows:
 
   it('converges in ONE call, and the destructive rung still runs exactly once', async () => {
     const fake = lateInterstitial();
-    const trace = await new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(fake.launches).toHaveLength(1); // one wipe, not two
     expect(fake.taps).toEqual(['not_now']); // rung 1 re-ran, and only after the wait timed out
     expect(trace.at(-1)).toEqual({
@@ -711,8 +706,7 @@ flows:
       - optional: [ { tap: { id: never_there } } ]
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/waiting for state logged_in/);
     // no ↻ line: the only candidate was filtered out, so the pass had nothing
     // to run. Without the filter it would re-run login and wipe a second time.
@@ -751,13 +745,12 @@ flows:
       { home: screen(el({ identifier: 'app_root' }), el({ role: 'button', identifier: 'not_now' })) },
       'home',
     );
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/waiting for state logged_in/);
+    await expect(FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/waiting for state logged_in/);
     expect(fake.launches).toHaveLength(1); // ran as rung 1; the pass would not touch it
   });
 
   it('spends its single pass across nested requires, not once per state', async () => {
-    // `requires` nests ensureState inside a reach flow, so "at most once" has
+    // `requires` nests a state's ladder inside a reach flow, so "at most once" has
     // to mean once per tool call. The inner state consumes the pass; the outer
     // one must then fail without a second.
     const cfg2 = parseConfig(`
@@ -786,11 +779,56 @@ flows:
       { interstitial: screen(el({ role: 'button', identifier: 'not_now' })) },
       'interstitial',
     );
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     const passes = (error as FlowError).trace.filter((t) => t.action.startsWith('↻ recovery'));
     expect(passes).toHaveLength(1);
     expect(passes[0]?.action).toBe('↻ recovery gated'); // the inner one spent it
+  });
+
+  it('spends its single pass across a run\'s state AND flow — one per tool call, a verify leg included', async () => {
+    // 2026-10-07: a verify leg with a state and a flow is ONE run. Before,
+    // it called two entries, each with its own budget, so the flow's
+    // `requires` got a second pass after the state had spent the first.
+    const cfg2 = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [dismiss_prompt, login]
+  gated:
+    detect: { element: { id: never_there } }
+    reach: [poke, settle]
+flows:
+  dismiss_prompt:
+    steps:
+      - tap: { id: not_now }
+  login:
+    steps:
+      - launch: { clearState: true }
+  poke:
+    steps:
+      - optional: [ { tap: { id: not_now } } ]
+  settle:
+    steps:
+      - optional: [ { tap: { id: never_there } } ]
+  behind_gate:
+    requires: gated
+    steps:
+      - tap: { id: dashboard_root }
+`);
+    const fake = lateInterstitial();
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in', flow: 'behind_gate' })
+      .catch((e: unknown) => e);
+    const passes = (error as FlowError).trace.filter((t) => t.action.startsWith('↻ recovery'));
+    expect(passes.map((t) => t.action)).toEqual(['↻ recovery logged_in']); // the state spent it; gated gets none
+    expect((error as FlowError).message).toMatch(/waiting for state gated/);
+    // ...and the trace says so, rather than reading as `requires:` not getting recovery at all.
+    expect((error as FlowError).trace).toContainEqual({
+      action: '↻ no recovery gated',
+      detail: expect.stringMatching(/ — the run's one recovery pass was already spent on logged_in$/),
+    });
+    expect((error as FlowError).message).toContain("↻ no recovery gated: ");
   });
 
   it('honours destructive: true for a wipe a static walk cannot see', async () => {
@@ -811,8 +849,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
+    await expect(FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/Timed out/);
     expect(fake.taps).toEqual([]); // the interstitial was tappable; the flag kept us off it
   });
 
@@ -837,8 +874,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    await expect(engine.ensureState('logged_in')).rejects.toThrow(/Timed out/);
+    await expect(FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(/Timed out/);
     // prelude ran once as rung 1 (wiping via requires), and was not re-run
     expect(fake.launches).toHaveLength(2);
   });
@@ -852,8 +888,7 @@ flows:
       };
     };
     const fake = new FakeAdapter(screens(), 'stuck'); // tapping never gets home
-    const engine = new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/Timed out after \d+ms waiting for state logged_in/);
     const trace = (error as FlowError).trace;
     expect(trace.find((t) => t.action.startsWith('↻ recovery'))?.detail).toMatch(
@@ -885,9 +920,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = lateInterstitial();
-    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState(
-      'logged_in',
-    );
+    const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.find((t) => t.action === '⚠ recovery dismiss')?.detail).toMatch(/never_there/);
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after recovery dismiss' });
     expect(fake.launches).toHaveLength(1);
@@ -912,8 +945,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     // The headline is the real failure; the rung's own error is trace detail
     // (guard appends the whole trace to the message, so assert the first line).
     const headline = (error as Error).message.split('\n')[0];
@@ -939,8 +971,7 @@ flows:
       - launch: { clearState: true }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     const trace = (error as FlowError).trace;
     expect(trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false);
     expect(fake.launches).toHaveLength(1);
@@ -976,7 +1007,7 @@ flows:
     // the 0.5.0 review found proved nothing, because the throw path skipped
     // the pass entirely and it passed with the destructiveness filter deleted.
     const fake = lateInterstitial();
-    const trace = await new FlowEngine(cfg, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(fake.launches).toHaveLength(1); // one wipe, not two
     expect(fake.taps).toEqual(['not_now']); // rung 1 re-ran, after the last rung threw
     expect(trace.find((t) => t.action === '↻ recovery logged_in')?.detail).toMatch(
@@ -1017,7 +1048,7 @@ flows:
       await launch(appId, opts);
       fake.current = 'dashboard'; // the state IS reached when the trailing tap dies
     };
-    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.find((t) => t.action === '⚠ reach login')?.detail).toMatch(/never_there/);
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
   });
@@ -1065,7 +1096,7 @@ flows:
       await launch(appId, opts);
       fake.current = 'dashboard'; // reached, and then the rung dies on its next step
     };
-    const trace = await new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 }).ensureState('logged_in');
+    const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
     expect(fake.taps).toEqual([]); // nothing was touched on the live screen
     expect(trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false); // pass still unspent
@@ -1091,8 +1122,7 @@ flows:
       - type: { value: $nonexistent }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/Unknown credential "\$nonexistent"/);
     expect((error as FlowError).trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false);
   });
@@ -1117,8 +1147,7 @@ flows:
       - wait: { state: logged_in, timeout: 100ms }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/waiting for state logged_in/);
     const trace = (error as FlowError).trace;
     expect(trace.some((t) => t.action.startsWith('↻ recovery'))).toBe(false);
@@ -1145,8 +1174,7 @@ flows:
       - wait: { element: { id: nothing_like_this }, timeout: 100ms }
 `);
     const fake = lateInterstitial();
-    const engine = new FlowEngine(cfg2, fake, { ...FAST, reachRecheckMs: 20 });
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e);
     const headline = (error as Error).message.split('\n')[0];
     expect(headline).toMatch(/nothing_like_this/); // the last rung's own failure
     expect(headline).not.toMatch(/never_there/); // not the salvage's
@@ -1162,8 +1190,7 @@ describe('a failing flow carries its trace', () => {
     // of the finding: a timeout whose message alone says nothing about how far
     // the reach flow got.
     const fake = new FakeAdapter(buildScreens(), 'pin_login');
-    const engine = new FlowEngine(CONFIG, fake, FAST);
-    const error = await engine.ensureState('logged_in').catch((e: unknown) => e);
+    const error = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(FlowError);
     const { message, trace } = error as FlowError;
     expect(message).toMatch(/Timed out after \d+ms waiting for state logged_in/);
@@ -1175,7 +1202,7 @@ describe('a failing flow carries its trace', () => {
 
   it('redacts credentials in the attached trace, exactly as on the success path', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const error = await new FlowEngine(CONFIG, fake, FAST).runFlow('login').catch((e: unknown) => e);
+    const error = await FlowEngine.run(CONFIG, fake, FAST, { flow: 'login' }).catch((e: unknown) => e);
     expect((error as Error).message).not.toContain('hunter2secret');
     expect((error as Error).message).toContain('type: ***');
   });
@@ -1195,7 +1222,7 @@ flows:
       - launch: {}
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const error = await new FlowEngine(cfg, fake, FAST).runFlow('nope').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg, fake, FAST, { flow: 'nope' }).catch((e: unknown) => e);
     // the environment line WAS logged — the filter is what keeps it out
     expect((error as FlowError).trace).toEqual([
       { action: 'environment staging', detail: 'overrides: username' },
@@ -1220,8 +1247,8 @@ flows:
 
   it('warns on the wipe and counts them across the session', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const engine = new FlowEngine(cfg, fake, FAST);
-    const first = await engine.runFlow('cold');
+    const session = new EngineSession();
+    const first = await FlowEngine.run(cfg, fake, { ...FAST, session }, { flow: 'cold' });
     expect(first).toContainEqual({
       action: '\u26a0 clearState',
       detail:
@@ -1230,12 +1257,23 @@ flows:
     });
     // A second tool call is a fresh engine; the count is the SESSION's, which
     // is the only scale at which a finite resource can be budgeted.
-    const second = await new FlowEngine(cfg, fake, FAST).runFlow('cold');
+    const second = await FlowEngine.run(cfg, fake, { ...FAST, session }, { flow: 'cold' });
     expect(second.at(-2)?.detail).toContain('(2 this session)');
+    expect(session.clearStateCount).toBe(2);
+  });
+
+  // The count used to be a module global the engine tests zeroed by hand
+  // (2026-10-07): every engine continued whatever count the process had
+  // reached. Now the count is the session's, and two sessions share nothing.
+  it('two sessions count apart — nothing leaks from the runs of another', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'cold' });
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'cold' });
+    expect(trace.at(-2)?.detail).toContain('(1 this session)');
   });
 
   it('stays silent when the launch preserves state', async () => {
-    const trace = await new FlowEngine(cfg, new FakeAdapter(buildScreens(), 'dashboard'), FAST).runFlow('warm');
+    const trace = await FlowEngine.run(cfg, new FakeAdapter(buildScreens(), 'dashboard'), FAST, { flow: 'warm' });
     expect(trace.some((t) => t.action.includes('clearState'))).toBe(false);
   });
 });
@@ -1256,9 +1294,8 @@ flows:
           intent: { action: android.intent.action.SEND }
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const engine = new FlowEngine(cfg, fake, FAST);
-    const trace = await engine.runFlow('open');
-    await engine.runFlow('share_qr');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'share_qr' });
     expect(fake.launches).toEqual([
       { appId: 'md.bank.app', clearState: true, activity: '.MainActivity' },
       { appId: 'md.bank.app', activity: '.ShareActivity', intent: { action: 'android.intent.action.SEND' } },
@@ -1282,7 +1319,7 @@ flows:
           intent: { action: android.intent.action.SEND }
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('share');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'share' });
     expect(fake.launches).toEqual([{ appId: 'md.bank.app', intent: { action: 'android.intent.action.SEND' } }]);
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
   });
@@ -1326,14 +1363,14 @@ flows:
   it('a wait: keeps polling through reads that fail while the app has no window yet', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, 3);
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('smoke');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'smoke' });
     expect(trace).toContainEqual({ action: 'wait', detail: 'element id:"dashboard_root"' });
   });
 
   it('a persistent read failure still times out, and the message carries the underlying error', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, Number.POSITIVE_INFINITY);
-    await expect(new FlowEngine(cfg, fake, FAST).runFlow('smoke')).rejects.toThrow(
+    await expect(FlowEngine.run(cfg, fake, FAST, { flow: 'smoke' })).rejects.toThrow(
       /Timed out after 300ms[\s\S]*last UI tree read failed: uiautomator dump returned no XML/,
     );
   });
@@ -1341,7 +1378,7 @@ flows:
   it('ensure_state treats an unreadable detect probe as "not in state" and runs the reach flows', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, 1); // exactly the first probe fails — the cold-launch case
-    const trace = await new FlowEngine(cfg, fake, FAST).ensureState('home');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { state: 'home' });
     expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: false, activity: undefined, intent: undefined }]);
     expect(trace).toContainEqual({ action: 'state home', detail: 'reached after warm' });
   });
@@ -1352,7 +1389,7 @@ flows:
   it('a detect probe that cannot read the tree says so in the trace — the ladder still runs, the reason is no longer silent', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, Number.POSITIVE_INFINITY);
-    const error = await new FlowEngine(cfg, fake, FAST).ensureState('home').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg, fake, FAST, { state: 'home' }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(FlowError);
     expect((error as FlowError).trace).toContainEqual({
       action: '⚠ detect',
@@ -1363,7 +1400,7 @@ flows:
 
   it('a detect probe that reads fine and simply misses adds NO such line', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const error = await new FlowEngine(cfg, fake, FAST).ensureState('home').catch((e: unknown) => e);
+    const error = await FlowEngine.run(cfg, fake, FAST, { state: 'home' }).catch((e: unknown) => e);
     expect((error as FlowError).trace.some((t) => t.action === '⚠ detect')).toBe(false);
   });
 });
@@ -1371,7 +1408,7 @@ flows:
 describe('runFlow', () => {
   it('requires: runs ensureState first, then the flow steps', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    await new FlowEngine(CONFIG, fake, FAST).runFlow('goto_transfers');
+    await FlowEngine.run(CONFIG, fake, FAST, { flow: 'goto_transfers' });
     expect(fake.taps).toEqual(['tab_payments']);
   });
 });
@@ -1383,7 +1420,7 @@ describe('secrets', () => {
       if (id === 'login_submit') self.current = 'pin_setup';
       if (id.startsWith('setup_key_') && (entered += 'x').length === 8) self.current = 'dashboard';
     });
-    const trace = await new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in');
+    const trace = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' });
     const dump = JSON.stringify(trace);
     expect(dump).not.toContain('alice@bank.md');
     expect(dump).not.toContain('hunter2secret');
@@ -1397,16 +1434,16 @@ describe('secrets', () => {
       if (id === 'login_submit') self.current = 'pin_setup';
       // PIN setup never completes → wait for logged_in times out after typing secrets
     });
-    await expect(new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in'))
+    await expect(FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' }))
       .rejects.toThrow(/Timed out/);
     // and the message must not contain any secret
-    await expect(new FlowEngine(CONFIG, fake, FAST).ensureState('logged_in'))
+    await expect(FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' }))
       .rejects.not.toThrow(/hunter2secret/);
   });
 
   it('missing env var error names the variable and the credential', async () => {
     const fake = new FakeAdapter(buildScreens(), 'pin_login');
-    await expect(new FlowEngine(CONFIG, fake, { ...FAST, env: envWithout('TEST_PIN') }).ensureState('logged_in'))
+    await expect(FlowEngine.run(CONFIG, fake, { ...FAST, env: envWithout('TEST_PIN') }, { state: 'logged_in' }))
       .rejects.toThrow(/TEST_PIN is not set \(needed for credential "pin"\)/);
   });
 });
@@ -1421,7 +1458,7 @@ flows:
       - swipe: { direction: down, times: 2 }
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    await new FlowEngine(cfg, fake, FAST).runFlow('scroll_up');
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'scroll_up' });
     expect(fake.swipes).toHaveLength(2);
     const { from, to } = fake.swipes[0];
     expect(from.x).toBe(to.x); // vertical gesture
@@ -1448,7 +1485,7 @@ flows:
     steps:
       - tap: { id: dup }
 `);
-    const trace = await new FlowEngine(c, fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(c, fake, FAST, { flow: 'f' });
     expect(points).toEqual([{ x: 50, y: first.rect.y + 5 }]); // the first button's centre, not the second's
     expect(trace).toContainEqual({ action: 'tap', detail: 'id:"dup"' }); // byte-identical to a one-match tap
   });
@@ -1470,7 +1507,7 @@ flows:
       }
     }
     const fake = new AnimatedFake({ dashboard: dash }, 'dashboard');
-    await new FlowEngine(CONFIG, fake, FAST).runFlow('goto_transfers');
+    await FlowEngine.run(CONFIG, fake, FAST, { flow: 'goto_transfers' });
     // tapped exactly once, at the settled position
     expect(fake.taps).toEqual(['tab_payments']);
     expect(poll).toBeGreaterThanOrEqual(4); // needed at least two identical polls after moving
@@ -1506,7 +1543,7 @@ flows:
 
   it('swipes until the element intersects the viewport', async () => {
     const fake = scrollingFake(3100); // needs 2 swipes to get under y=2000
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
     expect(fake.swipes).toHaveLength(2);
     // content below → finger moves up
     expect(fake.swipes[0].to.y).toBeLessThan(fake.swipes[0].from.y);
@@ -1518,7 +1555,7 @@ flows:
 
   it('passes with 0 swipes when the element is already visible (fast path)', async () => {
     const fake = scrollingFake(500);
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
     expect(fake.swipes).toHaveLength(0);
     expect(trace).toContainEqual({
       action: 'scroll_until',
@@ -1542,7 +1579,7 @@ flows:
   it('reports the CLIPPED fraction instead of a bare "visible" when the element straddles an edge', async () => {
     // 40px tall, stopping at y=1980 in a 1000x2000 viewport → half of it below the fold.
     const fake = scrollingFake(2580);
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
     const row = trace.find((t) => t.action.endsWith('scroll_until'));
     expect(row?.detail).toContain('CLIPPED at bottom');
     expect(row?.detail).toContain('50% of it is in the viewport');
@@ -1554,7 +1591,7 @@ flows:
 
   it('fully: true keeps swiping past a clipped stop until the element is entirely inside', async () => {
     const fake = scrollingFake(2580);
-    const trace = await new FlowEngine(cfgFully, fake, FAST).runFlow('to_submit');
+    const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });
     expect(fake.swipes).toHaveLength(2); // the default would have stopped at 1
     expect(trace).toContainEqual({
       action: 'scroll_until',
@@ -1567,10 +1604,10 @@ flows:
     // No amount of swiping can reveal the last row, so more swipes is the wrong
     // diagnosis and the message must say which one is right.
     const fake = scrollingFake(1980, 0); // clipped at bottom, swipes move nothing
-    await expect(new FlowEngine(cfgFully, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+    await expect(FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
       /CLIPPED at bottom, 50% of it is in the viewport, and the content is exhausted/,
     );
-    await expect(new FlowEngine(cfgFully, scrollingFake(1980, 0), FAST).runFlow('to_submit')).rejects.toThrow(
+    await expect(FlowEngine.run(cfgFully, scrollingFake(1980, 0), FAST, { flow: 'to_submit' })).rejects.toThrow(
       /cannot be fully revealed — that is a layout defect/,
     );
   });
@@ -1585,7 +1622,7 @@ flows:
     // element tops out at 97.5% and would pass this test with the clamp
     // deleted — a pin that cannot fail cannot distinguish itself from no check.
     const fake = scrollingFake(1601, 600, 400); // 399 of 400 px inside → 99.75%
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('to_submit');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
     const row = trace.find((t) => t.action.endsWith('scroll_until'));
     expect(row?.detail).toContain('CLIPPED at bottom');
     expect(row?.detail).toContain('99% of it is in the viewport');
@@ -1594,14 +1631,14 @@ flows:
 
   it('the NEGATIVE half: a genuinely off-screen element still fails as before', async () => {
     const fake = scrollingFake(50_000, 10);
-    await expect(new FlowEngine(cfgFully, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+    await expect(FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
       /never intersected the 1000x2000 viewport/,
     );
   });
 
   it('fails after maxSwipes with a diagnosis of the last tree', async () => {
     const fake = scrollingFake(50_000, 10); // never gets there in 4 swipes
-    await expect(new FlowEngine(cfg, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+    await expect(FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
       /scroll_until id:"submit_button" failed after 4 swipes \(maxSwipes\) — element in tree but never intersected/,
     );
   });
@@ -1609,7 +1646,7 @@ flows:
   it('reports when the element never appeared at all', async () => {
     resetLayout();
     const fake = new FakeAdapter({ form: screen(el({ identifier: 'form_root' })) }, 'form');
-    await expect(new FlowEngine(cfg, fake, FAST).runFlow('to_submit')).rejects.toThrow(
+    await expect(FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
       /element never appeared in the tree/,
     );
   });
@@ -1639,7 +1676,7 @@ flows:
 
   it('taps the field then types; no clearing by default (pre-filled login fields must survive)', async () => {
     const fake = formFake('9.99');
-    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "2.50" }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfg('{ id: amount_input, value: "2.50" }'), fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([]);
     expect(fake.typed).toEqual(['2.50']);
@@ -1648,7 +1685,7 @@ flows:
 
   it('clear: true through YAML wipes the pre-filled value before typing, and the trace says (cleared)', async () => {
     const fake = formFake('2.50');
-    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST, { flow: 'f' });
     expect(fake.deletes).toEqual([4]); // "2.50".length — the step's `clear` reached the fill
     expect(fake.typed).toEqual(['7']);
     expect(fake.focused?.value).toBe('7');
@@ -1659,7 +1696,7 @@ flows:
     const fake = formFake();
     const started = Date.now();
     await expect(
-      new FlowEngine(cfg('{ id: nope, value: "1" }'), fake, { ...FAST, tapTimeoutMs: 120 }).runFlow('f'),
+      FlowEngine.run(cfg('{ id: nope, value: "1" }'), fake, { ...FAST, tapTimeoutMs: 120 }, { flow: 'f' }),
     ).rejects.toThrow(/Timed out after 120ms waiting for element id:"nope" \(visible and settled\)/);
     expect(Date.now() - started).toBeLessThan(FAST.waitTimeoutMs); // not some other budget
     expect(fake.taps).toEqual([]);
@@ -1678,11 +1715,9 @@ flows:
       order.push(`key:${k}`);
     };
 
-    await new FlowEngine(
-      cfg('{ id: amount_input, value: "2.50", dismissKeyboard: true }'),
+    await FlowEngine.run(cfg('{ id: amount_input, value: "2.50", dismissKeyboard: true }'),
       fake,
-      FAST,
-    ).runFlow('f');
+      FAST, { flow: 'f' });
 
     // Dismissing first would close the keyboard the typing needs.
     expect(order).toEqual(['type:2.50', 'key:back']);
@@ -1704,7 +1739,7 @@ flows:
     // fill (finportal 2026-09-17: the backend said invalid_grant). The trace says it.
     const fake = formFake('•'.repeat(20));
     appendBullets(fake);
-    const trace = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfg('{ id: amount_input, value: "hunter2-password" }'), fake, FAST, { flow: 'f' });
     expect(fake.focused?.value).toHaveLength(36);
     expect(trace).toContainEqual({
       action: '⚠ fill',
@@ -1722,7 +1757,7 @@ flows:
       fake.typed.push(text); // nothing lands
     };
     await expect(
-      new FlowEngine(cfg('{ id: amount_input, value: "12.34", dismissKeyboard: true }'), fake, FAST).runFlow('f'),
+      FlowEngine.run(cfg('{ id: amount_input, value: "12.34", dismissKeyboard: true }'), fake, FAST, { flow: 'f' }),
     ).rejects.toThrow(/typed 5 characters/);
     expect(keys).toEqual([]);
   });
@@ -1734,8 +1769,7 @@ flows:
     fake.pressKey = async () => {
       throw new Error('idb ui key: timed out');
     };
-    const error = await new FlowEngine(cfg('{ id: amount_input, value: "hunter2-password", dismissKeyboard: true }'), fake, FAST)
-      .runFlow('f')
+    const error = await FlowEngine.run(cfg('{ id: amount_input, value: "hunter2-password", dismissKeyboard: true }'), fake, FAST, { flow: 'f' })
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(FlowError);
     const { trace } = error as FlowError;
@@ -1751,7 +1785,7 @@ flows:
       fake.typed.push(text);
     };
     await expect(
-      new FlowEngine(cfg('{ id: amount_input, value: "12.34" }'), fake, FAST).runFlow('f'),
+      FlowEngine.run(cfg('{ id: amount_input, value: "12.34" }'), fake, FAST, { flow: 'f' }),
     ).rejects.toThrow(/✗ fill id:"amount_input".*failed — fill: typed 5 characters/s);
   });
 
@@ -1770,7 +1804,7 @@ flows:
             do:
               - fill: { id: amount_input, value: "12.34" }
 `);
-    const err = await new FlowEngine(c, fake, FAST).runFlow('f').then(() => undefined, (e: Error) => e);
+    const err = await FlowEngine.run(c, fake, FAST, { flow: 'f' }).then(() => undefined, (e: Error) => e);
     const crosses = (err?.message ?? '').split('\n').filter((l) => l.includes('✗'));
     expect(crosses).toHaveLength(1);
     expect(crosses[0]).toContain('✗ fill id:"amount_input"');
@@ -1792,7 +1826,7 @@ flows:
                 do:
                   - fill: { id: amount_input, value: "12.34" }
 `);
-    const trace = await new FlowEngine(c, fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(c, fake, FAST, { flow: 'f' });
     expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
     expect(trace).toContainEqual({ action: 'optional', detail: 'skipped step (not present)' });
   });
@@ -1822,6 +1856,19 @@ flows:
     }
   });
 
+  it('a type: step holding a control character is refused before anything is typed (interact/type-text.ts)', async () => {
+    const c = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - type: { value: "a\\nb" }
+`);
+    const fake = formFake();
+    await expect(FlowEngine.run(c, fake, FAST, { flow: 'f' })).rejects.toThrow('cannot type U+000A');
+    expect(fake.typed).toEqual([]);
+  });
+
   it('redacts credential values in the fill trace', async () => {
     const cfgSecret = parseConfig(`
 app: { android: { package: md.bank.app } }
@@ -1833,7 +1880,7 @@ flows:
       - fill: { id: amount_input, value: $pin }
 `);
     const fake = formFake();
-    const trace = await new FlowEngine(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '4321' } }).runFlow('f');
+    const trace = await FlowEngine.run(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '4321' } }, { flow: 'f' });
     expect(JSON.stringify(trace)).not.toContain('4321');
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = ***' });
   });
@@ -1855,7 +1902,7 @@ flows:
       - fill: { id: amount_input, value: $pin, clear: true }
 `);
     const fake = formFake();
-    await expect(new FlowEngine(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '' } }).runFlow('f')).rejects.toThrow(
+    await expect(FlowEngine.run(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '' } }, { flow: 'f' })).rejects.toThrow(
       /TEST_PIN is set but empty \(needed for credential "pin"\)/,
     );
     expect(fake.taps).toEqual([]);
@@ -1871,7 +1918,7 @@ flows:
       - fill: { id: amount_input, value: "", clear: true }
 `);
     const fake = formFake('9.99');
-    const trace = await new FlowEngine(cfgLiteral, fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfgLiteral, fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([4]); // "9.99".length
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" =  (cleared)' });
@@ -1891,14 +1938,14 @@ ${assert}
 
   it('passing asserts are logged in the trace and the flow continues', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const trace = await new FlowEngine(cfg('          - { element: { id: dashboard_root } }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfg('          - { element: { id: dashboard_root } }'), fake, FAST, { flow: 'f' });
     expect(trace).toContainEqual({ action: 'assert PASS', detail: 'element id:"dashboard_root" exists' });
   });
 
   it('a failing assert fails the FLOW with the diff in the error', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     await expect(
-      new FlowEngine(cfg('          - { element: { text: "No such text" } }'), fake, FAST).runFlow('f'),
+      FlowEngine.run(cfg('          - { element: { text: "No such text" } }'), fake, FAST, { flow: 'f' }),
     ).rejects.toThrow(/1\/1 flow asserts failed:[\s\S]*FAIL.*No such text/);
   });
 });
@@ -1933,18 +1980,18 @@ states:
   }
 
   it('matches when the discriminator element is gone', async () => {
-    const trace = await new FlowEngine(cfg, fakeOn('transactions'), FAST).ensureState('transactions_only');
+    const trace = await FlowEngine.run(cfg, fakeOn('transactions'), FAST, { state: 'transactions_only' });
     expect(trace).toEqual([{ action: 'state transactions_only', detail: 'already active' }]);
   });
 
   it('does not match while the discriminator is visible', async () => {
-    await expect(new FlowEngine(cfg, fakeOn('cards'), FAST).ensureState('transactions_only')).rejects.toThrow(
+    await expect(FlowEngine.run(cfg, fakeOn('cards'), FAST, { state: 'transactions_only' })).rejects.toThrow(
       /no reach flows/,
     );
   });
 
   it('treats an off-viewport node as absent (portable across the platform tree semantics)', async () => {
-    const trace = await new FlowEngine(cfg, fakeOn('cards_offscreen'), FAST).ensureState('transactions_only');
+    const trace = await FlowEngine.run(cfg, fakeOn('cards_offscreen'), FAST, { state: 'transactions_only' });
     expect(trace).toEqual([{ action: 'state transactions_only', detail: 'already active' }]);
   });
 });
@@ -1953,15 +2000,64 @@ describe('failure modes', () => {
   it('branch with no matching arm times out with the tried conditions', async () => {
     resetLayout();
     const fake = new FakeAdapter({ blank: screen(el({ role: 'text', identifier: 'something_else' })) }, 'blank');
-    await expect(new FlowEngine(CONFIG, fake, FAST).runFlow('login'))
+    await expect(FlowEngine.run(CONFIG, fake, FAST, { flow: 'login' }))
       .rejects.toThrow(/any branch condition.*pin_keyboard.*username_field/);
   });
 
   it('unknown state and flow names produce helpful errors', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
-    const engine = new FlowEngine(CONFIG, fake, FAST);
-    await expect(engine.ensureState('nirvana')).rejects.toThrow(/Unknown state "nirvana" — known: logged_in/);
-    await expect(engine.runFlow('fly')).rejects.toThrow(/Unknown flow "fly" — known: login, goto_transfers/);
+    await expect(FlowEngine.run(CONFIG, fake, FAST, { state: 'nirvana' })).rejects.toThrow(
+      /Unknown state "nirvana" — known: logged_in/,
+    );
+    await expect(FlowEngine.run(CONFIG, fake, FAST, { flow: 'fly' })).rejects.toThrow(
+      /Unknown flow "fly" — known: login, goto_transfers/,
+    );
+  });
+});
+
+/**
+ * One tool call = one engine run (2026-10-07, flow-engine review candidate 1).
+ * The engine had two entries that each reset the trace, and `verify` called
+ * both on one instance; now a run names a state, a flow or both, and owns one
+ * trace for all of it.
+ */
+describe('run — the one entry', () => {
+  it('a state and a flow in one run: a failing flow\'s FlowError carries the state\'s lines too', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const err = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in', flow: 'fly' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(FlowError);
+    expect((err as FlowError).trace).toContainEqual({ action: 'state logged_in', detail: 'already active' });
+    expect((err as FlowError).message).toContain('Steps that ran before the failure:\nstate logged_in: already active');
+  });
+
+  it('runRequestOf: the request two optional names make — an empty one is none', () => {
+    expect(runRequestOf('home', 'pay')).toEqual({ state: 'home', flow: 'pay' });
+    expect(runRequestOf('home', undefined)).toEqual({ state: 'home', flow: undefined });
+    expect(runRequestOf('', 'pay')).toEqual({ flow: 'pay' });
+    expect(runRequestOf(undefined, '')).toBeUndefined();
+    expect(runRequestOf()).toBeUndefined();
+  });
+
+  it('the state runs before the flow', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const trace = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in', flow: 'goto_transfers' });
+    expect(trace[0]).toEqual({ action: 'state logged_in', detail: 'already active' });
+    expect(trace.at(-1)?.action).toBe('flow goto_transfers');
+  });
+
+  // Two shapes, not two runtime checks: the constructor is private, so the
+  // static `run` is the only way in and an engine cannot be run twice; and a
+  // request must name a state or a flow. `npm run lint` type-checks this file,
+  // so each @ts-expect-error fails the build the day its rule loosens.
+  it('the engine is only reachable through one run, and a run must name something', () => {
+    // @ts-expect-error — a request must name a state, a flow, or both
+    const nothing: RunRequest = {};
+    // @ts-expect-error — a run must be handed its session: an omitted one silently reset the count per call
+    const sessionless: EngineOptions = { env: {} };
+    // @ts-expect-error — the constructor is private: build-and-keep is not a shape the engine offers
+    const kept = (cfg: AveriConfig, a: FakeAdapter) => new FlowEngine(cfg, a, FAST);
+    expect([nothing, sessionless, typeof kept]).toEqual([{}, { env: {} }, 'function']);
   });
 });
 
@@ -1999,7 +2095,7 @@ flows:
 
   it('types the selected environment’s username and the shared password', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow('type_username');
+    await FlowEngine.run(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }, { flow: 'type_username' });
     // username from the environment, password inherited from base credentials
     expect(fake.typed).toEqual(['starter.user', 'hunter2secret']);
   });
@@ -2007,15 +2103,13 @@ flows:
   it('switching environment switches the username without touching averi.yaml', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
     // AVERI_ENV comes from the same environment value (.env.averi can set it), not from the process
-    await new FlowEngine(MULTI_ENV, fake, { ...MULTI, env: { ...ENV_USERS, AVERI_ENV: 'alfons_dev' } }).runFlow('type_username');
+    await FlowEngine.run(MULTI_ENV, fake, { ...MULTI, env: { ...ENV_USERS, AVERI_ENV: 'alfons_dev' } }, { flow: 'type_username' });
     expect(fake.typed[0]).toBe('martha.key');
   });
 
   it('names the active environment in the trace so a mix-up is visible', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const trace = await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow(
-      'type_username',
-    );
+    const trace = await FlowEngine.run(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }, { flow: 'type_username' });
     expect(trace[0]).toEqual({ action: 'environment starterkit', detail: 'overrides: username' });
   });
 
@@ -2024,21 +2118,19 @@ flows:
     // Credentials.overriddenNames since 2026-10-05; the wording must not move).
     const cfg = { ...MULTI_ENV, environments: { ...MULTI_ENV.environments, mirror: { credentials: {} } } };
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const trace = await new FlowEngine(cfg, fake, { ...MULTI, environment: 'mirror' }).runFlow('type_username');
+    const trace = await FlowEngine.run(cfg, fake, { ...MULTI, environment: 'mirror' }, { flow: 'type_username' });
     expect(trace[0]).toEqual({ action: 'environment mirror' });
   });
 
   it('keeps environment usernames redacted from the trace', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    const trace = await new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }).runFlow(
-      'type_username',
-    );
+    const trace = await FlowEngine.run(MULTI_ENV, fake, { ...MULTI, environment: 'starterkit' }, { flow: 'type_username' });
     expect(JSON.stringify(trace)).not.toContain('starter.user');
   });
 
-  it('refuses an unknown environment at construction — before any step (the run layer refuses it before any device)', () => {
+  it('refuses an unknown environment at construction — before any step (the run layer refuses it before any device)', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
-    expect(() => new FlowEngine(MULTI_ENV, fake, { ...MULTI, environment: 'nope' })).toThrow(
+    await expect(FlowEngine.run(MULTI_ENV, fake, { ...MULTI, environment: 'nope' }, { flow: 'type_username' })).rejects.toThrow(
       /Unknown environment "nope"/,
     );
     expect(fake.taps).toEqual([]);
@@ -2048,7 +2140,7 @@ flows:
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
     const { TEST_STARTERKIT_USER: _unset, ...withoutStarterkit } = ENV_USERS;
     await expect(
-      new FlowEngine(MULTI_ENV, fake, { ...MULTI, env: withoutStarterkit, environment: 'starterkit' }).runFlow('type_username'),
+      FlowEngine.run(MULTI_ENV, fake, { ...MULTI, env: withoutStarterkit, environment: 'starterkit' }, { flow: 'type_username' }),
     ).rejects.toThrow(/TEST_STARTERKIT_USER is not set .*environment "starterkit"/);
   });
 });
@@ -2074,7 +2166,7 @@ flows:
       { both: screen(el({ identifier: 'pin_keyboard' }), el({ identifier: 'username_field' })) },
       'both',
     );
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['pin_keyboard']);
     expect(trace).toContainEqual({ action: 'branch', detail: 'matched element id:"pin_keyboard"' });
   });
@@ -2082,7 +2174,7 @@ flows:
   it('falls through to a later arm when the earlier condition does not hold', async () => {
     resetLayout();
     const fake = new FakeAdapter({ fresh: screen(el({ identifier: 'username_field' })) }, 'fresh');
-    await new FlowEngine(cfg, fake, FAST).runFlow('f');
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['username_field']);
   });
 });
@@ -2126,7 +2218,7 @@ flows:
   it('a tap: under the keyboard logs ONE ⚠ tap line before the tap line, and taps the re-resolved point', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
-    const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(trace).toEqual([
       { action: 'flow f', detail: 'start' },
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; hidden before tapping' },
@@ -2144,7 +2236,7 @@ flows:
   ])('a tap: that meets no keyboard traces exactly what it always did — keyboard %s', async (_name, keyboard) => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = keyboard;
-    const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(JSON.stringify(trace)).toBe('[{"action":"flow f","detail":"start"},{"action":"tap","detail":"id:\\"login_submit\\""},{"action":"flow f","detail":"done"}]');
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
@@ -2153,7 +2245,7 @@ flows:
   it('a fill: whose field lies under the keyboard logs ONE ⚠ fill line before the fill line', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
-    const trace = await new FlowEngine(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST, { flow: 'f' });
     expect(trace).toEqual([
       { action: 'flow f', detail: 'start' },
       { action: '⚠ fill', detail: 'the soft keyboard covered id:"login_otp"; hidden before tapping' },
@@ -2168,7 +2260,7 @@ flows:
   it('a fill: clear of the keyboard traces the one fill line, as before', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
-    const trace = await new FlowEngine(flow('fill: { id: login_password, value: "123456" }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('fill: { id: login_password, value: "123456" }'), fake, FAST, { flow: 'f' });
     expect(JSON.stringify(trace)).toBe('[{"action":"flow f","detail":"start"},{"action":"fill","detail":"id:\\"login_password\\" = 123456"},{"action":"flow f","detail":"done"}]');
     expect(fake.keys).toEqual([]);
   });
@@ -2179,7 +2271,7 @@ flows:
     fake.onKey = (_key, self) => {
       self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
-    const error = (await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.message).toMatch(/Pressed back to hide the soft keyboard covering id:"login_submit", but back did not close it/);
     expect(error.message).toMatch(
       /In a flow: no step can recover this — the screen keeps a keyboard that back does not close over id:"login_submit" — fix the screen \(or the test data\) so the target is not under the keyboard$/,
@@ -2196,7 +2288,7 @@ flows:
     raced.backTo = 'previous';
     raced.attachKeyboard({ state: 'unknown' }, 'shown'); // the input method agrees, wrongly: nothing could have vetoed this back
     raced.attachedKeyboard.state = async () => ({ state: 'shown', frame: KEYBOARD }); // the adapter saw one; none is up when back lands
-    const error = (await new FlowEngine(flow('tap: { id: login_submit }'), raced, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('tap: { id: login_submit }'), raced, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(raced.current).toBe('previous');
     expect(error.trace.slice(1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; back pressed' },
@@ -2215,7 +2307,7 @@ flows:
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'hidden';
     fake.attachedKeyboard.windowAnswers.queue = [{ state: 'shown', frame: KEYBOARD }, { state: 'shown', frame: KEYBOARD }, { state: 'hidden' }];
-    const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1)).toEqual([
       {
         action: '⚠ tap',
@@ -2231,7 +2323,7 @@ flows:
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'hidden';
-    const error = (await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1)).toEqual([
       { action: '⚠ tap', detail: 'the window state reported a soft keyboard over id:"login_submit" that the input method denied; nothing sent' },
       {
@@ -2254,7 +2346,7 @@ flows:
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'hidden';
-    const error = (await new FlowEngine(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ fill', expect.stringMatching(/^✗ fill/)]);
     expect(error.trace[1].detail).toBe('the window state reported a soft keyboard over id:"login_otp" that the input method denied; nothing sent');
     expect(fake.typed).toEqual([]);
@@ -2264,7 +2356,7 @@ flows:
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'hidden';
-    const trace = await new FlowEngine(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1).map((t) => t.action)).toEqual(['⚠ tap', 'optional']);
     expect(trace[2].detail).toMatch(/^skipped id:"login_submit" \(The window state reports a soft keyboard over id:"login_submit" — .* no flow step waits on the keyboard itself\)$/);
     expect(fake.keys).toEqual([]);
@@ -2275,7 +2367,7 @@ flows:
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'shown';
-    const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(JSON.stringify(trace.slice(1, -1))).toBe(
       '[{"action":"⚠ tap","detail":"the soft keyboard covered id:\\"login_submit\\"; hidden before tapping"},{"action":"tap","detail":"id:\\"login_submit\\""}]',
     );
@@ -2286,7 +2378,7 @@ flows:
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: { ...KEYBOARD, y: 1900, height: 320 } }; // not over the field: the fill itself meets no keyboard
     fake.attachedKeyboard.witnessAnswers.current = 'hidden';
-    await new FlowEngine(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST).runFlow('f');
+    await FlowEngine.run(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
     expect(fake.keys).toEqual([]);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
   });
@@ -2294,7 +2386,7 @@ flows:
   it('a tap: that fails with NO dismissal (the element is simply not there) gets no ⚠ tap line — only its ✗', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
-    const error = (await new FlowEngine(flow('tap: { id: nope }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('tap: { id: nope }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['✗ tap id:"nope"']);
     expect(fake.keys).toEqual([]);
   });
@@ -2305,7 +2397,7 @@ flows:
     fake.onKey = (_key, self) => {
       self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
-    const error = (await new FlowEngine(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('fill: { id: login_otp, value: "123456" }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ fill', expect.stringMatching(/^✗ fill/)]);
     expect(error.trace[1].detail).toBe('the soft keyboard covered id:"login_otp"; back pressed');
     expect(fake.typed).toEqual([]);
@@ -2317,7 +2409,7 @@ flows:
     fake.onKey = (_key, self) => {
       self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     };
-    const trace = await new FlowEngine(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; back pressed' },
       {
@@ -2336,7 +2428,7 @@ flows:
   it('an optional: tap on a genuinely absent element still reads "(not present)", byte for byte', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
-    const trace = await new FlowEngine(flow('optional: [ { tap: { id: promo_close } } ]'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: promo_close } } ]'), fake, FAST, { flow: 'f' });
     expect(JSON.stringify(trace.slice(1, -1))).toBe('[{"action":"optional","detail":"skipped id:\\"promo_close\\" (not present)"}]');
     expect(fake.keys).toEqual([]);
   });
@@ -2356,7 +2448,7 @@ flows:
     steps:
       - type_pin: { value: $pin, keypad: { id_pattern: "pin_key_{digit}" } }
 `);
-    const trace = await new FlowEngine(cfg, fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"pin_key_1"; hidden before tapping' },
       { action: 'type_pin', detail: '4 digits' },
@@ -2374,7 +2466,7 @@ flows:
       move(key, self);
       self.attachedKeyboard.windowAnswers.current = { state: 'unknown' };
     };
-    const trace = await new FlowEngine(flow('tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; back pressed; the keyboard\'s state afterwards could not be read' },
       { action: 'tap', detail: 'id:"login_submit"' },
@@ -2384,7 +2476,7 @@ flows:
   it('fill … dismissKeyboard: true does NOT press back when the adapter says no keyboard is up (it would navigate away)', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'hidden' };
-    await new FlowEngine(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST).runFlow('f');
+    await FlowEngine.run(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
     expect(fake.keys).toEqual([]);
   });
 });
@@ -2414,7 +2506,7 @@ flows:
   };
   /** The failure's message — the headline, any hint beneath it, then the trace the FlowError appends. */
   const failure = async (cfg: ReturnType<typeof parseConfig>, fake: FakeAdapter): Promise<string> => {
-    const error = await new FlowEngine(cfg, fake, FAST).runFlow('f').then(
+    const error = await FlowEngine.run(cfg, fake, FAST, { flow: 'f' }).then(
       () => undefined,
       (e: unknown) => e,
     );
@@ -2530,7 +2622,7 @@ ${steps}
 
   it('the measured bug as a flow: fill, fill, tap login_submit → the tap step fails with the refusal, ⚠ tap then ✗ tap, nothing tapped or pressed', async () => {
     const fake = iosFake();
-    const error = (await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('      - tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error).toBeInstanceOf(FlowError);
     expect(error.message).toMatch(/^The soft keyboard covers id:"login_submit": the band it draws over \[0,539\]\[402,874\] contains the tap point \(107,571\)/);
     expect(error.message).toMatch(/on two looks 300ms apart; this adapter cannot hide it on its own \(ADVICE\), and no dismissal is configured\. Nothing was tapped/);
@@ -2545,14 +2637,14 @@ ${steps}
 
   it('the workaround the message names: a tap: on the title first — a target clear of the band traces exactly what it always did', async () => {
     const fake = iosFake();
-    const trace = await new FlowEngine(flow('      - tap: { id: login_title }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('      - tap: { id: login_title }'), fake, FAST, { flow: 'f' });
     expect(JSON.stringify(trace)).toBe('[{"action":"flow f","detail":"start"},{"action":"tap","detail":"id:\\"login_title\\""},{"action":"flow f","detail":"done"}]');
     expect(fake.tapPoints).toEqual([{ x: 201, y: 303 }]);
   });
 
   it('no band in the tree (keyboard parked or absent, or an idb tree): the tap lands as before 2026-10-07, no ⚠ line', async () => {
     const fake = iosFake(false);
-    const trace = await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('      - tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(trace.map((t) => t.action)).toEqual(['flow f', 'tap', 'flow f']);
     expect(fake.tapPoints).toEqual([{ x: 107, y: 571 }]);
   });
@@ -2560,7 +2652,7 @@ ${steps}
   it('a fill: whose field lies under the band is refused the same way — ⚠ fill, ✗ fill, nothing typed', async () => {
     const fake = iosFake();
     fake.live().children[1].rect = { x: 90, y: 600, width: 222, height: 20 };
-    const error = (await new FlowEngine(flow('      - fill: { id: login_password, value: secret }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('      - fill: { id: login_password, value: secret }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ fill', expect.stringMatching(/^✗ fill/)]);
     expect(error.trace[1].detail).toBe('the soft keyboard covered id:"login_password"; no dismissal, nothing sent');
     expect(fake.typed).toEqual([]);
@@ -2575,7 +2667,7 @@ ${steps}
       if (++reads === 3) fake.live().children = fake.live().children.filter((c) => c.identifier !== 'login_submit');
       return real();
     };
-    const error = (await new FlowEngine(flow('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+    const error = (await FlowEngine.run(flow('      - tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; nothing sent, and the second look failed' },
       { action: '✗ tap id:"login_submit"', detail: expect.stringMatching(/^failed — After the soft keyboard covered id:"login_submit" at \(107,571\) on a first look, the second look failed: Timed out/) },
@@ -2585,7 +2677,7 @@ ${steps}
 
   it('an optional: tap under the band is skipped quoting the refusal, not "not present", after its ⚠ tap line', async () => {
     const fake = iosFake();
-    const trace = await new FlowEngine(flow('      - optional:\n          - tap: { id: login_submit }'), fake, FAST).runFlow('f');
+    const trace = await FlowEngine.run(flow('      - optional:\n          - tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1)).toEqual([
       { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
       { action: 'optional', detail: expect.stringMatching(/^skipped id:"login_submit" \(The soft keyboard covers id:"login_submit"/) },
@@ -2617,7 +2709,7 @@ ${steps}
 
     it('a tap: under the band: the title tapped first, then the target — ONE ⚠ tap line naming the strategy, before the tap line', async () => {
       const fake = hidingFake();
-      const trace = await new FlowEngine(configured('      - tap: { id: login_submit }'), fake, FAST).runFlow('f');
+      const trace = await FlowEngine.run(configured('      - tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
       expect(trace).toEqual([
         { action: 'flow f', detail: 'start' },
         { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; hidden by tapping id:"login_title" before tapping' },
@@ -2631,7 +2723,7 @@ ${steps}
 
     it('a tap: whose dismissal does not hide the keyboard: ⚠ tap … still covered, then the ✗ naming the tap that was sent; the target untapped', async () => {
       const fake = iosFake(); // the band stays
-      const error = (await new FlowEngine(configured('      - tap: { id: login_submit }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+      const error = (await FlowEngine.run(configured('      - tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
       expect(error.trace.slice(1)).toEqual([
         { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; tapped id:"login_title" to hide it, still covered' },
         { action: '✗ tap id:"login_submit"', detail: expect.stringMatching(/^failed — Tapped id:"login_title" at \(201,303\) to hide the soft keyboard covering id:"login_submit", but it is still up/) },
@@ -2641,7 +2733,7 @@ ${steps}
 
     it('a tap: with every configured dismissal absent from the screen: the refusal lists them', async () => {
       const fake = iosFake();
-      const error = (await new FlowEngine(configured('      - tap: { id: login_submit }', '[{ tap: { id: twofactor_title } }, { accessory: true }]'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+      const error = (await FlowEngine.run(configured('      - tap: { id: login_submit }', '[{ tap: { id: twofactor_title } }, { accessory: true }]'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
       expect(error.message).toMatch(/and none of the configured dismissals is usable on this screen \(tap id:"twofactor_title": not found; accessory: no accessory toolbar on screen\)\. Nothing was tapped/);
       expect(error.trace[1]).toEqual({ action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' });
       expect(fake.taps).toEqual([]);
@@ -2649,7 +2741,7 @@ ${steps}
 
     it('fill … dismissKeyboard: true with the band up after typing: the configured title is tapped, and the fill line says what hid the keyboard; no enter', async () => {
       const fake = hidingFake();
-      const trace = await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      const trace = await FlowEngine.run(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace).toEqual([
         { action: 'flow f', detail: 'start' },
         { action: 'fill', detail: 'id:"login_password" = secret; keyboard hidden by tapping id:"login_title"' },
@@ -2662,14 +2754,14 @@ ${steps}
     it('the post-fill dismissal judges its strategies under the flow\'s `first` policy: a tap: { text } matching two neutral nodes taps the first, and the fill line says so', async () => {
       const fake = hidingFake();
       fake.live().children.push(node({ role: 'text', identifier: 'login_heading', label: 'Prihlásenie', rect: { x: 36, y: 330, width: 330, height: 24 } }));
-      const trace = await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }', '[{ tap: { text: Prihlásenie } }]'), fake, FAST).runFlow('f');
+      const trace = await FlowEngine.run(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }', '[{ tap: { text: Prihlásenie } }]'), fake, FAST, { flow: 'f' });
       expect(trace[1]).toEqual({ action: 'fill', detail: 'id:"login_password" = secret; keyboard hidden by tapping text:"Prihlásenie" (2 matches, the first)' });
       expect(fake.taps).toEqual(['login_password', 'login_title']);
     });
 
     it('fill … dismissKeyboard: true whose dismissal tap does not hide the keyboard: a ⚠ fill line naming the tap, then the ✗ (review round 1: the line was missing)', async () => {
       const fake = iosFake(); // the band stays
-      const error = (await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f').catch((e: unknown) => e)) as FlowError;
+      const error = (await FlowEngine.run(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
       expect(error).toBeInstanceOf(FlowError);
       expect(error.trace.slice(1)).toEqual([
         { action: '⚠ fill', detail: 'the soft keyboard was up after the fill; tapped id:"login_title" to hide it, still up' },
@@ -2680,7 +2772,7 @@ ${steps}
 
     it('…and inside optional: the skip quotes that headline, never "(not present)" — a tap was sent', async () => {
       const fake = iosFake();
-      const trace = await new FlowEngine(configured('      - optional:\n          - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      const trace = await FlowEngine.run(configured('      - optional:\n          - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace.slice(1, -1)).toEqual([
         { action: '⚠ fill', detail: 'the soft keyboard was up after the fill; tapped id:"login_title" to hide it, still up' },
         { action: 'optional', detail: expect.stringMatching(/^skipped step \(Tapped id:"login_title" at \(201,303\) to hide the soft keyboard after the fill/) },
@@ -2689,7 +2781,7 @@ ${steps}
 
     it('fill … dismissKeyboard: true with the band up and nothing configured: a ⚠ fill line that the keyboard was left up, the fill line as before, and NO enter (the blind key submitted, K5d)', async () => {
       const fake = iosFake();
-      const trace = await new FlowEngine(flow('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      const trace = await FlowEngine.run(flow('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace).toEqual([
         { action: 'flow f', detail: 'start' },
         { action: '⚠ fill', detail: 'id:"login_password": the soft keyboard is up and was left up: no dismissal is configured — the next tap under it will be refused' },
@@ -2702,7 +2794,7 @@ ${steps}
 
     it('fill … dismissKeyboard: true with no band (the HID typing parked the keyboard, or an idb tree): nothing pressed, nothing tapped, the fill line as before', async () => {
       const fake = iosFake(false);
-      const trace = await new FlowEngine(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST).runFlow('f');
+      const trace = await FlowEngine.run(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace.map((t) => t.action)).toEqual(['flow f', 'fill', 'flow f']);
       expect(trace[1].detail).toBe('id:"login_password" = secret');
       expect(fake.keys).toEqual([]);
@@ -2712,11 +2804,9 @@ ${steps}
     it('the measured flow: fill, fill, tap login_submit under the band — passes with the title tapped between the last fill and the submit, by the guard', async () => {
       const fake = hidingFake();
       fake.live().children.splice(1, 0, node({ role: 'textfield', identifier: 'login_username', rect: { x: 90, y: 400, width: 222, height: 20 } }));
-      const trace = await new FlowEngine(
-        configured('      - fill: { id: login_username, value: user }\n      - fill: { id: login_password, value: secret }\n      - tap: { id: login_submit }'),
+      const trace = await FlowEngine.run(configured('      - fill: { id: login_username, value: user }\n      - fill: { id: login_password, value: secret }\n      - tap: { id: login_submit }'),
         fake,
-        FAST,
-      ).runFlow('f');
+        FAST, { flow: 'f' });
       expect(trace.map((t) => `${t.action}: ${t.detail}`)).toEqual([
         'flow f: start',
         'fill: id:"login_username" = user',

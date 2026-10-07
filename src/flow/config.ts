@@ -600,8 +600,8 @@ function stateReachIsDestructive(cfg: AveriConfig, name: string, stack: Set<stri
  * "already active". The sentence that exists to be read on the one call that
  * wipes was on all of them.
  *
- * The escalation case loses nothing: when `requires` is not met, the nested
- * ensureState ladder runs its own rungs through the same pre-flight check,
+ * The escalation case loses nothing: when `requires` is not met, the required
+ * state's ladder runs its own rungs through the same pre-flight check,
  * so the warning lands on the rung that actually wipes, immediately before
  * it does.
  *

@@ -4,7 +4,7 @@ import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import type { EnvValues } from '../flow/credentials.js';
 import { refuseUnknownEnvironment } from './preflight.js';
-import { formatTrace, FlowEngine, type TraceEntry } from '../flow/engine.js';
+import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
 import { captureFrame, unsettledNote, type Frame, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
@@ -46,7 +46,8 @@ import type { Contribution } from '../verify/contribution.js';
  * was also the only code with no tests.
  */
 
-interface VerificationRequestBase {
+/** The engine context (environment, session) is flow/engine.ts#EngineContext, shared with run/commands.ts. */
+interface VerificationRequestBase extends EngineContext {
   /** Already normalized: deduped, canonical android-then-ios order. */
   platforms: Platform[];
   cfg: AveriConfig;
@@ -55,7 +56,6 @@ interface VerificationRequestBase {
   specs: AssertSpec[];
   state?: string;
   flow?: string;
-  environment?: string;
   baselineDir: string;
   /** Test seam: the OCR recognizer behind the text-parity table. */
   ocrEngine?: OcrEngine;
@@ -452,10 +452,18 @@ export async function runVerification(
 
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);
-    const engine = new FlowEngine(cfg, adapter, { env, environment: req.environment });
-    const trace: TraceEntry[] = [];
-    if (req.state) trace.push(...(await engine.ensureState(req.state)));
-    if (req.flow) trace.push(...(await engine.runFlow(req.flow)));
+    // ONE engine run per leg (2026-10-07): the state and the flow share its
+    // trace, environment line and recovery budget, so a flow that fails after
+    // the state was ensured fails with the state's lines too. Until then the
+    // leg called the engine's two entries in turn and concatenated their
+    // traces — and a failing flow's error carried only its own half.
+    // Neither named (or both empty, as `if (req.state)` always read them):
+    // no run, an empty trace.
+    const request = runRequestOf(req.state, req.flow);
+    const trace: TraceEntry[] =
+      request === undefined ?
+        []
+      : await FlowEngine.run(cfg, adapter, { env, environment: req.environment, session: req.session }, request);
     const results = await new Verifier(adapter, { baselineDir: req.baselineDir }).assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one

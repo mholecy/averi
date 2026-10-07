@@ -194,15 +194,53 @@ type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
 const FLOW_AMBIGUITY: Ambiguity = 'first';
 
 /**
- * How many `launch { clearState: true }` steps this server process has run.
- * Module-scoped so it spans the tool calls of one session (each call builds a
- * fresh FlowEngine); `resetClearStateCount` exists for tests, which must not
- * inherit each other's count.
+ * What outlives one engine run: the state of the SESSION that runs it. Today
+ * that is one number, how many `launch { clearState: true }` steps the
+ * session's runs have performed — the `⚠ clearState` line's "(3 this
+ * session)", which is what makes a finite resource (a device registration)
+ * budgetable.
+ *
+ * Owned by the caller and handed in (`EngineOptions.session`), as the
+ * environment is (2026-10-04). Until 2026-10-07 it was a module-level `let`
+ * with an exported reset for tests: every engine in the PROCESS shared it, so
+ * a second server built in one process (each test file, an embedder of
+ * createAveriServer) continued the first one's count, and each engine test
+ * file had to remember to zero it. The MCP server (mcp/tools.ts) now makes one
+ * per server — the server IS the session — and passes it to every tool that
+ * runs the engine.
  */
-let clearStateCount = 0;
+export class EngineSession {
+  #clearStateCount = 0;
 
-export const resetClearStateCount = (): void => {
-  clearStateCount = 0;
+  /** How many wipes this session's runs have performed so far. */
+  get clearStateCount(): number {
+    return this.#clearStateCount;
+  }
+
+  /** Counts one wipe and returns the new total — the number the `⚠ clearState` line prints. */
+  recordClearState(): number {
+    return ++this.#clearStateCount;
+  }
+}
+
+/**
+ * What one engine run does: ensure a state, run a flow, or both — in that
+ * order, the state first (a flow may depend on it). A type, not a runtime
+ * check, says it names at least one: `{}` does not compile.
+ */
+export type RunRequest = { state: string; flow?: string } | { state?: undefined; flow: string };
+
+/**
+ * The request a caller holding two OPTIONAL names makes — `verify`'s state
+ * and flow — or undefined when it names neither (nothing for the engine to
+ * do). An empty string is "none", as `verify` always read it. The one place
+ * the union is built from optional strings, so no caller spells the
+ * narrowing by hand.
+ */
+export const runRequestOf = (state?: string, flow?: string): RunRequest | undefined => {
+  const s = state || undefined;
+  const f = flow || undefined;
+  return s !== undefined ? { state: s, flow: f } : f !== undefined ? { flow: f } : undefined;
 };
 
 export interface EngineOptions {
@@ -246,7 +284,23 @@ export interface EngineOptions {
    * engine. Tests pass a plain object.
    */
   env: EnvValues;
+  /**
+   * The session this run counts toward (see `EngineSession`). REQUIRED, like
+   * `env`: optional, a caller that forgot it silently reset the "N this
+   * session" count on every call — the leak this type exists to close, just
+   * moved (code review, 2026-10-07). The MCP layer passes the server's; a
+   * test passes `new EngineSession()`.
+   */
+  session: EngineSession;
 }
+
+/**
+ * What a run-layer request carries for the engine beyond the config and the
+ * adapter: the credential environment and the session. One type, so
+ * run/commands.ts and run/verify.ts declare (and document) them once — the
+ * comments are EngineOptions' own.
+ */
+export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
 
 /**
  * First line only: a trace entry is a headline, and the rest of a FlowError's
@@ -261,9 +315,17 @@ const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
  * from env and redacted from traces and errors — the caller never sees them.
  */
 export class FlowEngine {
-  private trace: TraceEntry[] = [];
-  /** One recovery pass per tool call, across nested `requires` (see `recoveryPass`). */
-  private recoveryUsed = false;
+  /** The run's trace — the whole run's, the state's lines and the flow's alike. */
+  private readonly trace: TraceEntry[] = [];
+  /**
+   * One recovery pass per run — per tool call — across the state, the flow
+   * and nested `requires` (see `recoveryPass`): the state whose ladder spent
+   * it, undefined while unspent. Named so a later ladder that finds it gone
+   * can say on what.
+   */
+  private recoverySpentOn: string | undefined;
+  /** The session this run counts its wipes toward (EngineOptions.session). */
+  private readonly session: EngineSession;
   private secrets = new Set<string>();
   /** >0 while inside an `optional` block, whose failures are swallowed by design (see runStep). */
   private swallowDepth = 0;
@@ -288,7 +350,7 @@ export class FlowEngine {
    */
   private readonly dismissals: readonly KeyboardDismissal[] | undefined;
 
-  constructor(
+  private constructor(
     private readonly cfg: AveriConfig,
     private readonly adapter: DeviceAdapter,
     opts: EngineOptions,
@@ -308,22 +370,39 @@ export class FlowEngine {
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
     this.dismissals = keyboardDismissals(cfg);
+    this.session = opts.session;
   }
 
-  /** Detect → run reach flows → confirm. Idempotent. */
-  async ensureState(name: string): Promise<TraceEntry[]> {
-    this.trace = [];
-    this.recoveryUsed = false;
-    this.logEnvironment();
-    await this.guard(() => this.ensureStateInner(name));
-    return this.trace;
+  /**
+   * The engine's one entry: ONE run — one trace, one environment line, one
+   * guard (so a failure carries everything the run did), one recovery budget.
+   * `state` is ensured first (detect → reach flows → confirm; idempotent),
+   * then `flow` runs. Each call builds its own engine, and the constructor is
+   * private: the per-run state below cannot outlive the run or be shared
+   * with another, because nothing outside can hold an engine.
+   *
+   * 2026-10-07 (flow-engine review, candidate 1). There used to be two
+   * instance entries, `ensureState` and `runFlow`, and an unwritten rule: one
+   * instance, one entry. Each entry reset the trace and the recovery budget
+   * and logged the environment, and `verify` called both in turn on one
+   * instance — so a flow that failed after its state was ensured threw a
+   * FlowError holding the flow's steps only (the `state … already active`
+   * line, and after a ladder the `⚠ clearState` line, were gone from the
+   * FAILED section), the environment line was printed twice, and "one
+   * recovery pass per tool call" held twice. The rule is now the shape.
+   */
+  static run(cfg: AveriConfig, adapter: DeviceAdapter, opts: EngineOptions, request: RunRequest): Promise<TraceEntry[]> {
+    // Async so a constructor throw (an unknown environment) is a rejection,
+    // like every other failure of a run.
+    return (async () => new FlowEngine(cfg, adapter, opts).runOnce(request))();
   }
 
-  async runFlow(name: string): Promise<TraceEntry[]> {
-    this.trace = [];
-    this.recoveryUsed = false;
+  private async runOnce({ state, flow }: RunRequest): Promise<TraceEntry[]> {
     this.logEnvironment();
-    await this.guard(() => this.runFlowInner(name));
+    await this.guard(async () => {
+      if (state !== undefined) await this.ensureStateInner(state);
+      if (flow !== undefined) await this.runFlowInner(flow);
+    });
     return this.trace;
   }
 
@@ -580,14 +659,26 @@ export class FlowEngine {
     state: AveriConfig['states'][string],
     why: string,
   ): Promise<boolean> {
-    // Per tool call, not per state: `requires` can nest ensureState inside a
-    // reach flow, and one bounded retry for the whole call is the honest read
-    // of "at most once" — nesting must not multiply it.
-    if (this.recoveryUsed) return false;
+    // Per run — per tool call — not per state: `requires` can nest a state
+    // inside a reach flow, and a run can ensure a state and then run a flow
+    // whose `requires` ladders again (verify with both, 2026-10-07). One
+    // bounded retry for the whole call is the honest read of "at most once" —
+    // neither nesting nor a second leg of the run may multiply it.
     // `reach` is non-empty here — ensureStateInner threw above if it was not.
     const rungs = (state.reach ?? []).slice(0, -1).filter((f) => !flowIsDestructive(this.cfg, f));
     if (rungs.length === 0) return false;
-    this.recoveryUsed = true;
+    if (this.recoverySpentOn !== undefined) {
+      // Said, not silent (code review, 2026-10-07): a second ladder in the
+      // run — a flow's `requires:` after verify's state — that WOULD have
+      // had a pass otherwise fails without one, and the trace must say why,
+      // or it reads as the recovery rule not applying to `requires`.
+      this.log(
+        `↻ no recovery ${name}`,
+        `${why} — the run's one recovery pass was already spent on ${this.recoverySpentOn}`,
+      );
+      return false;
+    }
+    this.recoverySpentOn = name;
     this.log(
       `↻ recovery ${name}`,
       `${why} — re-running ${rungs.join(', ')} once (a late screen may need clearing)`,
@@ -632,7 +723,7 @@ export class FlowEngine {
   /**
    * Is `detect` satisfied, within a window? `windowMs: 0` is a single
    * probe — the entry check, which must be cheap, and the check after the last
-   * reach flow, which has the ensureState wait right behind it. A rung with
+   * reach flow, which has the ensureStateInner wait right behind it. A rung with
    * another rung after it polls for a moment instead: a flow that just tapped
    * its way home may need one to land, and a false miss THERE is not merely
    * slow, it escalates to the next, possibly destructive, flow.
@@ -800,15 +891,16 @@ export class FlowEngine {
     // the reader: what it costs is app-specific, and averi drives any app. Be
     // precise about the mechanism too — this deletes the app's data container
     // (iOS) / runs `pm clear` (Android); it does not clear the iOS keychain,
-    // whatever a re-registration afterwards may suggest. The running count is
-    // process-wide on purpose: the MCP server process IS the session, and
-    // "3rd this session" is what makes a finite resource budgetable.
+    // whatever a re-registration afterwards may suggest. The running count
+    // spans tool calls on purpose: it is the SESSION's (EngineSession, the
+    // MCP server's, handed in), and "3rd this session" is what makes a finite
+    // resource budgetable.
     if (spec.clearState) {
-      clearStateCount++;
+      const count = this.session.recordClearState();
       this.log(
         '⚠ clearState',
         'app state wiped (data container deleted) — anything the app persisted, ' +
-          `a device registration included, is gone (${clearStateCount} this session)`,
+          `a device registration included, is gone (${count} this session)`,
       );
     }
   }
@@ -940,7 +1032,7 @@ export class FlowEngine {
    * both come from the ADAPTER, never from `app.ios.treeSource` — why is on
    * `DeviceAdapter.treeSourceKind` (adapters/types.ts). An adapter that does
    * not say (unknown kind) gets no hint. Only the `wait:` step asks;
-   * ensureState's state waits and branch polls describe conditions a single
+   * ensureStateInner's state waits and branch polls describe conditions a single
    * id does not own.
    */
   private waitHint(cond: Condition): string | undefined {
