@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KEYBOARD_ROLE, type KeyboardWitness, type Point, type Rect, type SoftKeyboard } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
@@ -879,5 +879,32 @@ describe('scrollUntilVisible — after the device check', () => {
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
     expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] }); // 1906 under the IME → one stroke above it → 1306
     expect(fake.swipes[1].from.y).toBe(1118);
+  });
+});
+
+describe('scrollUntilVisible — the round bound (code review of round 2, 2026-10-08)', () => {
+  it('at the defaults the rounds number at most 1 + (1 + SETTLE_CONFIRM_READS) × maxSwipes = 25: a target that leaves the frame every fourth read after a stroke', async () => {
+    resetLayout();
+    const target = node({ role: 'button', identifier: 't', rect: { x: 0, y: 3000, width: 100, height: 40 } });
+    const s = screen(el({ identifier: 'root' }), target);
+    let reads = 0;
+    let afterStroke = 0;
+    class Restless extends FakeAdapter {
+      override async uiTree(): Promise<UiNode> {
+        reads++;
+        // Round 0 below the fold; after any stroke, three reads in the frame
+        // each at a new y (a stop that never confirms), then one off it.
+        if (this.swipes.length > 0) {
+          const i = afterStroke++;
+          target.rect = { ...target.rect, y: i % 4 === 3 ? 3000 : 100 + i * 10 };
+        }
+        return super.uiTree();
+      }
+    }
+    const fake = new Restless({ s }, 's');
+    const error = await scrollUntilVisible(fake, 'id:t', { settleMs: 0 }).catch((e: unknown) => e);
+    expect((error as Error).message).toContain('failed after 6 swipes (maxSwipes)');
+    expect(fake.swipes).toHaveLength(6);
+    expect(reads).toBe(25);
   });
 });

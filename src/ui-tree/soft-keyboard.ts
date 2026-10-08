@@ -407,9 +407,9 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  *   stroke) is a round like any other and pays the same — with the
  *   keyboard up 2 or 3 queries each, not 1. Rounds: at most
  *   1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes` — 25 at the defaults,
- *   measured on the fake with a target that left the frame on every fourth
- *   read — and cut short by the deadline, which the confirming reads count
- *   against.
+ *   pinned in tests/interact/scroll.test.ts with a target that leaves the
+ *   frame on every fourth read — and cut short by the deadline, which the
+ *   confirming reads count against.
  *
  * FOLLOW-UP, not done (2026-10-08, review round 1, restated by the code
  * review of round 2): the touchable call's own `mInputShown`, read a moment
