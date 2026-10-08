@@ -78,7 +78,10 @@ export interface FillResult {
   /**
    * With `clear` only (absent otherwise): how many characters the input held
    * when the clear began — what clearText deleted, the field verified empty
-   * after; 0 when it held none (an input's null value is an empty one: the
+   * after unless `readBack` is `lost` (the read after a delete did not find
+   * the field: nothing then says the field is empty — review 2026-10-08,
+   * m-1, a field the keyboard moved still held `XX` behind "cleared 7
+   * characters first"); 0 when it held none (an input's null value is an empty one: the
    * adapters turn "" into null). `unmeasured` when the matched node is not
    * an input: its length is not the field's — a label's text, or no value
    * at all — so no delete was sent (review 2026-10-08: deletes counted off a
@@ -89,8 +92,11 @@ export interface FillResult {
   /**
    * How the typed text was checked:
    * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
-   * - `no-value`: the node exposed no value on two reads in a row — the
-   *   text may or may not be there; nothing was compared.
+   * - `no-value`: the field WAS found (by the selector or by identity) and
+   *   exposed no value, on two reads in a row — the text may or may not be
+   *   there; nothing was compared. Not to be confused with `lost` (the last
+   *   read found no field at all) or with a read that showed a value
+   *   (`landed`, `not-taken`, or the mismatch error).
    * - `not-taken`: the node is not an input and its value does not show the
    *   text — it never moved from what it showed before the tap (a WDA
    *   StaticText echoing its label), or it moved without taking the typing
@@ -99,7 +105,10 @@ export interface FillResult {
    * - `lost`: the field itself was not found again — the selector stopped
    *   matching (a `value:"…"` one, once the value changed) and the identity
    *   fallback (sameField) found no single twin or was not asked; `lost`
-   *   says which. Nothing was read, so nothing is known about the node's
+   *   says which. Also set when the clear's own read after a delete did not
+   *   find the field and nothing was typed (a clear alone, value ""): the
+   *   delete went out, nothing saw the field empty (review 2026-10-08,
+   *   m-1). Nothing was read, so nothing is known about the node's
    *   value either way. Until 2026-10-08 (iOS device check of the bug note
    *   below) this read as `no-value`, and a textfield that had just had 7
    *   characters deleted and then held the typed text was said to "expose
@@ -151,11 +160,7 @@ export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cl
   const reasons: string[] = [];
   if (r.readBack === 'no-value') reasons.push(`the matched node exposes no value (role ${r.role})`);
   if (r.readBack === 'not-taken') reasons.push(`the matched node's value does not show the typed text (role ${r.role}) — it is not the field`);
-  if (r.readBack === 'lost') {
-    reasons.push(
-      `the field could not be found again (${r.lost === 'screen-changed' ? 'the screen changed while typing' : 'the selector no longer matches it'})`,
-    );
-  }
+  if (r.readBack === 'lost') reasons.push(`the field could not be found again${lostWhyText(r.lost)}`);
   if (r.readBack !== 'landed') {
     if (r.cleared === 'unmeasured') reasons.push(`clear sent no delete — a role ${r.role} node's length is not the field's`);
     else if (r.cleared === 0 && r.readBack === 'no-value') reasons.push('clear sent no delete — the node gave no length to delete');
@@ -172,6 +177,22 @@ export function fillCaveats(r: Pick<FillResult, 'role' | 'notInput' | 'warning' 
   if (r.notInput !== undefined) out.push(notInputText(r.role, r.notInput.input, r.readBack !== 'nothing-typed'));
   if (r.warning !== undefined) out.push(r.warning);
   return out;
+}
+
+/**
+ * ` (why)` for a `lost` read-back, chosen per reason — an absent reason
+ * says nothing rather than borrowing one (review 2026-10-08, n-3: it read
+ * as "the selector no longer matches it").
+ */
+function lostWhyText(lost: FillResult['lost']): string {
+  switch (lost) {
+    case 'screen-changed':
+      return ' (the screen changed while typing)';
+    case 'unmatched':
+      return ' (the selector no longer matches it)';
+    case undefined:
+      return '';
+  }
 }
 
 function notInputText(role: string, input: NearbyInput | 'none' | 'unread', typed: boolean): string {
@@ -379,6 +400,10 @@ export async function fillField(
     }
   }
   let cleared: FillResult['cleared'];
+  // Why the clear's read after a delete found no field (review 2026-10-08,
+  // m-1): the loop then stops without calling the field empty, and a clear
+  // alone (nothing typed, so no read-back) reports it as `lost`.
+  let clearLost: FillResult['lost'];
   if (clear && !isInput) {
     // Not an input: what it shows is not the field's length — a label's own
     // text (deletes counted off it went into whatever had focus) or nothing
@@ -406,6 +431,14 @@ export async function fillField(
       if (existing === 0) break;
       await adapter.clearText(existing);
       current = await refetch();
+      if (current === undefined) {
+        // Not found is not empty: until 2026-10-08 this read as `left = 0`,
+        // and a clear alone was "Filled … (cleared 7 characters first)" on a
+        // field that the keyboard had moved and that still held `XX`. With a
+        // value, the read-back below (exact, with clear) is what decides.
+        clearLost = lostOnLastRead;
+        break;
+      }
       const left = current?.value?.length ?? 0;
       if (left === 0) break;
       if (attempt >= 1) {
@@ -415,7 +448,8 @@ export async function fillField(
   }
 
   await startTyping(value);
-  let readBack: FillResult['readBack'] = 'nothing-typed';
+  let readBack: FillResult['readBack'] = value === '' && clearLost !== undefined ? 'lost' : 'nothing-typed';
+  let lost = value === '' ? clearLost : undefined;
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -496,6 +530,7 @@ export async function fillField(
       }
     }
     if (readBack !== 'not-taken') readBack = observed !== undefined ? 'landed' : lostOnLastRead !== undefined ? 'lost' : 'no-value';
+    if (readBack === 'lost') lost = lostOnLastRead;
   }
   return {
     note,
@@ -504,7 +539,7 @@ export async function fillField(
     role: node.role,
     cleared,
     readBack,
-    ...(readBack === 'lost' ? { lost: lostOnLastRead } : {}),
+    ...(readBack === 'lost' ? { lost } : {}),
     notInput: readBack === 'landed' ? undefined : await notInput(),
   };
 }

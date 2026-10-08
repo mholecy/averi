@@ -71,6 +71,11 @@ describe('tap and type_text response lines', () => {
     expect(fillText('role:textfield value:"XX"', { length: 3, role: 'textfield', readBack: 'lost', lost: 'unmatched' })).toBe(
       'Typed 3 characters into role:textfield value:"XX" — NOT verified: the field could not be found again (the selector no longer matches it)',
     );
+    // m-1 (review 2026-10-08, bundle C round 1): a clear alone whose read after the delete lost the field.
+    expect(fillText('role:textfield value:"XX12345"', { length: 0, role: 'textfield', readBack: 'lost', lost: 'unmatched', cleared: 7 })).toBe(
+      'Typed 0 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
+        'NOT verified: the field could not be found again (the selector no longer matches it)',
+    );
   });
 
   it('an unverified fill is "Typed … into", never "Filled", and the not-an-input finding gets its own ⚠ line naming the input', () => {

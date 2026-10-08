@@ -615,6 +615,66 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     await expect(fillField(fake, 'id:pin', '', { ...FAST, clear: true })).rejects.toThrow('fill: field still shows 1 character after clearing twice');
   });
 
+  // m-2 (review 2026-10-08, bundle C round 1): `lost` is the LAST read's finding, reset on every read.
+  it('a first read after typing that misses the field, then one that finds it with no value: no-value, no `lost`', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', null);
+    const real = fake.uiTree.bind(fake);
+    let typed = false;
+    let hidden = false;
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      await origType(text);
+      typed = true;
+    };
+    fake.uiTree = async () => {
+      const tree = await real();
+      if (!typed || hidden) return tree;
+      hidden = true; // only the first read after typing misses the label
+      return { ...tree, children: tree.children.filter((n) => n.role !== 'text') };
+    };
+    const result = await fillField(fake, 'text:"IBAN*"', 'DE89', FAST);
+    expect(hidden).toBe(true);
+    expect(result.readBack).toBe('no-value');
+    expect(result).not.toHaveProperty('lost');
+  });
+
+  // m-1 (review 2026-10-08, bundle C round 1): the read after the first
+  // delete lost the field (the keyboard moved it, the value selector no
+  // longer matches), which read as "empty" — `Filled … (0 characters,
+  // cleared 7 characters first)` while the field still held `XX`.
+  describe('a clear whose read after the delete does not find the field', () => {
+    const probe = () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      const input = () => fake.live().children.find((n) => n.role === 'textfield')!;
+      fake.clearText = async (count: number) => {
+        fake.deletes.push(count);
+        const f = input();
+        f.value = (f.value ?? '').slice(0, -5) || null; // only 5 of the 7 went
+        f.rect = { ...f.rect, y: 200 }; // and the keyboard pushed the form up
+      };
+      return { fake, input };
+    };
+
+    it('a clear alone is NOT verified: readBack lost, unmatched — never a verified empty field', async () => {
+      const { fake, input } = probe();
+      const result = await fillField(fake, 'role:textfield value:"XX12345"', '', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([7]); // sent once; the loop does not delete blind
+      expect(input().value).toBe('XX');
+      expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: 'lost', lost: 'unmatched', notInput: undefined });
+      expect(fillUnverifiedText(result)).toBe('NOT verified: the field could not be found again (the selector no longer matches it)');
+    });
+
+    it('with a value, the read-back decides: not landed, and still lost', async () => {
+      const { fake } = probe();
+      const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89', { ...FAST, clear: true });
+      expect(result).toMatchObject({ cleared: 7, readBack: 'lost' });
+    });
+  });
+
+  it('a lost read-back with no reason says none rather than borrowing one', () => {
+    expect(fillUnverifiedText({ role: 'textfield', readBack: 'lost' })).toBe('NOT verified: the field could not be found again');
+  });
+
   it('a node that IS found but shows no value is still no-value, with no `lost`', async () => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     const result = await fillField(fake, 'text:"IBAN*"', 'DE89', FAST);
