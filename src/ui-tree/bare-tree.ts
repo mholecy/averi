@@ -207,11 +207,12 @@ const statusBarBottom = (nodes: readonly UiNode[], screen: Rect): number | undef
 /**
  * A status-bar clock: the WHOLE label is a time — `18:29` (measured), `6:29`,
  * Finnish `18.29`, Arabic-Indic digits (`\p{Nd}`), an iPad's `6:29 PM` or
- * `6:29 p.m.`, a prefixed `下午6:29` (inferred). Anchored, and the prefix is
- * letters only, so "Departs 10:30", "Total €12.50", "$4.99" and
+ * `6:29 p.m.`, a prefixed `下午6:29`, a Devanagari `6:29 अपराह्न` (letters
+ * and combining marks, up to 8 a word) — inferred. Anchored, and the prefix
+ * is letters only, so "Departs 10:30", "Total €12.50", "$4.99" and
  * "08.10.2026" are not clocks; `v2.10` is, which the status item guards.
  */
-const CLOCK = /^(?:\p{L}{1,3}\s?)?\p{Nd}{1,2}[:.]\p{Nd}{2}(?:\s?\p{L}{1,3}\.?){0,2}$/u;
+const CLOCK = /^(?:[\p{L}\p{M}]{1,3}\s?)?\p{Nd}{1,2}[:.]\p{Nd}{2}(?:\s?[\p{L}\p{M}]{1,8}\.?){0,2}$/u;
 
 // STRUCTURAL_ROLES, the wrapper roles this rule reads, is defined beside
 // KEYBOARD_ROLE in adapters/types.ts since 2026-10-07 (geometry.ts's

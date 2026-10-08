@@ -292,7 +292,7 @@ describe('isBareTree: a status bar is not a reason to call a loaded screen bare'
   it('a status-bar clock in other locales (inferred): the WHOLE label is a time — 6:29, Finnish 18.29, Arabic-Indic digits, "6:29 PM", "6:29 p.m.", 下午6:29; not a price, a date or a title', () => {
     const withClock = (clock: string) =>
       parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), axv('StaticText', clock, { x: 50, y: 22, width: 48, height: 22 }, null, null), STATUS_BAR[3]]));
-    for (const clock of ['18:29', '6:29', '18.29', '٦:٢٩', '6:29 PM', '6:29 p.m.', '下午6:29']) expect(isBareTree(withClock(clock)), clock).toBe(true);
+    for (const clock of ['18:29', '6:29', '18.29', '٦:٢٩', '6:29 PM', '6:29 p.m.', '下午6:29', '6:29 अपराह्न']) expect(isBareTree(withClock(clock)), clock).toBe(true);
     for (const text of ['Loading', '100 %', '1.200 EUR', 'Departs 10:30', 'Total €12.50', '$4.99', '08.10.2026', '18 h 29', '18:29x9', '18:290']) expect(isBareTree(withClock(text)), text).toBe(false);
   });
 });
@@ -372,6 +372,24 @@ describe('isBareTree: what the status bar takes, and no more', () => {
       ...STATUS_BAR.slice(1),
       LAUNCH_ICON,
     ])))).toBe(false);
+  });
+  it('a status item is a labelled or valued container/other: a navigation bar\'s Back button, or an unlabeled other, beside a whole-label time is none', () => {
+    const navBar = (...els: Record<string, unknown>[]) => parseIdbDescribeAll(JSON.stringify([
+      axv('Application', 'Timer', FULL, null, null),
+      axv('StaticText', '10:30', { x: 170, y: 22, width: 62, height: 22 }, null, null),
+      ...els,
+      axv('Button', 'Start', { x: 20, y: 760, width: 362, height: 48 }, null, null),
+    ]));
+    expect(isBareTree(navBar(axv('Button', 'Back', { x: 8, y: 20, width: 60, height: 24 }, null, null)))).toBe(false);
+    expect(isBareTree(navBar(axv('Other', null, { x: 300, y: 24, width: 40, height: 18 }, null, null)))).toBe(false);
+  });
+  it('a status item may end a little below the clock (within 1 % of the screen): 6 pt below on the measured screen still makes a status bar', () => {
+    expect(isBareTree(parseIdbDescribeAll(JSON.stringify([
+      axv('Application', ' ', FULL, null, null),
+      STATUS_BAR[0],
+      axv('StatusItem', '100 % battery power', { x: 341, y: 36, width: 29, height: 14 }, null, 'Not charging'), // ends at 50, the clock at 44
+      LAUNCH_ICON,
+    ])))).toBe(true);
   });
   it('a clock alone, with no status item beside it, is no status bar', () => {
     expect(isBareTree(parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), STATUS_BAR[0], LAUNCH_ICON])))).toBe(false);
