@@ -338,6 +338,86 @@ states:
   });
 });
 
+describe('detect cycles are config errors, rejected at parse', () => {
+  // A state's detect evaluating another state's detect (`matches`) on a cycle
+  // never finished at run time (a stack overflow, measured 2026-10-07). The
+  // engine's other recursion, a reach rung's `requires:`, is a runtime
+  // condition and is NOT rejected here (engine.test.ts, re-entry guard).
+  // Every expected message carries the whole cycle path.
+  const cfg = (states: string, flows = '') =>
+    `app: {}\nstates:\n${states}${flows ? `flows:\n${flows}` : ''}`;
+
+  it('rejects two states whose detects name each other, with the path', () => {
+    expect(() => parseConfig(cfg('  a: { detect: { state: b } }\n  b: { detect: { state: a } }\n'))).toThrow(
+      'Invalid averi.yaml: states.a.detect refers back to itself: states.a → states.b → states.a',
+    );
+  });
+
+  it('rejects a detect that names its own state', () => {
+    expect(() =>
+      parseConfig(cfg('  a: { detect: { any: [ { element: { id: x } }, { state: a } ] } }\n')),
+    ).toThrow(/states\.a\.detect refers back to itself: states\.a → states\.a \(/);
+  });
+
+  it('follows any: and all: at any depth, through a longer cycle', () => {
+    // An `any:` whose first arm would short-circuit on some screens is still a
+    // cycle: on every screen where the element is absent it never finishes
+    // (with an element arm awaited first, it loops in microtasks until the
+    // heap is gone rather than overflowing).
+    expect(() =>
+      parseConfig(
+        cfg(
+          '  a: { detect: { any: [ { element: { id: x } }, { all: [ { element: { id: y } }, { state: b } ] } ] } }\n' +
+            '  b: { detect: { all: [ { state: c } ] } }\n' +
+            '  c: { detect: { any: [ { element: { id: z } }, { state: a } ] } }\n',
+        ),
+      ),
+    ).toThrow('states.a → states.b → states.c → states.a');
+  });
+
+  it('accepts shared references — a DAG is not a cycle', () => {
+    // a and b both name c, c names d; flows require shared states and wait on,
+    // branch on, them. Every state is reached by two routes, none comes back.
+    const parsed = parseConfig(
+      cfg(
+        '  a: { detect: { any: [ { state: c }, { state: d } ] }, reach: [f] }\n' +
+          '  b: { detect: { all: [ { state: c }, { state: c } ] }, reach: [f, g] }\n' +
+          '  c: { detect: { state: d }, reach: [g] }\n' +
+          '  d: { detect: { element: { id: d } } }\n',
+        `  f: { requires: c, steps: [ { wait: { state: a } }, { branch: [ { when: { state: b }, do: [] } ] } ] }\n` +
+          '  g: { requires: d, steps: [ { wait: { state: c } } ] }\n',
+      ),
+    );
+    expect(Object.keys(parsed.states)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('accepts a reach/requires loop — whether it loops depends on the screen, so the engine decides', () => {
+    // The mutual login/logout shape works from either state on the loop; only
+    // a third screen loops, and the engine refuses that re-entry at run time.
+    const parsed = parseConfig(
+      cfg(
+        '  logged_in: { detect: { element: { id: home } }, reach: [login] }\n' +
+          '  login_screen: { detect: { element: { id: login } }, reach: [logout] }\n',
+        `  login: { requires: login_screen, steps: [ { swipe: { direction: up } } ] }\n` +
+          `  logout: { requires: logged_in, steps: [ { swipe: { direction: up } } ] }\n`,
+      ),
+    );
+    expect(parsed.flows.logout.requires).toBe('logged_in');
+  });
+
+  it('does not join the detect graph to requires: a detect edge and a requires edge make no cycle', () => {
+    // Ensuring b runs f, f requires a, a's detect evaluates b's detect and
+    // returns — neither recursion re-enters itself.
+    const parsed = parseConfig(
+      cfg(
+        '  a: { detect: { state: b } }\n  b: { detect: { element: { id: b } }, reach: [f] }\n',
+        '  f: { requires: a, steps: [ { swipe: { direction: up } } ] }\n',
+      ),
+    );
+    expect(parsed.flows.f.requires).toBe('a');
+  });
+});
+
 describe('app.android.package format', () => {
   it('rejects a package name that is not a package name — before any adb command could interpolate it', () => {
     expect(() =>

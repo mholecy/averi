@@ -3038,3 +3038,249 @@ ${steps}
     });
   });
 });
+
+describe('a reach rung whose requires: re-enters the state being ensured', () => {
+  // Not a config error (flow/config.ts, rejectDetectCycles): the mutual
+  // login/logout shape works from either state on the loop. From a third
+  // screen the nested ladder used to re-run the same first rung forever —
+  // no step runs between the two entries, so the screen never changes and
+  // the call hung. Now the re-entry fails the rung that closed the loop (a
+  // ReentryError naming it, NOT terminal): the ladder escalates as for any
+  // failed rung, and with no rung left the call fails fast with that error.
+  const LOOP = parseConfig(`
+app: {}
+states:
+  logged_in: { detect: { element: { id: home } }, reach: [login] }
+  login_screen: { detect: { element: { id: login_btn } }, reach: [logout] }
+flows:
+  login: { requires: login_screen, steps: [ { tap: { id: login_btn } } ] }
+  logout: { requires: logged_in, steps: [ { tap: { id: logout_btn } } ] }
+`);
+  const loopScreens = () => {
+    resetLayout();
+    return {
+      home: screen(el({ identifier: 'home', role: 'text', label: 'Home' }), el({ role: 'button', identifier: 'logout_btn', label: 'Log out' })),
+      login: screen(el({ role: 'button', identifier: 'login_btn', label: 'Log in' })),
+      onboarding: screen(el({ identifier: 'onboarding', role: 'text', label: 'Welcome' })),
+    };
+  };
+  const loopFake = (start: string) =>
+    new FakeAdapter(loopScreens(), start, (id, self) => {
+      if (id === 'login_btn') self.current = 'home';
+      if (id === 'logout_btn') self.current = 'login';
+    });
+
+  it('works from the login screen, as before', async () => {
+    const fake = loopFake('login');
+    const trace = await FlowEngine.run(LOOP, fake, FAST, { state: 'logged_in' });
+    expect(fake.taps).toEqual(['login_btn']);
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
+  });
+
+  it('works from the logged-in side, as before', async () => {
+    const fake = loopFake('home');
+    const trace = await FlowEngine.run(LOOP, fake, FAST, { state: 'login_screen' });
+    expect(fake.taps).toEqual(['logout_btn']);
+    expect(trace.at(-1)).toEqual({ action: 'state login_screen', detail: 'reached after logout' });
+  });
+
+  /**
+   * Counts tree reads, and flips the fake to a screen the ensured state
+   * detects (`home` by default) at read `flipAt` (100 by default) — far past
+   * anything the guarded engine reads. Without the guard the loop then ends by itself and the
+   * test fails by ASSERTION, where it used to spin the worker until the heap
+   * was gone.
+   */
+  const countReads = (fake: FakeAdapter, detected = 'home', flipAt = 100) => {
+    const read = fake.uiTree.bind(fake);
+    const counter = { reads: 0 };
+    fake.uiTree = async () => {
+      if (++counter.reads === flipAt) fake.current = detected;
+      return read();
+    };
+    return counter;
+  };
+  const failure = async (run: Promise<unknown>): Promise<FlowError> => {
+    try {
+      await run;
+    } catch (e) {
+      if (e instanceof FlowError) return e;
+      throw e;
+    }
+    throw new Error('expected the run to fail');
+  };
+
+  it('fails fast from a third screen, naming the loop, and taps nothing', async () => {
+    const fake = loopFake('onboarding');
+    const counter = countReads(fake);
+    const e = await failure(FlowEngine.run(LOOP, fake, FAST, { state: 'logged_in' }));
+    expect(e.message).toContain(
+      'ensure_state logged_in re-entered itself: states.logged_in → flows.login → states.login_screen → flows.logout → states.logged_in — ' +
+        'no state on this loop is on screen, so its rungs can only call each other; start from a screen one of them detects, or drop the requires: that closes the loop',
+    );
+    expect(fake.taps).toEqual([]);
+    // Bounded: each state is on the ensuring stack at most once, so the
+    // failure is bounded by the product of the loop's rung counts (one rung
+    // each here); no step runs in a re-entry subtree, so it costs reads only.
+    expect(counter.reads).toBeLessThan(20);
+    // Not terminal: each ladder logged its failed rung and went on to salvage.
+    expect(e.trace.map((t) => t.action)).toEqual(expect.arrayContaining(['⚠ reach logout', '⚠ reach login']));
+  });
+
+  it('escalates to a declared fallback rung past the loop', async () => {
+    // `reach: [login, hard_login]`: login's requires: closes the loop on a
+    // third screen, and hard_login — the fallback the author declared for
+    // exactly a screen login cannot handle — still gets its turn.
+    const cfg = parseConfig(`
+app: {}
+states:
+  logged_in: { detect: { element: { id: home } }, reach: [login, hard_login] }
+  login_screen: { detect: { element: { id: login_btn } }, reach: [logout] }
+flows:
+  login: { requires: login_screen, steps: [ { tap: { id: login_btn } } ] }
+  logout: { requires: logged_in, steps: [ { tap: { id: logout_btn } } ] }
+  hard_login: { steps: [ { tap: { id: hard_btn } } ] }
+`);
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        home: screen(el({ identifier: 'home', role: 'text', label: 'Home' })),
+        onboarding: screen(el({ role: 'button', identifier: 'hard_btn', label: 'Start' })),
+      },
+      'onboarding',
+      (id, self) => {
+        if (id === 'hard_btn') self.current = 'home';
+      },
+    );
+    const counter = countReads(fake);
+    const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
+    expect(fake.taps).toEqual(['hard_btn']);
+    expect(trace.find((t) => t.action === '⚠ reach login')?.detail).toMatch(/^failed, escalating to hard_login — .*re-entered itself/);
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after hard_login' });
+    expect(counter.reads).toBeLessThan(20);
+  });
+
+  it('lets a re-entered state that IS detected by now answer "already active"', async () => {
+    // A cold launch can render between two probes: the first read is the
+    // third screen, the third read is home. The re-entry check sits after the
+    // entry probe, so the loop then unwinds as it would from the logged-in
+    // side. That is also its cost: the OUTER entry's read was stale, so the
+    // call pays a spurious logout and login to end up where the app already
+    // was — pinned below rather than hidden. With a destructive unwinding
+    // rung (a `reset` launching with clearState) the same stale read costs a
+    // wipe of a logged-in app, as it did on fb171ef.
+    const fake = loopFake('onboarding');
+    const read = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (++reads === 3) fake.current = 'home';
+      return read();
+    };
+    const trace = await FlowEngine.run(LOOP, fake, FAST, { state: 'logged_in' });
+    expect(fake.taps).toEqual(['logout_btn', 'login_btn']);
+    expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
+  });
+
+  it('fails a rung that requires its own state and escalates to the next rung', async () => {
+    const cfg = parseConfig(`
+app: {}
+states:
+  s: { detect: { element: { id: s_root } }, reach: [f, g] }
+flows:
+  f: { requires: s, steps: [ { tap: { id: welcome } } ] }
+  g: { steps: [ { tap: { id: welcome } } ] }
+`);
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        other: screen(el({ role: 'button', identifier: 'welcome', label: 'Welcome' })),
+        s: screen(el({ identifier: 's_root', role: 'text', label: 'S' })),
+      },
+      'other',
+      (id, self) => {
+        if (id === 'welcome') self.current = 's';
+      },
+    );
+    const counter = countReads(fake, 's');
+    const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 's' });
+    expect(counter.reads).toBeLessThan(20);
+    expect(fake.taps).toEqual(['welcome']);
+    expect(trace.find((t) => t.action === '⚠ reach f')?.detail).toContain(
+      'ensure_state s re-entered itself: states.s → flows.f → states.s — no state on this loop is on screen',
+    );
+    expect(trace.at(-1)).toEqual({ action: 'state s', detail: 'reached after g' });
+  });
+
+  it('still refuses a destructive next rung on an unread screen — escalation meets the never-wipes-blind check', async () => {
+    // Every read is bare, so the re-entry says the loop's states could not be
+    // READ, and the escalation into the destructive g is refused by the
+    // second look, as any destructive rung on an unread probe is.
+    const cfg = parseConfig(`
+app: {}
+states:
+  s: { detect: { element: { id: s_root } }, reach: [f, g] }
+flows:
+  f: { requires: s, steps: [ { tap: { id: welcome } } ] }
+  g: { destructive: true, steps: [ { tap: { id: welcome } } ] }
+`);
+    resetLayout();
+    const fake = new FakeAdapter({ splash: screen(), s: screen(el({ identifier: 's_root', role: 'text', label: 'S' })) }, 'splash');
+    // The second look polls its whole window (~60 reads here), so the flip
+    // sits further out.
+    const counter = countReads(fake, 's', 1_000);
+    const e = await failure(FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 's' }));
+    expect(e.message).toMatch(/Refused to run reach flow "g" for state "s"/);
+    expect(fake.taps).toEqual([]);
+    expect(e.trace.find((t) => t.action === '⚠ reach f')?.detail).toContain(
+      "ensure_state s re-entered itself: states.s → flows.f → states.s — none of this loop's states could be read on this probe (every UI tree read was bare",
+    );
+    expect(e.trace.some((t) => t.action === '⛔ reach g')).toBe(true);
+    expect(counter.reads).toBeLessThan(1_000);
+  });
+
+  // Only NESTING counts. Each of the two below ensures one state twice inside
+  // another's ladder, one after the other, with the state not detected on the
+  // second entry: a stack that forgot to pop would call that a re-entry.
+  const SEQ = (reach: string) => parseConfig(`
+app: {}
+states:
+  s: { detect: { element: { id: s_root } }, reach: ${reach} }
+  t: { detect: { element: { id: t_root } }, reach: [to_t] }
+flows:
+  to_t: { steps: [ { tap: { id: to_t_btn } } ] }
+  f1: { requires: t, steps: [ { tap: { id: go } } ] }
+  f2: { requires: t, steps: [ { tap: { id: go } } ] }
+  stall: { steps: [ { tap: { id: stall_btn } } ] }
+`);
+  const seqFake = () => {
+    resetLayout();
+    let gone = 0;
+    // `go` leads away from t the first time (s not reached) and into s the second.
+    return new FakeAdapter(
+      {
+        a: screen(el({ role: 'button', identifier: 'to_t_btn', label: 'To T' }), el({ role: 'button', identifier: 'stall_btn', label: 'Stall' })),
+        t: screen(el({ identifier: 't_root', role: 'text', label: 'T' }), el({ role: 'button', identifier: 'go', label: 'Go' })),
+        s: screen(el({ identifier: 's_root', role: 'text', label: 'S' })),
+      },
+      'a',
+      (id, self) => {
+        if (id === 'to_t_btn') self.current = 't';
+        if (id === 'go') self.current = ++gone === 1 ? 'a' : 's';
+      },
+    );
+  };
+
+  it('does not call a second, sequential ensure of the same state a re-entry (escalation)', async () => {
+    const fake = seqFake();
+    const trace = await FlowEngine.run(SEQ('[f1, f2]'), fake, { ...FAST, reachRecheckMs: 20 }, { state: 's' });
+    expect(fake.taps).toEqual(['to_t_btn', 'go', 'to_t_btn', 'go']);
+    expect(trace.at(-1)).toEqual({ action: 'state s', detail: 'reached after f2' });
+  });
+
+  it('does not call the recovery pass re-running a rung whose requires: was met before a re-entry', async () => {
+    const fake = seqFake();
+    const trace = await FlowEngine.run(SEQ('[f1, stall]'), fake, { ...FAST, reachRecheckMs: 20 }, { state: 's' });
+    expect(fake.taps).toEqual(['to_t_btn', 'go', 'stall_btn', 'to_t_btn', 'go']);
+    expect(trace.at(-1)).toEqual({ action: 'state s', detail: 'reached after recovery f1' });
+  });
+});

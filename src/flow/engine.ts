@@ -152,6 +152,31 @@ export class UnreadTreeRefusal extends Error {
 }
 
 /**
+ * A state ensured again from inside its own ensure, and not detected on that
+ * entry — a reach rung whose `requires:` leads back round (FlowEngine's
+ * `refuseReentry`). Deliberately NOT terminal (`isTerminal` does not list
+ * it): the loop is one rung's way in failing, not the descriptor being
+ * broken, so the ladder logs `⚠ reach <rung>: failed — …re-entered itself…`,
+ * re-checks detect and escalates to its next rung exactly as for any rung
+ * that threw — a declared fallback (`reach: [login, hard_login]`) still gets
+ * its turn, and a destructive one still meets the never-wipes-blind second
+ * look. When the looping rung is the last, salvage and the recovery pass run
+ * as usual and this, the original error, is rethrown. Termination is bounded
+ * — a state is on the `ensuring` stack at most once — but the bound is the
+ * product of the loop's rung counts, not their sum: every rung of every
+ * state on the loop is tried at every depth (measured: n states each with
+ * two rungs requiring the next costs 2^(n+1)−3 reads, 253 at n = 6). No
+ * step runs in a re-entry subtree — each rung fails on its `requires:`
+ * before its first step — so it costs reads only, never a tap.
+ */
+class ReentryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ReentryError';
+  }
+}
+
+/**
  * An error the ladder must NOT escalate past, nor hand to salvage: re-running
  * flows cannot fix it, and the next rung may be the destructive one. A
  * SetupError is a broken descriptor; an UnreadTreeRefusal is a nested ladder
@@ -170,7 +195,7 @@ const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanc
  * never saw the device"; `bare` is "every tree read was bare" (UnreadProbe).
  * Callers that only need a boolean fold both into "not detected" by
  * comparing against `'yes'` (salvage, the recovery pass); the ladder alone
- * tells them apart (ensureStateInner). `readError` is set exactly when it is
+ * tells them apart (ensureStateLadder). `readError` is set exactly when it is
  * unknown, `shape` exactly when it is bare.
  */
 type Detection = { answer: 'yes' | 'no' } | UnreadProbe;
@@ -343,6 +368,17 @@ export class FlowEngine {
    * can say on what.
    */
   private recoverySpentOn: string | undefined;
+  /**
+   * The ensure chain this run is inside of, outermost first: `states.x` while
+   * `ensureStateInner(x)` runs, `flows.f` while `runFlowInner(f)` ensures
+   * f's `requires:`. Per run like the trace, never module-level — a second
+   * run starts empty. Only NESTING counts: a state ensured again after its
+   * first ensure returned (a `verify` leg's state, then its flow's
+   * `requires:` naming the same state; the recovery pass re-running a rung
+   * whose `requires:` was met before) is not on it any more. See
+   * `refuseReentry`.
+   */
+  private readonly ensuring: string[] = [];
   /** The session this run counts its wipes toward (EngineOptions.session). */
   private readonly session: EngineSession;
   private secrets = new Set<string>();
@@ -440,7 +476,71 @@ export class FlowEngine {
     );
   }
 
-  private async ensureStateInner(name: string): Promise<void> {
+  private ensureStateInner(name: string): Promise<void> {
+    const node = `states.${name}`;
+    return this.within(node, () => this.ensureStateLadder(name, node));
+  }
+
+  /** `fn` with `node` on `this.ensuring`: pushed before, popped after, however it ends. */
+  private async within<T>(node: string, fn: () => Promise<T>): Promise<T> {
+    this.ensuring.push(node);
+    try {
+      return await fn();
+    } finally {
+      this.ensuring.pop();
+    }
+  }
+
+  /**
+   * A state ensured from inside its own ensure — a reach rung whose
+   * `requires:` leads back to it, directly or through other states' rungs —
+   * and NOT detected on this second entry. No step ran between the two
+   * entries (a rung ensures its `requires:` before its first step), so the
+   * screen is the one the outer entry already judged; the nested ladder
+   * would re-run the SAME first rung and come back here again, forever (the
+   * awaits unwind the stack, so it does not overflow — the call hung, and on
+   * a screen still rendering it ping-ponged: 7 login/logout taps measured on
+   * fb171ef right after a launch).
+   *
+   * Not a config error (flow/config.ts, rejectDetectCycles): the mutual
+   * login/logout shape — `logged_in.reach: [login]`, `login.requires:
+   * login_screen`, `login_screen.reach: [logout]`, `logout.requires:
+   * logged_in` — works from either state on the loop, because there the
+   * nested ensure finds its state and returns before re-entering anything.
+   * Only a third screen loops, and that is when this throws — a
+   * ReentryError, NOT terminal: it fails the one rung whose `requires:`
+   * closed the loop, and the ladder that rung belongs to escalates to its
+   * next rung as for any failed rung (see ReentryError). A terminal error
+   * here killed a declared fallback (`reach: [login, hard_login]` never
+   * tried `hard_login`) for a protection the ladder already has: a
+   * destructive next rung still faces the never-wipes-blind check.
+   *
+   * Checked after the entry probe, so a state that IS detected on re-entry
+   * (a cold launch rendered between the two probes) answers "already active"
+   * as any ensure does. Its cost is the OUTER entry's stale read: the loop
+   * unwinds through rungs the app did not need — a spurious logout and login
+   * in the plain shape, and a WIPE when the unwinding rung is destructive
+   * (`login_screen.reach: [reset]`, reset requiring logged_in and launching
+   * with clearState: home rendering mid-way makes reset wipe a logged-in
+   * app). That is no worse than fb171ef, which behaved identically there.
+   * `node` is this entry's own, already on top of the
+   * stack (ensureStateInner pushed it), so an EARLIER copy is the re-entry,
+   * and the loop runs from it to the top.
+   */
+  private refuseReentry(name: string, node: string, probe: Detection): void {
+    const at = this.ensuring.indexOf(node);
+    if (at === this.ensuring.length - 1) return;
+    const loop = this.ensuring.slice(at).join(' → ');
+    const why =
+      learnedNothing(probe) ?
+        `none of this loop's states could be read on this probe (${describeUnreadCause(probe)}), ` +
+        'so its rungs can only call each other; retry once the screen renders, or drop the requires: that closes the loop'
+      : 'no state on this loop is on screen, so its rungs can only call each other; ' +
+        'start from a screen one of them detects, or drop the requires: that closes the loop';
+    throw new ReentryError(`ensure_state ${name} re-entered itself: ${loop} — ${why}`);
+  }
+
+  private async ensureStateLadder(name: string, node: string): Promise<void> {
     const state = this.cfg.states[name];
     if (!state) throw new SetupError(`Unknown state "${name}" — known: ${Object.keys(this.cfg.states).join(', ')}`);
     // The probe immediately before the next rung: this entry check for rung
@@ -450,6 +550,7 @@ export class FlowEngine {
       this.log(`state ${name}`, 'already active');
       return;
     }
+    this.refuseReentry(name, node, probe);
     if (!state.reach || state.reach.length === 0) {
       throw new SetupError(
         learnedNothing(probe) ?
@@ -683,7 +784,7 @@ export class FlowEngine {
     // whose `requires` ladders again (verify with both, 2026-10-07). One
     // bounded retry for the whole call is the honest read of "at most once" —
     // neither nesting nor a second leg of the run may multiply it.
-    // `reach` is non-empty here — ensureStateInner threw above if it was not.
+    // `reach` is non-empty here — ensureStateLadder threw if it was not.
     const rungs = (state.reach ?? []).slice(0, -1).filter((f) => !flowIsDestructive(this.cfg, f));
     if (rungs.length === 0) return false;
     if (this.recoverySpentOn !== undefined) {
@@ -742,7 +843,7 @@ export class FlowEngine {
   /**
    * Is `detect` satisfied, within a window? `windowMs: 0` is a single
    * probe — the entry check, which must be cheap, and the check after the last
-   * reach flow, which has the ensureStateInner wait right behind it. A rung with
+   * reach flow, which has the ensureStateLadder wait right behind it. A rung with
    * another rung after it polls for a moment instead: a flow that just tapped
    * its way home may need one to land, and a false miss THERE is not merely
    * slow, it escalates to the next, possibly destructive, flow.
@@ -813,7 +914,8 @@ export class FlowEngine {
   private async runFlowInner(name: string): Promise<void> {
     const flow = this.cfg.flows[name];
     if (!flow) throw new SetupError(`Unknown flow "${name}" — known: ${Object.keys(this.cfg.flows).join(', ')}`);
-    if (flow.requires) await this.ensureStateInner(flow.requires);
+    const requires = flow.requires;
+    if (requires) await this.within(`flows.${name}`, () => this.ensureStateInner(requires));
     this.log(`flow ${name}`, 'start');
     for (const step of flow.steps) await this.runStep(step);
     this.log(`flow ${name}`, 'done');
@@ -1069,7 +1171,7 @@ export class FlowEngine {
    * both come from the ADAPTER, never from `app.ios.treeSource` — why is on
    * `DeviceAdapter.treeSourceKind` (adapters/types.ts). An adapter that does
    * not say (unknown kind) gets no hint. Only the `wait:` step asks;
-   * ensureStateInner's state waits and branch polls describe conditions a single
+   * ensureStateLadder's state waits and branch polls describe conditions a single
    * id does not own.
    */
   private waitHint(cond: Condition): string | undefined {

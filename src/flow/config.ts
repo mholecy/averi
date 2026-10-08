@@ -587,9 +587,12 @@ export function childSteps(step: Step): Step[] | undefined {
  * rungs may be re-run at all).
  *
  * It is deliberately conservative: an unknown flow, or a `requires` cycle,
- * counts as destructive. The only thing it gates is whether a rung may be
- * re-run in the recovery pass, so "cannot prove it is safe" must land on the
- * side of not re-running it — that is exactly the pre-recovery behaviour,
+ * counts as destructive (an unknown flow cannot survive `parseConfig`, but
+ * this takes any AveriConfig; a `requires` cycle can, and the engine refuses
+ * it at run time only when no state on it is on screen). The only thing
+ * it gates is whether a rung may be re-run in the recovery pass, so "cannot
+ * prove it is safe" must land on the side of not re-running it — that is
+ * exactly the pre-recovery behaviour,
  * which is merely slower, not more expensive.
  *
  * `requires` is followed because it pulls in a whole other reach ladder: a
@@ -714,16 +717,30 @@ function stepsAreDestructive(steps: Step[]): boolean {
   });
 }
 
-/** Cross-reference checks zod can't express: state/flow names must exist. */
+/**
+ * Every state a condition names, at any depth of `any:`/`all:` — the one walk
+ * over Condition's nesting, as `childSteps` is over Step's. The existence
+ * check and the cycle check below both read it, so a combinator added to
+ * Condition later is followed by both or by neither.
+ */
+function conditionStateRefs(c: Condition): string[] {
+  return [
+    ...(c.state !== undefined ? [c.state] : []),
+    ...[...(c.any ?? []), ...(c.all ?? [])].flatMap(conditionStateRefs),
+  ];
+}
+
+/**
+ * Cross-reference checks zod can't express: state/flow names must exist, and
+ * no state's detect may lead back to itself (rejectDetectCycles).
+ */
 function validateReferences(cfg: AveriConfig, source: string): void {
-  const fail = (msg: string) => {
+  const fail = (msg: string): never => {
     throw new Error(`Invalid ${source}: ${msg}`);
   };
   const checkCondition = (c: Condition, where: string): void => {
-    if (c.state !== undefined && !(c.state in cfg.states)) {
-      fail(`${where} references unknown state "${c.state}"`);
-    }
-    [...(c.any ?? []), ...(c.all ?? [])].forEach((sub) => checkCondition(sub, where));
+    const unknown = conditionStateRefs(c).find((ref) => !(ref in cfg.states));
+    if (unknown !== undefined) fail(`${where} references unknown state "${unknown}"`);
   };
   const checkSteps = (steps: Step[], where: string): void => {
     for (const s of steps) {
@@ -756,4 +773,76 @@ function validateReferences(cfg: AveriConfig, source: string): void {
     }
     checkSteps(flow.steps, `flows.${name}`);
   }
+  rejectDetectCycles(cfg, fail);
+}
+
+/**
+ * A detect cycle is a config error, caught here rather than at run time.
+ * Run after the existence checks, so every name below resolves.
+ *
+ * `matches` evaluates a `{ state: x }` condition by evaluating
+ * `states.x.detect` on the same tree, at any depth of `any:`/`all:`. Nodes
+ * are states; `a → b` when `b` appears anywhere in `a`'s detect. A cycle
+ * never finishes — it overflows the stack when the cyclic arm is reached
+ * synchronously (a pure `{ state }` chain: measured 2026-10-07,
+ * `a.detect: { state: b }` ↔ `b.detect: { state: a }` parsed and
+ * `ensure_state a` failed with `FlowError: Maximum call stack size
+ * exceeded`, and inside a rung's `requires:` that RangeError is not terminal
+ * (`isTerminal`), so the outer ladder escalated past it into its next rung),
+ * and loops in microtasks until the heap is gone when an element arm is
+ * awaited first. An `any:` that would short-circuit before the cyclic arm on
+ * some screens is no defence: on every screen where it does not, it never
+ * finishes. A flow's `wait: { state }` and `branch: when:` are ROOTS of this
+ * graph, never members — a flow is not evaluated by a condition — so a cycle
+ * can only lie among states, and checking every state's detect covers those
+ * too. Shared references (two states' detects naming one third state) are a
+ * DAG: evaluated twice, finished twice.
+ *
+ * The engine's other recursion — a reach rung ensuring its `requires:`, which
+ * may lead back to the state being ensured — is NOT rejected here: the mutual
+ * login/logout shape (`logged_in.reach: [login]`, `login.requires:
+ * login_screen`, `login_screen.reach: [logout]`, `logout.requires:
+ * logged_in`) works from either state on the loop and only loops from a
+ * third screen, so it is a runtime condition, and the engine refuses it when
+ * it happens (FlowEngine's `ensuring` stack). A path that mixes the two
+ * kinds — `a`'s detect naming `b`, `b`'s rung requiring `a` — is no
+ * recursion at all.
+ */
+function rejectDetectCycles(cfg: AveriConfig, fail: (msg: string) => never): void {
+  const cycle = findCycle(Object.keys(cfg.states), (state) => conditionStateRefs(cfg.states[state].detect));
+  if (cycle !== undefined) {
+    fail(
+      `states.${cycle[0]}.detect refers back to itself: ${cycle.map((s) => `states.${s}`).join(' → ')} ` +
+        "(a { state: … } condition is evaluated through that state's detect, so this one would never finish)",
+    );
+  }
+}
+
+/**
+ * The first cycle a depth-first walk from `roots` (in order) meets, as the
+ * path from the node it re-enters back to that node — `[a, b, a]`, `[a, a]`
+ * for a self-reference — or undefined for a DAG. A node already fully
+ * explored is not walked again, so shared references cost one visit.
+ */
+function findCycle(roots: string[], next: (node: string) => string[]): string[] | undefined {
+  const done = new Set<string>();
+  const path: string[] = [];
+  const visit = (node: string): string[] | undefined => {
+    const at = path.indexOf(node);
+    if (at !== -1) return [...path.slice(at), node];
+    if (done.has(node)) return undefined;
+    path.push(node);
+    for (const n of next(node)) {
+      const cycle = visit(n);
+      if (cycle !== undefined) return cycle;
+    }
+    path.pop();
+    done.add(node);
+    return undefined;
+  };
+  for (const root of roots) {
+    const cycle = visit(root);
+    if (cycle !== undefined) return cycle;
+  }
+  return undefined;
 }
