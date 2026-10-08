@@ -77,6 +77,11 @@ function* markedNodes(
  * tap on it is the thing the user does, not the thing the guard prevents.
  */
 
+export function partOfKeyboard(tree: UiNode, node: UiNode): boolean {
+  for (const marked of markedNodes(tree)) if (marked.node === node) return marked.ofKeyboard;
+  return false;
+}
+
 /**
  * Every node of `tree` that is the keyboard's own UI — `partOfKeyboard`'s
  * answer for all of them at once, from one walk (2026-10-08: `scroll_until`
@@ -87,11 +92,6 @@ export function keyboardSideNodes(tree: UiNode): ReadonlySet<UiNode> {
   const out = new Set<UiNode>();
   for (const marked of markedNodes(tree)) if (marked.ofKeyboard) out.add(marked.node);
   return out;
-}
-
-export function partOfKeyboard(tree: UiNode, node: UiNode): boolean {
-  for (const marked of markedNodes(tree)) if (marked.node === node) return marked.ofKeyboard;
-  return false;
 }
 
 /**

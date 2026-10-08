@@ -50,8 +50,10 @@ export interface ScrollUntilResult {
    *   whole screen, and that changed it — the part under it is not visible,
    *   whatever the tree says
    *   (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md).
-   *   Only on a stop CLIPPED at the keyboard's edge: a band that changes
-   *   nothing is not applied, so a clean "fully visible" never carries it;
+   *   Only where the band changed the stop: a clip at its edge, or — when
+   *   several nodes match — a different match judged (one under the band
+   *   loses to one above it), which can be a clean "fully visible" (round 3
+   *   of the review, 2026-10-08); a band that changes nothing is not applied;
    * - `unlocated`: the window model's floating-keyboard row — the input
    *   method says one is shown, the window state gives it no area — so
    *   nothing could be judged against it and the report says so
@@ -88,14 +90,15 @@ function describeClip(edges: readonly string[], visible: number, band?: Rect): s
 /** The honest one-line summary both call sites print. */
 export function describeScrollResult(r: ScrollUntilResult): string {
   const n = `${r.swipes} swipe${r.swipes === 1 ? '' : 's'}`;
-  // `shown` comes only with a clip at the keyboard's edge, and `unlocated`
-  // only with a clean `fully: true` stop (scrollUntilVisible): each has the
-  // one branch below it can reach.
-  if (r.clipped.length === 0) {
-    const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
-    return `fully visible after ${n}${unlocated}`;
-  }
+  // `shown` comes where the band changed the stop — a clip at its edge, or a
+  // different match judged, which can be clean; `unlocated` only with a
+  // clean `fully: true` stop (scrollUntilVisible).
   const band = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
+  if (r.clipped.length === 0) {
+    const above = band === undefined ? '' : `, judged above the soft keyboard over ${frameText(band)}`;
+    const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
+    return `fully visible after ${n}${above}${unlocated}`;
+  }
   return (
     `visible after ${n} — ${describeClip(r.clipped, r.visible, band)}` +
     '. A rect assert or screenshot on this element will measure the CLIPPED box'
@@ -260,7 +263,12 @@ const frameWords = (viewport: Box, cover: Cover | undefined): string =>
  * judged. A failed or `fully: true` stop may add one more, the floating
  * row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
- * judged under one this round — which means a clip at its edge. A band that leaves nothing above
+ * judged under one this round — a clip at its edge, or another of several
+ * matches judged. The witness is no longer remembered, so one that times
+ * out costs its timeout (KEYBOARD_WITNESS_TIMEOUT_MS in adapters/android.ts,
+ * 2 s) on each round where the band matters; the deadline is checked once
+ * a round, after it, so the last round can run past `timeoutMs` by that
+ * wait on top of its reads. A band that leaves nothing above
  * it (its top at y ≤ 0 — a full-screen extract-mode IME, unmeasured) scores
  * every non-keyboard node 0 and fails at once, no stroke, naming it.
  *

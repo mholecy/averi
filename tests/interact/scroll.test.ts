@@ -221,6 +221,17 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.keys).toEqual([]);
   });
 
+  it('Android, two matches — one under the IME, one above it: the band changes WHICH is judged, so the clean stop says it was judged above the keyboard (review round 3)', async () => {
+    resetLayout();
+    const under = node({ role: 'button', identifier: 't', rect: { x: 66, y: 1906, width: 948, height: 73 } });
+    const above = node({ role: 'button', identifier: 't', rect: { x: 66, y: 500, width: 948, height: 73 } });
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [under, above] }) }, 's');
+    fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+    const result = await scrollUntilVisible(fake, 'id:t', FAST);
+    expect(result).toEqual({ swipes: 0, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IME } });
+    expect(describeScrollResult(result)).toBe('fully visible after 0 swipes, judged above the soft keyboard over [0,1398][1080,2220]');
+  });
+
   it('Android, a band that changes nothing (the target clear above it, a clean stop) is not asked about and not reported', async () => {
     const { fake } = androidForm({ startY: 500 });
     expect(await scrollUntilVisible(fake, 'id:priority_select', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
