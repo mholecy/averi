@@ -1182,7 +1182,9 @@ export class FlowEngine {
     // may tap a configured element — said on the fill line, since the step
     // did it — or leave the keyboard up with a reason, a `⚠ fill` line like
     // the masked-append one, so the next step's refusal is not a surprise.
-    // On the oracle model both are absent and the line is as it was. A
+    // On the oracle model `hiddenBy` is always absent, and `warning` is set
+    // only by its floating-keyboard row (2026-10-08: the input method says
+    // shown, the window state gives no area, nothing was pressed). A
     // dismissal that THROWS after tapping (AfterDismissalTap) gets its `⚠
     // fill` line before the `✗` through the guard's one catch
     // (tracingGuardFailure) — not tracingDismissal: the result has no

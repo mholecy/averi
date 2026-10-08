@@ -169,11 +169,15 @@ function judge(found: readonly UiNode[], tree: UiNode | undefined, viewport: Box
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
 const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== undefined && j.visible > 0 && (!fully || j.clipped.length === 0);
 
-/** The two judgements say the same thing about the same node. */
+/**
+ * The two judgements say the same thing about the same node. `clipped` is
+ * not compared: the box above a band lies inside the viewport, so the same
+ * node scoring the same fraction against both has no area between the
+ * band's top and the screen's bottom, and its edges agree (review round 1,
+ * 2026-10-08: the comparison was dead — a mutation dropping it survived).
+ */
 const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
-  a === undefined || b === undefined
-    ? a === b
-    : a.node === b.node && a.visible === b.visible && a.clipped.join() === b.clipped.join();
+  a === undefined || b === undefined ? a === b : a.node === b.node && a.visible === b.visible;
 
 /** What the stop judged against, for "never intersected …". */
 const frameWords = (viewport: Box, cover: Cover | undefined): string =>
@@ -235,10 +239,16 @@ const frameWords = (viewport: Box, cover: Cover | undefined): string =>
  * keyboard-window.ts). Review 2026-10-08: the window state was measured
  * stale for seconds after a navigating tap, and a phantom band would score
  * an on-screen target 0, send a stroke through the next screen and report
- * a keyboard that is gone. One witness query per call at most, asked the
- * first time a band matters and kept for the call (a scroll raises no
- * keyboard; one it hides leaves the window reading hidden); none on iOS,
- * whose band is read off the tree being judged. A band that does not
+ * a keyboard that is gone. The witness is asked the first time a band
+ * matters, and a NON-denial is kept for the call (a scroll raises no
+ * keyboard; one it hides leaves the window reading hidden). A denial is
+ * not kept (review round 1, 2026-10-08): a stale window on round 0 can be
+ * followed by a real keyboard — a new screen that auto-focuses a field —
+ * so after a denial the witness is asked again each round a band matters,
+ * until it stops denying: at most one query per round, the rounds bounded
+ * by `maxSwipes` (what one costs: AndroidAdapter's keyboardWitness). None
+ * on iOS, whose band is read off the tree being judged. A failed or
+ * `fully: true` stop may add one more, the floating row's (below). A band that does not
  * change the round is not reported either: the result carries `keyboard`
  * only when the stop was judged under one. A band that leaves nothing above
  * it (its top at y ≤ 0 — a full-screen extract-mode IME, unmeasured) scores
@@ -290,12 +300,14 @@ export async function scrollUntilVisible(
   // swipe" from "this element CANNOT be fully revealed", which is a real
   // layout defect rather than an impatient loop.
   let prevRect: Rect | undefined;
-  /** The last cover a round applied, and how many rounds applied one — for the failure text and for the stroke of a round whose tree did not read. */
+  /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   let lastCover: Cover | undefined;
   let coveredRounds = 0;
-  /** The witness's word on a `shown` band, asked once per call the first time a band matters (`keyboardCorroborated`). */
-  let corroborated: boolean | undefined;
-  const corroborate = async (): Promise<boolean> => (corroborated ??= await keyboardCorroborated(adapter));
+  /** True once the witness has stood by a `shown` band in this call (`keyboardCorroborated`); a denial is not kept — the next band that matters asks again. */
+  let corroborated = false;
+  const corroborate = async (): Promise<boolean> => (corroborated ||= await keyboardCorroborated(adapter));
+  /** The cover the last round whose tree READ applied — undefined when that round applied none — for the stroke of a round whose tree did not read. */
+  let lastReadCover: Cover | undefined;
   /** On a failed or `fully: true` stop only: the floating row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
   const unlocatedAt = async (round: SoftKeyboard | undefined): Promise<boolean> => round !== undefined && (await keyboardUnlocated(adapter, round));
   for (let swipes = 0; ; swipes++) {
@@ -327,12 +339,15 @@ export async function scrollUntilVisible(
       lastCover = cover;
       coveredRounds++;
     }
+    if (tree !== undefined) lastReadCover = cover;
     if (best !== undefined && best.visible > 0) {
       if (!fully || best.clipped.length === 0) {
         // Shown when the stop was judged under the band — or when the band
         // was moot this round but the witness already stood by it in this
-        // call (no query: then judging under it says the same thing).
-        const under = best.under ?? (offered !== undefined && corroborated === true ? offered.band : undefined);
+        // call (no query: then judging under it says the same thing). Never
+        // for the keyboard's own node: a key is not "above" the keyboard.
+        const keyboardSide = tree !== undefined && partOfKeyboard(tree, best.node);
+        const under = best.under ?? (offered !== undefined && corroborated && !keyboardSide ? offered.band : undefined);
         const keyboard: ScrollUntilResult['keyboard'] =
           under !== undefined
             ? { state: 'shown', frame: under }
@@ -423,10 +438,11 @@ export async function scrollUntilVisible(
     // other way (content below → finger up). See swipeVector. Under an
     // applied cover (2026-10-08) the box is cut to the part above the band,
     // so the stroke starts on the content, not on a key; a round whose tree
-    // did not read has no reading of its own and keeps the last cover
-    // applied, rather than stroke through the keyboard it last saw.
+    // did not read has no reading of its own and keeps the cover of the last
+    // round that DID read — none if that round applied none — rather than
+    // stroke through the keyboard it last saw.
     const { box } = await screenBox(adapter, read);
-    const strokeCover = tree === undefined ? lastCover : cover;
+    const strokeCover = tree === undefined ? lastReadCover : cover;
     const strokeBox = strokeCover === undefined ? box : { ...box, height: Math.min(box.height, strokeCover.band.y) };
     const { from, to } = swipeVector(strokeBox, direction, 'content');
     await adapter.swipe(from, to);

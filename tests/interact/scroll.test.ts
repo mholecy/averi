@@ -212,7 +212,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     );
   });
 
-  it('Android cost: ONE window query per round, the witness asked ONCE per call — the first time the band matters — and no key pressed', async () => {
+  it('Android cost: ONE window query per round, the witness asked the first time the band matters and not again once it stood by it, and no key pressed', async () => {
     const { fake } = androidForm({ startY: 2900 });
     await scrollUntilVisible(fake, 'id:priority_select', FAST);
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(4); // 3 swipes, 4 reads
@@ -240,11 +240,53 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect((error as Error).message).toBe('scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree');
   });
 
-  it('Android, a vetoed band leaves the stroke whole-screen too, and is asked about once for the call', async () => {
+  it('Android, a vetoed band leaves the stroke whole-screen too — and a denial is not kept: the witness is asked again on every round the band matters', async () => {
     const { fake } = androidForm({ startY: 2900, witness: 'hidden', keyboardTop: undefined });
-    await scrollUntilVisible(fake, 'id:priority_select', FAST);
+    const result = await scrollUntilVisible(fake, 'id:priority_select', FAST);
     expect(fake.swipes[0]).toEqual({ from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } }); // the whole 2220 screen's stroke
-    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+    // y 2900 and 2300 stroke (the band matters), y 1700 is under the band (the judgements differ): three rounds, three denials.
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(3);
+  });
+
+  it('Android, a denial followed by a real keyboard (review round 1: a stale window on round 0, then a new screen auto-focuses a field) — asked again, so the row under the IME is not "fully visible after 1 swipe"', async () => {
+    const { fake } = androidForm({ startY: 2506, keyboardTop: undefined });
+    fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'shown']; // denied once, then confirmed (a queued answer becomes the standing one)
+    const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
+    // Round 1 found the row at y 1906–1979, inside the IME: asked again, the band applied, one more swipe.
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IME } });
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(2);
+  });
+
+  it('a round whose tree did not read strokes in the box of the last round that DID read — whole-screen when that round applied no band', async () => {
+    const { fake } = androidForm({ startY: 2900, keyboardTop: undefined, perSwipe: 100 });
+    fake.attachedKeyboard.windowAnswers.queue = [{ state: 'shown', frame: IME }, { state: 'hidden' }];
+    const real = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (reads++ === 2) throw new Error('uiautomator dump returned no XML');
+      return real();
+    };
+    await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, maxSwipes: 3 }).catch(() => undefined);
+    expect(fake.swipes[0].from.y).toBe(1118); // round 0: the band applied
+    expect(fake.swipes[1].from.y).toBe(1776); // round 1: window hidden
+    expect(fake.swipes[2].from.y).toBe(1776); // round 2, unread: round 1's whole screen, not round 0's band
+  });
+
+  it('iOS (WDA band): once a band was applied, a later moot stop on the keyboard\'s OWN node does not call the key "above the soft keyboard"', async () => {
+    resetLayout();
+    const key = node({ role: 'button', identifier: 'kb_done', rect: { x: 300, y: 900, width: 80, height: 40 } });
+    const band = node({ role: KEYBOARD_ROLE, rect: { ...IOS_BAND }, children: [node({ role: 'container', ofKeyboard: true, rect: { ...IOS_BAND }, children: [key] })] });
+    class KeyFake extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        key.rect = { ...key.rect, y: key.rect.y - 100 };
+      }
+    }
+    const fake = new KeyFake({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [band] }) }, 's');
+    fake.keyboard = undefined;
+    // Round 0: the key below the screen, the round strokes — the band applied (in-tree: corroborated by construction).
+    expect(await scrollUntilVisible(fake, 'id:kb_done', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
   });
 
   it('a band from the top edge (y 0, a full-screen extract-mode IME — unmeasured) covers everything: no bare "fully visible", no stroke, a failure naming it', async () => {
@@ -269,7 +311,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(scrolled.attachedKeyboard.witnessAnswers.queries).toBe(0);
   });
 
-  it('a round whose tree did not read strokes in the box the last applied band left, not through the keyboard', async () => {
+  it('a round whose tree did not read strokes in the box the last read round\'s band left, not through the keyboard', async () => {
     const { fake } = androidForm({ startY: 2900 });
     const real = fake.uiTree.bind(fake);
     let reads = 0;

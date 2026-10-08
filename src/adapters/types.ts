@@ -302,9 +302,10 @@ export interface KeyboardOracle {
    * the caller has no tap point — the post-fill dismissal, and
    * `scroll_until` on a failed or `fully: true` stop
    * (interact/keyboard.ts#keyboardUnlocated, the floating-keyboard row:
-   * window hidden, input method shown, only reported) — and once per
-   * `scroll_until` call before a `shown` band may change its judgement or its
-   * stroke (keyboard.ts#keyboardCorroborated, the same veto). Those callers
+   * window hidden, input method shown, only reported) — and in
+   * `scroll_until` before a `shown` band may change its judgement or its
+   * stroke (keyboard.ts#keyboardCorroborated, the same veto; at most once a
+   * round, and not again once it has stood by a band). Those callers
    * (interact/keyboard-window.ts#windowUnlocated, #windowCorroborated) rely
    * on the never-throws contract above and have no catch.
    *
