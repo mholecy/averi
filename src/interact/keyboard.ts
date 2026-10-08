@@ -97,12 +97,18 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  *   dismissal tap — the model's number, its reason beside it.
  *
  * Cost on Android: ONE oracle query per tap when nothing covers the target
- * (what one call costs is measured on AndroidAdapter's keyboardState, the one
- * place the figures are kept); the second resolve and the second query
- * happen only in the overlap case, and so does the witness query
+ * and the keyboard reads hidden or unknown (what one call costs is measured
+ * on AndroidAdapter's keyboardState, the one place the figures are kept);
+ * TWO when it reads shown, since 2026-10-08 — the band's window region
+ * beside it (`touchable()`, AndroidAdapter's keyboardTouchable has the
+ * figures), because a floating Gboard's panel lies outside its 132-px band
+ * and a tap there pressed a key (docs/bugs/2026-10-05-android-floating-gboard-
+ * keyboard.md; `readSoftKeyboard` reads it, `keyboardOver` tests it). A
+ * point under the panel takes the band's path. The second resolve and the
+ * second look happen only in the overlap case, and so does the witness query
  * (AndroidAdapter's keyboardWitness has its cost). A `type_pin` keypad taps
  * once per digit, so it asks once per digit — a 6-digit PIN is 6 dumpsys
- * calls, six times that figure, beside six tree-settle waits of seconds
+ * calls (12 with a keyboard up), beside six tree-settle waits of seconds
  * each. On iOS: no device read for the keyboard on any look, ever. The
  * on-screen rule adds `viewport()` per tap, which the adapter memoizes:
  * one `wm size` / `idb describe` per adapter, re-asked only after a failed
@@ -195,9 +201,13 @@ export function dismissKeyboard(adapter: KeyboardAdapter, opts: DismissOptions):
  * caller that does not dismiss — `scroll_until`'s stop (scroll.ts) — asks
  * it, at the cost of one witness query, only when the window read hidden,
  * and only on a failed or `fully: true` stop (review 2026-10-08: not on
- * every clean stop, where the answer changes nothing the reader does). The tap guard does NOT ask it: its clear path is pinned to one
- * oracle query per tap, and a frameless keyboard gives it no point to test
- * against anyway (the bug note's residual).
+ * every clean stop, where the answer changes nothing the reader does). The
+ * tap guard does NOT ask it: a frameless keyboard gives it no point to test
+ * against. The floating Gboard this row was written for was measured the
+ * same evening NOT to be frameless on API 33 — a 132-px band plus a panel,
+ * which the guard now reads (`panels`, ui-tree/soft-keyboard.ts#panelsBeyond)
+ * — so what is left to this row is a window reading hidden beside an IME
+ * the input method says is shown (keyboard-window.ts#UNLOCATED_KEYBOARD).
  */
 export function keyboardUnlocated(adapter: Pick<KeyboardAdapter, 'keyboard'>, window: SoftKeyboard): Promise<boolean> {
   return adapter.keyboard === undefined ? Promise.resolve(false) : windowUnlocated(adapter.keyboard, window);

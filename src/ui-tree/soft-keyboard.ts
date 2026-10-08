@@ -1,4 +1,5 @@
-import { everyNode, KEYBOARD_ROLE, rectArea, type DeviceAdapter, type SoftKeyboard, type UiNode } from '../adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, sameRect, type DeviceAdapter, type KeyboardOracle, type KeyboardTouchable, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
+import { rectText } from './geometry.js';
 
 /**
  * What the TREE says about the soft keyboard (2026-10-07): the in-tree half
@@ -168,6 +169,141 @@ export function cannotHide(advice: string | undefined): string {
   return advice === undefined ? CANNOT_HIDE : `${CANNOT_HIDE} (${advice})`;
 }
 
+/**
+ * What `panelsBeyond` made of one region: the rects admitted beside the
+ * band, and — when the region held something it did NOT admit, or could not
+ * be read although the input method answered — why, as a clause, for the
+ * one-line notice `oracleKeyboard` writes (review 2026-10-08: a device check
+ * must be able to tell "no panel" from "a panel refused, and for which
+ * reason"). `ignored` is absent for a region that is just the band (docked)
+ * and for a call that failed whole (nothing was learned).
+ */
+export interface RegionVerdict {
+  panels: readonly Rect[];
+  ignored?: string;
+}
+
+/**
+ * Which rects of the keyboard window's touchable region count as covered
+ * BESIDE the inset band (2026-10-08, the floating-Gboard device check:
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Measured on
+ * API 33 (emulator-5554, 1080x2220): a floating Gboard's band was its
+ * 132-px collapse strip `[0,2088][1080,2220]` and its region
+ * `SkRegion((359,1269,1040,1912)(0,2088,1080,2220))` — the panel is the
+ * second rect; a docked one's region was exactly its band; a HIDDEN one's
+ * region was not empty, and after a landscape keyboard it was stale, in
+ * landscape coordinates, in portrait. So the region is never evidence on
+ * its own, and the rules are:
+ * - only beside a `shown` band — the caller (`oracleKeyboard`) asks the
+ *   region only then;
+ * - only when the input method, in the same call, says SHOWN — `hidden` and
+ *   `unknown` alike admit nothing: this is a precondition for new evidence,
+ *   not the veto over a band the window state already reported
+ *   (interact/keyboard-window.ts#witnessDenies), so a witness that cannot be
+ *   asked leaves the band alone, as before this date;
+ * - only a region that holds the band itself, byte for byte — every shown
+ *   region measured did; one that does not is not of this moment (the
+ *   stale-rotation case) or not of a shape that was measured, and is
+ *   ignored whole;
+ * - of the rest, every rect with positive area that lies inside the screen
+ *   the band spans — from 0,0 to the band's right and bottom edges, the
+ *   current orientation by construction (a docked or collapsed band runs
+ *   the screen's width to its bottom) — and is not the band.
+ * Fail open everywhere, as the rest of the reader: an unreadable region
+ * (`undefined`) is none. Docked: nothing beyond the band — behaviour
+ * unchanged.
+ *
+ * THE BRITTLE PART (review 2026-10-08): the exact-band test. A floating
+ * keyboard whose region strip is not equal to its inset frame — another
+ * navigation mode, a strip that leaves out the nav bar, an IME whose
+ * touchable insets differ from its content insets, a band that is not full
+ * width (a side nav bar, landscape, a split keyboard), where Skia's region
+ * would merge a panel sharing its rows into other rects — has its whole
+ * region dropped, and the panel goes back to being invisible: the `d`-key
+ * tap of the device check, no worse than before this date. None of these is
+ * measured; each refusal is SAID once (`ignored`, `oracleKeyboard`), so a
+ * device check can tell them apart.
+ */
+export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): RegionVerdict {
+  const { witness, region } = touchable;
+  if (region === undefined) {
+    // Said only when the input method answered: then the call ran, and the region line was missing or unreadable.
+    return witness === 'shown' ? { panels: [], ignored: 'the region could not be read' } : { panels: [] };
+  }
+  const beyond = region.filter((r) => !sameRect(r, band));
+  if (beyond.length === 0) return { panels: [] }; // the band alone (docked), or an empty region
+  if (witness !== 'shown') return { panels: [], ignored: `the input method said ${witness} in the same call` };
+  if (!region.some((r) => sameRect(r, band))) return { panels: [], ignored: 'no rect of it is the band' };
+  const right = band.x + band.width;
+  const bottom = band.y + band.height;
+  const panels = beyond.filter((r) => rectArea(r) > 0 && r.x >= 0 && r.y >= 0 && r.x + r.width <= right && r.y + r.height <= bottom);
+  const dropped = beyond.length - panels.length;
+  return dropped === 0 ? { panels } : { panels, ignored: `${dropped} of its rects lie outside the screen the band spans, or have no area` };
+}
+
+/** The notices `oracleKeyboard` has written in this process — each distinct one once. */
+const noticed = new Set<string>();
+
+/**
+ * The ORACLE's reading of the keyboard, whole (review 2026-10-08): `state()`,
+ * and — when it reads shown — `touchable()` with `panelsBeyond` over it, so
+ * the reading carries the floating panel as `panels`. THE one place an
+ * oracle reading is composed: `readSoftKeyboard` (every look of the guard,
+ * the pixel poll's round, `scroll_until`'s round) and the guard's re-check
+ * loop after a witness veto (interact/keyboard-window.ts) both read through
+ * here. Until the review that loop read `state()` alone: a point the first
+ * look found under the PANEL read clear on the strip once the witness had
+ * said hidden, and the tap went to Gboard's `d` key with a note about a
+ * wait.
+ *
+ * Cost: one `state()` query; with the band up, one `touchable()` query more
+ * (AndroidAdapter's keyboardState and keyboardTouchable have the figures).
+ *
+ * A region `panelsBeyond` refused is said ONCE per distinct case, as a
+ * one-line `averi:` notice on stderr — the channel the adapters already use
+ * for a non-fatal note (adapters/wda.ts, adapters/ios.ts); stdout is the MCP
+ * protocol's. It reaches ONLY the server's stderr — not an MCP tool result,
+ * not a flow trace — so a device check that wants to know why a panel was
+ * not judged reads the server's log. Nothing else changes: the band alone,
+ * as before 2026-10-08.
+ */
+export async function oracleKeyboard(oracle: KeyboardOracle): Promise<SoftKeyboard> {
+  const keyboard = await oracle.state();
+  if (keyboard.state !== 'shown') return keyboard;
+  const touchable = await oracle.touchable();
+  const { panels, ignored } = panelsBeyond(keyboard.frame, touchable);
+  if (ignored !== undefined) {
+    const region = touchable.region === undefined ? 'region' : `region ${touchable.region.map(rectText).join(' + ') || '(empty)'}`;
+    const line =
+      `averi: the soft keyboard window's touchable ${region} beside its band ${rectText(keyboard.frame)} — ` +
+      `${ignored}, so ${panels.length === 0 ? 'no panel of it is' : 'only part of it is'} judged as covered ` +
+      '(docs/bugs/2026-10-05-android-floating-gboard-keyboard.md)';
+    if (!noticed.has(line)) {
+      noticed.add(line);
+      console.error(line);
+    }
+  }
+  return panels.length === 0 ? keyboard : { ...keyboard, panels };
+}
+
+/**
+ * Every rect a `shown` keyboard covers — the band, then its panels
+ * (`panelsBeyond`) — the one list the readers test a point or a rect
+ * against: the tap guard (interact/keyboard-model.ts#keyboardOver), the
+ * pixel poll (verify/pixel-poll.ts) and `scroll_until`'s cover
+ * (interact/scroll.ts#coverOf, through `highestCover`).
+ */
+export const keyboardRects = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): readonly Rect[] => [keyboard.frame, ...(keyboard.panels ?? [])];
+
+/**
+ * The covered rect whose TOP edge is highest — the band, or a floating
+ * panel above it — for a reader that keeps the screen above the keyboard
+ * (`scroll_until`): above that edge, nothing of the keyboard lies. Ties keep
+ * the band.
+ */
+export const highestCover = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): Rect =>
+  keyboardRects(keyboard).reduce((top, r) => (r.y < top.y ? r : top));
+
 /** One reading of the soft keyboard for one subject node, and what the adapter can do about a covering one. */
 export interface SoftKeyboardReading extends KeyboardRemedy {
   /** The keyboard's state and frame; `unknown` when the subject is part of the keyboard's own UI, whatever is on screen. */
@@ -201,6 +337,31 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  * `scroll_until` (interact/scroll.ts) judges every match against one
  * reading per round and exempts the keyboard's own nodes itself, with
  * `partOfKeyboard`, so one round still costs one oracle query.
+ *
+ * Since 2026-10-08 the oracle is read through `oracleKeyboard`: a `shown`
+ * reading costs a SECOND query, `touchable()`, the keyboard window's region
+ * beside the input method's word, read into `panels` (`panelsBeyond` — a
+ * floating Gboard's panel, which the band does not cover); a hidden or
+ * unknown one costs one, as before. Every reader tests the band and the
+ * panels alike (`keyboardRects`). What a caller pays in all, on Android
+ * (each adb call's figures are on AndroidAdapter's keyboardState,
+ * keyboardTouchable and keyboardWitness):
+ * - a tap, the keyboard hidden or unknown: 1; up but clear of the point: 2;
+ *   covering it: 2, the witness, `back`, then the look after it — 1 more
+ *   when the keyboard went, 2 when it still reads shown; a witness veto
+ *   adds, per re-check round, 3 while it still reads shown (state,
+ *   touchable, witness) or 1 once it does not;
+ * - a pixel-poll round: 1, or 2 with the keyboard up (no witness);
+ * - a `scroll_until` round: 1, or 2 with the keyboard up, or 3 when the band
+ *   changes the round (its `keyboardCorroborated` witness), plus the
+ *   floating row's witness on a failed or `fully: true` stop. The
+ *   touchable call's own `mInputShown`, read a moment before, could serve
+ *   that veto and save the third call; it is not reused (judged 2026-10-08,
+ *   review round 1): the reading would carry a witness only on the shown
+ *   path, the veto would then take its input from two places — the reading
+ *   or a fresh query — and the round loop that would thread it is being
+ *   rewritten beside this change. One call a round, at most `maxSwipes` + 1
+ *   rounds; a follow-up once that rewrite has landed.
  */
 export async function readSoftKeyboard(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
@@ -210,6 +371,6 @@ export async function readSoftKeyboard(
   const dismissal = adapter.keyboard === undefined ? 'none' : 'back';
   const advice = dismissal === 'none' ? adapter.keyboardAdvice : undefined;
   if (subject !== undefined && partOfKeyboard(tree, subject)) return { keyboard: { state: 'unknown' }, dismissal, advice };
-  const keyboard = adapter.keyboard === undefined ? keyboardInTree(tree) : await adapter.keyboard.state();
+  const keyboard = adapter.keyboard === undefined ? keyboardInTree(tree) : await oracleKeyboard(adapter.keyboard);
   return { keyboard, dismissal, advice };
 }

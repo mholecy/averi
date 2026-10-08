@@ -61,11 +61,11 @@ const submit = (fake: FakeAdapter): UiNode => fake.live().children[1];
 const NOTE = 'the soft keyboard covered id:login_submit; hidden before tapping';
 
 describe('tapElement — a target under the Android soft keyboard is not tapped through it', () => {
-  it('target OUTSIDE the keyboard frame: one keyboard query, no back, the tap lands on the point first resolved, no note', async () => {
+  it('target OUTSIDE the keyboard frame: one keyboard query (and, the band being up, its window region beside it — 2026-10-08), no back, the tap lands on the point first resolved, no note', async () => {
     const fake = loginFake();
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_password', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'tap:540,1166']);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'tap:540,1166']);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0); // the independent witness is never asked on an ordinary tap
     expect(fake.keys).toEqual([]);
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
@@ -82,7 +82,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
       move(key, self);
     };
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
     expect(sleptBeforeBack).toEqual([FAST.pollMs]); // the hide delay comes AFTER the key press, not before it
     expect(fake.tapPoints).toEqual([{ x: 249, y: SUBMIT_AFTER_RESIZE_Y + 66 }]); // not the stale (249,1466)
     expect(result).toEqual({ note: NOTE, keyboardHidden: NOTE });
@@ -307,7 +307,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     const without = await run();
     const withThem = await run([TITLE_TAP, ACCESSORY]);
     expect(withThem).toEqual(without);
-    expect(withThem.events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
+    expect(withThem.events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
     expect(withThem.taps).toEqual(['login_submit']);
   });
 });
@@ -340,7 +340,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     const fake = loginFake();
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
     expect(result).toEqual({ note: NOTE, keyboardHidden: NOTE });
   });
 
@@ -349,7 +349,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     fake.attachedKeyboard.windowAnswers.queue = [SHOWN, { state: 'hidden' }];
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'keyboard?', 'read', 'read', 'tap:249,1466']);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'read', 'read', 'tap:249,1466']);
     expect(fake.keys).toEqual([]);
     expect(sleeps).toEqual([FAST.pollMs, POLL, FAST.pollMs]);
     const sentence = `${DISAGREEMENT}; waited 500ms for it to clear`;
@@ -367,7 +367,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
       return ask.call(fake.attachedKeyboard);
     };
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'keyboard?', 'witness?', 'keyboard?', 'witness?', 'keyboard?', 'read', 'read', 'tap:249,1566']);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'read', 'read', 'tap:249,1566']);
     expect(sleeps).toEqual([FAST.pollMs, POLL, POLL, POLL, FAST.pollMs]);
     expect(fake.keys).toEqual([]);
     expect(result.keyboardHidden).toBe(`${DISAGREEMENT}; waited 1500ms for it to clear`);
@@ -397,9 +397,9 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
     expect(events).toEqual([
-      'read', 'read', 'keyboard?', 'witness?', // vetoed
-      'keyboard?', 'witness?', // still disagreeing
-      'keyboard?', 'witness?', 'key:back', // the witness now confirms
+      'read', 'read', 'keyboard?', 'touchable?', 'witness?', // vetoed
+      'keyboard?', 'touchable?', 'witness?', // still disagreeing (the band up: its region read too)
+      'keyboard?', 'touchable?', 'witness?', 'key:back', // the witness now confirms
       'read', 'read', 'keyboard?', 'tap:249,1766',
     ]);
     expect(sleeps).toEqual([FAST.pollMs, POLL, POLL, KEYBOARD_HIDE_DELAY_MS, FAST.pollMs]);
@@ -481,7 +481,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     expect(fake.keys).toEqual([]);
     expect(fake.taps).toEqual([]);
     expect(sleeps).toEqual([FAST.pollMs, POLL, POLL, POLL, POLL, POLL, POLL]);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', ...Array(6).fill(['keyboard?', 'witness?']).flat()]);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', ...Array(6).fill(['keyboard?', 'touchable?', 'witness?']).flat()]);
   });
 
   it('witness CANNOT TELL at the first ask: back as before the veto existed (the fallback), asked once and before the key', async () => {
@@ -489,7 +489,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     fake.attachedKeyboard.witnessAnswers.current = 'unknown';
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
-    expect(events).toEqual(['read', 'read', 'keyboard?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:249,1766']);
     expect(result.keyboardHidden).toBe(NOTE);
   });
 
@@ -715,9 +715,107 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     expect(fake.current).toBe('s');
     expect(result).toEqual({
       warning:
-        'the input method reports a soft keyboard shown, but the window state gives it no area on screen (a floating keyboard? ' +
-        'inferred, not measured), so where it lies is unknown — nothing was pressed (back would pop the screen if no keyboard ' +
+        'the input method reports a soft keyboard shown, but the window state gives it no area on screen (one still coming up? ' +
+        'not measured), so where it lies is unknown — nothing was pressed (back would pop the screen if no keyboard ' +
         'is up); if one is, hide or dock it before the next step',
     });
+  });
+});
+
+/**
+ * The floating Gboard (device check 2026-10-08, emulator-5554, API 33 —
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md): the window state
+ * reads only the 132-px collapse strip as the band, the panel at
+ * [359,1269][1040,1912] is a second rect of the IME window's touchable
+ * region, and a tap on a field whose centre (540,1586) lay inside the panel
+ * pressed Gboard's `d` key. The panel now covers as the band does: the same
+ * witness, the same one `back` (measured that day to hide the floating
+ * keyboard and leave the form), the same look.
+ */
+describe('tapElement — a target under a FLOATING keyboard\'s panel, above its band (2026-10-08)', () => {
+  const STRIP: Rect = { x: 0, y: 2088, width: 1080, height: 132 };
+  const PANEL: Rect = { x: 359, y: 1269, width: 681, height: 643 };
+  const FLOATING_REGION = { witness: 'shown' as const, region: [PANEL, STRIP] };
+
+  function sepaFake() {
+    const fake = new FakeAdapter(
+      {
+        form: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 1080, height: 2220 },
+          children: [
+            node({ role: 'textfield', identifier: 'iban_input', rect: { x: 0, y: 930, width: 1080, height: 140 } }),
+            node({ role: 'textfield', identifier: 'message_for_payee_input', rect: { x: 0, y: 1515, width: 1080, height: 142 } }),
+          ],
+        }),
+      },
+      'form',
+    );
+    fake.attachKeyboard({ state: 'shown', frame: STRIP }, 'shown');
+    fake.attachedKeyboard.touchableAnswers.current = FLOATING_REGION;
+    return fake;
+  }
+
+  it('a target inside the panel: the region read, the witness, back once, one look, then the tap — not a key press', async () => {
+    const fake = sepaFake();
+    const events = recorded(fake);
+    const result = await tapElement(fake, 'id:message_for_payee_input', FAST);
+    // Until this date: ['read', 'read', 'keyboard?', 'tap:540,1586'] — the panel's `d` key.
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:540,1586']);
+    expect(fake.keys).toEqual(['back']);
+    expect(result.keyboardHidden).toBe('the soft keyboard covered id:message_for_payee_input; hidden before tapping');
+  });
+
+  it('a witness VETO on a point under the panel: the re-check reads the panel too — it waits, and backs once the input method confirms, never taps a key (review 2026-10-08)', async () => {
+    const fake = sepaFake();
+    fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'shown'];
+    const events = recorded(fake);
+    const result = await tapElement(fake, 'id:message_for_payee_input', FAST);
+    // Until the review the round read state() alone — the strip — called the point clear and tapped (540,1586):
+    // ['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'read', 'read', 'tap:540,1586'].
+    expect(events).toEqual([
+      'read', 'read', 'keyboard?', 'touchable?', 'witness?', // vetoed
+      'keyboard?', 'touchable?', 'witness?', 'key:back', // still under the panel; the input method now confirms
+      'read', 'read', 'keyboard?', 'tap:540,1586',
+    ]);
+    expect(fake.keys).toEqual(['back']);
+    expect(result.keyboardHidden).toBe(
+      'the soft keyboard covered id:message_for_payee_input; hidden before tapping (after waiting 500ms for the input method to confirm it)',
+    );
+  });
+
+  it('a target clear of the panel and the band: two queries (the band is up, so its region is read), no witness, no key', async () => {
+    const fake = sepaFake();
+    const events = recorded(fake);
+    await tapElement(fake, 'id:iban_input', FAST);
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'tap:540,1000']);
+    expect(fake.keys).toEqual([]);
+  });
+
+  it('the input method not saying shown in the region\'s own call: no panel — the band alone, as before this date (fail open)', async () => {
+    const fake = sepaFake();
+    fake.attachedKeyboard.touchableAnswers.current = { ...FLOATING_REGION, witness: 'unknown' };
+    await tapElement(fake, 'id:message_for_payee_input', FAST);
+    expect(fake.keys).toEqual([]);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1586 }]);
+  });
+
+  it('a panel that back does not close: the refusal quotes the PANEL\'s frame, nothing tapped', async () => {
+    const fake = sepaFake();
+    fake.onKey = (key, self) => {
+      if (key === 'back') self.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: STRIP };
+    };
+    const err = await tapElement(fake, 'id:message_for_payee_input', FAST).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AfterKeyboardDismissal);
+    expect((err as Error).message).toContain('the keyboard frame [359,1269][1040,1912] still contains the tap point (540,1586)');
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('keyboardOver tests the band and every panel, and names the rect that holds the point', () => {
+    const floating = { state: 'shown' as const, frame: STRIP, panels: [PANEL] };
+    expect(keyboardOver(floating, { x: 540, y: 1586 })).toEqual({ over: 'covering', frame: PANEL });
+    expect(keyboardOver(floating, { x: 540, y: 2100 })).toEqual({ over: 'covering', frame: STRIP });
+    expect(keyboardOver(floating, { x: 200, y: 1586 })).toEqual({ over: 'clear' }); // beside the panel, above the strip
+    expect(keyboardOver({ state: 'shown', frame: STRIP }, { x: 540, y: 1586 })).toEqual({ over: 'clear' });
   });
 });

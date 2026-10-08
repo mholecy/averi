@@ -139,8 +139,9 @@ The `color` and `ocr` asserts poll for up to 12 s by default (`timeout` per spec
 3 s). Each round measures only a frame whose ELEMENT region held still across two captures 300 ms
 apart (falling back to the whole screen when the region cannot be checked), so "the screen did
 not settle" usually means the element's own region kept changing — a spinner or fade inside it.
-A round whose element is overlapped by the soft keyboard (Android: the window state; iOS under
-`treeSource: wda`: the tree's keyboard band) is a fail-closed miss that names both rects and
+A round whose element is overlapped by the soft keyboard (Android: the window state's band and,
+since 2026-10-08, a floating keyboard's panel read from the keyboard window's touchable region;
+iOS under `treeSource: wda`: the tree's keyboard band) is a fail-closed miss that names both rects and
 captures nothing; the poll keeps going, so a keyboard that hides before the deadline costs a
 round, not the verdict.
 

@@ -235,7 +235,24 @@ export type KeyboardWitness = 'shown' | 'hidden' | 'unknown';
  * rects (Android: pixels), so a tap point can be tested against it directly.
  */
 export type SoftKeyboard =
-  | { state: 'shown'; frame: Rect }
+  | {
+      state: 'shown';
+      frame: Rect;
+      /**
+       * Rects the keyboard's WINDOW covers beyond `frame`, the inset band
+       * (2026-10-08, docs/bugs/2026-10-05-android-floating-gboard-keyboard.md):
+       * a floating Gboard on API 33 keeps only a 132-px collapse strip as its
+       * IME inset — `frame` — while its panel, mid-screen, is a second rect of
+       * the IME window's touchable region. Never set by `KeyboardOracle.state()`
+       * (one command, the band only): `ui-tree/soft-keyboard.ts#readSoftKeyboard`,
+       * the one reader, adds them from `KeyboardOracle.touchable()` when the
+       * band is up, by `panelsBeyond`'s rules. Absent: none, or not read (the
+       * in-tree model, a docked keyboard whose region IS the band, a region
+       * that could not be trusted). Every reader that tests the keyboard
+       * against a point or a rect tests `frame` AND these (`keyboardRects`).
+       */
+      panels?: readonly Rect[];
+    }
   | { state: 'hidden' }
   /** The platform did not answer, or answered in a shape the adapter does not recognise. Callers behave as before the question existed. */
   | { state: 'unknown' };
@@ -326,6 +343,34 @@ export interface KeyboardOracle {
    * cost the policy is pinned to.
    */
   witness(): Promise<KeyboardWitness>;
+  /**
+   * The keyboard WINDOW's touchable region and the input method's word,
+   * read together in ONE call (2026-10-08, the floating-Gboard device check:
+   * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Raw facts, no
+   * policy: what of the region counts as covered — only beside a `shown`
+   * band, only with the input method saying shown, only rects that fit the
+   * band's screen, never the band itself — is
+   * `ui-tree/soft-keyboard.ts#panelsBeyond`'s, and `readSoftKeyboard` asks
+   * this only after `state()` read `shown` (the region alone was measured
+   * non-empty while hidden and stale after a rotation, so it is never
+   * evidence on its own). A method of its own, not part of `state()`, for
+   * the reason `witness` gives: one call that sometimes runs two commands
+   * would hide the cost. Never throws: a failed call is
+   * `{ witness: 'unknown', region: undefined }`.
+   */
+  touchable(): Promise<KeyboardTouchable>;
+}
+
+/**
+ * What `KeyboardOracle.touchable()` read: the input method's own "shown"
+ * (the same fact as `witness()`, from the same call as the region, so the
+ * two are of one moment) and the keyboard window's touchable region as
+ * rects in screen units — `undefined` when the call failed, printed no
+ * region, or printed one the adapter could not read whole.
+ */
+export interface KeyboardTouchable {
+  witness: KeyboardWitness;
+  region: readonly Rect[] | undefined;
 }
 
 /**

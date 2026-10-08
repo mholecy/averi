@@ -1,5 +1,5 @@
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -321,12 +321,19 @@ export class FakeKeyboard implements KeyboardOracle {
   async witness(): Promise<KeyboardWitness> {
     return this.witnessAnswers.next();
   }
+
+  /** The keyboard window's touchable region with the input method's word (2026-10-08). Default: the witness could not be asked and no region read — no panel, the band alone, as before that date. */
+  readonly touchableAnswers = new ScriptedAnswer<KeyboardTouchable>({ witness: 'unknown', region: undefined });
+
+  async touchable(): Promise<KeyboardTouchable> {
+    return this.touchableAnswers.next();
+  }
 }
 
 /** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll — the two keyboard-*.test.ts files share it (fill.test.ts keeps an identical one of its own). */
 export const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
 
-/** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `key:back`, `tap:x,y`. */
+/** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `touchable?` (2026-10-08), `key:back`, `tap:x,y`. */
 export function recorded(fake: FakeAdapter): string[] {
   const events: string[] = [];
   const wrap = <T extends object, K extends keyof T>(on: T, name: K, label: (...args: never[]) => string) => {
@@ -340,6 +347,7 @@ export function recorded(fake: FakeAdapter): string[] {
   if (fake.keyboard !== undefined) {
     wrap(fake.keyboard, 'state', () => 'keyboard?');
     wrap(fake.keyboard, 'witness', () => 'witness?');
+    wrap(fake.keyboard, 'touchable', () => 'touchable?');
   }
   wrap(fake, 'pressKey', (key: string) => `key:${key}`);
   wrap(fake, 'tap', (x: number, y: number) => `tap:${x},${y}`);

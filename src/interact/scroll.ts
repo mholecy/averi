@@ -1,7 +1,7 @@
 import type { DeviceAdapter, DeviceScreen, Rect, SoftKeyboard, Stroke, UiNode } from '../adapters/types.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { cannotHide, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, highestCover, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
@@ -142,13 +142,25 @@ type Edge = 'top' | 'bottom' | 'left' | 'right';
  * A shown soft keyboard as the round may apply it (2026-10-08): its frame,
  * the part of the screen it leaves — everything above its TOP edge, full
  * width — and what the adapter can do about it. Above the top edge, not
- * around the band: a docked keyboard (the only kind measured, Android IME
- * [0,1398][1080,2220], WDA band from y 539/589 of 874) runs to the bottom,
- * so the two are the same; a band that does not (an iPad split or floating
- * keyboard, unmeasured) costs content below it, which can only make the
+ * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
+ * band from y 539/589 of 874) runs to the bottom, so the two are the same;
+ * a band that does not costs content below it, which can only make the
  * scroll swipe more or fail naming the keyboard — never report as visible
  * what is under it. `above` undefined: the band starts at or above y 0 and
  * leaves nothing (a full-screen extract-mode IME, unmeasured).
+ *
+ * `band` is the HIGHEST covered rect (`highestCover`), since 2026-10-08 not
+ * always the inset band: with a floating Gboard (measured that day, API 33)
+ * it is the panel, [359,1269][1040,1912], 681 px wide and mid-screen. The
+ * invariant: only its `.y` is meaningful as a cut — the rect need not be
+ * full width nor reach the bottom; the rest of it is quoted in messages.
+ * The cost of the full-width cut, accepted (it never certifies a covered
+ * target): content beside the panel (x < 359 there) and in the gap between
+ * the panel and the strip below it is never judged visible, so a target
+ * there that cannot be scrolled above the panel fails `scroll_until` with
+ * the keyboard named, though the tap guard — which tests the panel's rect
+ * itself — would tap it; and a panel dragged near the top leaves a short
+ * stroke box (a residual).
  */
 interface Cover {
   band: Rect;
@@ -159,7 +171,12 @@ interface Cover {
 /** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
 function coverOf(reading: SoftKeyboardReading | undefined, viewport: DeviceScreen): Cover | undefined {
   if (reading?.keyboard.state !== 'shown') return undefined;
-  const band = reading.keyboard.frame;
+  // The highest covered rect, not always the inset band (2026-10-08): a
+  // floating Gboard's panel mid-screen above its 132-px strip
+  // (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md) — so a target
+  // behind it is judged under the cover and the stroke starts above it. Full
+  // width above its top, as for any band that does not reach the sides.
+  const band = highestCover(reading.keyboard);
   if (band.y >= viewport.height) return undefined;
   return { band, above: band.y <= 0 ? undefined : { width: viewport.width, height: band.y }, remedy: reading };
 }
@@ -537,7 +554,9 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * nothing for 15 s; the same on iOS 27 with the pad up (y ≈ 699 of 874). So
  * every round reads the keyboard the way the tap guard and the pixel poll do
  * — `readSoftKeyboard` on the round's tree (the oracle's `state()` on
- * Android, one query a round; the WDA band on iOS, no device read) — and
+ * Android, one query a round, two with the keyboard up since 2026-10-08 —
+ * its window's region, for a floating panel — and three when the band
+ * changes the round, the witness below; the WDA band on iOS, no device read) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
  * shown keyboard (`coverOf`): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke keeps clear of it
@@ -819,7 +838,7 @@ export async function scrollUntilVisible(
       const seenAs = everFound ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
       throw absenceError(
         `scroll_until ${describe} failed after ${swipesText(swipes)} — ${seenAs}; the soft keyboard over ` +
-          `${frameText(cover.band)} covers the whole screen, so nothing under it can be judged and no swipe was sent — ` +
+          `${frameText(cover.band)} ${cover.band.y + cover.band.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
           hideToJudgeWholeScreen(cover.remedy),
         { sighted: everFound, treesRead, readError: lastReadError },
       );

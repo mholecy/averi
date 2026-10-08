@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
-import { AndroidAdapter, parseImeInsets, parseInputShown, parseUiautomatorXml } from '../../src/adapters/android.js';
+import { AndroidAdapter, parseImeInsets, parseInputShown, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
-import { INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
+import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -846,6 +846,84 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
       throw failure;
     };
     await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('unknown');
+  });
+});
+
+/**
+ * The keyboard window's touchable region with the input method's word, one
+ * adb call (2026-10-08, the floating-Gboard device check —
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). The adapter
+ * reads; what counts is ui-tree/soft-keyboard.ts#panelsBeyond's (its tests).
+ */
+describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable region, read beside mInputShown', () => {
+  it('reads the four measured regions as rects: floating (panel + strip), docked (the band), hidden (the strip), stale landscape', () => {
+    expect(parseTouchableRegion(GBOARD.floating.touchable)).toEqual([GBOARD_PANEL, GBOARD_STRIP]);
+    expect(parseTouchableRegion(GBOARD.docked.touchable)).toEqual([{ x: 0, y: 1398, width: 1080, height: 822 }]);
+    expect(parseTouchableRegion(GBOARD.hidden.touchable)).toEqual([GBOARD_STRIP]);
+    expect(parseTouchableRegion(GBOARD.staleLandscape.touchable)).toEqual([{ x: 0, y: 948, width: 2220, height: 132 }]);
+  });
+
+  it('any count, any whitespace between the numbers and the groups; an empty region is no rect', () => {
+    expect(parseTouchableRegion('    touchable region=SkRegion( ( 359, 1269 ,1040,1912 )  (0,2088,1080,2220) )\n')).toEqual([GBOARD_PANEL, GBOARD_STRIP]);
+    expect(parseTouchableRegion('touchable region=SkRegion((0,0,10,10)(0,10,20,20)(5,20,6,30))')).toEqual([
+      { x: 0, y: 0, width: 10, height: 10 },
+      { x: 0, y: 10, width: 20, height: 10 },
+      { x: 5, y: 20, width: 1, height: 10 },
+    ]);
+    expect(parseTouchableRegion('  touchable region=SkRegion()\n')).toEqual([]);
+    // Two lines that say the same thing are one region.
+    expect(parseTouchableRegion(GBOARD.floating.touchable + GBOARD.floating.touchable)).toEqual([GBOARD_PANEL, GBOARD_STRIP]);
+  });
+
+  it.each([
+    ['no such line (grep matched nothing)', '  mInputShown=true\n'],
+    ['empty output', ''],
+    ['a region that is not wholly (l,t,r,b) groups', '  touchable region=SkRegion((359,1269,1040,1912)junk(0,2088,1080,2220))\n'],
+    ['a truncated region', '  touchable region=SkRegion((359,1269,1040\n'],
+    ['three numbers to a group', '  touchable region=SkRegion((359,1269,1040))\n'],
+    ['another notation', '  touchable region=Region[0,2088][1080,2220]\n'],
+    ['a rect with right < left', '  touchable region=SkRegion((1040,1269,359,1912))\n'],
+    ['two lines that disagree', GBOARD.floating.touchable + '  touchable region=SkRegion((0,1398,1080,2220))\n'],
+    ['a readable line beside one that is not (no line is dropped to make the rest agree)', GBOARD.floating.touchable + '  touchable region=SkRegion((359,1269\n'],
+  ])('cannot read → undefined (no panel, the band alone): %s', (_name, out) => {
+    expect(parseTouchableRegion(out)).toBeUndefined();
+  });
+
+  it('is exactly one adb call — the witness\'s filtered read, then the region\'s, on the device — with a 2 s budget, both answers from it', async () => {
+    const calls: { cmd: string; args: string[]; timeoutMs?: number }[] = [];
+    const fn: ExecFn = async (cmd, args, opts) => {
+      calls.push({ cmd, args, timeoutMs: opts?.timeoutMs });
+      return { stdout: Buffer.from(GBOARD.floating.touchable), stderr: '' };
+    };
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.touchable()).resolves.toEqual({
+      witness: 'shown',
+      region: [GBOARD_PANEL, GBOARD_STRIP],
+    });
+    expect(calls).toEqual([
+      {
+        cmd: 'adb',
+        args: ['-s', 'emulator-5554', 'shell', "dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true"],
+        timeoutMs: 2_000,
+      },
+    ]);
+  });
+
+  it('either half alone is read: the witness without a region, the region without a witness', async () => {
+    const answer = async (out: string) =>
+      new AndroidAdapter({ serial: 'emulator-5554', exec: async () => ({ stdout: Buffer.from(out), stderr: '' }) }).keyboard.touchable();
+    await expect(answer(INPUT_SHOWN_LINE(false))).resolves.toEqual({ witness: 'hidden', region: undefined });
+    await expect(answer('  touchable region=SkRegion((0,2088,1080,2220))\n')).resolves.toEqual({ witness: 'unknown', region: [GBOARD_STRIP] });
+  });
+
+  it.each([
+    ['adb exits non-zero', execErrorLikeExec('adb shell …', 1, "error: device 'emulator-5554' not found")],
+    ['the call times out', execErrorLikeExec('adb shell …', null, '', { timedOut: true })],
+    ['adb cannot be spawned', new Error('spawn adb ENOENT')],
+  ])('a failing call does not throw — %s → witness unknown, no region', async (_name, failure) => {
+    const fn: ExecFn = async () => {
+      throw failure;
+    };
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.touchable()).resolves.toEqual({ witness: 'unknown', region: undefined });
   });
 });
 

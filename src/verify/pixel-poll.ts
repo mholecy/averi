@@ -3,7 +3,7 @@ import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import { cannotHide, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, keyboardRects, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -109,8 +109,11 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * costs a round, not the verdict, and once a later query finds the element
  * clear the covered sentence stops being the timeout's wording. `hidden`, `unknown`, a frame elsewhere, or
  * no oracle at all (iOS, whose keyboard is in the tree) → the round proceeds
- * exactly as before. Only `state()` is asked, never `witness()`: the witness
- * exists to veto a `back` key press, and nothing is pressed here — a stale
+ * exactly as before. `witness()` is never asked: the witness exists to veto
+ * a `back` key press, and nothing is pressed here (since 2026-10-08 the
+ * `touchable()` read that follows a shown `state()` carries `mInputShown`
+ * too, but only as the admission rule for a floating panel —
+ * ui-tree/soft-keyboard.ts#panelsBeyond — never as a veto over the band) — a stale
  * `shown` costs covered rounds until the window state catches up (seconds,
  * measured on `KeyboardOracle.witness`), within the 12 s pixel default; under
  * a short explicit timeout it fails closed with the covered wording; never a
@@ -120,12 +123,17 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * measured — a cost accepted for one rule, and the sentence quotes both rects
  * so the case is plain to diagnose. Residual — the old behaviour returns,
  * silently, when the oracle cannot see the keyboard: a floating or split IME
- * supplies no insets frame (it reads hidden, or a zero-size frame read as
- * unknown); the API 34+ `type=ime` line is taken from AOSP and has not been
+ * that supplies no insets frame at all (it reads hidden, or a zero-size frame
+ * read as unknown — on API 33 a floating Gboard was measured 2026-10-08 to
+ * keep a 132-px band, and its panel is now read beside it, `keyboardOver`
+ * below; the transient read right after the focus tap was hidden); the API 34+ `type=ime` line is taken from AOSP and has not been
  * captured on a device; a multi-display device reads unknown. The check sits after the deadline check so a round that
  * would capture nothing queries nothing either. Cost: one `dumpsys window
  * displays` per round, tens of ms (the measured figures are on
- * AndroidAdapter's `keyboardState`), on Android only, against a round of
+ * AndroidAdapter's `keyboardState`), and since 2026-10-08 one more adb call
+ * on a round that reads the keyboard up (`touchable()`, AndroidAdapter's
+ * `keyboardTouchable`: `dumpsys input_method` and `dumpsys window
+ * InputMethod`, filtered on the device), on Android only, against a round of
  * ~2.6–4.3 s there. The verify legs are untouched: their text table already
  * reports this case as OCCLUDED.
  *
@@ -387,7 +395,12 @@ class PixelPollMemory {
  * notation by the same `parseBounds` (adapters/android.ts — a uiautomator
  * node's `bounds` and the IME `InsetsSource` entry's `frame=`); on iOS both
  * are points of one WDA tree; and the tree rect reaches this poll unscaled.
- * `state()` never throws (KeyboardOracle's contract), so no catch.
+ * `state()` never throws (KeyboardOracle's contract), so no catch. Since
+ * 2026-10-08 a floating keyboard's panel counts as the band does: the
+ * reading carries it (`panels`, read by `readSoftKeyboard` only when the
+ * band is up — one more adb call per such round, the figures on
+ * AndroidAdapter's keyboardTouchable), and an element under it is the same
+ * covered miss, quoting the panel's rect.
  */
 async function keyboardOver(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
@@ -395,8 +408,11 @@ async function keyboardOver(
   element: UiNode,
 ): Promise<{ frame: Rect; remedy: KeyboardRemedy } | undefined> {
   const { keyboard, ...remedy } = await readSoftKeyboard(adapter, tree, element);
-  if (keyboard.state !== 'shown' || !rectsOverlap(element.rect, keyboard.frame)) return undefined;
-  return { frame: keyboard.frame, remedy };
+  if (keyboard.state !== 'shown') return undefined;
+  // The band or, since 2026-10-08, a floating panel beside it (`keyboardRects`):
+  // the first that overlaps is the frame the miss quotes.
+  const frame = keyboardRects(keyboard).find((r) => rectsOverlap(element.rect, r));
+  return frame === undefined ? undefined : { frame, remedy };
 }
 
 /**
