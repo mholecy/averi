@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTree, Undecided } from '../ui-tree/read-tree.js';
-import { parseDuration } from '../util/duration.js';
+import { formatSeconds, parseDuration } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
 import {
@@ -550,9 +550,9 @@ export class Verifier {
         // not tell, so it outranks "still visible"; and the last read failing
         // is the fresher fact than the bare tree before it.
         timeoutDetail: ({ readError, undecidedTree }) =>
-          readError !== undefined ? `could not verify within ${timeoutMs}ms (last UI tree read failed: ${readError.message})`
-          : undecidedTree !== undefined ? `could not verify within ${timeoutMs}ms (${bareTimeoutNote(undecidedTree)})`
-          : `still visible after ${timeoutMs}ms`,
+          readError !== undefined ? `could not verify within ${formatSeconds(timeoutMs)} (last UI tree read failed: ${readError.message})`
+          : undecidedTree !== undefined ? `could not verify within ${formatSeconds(timeoutMs)} (${bareTimeoutNote(undecidedTree)})`
+          : `still visible after ${formatSeconds(timeoutMs)}`,
       },
     );
   }

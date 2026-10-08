@@ -8,6 +8,7 @@ import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { sleep } from '../util/sleep.js';
+import { formatSeconds } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 
 /**
@@ -238,7 +239,7 @@ export class WdaServer {
       if (alive) {
         throw new Error(
           `WDA on port ${this.port} (udid ${this.udid}) answered /status but GET /source did not complete ` +
-            `(${reason}) — a deep tree (the known WDA weakness; budget ${SOURCE_TIMEOUT_MS / 1000} s) or a wedged ` +
+            `(${reason}) — a deep tree (the known WDA weakness; budget ${formatSeconds(SOURCE_TIMEOUT_MS)}) or a wedged ` +
             'server. Read a narrower screen and retry; if it repeats, `pkill -f WebDriverAgentRunner`; ' +
             `xcodebuild log: ${this.logPath}`,
           { cause: err },
@@ -611,7 +612,7 @@ export class WdaServer {
         await sleep(this.pollIntervalMs);
       }
       throw new Error(
-        `WDA did not answer /status on port ${this.port} within ${Math.round(this.readyTimeoutMs / 1000)}s ` +
+        `WDA did not answer /status on port ${this.port} within ${formatSeconds(this.readyTimeoutMs)} ` +
           `— xcodebuild log: ${this.logPath}. First install on a fresh simulator is slow. ${FIRST_BUILD_NOTE}`,
       );
     } catch (err) {

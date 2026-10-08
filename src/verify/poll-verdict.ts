@@ -1,5 +1,6 @@
 import type { Rect } from '../adapters/types.js';
 import { PollMiss } from '../ui-tree/read-tree.js';
+import { formatSeconds } from '../util/duration.js';
 import type { MeasuredFrame } from './capture.js';
 
 /**
@@ -20,19 +21,25 @@ import type { MeasuredFrame } from './capture.js';
  * reached, without ending the poll: mid-animation geometry may legitimately be
  * wrong for a frame, so only the state at timeout is the verdict.
  */
-export interface PollVerdict {
-  pass: boolean;
-  detail?: string;
-  /**
-   * A miss no later round can change (2026-10-08): the poll ends at once with
-   * this verdict instead of polling to the deadline, which would only repeat
-   * it and bury it under the timeout wording. Only a failing verdict carries
-   * it, and only the pixel poll honours it (verify/pixel-poll.ts, the one
-   * place that turns it into control flow) — today for the ocr assert's
-   * engine that will never read (text-parity.ts#measureOcrAssert, on an
-   * `OcrUnavailableError`). The tree-only asserts never set it.
-   */
-  final?: true;
+export type PollVerdict = { pass: boolean; detail?: string; final?: undefined } | FinalVerdict;
+
+/**
+ * A miss no later round can change (2026-10-08): the poll ends at once with
+ * this verdict instead of polling to the deadline, which would only repeat
+ * it and bury it under the timeout wording. Only the pixel poll honours it
+ * (verify/pixel-poll.ts, the one place that turns it into control flow) —
+ * today for the ocr assert's engine that will never read (text-parity.ts#
+ * measureOcrAssert, on an `OcrUnavailableError`). The tree-only asserts
+ * never set it. Its own member of the union since round 4 (2026-10-08):
+ * a final verdict ENDS the assert and its detail IS the failure sentence,
+ * so one that does not fail, or fails without its sentence, does not
+ * type-check — until then `final?: true` sat beside an optional detail and
+ * the poll read a missing one as `''`.
+ */
+export interface FinalVerdict {
+  pass: false;
+  detail: string;
+  final: true;
 }
 
 /**
@@ -62,7 +69,7 @@ export const verdictToPoll = (verdict: PollVerdict | undefined): { detail?: stri
   return verdict?.detail === undefined ? undefined : new PollMiss(verdict.detail);
 };
 
-/** "not found within Nms", plus the last tree-read error when there was one. */
+/** "not found within N s" (formatSeconds), plus the last tree-read error when there was one. */
 export const notFound = (timeoutMs: number, readError?: Error): string =>
-  `not found within ${timeoutMs}ms` +
+  `not found within ${formatSeconds(timeoutMs)}` +
   (readError === undefined ? '' : ` (last UI tree read failed: ${readError.message})`);

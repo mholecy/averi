@@ -142,7 +142,7 @@ describe('AndroidAdapter interactions', () => {
     it('null root node twice on a reachable device with settle: classified as settling', async () => {
       const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
       await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree({ settle: true })).rejects.toThrow(
-        /device emulator-5554 is still settling.*retried once/s,
+        /device emulator-5554 is still settling.*retried once after 1 s\)/s,
       );
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
     }, 10_000);

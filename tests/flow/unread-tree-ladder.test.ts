@@ -228,6 +228,11 @@ describe('the ladder refuses a DESTRUCTIVE rung when the probe right before it n
     expect(fake.launches).toEqual([]);
     // The entry probe and its second look both failed to read.
     expect(actions(error.trace)).toEqual(['⚠ detect', '⚠ detect', '⛔ reach login']);
+    // The two read-failed lines are told apart: the second names its look and window.
+    const detects = error.trace.filter((t) => t.action === '⚠ detect').map((t) => t.detail ?? '');
+    expect(detects[0]).not.toMatch(/second look/);
+    expect(detects[0]).toMatch(/treated as not detected — last UI tree read failed: idb returned an empty accessibility tree/);
+    expect(detects[1]).toMatch(/treated as not detected \(second look over [\d.]+ s\) — last UI tree read failed: idb returned an empty accessibility tree/);
   });
 
   it('an explicit run_flow of the destructive flow is never refused — the rule is the ladder\'s', async () => {
@@ -384,7 +389,7 @@ describe('waits and asserts on the stuck tree fail closed', () => {
     const { fake } = stuckIdb(always);
     const error = await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'assert_modal_absent' }));
     expect(error.message).toMatch(
-      /FAIL element id:"some_modal" is absent — could not verify within 60ms \(last UI tree read failed: idb returned an empty accessibility tree/,
+      /FAIL element id:"some_modal" is absent — could not verify within 0.06 s \(last UI tree read failed: idb returned an empty accessibility tree/,
     );
   });
 

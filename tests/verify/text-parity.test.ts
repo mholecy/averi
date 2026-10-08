@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { measuredFrameFor, type MeasuredFrame, type TreeFrame, type Undecoded } from '../../src/verify/capture.js';
 import { sizeOnlyPng } from '../helpers/fake.js';
+import type { PollVerdict } from '../../src/verify/poll-verdict.js';
 import { windowWidth } from '../../src/verify/scale.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { OcrUnavailableError, ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
@@ -791,6 +792,15 @@ describe('measureOcrAssert — the ocr assert\'s one measurement, every "not rea
       final: true,
       detail: 'OCR failed: OCR needs the Swift compiler: `swiftc --version` failed; failing closed, rendered text unchecked',
     });
+  });
+
+  it('a final verdict carries its failure sentence by type — a final pass, or a final miss without its detail, does not compile (round 4, 2026-10-08)', () => {
+    const ended: PollVerdict = { pass: false, final: true, detail: 'OCR failed: …; failing closed, rendered text unchecked' };
+    // @ts-expect-error — a final verdict ends the assert, so it must say why
+    const silent: PollVerdict = { pass: false, final: true };
+    // @ts-expect-error — a final verdict is a miss; a pass already ends the poll
+    const passing: PollVerdict = { pass: true, final: true, detail: 'ok' };
+    expect([ended, silent, passing].map((v) => v.final)).toEqual([true, true, true]);
   });
 
   it('only the recognizer is caught: a fault of the measurement itself propagates, never dressed as an OCR reading', async () => {

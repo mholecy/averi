@@ -276,7 +276,7 @@ describe('exact-text misses hint at a combined accessibility element', () => {
 
   it('stays quiet when the string is genuinely absent — no hint to invent', async () => {
     const result = await new Verifier(dashboardFake(), FAST).assert({ element: { text: 'Nowhere' } });
-    expect(result.detail).toBe('not found within 100ms');
+    expect(result.detail).toBe('not found within 0.1 s');
   });
 
   it('does not hint for a failing `match` — a regex already asks the containment question', async () => {
@@ -1177,7 +1177,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 5500ms here) — raise this assert timeout');
+    expect(result.detail).toBe('element found, but no time was left within 3 s to capture a settled frame (the slowest round — a tree read and its captures — took 5.5 s here) — raise this assert timeout');
     expect(fake.screenshots).toHaveLength(0);
   });
 
@@ -1195,7 +1195,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 3200ms here) — raise this assert timeout');
+    expect(result.detail).toBe('element found, but no time was left within 3 s to capture a settled frame (the slowest round — a tree read and its captures — took 3.2 s here) — raise this assert timeout');
     expect(fake.screenshots).toHaveLength(1);
   });
 
@@ -1346,7 +1346,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 300 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toBe(
-      'element found and its region held still, but no time was left within 300ms to confirm its position with a second tree read (the slowest round — a tree read and its captures — took 300ms here) — raise this assert timeout or let the screen come to rest',
+      'element found and its region held still, but no time was left within 0.3 s to confirm its position with a second tree read (the slowest round — a tree read and its captures — took 0.3 s here) — raise this assert timeout or let the screen come to rest',
     );
     expect(probe.treeReads).toBe(1);
     expect(fake.screenshots).toHaveLength(2);
@@ -1361,7 +1361,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     // poll ran out, so the cut sentence decides the wording, round cost and all.
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 500 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 500ms to capture a settled frame (the slowest round — a tree read and its captures — took 300ms here) — raise this assert timeout');
+    expect(result.detail).toBe('element found, but no time was left within 0.5 s to capture a settled frame (the slowest round — a tree read and its captures — took 0.3 s here) — raise this assert timeout');
     expect(probe.treeReads).toBe(2);
     expect(fake.screenshots).toHaveLength(2);
   });
@@ -1452,7 +1452,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       ocr: { text: 'CONTINUE' },
     });
     expect(result.pass).toBe(false);
-    expect(result.detail).toBe('element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 3200ms here) — raise this assert timeout');
+    expect(result.detail).toBe('element found, but no time was left within 3 s to capture a settled frame (the slowest round — a tree read and its captures — took 3.2 s here) — raise this assert timeout');
     expect(fake.screenshots).toHaveLength(1);
     expect(probe.recognized).toBe(0);
   });
@@ -1535,7 +1535,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     });
     expect(result.pass).toBe(false);
     expect(result.detail).toBe(
-      'element found, but no time was left within 3000ms to capture a settled frame (the slowest round — a tree read and its captures — took 3350ms here) — raise this assert timeout',
+      'element found, but no time was left within 3 s to capture a settled frame (the slowest round — a tree read and its captures — took 3.35 s here) — raise this assert timeout',
     );
   });
 
@@ -1553,13 +1553,13 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   it('the tree asserts keep the 3 s default — only the pixel asserts pay for a round of captures', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     // element exists: never found
-    expect((await new Verifier(cardFake()).assert({ element: { id: 'ghost' } })).detail).toBe('not found within 3000ms');
+    expect((await new Verifier(cardFake()).assert({ element: { id: 'ghost' } })).detail).toBe('not found within 3 s');
     // text content: never found
     const text = await new Verifier(cardFake()).assert({ element: { id: 'ghost' }, text: 'x' });
-    expect(text.detail).toBe('not found within 3000ms');
+    expect(text.detail).toBe('not found within 3 s');
     // rect: never found
     const rect = await new Verifier(cardFake()).assert({ element: { id: 'ghost' }, rect: { x: 100, frameWidth: 1000 } });
-    expect(rect.detail).toBe('not found within 3000ms');
+    expect(rect.detail).toBe('not found within 3 s');
     // absent: present the whole time — the poll gives up at 3 s
     const fake = cardFake();
     const t0 = Date.now();
@@ -1586,7 +1586,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       color: { expected: '#FDFDFD' },
     });
     expect(result.detail).toBe(
-      'element found, but no time was left within 6000ms to capture a settled frame (the slowest round — a tree read and its captures — took 4600ms here) — raise this assert timeout',
+      'element found, but no time was left within 6 s to capture a settled frame (the slowest round — a tree read and its captures — took 4.6 s here) — raise this assert timeout',
     );
   });
 });
@@ -1985,7 +1985,7 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 2000 }).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toBe(
-      'element found, but no time was left within 2000ms to capture a settled frame (the slowest round — a tree read and its captures — took 1200ms here) — raise this assert timeout',
+      'element found, but no time was left within 2 s to capture a settled frame (the slowest round — a tree read and its captures — took 1.2 s here) — raise this assert timeout',
     );
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(2);
     expect(fake.screenshots).toHaveLength(1);

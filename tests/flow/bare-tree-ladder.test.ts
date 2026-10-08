@@ -216,6 +216,18 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
     expect(actions(error.trace)).toEqual(['⚠ detect', '⚠ detect', '⛔ reach fresh_launch']);
   });
 
+  // The round-3 device check (2026-10-08) saw two identical `⚠ detect … bare`
+  // lines: the entry probe's and the second look's said the same sentence.
+  it('the second look\'s ⚠ detect line names the second look and its window, so it never repeats the entry probe\'s', async () => {
+    const { fake } = timeline(() => ANDROID_DECOR);
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
+    const bare = `every UI tree read was bare, the last one ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration`;
+    expect(error.trace.filter((t) => t.action === '⚠ detect').map((t) => t.detail)).toEqual([
+      `element id:"login_screen" treated as not detected — ${bare}`,
+      `element id:"login_screen" treated as not detected (second look over 0.12 s) — ${bare}`,
+    ]);
+  });
+
   it('bare reads, then failing ones: the probe answers bare, and its trace line is the bare one alone — no read-error line beside it', async () => {
     const { fake } = timeline((ms) => (ms < 40 ? ANDROID_DECOR : ANDROID_NULL_ROOT));
     const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
@@ -520,7 +532,7 @@ flows:
     expect(await v.assert({ element: { id: 'some_modal' }, absent: true })).toEqual({
       description: 'element id:"some_modal" is absent',
       pass: false,
-      detail: `could not verify within 60ms (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, so it could not ` +
+      detail: `could not verify within 0.06 s (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, so it could not ` +
         'decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
     });
     // Bare, then a rendered screen SHOWING the modal: the verdict is the last tree's — "still visible", not could-not-verify.
@@ -530,7 +542,7 @@ flows:
     const shown = timeline((ms) => (ms < 20 ? ANDROID_DECOR : modal));
     expect(await new Verifier(shown.fake, { pollMs: 5, timeoutMs: 80 }).assert({ element: { id: 'some_modal' }, absent: true })).toMatchObject({
       pass: false,
-      detail: 'still visible after 80ms',
+      detail: 'still visible after 0.08 s',
     });
     const later = timeline((ms) => (ms < 20 ? ANDROID_DECOR : ANDROID_LOGIN));
     expect(await new Verifier(later.fake, { pollMs: 5, timeoutMs: 1000 }).assert({ element: { id: 'some_modal' }, absent: true })).toMatchObject({ pass: true });

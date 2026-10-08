@@ -11,7 +11,7 @@ import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } 
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
 import { treeShape } from '../ui-tree/bare-tree.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
-import { parseDuration } from '../util/duration.js';
+import { formatSeconds, parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
@@ -626,7 +626,7 @@ export class FlowEngine {
         // bare entry read is still worth naming when every read of the
         // second look failed.
         const before = probe;
-        probe = await this.detects(state.detect, this.ensureTimeoutMs);
+        probe = await this.detects(state.detect, this.ensureTimeoutMs, 'second look');
         if (probe.answer === 'yes') {
           this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
           return;
@@ -885,8 +885,17 @@ export class FlowEngine {
    * from `no`, and refuses a destructive rung on them. The window is a
    * grace window (`reachRecheckMs`) after a rung, and since 2026-10-07 the
    * second look (`ensureTimeoutMs`) before a destructive one.
+   *
+   * `look` names a probe whose `⚠ detect` line would otherwise repeat the
+   * one before it word for word: the second look after a bare or unread
+   * entry probe reads the same decor and said the same sentence, so a
+   * reader saw two identical lines and could not tell the entry read from
+   * the window behind it (round-3 device check, 2026-10-08). Its line now
+   * says `(second look over 20 s)` — the window it polled, which an
+   * unanswered look spent whole.
    */
-  private async detects(cond: Condition, windowMs: number): Promise<Detection> {
+  private async detects(cond: Condition, windowMs: number, look?: 'second look'): Promise<Detection> {
+    const subject = `${describeCondition(cond)} treated as not detected${look === undefined ? '' : ` (${look} over ${formatSeconds(windowMs)})`}`;
     // Trees that held something rendered, and the last bare one's shape —
     // asked only of a round that is not `yes`. Since 2026-10-08 `yes` is
     // the condition module's three-valued answer (flow/condition.ts), which
@@ -922,7 +931,7 @@ export class FlowEngine {
     // "yes" (an unreadable tree is not "in state"), and the trace says why.
     // Right after a cold launch (no window yet) it is the normal case.
     if (outcome.readError !== undefined && allBareTree === undefined) {
-      this.log('⚠ detect', `${describeCondition(cond)} treated as not detected — ${readFailed(outcome.readError)}`);
+      this.log('⚠ detect', `${subject} — ${readFailed(outcome.readError)}`);
     }
     // The 2026-10-03 follow-up, done 2026-10-06 with its measured incident
     // (the idb 0×0 tree): a probe that read NO tree in any round is unknown,
@@ -940,7 +949,7 @@ export class FlowEngine {
     // exactly when nothing rendered was read.
     if (allBareTree !== undefined) {
       const probe: UnreadProbe = { answer: 'bare', shape: treeShape(allBareTree) };
-      this.log('⚠ detect', `${describeCondition(cond)} treated as not detected — ${describeUnreadCause(probe)}`);
+      this.log('⚠ detect', `${subject} — ${describeUnreadCause(probe)}`);
       return probe;
     }
     return { answer: 'no' };

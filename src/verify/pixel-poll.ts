@@ -6,6 +6,7 @@ import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
+import { formatSeconds } from '../util/duration.js';
 import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } from './poll-verdict.js';
 
 /**
@@ -360,13 +361,13 @@ class PixelPollMemory {
   timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error }): string {
     const stale = this.coverCleared && last.detail === this.lastCovered;
     if (last.detail !== undefined && !stale) return last.detail;
-    const roundCost = `the slowest round — a tree read and its captures — took ${this.slowestRoundMs}ms here`;
+    const roundCost = `the slowest round — a tree read and its captures — took ${formatSeconds(this.slowestRoundMs)} here`;
     if (this.foundSilently === 'cut') {
-      return `element found, but no time was left within ${timeoutMs}ms to capture a settled frame (${roundCost}) — raise this assert timeout`;
+      return `element found, but no time was left within ${formatSeconds(timeoutMs)} to capture a settled frame (${roundCost}) — raise this assert timeout`;
     }
     if (this.foundSilently === 'unconfirmed') {
       return (
-        `element found and its region held still, but no time was left within ${timeoutMs}ms to confirm its position ` +
+        `element found and its region held still, but no time was left within ${formatSeconds(timeoutMs)} to confirm its position ` +
         `with a second tree read (${roundCost}) — raise this assert timeout or let the screen come to rest`
       );
     }
@@ -426,7 +427,7 @@ export const screenshotFailed = (reason: string, unchecked: Unchecked): string =
  * or fail-closed reason, else "element found, but no time was left…" (to
  * capture a settled frame, or — after a region-only round with nothing to
  * confirm it — to confirm the element's position), else "not found within
- * Nms" with the last tree-read error.
+ * N s" with the last tree-read error.
  */
 export async function pollPixels(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport' | 'keyboard' | 'keyboardAdvice'>,
@@ -458,7 +459,7 @@ export async function pollPixels(
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
     const verdict = await measure({ rect, shot, measured });
     // A failure no later round can change leaves the poll at once, as a refused capture does.
-    if (verdict.final && !verdict.pass) throw new FinalMiss(verdict.detail ?? '');
+    if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;
   };
   // Each round is timed from the start of its read, for the timeout wording;

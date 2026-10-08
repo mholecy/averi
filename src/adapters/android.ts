@@ -5,6 +5,7 @@ import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
+import { formatSeconds } from '../util/duration.js';
 import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
@@ -387,7 +388,7 @@ export class AndroidAdapter implements DeviceAdapter {
     retried: boolean,
   ): Promise<string> {
     const dump = kind === 'timeout'
-      ? `uiautomator dump timed out after ${DUMP_TIMEOUT_MS / 1000} s`
+      ? `uiautomator dump timed out after ${formatSeconds(DUMP_TIMEOUT_MS)}`
       : kind === 'exec-error'
         ? `adb could not run uiautomator dump: ${status}`
         : `uiautomator dump returned no XML: ${status}`;
@@ -416,7 +417,7 @@ export class AndroidAdapter implements DeviceAdapter {
     }
     if (NULL_ROOT_RE.test(status)) {
       return `device ${this.serial} is still settling: uiautomator has no window to dump yet ` +
-        `(cold launch or animation; ${retried ? `retried once after ${NULL_ROOT_RETRY_MS} ms` : 'read once'}). ` +
+        `(cold launch or animation; ${retried ? `retried once after ${formatSeconds(NULL_ROOT_RETRY_MS)}` : 'read once'}). ` +
         `Wait for the screen (\`screenshot\` waits for stability) and retry. (${dump})`;
     }
     return `${dump} — adb get-state says "device", so the dump itself died on the guest ` +

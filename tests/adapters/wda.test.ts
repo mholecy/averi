@@ -329,6 +329,9 @@ describe('WdaServer.ensureRunning', () => {
     const err = await server.ensureRunning().then(() => undefined, (e: Error) => e);
     expect(err?.message).toContain(server.logPath);
     expect(err?.message).toContain('first WDA build per Xcode version takes minutes');
+    // The budget in util/duration.ts#formatSeconds's spelling (round 4): until
+    // then Math.round(ms / 1000) + "s", which said "within 0s" for this one.
+    expect(err?.message).toMatch(/\/status on port \d+ within 0\.04 s —/);
     expect(spawner.kills).toContain('SIGTERM'); // no orphaned xcodebuild
     server.stop();
   });
