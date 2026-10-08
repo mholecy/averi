@@ -14,7 +14,7 @@ import {
   type KeyboardModel,
   type ResolvedClear,
 } from './keyboard-model.js';
-import { windowModel, windowUnlocated } from './keyboard-window.js';
+import { windowCorroborated, windowModel, windowUnlocated } from './keyboard-window.js';
 import { describeTarget, resolveSettled, type Resolved, type Target } from './resolve.js';
 
 /**
@@ -29,7 +29,6 @@ import { describeTarget, resolveSettled, type Resolved, type Target } from './re
  */
 export { KeyboardGuardError, type DismissOptions, type DismissResult, type GuardOptions, type KeyboardDismissal, type ResolvedClear } from './keyboard-model.js';
 export { AfterKeyboardDismissal, KeyboardStateDisagreement, UNLOCATED_KEYBOARD } from './keyboard-window.js';
-export { frameText } from './keyboard-model.js';
 export { AfterDismissalTap, KeyboardWithoutDismissal } from './keyboard-in-tree.js';
 
 /**
@@ -174,11 +173,26 @@ export function dismissKeyboard(adapter: KeyboardAdapter, opts: DismissOptions):
  * second source, and is never `unlocated`. The rule is the dismissal's own
  * row (keyboard-window.ts#dismissal, `clear · witness shown`); this is how a
  * caller that does not dismiss — `scroll_until`'s stop (scroll.ts) — asks
- * it, at the cost of one witness query, and only when the window read
- * hidden. The tap guard does NOT ask it: its clear path is pinned to one
+ * it, at the cost of one witness query, only when the window read hidden,
+ * and only on a failed or `fully: true` stop (review 2026-10-08: not on
+ * every clean stop, where the answer changes nothing the reader does). The tap guard does NOT ask it: its clear path is pinned to one
  * oracle query per tap, and a frameless keyboard gives it no point to test
  * against anyway (the bug note's residual).
  */
 export function keyboardUnlocated(adapter: Pick<KeyboardAdapter, 'keyboard'>, window: SoftKeyboard): Promise<boolean> {
   return adapter.keyboard === undefined ? Promise.resolve(false) : windowUnlocated(adapter.keyboard, window);
+}
+
+/**
+ * May a `shown` reading change what a caller REPORTS — not what it does to
+ * the keyboard? (2026-10-08, review of the keyboard-aware scroll.) The
+ * window model's `state()` can be stale for seconds after a navigating tap
+ * (keyboard-window.ts#witnessDenies has the measurement), so before
+ * `scroll_until` lets a band score a target 0 or shrink its stroke, the
+ * witness may veto it — the guard's rule, its one owner. The in-tree model
+ * has no second source and its band is read off the very tree being judged:
+ * corroborated by construction, no query.
+ */
+export function keyboardCorroborated(adapter: Pick<KeyboardAdapter, 'keyboard'>): Promise<boolean> {
+  return adapter.keyboard === undefined ? Promise.resolve(true) : windowCorroborated(adapter.keyboard);
 }

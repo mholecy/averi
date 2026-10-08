@@ -115,7 +115,7 @@ export class KeyboardStateDisagreement extends KeyboardGuardError {
 // else proceed) — were one ternary each over one input, and their row
 // tests tested the ternary while the bugs that bit lived in the
 // orchestration around it; they failed the deletion test. `firstLook` is
-// the `if (witness === 'hidden')` in `windowModel.guard` below, its rows
+// the `if (witnessDenies(witness))` in `windowModel.guard` below, its rows
 // beside it; `afterBack`'s branch is the skeleton's one shared ternary
 // over the confirming look (keyboard.ts#resolveClearOfKeyboard, the same
 // for both models), and its rows — the reasons behind proceed and refuse
@@ -150,6 +150,29 @@ type WindowReading = 'covering' | 'clear' | 'unknown';
  * is "do nothing this time".
  */
 export type DismissalDecision = 'back' | 'nothing' | 'unlocated';
+
+/**
+ * THE veto (2026-10-04), named on 2026-10-08 so its readers share one owner:
+ * an input method that says no keyboard is shown DENIES a window state that
+ * reports one over the point — that state was measured stale for seconds
+ * after a navigating tap (AndroidAdapter's keyboardWitness has the
+ * measurement). `unknown` denies nothing: a witness that cannot be asked
+ * leaves the window state standing. Read by the guard's first look, the
+ * dismissal's `covering` row, and `scroll_until` before it lets a band
+ * change its judgement or its stroke (`windowCorroborated`, below).
+ */
+export const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden';
+
+/**
+ * Does the input method stand by a `shown` window reading — i.e. not deny
+ * it (`witnessDenies`)? One witness query. For a caller that does not act on
+ * the keyboard but lets it change what it reports: `scroll_until`, through
+ * keyboard.ts#keyboardCorroborated. Relies on KeyboardOracle's contract that
+ * `witness()` never throws (a failed query is `unknown`), so no catch.
+ */
+export async function windowCorroborated(oracle: KeyboardOracle): Promise<boolean> {
+  return !witnessDenies(await oracle.witness());
+}
 
 /**
  * One round of the bounded re-check that a vetoed first look starts, while
@@ -219,7 +242,7 @@ export function dismissal(window: 'clear' | 'covering', witness: KeyboardWitness
 export function dismissal(window: WindowReading, witness?: KeyboardWitness): DismissalDecision {
   if (window === 'unknown') return 'back';
   if (window === 'clear') return witness === 'shown' ? 'unlocated' : 'nothing';
-  return witness === 'hidden' ? 'nothing' : 'back';
+  return witness !== undefined && witnessDenies(witness) ? 'nothing' : 'back';
 }
 
 /**
@@ -238,7 +261,9 @@ export const UNLOCATED_KEYBOARD =
  * says `shown`? Asks the witness only for a `hidden` reading — a `shown` one
  * has its frame and an `unknown` one has nothing to contradict — and decides
  * by `dismissal`'s own row, so the rule has one owner. For `scroll_until`'s
- * stop (interact/scroll.ts), through keyboard.ts.
+ * stop (interact/scroll.ts), through keyboard.ts — on a failed stop or a
+ * `fully: true` one only. Relies on KeyboardOracle's contract that
+ * `witness()` never throws (a failed query is `unknown`), so no catch.
  */
 export async function windowUnlocated(oracle: KeyboardOracle, window: SoftKeyboard): Promise<boolean> {
   return window.state === 'hidden' && dismissal('clear', await oracle.witness()) === 'unlocated';
@@ -317,7 +342,7 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
       //     already said not shown); `back` then navigates, a tap then
       //     presses a key. Nothing is sent on one disagreeing sample; the
       //     re-check rounds follow.
-      if (witness === 'hidden') {
+      if (witnessDenies(witness)) {
         const disagreement = `the window state reported a soft keyboard over ${what} that the input method denied`;
         let stillCovering = frame;
         for (let waited = KEYBOARD_DISAGREEMENT_POLL_MS; ; waited += KEYBOARD_DISAGREEMENT_POLL_MS) {

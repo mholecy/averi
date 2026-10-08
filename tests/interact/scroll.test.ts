@@ -205,18 +205,105 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect((error as Error).message).toBe(
       'scroll_until id:payee_street_input failed after 2 swipes (maxSwipes) — element never appeared in the tree. The soft ' +
-        'keyboard was up over [0,1398][1080,2220]: visibility was judged, and the swipes drawn, in the screen above it — to ' +
+        'keyboard was up over [0,1398][1080,2220] in 3 of the 3 rounds read: in those, visibility was judged, and the swipe drawn, in ' +
+        'the screen above it — to ' +
         'reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the ' +
         'fill before this step in a flow) and scroll again',
     );
   });
 
-  it('Android cost: ONE window query per round, the witness never asked while a frame is shown, and no key pressed', async () => {
+  it('Android cost: ONE window query per round, the witness asked ONCE per call — the first time the band matters — and no key pressed', async () => {
     const { fake } = androidForm({ startY: 2900 });
     await scrollUntilVisible(fake, 'id:priority_select', FAST);
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(4); // 3 swipes, 4 reads
-    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
     expect(fake.keys).toEqual([]);
+  });
+
+  it('Android, a band that changes nothing (the target clear above it, a clean stop) is not asked about and not reported', async () => {
+    const { fake } = androidForm({ startY: 500 });
+    expect(await scrollUntilVisible(fake, 'id:priority_select', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
+  });
+
+  it('Android, a STALE window state (review 2026-10-08: frame shown, input method says hidden — measured for seconds after a navigating tap) is vetoed: the on-screen target is not scored 0, no stroke is sent, no keyboard reported', async () => {
+    const { fake } = androidForm({ startY: 1906, witness: 'hidden' });
+    const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
+    expect(result).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([]);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+  });
+
+  it('Android, a vetoed band is not claimed at a failed stop either', async () => {
+    const { fake } = androidForm({ startY: 0, witness: 'hidden' });
+    const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree');
+  });
+
+  it('Android, a vetoed band leaves the stroke whole-screen too, and is asked about once for the call', async () => {
+    const { fake } = androidForm({ startY: 2900, witness: 'hidden', keyboardTop: undefined });
+    await scrollUntilVisible(fake, 'id:priority_select', FAST);
+    expect(fake.swipes[0]).toEqual({ from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } }); // the whole 2220 screen's stroke
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+  });
+
+  it('a band from the top edge (y 0, a full-screen extract-mode IME — unmeasured) covers everything: no bare "fully visible", no stroke, a failure naming it', async () => {
+    const { fake } = androidForm({ startY: 500, window: { state: 'shown', frame: { x: 0, y: 0, width: 1080, height: 2220 } } });
+    const error = await scrollUntilVisible(fake, 'id:priority_select', FAST).catch((e: unknown) => e);
+    expect((error as Error).message).toBe(
+      'scroll_until id:priority_select failed after 0 swipes — the soft keyboard over [0,0][1080,2220] covers the whole screen, ' +
+        'so nothing under it can be judged and no swipe was sent — to reach it with the keyboard down, hide it first (press_key ' +
+        'back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again',
+    );
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('a band whose top lies at the screen\'s bottom edge covers nothing on it: judged as no keyboard, not asked about', async () => {
+    const offscreen = { state: 'shown', frame: { x: 0, y: 2220, width: 1080, height: 100 } } as const;
+    const { fake } = androidForm({ startY: 2100, window: offscreen });
+    expect(await scrollUntilVisible(fake, 'id:priority_select', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    // …and on a round that strokes too: whole-screen, still no witness query.
+    const scrolled = androidForm({ startY: 2900, window: offscreen, keyboardTop: undefined }).fake;
+    await scrollUntilVisible(scrolled, 'id:priority_select', FAST);
+    expect(scrolled.swipes[0]).toEqual({ from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } });
+    expect(scrolled.attachedKeyboard.witnessAnswers.queries).toBe(0);
+  });
+
+  it('a round whose tree did not read strokes in the box the last applied band left, not through the keyboard', async () => {
+    const { fake } = androidForm({ startY: 2900 });
+    const real = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (reads++ === 1) throw new Error('uiautomator dump returned no XML');
+      return real();
+    };
+    await scrollUntilVisible(fake, 'id:priority_select', FAST);
+    expect(fake.swipes.length).toBeGreaterThanOrEqual(2);
+    for (const { from } of fake.swipes) expect(from.y).toBeLessThan(IME.y);
+  });
+
+  it('keyboard up, element stuck clipped at a NON-keyboard edge (right): the layout-defect wording, not the keyboard\'s', async () => {
+    resetLayout();
+    const row = node({ role: 'button', identifier: 'wide', rect: { x: 900, y: 500, width: 300, height: 73 } });
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [row] }) }, 's');
+    fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+    await expect(scrollUntilVisible(fake, 'id:wide', { ...FAST, fully: true })).rejects.toThrow(
+      /CLIPPED at right, 60% of it is in the viewport above the soft keyboard over \[0,1398\]\[1080,2220\], and the content is exhausted[\s\S]*cannot be fully revealed — that is a layout defect/,
+    );
+  });
+
+  it('a stop bound with the element still partly under the band reports the clip at the KEYBOARD\'s edge', async () => {
+    const { fake } = androidForm({ startY: 1380, perSwipe: 5 }); // moves, never clears 1398, never stuck
+    const error = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true, maxSwipes: 2 }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(
+      /^scroll_until id:priority_select failed after 2 swipes \(maxSwipes\) — element reached the viewport but stayed CLIPPED at bottom, 38% of it is in the viewport above the soft keyboard over \[0,1398\]\[1080,2220\] \(last rect /,
+    );
+  });
+
+  it('in tree but entirely under the band at the stop: "never intersected" names the frame actually judged', async () => {
+    const { fake } = androidForm({ startY: 1906, perSwipe: 0 });
+    const error = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/element in tree but never intersected the 1080x1398 screen above the soft keyboard over \[0,1398\]\[1080,2220\] \(last rect/);
   });
 
   it.each([
@@ -229,10 +316,10 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(witnessQueries);
   });
 
-  it('Android floating keyboard (inferred): window hidden, input method shown — the stop says the keyboard could not be placed, asked ONCE, and the flow line is not a clean "fully visible"', async () => {
+  it('Android floating keyboard (inferred): window hidden, input method shown — on a fully: true stop the result says the keyboard could not be placed, asked ONCE, and the line is not a clean "fully visible"', async () => {
     // Where a floating keyboard lies is unmeasured: here it eats no stroke.
     const { fake } = androidForm({ startY: 2900, window: { state: 'hidden' }, witness: 'shown', keyboardTop: undefined });
-    const result = await scrollUntilVisible(fake, 'id:priority_select', FAST);
+    const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
     expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }); // judged over the whole screen: there is no frame to exclude
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
     expect(describeScrollResult(result)).toBe(
@@ -240,6 +327,12 @@ describe('scrollUntilVisible — the soft keyboard', () => {
         'screen (a floating keyboard? inferred, not measured), so where it lies is unknown — it was not judged and may cover the element',
     );
     expect(fake.keys).toEqual([]);
+  });
+
+  it('Android floating keyboard on a DEFAULT clean stop: not asked (review 2026-10-08 — a witness query on every clean stop buys a sentence nobody acts on)', async () => {
+    const { fake } = androidForm({ startY: 500, window: { state: 'hidden' }, witness: 'shown' });
+    expect(await scrollUntilVisible(fake, 'id:priority_select', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
   });
 
   it('Android floating keyboard at a failed stop: named, with the swipes it may have eaten', async () => {
@@ -275,7 +368,8 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toBe(
       'scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree. The soft keyboard was up over ' +
-        '[0,589][402,874]: visibility was judged, and the swipes drawn, in the screen above it — to reach it with the keyboard ' +
+        '[0,589][402,874] in 2 of the 2 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — ' +
+        'to reach it with the keyboard ' +
         'down, hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and scroll again; this ' +
         'adapter cannot hide it on its own (ADVICE)',
     );

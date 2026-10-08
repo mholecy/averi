@@ -1738,19 +1738,19 @@ flows:
   // 2026-10-08 (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
   // the keyboard on the line — and ⚠ only where it leaves the result unproven.
   it('a stop judged above a docked soft keyboard says so, without ⚠: the judgement already excluded it', async () => {
-    const fake = scrollingFake(500);
+    const fake = scrollingFake(1500); // under the keyboard: one swipe lifts it above
     fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1400, width: 1000, height: 600 } }, 'shown');
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
     expect(trace).toContainEqual({
       action: 'scroll_until',
-      detail: 'id:"submit_button" fully visible after 0 swipes, above the soft keyboard over [0,1400][1000,2000]',
+      detail: 'id:"submit_button" fully visible after 1 swipe, above the soft keyboard over [0,1400][1000,2000]',
     });
   });
 
-  it('the floating-keyboard row (window hidden, input method shown) marks the line ⚠: "fully visible" is not established', async () => {
+  it('the floating-keyboard row (window hidden, input method shown) marks a fully: true line ⚠: "fully visible" is not established', async () => {
     const fake = scrollingFake(500);
     fake.attachKeyboard({ state: 'hidden' }, 'shown');
-    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
+    const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });
     const row = trace.find((t) => t.action.endsWith('scroll_until'));
     expect(row?.action).toBe('⚠ scroll_until');
     expect(row?.detail).toMatch(/^id:"submit_button" fully visible after 0 swipes; the input method reports a soft keyboard shown, but the window state gives it no area/);

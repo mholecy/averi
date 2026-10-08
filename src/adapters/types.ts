@@ -298,11 +298,15 @@ export interface KeyboardOracle {
    * full frame for a few seconds, while the input method itself already said
    * it was not. interact/keyboard-window.ts asks this immediately before it presses
    * `back` for keyboard reasons — never on an ordinary tap. Since 2026-10-08
-   * also where `state()` read HIDDEN and the caller has no tap point: the
-   * post-fill dismissal, and `scroll_until` once at its stop
-   * (interact/keyboard.ts#keyboardUnlocated) — the floating-keyboard row
-   * (window hidden, input method shown), which presses nothing and is only
-   * reported.
+   * also in two places that press nothing: where `state()` read HIDDEN and
+   * the caller has no tap point — the post-fill dismissal, and
+   * `scroll_until` on a failed or `fully: true` stop
+   * (interact/keyboard.ts#keyboardUnlocated, the floating-keyboard row:
+   * window hidden, input method shown, only reported) — and once per
+   * `scroll_until` call before a `shown` band may change its judgement or its
+   * stroke (keyboard.ts#keyboardCorroborated, the same veto). Those callers
+   * (interact/keyboard-window.ts#windowUnlocated, #windowCorroborated) rely
+   * on the never-throws contract above and have no catch.
    *
    * A method of its own rather than an option on `state()`: the caller needs
    * it at a different moment (after the frame has been tested against the
