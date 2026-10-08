@@ -15,7 +15,7 @@ Find the line or error you see, then act on it. Each entry gives the meaning, th
 ## The tree is empty, bare or unreadable
 
 - **`ui_snapshot` returns `[]` plus `0 matches for … in a tree of N nodes`**: the tree has content and none of it matches. If the screen may still be loading (a spinner, an overlay), confirm with an `assert` with a `timeout`, or with a `screenshot`.
-- **`[]` plus `⚠ … the tree is bare`**: the tree is empty or unrendered. Take a `screenshot`. If the screen is rendered, the tree source is stuck; do not read the element as absent.
+- **`[]` plus `⚠ … the tree is bare`**: the tree is empty or unrendered. On iOS right after `launch_app` it may hold only the status bar and the app's icon; that is SpringBoard, not the app, and is bare too. Take a `screenshot`. If the screen is rendered, the tree source is stuck; do not read the element as absent.
 - **iOS `idb returned an empty accessibility tree …`** (a lone 0×0 `Application`): a stuck idb, or the first second after `launch_app`. If it says `retried once after 1 s`, it is still stuck. Recover in this order:
   1. `terminate_app`, then `launch_app` (only a new process recovers);
   2. the simulator reboot the error names;

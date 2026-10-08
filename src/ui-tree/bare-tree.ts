@@ -1,4 +1,4 @@
-import { everyNode, STRUCTURAL_ROLES, type UiNode } from '../adapters/types.js';
+import { everyNode, STRUCTURAL_ROLES, type Rect, type UiNode } from '../adapters/types.js';
 import { rectArea } from './geometry.js';
 
 /**
@@ -67,8 +67,8 @@ import { rectArea } from './geometry.js';
  * it reaches this rule, and the clause stays for every other tree with no
  * geometry — a source or fixture that sends no rects, a synthetic root
  * alone (WDA always sends rects, every fixture). Nothing is
- * skipped by position (the root counts). Sizes are judged against the tree's
- * OWN largest rect, which assumes every source wraps the screen in a
+ * skipped by position (the root counts) but a status bar's band, below.
+ * Sizes are judged against the tree's OWN largest rect, which assumes every source wraps the screen in a
  * full-size root (idb's Application, WDA's Application/Window, Android's
  * decor): a future source without one, giving only a few labelled
  * equal-size containers, would be called bare. Accepted costs: a labelled
@@ -99,17 +99,83 @@ import { rectArea } from './geometry.js';
  * last now a read error at the idb source, see above); the uiautomator decor
  * shape is also what the ladder's second look read for +5.3…+13.8 s of a
  * measured Android cold launch before `login_screen` rendered at +18.3 s.
+ *
+ * SpringBoard's launch tree (2026-10-08, docs/bugs/2026-10-08-ios-launch-
+ * transition-tree-reads-as-rendered.md). MEASURED on an iPhone 17 simulator,
+ * iOS 27.0, idb, four cold launches: for ~2 s after launch_app idb reads
+ * SpringBoard, not the app — the status bar (`text '18:29'` at {50,22,48,22},
+ * `other 'Cellular'`, a Wi-Fi `other` with a value, `other '100 % battery
+ * power'`, all ending by y = 44 of an 874 pt screen) and, for the first
+ * ~1.2 s, `button 'Skeleton Internal' id='Skeleton Internal'` at
+ * {-2,234,406,406}, the app's home-screen icon zooming in — beside a
+ * full-screen Application labelled ' '. Every one of those counted as
+ * content, so an `absent:` passed and `ensure_state` ran a DESTRUCTIVE rung
+ * with no second look. Two clauses make that tree bare:
+ *
+ * - the STATUS BAR is not content: when the top STATUS_BAND_FRACTION of the
+ *   screen (the largest rect) holds a clock — a `text` reading like a time,
+ *   `18:29` — every node lying wholly inside that band is skipped, whatever
+ *   its role or label. The clock is the key, not the band alone: a band
+ *   alone would also swallow the content a test fake or an edge-to-edge app
+ *   draws at the top, and every measured SpringBoard read carried one.
+ * - a LONE button beside a status bar is the launch icon: when the band
+ *   held a status bar and the only content left is one `button`, the tree
+ *   is bare. No shape is asked of the button (the measured frame overflows
+ *   the screen and its label is its identifier, but a frame read earlier in
+ *   the zoom is not measured and need not do either), because a miss here
+ *   is the bug and a wrong "bare" costs only a delay or a refusal.
+ *
+ * INFERRED, not measured: that the clock reads as a time in every locale
+ * (`\p{Nd}` digits around `:` or `.`, so Arabic-Indic and Finnish `18.29`
+ * match; a status bar with no readable time is missed, i.e. read as before);
+ * the band's size on other devices (see STATUS_BAND_FRACTION); and that an
+ * APP's tree carries no status bar — the one whole app read the note
+ * recorded on iOS 27 (bare, 2 nodes, at +3.0 s) had none, no WDA fixture
+ * holds a StatusBar, and uiautomator dumps only the app's window (its decor's `statusBarBackground`
+ * is identifier-only, bare by the clause above). Where a source does put the
+ * status bar in an app's tree, the costs are the safe ones: a loaded screen
+ * whose only content is one button, or whose only content sits in the
+ * band, is called bare — `unknown` verdicts, the second look, a ⛔ for a
+ * destructive rung. A loaded screen with one button and NO status bar in its
+ * tree is not bare, as before. The Android uiautomator decor is unchanged:
+ * it holds no clock, so neither clause applies.
  */
 export function isBareTree(tree: UiNode): boolean {
   const nodes = [...everyNode(tree)];
-  const largest = Math.max(0, ...nodes.map((n) => rectArea(n.rect)));
-  const wrapperBySize = (n: UiNode) => largest === 0 || rectArea(n.rect) >= largest * SCREEN_SIZED_FRACTION;
-  return !nodes.some((n) => {
-    if (DECORATION_ROLES.has(n.role)) return Boolean(n.label);
-    if (STRUCTURAL_ROLES.has(n.role)) return (Boolean(n.label) || Boolean(n.value)) && !wrapperBySize(n);
-    return true;
-  });
+  const screen = largestRect(nodes);
+  const wrapperBySize = (n: UiNode) => screen === undefined || rectArea(n.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION;
+  const inBand = (n: UiNode) => screen !== undefined && inStatusBand(n.rect, screen);
+  const statusBar = nodes.some((n) => n.role === 'text' && inBand(n) && CLOCK.test(n.label ?? ''));
+  const content: UiNode[] = [];
+  for (const n of nodes) {
+    if (statusBar && inBand(n)) continue;
+    const counts =
+      DECORATION_ROLES.has(n.role) ? Boolean(n.label)
+      : STRUCTURAL_ROLES.has(n.role) ? (Boolean(n.label) || Boolean(n.value)) && !wrapperBySize(n)
+      : true;
+    // Two content nodes settle it: the launch icon is only ever alone.
+    if (counts && content.push(n) > 1) return false;
+  }
+  return content.length === 0 || (statusBar && content[0].role === 'button');
 }
+
+/** The tree's largest rect — the screen every source wraps its tree in — or undefined when no rect has area. */
+const largestRect = (nodes: readonly UiNode[]): Rect | undefined => {
+  let best: Rect | undefined;
+  for (const n of nodes) if (rectArea(n.rect) > (best === undefined ? 0 : rectArea(best))) best = n.rect;
+  return best;
+};
+
+/** A rect with area lying wholly inside the top STATUS_BAND_FRACTION of `screen`. */
+const inStatusBand = (r: Rect, screen: Rect): boolean =>
+  rectArea(r) > 0 && r.y >= screen.y && r.y + r.height <= screen.y + screen.height * STATUS_BAND_FRACTION;
+
+/**
+ * A status-bar clock: a time anywhere in the label — `18:29`, `6:29`,
+ * Finnish `18.29`, Arabic-Indic digits (`\p{Nd}`), an iPad's `6:29 PM` or a
+ * prefixed `下午6:29`. Measured: `18:29`; the rest inferred.
+ */
+const CLOCK = /(?:^|\D)\p{Nd}{1,2}[:.]\p{Nd}{2}(?:\D|$)/u;
 
 // STRUCTURAL_ROLES, the wrapper roles this rule reads, is defined beside
 // KEYBOARD_ROLE in adapters/types.ts since 2026-10-07 (geometry.ts's
@@ -124,6 +190,17 @@ export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress
  * row (a Cell, a Pressable) sits far below it.
  */
 export const SCREEN_SIZED_FRACTION = 0.9;
+/**
+ * The status-bar band (2026-10-08): the top fraction of the screen (the
+ * tree's largest rect) a node must lie wholly inside to be skipped as the
+ * status bar — and only on a tree whose band holds a clock (isBareTree). A
+ * fraction, not points, because iOS rects are points and Android's are
+ * pixels. Measured on iOS 27 (iPhone 17, 874 pt): the status bar's nodes
+ * end at y = 44, 5.0 %. Inferred from published top insets: a Dynamic
+ * Island iPhone's 62 pt of 874 is 7.1 %, an iPhone SE's 20 of 667 is 3.0 %,
+ * an iPad's 24 of 1024 is 2.3 %. 8 % holds them all with room for rounding.
+ */
+export const STATUS_BAND_FRACTION = 0.08;
 
 /**
  * `button ×3, container ×1, text ×1` — by count, then name; the normalized

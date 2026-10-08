@@ -4,7 +4,8 @@ import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import { isBareTree } from '../../src/ui-tree/bare-tree.js';
+import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
+import { absenceVerdict, presenceVerdict } from '../../src/ui-tree/verdict.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -208,5 +209,90 @@ describe('isBareTree: what counts as content', () => {
   it('the root counts like any node, and a full-screen text/button still counts — only structural roles are judged by size', () => {
     expect(isBareTree(node({ role: 'button', label: 'OK', rect: FULL }))).toBe(false);
     expect(isBareTree(wda({ type: 'StaticText', label: 'Loading your accounts', rect: FULL, children: [] }))).toBe(false);
+  });
+});
+
+/**
+ * SpringBoard's launch tree (docs/bugs/2026-10-08-ios-launch-transition-tree-
+ * reads-as-rendered.md): measured on an iPhone 17 simulator, iOS 27.0, idb,
+ * in the first ~2 s after launch_app — the status bar and the app's icon
+ * zooming in, beside a full-screen Application labelled ' '. Rebuilt from the
+ * note's printed tree as idb's raw elements, through the real parser.
+ */
+const axv = (type: string, label: string | null, frame: { x: number; y: number; width: number; height: number }, id: string | null, value: string | null) => ({
+  type, AXLabel: label, AXUniqueId: id, AXValue: value, frame,
+});
+// The note printed the normalized tree, so the status items' raw idb type is
+// not recorded — only that it normalized to `other`, i.e. it is no key of
+// IOS_ROLE_MAP (whose `Other` is `container`). 'StatusItem' stands in for it.
+const STATUS_BAR = [
+  axv('StaticText', '18:29', { x: 50, y: 22, width: 48, height: 22 }, null, null),
+  axv('StatusItem', 'Cellular', { x: 285, y: 25, width: 20, height: 14 }, null, 'No signal'),
+  axv('StatusItem', null, { x: 314, y: 26, width: 18, height: 13 }, '3 of 3 Wi-Fi bars', 'SSID, 3 of 3 Wi-Fi bars'),
+  axv('StatusItem', '100 % battery power', { x: 341, y: 25, width: 29, height: 14 }, null, 'Not charging'),
+];
+const LAUNCH_ICON = axv('Button', 'Skeleton Internal', { x: -2, y: 234, width: 406, height: 406 }, 'Skeleton Internal', null);
+const springBoard = (...els: Record<string, unknown>[]) =>
+  parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), ...STATUS_BAR, ...els]));
+/** A loaded PIN screen in idb's shape (constructed, not measured): the prompt and the keypad. */
+const PIN_SCREEN = [
+  axv('StaticText', 'Enter your PIN to log in', { x: 40, y: 180, width: 322, height: 24 }, null, null),
+  ...['1', '2', '3'].map((d, i) => axv('Button', d, { x: 40 + i * 110, y: 500, width: 100, height: 64 }, `pin_key_${d}`, null)),
+];
+
+describe('isBareTree: SpringBoard\'s launch tree on iOS 27 (measured 2026-10-08) is bare', () => {
+  it('the 7-node read 0.3 s after launch_app — status bar + the zooming app icon — is bare, so presence and absence are both unknown', () => {
+    const tree = springBoard(LAUNCH_ICON);
+    expect(treeShape(tree)).toBe('7 nodes (roles: other ×4, button ×1, container ×1, text ×1)'); // the note's timeline line
+    expect(isBareTree(tree)).toBe(true);
+    const pin = (t: UiNode) => [...everyNode(t)].filter((n) => n.label === 'Enter your PIN to log in');
+    expect(presenceVerdict(pin(tree), tree)).toBe('unknown');
+    expect(absenceVerdict(pin(tree), { width: 402, height: 874 }, tree)).toBe('unknown'); // the absent assert / detect that PASSED
+  });
+
+  it('the 6-node reads at 1.5–2.1 s — the status bar alone — are bare', () => {
+    const tree = springBoard();
+    expect(treeShape(tree)).toBe('6 nodes (roles: other ×4, container ×1, text ×1)');
+    expect(isBareTree(tree)).toBe(true);
+  });
+
+  it('the icon is the launch icon by being the one button beside a status bar — no frame is asked of it (an earlier zoom frame is unmeasured)', () => {
+    expect(isBareTree(springBoard(axv('Button', 'Skeleton Internal', { x: 170, y: 400, width: 62, height: 62 }, null, null)))).toBe(true);
+  });
+});
+
+describe('isBareTree: a status bar is not a reason to call a loaded screen bare', () => {
+  it('a loaded screen with a status bar and content is not bare (should a source ever put the status bar in an app\'s tree)', () => {
+    expect(isBareTree(springBoard(...PIN_SCREEN))).toBe(false);
+    expect(isBareTree(springBoard(PIN_SCREEN[0]))).toBe(false); // one text below the band is content
+    expect(isBareTree(springBoard(LAUNCH_ICON, PIN_SCREEN[0]))).toBe(false); // a button is a launch icon only when ALONE
+    expect(isBareTree(springBoard(axv('Button', 'Log in', { x: 20, y: 600, width: 362, height: 48 }, null, null), axv('Button', 'Register', { x: 20, y: 660, width: 362, height: 48 }, null, null)))).toBe(false);
+  });
+
+  it('a loaded screen whose only content is ONE button: not bare without a status bar in its tree (the measured app trees have none); bare beside one — the accepted, safe cost', () => {
+    const lone = axv('Button', 'Continue', { x: 20, y: 760, width: 362, height: 48 }, 'continue', null);
+    expect(isBareTree(idb(lone))).toBe(false);
+    expect(isBareTree(idb(LAUNCH_ICON))).toBe(false); // even the measured icon's shape: without a status bar it is an app's button
+    expect(isBareTree(springBoard(lone))).toBe(true);
+  });
+
+  it('the band is skipped only when it holds a clock: content at the top of a screen with no clock still counts (test fakes, an edge-to-edge Android app)', () => {
+    expect(isBareTree(idb(ax('StaticText', 'Accounts', { x: 16, y: 20, width: 200, height: 30 })))).toBe(false);
+    expect(isBareTree(parseUiautomatorXml(androidXml(
+      '<node index="0" text="Settings" resource-id="" class="android.widget.TextView" package="md.bank.app" content-desc="" bounds="[48,40][600,140]"/>',
+    )))).toBe(false);
+    // A time BELOW the band is the app's text, not a status bar.
+    expect(isBareTree(idb(ax('StaticText', '18:29', { x: 40, y: 400, width: 100, height: 30 })))).toBe(false);
+  });
+
+  it('the Android decor is bare as before (it holds no clock, so neither clause applies)', () => {
+    expect(isBareTree(parseUiautomatorXml(androidXml('')))).toBe(true);
+  });
+
+  it('a status-bar clock in other locales (inferred): 6:29, Finnish 18.29, Arabic-Indic digits, an iPad\'s "6:29 PM"; not a number that is no time', () => {
+    const withClock = (clock: string) =>
+      parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), axv('StaticText', clock, { x: 50, y: 22, width: 48, height: 22 }, null, null)]));
+    for (const clock of ['6:29', '18.29', '٦:٢٩', '6:29 PM', '下午6:29']) expect(isBareTree(withClock(clock)), clock).toBe(true);
+    for (const text of ['Loading', '100 %', '1.200 EUR']) expect(isBareTree(withClock(text)), text).toBe(false);
   });
 });
