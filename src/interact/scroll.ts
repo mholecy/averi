@@ -247,10 +247,13 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
  * still holds. Measured under WDA: the 400 ms settle read caught a
  * SwiftUI form mid-fling with the row inside the viewport — "fully visible
  * after 1 swipe" — and a read 1 s later had it at y -48 / -121 / -133,
- * behind the top bar, three runs of three. What it costs: every stop after
- * a stroke spends one more settle, one more tree read and, on Android, one
- * more window query — a witness query only when the band matters on that
- * read; a stop at 0 swipes sent no stroke and spends none. A target still
+ * behind the top bar, three runs of three. What it costs: each confirming
+ * read is a round like any other — one more settle, one more tree read
+ * and, on Android, what a round's keyboard reading costs: the window query,
+ * the touchable-region query too while the keyboard reads shown, and a
+ * witness query when the band matters on that read (1 to 3 adb calls;
+ * ui-tree/soft-keyboard.ts#readSoftKeyboard has the table); a stop at 0
+ * swipes sent no stroke and spends none. A target still
  * moving inside the viewport is read again, up to this many reads a
  * stroke, then reported with `settled: false` and a note saying so: a
  * fling is over well inside 3 × 400 ms plus the reads, and a target that
@@ -593,10 +596,12 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * stale window on round 0 can be followed by a real keyboard — a new
  * screen that auto-focuses a field — and a confirmed keyboard can be hidden
  * by the scroll itself (a list that dismisses it on drag) and leave the
- * window state stale-shown behind it. At most one query a round, the
- * rounds bounded by `maxSwipes` (what one costs: AndroidAdapter's
- * keyboardWitness); none on iOS, whose band is read off the tree being
- * judged. A failed or `fully: true` stop may add one more, the floating
+ * window state stale-shown behind it. At most one query a round (what one
+ * costs: AndroidAdapter's keyboardWitness); none on iOS, whose band is
+ * read off the tree being judged. The rounds — strokes and confirming
+ * reads alike — number at most 1 + (1 + SETTLE_CONFIRM_READS) ×
+ * `maxSwipes`, 25 at the defaults, and stop at the deadline whichever
+ * comes first. A failed or `fully: true` stop may add one more, the floating
  * row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
  * judged under one this round — a clip at its edge, or another of several

@@ -336,7 +336,8 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  * since 2026-10-08 for the one reader with no single subject:
  * `scroll_until` (interact/scroll.ts) judges every match against one
  * reading per round and exempts the keyboard's own nodes itself, with
- * `partOfKeyboard`, so one round still costs one oracle query.
+ * `partOfKeyboard`, so one round still reads the oracle once (its cost
+ * below).
  *
  * Since 2026-10-08 the oracle is read through `oracleKeyboard`: a `shown`
  * reading costs a SECOND query, `touchable()`, the keyboard window's region
@@ -354,14 +355,26 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  * - a pixel-poll round: 1, or 2 with the keyboard up (no witness);
  * - a `scroll_until` round: 1, or 2 with the keyboard up, or 3 when the band
  *   changes the round (its `keyboardCorroborated` witness), plus the
- *   `unlocated` row's witness on a failed or `fully: true` stop. The
- *   touchable call's own `mInputShown`, read a moment before, could serve
- *   that veto and save the third call; it is not reused (judged 2026-10-08,
- *   review round 1): the reading would carry a witness only on the shown
- *   path, the veto would then take its input from two places — the reading
- *   or a fresh query — and the round loop that would thread it is being
- *   rewritten beside this change. One call a round, at most `maxSwipes` + 1
- *   rounds; a follow-up once that rewrite has landed.
+ *   `unlocated` row's witness on a failed or `fully: true` stop. A
+ *   confirming read (scroll.ts#SETTLE_CONFIRM_READS, up to 3 after a
+ *   stroke) is a round like any other and pays the same — with the
+ *   keyboard up 2 or 3 queries each, not 1. Rounds: at most
+ *   1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes` — 25 at the defaults,
+ *   measured on the fake with a target that left the frame on every fourth
+ *   read — and cut short by the deadline, which the confirming reads count
+ *   against.
+ *
+ * FOLLOW-UP, not done (2026-10-08, review round 1, restated by the code
+ * review of round 2): the touchable call's own `mInputShown`, read a moment
+ * before, could serve `scroll_until`'s veto and save the third call of a
+ * round — the reading would carry the witness beside `panels`, and
+ * `witnessDenies` would stay the one decider over it. Not done because
+ * TOUCHABLE_COMMAND is UNMEASURED as one command on a device
+ * (adapters/android.ts#keyboardTouchable): the veto is the guard against a
+ * stale band driving strokes through the next screen, and moving its input
+ * onto an unmeasured command is a change to check on a device first, in a
+ * round that allows one. The round loop it would thread through has landed
+ * (Motion, scroll.ts), so that is no longer the reason.
  */
 export async function readSoftKeyboard(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
