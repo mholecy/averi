@@ -355,6 +355,15 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(result.keyboardHidden).toBe(HIDDEN);
       });
 
+      it('a later screen-sized toolbar (WDA\'s SwiftUI toolbar host, 402×874, after the title) is not a cover: the title is tapped (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md)', async () => {
+        const fake = hiding(iosFake());
+        const full = { x: 0, y: 0, width: 402, height: 874 };
+        fake.live().children.push(node({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: full, children: [node({ role: 'container', rect: full })] }));
+        const result = await tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] });
+        expect(fake.taps).toEqual(['login_title', 'login_submit']);
+        expect(result.keyboardHidden).toBe(HIDDEN);
+      });
+
       it('a root without a rect (no screen to judge by) skips the on-screen check, not the strategy', async () => {
         const fake = hiding(iosFake());
         fake.live().rect = { x: 0, y: 0, width: 0, height: 0 };

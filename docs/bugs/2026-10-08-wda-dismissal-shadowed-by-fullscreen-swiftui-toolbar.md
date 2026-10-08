@@ -1,6 +1,6 @@
 # BUG: through WebDriverAgent a full-screen SwiftUI `Toolbar` "shadows" every point, so a configured `keyboardDismiss` tap on the screen title is refused as "covered"
 
-> **Status (2026-10-08):** open — triaged P3 (`treeSource: wda` only; mp-native runs idb today, but it blocks the documented path to WDA); the cited code is unchanged on `c35388a`.
+> **Status (2026-10-08):** fixed on branch `fix/p3-wda-toolbar-shadow`; unmeasured on a device: `shadowing` (`src/ui-tree/geometry.ts`) no longer counts a later non-structural node whose area reaches `SCREEN_SIZED_FRACTION` of the tree's largest rect as cover by itself (its content descendants at the point still are), pinned by a test built from the tree below; re-run the repro with `treeSource: wda` to confirm the title is tapped and the keyboard hides.
 
 **Measured 2026-10-08 16:42–16:43 UTC** in `/Users/mholecy/Finshape/mp-native` (SWIFT payment form, branch
 `feature/swift-payment`) with a scratch config — mp-native's `averi.yaml` uses idb and was not edited — iPhone 17
