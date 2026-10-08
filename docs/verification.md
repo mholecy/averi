@@ -9,14 +9,19 @@ Verification is tiered, cheapest first:
 
 1. **Element asserts** — deterministic checks against the normalized accessibility tree.
 2. **Screenshots** — for the agent's own visual judgment.
-3. **Pixel-diff** against stored baselines (auto-created under `.averi/baselines/` on first use;
-   delete one to re-baseline).
+3. **Pixel-diff** against stored baselines (auto-created as `.averi/baselines/<platform>/<name>.png`
+   beside averi.yaml on first use — refused, not created, while the screen, a blinking caret or a
+   clock included, is still changing; delete the file to re-baseline).
 4. **Numbers, never impressions, for geometry and fills**: `rect` asserts against Figma-frame
    values, `color` asserts against an expected hex (CIEDE2000), `ocr` asserts reading back the
    text an element actually renders, and `verify` with a layout contract printing per-anchor
    geometry, color and text/type-size tables.
 
-Every flow response reports `appAlive` with a crash-log excerpt if the app died.
+A successful `ensure_state` or `run_flow`, every `assert`, and every `verify` leg whose state and
+flow completed end with an `appAlive` line (when averi.yaml names the app for the platform) —
+`false` with a crash-log excerpt if the app died, `unknown` if the device could not be asked. A
+FAILED flow or leg carries no `appAlive` line: after a failure, check with `get_logs` (grep for
+the crash) or a `screenshot`.
 
 ## Forms & validation
 
@@ -39,20 +44,24 @@ flows:
 - **`absent` semantics** (assert + state `detect:`): an element is absent when it is *not in the
   tree, or its rect does not intersect the visible viewport*. This is the one portable meaning —
   Android prunes off-screen nodes from its tree while iOS keeps them with off-viewport rects, so
-  a raw tree check would pass on one platform and fail on the other for the same screen.
+  a raw tree check would pass on one platform and fail on the other for the same screen. On a
+  BARE tree (only wrappers and unlabeled decoration — a cold launch's decor or splash) absence is
+  undecided, never satisfied: the assert fails `could not verify …`, `wait:`/`branch:` keep
+  polling, and a state `detect:` reads it as unknown.
 - **`fill`** clears opt-in only: typing APPENDS on both platforms, but dev flavors may pre-fill
   login fields that must survive. Fills are verified against a fresh accessibility tree when the
   field exposes its text — a clear-fill that lands wrong is wiped and retyped once; a no-clear
   fill never destroys existing content (it fails loudly instead). Android types one character per
   `input text` call: bulk injection races Compose's async state and drops most characters
   (measured 3 of 11 landing).
-- **Field errors**: `ui_snapshot` attaches `error` to an input when the platform exposes the
-  association (iOS: a same-identifier text below the field — the SwiftUI convention when
-  titles/errors share the field's `accessibilityIdentifier`); assert with
-  `{ element: { id: amount_input }, error: "Required" }`.
+- **Field errors**: on iOS `ui_snapshot` attaches `error` to an input from a same-identifier text
+  below the field (the SwiftUI convention when titles/errors share the field's
+  `accessibilityIdentifier`); assert with `{ element: { id: amount_input }, error: "Required" }`.
+  Android sets no `error`, so there assert the message's `text` instead.
 - **Tap disambiguation**: when a selector matches several nodes and exactly one is interactive
   (button/textfield/switch/…), `tap`/`fill` target that one and say so in the trace. Several
-  interactive matches stay an error.
+  interactive matches: a flow step takes the first and says so (the descriptor's author can see
+  the tree, and can narrow with `role:`); the MCP `tap` / `type_text` tools refuse and list them.
 
 ## Layout contracts — geometry with numbers
 
@@ -125,6 +134,15 @@ single-element form is a `color` assert: `{"element":{"id":"card"},"color":{"exp
 "deltaE":8,"sample":"dominant"}}` — compared directly against `deltaE` (no 1.5× slack: the
 caller chose the hex), so the default catches the 10.19 bug. Thin 1–2 px strokes are invisible
 to region sampling — borders stay with the screenshot judge.
+
+The `color` and `ocr` asserts poll for up to 12 s by default (`timeout` per spec; tree asserts
+3 s). Each round measures only a frame whose ELEMENT region held still across two captures 300 ms
+apart (falling back to the whole screen when the region cannot be checked), so "the screen did
+not settle" usually means the element's own region kept changing — a spinner or fade inside it.
+A round whose element is overlapped by the soft keyboard (Android: the window state; iOS under
+`treeSource: wda`: the tree's keyboard band) is a fail-closed miss that names both rects and
+captures nothing; the poll keeps going, so a keyboard that hides before the deadline costs a
+round, not the verdict.
 
 Screen width per platform is the WINDOW's width, read from the whole tree (the id-less
 root/window node), and the device screen witnesses it. Both the `rect` assert and the rect

@@ -29,7 +29,7 @@ Prefer to do it by hand, or setting up for a whole team (committed `.mcp.json`)?
 ```mermaid
 flowchart LR
     A(["AI agent"]) -- MCP --> S["averi server"]
-    S -- "adb / simctl + idb" --> D["emulator / simulator"]
+    S -- "adb / simctl + idb (opt-in WDA)" --> D["emulator / simulator"]
     subgraph R["your app repo"]
         Y["averi.yaml<br/>states, flows, selectors"]
         E[".env.averi — gitignored<br/>credential values"]
@@ -67,15 +67,20 @@ flowchart LR
 
 Idempotent — the agent calls it freely; it costs ~1 second when the app is already there.
 
-`reach:` is a ladder, so order it cheapest-first: `detect` is re-checked after every flow and the rest are skipped once it matches. `reach: [dismiss_post_login_prompts, login]` reads as "try the cheap idempotent dismissal; fall back to a full login only if that did not get us there" — and that is what it does, including when the cheap flow *fails* (its `tap:` times out because the interstitial was not there). A failed rung escalates to the next one and is reported in the trace as `⚠ reach <flow>`; only the last rung's failure fails the call — and not before averi re-checks `detect` (a flow can reach the state and then die on a later step) and, unless the failure was a config mistake, runs the recovery pass below.
+`reach:` is a ladder, so order it cheapest-first: `detect` is re-checked after every flow and the rest are skipped once it matches. `reach: [dismiss_post_login_prompts, login]` reads as "try the cheap idempotent dismissal; fall back to a full login only if that did not get us there" — and that is what it does, including when the cheap flow *fails* (its `tap:` times out because the interstitial was not there). A failed rung escalates to the next one and is reported in the trace as `⚠ reach <flow>` — unless it failed on a config mistake (an undeclared or empty credential, an unknown state or flow), which ends the call at once rather than escalating into a costlier rung. Only the last rung's failure fails the call — and not before averi re-checks `detect` (a flow can reach the state and then die on a later step) and, again unless the failure was a config mistake, runs the recovery pass below.
 
 The ladder also runs backwards once, at the end. The last rung's own aftermath can produce a screen that an *earlier* rung exists to clear — a login completes, then a network-gated biometrics interstitial arrives too late for that login's `optional:` windows — and a forward-only ladder would fail there while an immediately repeated call succeeded. So whenever the ladder ends short of the state — its final wait times out, *or* the last rung itself throws, which is what happens when a login flow spells its success criterion as its own trailing `wait: { state: ... }` — averi re-runs the earlier rungs **once** (`↻ recovery` in the trace) and re-checks. Once per tool call, not per state: nested `requires:` and a `verify` leg's state and flow (whose `requires:` may ladder again) share that one pass. Only rungs it can prove are repeatable take part: a `launch { clearState: true }` anywhere in a flow, or reachable through its `requires:`, or a flow marked `destructive: true`, is never re-run: the recovery pass adds no wipes to what the ladder already spent. If the state is still not reached, the call fails with the original error — the wait's timeout, or the last rung's own failure, whichever ended the ladder.
+
+One more guard sits in front of every destructive rung (`launch { clearState: true }`, or a flow marked `destructive: true`): if the screen could not be read — iOS idb stuck on a 0×0 tree, a cold launch's bare decor or splash — averi looks again for up to 20 s (a bare screen gets that second look before a cheap rung too), and if it still sees nothing rendered it refuses the rung (`⛔ reach` in the trace, `Refused to run reach flow …` as the error) rather than wipe an app whose screen it never saw. Nothing was wiped; retry once the screen has rendered.
 
 ### The yaml is code
 
 States and flows live in your repo and evolve with your app — when navigation changes and a flow times out, the agent fixes the descriptor as part of the change. You don't hand-author it either: the agent bootstraps it by driving your app ([SETUP.md, step 4](SETUP.md#step-4--author-averiyaml-by-driving-the-app)).
 
 ```yaml
+credentials:
+  password: ${APP_PASSWORD}             # the value comes from .env.averi
+
 states:
   logged_in:
     detect: { element: { text: "Accounts" } }
@@ -86,7 +91,7 @@ flows:
     steps:
       - launch: { clearState: true }
       - tap: { text: "Log in" }
-      - type: { value: $password }        # resolves from .env.averi — never a literal
+      - type: { value: $password }        # the credential above — never a literal
       - wait: { state: logged_in, timeout: 20s }
 ```
 
@@ -101,7 +106,7 @@ The schema covers the real world: per-platform steps, PIN keypads without resour
 | 3 | baseline pixel-diff | Did anything visually regress since last time? |
 | 4 | `rect` / `color` / `ocr` asserts, layout contracts | Is the margin 24pt, the fill `#FDFDFD`, the rendered copy `CONTINUE`? Geometry and color are arithmetic — never eyeballed. |
 
-`verify` runs the same state/flow/asserts on **both platforms** and returns paired screenshots; with a layout contract it appends per-anchor geometry, color (CIEDE2000) and text/type-size parity tables. Every response reports `appAlive`, with a crash-log excerpt if the app died. Full detail: [docs/verification.md](docs/verification.md).
+`verify` runs the same state/flow/asserts on **both platforms** and returns paired screenshots; with a layout contract it appends per-anchor geometry, color (CIEDE2000) and text/type-size parity tables. A flow or `ensure_state` that succeeds, every `assert` call (failed asserts included) and every `verify` leg whose state and flow completed report `appAlive` (when averi.yaml names the app for that platform) — `false` with a crash-log excerpt if the app died, `unknown` when the device could not be asked; a failed flow, state or leg carries its trace instead, so check `get_logs` for a crash. Full detail: [docs/verification.md](docs/verification.md).
 
 ### One habit that pays off immediately: stable ids
 
@@ -109,9 +114,9 @@ averi can only select what the accessibility tree exposes. Give new screens test
 
 ## Requirements
 
-Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
+Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. The opt-in `app.ios.treeSource: wda` reads the tree through WebDriverAgent, which averi builds with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed with averi (`npx` included); if that optional install was skipped or failed (e.g. `--omit=optional`), `treeSource: wda` fails with a message naming the package. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
 
-On a Linux/Windows box you get the full Android toolset — pass `platforms: ["android"]` to `verify` (its default runs both platforms; iOS tools error only when called). OCR-backed checks (`ocr` asserts, text/type-size parity) use the macOS Vision framework and fall back to the accessibility tree elsewhere. Windows is untested — reports welcome.
+On a Linux/Windows box you get the full Android toolset — pass `platforms: ["android"]` to `verify` (its default runs both platforms; iOS tools error only when called). OCR-backed checks use the macOS Vision framework: elsewhere `ocr` asserts fail closed and the text/type-size parity tables compare from the accessibility tree instead. Windows is untested — reports welcome.
 
 ## Documentation
 
@@ -127,8 +132,9 @@ On a Linux/Windows box you get the full Android toolset — pass `platforms: ["a
 ```bash
 npm install
 npm test           # vitest
+npm run lint       # typecheck src + tests
 npm run build      # tsc → dist/
 npm run dev        # run the MCP server over stdio from source
 ```
 
-Layout: `src/adapters/` (adb, simctl/idb, opt-in WDA tree source, one normalized tree) · `src/flow/` (yaml schema + engine) · `src/verify/` (asserts, baselines, crash scan) · `src/mcp/` (tool layer) · `skill/` · `docs/plans/`.
+Layout (each layer imports only those after it): `src/mcp/` (tool surface, no logic) · `src/run/` (tool commands, verify runs) · `src/flow/` (yaml schema, credentials, engine) · `src/interact/` (tap/type/fill/scroll/swipe, keyboard guard) · `src/verify/` (asserts, baselines, pixel poll, parity tables, crash scan) · `src/ui-tree/` (selectors, geometry, tree verdicts) · `src/adapters/` (adb, simctl/idb, opt-in WDA tree source, one normalized tree) · `src/util/` · `skill/` · `docs/plans/`.

@@ -28,10 +28,15 @@ Ask the user which platforms they need if the repo doesn't make it obvious.
 
 **iOS** (macOS only — Apple ships simulators only with Xcode):
 - Xcode and a booted simulator
-- `idb`: `brew install idb-companion && pipx install fb-idb --python python3.13`
+- `idb`: `brew tap facebook/fb && brew install idb-companion && pipx install fb-idb --python python3.13`
   (fb-idb breaks on Python 3.14 — pin 3.13)
 - If `xcode-select -p` points at CommandLineTools, that's fine — averi injects `DEVELOPER_DIR`
-  itself, no sudo needed.
+  itself when Xcode is at `/Applications/Xcode.app` (anywhere else, set `DEVELOPER_DIR` in
+  `.mcp.json`'s `env`), no sudo needed.
+- Only for `app.ios.treeSource: wda` (step 4): averi builds WebDriverAgent with `xcodebuild`
+  from the `appium-webdriveragent` package — an optional dependency installed with averi
+  (`npx -y averi` included). If that optional install was skipped or failed (e.g.
+  `--omit=optional`), `treeSource: wda` fails with a message naming the package.
 
 **Check:**
 
@@ -67,12 +72,13 @@ claude mcp add averi -- npx -y averi
 ```
 
 **Whole team** — create `.mcp.json` at the repo root and commit it (teammates get a one-time
-approval prompt). Pin the version so everyone runs the same build:
+approval prompt). Pin the version so everyone runs the same build — `<version>` is what
+`npm view averi version` prints:
 
 ```json
 {
   "mcpServers": {
-    "averi": { "command": "npx", "args": ["-y", "averi@0.2.0"] }
+    "averi": { "command": "npx", "args": ["-y", "averi@<version>"] }
   }
 }
 ```
@@ -85,7 +91,7 @@ Either way the agent session runs the server with the **repo root as its working
 that's how averi finds `averi.yaml`. No paths need configuring in averi itself.
 
 > **Monorepo / nested repo?** If sessions run somewhere other than the directory holding
-> `averi.yaml`, tools accept `configPath: app/averi.yaml`. Everything the config points at
+> `averi.yaml`, the tools that read averi.yaml accept `configPath: app/averi.yaml`. Everything the config points at
 > (build paths, `.env.averi`, `.averi/baselines/`) resolves against **the config file**, not the
 > working directory, so the yaml stays identical either way.
 
@@ -147,7 +153,7 @@ curl -fsSL https://raw.githubusercontent.com/mholecy/averi/main/skill/SKILL.md \
 
 (For agents other than Claude Code, put it wherever that agent loads skills/instructions from.)
 
-**Check:** the file exists and starts with `name: averi` frontmatter.
+**Check:** the file exists and its YAML frontmatter has `name: averi`.
 
 ---
 
@@ -220,7 +226,8 @@ step reference is in the skill you installed in step 3.
 > **React Native app on iOS:** if `id:` selectors miss static text and containers under the
 > default tree source, that's expected — add `app.ios.treeSource: wda` to `averi.yaml` (one
 > line; taps/typing stay on idb, only the tree read routes through WebDriverAgent; first WDA
-> build per Xcode version takes minutes). Details: `docs/plans/ios-wda-tree-source.md`.
+> build per Xcode version takes minutes; it needs the optional `appium-webdriveragent` package,
+> see step 0). Details: https://github.com/mholecy/averi/blob/main/docs/plans/ios-wda-tree-source.md.
 > With `wda` averi also sees the iOS soft keyboard: a tap on an element it covers is refused
 > rather than sent into the keys — unless `app.ios.keyboardDismiss` names what hides it, e.g.
 > `[{ tap: { id: login_title } }, { accessory: true }]` (a neutral element whose tap does not
@@ -296,6 +303,7 @@ Then report to the user:
 - [ ] Skill installed at `.claude/skills/averi/SKILL.md`
 - [ ] `averi.yaml` committed-ready: which states and flows it defines
 - [ ] Cold + warm `ensure_state` both passed (include the timings)
+- [ ] If `treeSource: wda` is enabled: `ui_snapshot` on iOS returned a tree (proves WDA built and started)
 - [ ] Anything flagged: missing test ids, `treeSource: wda` enabled, platforms skipped and why
 
 If any box is unchecked, setup is **not done** — say so plainly and list what's missing.
@@ -350,8 +358,8 @@ one happens by itself.
   exposes container identifiers: `app.ios.treeSource: wda` (step 4), or wait on a button/row id.
 - **iOS: `idb returned an empty accessibility tree`, or `ensure_state` stops with `Refused to run reach flow …` and a
   `⛔ reach` line** — idb returns a 0×0 tree on a rendered screen (measured 2026-10-06/07). averi treats it as an
-  unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a `clearState`
-  rung on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
+  unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a destructive
+  rung (`clearState`, `destructive: true`) on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
   (`treeSource: wda` in any project, or another XCTest driver): every app process launched after it starts stuck, and
   waiting does not end it (18+ min measured). The same 0×0 shape is also a healthy app's first read right after a
   launch (0.4 s after `launch_app`, measured 2026-10-08): `ui_snapshot` reads once more a second later before failing,
@@ -363,10 +371,11 @@ one happens by itself.
 - **`ensure_state` stops with `Refused to run reach flow …` and `every UI tree read was bare` (either platform)** — every
   tree the detect probe read held only wrappers and unlabeled decoration: a cold launch's Android decor
   (`android:id/content`, `action_bar_root`; measured +5.3…+13.8 s after launch on an RN debug build) or the WDA splash
-  (7 nodes, `SplashScreenLogo`). Before a `clearState` rung averi takes a second look of up to `ensureTimeoutMs` (20 s):
-  it ends at once on the state, runs the rung after the full 20 s when it saw a rendered screen outside the state, and
-  refuses rather than wipe an app whose screen it never saw (until 2026-10-07 it read the decor as "not in
-  state" and wiped). Take a `screenshot`: still launching → retry the call; rendered but made only of unlabeled icons
+  (7 nodes, `SplashScreenLogo`). Before a destructive rung (`clearState`, or a flow marked `destructive: true`) — and
+  since 2026-10-08 before any rung when the screen read bare — averi takes a second look of up to 20 s: it ends at once
+  on the state, runs the rung (after the full 20 s) when it saw a rendered screen outside the state, runs a cheap rung
+  anyway on a still-bare screen, and refuses a destructive one rather than wipe an app whose screen it never saw (until
+  2026-10-07 it read the decor as "not in state" and wiped). Take a `screenshot`: still launching → retry the call; rendered but made only of unlabeled icons
   (they read as bare too) → `run_flow` the rung deliberately, or give the screen a labelled element to detect on.
 - **iOS typing lands the wrong characters (`y`↔`z`, `ý` for a digit), or `fill` on a PLAIN field reports fewer
   characters than typed** — HID typing follows the simulator's hardware keyboard layout, which follows the Mac's
