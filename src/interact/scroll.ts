@@ -452,13 +452,22 @@ class Motion {
    * Converging is deliberate (review round 2): every direction change
    * halves the reach of every stroke after it (`reach`, applied with
    * swipe.ts#shortenStroke — the touch-down kept, never under twice
-   * TOUCH_SLOP). A fling is the app's: with the measured content-down fling
+   * TOUCH_SLOP nor 3 % of the box's side along it). A fling is the app's: with the measured content-down fling
    * (−729 to −970 pt for the 344-pt stroke) and a content-up fling of the
    * same size, full strokes both ways ping-pong round the target to
    * `maxSwipes`; with the reach halved per turn the distance left shrinks
    * geometrically whatever the app flings. A turn that overshoots too is
    * turned again, not given up — giving up would swipe on into content the
    * target has passed — and the failure counts the turns.
+   *
+   * The reach is deliberately NEVER restored after a turn, not even on
+   * strokes back toward the caller's direction (review round 3): a turn
+   * means the target was within one move of the frame and a full stroke
+   * just carried it past — the distance left is less than what that stroke
+   * moves. Restoring the reach would draw that stroke again and bring the
+   * oscillation back. The cost: a scroll that turned once early keeps the
+   * shorter strokes (and spends more of `maxSwipes`) if the target then
+   * turns out to be further away than one move.
    */
   nextStroke(): NextStroke {
     const toward = this.carriedPast ? OPPOSITE[this.direction] : this.direction;
@@ -893,7 +902,7 @@ export async function scrollUntilVisible(
     const { box } = await screenBox(adapter, read);
     const strokeCover = tree === undefined ? lastReadCover : cover;
     const drawn = strokeCover === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, strokeCover.band.y, toward, 'content');
-    const stroke = shortenStroke(drawn, reach);
+    const stroke = shortenStroke(drawn, reach, toward === 'up' || toward === 'down' ? box.height : box.width);
     await adapter.swipe(stroke.from, stroke.to);
     swipes++;
     motion.stroked(toward, stroke);

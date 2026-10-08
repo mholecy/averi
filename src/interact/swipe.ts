@@ -126,22 +126,35 @@ export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Dire
 export const TOUCH_SLOP = 24;
 
 /**
+ * The other floor on a shortened stroke, as a fraction of the box's side
+ * along it (review round 3): TOUCH_SLOP is a fixed number in tree units,
+ * points on iOS and pixels on Android, so on a dense Android panel twice it
+ * is a smaller finger travel than on iOS. 3 % of the side scales with the
+ * screen whatever its units: 26 pt of an 874-pt iPhone height (below the
+ * 48 of the slop floor, which stands), 67 px of a 2220-px Pixel_3a height.
+ */
+export const MIN_STROKE_FRACTION = 0.03;
+
+/**
  * `stroke` with its reach scaled by `factor` (0 < factor ≤ 1), its
  * touch-down kept: the end moves along the stroke toward the touch-down,
  * so whatever placed the touch-down (`swipeVectorAbove`'s rules: never in
  * the keyboard clearance, never higher than without a keyboard) still
  * holds, and the stroke still runs the same way. Never shorter than twice
- * TOUCH_SLOP (nor longer than the stroke given). Used by `scroll_until`
+ * TOUCH_SLOP nor than MIN_STROKE_FRACTION of `side` — the gesture box's
+ * side along the stroke (its height for up/down, its width for
+ * left/right) — and never longer than the stroke given. Used by `scroll_until`
  * to shorten the stroke after each turn round a target a fling carried past
  * (interact/scroll.ts, Motion.nextStroke), so the distance left shrinks
  * however far the app flings. Pure.
  */
-export function shortenStroke(stroke: Stroke, factor: number): Stroke {
+export function shortenStroke(stroke: Stroke, factor: number, side: number): Stroke {
   const dx = stroke.to.x - stroke.from.x;
   const dy = stroke.to.y - stroke.from.y;
   const reach = Math.hypot(dx, dy);
   if (factor >= 1 || reach === 0) return stroke;
-  const k = Math.min(reach, Math.max(reach * factor, 2 * TOUCH_SLOP)) / reach;
+  const floor = Math.max(2 * TOUCH_SLOP, side * MIN_STROKE_FRACTION);
+  const k = Math.min(reach, Math.max(reach * factor, floor)) / reach;
   return { from: stroke.from, to: { x: Math.round(stroke.from.x + dx * k), y: Math.round(stroke.from.y + dy * k) } };
 }
 

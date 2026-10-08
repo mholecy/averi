@@ -594,6 +594,28 @@ describe('scrollUntilVisible — after the device check', () => {
     expect(fake.swipes.slice(0, 3).map(fingerUp)).toEqual([true, false, true]);
   });
 
+  it.each([
+    // Sideways: 648 full, then each direction change halves — 324, 162, 81, then 40.5 → the floor, 3 % of the WIDTH (32) under the slop's 48.
+    ['right', 'x', [648, 324, 162, 81, 48]],
+    // Up/down: 1332 full, 666, 333, 167, then 83 → 42 → the floor, 3 % of the HEIGHT 2220 (67) over the slop's 48.
+    ['down', 'y', [1332, 666, 333, 167, 83, 67]],
+  ] as const)('the stroke floor is a fraction of the box\'s side ALONG the stroke (1080x2220, content %s)', async (direction, axis, reaches) => {
+    resetLayout();
+    const far = axis === 'x' ? { x: -500, y: 500 } : { x: 100, y: -500 }; // beyond the far edge
+    const near = axis === 'x' ? { x: 1500, y: 500 } : { x: 100, y: 3000 }; // short of it
+    const target = node({ role: 'button', identifier: 'card', rect: { ...near, width: 300, height: 100 } });
+    class PingPong extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        const at = target.rect[axis] === near[axis] ? far : near; // every stroke flings it past the frame
+        target.rect = { ...target.rect, ...at };
+      }
+    }
+    const fake = new PingPong({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [target] }) }, 's');
+    await scrollUntilVisible(fake, 'id:card', { ...FAST, direction, maxSwipes: reaches.length }).catch(() => undefined);
+    expect(fake.swipes.map((s) => Math.abs(s.to[axis] - s.from[axis]))).toEqual(reaches);
+  });
+
   it('a target first seen short only at a stop the confirming read then lost (not on the round-0 read) still turns the next stroke — where it stands is recorded on every read', async () => {
     // Not in the tree on round 0 (a lazy list); the first stroke brings it in, the settle read catches it at 300, it rests at -48.
     const fake = wdaForm(2000, (rect, travel) => (travel < 0 && rect.y === 2000 ? [300, -48] : [rect.y + travel]));

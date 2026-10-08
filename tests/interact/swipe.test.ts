@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { MIN_STROKE_FRACTION, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -288,21 +288,29 @@ describe('shortenStroke — the touch-down kept, the reach scaled, never a tap',
   const down = { from: { x: 201, y: 458 }, to: { x: 201, y: 114 } }; // the WDA content-down stroke, 344 pt
 
   it('scales the reach toward the touch-down, which stays where it was placed', () => {
-    expect(shortenStroke(down, 0.5)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 286 } });
-    expect(shortenStroke(down, 1)).toEqual(down);
+    expect(shortenStroke(down, 0.5, 874)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 286 } });
+    expect(shortenStroke(down, 1, 874)).toEqual(down);
   });
 
-  it('never below twice TOUCH_SLOP (assumed 24): 344 × 1/16 = 21.5 becomes 48', () => {
+  it('never below twice TOUCH_SLOP (assumed 24) on an 874-pt iPhone, where 3 % of the side is only 26: 344 × 1/16 = 21.5 becomes 48', () => {
     expect(TOUCH_SLOP).toBe(24);
-    expect(shortenStroke(down, 1 / 16)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 410 } });
+    expect(shortenStroke(down, 1 / 16, 874)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 410 } });
+  });
+
+  it('never below MIN_STROKE_FRACTION (3 %) of the side along the stroke: on the 2220-px Pixel_3a 67 px, not the slop floor\'s 48', () => {
+    expect(MIN_STROKE_FRACTION).toBe(0.03);
+    const androidDown = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } }; // 838 px; × 1/32 = 26
+    expect(shortenStroke(androidDown, 1 / 32, 2220)).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 1051 } });
+    // Sideways the side is the width: 3 % of 1080 = 32.4, under the slop floor — 48.
+    expect(shortenStroke({ from: { x: 216, y: 1110 }, to: { x: 864, y: 1110 } }, 1 / 32, 1080)).toEqual({ from: { x: 216, y: 1110 }, to: { x: 264, y: 1110 } });
   });
 
   it('never longer than the stroke given: a stroke already under the floor is left as it is', () => {
     const short = { from: { x: 10, y: 50 }, to: { x: 10, y: 30 } };
-    expect(shortenStroke(short, 0.5)).toEqual(short);
+    expect(shortenStroke(short, 0.5, 874)).toEqual(short);
   });
 
   it('sideways too: along the stroke, x scaled, y kept', () => {
-    expect(shortenStroke({ from: { x: 80, y: 437 }, to: { x: 322, y: 437 } }, 0.5)).toEqual({ from: { x: 80, y: 437 }, to: { x: 201, y: 437 } });
+    expect(shortenStroke({ from: { x: 80, y: 437 }, to: { x: 322, y: 437 } }, 0.5, 402)).toEqual({ from: { x: 80, y: 437 }, to: { x: 201, y: 437 } });
   });
 });
