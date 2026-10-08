@@ -244,9 +244,11 @@ export type SoftKeyboard =
        * a floating Gboard on API 33 keeps only a 132-px collapse strip as its
        * IME inset — `frame` — while its panel, mid-screen, is a second rect of
        * the IME window's touchable region. Never set by `KeyboardOracle.state()`
-       * (one command, the band only): `ui-tree/soft-keyboard.ts#readSoftKeyboard`,
-       * the one reader, adds them from `KeyboardOracle.touchable()` when the
-       * band is up, by `panelsBeyond`'s rules. Absent: none, or not read (the
+       * (one command, the band only): `ui-tree/soft-keyboard.ts#oracleKeyboard`,
+       * the one composer of an oracle reading (behind `readSoftKeyboard` and
+       * the guard's re-check loop in interact/keyboard-window.ts), adds them
+       * from `KeyboardOracle.touchable()` when the band is up, by
+       * `panelsBeyond`'s rules. Absent: none, or not read (the
        * in-tree model, a docked keyboard whose region IS the band, a region
        * that could not be trusted). Every reader that tests the keyboard
        * against a point or a rect tests `frame` AND these (`keyboardRects`).
@@ -350,8 +352,8 @@ export interface KeyboardOracle {
    * policy: what of the region counts as covered — only beside a `shown`
    * band, only with the input method saying shown, only rects that fit the
    * band's screen, never the band itself — is
-   * `ui-tree/soft-keyboard.ts#panelsBeyond`'s, and `readSoftKeyboard` asks
-   * this only after `state()` read `shown` (the region alone was measured
+   * `ui-tree/soft-keyboard.ts#panelsBeyond`'s, and its one caller,
+   * `oracleKeyboard` there, asks this only after `state()` read `shown` (the region alone was measured
    * non-empty while hidden and stale after a rotation, so it is never
    * evidence on its own). A method of its own, not part of `state()`, for
    * the reason `witness` gives: one call that sometimes runs two commands

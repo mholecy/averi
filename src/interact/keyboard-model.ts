@@ -148,7 +148,7 @@ export type ClearReading = { over: 'clear' } | { over: 'unknown' };
  * `SoftKeyboard` (named `windowOver` until the review of the model split,
  * which was the window model's word). Since 2026-10-08 the point is tested
  * against every rect the keyboard covers (`keyboardRects`: the band, then a
- * floating panel `readSoftKeyboard` found beside it —
+ * floating panel the oracle reading (`oracleKeyboard`) found beside it —
  * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md, where a tap
  * inside the panel pressed Gboard's `d` key), and `frame` is the rect that
  * holds it, so a message quotes the panel, not the band, when the panel is
