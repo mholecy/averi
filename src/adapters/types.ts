@@ -305,7 +305,7 @@ export interface KeyboardOracle {
    * window hidden, input method shown, only reported) — and in
    * `scroll_until` before a `shown` band may change its judgement or its
    * stroke (keyboard.ts#keyboardCorroborated, the same veto; at most once a
-   * round, and not again once it has stood by a band). Those callers
+   * round, on every round a band matters — the answer is never kept). Those callers
    * (interact/keyboard-window.ts#windowUnlocated, #windowCorroborated) rely
    * on the never-throws contract above and have no catch.
    *

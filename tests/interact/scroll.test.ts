@@ -157,11 +157,12 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     return made;
   };
 
-  it('Android, symptom 1: a row WHOLLY under the IME is not "fully visible after 0 swipes" — it is scrolled out from under it, and the line says what it was judged against', async () => {
+  it('Android, symptom 1: a row WHOLLY under the IME is not "fully visible after 0 swipes" — it is scrolled out from under it first', async () => {
     const { fake } = androidForm({ startY: 1906 }); // the measured rect: y 1906–1979, inside [0,1398][1080,2220]
     const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
-    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IME } });
-    expect(describeScrollResult(result)).toBe('fully visible after 1 swipe, above the soft keyboard over [0,1398][1080,2220]');
+    // Clear of the band at the stop: the band changes nothing there, so it is not reported (review 2026-10-08).
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(describeScrollResult(result)).toBe('fully visible after 1 swipe');
   });
 
   it('Android, symptom 2: with the IME up the content-down stroke starts ABOVE it, so it scrolls — the old stroke started at y 1776, on a key', async () => {
@@ -212,11 +213,11 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     );
   });
 
-  it('Android cost: ONE window query per round, the witness asked the first time the band matters and not again once it stood by it, and no key pressed', async () => {
+  it('Android cost: ONE window query per round, the witness asked on each round the band matters — never remembered — and none on the moot stop; no key pressed', async () => {
     const { fake } = androidForm({ startY: 2900 });
     await scrollUntilVisible(fake, 'id:priority_select', FAST);
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(4); // 3 swipes, 4 reads
-    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(3); // y 2900, 2300, 1700 matter; y 1100 is a moot clean stop
     expect(fake.keys).toEqual([]);
   });
 
@@ -254,8 +255,18 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'shown']; // denied once, then confirmed (a queued answer becomes the standing one)
     const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
     // Round 1 found the row at y 1906–1979, inside the IME: asked again, the band applied, one more swipe.
-    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IME } });
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.swipes[1].from.y).toBe(1118); // drawn above the IME
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(2);
+  });
+
+  it('Android, a keyboard the scroll itself HIDES (a list that dismisses it on drag) with the window left stale-shown: asked again, denied, and the later rounds judged and stroked whole-screen — no keyboard claimed', async () => {
+    const { fake } = androidForm({ startY: 2900, keyboardTop: undefined }); // the window keeps reporting the IME frame
+    fake.attachedKeyboard.witnessAnswers.queue = ['shown', 'hidden']; // confirmed on round 0, gone after the first swipe
+    const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
+    expect(fake.swipes.map((s) => s.from.y)).toEqual([1118, 1776]); // round 0 above the band, round 1 the whole screen
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] }); // y 1700–1773: judged whole-screen, not "under" a phantom band
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(3);
   });
 
   it('a round whose tree did not read strokes in the box of the last round that DID read — whole-screen when that round applied no band', async () => {
@@ -292,11 +303,20 @@ describe('scrollUntilVisible — the soft keyboard', () => {
   it('a band from the top edge (y 0, a full-screen extract-mode IME — unmeasured) covers everything: no bare "fully visible", no stroke, a failure naming it', async () => {
     const { fake } = androidForm({ startY: 500, window: { state: 'shown', frame: { x: 0, y: 0, width: 1080, height: 2220 } } });
     const error = await scrollUntilVisible(fake, 'id:priority_select', FAST).catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError); // it was in the tree
     expect((error as Error).message).toBe(
-      'scroll_until id:priority_select failed after 0 swipes — the soft keyboard over [0,0][1080,2220] covers the whole screen, ' +
-        'so nothing under it can be judged and no swipe was sent — to reach it with the keyboard down, hide it first (press_key ' +
+      'scroll_until id:priority_select failed after 0 swipes — the element is in the tree but under the soft keyboard; the soft ' +
+        'keyboard over [0,0][1080,2220] covers the whole screen, so nothing under it can be judged and no swipe was sent — to reach it with the keyboard down, hide it first (press_key ' +
         'back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again',
     );
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('a band from the top edge with the target NOT in the tree: still absence — ElementNotFoundError, so an optional step is skipped — with the keyboard named', async () => {
+    const { fake } = androidForm({ startY: 500, window: { state: 'shown', frame: { x: 0, y: 0, width: 1080, height: 2220 } } });
+    const error = await scrollUntilVisible(fake, 'id:nope', FAST).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toMatch(/^scroll_until id:nope failed after 0 swipes — element never appeared in the tree; the soft keyboard over \[0,0\]\[1080,2220\] covers the whole screen/);
     expect(fake.swipes).toEqual([]);
   });
 
@@ -400,7 +420,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
   it('iOS (WDA band): the measured partly-covered row (y 545, h 52, band from 589) is not "fully visible after 0 swipes"; fully: true scrolls it above the band', async () => {
     const { fake } = iosForm(545, 52);
     const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
-    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IOS_BAND } });
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
     // The stroke started above the band (the old one: y ≈ 699, on a key).
     expect(fake.swipes[0].from.y).toBeLessThan(IOS_BAND.y);
   });

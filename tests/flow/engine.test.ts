@@ -1737,13 +1737,20 @@ flows:
 
   // 2026-10-08 (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
   // the keyboard on the line — and ⚠ only where it leaves the result unproven.
-  it('a stop judged above a docked soft keyboard says so, without ⚠: the judgement already excluded it', async () => {
-    const fake = scrollingFake(1500); // under the keyboard: one swipe lifts it above
-    fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1400, width: 1000, height: 600 } }, 'shown');
-    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
-    expect(trace).toContainEqual({
+  it('a stop clipped at a docked soft keyboard\'s edge is ⚠ and names the keyboard; one cleared above it is a plain line', async () => {
+    const clipped = scrollingFake(1380); // 1380–1420 straddles the keyboard's top edge at 1400
+    clipped.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1400, width: 1000, height: 600 } }, 'shown');
+    expect(await FlowEngine.run(cfg, clipped, FAST, { flow: 'to_submit' })).toContainEqual({
+      action: '⚠ scroll_until',
+      detail:
+        'id:"submit_button" visible after 0 swipes — CLIPPED at bottom, 50% of it is in the viewport above the soft keyboard over ' +
+        '[0,1400][1000,2000]. A rect assert or screenshot on this element will measure the CLIPPED box',
+    });
+    const lifted = scrollingFake(1500); // wholly under the keyboard: one swipe lifts it above
+    lifted.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1400, width: 1000, height: 600 } }, 'shown');
+    expect(await FlowEngine.run(cfg, lifted, FAST, { flow: 'to_submit' })).toContainEqual({
       action: 'scroll_until',
-      detail: 'id:"submit_button" fully visible after 1 swipe, above the soft keyboard over [0,1400][1000,2000]',
+      detail: 'id:"submit_button" fully visible after 1 swipe',
     });
   });
 
@@ -2003,6 +2010,13 @@ flows:
     it('a scroll_until whose element never appears in any read: skipped step (not present)', async () => {
       const fake = formFake();
       expect(await skipOf(fake, 'scroll_until: { element: { id: nope }, maxSwipes: 2 }')).toEqual(['skipped step (not present)']);
+    });
+
+    it('a scroll_until whose element is absent under a soft keyboard covering the whole screen: still skipped (not present), no swipe (review 2026-10-08)', async () => {
+      const fake = formFake();
+      fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 0, width: 1000, height: 2000 } }, 'shown');
+      expect(await skipOf(fake, 'scroll_until: { element: { id: nope }, maxSwipes: 2 }')).toEqual(['skipped step (not present)']);
+      expect(fake.swipes).toEqual([]);
     });
 
     it('a tap on a DEAD device is not (not present): the skip carries the read error, so it never reads as a slow screen', async () => {

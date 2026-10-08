@@ -76,6 +76,19 @@ function* markedNodes(
  * keyboard. Such a node lies INSIDE the band and is never "under" it: a
  * tap on it is the thing the user does, not the thing the guard prevents.
  */
+
+/**
+ * Every node of `tree` that is the keyboard's own UI — `partOfKeyboard`'s
+ * answer for all of them at once, from one walk (2026-10-08: `scroll_until`
+ * asks it of every match each round). Empty for a tree with no mark (every
+ * Android tree).
+ */
+export function keyboardSideNodes(tree: UiNode): ReadonlySet<UiNode> {
+  const out = new Set<UiNode>();
+  for (const marked of markedNodes(tree)) if (marked.ofKeyboard) out.add(marked.node);
+  return out;
+}
+
 export function partOfKeyboard(tree: UiNode, node: UiNode): boolean {
   for (const marked of markedNodes(tree)) if (marked.node === node) return marked.ofKeyboard;
   return false;

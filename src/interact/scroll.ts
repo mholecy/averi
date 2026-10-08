@@ -1,7 +1,7 @@
 import type { DeviceAdapter, Rect, SoftKeyboard, UiNode } from '../adapters/types.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { cannotHide, partOfKeyboard, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
@@ -47,12 +47,15 @@ export interface ScrollUntilResult {
    * (2026-10-08) — absent when none was read, so a run without a keyboard
    * reports what it always did:
    * - `shown`: the stop was judged against the screen ABOVE `frame`, not the
-   *   whole screen — the part under it is not visible, whatever the tree
-   *   says (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md);
+   *   whole screen, and that changed it — the part under it is not visible,
+   *   whatever the tree says
+   *   (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md).
+   *   Only on a stop CLIPPED at the keyboard's edge: a band that changes
+   *   nothing is not applied, so a clean "fully visible" never carries it;
    * - `unlocated`: the window model's floating-keyboard row — the input
    *   method says one is shown, the window state gives it no area — so
    *   nothing could be judged against it and the report says so
-   *   (keyboard.ts#keyboardUnlocated).
+   *   (keyboard.ts#keyboardUnlocated). Only on a clean `fully: true` stop.
    */
   keyboard?: { state: 'shown'; frame: Rect } | { state: 'unlocated' };
 }
@@ -85,15 +88,17 @@ function describeClip(edges: readonly string[], visible: number, band?: Rect): s
 /** The honest one-line summary both call sites print. */
 export function describeScrollResult(r: ScrollUntilResult): string {
   const n = `${r.swipes} swipe${r.swipes === 1 ? '' : 's'}`;
-  const band = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
-  const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
+  // `shown` comes only with a clip at the keyboard's edge, and `unlocated`
+  // only with a clean `fully: true` stop (scrollUntilVisible): each has the
+  // one branch below it can reach.
   if (r.clipped.length === 0) {
-    return `fully visible after ${n}${band === undefined ? '' : `, above the soft keyboard over ${frameText(band)}`}${unlocated}`;
+    const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
+    return `fully visible after ${n}${unlocated}`;
   }
+  const band = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
   return (
     `visible after ${n} — ${describeClip(r.clipped, r.visible, band)}` +
-    '. A rect assert or screenshot on this element will measure the CLIPPED box' +
-    unlocated
+    '. A rect assert or screenshot on this element will measure the CLIPPED box'
   );
 }
 
@@ -140,28 +145,30 @@ function coverOf(reading: SoftKeyboardReading | undefined, viewport: Box): Cover
   return { band, above: band.y <= 0 ? undefined : { width: viewport.width, height: band.y }, remedy: reading };
 }
 
-/** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the band it was judged under (none for a whole-screen judgement or a keyboard-side node). */
+/** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the cover it was judged under (none for a whole-screen judgement or a keyboard-side node). */
 interface Judged {
   node: UiNode;
   visible: number;
   clipped: Edge[];
-  under?: Rect;
+  under?: Cover;
 }
 
 /**
  * The MOST revealed match, not the first: an id can sit on a container and
  * its child, and reporting the clipped one of the two would invent a defect.
- * Under a cover, a keyboard-side node (`partOfKeyboard`) is judged against
+ * Under a cover, a keyboard-side node (`keyboardSideNodes`, the set
+ * `partOfKeyboard` answers from, built once per round) is judged against
  * the whole screen; every other node against the part above the band, or
  * scores 0 when the band leaves none.
  */
-function judge(found: readonly UiNode[], tree: UiNode | undefined, viewport: Box, cover?: Cover): Judged | undefined {
+function judge(found: readonly UiNode[], viewport: Box, cover?: { cover: Cover; keyboardSide: ReadonlySet<UiNode> }): Judged | undefined {
   const scored = found.map((node): Judged => {
-    if (cover === undefined || (tree !== undefined && partOfKeyboard(tree, node))) {
+    if (cover === undefined || cover.keyboardSide.has(node)) {
       return { node, visible: visibleFractionInViewport(node.rect, viewport), clipped: clippedEdges(node.rect, viewport) };
     }
-    if (cover.above === undefined) return { node, visible: 0, clipped: [], under: cover.band };
-    return { node, visible: visibleFractionInViewport(node.rect, cover.above), clipped: clippedEdges(node.rect, cover.above), under: cover.band };
+    const { above } = cover.cover;
+    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover };
+    return { node, visible: visibleFractionInViewport(node.rect, above), clipped: clippedEdges(node.rect, above), under: cover.cover };
   });
   return scored.sort((a, b) => b.visible - a.visible)[0];
 }
@@ -229,8 +236,11 @@ const frameWords = (viewport: Box, cover: Cover | undefined): string =>
  * as the target) are judged against the whole screen, as `readSoftKeyboard`
  * reads them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
  * as before — the guard's fail-open rule; an unread tree strokes in the box
- * the last applied band left (review 2026-10-08), the stop already quoting
- * the read error.
+ * the last read round's band left (review 2026-10-08), the stop already
+ * quoting the read error. Landscape is not handled: the band and the
+ * judgement use `viewport()` as built while the stroke box is turned
+ * (swipe.ts#screenBox) — the pre-existing gap ARCHITECTURE.md records for
+ * the visibility judgements.
  *
  * The band is APPLIED only when it changes the round — the two judgements
  * differ, or the round ends in a stroke or a failure rather than a clean
@@ -239,18 +249,18 @@ const frameWords = (viewport: Box, cover: Cover | undefined): string =>
  * keyboard-window.ts). Review 2026-10-08: the window state was measured
  * stale for seconds after a navigating tap, and a phantom band would score
  * an on-screen target 0, send a stroke through the next screen and report
- * a keyboard that is gone. The witness is asked the first time a band
- * matters, and a NON-denial is kept for the call (a scroll raises no
- * keyboard; one it hides leaves the window reading hidden). A denial is
- * not kept (review round 1, 2026-10-08): a stale window on round 0 can be
- * followed by a real keyboard — a new screen that auto-focuses a field —
- * so after a denial the witness is asked again each round a band matters,
- * until it stops denying: at most one query per round, the rounds bounded
- * by `maxSwipes` (what one costs: AndroidAdapter's keyboardWitness). None
- * on iOS, whose band is read off the tree being judged. A failed or
- * `fully: true` stop may add one more, the floating row's (below). A band that does not
- * change the round is not reported either: the result carries `keyboard`
- * only when the stop was judged under one. A band that leaves nothing above
+ * a keyboard that is gone. The witness is asked on EVERY round a band
+ * matters and its answer is not kept (review 2026-10-08, two rounds): a
+ * stale window on round 0 can be followed by a real keyboard — a new
+ * screen that auto-focuses a field — and a confirmed keyboard can be hidden
+ * by the scroll itself (a list that dismisses it on drag) and leave the
+ * window state stale-shown behind it. At most one query a round, the
+ * rounds bounded by `maxSwipes` (what one costs: AndroidAdapter's
+ * keyboardWitness); none on iOS, whose band is read off the tree being
+ * judged. A failed or `fully: true` stop may add one more, the floating
+ * row's (below). A band that does not change the round is not reported
+ * either: the result carries `keyboard: shown` only when the stop was
+ * judged under one this round — which means a clip at its edge. A band that leaves nothing above
  * it (its top at y ≤ 0 — a full-screen extract-mode IME, unmeasured) scores
  * every non-keyboard node 0 and fails at once, no stroke, naming it.
  *
@@ -303,9 +313,6 @@ export async function scrollUntilVisible(
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   let lastCover: Cover | undefined;
   let coveredRounds = 0;
-  /** True once the witness has stood by a `shown` band in this call (`keyboardCorroborated`); a denial is not kept — the next band that matters asks again. */
-  let corroborated = false;
-  const corroborate = async (): Promise<boolean> => (corroborated ||= await keyboardCorroborated(adapter));
   /** The cover the last round whose tree READ applied — undefined when that round applied none — for the stroke of a round whose tree did not read. */
   let lastReadCover: Cover | undefined;
   /** On a failed or `fully: true` stop only: the floating row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
@@ -322,15 +329,18 @@ export async function scrollUntilVisible(
     // is judged against it, the keyboard's own exempted in `judge`).
     const reading = tree === undefined ? undefined : await readSoftKeyboard(adapter, tree);
     const offered = coverOf(reading, viewport);
-    const whole = judge(lastFound, tree, viewport);
+    const whole = judge(lastFound, viewport);
     let cover: Cover | undefined;
     let best = whole;
-    if (offered !== undefined) {
-      const covered = judge(lastFound, tree, viewport, offered);
+    if (offered !== undefined && tree !== undefined) {
+      const covered = judge(lastFound, viewport, { cover: offered, keyboardSide: keyboardSideNodes(tree) });
       // Moot: the round stops cleanly either way, on the same judgement — the
       // band changes nothing, and is neither asked about nor reported.
+      // Otherwise the witness is asked THIS round, never remembered: a
+      // scroll can hide a keyboard (a list that dismisses it on drag) and
+      // leave the window state stale-shown behind it (review 2026-10-08).
       const moot = endsClean(whole, fully) && sameJudgement(whole, covered);
-      if (!moot && (await corroborate())) {
+      if (!moot && (await keyboardCorroborated(adapter))) {
         cover = offered;
         best = covered;
       }
@@ -342,15 +352,11 @@ export async function scrollUntilVisible(
     if (tree !== undefined) lastReadCover = cover;
     if (best !== undefined && best.visible > 0) {
       if (!fully || best.clipped.length === 0) {
-        // Shown when the stop was judged under the band — or when the band
-        // was moot this round but the witness already stood by it in this
-        // call (no query: then judging under it says the same thing). Never
-        // for the keyboard's own node: a key is not "above" the keyboard.
-        const keyboardSide = tree !== undefined && partOfKeyboard(tree, best.node);
-        const under = best.under ?? (offered !== undefined && corroborated && !keyboardSide ? offered.band : undefined);
+        // Shown only when THIS stop was judged under a band the witness stood
+        // by this round — never a band checked on an earlier round.
         const keyboard: ScrollUntilResult['keyboard'] =
-          under !== undefined
-            ? { state: 'shown', frame: under }
+          best.under !== undefined
+            ? { state: 'shown', frame: best.under.band }
             : fully && (await unlocatedAt(reading?.keyboard))
               ? { state: 'unlocated' }
               : undefined;
@@ -366,18 +372,18 @@ export async function scrollUntilVisible(
         // does not resize for it keeps its last rows under it. Said as such,
         // with how to hide it; the layout-defect wording only when the
         // keyboard is not the edge in question.
-        if (best.under !== undefined && cover !== undefined && best.clipped.includes('bottom')) {
+        if (best.under !== undefined && best.clipped.includes('bottom')) {
           throw new Error(
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-              `${describeClip(best.clipped, best.visible, best.under)}, and the content is exhausted: swiping ${direction} ` +
-              `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(cover.remedy)}; only if it ` +
+              `${describeClip(best.clipped, best.visible, best.under.band)}, and the content is exhausted: swiping ${direction} ` +
+              `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(best.under.remedy)}; only if it ` +
               `stays clipped with the keyboard down is it a layout defect. ` +
               `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
           );
         }
         throw new Error(
           `scroll_until ${describe} failed after ${n} — ` +
-            `element is in the viewport but ${describeClip(best.clipped, best.visible, best.under)}, ` +
+            `element is in the viewport but ${describeClip(best.clipped, best.visible, best.under?.band)}, ` +
             `and the content is exhausted: swiping ${direction} no longer moves it. ` +
             `The element cannot be fully revealed — that is a layout defect ` +
             `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
@@ -389,17 +395,23 @@ export async function scrollUntilVisible(
     // judged, and no stroke can start on the content — fail now, naming it,
     // rather than swipe on keys (review 2026-10-08: until then this fell
     // back to the whole screen and reported a bare "fully visible").
+    // The absence rule holds here too (review 2026-10-08): a target no read
+    // has matched is ElementNotFoundError through `absenceError`, so an
+    // `optional:` step is skipped "(not present)" — with the keyboard named,
+    // since no swipe could look further.
     if (cover !== undefined && cover.above === undefined) {
-      throw new Error(
-        `scroll_until ${describe} failed after ${swipes} swipe${swipes === 1 ? '' : 's'} — the soft keyboard over ` +
+      const seenAs = everFound ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
+      throw absenceError(
+        `scroll_until ${describe} failed after ${swipes} swipe${swipes === 1 ? '' : 's'} — ${seenAs}; the soft keyboard over ` +
           `${frameText(cover.band)} covers the whole screen, so nothing under it can be judged and no swipe was sent — ` +
           hideToJudgeWholeScreen(cover.remedy),
+        { sighted: everFound, treesRead, readError: lastReadError },
       );
     }
     if (swipes >= maxSwipes || Date.now() >= deadline) {
       const partial =
         best !== undefined && best.visible > 0
-          ? `element reached the viewport but stayed ${describeClip(best.clipped, best.visible, best.under)} ` +
+          ? `element reached the viewport but stayed ${describeClip(best.clipped, best.visible, best.under?.band)} ` +
             `(last rect ${JSON.stringify(best.node.rect)})`
           : undefined;
       const why =
