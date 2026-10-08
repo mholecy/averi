@@ -83,3 +83,44 @@ path to `treeSource: wda`, which mp-native's own `averi.yaml` header considers f
 1. A SwiftUI pushed screen with a navigation toolbar, `treeSource: wda`, `keyboardDismiss: [tap: { id: <title id> }]`.
 2. Focus a text field (soft keyboard up), `tap` an element under the keyboard → refused, `covered by toolbar "Toolbar"`.
 3. `ui_snapshot` → a `toolbar` node with the screen's full frame after the title in pre-order.
+
+
+## Device check (2026-10-08 iOS, re-run at e9e6509)
+
+Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native
+(`feature/swift-payment`), averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509` (`dist/`, stdio). **Does not hold**: the toolbar is excused now, but the next node in pre-order, the form's `scrollable`, covers the title.
+
+Scratch config as in the note (`treeSource: wda`, `keyboardDismiss: [tap: { id: swift_payment.form.title }]`), decimal pad up
+after `tap id:swift_payment.form.amount_input` (`role:keyboard` `0 572 402 302`), `priority_select` at y 681 (under the pad):
+
+```
+20:16  tap { selector: "id:swift_payment.form.priority_select", configPath: <scratch> }       (6.5 s)
+→ The soft keyboard covers id:swift_payment.form.priority_select: the band it draws over [0,572][402,874] contains the
+  tap point (201,707) on two looks 300ms apart; this adapter cannot hide it on its own (…), and none of the configured
+  dismissals is usable on this screen (tap id:"swift_payment.form.title": covered by scrollable). Nothing was tapped: …
+```
+
+WDA tree (unfiltered, pre-order, abridged):
+
+```
+16:          text 'SWIFT PAYMENT' swift_payment.form.title 135 73 131 22
+17:       container None None None 0 0 402 874
+ …
+22:           scrollable None None None 0 0 402 512          ← after the title; its frame runs under the top bar
+ …
+138:       toolbar 'Toolbar' Toolbar None 0 0 402 874         ← now excused as a screen-sized host
+155:   keyboard None None None 0 572 402 302
+```
+
+The form's scroll view (`0 0 402 512`, 58 % of the screen, so not a `SCREEN_SIZED_FRACTION` host) extends behind the
+translucent top bar; nothing of its CONTENT is at (201,84) (its first row, `debit_select`, starts at y 150). `shadowing`
+(`src/ui-tree/geometry.ts:608–618`) counts the scrollable's own rect as cover. The same scrollable was in the original
+tree above ("the form, scrollable 0 0 402 512"); it was shadowed by the later toolbar then, so the test built from the
+abridged tree did not pin it.
+
+Contrast: the flow `fill: { id: swift_payment.form.amount_input, value: "3.10", clear: true, dismissKeyboard: true }` on the
+same screen hid the pad (`role:keyboard` → 0 matches after) with no ⚠ (the flow trace does not say what hid it) — so
+the post-fill dismiss path apparently does not hit this refusal; only the tap guard's pick does.
+
+Fix direction: treat a `scrollable` (and other containers with children) like a host — cover only through its content at
+the point, not its own frame — at least when it is not interactive by itself; or judge cover only by leaf/content nodes.

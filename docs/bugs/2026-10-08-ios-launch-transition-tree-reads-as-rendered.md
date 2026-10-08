@@ -148,3 +148,26 @@ destructive-rung refusal never engaged. Had the rung been a real `launch: { clea
 3. `terminate_app`, `launch_app`, `assert [{ element: { text: "<text on the first screen>" }, absent: true }]` → PASS.
 4. With the scratch config above: `terminate_app`, `launch_app`, `ensure_state pin_seen` → `⚠ reach
    fake_destructive_rung: this rung is DESTRUCTIVE` and the rung runs, no second look.
+
+
+## Device check (2026-10-08 iOS, re-run at e9e6509)
+
+Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native
+(`feature/swift-payment`), averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509` (`dist/`, stdio). **Confirmed fixed** (all four repro steps, default idb):
+
+- `terminate_app` → `launch_app` → `ui_snapshot` (no filter), 6 cold launches: both measured shapes now carry the bare ⚠ —
+  `⚠ The tree is bare: 6 nodes, nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch
+  icon). …` (status bar only) and `… bare: 7 nodes …` (status bar + `button 'Skeleton Internal'` at -2,234 406x406).
+- `assert [{ element: { text: "Enter your PIN to log in" }, absent: true, timeout: T }]` right after the launch:
+  T=500 → `FAIL … is absent — could not verify within 0.5 s (the last UI tree read was bare, 6 nodes …)`; T=1500 → the
+  same, `bare, 2 nodes`; T=6000 → `FAIL … is absent — still visible after 6 s` (the PIN screen rendered). No false PASS.
+- Scratch flow `[launch: { clearState: false }, wait: { state: no_pin_screen (absent), timeout: 2s }]`, 2 runs →
+  `Timed out after 2000ms waiting for state no_pin_screen (the last UI tree read was bare, 2 nodes …)` (was: `done`).
+- `ensure_state pin_seen` (scratch config, reach = a fake DESTRUCTIVE rung that only waits for `zzz-never`) right after
+  `launch_app`, 3 of 3: `⚠ detect: element text:"Enter your PIN to log in" treated as not detected — every UI tree read was
+  bare, the last one 7 nodes (roles: other ×4, button ×1, container ×1, text ×1) …` then `state pin_seen: already
+  active` (4.3 s). The rung never ran; no DESTRUCTIVE line.
+- Regression watch: loaded screens full of times/dates/amounts were not called bare — the dashboard (account header,
+  `17.07.2026` date headers, `+602,00 EUR` rows), the Transactions tab and a transaction detail (`Booking date,
+  17.07.2026`) all returned their trees with no ⚠. (With the app up, idb lists no status-bar nodes at all.)
+- Not measured: landscape (no Simulator.app window to rotate — the simulator runs headless here).

@@ -86,3 +86,71 @@ If step 2 shows `visible=false` / no frame next to `mInputShown=true`, the bug i
 
 Dock the keyboard on the evidence emulator (Gboard → Floating off). Optionally assert it in pre-flight: a floating Gboard
 leaves `mInputShown=true` with no IME insets.
+
+## Device check (2026-10-08, re-run at e9e6509): measured — floating Gboard is NOT "window clear"
+
+Measured 19:58–20:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220), Gboard switched to Floating via its
+toolbar (grid → Floating), mp-native SEPA form, averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509`.
+
+"To measure" step 2, with the IBAN field focused and the floating panel drawn at about x 359–1040, y 1269–1912:
+```
+mIsImeShowing=true
+InsetsSource type=ITYPE_IME frame=[0,2088][1080,2220] visibleFrame=[0,2088][1080,2220] visible=true
+mControl=… mInsetsHint=Insets{left=0, top=0, right=0, bottom=132}
+mShowRequested=true mShowExplicitlyRequested=true mShowForced=false mInputShown=true
+mIsInputViewShown=true
+dumpsys window InputMethod:
+  mGivenContentInsets=[0,2022][0,0] mGivenVisibleInsets=[0,2022][0,0]
+  touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))
+  Frames: … frame=[0,66][1080,2220]
+```
+So on API 33 the floating keyboard keeps a 132-px IME inset: the docked strip at the bottom (the collapse chevron and
+the keyboard-switch key) — the window reading is `covering` with band `[0,2088][1080,2220]`, not `clear`. The new
+`clear + shown → unlocated` row was therefore NOT reached. One transient exception: read right after a focus tap that
+brought the floating panel up, the same dump gave `frame=[0,0][0,0] … visible=false` / `mIsImeShowing=false` and
+`touchable region=SkRegion((0,2088,1080,2220))`; a second read moments later gave the values above.
+
+Step 3, flow `fill { id: swift_payment.form.iban_input, value: …, clear: true, dismissKeyboard: true }` (scratch config):
+```
+fill: id:"swift_payment.form.iban_input" = FR1420041010050500013M02606 (cleared 28 characters first)
+```
+No `⚠ fill` line. `back` was pressed (window `covering`, witness `shown`): afterwards `mInputShown=false`,
+`mIsImeShowing=false`, the form still on screen (not popped). Correct outcome, by the old row.
+
+Step 4 — the defect that remains (the Status's "Not done: the tap guard"). Tap on a field under the floating panel:
+```
+tap { selector: "id:swift_payment.form.message_for_payee_input" }   (rect y 1515–1658; centre (540,1586) inside the panel)
+→ Tapped id:swift_payment.form.message_for_payee_input
+ui_snapshot iban_input → "value": "FR14200410100505d00013M02606"     (was FR1420041010050500013M02606)
+```
+The tap hit Gboard's `d` key and typed into the focused IBAN field; the target was never focused. averi's guard judged
+the target against the 132-px strip only. Same for `scroll_until`:
+```
+scroll_until { selector: "id:swift_payment.form.message_for_payee_input", fully: true }
+→ Element id:swift_payment.form.message_for_payee_input fully visible after 0 swipes
+```
+(screenshot: the row is behind the panel). Direction, now with a measured fixture: when the IME window's
+`touchable region` has a rect that is not the inset band, treat that rect as covered too (tap guard, scroll stop, pixel
+poll). The shape is `SkRegion((l,t,r,b)(l,t,r,b))`, in screen coordinates. Gboard was restored to docked after the check.
+
+## Device check (2026-10-08 20:28–20:29 UTC, docked + hidden IME region)
+
+emulator-5554 Pixel_3a API 33, Gboard docked, portrait (`cur=1080x2220`). Commands per read:
+`dumpsys window InputMethod | grep -E "touchable region|mGivenContentInsets"`, `dumpsys window displays | grep ITYPE_IME`,
+`dumpsys input_method | grep -E "mInputShown|mShowRequested"`.
+
+| State | touchable region | mGivenContentInsets | ITYPE_IME | mInputShown |
+|---|---|---|---|---|
+| Docked, Settings search field focused (two reads 5 s apart, identical) | `SkRegion((0,1398,1080,2220))` — one rect, equal to the band | `[0,1332][0,0]` | `frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true` | `true` |
+| Hidden by `back`, field still focused | `SkRegion((0,2088,1080,2220))` | `[0,2022][0,0]` | `frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false` | `false` |
+| Hidden, back in the app (Account Detail, nothing focused) | `SkRegion((0,2088,1080,2220))` | `[0,2022][0,0]` | `frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false` | `false` |
+| Hidden, first read of the session — the last shown IME layout had been in LANDSCAPE, device back in portrait | `SkRegion((0,948,2220,1080))` (landscape coordinates) | `[0,1014][0,0]` | `frame=[0,0][0,0] visible=false` (no visibleFrame) | `false` |
+
+What this says for the fix (`touchable region` minus the inset band = covered):
+- Docked: the region is exactly the band, so "extra rect" finds nothing — no false cover from a normal keyboard.
+- Hidden: the region is NOT empty. It keeps a 132 px strip `(0,2088,1080,2220)` — the same 132 px band the floating
+  keyboard reported as its `ITYPE_IME` frame. So the floating band is this collapsed strip, and the floating panel is the
+  extra rect. The region is also stale: after a landscape keyboard it still holds landscape coordinates
+  (`0,948,2220,1080`) in portrait. Read it only when the IME is shown (`ITYPE_IME visible=true` / `mInputShown=true`),
+  never as evidence on its own.
+- `mIsImeShowing` does not appear in `dumpsys input_method` on this image (grep matched nothing).

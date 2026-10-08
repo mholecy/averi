@@ -170,3 +170,87 @@ Why, on iOS: `scroll.ts` reads no keyboard (as above); the idb parse (`src/adapt
 the band `other` are there (the WDA source marks them via `wda-source.ts#keyboardMarks`). Fix direction for iOS: mark
 idb's keyboard (the trailing key buttons and the 402-wide `other` at the bottom) the way the WDA source does, so the
 existing guard, the pixel poll, and a keyboard-aware `scroll_until` all see it under the default tree source.
+
+## Device check (2026-10-08, re-run at e9e6509): confirmed, one gap
+
+Measured 19:47–19:57 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), mp-native SWIFT form,
+averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509` (`dist/`, stdio). IME up after a `type_text` into the
+amount field; `dumpsys window displays`: `InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] … visible=true`.
+
+- Symptom 1 holds fixed. A row under the IME is no longer "fully visible after 0 swipes":
+  ```
+  scroll_until { selector: "id:swift_payment.form.priority_select", fully: true }   (rect y 1749, under the IME)
+  → Element id:swift_payment.form.priority_select fully visible after 1 swipe          (now at y 385)
+  scroll_until { selector: "id:swift_payment.form.bank_city_input", fully: true }    (y 1658)
+  → Element id:swift_payment.form.bank_city_input fully visible after 1 swipe           (now at y 1021)
+  ```
+- Clipped wording, default mode (rect y 1284–1427 against the band at 1398):
+  ```
+  → Element id:swift_payment.form.payee_country_select visible after 0 swipes — CLIPPED at bottom, 80% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. A rect assert or screenshot on this element will measure the CLIPPED box
+  ```
+- Symptom 2 holds fixed: with the IME up every downward `scroll_until` moved the content (IME still up after, `mInputShown=true`).
+  The shorter stroke is enough for this Compose form: each target above was reached in 1 swipe; measured movement
+  637 px for one swipe (bank_city 1658 → 1021); a first swipe from the top of the form moved 1364 px (fling).
+- Keyboard down (B2): fill → tap that opened a dialog (the guard hid the IME) → Cancel → `scroll_until
+  payee_name_input fully` → `fully visible after 1 swipe`, no keyboard mentioned, `mIsImeShowing=false` at the time.
+
+Gap (minor): a row ENTIRELY under the IME at the end of a container that does not resize for the keyboard (the form's
+last field, `my_note_input`, y 1769) does not get the fast "content is exhausted" failure — the stuck-rect check only runs
+for a node that intersects the viewport, so it swipes until the 15 s timeout:
+```
+scroll_until { selector: "id:swift_payment.form.my_note_input", fully: true }                       (15.9 s)
+→ scroll_until id:swift_payment.form.my_note_input failed after 15000ms (timeout) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 6 of the 6 rounds read: … hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again
+```
+The words are right (it names the keyboard and the remedy); only the 15 s are wasted. Direction: apply the same
+`rectsEqual(prevRect, rect)` stuck test to a node that is in the tree but outside the viewport.
+
+Unrelated limitation seen on the same screen (not a regression): Android reports a node's bounds clipped to its scroll
+container, so `fees_select` partly hidden under the top bar came back as `{y:242, height:99}` (its siblings are 143 high)
+and `scroll_until … fully: true` answered `fully visible after 0 swipes`. averi cannot see the clipped part from the tree.
+
+## Device check (2026-10-08 iOS, re-run at e9e6509)
+
+Measured 20:14–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native
+SWIFT form, averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509` (`dist/`, stdio). Scratch config with
+`treeSource: wda` (mp-native's `averi.yaml` untouched); decimal pad up after `tap id:swift_payment.form.amount_input`
+(simulator `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` set to 0 for the run, restored to 1), WDA
+`role:keyboard` `0 572 402 302`. The CONTINUE bar is pinned at y 512–556 with the pad up.
+
+**WDA — partly holds, two new failures caused by the shorter stroke box:**
+
+- Holds — clipped wording: `scroll_until id:swift_payment.form.value_date_select` (rect y 545–597) → `visible after 0 swipes
+  — CLIPPED at bottom, 52% of it is in the viewport above the soft keyboard over [0,572][402,874]. A rect assert or
+  screenshot on this element will measure the CLIPPED box`. No more "fully visible after 0 swipes" for a row under the pad.
+- Holds — a down-swipe with the pad up now moves the content (it did not move at all on idb before).
+- **Fails — overshoot reported as success.** `scroll_until { selector: "id:swift_payment.form.priority_select", fully: true }`
+  (row at y 681, under the pad), 3 of 3 runs → `Element id:swift_payment.form.priority_select fully visible after 1 swipe`
+  (3.5 s), and a read 1 s later puts the row at **y -48 / -121 / -133** — above the top of the screen, behind the top bar
+  (screenshot: the form shows Payee’s street … bank country; Priority is gone). The content-down stroke in the box above the
+  pad (finger 458 → 114) flings the SwiftUI form ~730–800 pt; the round's read (settle 400 ms, `src/interact/scroll.ts:505`)
+  caught the row mid-fling inside 0–572 and stopped. Worse case: `scroll_until id:swift_payment.form.fees_select` (y 613,
+  just under the pad) → the one fling carried it from 613 to -357 without a read in between, and the loop kept swiping DOWN
+  into exhausted content: `failed after 6 swipes (maxSwipes) — element in tree but never intersected the 402x572 screen above
+  the soft keyboard … (last rect {"x":24,"y":-357,…})` (14.2 s). With the pad DOWN the same tool is fine
+  (`payee_country_select` 1005 → `fully visible after 1 swipe`, at y 304 a second later; `debit_select` up, likewise).
+- **Fails — content-up does not move at all with the pad up.** `scroll_until { selector: "id:swift_payment.form.debit_select",
+  direction: "up", fully: true }` from a scrolled form → `failed after 6 swipes (maxSwipes) — element in tree but never
+  intersected the 402x572 screen above the soft keyboard over [0,572][402,874] (last rect {"x":42,"y":-586,…})` (13.9 s); the
+  row did not move. The finger-down stroke in the 0–572 box starts at y 286 − 172 = **114**, inside the app's top bar (it
+  ends at ≈ y 116; status bar + nav bar with the title at y 73–95). Measured by hand: `swipe (201,114) → (201,458)` → row
+  unchanged at y -55; `swipe (201,160) → (201,458)` → row to y 367. Before the fix the full-screen stroke started at
+  y 437 − 262 = 175, below the bar, and worked. The failure text blames nothing but maxSwipes (and recommends hiding the
+  keyboard, which would work, but for the wrong stated reason).
+- Keyboard no longer up (B2): `type_text` into the amount (pad up) → `tap id:swift_payment.form.debit_select` (the sheet;
+  `role:keyboard` 0 matches after) → pick a row → `scroll_until id:swift_payment.form.bank_country_select fully` → `fully
+  visible after 1 swipe`, no keyboard mentioned.
+
+Direction: on iOS the stroke box above the keyboard should also exclude the top inset (status bar + navigation bar — e.g.
+start no higher than the first content node / the scrollable's visible top), and the stop should be judged on a settled
+tree (two equal reads, or re-check the stop after a further settle) so a fling past the target is not reported as reached;
+a stroke of fixed fraction over a 572-pt box was enough to fling this form ~2 screens.
+
+**Default idb — unchanged, as documented in Status:** pad up after `tap text:"Value*"` (idb lists the keys and the band
+`other 0 589 402 285`): `scroll_until value_date_select fully` → `fully visible after 0 swipes` (bottom under the band);
+`scroll_until priority_select fully maxSwipes 2` → `failed after 2 swipes (maxSwipes) — element never appeared in the tree`;
+`tap id:swift_payment.form.priority_select` → `Timed out after 5000ms waiting for element … to appear`. The server's
+startup warning still says "the idb tree carries no keyboard", which is not true on iOS 27 (keys + band are listed).

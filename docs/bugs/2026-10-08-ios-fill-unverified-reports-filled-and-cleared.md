@@ -74,3 +74,47 @@ old value, so it is unverified as well (it happened to land).
 2. Type something into the field so the label floats (moves off the input's frame).
 3. `type_text { selector: 'text:"<label>"', text: "abc", clear: true }` → `Filled … (3 characters, cleared first)`;
    `ui_snapshot { filter: "role:textfield" }` shows the old value.
+
+## Device check (2026-10-08, re-run at e9e6509): Android confirmed
+
+Emulator-5554 (Pixel_3a AVD, Android 13), SWIFT form. EditText fills by `id:` and by `role:textfield value:` read back
+and report real deletes: `Filled id:swift_payment.form.amount_input (3 characters, cleared 4 characters first)` (field
+held `1000`), `Filled role:textfield value:"1.5" (1 characters, cleared 3 characters first)`, `Filled id:…iban_input (22
+characters, cleared 7 characters first)`. Non-input match (the read-only SEPA BIC, a `scrollable`): `Typed 1 characters into
+id:swift_payment.form.bic_input — NOT verified: the matched node exposes no value (role scrollable)` + the `⚠ … the
+nearest input is textfield id:"swift_payment.form.iban_input"` line. The reformatting-field consequence does not bite on
+Android here: the amount field shows the raw text while focused (`1000`) and reformats only on blur (`2` → `2.00`), so
+`role:textfield value:"2.00"` + `clear` + `1000` → `Filled … (4 characters, cleared 4 characters first)`, value `1000`.
+Nit: "1 characters".
+
+
+## Device check (2026-10-08 iOS, re-run at e9e6509)
+
+Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native
+(`feature/swift-payment`), averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509` (`dist/`, stdio). **Confirmed fixed**, one wording nit (default idb unless stated):
+
+- Floating label over a filled field (IBAN held `XX12345`, label at 42,351 35x15):
+  `type_text { selector: 'text:"IBAN*"', text: "DE89370400440532013000", clear: true }` → `Typed 22 characters into
+  text:"IBAN*" — NOT verified: the matched node exposes no value (role text); clear sent no delete — a role text node's
+  length is not the field's` + `⚠ the matched node is role text, not a textfield — … the input overlapping it is textfield
+  id:"TextFieldWithComponentStyle" at 42,364 280x20 — select the input itself …`. Field still `XX12345`, no deletes.
+- `role:textfield value:` read-back verified when the screen's ids stay put: `role:textfield value:"DE89…"` → same value,
+  `clear` → `Filled … (22 characters, cleared 22 characters first)`; DE→BE and BE→DE swaps (4×) → `Filled … (16|22
+  characters, cleared 22|16 characters first)`.
+- Non-input with a value (read-only SEPA BIC, `other 'BIC*' value 'COBADEFFXXX'`): `type_text id:swift_payment.form.bic_input
+  "Q"` → `Typed 1 characters into id:… — NOT verified: the matched node's value does not show the typed text (role other) —
+  it is not the field` + the `⚠` naming the IBAN input. Nothing landed anywhere.
+- Reformatting amount field: the consequence does not bite here either — the SwiftUI amount field shows the raw text while
+  focused and reformats only on blur (`12.5` → `12,50`, `1000` → `1 000,00` with a NBSP). `role:textfield value:"12,50"` +
+  clear + `7.25` → `Filled … (4 characters, cleared 5 characters first)`; `value:"7.25"` + clear + `1000` → `Filled …
+  (4 characters, cleared 4 characters first)`.
+- Nit (wording): when the identity fallback refuses because the screen's id set changed during typing, the reply blames the
+  node: `type_text { selector: 'role:textfield value:"XX12345"', text: "DE89370400440532013000", clear: true }` → `Typed 22
+  characters into role:textfield value:"XX12345" (cleared 7 characters first) — NOT verified: the matched node exposes no
+  value (role textfield)` — yet the field read `DE89370400440532013000` right after (the inline `iban_input_error` went away
+  and `iban_notice` appeared, so `screenSignature` changed — refusing is right). Same under `treeSource: wda` (`value:"3.10"`
+  → `4.20`, landed as `4,20`; the keyboard's arrival changes the id set). A textfield that just had 7 characters deleted
+  plainly exposes a value; say instead "the field could not be found again (the screen changed while typing)".
+- Under `treeSource: wda` a fill by the container id (`fill: { id: swift_payment.form.amount_input … }`, a `container`) prints
+  both `⚠` lines (not a textfield; NOT verified, no value) although `3.10` landed — correct by the rules, noted for
+  mp-native's config.

@@ -59,3 +59,35 @@ field). In a flow the `tap:` step passes and the failure surfaces steps later.
 1. iOS, idb, a scroll view whose content extends below the screen (mp-native SWIFT form).
 2. `ui_snapshot { filter: <selector of a node below the fold> }` → rect y + h/2 > screen height.
 3. `tap { selector }` → `Tapped …`; screenshot unchanged.
+
+## Device check (2026-10-08, re-run at e9e6509): Android part
+
+Emulator-5554 (Pixel_3a AVD, Android 13), mp-native SWIFT/SEPA form. The off-screen refusal itself is **not measurable on
+this Android app**: uiautomator never lists Compose nodes below the fold (the raw `uiautomator dump` holds only the
+on-screen fields), so a below-the-fold selector times out before any rect is judged:
+`tap { selector: "id:swift_payment.form.payee_street_input" }` → `Timed out after 5000ms waiting for element … to appear`
+(no 0×0 hint either: no 0×0 node exists on Android here). Confirmed: a partly visible node (`iban_input` clipped to
+`{y:242,height:23}` under the top bar, centre on screen) was tapped at its centre and focused; no visible element was
+wrongly refused in any of the ~20 portrait taps of the run nor in landscape (`tap id:nav.tab_home` at ROTATION_90, 2220x1080 → `Tapped`).
+
+
+## Device check (2026-10-08 iOS, re-run at e9e6509)
+
+Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native
+(`feature/swift-payment`), averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509` (`dist/`, stdio). **Confirmed fixed** (default idb):
+
+- `tap { selector: 'text:"Payee’s street"' }` → `text:"Payee’s street" is off screen at (94,895) on a 402x874 screen (rect
+  42,885 103x20) — scroll_until it first; nothing was tapped`; `tap text:"Payee’s bank city*"` → `… off screen at
+  (110,1167) …`. Screenshot unchanged.
+- `scroll_until text:"Payee’s street" fully` → `fully visible after 1 swipe`; `type_text` on it then landed (field value
+  `Hauptstrasse 1`).
+- Above the top: the amount input scrolled off came back `0 0 0 0`; `tap { selector: 'role:textfield value~"000,00"' }` →
+  `Timed out after 5000ms waiting for element … to appear` + `(it matched only 0×0 nodes (scrolled off screen, or
+  collapsed) — if it is in a scroll view, scroll_until it first)`. Its label (still listed at y -77) → `text:"Amount*" is off
+  screen at (68,-69) … nothing was tapped`.
+- Partly visible node (`priority_select` at y -20 h 52, centre y 6) was tapped at its centre, as designed. Note: that
+  point is iOS's status bar — the tap scrolled the form to the top (status-bar scroll-to-top) instead of opening the
+  select. The centre is "on screen" but covered by system/app chrome; see
+  [2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md](2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md).
+- No visible element was wrongly refused in ~45 portrait taps (idb and WDA). Landscape not measured (headless simulator,
+  no rotation available).
