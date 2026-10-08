@@ -1,4 +1,4 @@
-import { everyNode, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectsOverlap, sameRect, sameRectWithinPixel, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { isInteractive } from './selectors.js';
 
 /**
@@ -500,9 +500,11 @@ export function visibleFractionInViewport(
  * `rectsOverlap` joined it on 2026-10-07 for the same reason: the WDA
  * parser's keyboard band test (wda-source.ts) had a copy of its arithmetic.
  * `sameRect` joined them on 2026-10-08 (round 4): the WDA parser's text-echo
- * rule (wda-source.ts#isTextEcho) asks the same question.
+ * rule (wda-source.ts#isTextEcho) asks the same question. Its tolerant
+ * sibling `sameRectWithinPixel` (scroll_until's motion test) joined it the
+ * same day, so rect equality has one owner.
  */
-export { rectArea, rectsOverlap, sameRect };
+export { rectArea, rectsOverlap, sameRect, sameRectWithinPixel };
 
 /**
  * Is the point inside the rect — left and top inclusive, right and bottom

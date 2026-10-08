@@ -8,6 +8,8 @@ import {
   intersectsViewport,
   rectArea,
   rectsOverlap,
+  sameRect,
+  sameRectWithinPixel,
   shadowing,
 } from '../../src/ui-tree/geometry.js';
 import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
@@ -445,5 +447,21 @@ describe('shadowing — the later content node drawn over a point (the dismissal
       const card = uiNode({ role: 'toolbar', rect: { x: 20, y: 60, width: 362, height: 200 }, children: elsewhere() });
       for (const cover of [empty, backdrop, web, card]) expect(shadowing(app(title, cover), title, at)).toBe(cover);
     });
+  });
+});
+
+describe('rect equality — one owner, two questions (code review of round 2, 2026-10-08)', () => {
+  const r = { x: 10, y: 20, width: 30, height: 40 };
+  it('sameRect is exact: a one-unit or a sub-unit change is a change', () => {
+    expect(sameRect(r, { ...r })).toBe(true);
+    expect(sameRect(r, { ...r, y: 21 })).toBe(false);
+    expect(sameRect(r, { ...r, height: 40.5 })).toBe(false);
+  });
+  it('sameRectWithinPixel forgives under one unit on every side, and nothing more', () => {
+    expect(sameRectWithinPixel(r, { x: 10.9, y: 19.1, width: 30.5, height: 39.5 })).toBe(true);
+    expect(sameRectWithinPixel(r, { ...r, x: 11 })).toBe(false);
+    expect(sameRectWithinPixel(r, { ...r, y: 19 })).toBe(false);
+    expect(sameRectWithinPixel(r, { ...r, width: 31 })).toBe(false);
+    expect(sameRectWithinPixel(r, { ...r, height: 39 })).toBe(false);
   });
 });

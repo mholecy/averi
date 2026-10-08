@@ -1,6 +1,6 @@
 import type { DeviceAdapter, DeviceScreen, Rect, SoftKeyboard, Stroke, UiNode } from '../adapters/types.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
-import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { clippedEdges, sameRectWithinPixel, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { cannotHide, highestCover, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
@@ -410,7 +410,7 @@ class Motion {
    */
   observe(found: readonly UiNode[], best: Judged | undefined, frames: readonly Rect[], swipes: number): Observed {
     const rects = found.map((n) => ({ ...n.rect }));
-    const bestUnmoved = best !== undefined && this.prevBest !== undefined && rectsEqual(this.prevBest, best.node.rect);
+    const bestUnmoved = best !== undefined && this.prevBest !== undefined && sameRectWithinPixel(this.prevBest, best.node.rect);
     if (this.current === 'stroke') {
       // Every match, not only the judged one, for "exhausted" (review round
       // 1): with several matches off the frame the judged one is the first
@@ -514,7 +514,7 @@ function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
   if (a.length === 0 || a.length !== b.length) return false;
   const left = [...a];
   return b.every((r) => {
-    const i = left.findIndex((l) => rectsEqual(l, r));
+    const i = left.findIndex((l) => sameRectWithinPixel(l, r));
     if (i < 0) return false;
     left.splice(i, 1);
     return true;
@@ -940,9 +940,3 @@ export async function scrollUntilVisible(
     await sleep(settleMs);
   }
 }
-
-const rectsEqual = (a: Rect, b: Rect): boolean =>
-  Math.abs(a.x - b.x) < 1 &&
-  Math.abs(a.y - b.y) < 1 &&
-  Math.abs(a.width - b.width) < 1 &&
-  Math.abs(a.height - b.height) < 1;

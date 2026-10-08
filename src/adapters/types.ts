@@ -111,6 +111,22 @@ export function sameRect(a: Rect, b: Rect): boolean {
 }
 
 /**
+ * The same rect to within a pixel on every side — under 1 unit of x, y,
+ * width and height apart. `sameRect`'s sibling, kept beside it so rect
+ * equality has one owner with two honestly named questions (code review of
+ * round 2, 2026-10-08: it was `rectsEqual`, private to interact/scroll.ts).
+ * `scroll_until` asks it of one match's rect read for read — "did the
+ * stroke move it?", "did the confirming read find it where the stop's read
+ * did?" — where a sub-unit difference between reads (fractional
+ * coordinates, a rounding in the tree source) is not motion. Exact
+ * equality stays the question for `sameRect`'s callers: there a one-unit
+ * change IS the finding.
+ */
+export function sameRectWithinPixel(a: Rect, b: Rect): boolean {
+  return Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1;
+}
+
+/**
  * Do two rects share any area at all? Positive area only: rects that merely
  * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —
  * do not overlap, and neither does a zero-area rect with anything. Added
