@@ -3,7 +3,7 @@ import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import { cannotHide, keyboardRects, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, coveringRect, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -125,7 +125,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * silently, when the oracle cannot see the keyboard: a floating or split IME
  * that supplies no insets frame at all (it reads hidden, or a zero-size frame
  * read as unknown — on API 33 a floating Gboard was measured 2026-10-08 to
- * keep a 132-px band, and its panel is now read beside it, `keyboardOver`
+ * keep a 132-px band, and its panel is now read beside it, `keyboardOverElement`
  * below; the transient read right after the focus tap was hidden); the API 34+ `type=ime` line is taken from AOSP and has not been
  * captured on a device; a multi-display device reads unknown. The check sits after the deadline check so a round that
  * would capture nothing queries nothing either. Cost: one `dumpsys window
@@ -402,16 +402,15 @@ class PixelPollMemory {
  * AndroidAdapter's keyboardTouchable), and an element under it is the same
  * covered miss, quoting the panel's rect.
  */
-async function keyboardOver(
+async function keyboardOverElement(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
 ): Promise<{ frame: Rect; remedy: KeyboardRemedy } | undefined> {
   const { keyboard, ...remedy } = await readSoftKeyboard(adapter, tree, element);
-  if (keyboard.state !== 'shown') return undefined;
-  // The band or, since 2026-10-08, a floating panel beside it (`keyboardRects`):
-  // the first that overlaps is the frame the miss quotes.
-  const frame = keyboardRects(keyboard).find((r) => rectsOverlap(element.rect, r));
+  // The band or, since 2026-10-08, a floating panel beside it (`coveringRect`
+  // over `keyboardRects`): the first that overlaps is the frame the miss quotes.
+  const frame = coveringRect(keyboard, (r) => rectsOverlap(element.rect, r));
   return frame === undefined ? undefined : { frame, remedy };
 }
 
@@ -460,7 +459,7 @@ export async function pollPixels(
     const { rect } = found[0];
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
-    const keyboard = await keyboardOver(adapter, tree, found[0]);
+    const keyboard = await keyboardOverElement(adapter, tree, found[0]);
     if (keyboard !== undefined) return memory.covered(rect, keyboard.frame, keyboard.remedy);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".

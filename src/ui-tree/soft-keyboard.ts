@@ -329,6 +329,20 @@ export async function oracleKeyboard(oracle: KeyboardOracle): Promise<SoftKeyboa
 export const keyboardRects = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): readonly Rect[] => [keyboard.frame, ...(keyboard.panels ?? [])];
 
 /**
+ * The first rect the keyboard covers (`keyboardRects`: the band, then its
+ * panels) that `hits` — the one search behind the two readers that test a
+ * keyboard against something of their own: the tap guard against a point
+ * (interact/keyboard-model.ts#keyboardOver, `containsPoint`) and the pixel
+ * poll against an element's rect (verify/pixel-poll.ts#keyboardOverElement,
+ * `rectsOverlap`). Code review of round 2 (2026-10-08): both spelled the
+ * search out, in two functions both named `keyboardOver`. Undefined when
+ * no rect hits, or the keyboard is not `shown` — the caller words that.
+ */
+export function coveringRect(keyboard: SoftKeyboard, hits: (covered: Rect) => boolean): Rect | undefined {
+  return keyboard.state === 'shown' ? keyboardRects(keyboard).find(hits) : undefined;
+}
+
+/**
  * The covered rect whose TOP edge is highest — the band, or a floating
  * panel above it — for a reader that keeps the screen above the keyboard
  * (`scroll_until`): above that edge, nothing of the keyboard lies. Ties keep

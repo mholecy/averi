@@ -1,7 +1,7 @@
 import type { DeviceAdapter, Point, Rect, SoftKeyboard } from '../adapters/types.js';
 import { containsPoint } from '../ui-tree/geometry.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { keyboardRects, readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
+import { coveringRect, readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type TapScreen, type Target } from './resolve.js';
@@ -158,7 +158,7 @@ export type ClearReading = { over: 'clear' } | { over: 'unknown' };
  */
 export const keyboardOver = (keyboard: SoftKeyboard, point: Point): CoverReading => {
   if (keyboard.state === 'unknown') return { over: 'unknown' };
-  const frame = keyboard.state === 'shown' ? keyboardRects(keyboard).find((r) => containsPoint(r, point)) : undefined;
+  const frame = coveringRect(keyboard, (r) => containsPoint(r, point));
   return frame === undefined ? { over: 'clear' } : { over: 'covering', frame };
 };
 
