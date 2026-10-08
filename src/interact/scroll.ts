@@ -6,7 +6,7 @@ import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
 import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
-import { judgingScreen, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
+import { judgingScreen, sameStroke, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -363,11 +363,11 @@ class Motion {
   /** Every match's rect at the last read that read, and the judged match's at the last read that had one. */
   private prevRects: Rect[] | undefined;
   private prevBest: Rect | undefined;
-  /** Identical strokes in a row after which every match, and the judged match, stayed put — and the stroke they were. */
+  /** Identical strokes in a row after which every match, and the judged match, stayed put — the stroke the streak was counted for, and the last one drawn (`sameStroke`). */
   private allUnmovedStrokes = 0;
   private bestUnmovedStrokes = 0;
-  private streakStroke: string | undefined;
-  private lastStrokeKey: string | undefined;
+  private streakDrawn: Stroke | undefined;
+  private lastDrawn: Stroke | undefined;
   /** Some read saw the target SHORT of the far edge (`beyondFarEdge`) — so a later read beyond it means a fling carried it across. */
   private seenShort = false;
   /**
@@ -419,10 +419,10 @@ class Motion {
       // in tree order, which can be a static duplicate (another page, a
       // hidden copy) while the real one moved.
       const allUnmoved = this.prevRects !== undefined && sameRects(this.prevRects, rects);
-      const same = this.streakStroke === this.lastStrokeKey;
+      const same = this.streakDrawn !== undefined && this.lastDrawn !== undefined && sameStroke(this.streakDrawn, this.lastDrawn);
       this.allUnmovedStrokes = !allUnmoved ? 0 : this.allUnmovedStrokes > 0 && same ? this.allUnmovedStrokes + 1 : 1;
       this.bestUnmovedStrokes = !bestUnmoved ? 0 : this.bestUnmovedStrokes > 0 && same ? this.bestUnmovedStrokes + 1 : 1;
-      this.streakStroke = this.lastStrokeKey;
+      this.streakDrawn = this.lastDrawn;
     }
     this.prevRects = rects;
     this.carriedPast = false;
@@ -496,16 +496,20 @@ class Motion {
    */
   nextStroke(): NextStroke {
     const toward = this.carriedPast ? OPPOSITE[this.direction] : this.direction;
-    const turns = this.strokesSent > 0 && toward !== this.lastStroke ? this.turns + 1 : this.turns;
-    return { toward, reach: 0.5 ** turns };
+    return { toward, reach: 0.5 ** (this.isTurn(toward) ? this.turns + 1 : this.turns) };
+  }
+
+  /** A stroke toward `toward` would be a turn: drawn the other way from the last one sent — the one test `nextStroke`'s reach and `stroked`'s count share. */
+  private isTurn(toward: Direction): boolean {
+    return this.strokesSent > 0 && toward !== this.lastStroke;
   }
 
   /** A stroke was sent: toward `toward`, drawn as `stroke`. */
   stroked(toward: Direction, stroke: Stroke): void {
-    if (this.strokesSent > 0 && toward !== this.lastStroke) this.turns++;
+    if (this.isTurn(toward)) this.turns++;
     this.strokesSent++;
     this.lastStroke = toward;
-    this.lastStrokeKey = JSON.stringify(stroke);
+    this.lastDrawn = stroke;
     this.confirmReads = 0;
     this.since = 'stroke';
   }

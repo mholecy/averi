@@ -158,6 +158,16 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
   return { from: stroke.from, to: { x: Math.round(stroke.from.x + dx * k), y: Math.round(stroke.from.y + dy * k) } };
 }
 
+/**
+ * The same stroke: the same touch-down and the same lift-off, point for
+ * point. For `scroll_until`'s "the same stroke twice" (interact/scroll.ts,
+ * Motion: UNMOVED_STROKES_EXHAUST) — until the code review of round 2
+ * (2026-10-08) a comparison of `JSON.stringify`ed strokes, which compared
+ * their spelling (key order included) rather than their points.
+ */
+export const sameStroke = (a: Stroke, b: Stroke): boolean =>
+  a.from.x === b.from.x && a.from.y === b.from.y && a.to.x === b.to.x && a.to.y === b.to.y;
+
 /** The lowest y a touch-down over a keyboard may take (`swipeVectorAbove` (a)): the lower point of `swipeVector`'s vertical stroke over the box the keyboard leaves — read off it, so a change to SWIPE_REACH_FRACTION moves both together. */
 function keyboardClearance(uncovered: Rect): number {
   const { from, to } = swipeVector(uncovered, 'up', 'finger');

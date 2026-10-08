@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { MIN_STROKE_FRACTION, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { MIN_STROKE_FRACTION, sameStroke, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -312,5 +312,16 @@ describe('shortenStroke — the touch-down kept, the reach scaled, never a tap',
 
   it('sideways too: along the stroke, x scaled, y kept', () => {
     expect(shortenStroke({ from: { x: 80, y: 437 }, to: { x: 322, y: 437 } }, 0.5, 402)).toEqual({ from: { x: 80, y: 437 }, to: { x: 201, y: 437 } });
+  });
+});
+
+describe('sameStroke — the same touch-down and lift-off, point for point (code review of round 2, 2026-10-08)', () => {
+  const s = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } };
+  it('compares points, not spelling: key order does not matter, any coordinate does', () => {
+    expect(sameStroke(s, { to: { y: 280, x: 540 }, from: { y: 1118, x: 540 } })).toBe(true);
+    expect(sameStroke(s, { ...s, from: { x: 541, y: 1118 } })).toBe(false);
+    expect(sameStroke(s, { ...s, from: { x: 540, y: 1117 } })).toBe(false);
+    expect(sameStroke(s, { ...s, to: { x: 539, y: 280 } })).toBe(false);
+    expect(sameStroke(s, { ...s, to: { x: 540, y: 699 } })).toBe(false);
   });
 });
