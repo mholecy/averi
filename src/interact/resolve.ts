@@ -81,12 +81,52 @@ export type Ambiguity = 'first' | 'refuse';
  */
 export class AmbiguityRefusal extends Error {}
 
+/**
+ * The target was never there (2026-10-08): no round of the wait that threw
+ * it resolved the target at all — every tree that was read lacked an
+ * actionable match. The one fact about an element that only this module
+ * knows, as a class of its own so a caller that must tell "absent" from
+ * "found, then something went wrong" reads it instead of guessing.
+ *
+ * Its one reader is the flow engine's `optional:` block, the only place
+ * where absence is not a failure. Until this class it deduced absence from
+ * missing evidence — its own presence poll for a tap, and for every other
+ * step "any error but the one class known to have found the element" — so a
+ * fill whose field was found and tapped, but whose text never landed, was
+ * logged "skipped step (not present)", and every new failure-after-finding
+ * needed one more `instanceof` there. Now an optional step is "(not
+ * present)" exactly when this is what it threw, and anything else is
+ * skipped with its own headline.
+ *
+ * Deliberately narrow:
+ * - A wait whose LAST read failed does not throw it — neither one that read
+ *   no tree at all nor one that read a few and then lost the device: the
+ *   last read's error is the fresher fact (the rule pollTimeoutMessage
+ *   applies to its hint, ui-tree/read-tree.ts), and "not present" would be
+ *   a claim about a screen nobody could see at the end. That timeout stays
+ *   a plain Error with the read error beneath its headline, so a dead
+ *   device never reads "(not present)" in an optional skip.
+ * - "Found, but never held still" is not this either — the element was
+ *   there; resolveSettled words that case on its own.
+ * - An AmbiguityRefusal is thrown at once, by resolveNow, and is a selector
+ *   problem, never absence.
+ * - Only the error a caller receives counts. A KeyboardGuardError that
+ *   wraps one as its `cause` (the target not coming back after the guard
+ *   pressed `back` or tapped a dismissal) is not absence: something was
+ *   sent by then, and its own headline says what.
+ *
+ * Same message shape as every poll timeout (pollTimeoutMessage); same
+ * `Error` to every caller that does not ask — the MCP tools print the
+ * message as before.
+ */
+export class ElementNotFoundError extends Error {}
+
 export interface ResolveOptions {
   ambiguous: Ambiguity;
 }
 
 export interface SettleOptions extends ResolveOptions {
-  /** How long the element may take to appear AND hold still. Default DEFAULT_SETTLE_TIMEOUT_MS. */
+  /** How long the element may take to appear AND hold still (for resolvePresent: to appear). Default DEFAULT_SETTLE_TIMEOUT_MS. */
   timeoutMs?: number;
   /** Pause between tree reads. Default DEFAULT_POLL_MS. */
   pollMs?: number;
@@ -148,9 +188,18 @@ export interface ResolvedSettled extends Resolved {
  * The rect comparison restarts whenever a round finds nothing: a node that
  * vanishes and returns has to prove it holds still again.
  *
- * Throws the shared poll-timeout wording. The read error, when the last
- * round could not read a tree, rides beneath it so a dead device never looks
- * like a slow screen.
+ * Throws the shared poll-timeout wording, in one of two sentences since
+ * 2026-10-08 — until then both read "(visible and settled)", so an element
+ * that was never on screen looked like one that would not stop moving:
+ * - no round resolved the target: ElementNotFoundError, "…waiting for element
+ *   X to appear" (when the last read succeeded; see ElementNotFoundError for why
+ *   a wait whose last read failed is a plain Error with the same wording);
+ * - some round did, but no two consecutive ones agreed on its rect (it kept
+ *   moving, or kept vanishing): a plain Error, "…waiting for element X to
+ *   hold still (found, but never at the same position in two consecutive
+ *   reads)".
+ * The read error, when the last round could not read a tree, rides beneath
+ * either so a dead device never looks like a slow screen.
  */
 export async function resolveSettled(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
@@ -159,6 +208,7 @@ export async function resolveSettled(
 ): Promise<ResolvedSettled> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
+  let sighted = false;
   const outcome = await pollTree(
     adapter,
     (tree) => {
@@ -167,6 +217,7 @@ export async function resolveSettled(
         lastRect = undefined;
         return undefined;
       }
+      sighted = true;
       const rect = JSON.stringify(resolved.node.rect);
       if (rect === lastRect) return { ...resolved, tree };
       lastRect = rect;
@@ -175,7 +226,69 @@ export async function resolveSettled(
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
-  throw new Error(
-    pollTimeoutMessage(`element ${describeTarget(target)} (visible and settled)`, timeoutMs, outcome.readError),
-  );
+  if (sighted) {
+    throw new Error(
+      pollTimeoutMessage(
+        `element ${describeTarget(target)} to hold still (found, but never at the same position in two consecutive reads)`,
+        timeoutMs,
+        outcome.readError,
+      ),
+    );
+  }
+  throw notFound(target, timeoutMs, outcome);
+}
+
+/** What a wait that gave up saw of its target — the evidence absenceError judges. */
+export interface WaitEvidence {
+  /** Some round matched the target (resolveSettled: resolved it; scroll_until: any match, any swipe). */
+  sighted: boolean;
+  /** How many rounds read a tree at all. */
+  treesRead: number;
+  /** The LAST read's error, when the last read failed. */
+  readError?: Error;
+}
+
+/**
+ * THE rule for when a wait that gave up is absence (2026-10-08, one owner
+ * for resolveSettled, resolvePresent and scroll.ts's scroll_until):
+ * ElementNotFoundError when no round matched the target, at least one tree
+ * was read and the last read succeeded; a plain Error with the same
+ * message otherwise — the element was seen, or nobody could see the screen
+ * at the end (see ElementNotFoundError). The caller words the message.
+ */
+export function absenceError(message: string, seen: WaitEvidence): Error {
+  return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message) : new Error(message);
+}
+
+/** A wait that never resolved its target, worded for what it waited for — nothing about settling. */
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }): Error {
+  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError), { sighted: false, ...outcome });
+}
+
+/**
+ * Wait only for the target to APPEAR — one round that resolves it under the
+ * same policy as resolveSettled (resolveNow: zero-area nodes are never
+ * targets, so a ghost node cannot pass), no settling — and return that
+ * sighting. Throws ElementNotFoundError (or, when the last read failed, a plain
+ * Error) in resolveSettled's never-found wording.
+ *
+ * The flow engine's optional tap is its caller (2026-10-08, moved here from
+ * the engine's own presence poll so the "found" fact has one owner): its
+ * budget bounds the presence check only, because a settle needs two reads
+ * and one Android dump alone can outlast the optional budget (2026-08-19).
+ * pollTree always completes one read before its deadline is checked, so a
+ * budget shorter than one read still gets one honest look.
+ */
+export async function resolvePresent(
+  adapter: Pick<DeviceAdapter, 'uiTree'>,
+  target: Target,
+  opts: SettleOptions,
+): Promise<Resolved> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
+  const outcome = await pollTree(adapter, (tree) => resolveNow(tree, target, opts), {
+    timeoutMs,
+    pollMs: opts.pollMs ?? DEFAULT_POLL_MS,
+  });
+  if (!outcome.timedOut) return outcome.value;
+  throw notFound(target, timeoutMs, outcome);
 }

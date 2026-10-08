@@ -2,13 +2,13 @@ import type { IosTreeSourceKind } from '../adapters/ios-node.js';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
 import { typeIntoFocused } from '../interact/type-text.js';
-import { DEFAULT_SETTLE_TIMEOUT_MS, resolveNow, type Ambiguity } from '../interact/resolve.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type KeyboardDismissal } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec as describeSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
+import { pollTimeoutMessage, pollTree, readErrorLine } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absentFromViewport } from '../ui-tree/geometry.js';
 import { isBareTree, treeShape } from '../ui-tree/bare-tree.js';
@@ -308,6 +308,22 @@ export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
  * as a second failure.
  */
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
+
+/**
+ * An optional step's skip reason when it is not "(not present)": the
+ * headline, and — when the error is a poll timeout carrying a read error —
+ * that parenthesis too, joined onto it as one line (review 2026-10-08;
+ * read-tree.ts#readErrorLine owns the shape, beside pollTimeoutMessage). The headline alone of a wait whose
+ * last read failed is "Timed out … waiting for element X to appear", which
+ * reads exactly like a slow screen; ElementNotFoundError is never thrown in that
+ * case, so the skip line is the one place that tells a dead device from an
+ * absent interstitial. Only that line: a FlowError's later lines are its
+ * trace, and a skip line is one line.
+ */
+const skipReason = (e: unknown): string => {
+  const readError = readErrorLine(errorMessage(e));
+  return readError === undefined ? headline(e) : `${headline(e)} ${readError}`;
+};
 
 /**
  * Interprets averi.yaml flows against a DeviceAdapter. Every action polls for
@@ -1056,7 +1072,7 @@ export class FlowEngine {
 
   /**
    * The optional budget bounds the PRESENCE CHECK only, never the tap. The
-   * tap path (settledNode) needs the element's rect identical in two
+   * tap path (resolveSettled) needs the element's rect identical in two
    * consecutive tree reads, and on Android one uiautomator dump alone runs
    * 1-3s — feeding tapSpec the tight optional budget meant the deadline was
    * spent before a second read could happen, so optional taps NEVER landed on
@@ -1073,6 +1089,15 @@ export class FlowEngine {
    * late on 2 of 3 runs). The committed tap still uses the standard tap
    * budget: the element is already sighted by then, so appearance latency is
    * paid; only settling remains.
+   *
+   * Since 2026-10-08 the presence check is the interaction module's
+   * (resolvePresent), and so is the verdict on it: a skip reads "(not
+   * present)" when the step threw ElementNotFoundError, whatever kind of
+   * step it was (runOptionalSteps) — and for a tap, only when the presence
+   * check itself threw it. An element resolvePresent sighted that then
+   * leaves for the whole committed tap budget WAS there: the failure came
+   * after finding, so the skip quotes the tap's own timeout (the spec card:
+   * "found" failures stay other errors; code review 2026-10-08).
    */
   private async runOptional(steps: StepPayload<'optional'>): Promise<void> {
     this.swallowDepth++;
@@ -1088,33 +1113,51 @@ export class FlowEngine {
       // Split OUTSIDE the try: a malformed `timeout:` is a config error, not
       // an absent element — it must fail the flow, never log as "skipped".
       const tap = 'tap' in s ? splitTapSpec(s.tap) : undefined;
-      // Why a skipped tap was skipped. "not present" is true only until the
-      // presence poll has passed; a tap that fails AFTER it (the element was
-      // there — e.g. the keyboard over it would not close, and `back` was
-      // pressed) says its own headline instead (review 2026-10-03: such a
-      // skip read "(not present)"). The other step kinds have no presence
-      // poll, so for them a KeyboardGuardError is the one failure known to
-      // have found the element — a fill whose dismissal tap did not hide
-      // the keyboard sent a tap, and "(not present)" would hide that
-      // (stage B review).
-      let present = false;
+      // Set from interact's answer, not deduced: resolvePresent returned a
+      // sighting. After it, an ElementNotFoundError from the committed tap
+      // (the element left before it could settle) is a failure after
+      // finding, not absence.
+      let sighted = false;
       try {
         if (tap) {
           // Presence = "something actionable is in the tree": the same policy
-          // the committed tap will apply, one-shot (resolveNow), so a ghost
-          // zero-area node cannot commit a tap that then cannot land.
-          await this.pollUntil(
-            async (tree) => (resolveNow(tree, tap.spec, { ambiguous: FLOW_AMBIGUITY }) === undefined ? undefined : true),
-            tap.timeoutMs ?? this.optionalTimeoutMs,
-            `optional element ${describeSpec(tap.spec)}`,
-          );
-          present = true;
+          // the committed tap will apply, one-shot per round (resolvePresent),
+          // so a ghost zero-area node cannot commit a tap that then cannot land.
+          await resolvePresent(this.adapter, tap.spec, {
+            ambiguous: FLOW_AMBIGUITY,
+            timeoutMs: tap.timeoutMs ?? this.optionalTimeoutMs,
+            pollMs: this.pollMs,
+          });
+          sighted = true;
           await this.tapSpec(tap.spec, this.tapTimeoutMs);
         } else {
           await this.runStep(s); // swallowDepth > 0: no ✗ line, the failure is logged as skipped below
         }
       } catch (e) {
-        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (${present || e instanceof KeyboardGuardError ? headline(e) : 'not present'})`);
+        // Why it was skipped: "(not present)" only when the interaction
+        // module says the element was never found (ElementNotFoundError,
+        // interact/resolve.ts) — the presence poll's own miss (never the
+        // committed tap's, once the presence poll sighted it), or a nested
+        // step's resolution or scroll_until that never saw its target. Every
+        // other failure is skipped with its own headline (and the read error
+        // beneath it, when the last read failed — skipReason): the element
+        // WAS there, or nobody could see the screen at the end, or the
+        // step never got as far as looking (a fill's value refused before
+        // anything is tapped), or what failed was no element at all (a
+        // `wait:` or `branch:` timeout says what it waited for).
+        //
+        // Until 2026-10-08 the engine deduced this from missing evidence: a
+        // `present` flag set by the tap's presence poll, and for the other
+        // steps `instanceof KeyboardGuardError` as the one failure known to
+        // have found the element (review 2026-10-03, stage B review) — so a
+        // fill whose field was found and tapped, but whose text never
+        // landed, and a fill refused for a control character, both read
+        // "skipped step (not present)". A KeyboardGuardError still quotes
+        // its headline, now because it is not ElementNotFoundError — even
+        // when a target that did not come back is its `cause`: something was
+        // sent.
+        const absent = e instanceof ElementNotFoundError && !sighted;
+        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (${absent ? 'not present' : skipReason(e)})`);
       }
     }
   }

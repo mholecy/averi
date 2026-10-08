@@ -240,7 +240,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
   }
   const TIMEOUT_AFTER_BACK =
     'After pressing back to hide the soft keyboard that covered id:login_submit at (249,1466): Timed out after 200ms ' +
-    'waiting for element id:login_submit (visible and settled). If no keyboard was really up at that moment, back may ' +
+    'waiting for element id:login_submit to appear. If no keyboard was really up at that moment, back may ' +
     'have navigated away — check the screen (ui_snapshot / screenshot)';
 
   it('the RACE: shown at query time, gone by the key press — back navigates away, and the failure says back was pressed', async () => {
@@ -251,7 +251,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     expect(error).toBeInstanceOf(AfterKeyboardDismissal);
     expect(error.message).toBe(TIMEOUT_AFTER_BACK);
     expect(error.backPressed).toBe('the soft keyboard covered id:login_submit; back pressed');
-    expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit (visible and settled)');
+    expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit to appear');
     expect(fake.taps).toEqual([]);
     expect(fake.keys).toEqual(['back']);
   });
@@ -262,7 +262,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     fake.attachedKeyboard.witnessAnswers.current = 'unknown';
     await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(
       'After pressing back to hide the soft keyboard that covered id:login_submit at (249,1466): Timed out after 200ms ' +
-        'waiting for element id:login_submit (visible and settled). If no keyboard was really up at that moment (the input ' +
+        'waiting for element id:login_submit to appear. If no keyboard was really up at that moment (the input ' +
         'method could not be asked whether a keyboard was shown), back may have navigated away — check the screen ' +
         '(ui_snapshot / screenshot)',
     );
@@ -518,7 +518,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
       if (++checks === 2) fake.live().children.pop();
       return ask.call(fake.attachedKeyboard);
     };
-    await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(/^Timed out after 200ms waiting for element id:login_submit \(visible and settled\)$/);
+    await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toThrow(/^Timed out after 200ms waiting for element id:login_submit to appear$/);
     expect(fake.taps).toEqual([]);
   });
 

@@ -335,7 +335,7 @@ describe('fillField — resolution is the shared policy', () => {
   it('a field that never appears fails with the settle wording before anything is typed', async () => {
     const fake = formFake();
     await expect(fillField(fake, { id: 'nope' }, '1', { ...FAST, timeoutMs: 10 })).rejects.toThrow(
-      /Timed out after 10ms waiting for element id:"nope" \(visible and settled\)/,
+      /Timed out after 10ms waiting for element id:"nope" to appear/,
     );
     expect(fake.typed).toEqual([]);
   });

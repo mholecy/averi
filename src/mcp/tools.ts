@@ -339,8 +339,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Tap an element by selector (preferred: \'id:login_button\', \'text:"Continue"\', \'role:button label~"Pay.*"\') or by x/y coordinates. ' +
         'Selector values containing spaces must be double-quoted: text:"Sign in" (exact) or text~"Sign in" (regex) — an unquoted text:Sign in fails at "in". ' +
-        `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still (same policy as a flow tap: step) and fails with "Timed out … (visible and settled)" ` +
-        'if it never does — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes; ' +
+        `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still (same policy as a flow tap: step) and fails with "Timed out … to appear" ` +
+        'if it never shows (or "… to hold still (found, but …)" if it shows but keeps moving) — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes; ' +
         'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector. ' +
         'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given. ' +
         'On iOS with treeSource: wda a target COVERED by the on-screen keyboard (its band: keys, AutoFill bar, accessory toolbar slot) is hidden first by tapping the first entry of averi.yaml app.ios.keyboardDismiss that is on screen (a tap: on a neutral element such as the title, or accessory: true for the input-accessory toolbar\'s Done), the element found again, then tapped — the response says so; with none configured or none on screen the tap is REFUSED, nothing tapped or pressed, since no key hides the keyboard without submitting: hide it yourself (tap a neutral, non-interactive element such as a title), then tap again. ' +

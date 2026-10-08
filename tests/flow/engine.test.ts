@@ -232,8 +232,8 @@ flows:
   // Regression: on a real Android device one uiautomator dump runs 1-3s —
   // longer than the whole optional budget. The instant FakeAdapter above can
   // never catch that, so this one makes each tree read outlast
-  // optionalTimeoutMs: the presence check must still succeed (pollUntil
-  // completes at least one read before checking its deadline) and the tap
+  // optionalTimeoutMs: the presence check must still succeed (resolvePresent's
+  // pollTree completes at least one read before checking its deadline) and the tap
   // must then run on the full tap timeout, not the optional budget.
   it('optional tap lands even when one tree read outlasts the optional budget', async () => {
     const fake = new FakeAdapter(buildScreens(), 'promo', (id, self) => {
@@ -1697,7 +1697,7 @@ flows:
     const started = Date.now();
     await expect(
       FlowEngine.run(cfg('{ id: nope, value: "1" }'), fake, { ...FAST, tapTimeoutMs: 120 }, { flow: 'f' }),
-    ).rejects.toThrow(/Timed out after 120ms waiting for element id:"nope" \(visible and settled\)/);
+    ).rejects.toThrow(/Timed out after 120ms waiting for element id:"nope" to appear/);
     expect(Date.now() - started).toBeLessThan(FAST.waitTimeoutMs); // not some other budget
     expect(fake.taps).toEqual([]);
   });
@@ -1828,7 +1828,105 @@ flows:
 `);
     const trace = await FlowEngine.run(c, fake, FAST, { flow: 'f' });
     expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
-    expect(trace).toContainEqual({ action: 'optional', detail: 'skipped step (not present)' });
+    // The field WAS found and tapped: until 2026-10-08 this pinned "skipped
+    // step (not present)", the engine's guess. Which reason the skip quotes
+    // is the table's below; this test is about the branch in between.
+    expect(trace).toContainEqual({ action: 'optional', detail: expect.stringMatching(/^skipped step \(fill: typed /) });
+  });
+
+  /**
+   * One fact, one table (2026-10-08): an `optional:` step is skipped "(not
+   * present)" exactly when the interaction module threw ElementNotFoundError, and
+   * with its own headline otherwise — every row is still skipped, none ✗.
+   */
+  describe('optional: — "(not present)" only when interact never found the element', () => {
+    const optionalFlow = (inner: string) =>
+      parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - optional:
+          - ${inner}
+`);
+    const skipOf = async (fake: FakeAdapter, inner: string) => {
+      const trace = await FlowEngine.run(optionalFlow(inner), fake, FAST, { flow: 'f' });
+      expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
+      return trace.filter((t) => t.action === 'optional').map((t) => t.detail);
+    };
+
+    it('a fill whose field is ABSENT: skipped step (not present), nothing typed', async () => {
+      const fake = formFake();
+      expect(await skipOf(fake, 'fill: { id: nope, value: "1" }')).toEqual(['skipped step (not present)']);
+      expect(fake.taps).toEqual([]);
+      expect(fake.typed).toEqual([]);
+    });
+
+    it('a fill whose field is FOUND but the text does not land: skipped with the fill\'s headline, not (not present)', async () => {
+      const fake = formFake('9.99');
+      fake.typeText = async (text: string) => {
+        fake.typed.push(text);
+      };
+      expect(await skipOf(fake, 'fill: { id: amount_input, value: "12.34" }')).toEqual([
+        'skipped step (fill: typed 5 characters but the field shows 4 (content withheld from this error))',
+      ]);
+      expect(fake.taps).toEqual(['amount_input']);
+    });
+
+    it('a fill REFUSED for a control character (nothing tapped): skipped with the refusal, not (not present)', async () => {
+      const fake = formFake();
+      const [detail] = await skipOf(fake, 'fill: { id: amount_input, value: "1\\n2" }');
+      expect(detail).toMatch(/^skipped step \(cannot type U\+000A \("\\n", a control character\): it is a key, not text/);
+      expect(fake.taps).toEqual([]);
+      expect(fake.typed).toEqual([]);
+    });
+
+    it('a wait that times out is skipped with its own timeout, which names what it waited for', async () => {
+      const fake = formFake();
+      const [detail] = await skipOf(fake, 'wait: { element: { id: nope }, timeout: 20ms }');
+      expect(detail).toMatch(/^skipped step \(Timed out after 20ms waiting for /);
+    });
+
+    it('a branch whose arms never match is skipped with its own timeout, which names the conditions', async () => {
+      const fake = formFake();
+      const [detail] = await skipOf(fake, 'branch: [ { when: { element: { id: nope } }, do: [ { tap: { id: submit_button } } ] } ]');
+      expect(detail).toBe(`skipped step (Timed out after ${FAST.waitTimeoutMs}ms waiting for any branch condition (element id:"nope"))`);
+      expect(fake.taps).toEqual([]);
+    });
+
+    it('a scroll_until whose element never appears in any read: skipped step (not present)', async () => {
+      const fake = formFake();
+      expect(await skipOf(fake, 'scroll_until: { element: { id: nope }, maxSwipes: 2 }')).toEqual(['skipped step (not present)']);
+    });
+
+    it('a tap on a DEAD device is not (not present): the skip carries the read error, so it never reads as a slow screen', async () => {
+      const fake = formFake();
+      fake.uiTree = async () => {
+        throw new Error('device offline');
+      };
+      expect(await skipOf(fake, 'tap: { id: promo_close }')).toEqual([
+        `skipped id:"promo_close" (Timed out after ${FAST.optionalTimeoutMs}ms waiting for element id:"promo_close" to appear ` +
+          '(last UI tree read failed: device offline))',
+      ]);
+    });
+
+    // Code review 2026-10-08, against the spec card: a failure after the
+    // element was found stays another error. The tap's own resolution never
+    // saw it, but the presence check did — so the skip quotes the tap.
+    it('a tap SIGHTED by the presence check that then leaves for the whole tap budget: the tap\'s timeout, not (not present)', async () => {
+      const fake = formFake();
+      const real = fake.uiTree.bind(fake);
+      let reads = 0;
+      fake.uiTree = async () => {
+        const tree = await real();
+        if (reads++ > 0) tree.children = tree.children?.filter((c) => c.identifier !== 'submit_button');
+        return tree;
+      };
+      expect(await skipOf(fake, 'tap: { id: submit_button }')).toEqual([
+        `skipped id:"submit_button" (Timed out after ${FAST.tapTimeoutMs}ms waiting for element id:"submit_button" to appear)`,
+      ]);
+      expect(fake.taps).toEqual([]);
+    });
   });
 
   describe('stepSummary — the ✗ line names the step and its selector, never a value', () => {
@@ -2296,7 +2394,7 @@ flows:
         action: '✗ tap id:"login_submit"',
         detail:
           'failed — After pressing back to hide the soft keyboard that covered id:"login_submit" at (249,1466): Timed out after ' +
-          `${FAST.tapTimeoutMs}ms waiting for element id:"login_submit" (visible and settled). If no keyboard was really up at ` +
+          `${FAST.tapTimeoutMs}ms waiting for element id:"login_submit" to appear. If no keyboard was really up at ` +
           'that moment, back may have navigated away — check the screen (ui_snapshot / screenshot)',
       },
     ]);

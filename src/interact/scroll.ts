@@ -2,7 +2,7 @@ import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { sleep } from '../util/sleep.js';
-import { describeTarget, findTarget, type Target } from './resolve.js';
+import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
 import { swipeVector, type Direction } from './swipe.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
@@ -90,6 +90,15 @@ export function describeScrollResult(r: ScrollUntilResult): string {
  * swipe, then a settle pause) and has a second stop bound (maxSwipes); the
  * read-failure rule is the same — a failed read is a miss, the last error is
  * quoted at the stop.
+ *
+ * The one stop that is absence — no read, at any swipe, held a match, and
+ * the last read succeeded — throws ElementNotFoundError (2026-10-08; the
+ * rule's one owner is resolve.ts's absenceError) with the same "element
+ * never appeared in the tree" wording,
+ * so an `optional:` scroll_until to an element that is not on this screen
+ * is skipped "(not present)" like a tap or a fill would be. Every other stop
+ * (found but clipped or off the viewport, a failed last read, content that
+ * ran out) stays a plain Error: the element was there, or nobody could see.
  */
 export async function scrollUntilVisible(
   adapter: DeviceAdapter,
@@ -113,6 +122,8 @@ export async function scrollUntilVisible(
 
   const deadline = Date.now() + timeoutMs;
   let lastFound: UiNode[] = [];
+  let everFound = false;
+  let treesRead = 0;
   let lastReadError: Error | undefined;
   // The best candidate seen so far, and whether the last swipe moved it. A
   // swipe that does not move the element is the only honest signal that the
@@ -124,7 +135,9 @@ export async function scrollUntilVisible(
     // A failed read is a miss, not a failure — see readTreeOrError.
     const { tree, error } = await readTreeOrError(adapter);
     lastReadError = error;
+    if (tree !== undefined) treesRead++;
     lastFound = tree === undefined ? [] : findTarget(tree, target);
+    if (lastFound.length > 0) everFound = true;
     // Judge the MOST revealed candidate, not the first: an id can sit on a
     // container and its child, and reporting the clipped one of the two would
     // invent a defect.
@@ -167,7 +180,8 @@ export async function scrollUntilVisible(
               : `element in tree but never intersected the ${viewport.width}x${viewport.height} viewport ` +
                 `(last rect ${JSON.stringify(lastFound[0].rect)})`;
       const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
-      throw new Error(`scroll_until ${describe} failed ${cause} — ${why}`);
+      const message = `scroll_until ${describe} failed ${cause} — ${why}`;
+      throw absenceError(message, { sighted: everFound, treesRead, readError: lastReadError });
     }
     await adapter.swipe(from, to);
     await sleep(settleMs);

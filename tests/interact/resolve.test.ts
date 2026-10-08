@@ -6,8 +6,12 @@ afterEach(() => {
 });
 import type { UiNode } from '../../src/adapters/types.js';
 import {
+  absenceError,
+  AmbiguityRefusal,
   DEFAULT_SETTLE_TIMEOUT_MS,
+  ElementNotFoundError,
   resolveNow,
+  resolvePresent,
   resolveSettled,
 } from '../../src/interact/resolve.js';
 import { tapElement } from '../../src/interact/tap.js';
@@ -99,7 +103,12 @@ describe('resolveNow — the one resolution policy, applied to one tree', () => 
       const real = fake.uiTree.bind(fake);
       fake.uiTree = async () => (reads++, real());
       const started = Date.now();
-      await expect(resolveSettled(fake, 'id:dup', { ...REFUSE, timeoutMs: 2_000, pollMs: 2 })).rejects.toThrow(/Selector matches 2 elements/);
+      const error = await resolveSettled(fake, 'id:dup', { ...REFUSE, timeoutMs: 2_000, pollMs: 2 }).catch((e: unknown) => e);
+      expect((error as Error).message).toMatch(/Selector matches 2 elements/);
+      // A refusal is a selector problem, never absence: an optional step
+      // that hits one must quote it, not read "(not present)".
+      expect(error).toBeInstanceOf(AmbiguityRefusal);
+      expect(error).not.toBeInstanceOf(ElementNotFoundError);
       expect(reads).toBe(1);
       expect(Date.now() - started).toBeLessThan(500);
     });
@@ -153,12 +162,74 @@ describe('resolveSettled — appear AND hold still', () => {
     expect(reads).toBe(4);
   });
 
-  it('times out with the shared wording, naming the target and that it needed to be visible AND settled', async () => {
+  // 2026-10-08: the two ways a settle wait ends are two sentences, and only
+  // the first is ElementNotFoundError. Until then both read "(visible and
+  // settled)", and the flow's `optional:` had to guess which one it got.
+  it('a target that NEVER resolves times out as ElementNotFoundError, worded "to appear" — nothing about settling', async () => {
     resetLayout();
     const fake = new FakeAdapter({ s: screen() }, 's');
-    await expect(resolveSettled(fake, { id: 'nope' }, { ...FIRST, timeoutMs: 20, pollMs: 2 })).rejects.toThrow(
-      'Timed out after 20ms waiting for element id:"nope" (visible and settled)',
+    const error = await resolveSettled(fake, { id: 'nope' }, { ...FIRST, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe('Timed out after 20ms waiting for element id:"nope" to appear');
+  });
+
+  it('a target that was FOUND but never held still is a plain Error worded "to hold still", never ElementNotFoundError', async () => {
+    // Every read moves it: found on every round, settled on none.
+    const { fake } = animated(Array.from({ length: 1_000 }, (_, i) => 100 + i));
+    const error = await resolveSettled(fake, { id: 'tab' }, { ...FIRST, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(
+      'Timed out after 20ms waiting for element id:"tab" to hold still (found, but never at the same position in two consecutive reads)',
     );
+  });
+
+  it('a target found ONCE and then gone is "found", not ElementNotFoundError: one sighting is a fact about the screen', async () => {
+    resetLayout();
+    const target = el({ role: 'button', identifier: 'tab' });
+    const withTarget = screen(target);
+    const without = screen();
+    let reads = 0;
+    class GoneFake extends FakeAdapter {
+      override async uiTree(): Promise<UiNode> {
+        return structuredClone(reads++ === 0 ? withTarget : without);
+      }
+    }
+    const error = await resolveSettled(new GoneFake({ withTarget }, 'withTarget'), { id: 'tab' }, { ...FIRST, timeoutMs: 20, pollMs: 2 }).catch(
+      (e: unknown) => e,
+    );
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toMatch(/to hold still \(found, /);
+  });
+
+  it('a wait that read good trees and then LOST the device is not ElementNotFoundError: the last read is the fresher fact', async () => {
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    const real = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (reads++ === 0) return real();
+      throw new Error('device offline');
+    };
+    const error = await resolveSettled(fake, 'id:nope', { ...FIRST, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect(reads).toBeGreaterThan(1);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message.split('\n')).toEqual([
+      'Timed out after 20ms waiting for element id:nope to appear',
+      '  (last UI tree read failed: device offline)',
+    ]);
+  });
+
+  it('a wait that read NO tree is not ElementNotFoundError: nobody saw the screen, so absence is not a finding', async () => {
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    fake.uiTree = async () => {
+      throw new Error('device offline');
+    };
+    const error = await resolveSettled(fake, 'id:nope', { ...FIRST, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message.split('\n')).toEqual([
+      'Timed out after 20ms waiting for element id:nope to appear',
+      '  (last UI tree read failed: device offline)',
+    ]);
   });
 
   it('quotes the last tree-read error beneath a timeout, so a dead device never reads as a slow screen', async () => {
@@ -173,6 +244,51 @@ describe('resolveSettled — appear AND hold still', () => {
 
   it('the default budget is the 5 s the tap: step documents, named once', () => {
     expect(DEFAULT_SETTLE_TIMEOUT_MS).toBe(5_000);
+  });
+});
+
+describe('absenceError — the one rule for when a wait that gave up is absence (2026-10-08)', () => {
+  const offline = new Error('device offline');
+  it.each([
+    ['never sighted, trees read, last read good', { sighted: false, treesRead: 3 }, true],
+    ['sighted', { sighted: true, treesRead: 3 }, false],
+    ['no tree read', { sighted: false, treesRead: 0, readError: offline }, false],
+    ['trees read, then the last read failed', { sighted: false, treesRead: 3, readError: offline }, false],
+  ])('%s', (_, seen, absent) => {
+    const error = absenceError('the message', seen);
+    expect(error.message).toBe('the message');
+    expect(error instanceof ElementNotFoundError).toBe(absent);
+  });
+});
+
+describe('resolvePresent — appear only, the optional tap\'s presence check (2026-10-08)', () => {
+  it('one sighting is enough: no second read to prove the rect still', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ s: screen(el({ role: 'button', identifier: 'promo' })) }, 's');
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++, real());
+    const { node: found } = await resolvePresent(fake, { id: 'promo' }, { ...FIRST, timeoutMs: 0, pollMs: 2 });
+    expect(found.identifier).toBe('promo');
+    expect(reads).toBe(1);
+  });
+
+  it('a zero-area ghost is not a sighting: the same policy as the tap that would follow', async () => {
+    resetLayout();
+    const ghost = node({ identifier: 'promo', rect: { x: 0, y: 0, width: 0, height: 0 } });
+    const fake = new FakeAdapter({ s: screen(ghost) }, 's');
+    await expect(resolvePresent(fake, { id: 'promo' }, { ...FIRST, timeoutMs: 0, pollMs: 2 })).rejects.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('an absent target is ElementNotFoundError in the never-found wording, after one read even on a zero budget', async () => {
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++, real());
+    const error = await resolvePresent(fake, { id: 'promo' }, { ...FIRST, timeoutMs: 0, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe('Timed out after 0ms waiting for element id:"promo" to appear');
+    expect(reads).toBe(1);
   });
 });
 
@@ -202,7 +318,7 @@ describe('tapElement', () => {
   it('a target that never appears fails with the settle wording — the same error a flow tap: throws', async () => {
     const fake = new FakeAdapter({ s: screen() }, 's');
     await expect(tapElement(fake, 'id:nope', { ...REFUSE, timeoutMs: 10, pollMs: 2 })).rejects.toThrow(
-      /Timed out after 10ms waiting for element id:nope \(visible and settled\)/,
+      /Timed out after 10ms waiting for element id:nope to appear/,
     );
     expect(fake.taps).toEqual([]);
   });

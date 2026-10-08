@@ -81,11 +81,12 @@ export interface TapSpec extends ElementSpec {
    * elements that render slowly enough that a `wait:` step used to have to
    * babysit the tap. Inside `optional:` it overrides the PRESENCE-CHECK
    * window (default 1.5s) instead: how long a maybe-interstitial gets to
-   * appear before the step is skipped as not-present. Note the cost: an
-   * optional tap burns this full window whenever the element never shows —
-   * when the alternative screen is detectable, a state with `any:` over both
-   * outcomes plus `branch:` exits immediately either way and stays the better
-   * idiom.
+   * appear before the step is skipped "(not present)" — interact's
+   * ElementNotFoundError, the one failure an optional step logs that way. Note
+   * the cost: an optional tap burns this full window whenever the element
+   * never shows — when the alternative screen is detectable, a state with
+   * `any:` over both outcomes plus `branch:` exits immediately either way
+   * and stays the better idiom.
    */
   timeout?: string | number;
 }

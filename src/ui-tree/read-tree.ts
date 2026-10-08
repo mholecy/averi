@@ -138,8 +138,36 @@ export type PollOutcome<T> =
  */
 export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hint?: string): string =>
   `Timed out after ${timeoutMs}ms waiting for ${what}` +
-  (readError === undefined ? '' : `\n  (last UI tree read failed: ${readError.message.replace(/\n/g, '\n   ')})`) +
+  (readError === undefined ? '' : `\n${READ_ERROR_OPEN}${readError.message.replace(/\n/g, `\n${READ_ERROR_CONTINUATION}`)})`) +
   (hint === undefined || readError !== undefined ? '' : `\n  (${hint})`);
+
+/** The read-error parenthesis's opening, and the indent of a multi-line read error's later lines inside it. */
+const READ_ERROR_OPEN = '  (last UI tree read failed: ';
+const READ_ERROR_CONTINUATION = '   ';
+
+/**
+ * The read-error parenthesis of a pollTimeoutMessage, as ONE line — or
+ * `undefined` when the message carries none (2026-10-08). For a caller that
+ * must keep a timeout on one line yet must not lose the read error: the flow
+ * engine's `optional:` skip, where "Timed out … to appear" alone reads
+ * exactly like a slow screen when the device was in fact unreadable. The
+ * parenthesis is looked for only directly beneath the headline, where
+ * pollTimeoutMessage puts it — a message that merely quotes such a line
+ * further down (a FlowError's trace) is not a poll timeout's own. A
+ * multi-line read error (the idb empty tree's paragraph of advice,
+ * re-indented by pollTimeoutMessage) gives its FIRST line only, the
+ * parenthesis closed after it: the cause, never the advice — the rule
+ * every trace line that quotes a read error follows (the engine's
+ * `readFailed`; pinned for the whole trace in
+ * tests/flow/unread-tree-ladder.test.ts). Here, beside the wording, so the
+ * shape has one owner.
+ */
+export function readErrorLine(message: string): string | undefined {
+  const [, first, next] = message.split('\n');
+  if (first === undefined || !first.startsWith(READ_ERROR_OPEN)) return undefined;
+  const continued = next !== undefined && next.startsWith(READ_ERROR_CONTINUATION);
+  return continued ? `${first.trim()})` : first.trim();
+}
 
 /**
  * Poll the UI tree until the predicate returns a value, or the deadline

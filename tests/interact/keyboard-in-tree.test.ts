@@ -191,10 +191,10 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       expect(error).toBeInstanceOf(AfterDismissalTap);
       expect(error.message).toBe(
         'After tapping id:"login_title" at (201,303) to hide the soft keyboard that covered id:login_submit at (107,571): Timed out after 200ms ' +
-          'waiting for element id:login_submit (visible and settled). That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot)',
+          'waiting for element id:login_submit to appear. That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot)',
       );
       expect(error.traceLine).toBe('the soft keyboard covered id:login_submit; tapped id:"login_title" to hide it, and the look after it failed');
-      expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit (visible and settled)');
+      expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit to appear');
       expect(fake.taps).toEqual(['login_title']);
     });
 
@@ -505,14 +505,18 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
     expect(error.message).toBe(
       'After the soft keyboard covered id:login_submit at (107,571) on a first look, the second look failed: Timed out after 200ms ' +
-        'waiting for element id:login_submit (visible and settled). Nothing was pressed; the screen is as the step found it',
+        'waiting for element id:login_submit to appear. Nothing was pressed; the screen is as the step found it',
     );
     expect(error.traceLine).toBe('the soft keyboard covered id:login_submit; nothing sent, and the second look failed');
-    expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit (visible and settled)');
+    expect((error.cause as Error).message).toBe('Timed out after 200ms waiting for element id:login_submit to appear');
     expect(fake.taps).toEqual([]);
     expect(fake.keys).toEqual([]);
   });
 
+  // The read that installs the dead tree still returned a tree holding the
+  // target, so the second look DID find it once: since 2026-10-08 that is
+  // the "found, but never held still" sentence, not the never-found one, with
+  // the read error beneath saying why no second agreeing read came.
   it('a second look that reads a dead tree keeps the read error beneath the headline', async () => {
     const fake = iosFake();
     onRead(fake, 3, () => {
@@ -523,7 +527,8 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message.split('\n')).toEqual([
       'After the soft keyboard covered id:login_submit at (107,571) on a first look, the second look failed: Timed out after 200ms ' +
-        'waiting for element id:login_submit (visible and settled). Nothing was pressed; the screen is as the step found it',
+        'waiting for element id:login_submit to hold still (found, but never at the same position in two consecutive reads). ' +
+        'Nothing was pressed; the screen is as the step found it',
       '  (last UI tree read failed: device offline)',
     ]);
   });

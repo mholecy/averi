@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
@@ -73,13 +74,47 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
     ).rejects.toThrow(/scroll_until id:"submit_button" failed after 1ms \(timeout\)/);
   });
 
-  it('reports the read failure instead of "element never appeared"', async () => {
+  it('reports the read failure instead of "element never appeared" — and that is not ElementNotFoundError', async () => {
     const fake = scrollingFake(500);
     fake.uiTree = async () => {
       throw new Error('uiautomator dump returned no XML');
     };
-    await expect(scrollUntilVisible(fake, 'id:below_fold', { maxSwipes: 2, timeoutMs: 100, settleMs: 1 })).rejects.toThrow(
-      /last UI tree read failed: uiautomator dump returned no XML/,
-    );
+    const error = await scrollUntilVisible(fake, 'id:below_fold', { maxSwipes: 2, timeoutMs: 100, settleMs: 1 }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/last UI tree read failed: uiautomator dump returned no XML/);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+  });
+});
+
+/**
+ * 2026-10-08: the one stop that is absence is interact's ElementNotFoundError, so
+ * an `optional:` scroll_until to an element not on this screen reads "(not
+ * present)"; every stop where the element was seen stays a plain Error.
+ */
+describe('scrollUntilVisible — which stops are ElementNotFoundError', () => {
+  it('no read at any swipe held a match: ElementNotFoundError, worded "element never appeared in the tree"', async () => {
+    const error = await scrollUntilVisible(scrollingFake(500), 'id:nope', FAST).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe('scroll_until id:nope failed after 4 swipes (maxSwipes) — element never appeared in the tree');
+  });
+
+  it('in the tree but never in the viewport: a plain Error — it was there', async () => {
+    const error = await scrollUntilVisible(scrollingFake(50_000, 10), 'id:submit_button', FAST).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/element in tree but never intersected/);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('matched on an early read and gone by the last: a plain Error, never ElementNotFoundError', async () => {
+    resetLayout();
+    const offscreen = screen(node({ role: 'button', identifier: 'row', rect: { x: 0, y: 50_000, width: 100, height: 40 } }));
+    const empty = screen();
+    let reads = 0;
+    class LeavingFake extends FakeAdapter {
+      override async uiTree() {
+        return structuredClone(reads++ === 0 ? offscreen : empty);
+      }
+    }
+    const error = await scrollUntilVisible(new LeavingFake({ offscreen }, 'offscreen'), 'id:row', FAST).catch((e: unknown) => e);
+    expect(reads).toBeGreaterThan(1);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
   });
 });
