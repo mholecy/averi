@@ -1,5 +1,4 @@
-import { everyNode, rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { SCREEN_SIZED_FRACTION } from './bare-tree.js';
+import { everyNode, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { isInteractive } from './selectors.js';
 
 /**

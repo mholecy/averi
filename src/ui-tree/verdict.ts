@@ -6,7 +6,8 @@ import { absentFromViewport } from './geometry.js';
  * What one tree says about one element question, in three values
  * (2026-10-08, flow-engine review candidate 2): `yes`, `no`, or `unknown` —
  * the tree is BARE (bare-tree.ts: only wrappers and unlabeled decoration, a
- * cold launch's Android decor for ~9 s, WDA's 7-node splash) and the answer
+ * cold launch's Android decor for ~9 s, WDA's 7-node splash, iOS 27's
+ * SpringBoard status bar and launch icon for ~2 s) and the answer
  * it would give is the one a bare tree gives for ANY selector, so it says
  * nothing about the screen.
  *

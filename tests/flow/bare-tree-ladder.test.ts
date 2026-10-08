@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 // Date.now-based and still fire.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseConfig } from '../../src/flow/config.js';
@@ -547,5 +548,74 @@ flows:
     const later = timeline((ms) => (ms < 20 ? ANDROID_DECOR : ANDROID_LOGIN));
     expect(await new Verifier(later.fake, { pollMs: 5, timeoutMs: 1000 }).assert({ element: { id: 'some_modal' }, absent: true })).toMatchObject({ pass: true });
     expect(later.state.reads).toBeGreaterThan(1);
+  });
+});
+
+/**
+ * SpringBoard's launch tree on iOS 27 through idb (docs/bugs/2026-10-08-ios-
+ * launch-transition-tree-reads-as-rendered.md, measured on an iPhone 17
+ * simulator): the status bar and the app's zooming icon for ~1.2 s, the
+ * status bar alone to ~2.1 s, then the app. Before 2026-10-08 the ENTRY probe
+ * read the first as "no" and `ensure_state` ran the DESTRUCTIVE rung at once,
+ * an `absent:` passed, and the absent assert PASSED.
+ */
+describe('iOS 27 idb: SpringBoard\'s launch tree is bare — no wipe, no absence passed', () => {
+  const ax = (type: string, label: string | null, frame: { x: number; y: number; width: number; height: number }, id: string | null = null, value: string | null = null) => ({
+    type, AXLabel: label, AXUniqueId: id, AXValue: value, frame,
+  });
+  const STATUS_BAR = [
+    ax('StaticText', '18:29', { x: 50, y: 22, width: 48, height: 22 }),
+    ax('StatusItem', 'Cellular', { x: 285, y: 25, width: 20, height: 14 }, null, 'No signal'), // raw type unrecorded; it normalized to `other`
+    ax('StatusItem', null, { x: 314, y: 26, width: 18, height: 13 }, '3 of 3 Wi-Fi bars', 'SSID, 3 of 3 Wi-Fi bars'),
+    ax('StatusItem', '100 % battery power', { x: 341, y: 25, width: 29, height: 14 }, null, 'Not charging'),
+  ];
+  const idb = (...els: Record<string, unknown>[]) => parseIdbDescribeAll(JSON.stringify(els));
+  const ICON_ZOOM = idb(ax('Application', ' ', FULL), ...STATUS_BAR, ax('Button', 'Skeleton Internal', { x: -2, y: 234, width: 406, height: 406 }, 'Skeleton Internal'));
+  const STATUS_ONLY = idb(ax('Application', ' ', FULL), ...STATUS_BAR);
+  const IDB_LOGIN = idb(
+    ax('Application', 'Skeleton Internal', FULL),
+    ax('Other', null, { x: 0, y: 0, width: 402, height: 874 }, 'login_screen'),
+    ax('StaticText', 'Enter your PIN to log in', { x: 40, y: 180, width: 322, height: 24 }),
+    ax('Button', '1', { x: 40, y: 500, width: 100, height: 64 }, 'pin_key_1'),
+  );
+  const LAUNCH = (ms: number) => (ms < 60 ? ICON_ZOOM : ms < 150 ? STATUS_ONLY : IDB_LOGIN);
+  const idbTimeline = (at: (ms: number) => UiNode) => {
+    const t = timeline(at, 'ios');
+    t.fake.treeSourceKind = 'idb';
+    return t;
+  };
+
+  it('ensure_state right after launch_app: the entry probe reads bare, the second look finds the state — "already active", nothing wiped', async () => {
+    const { fake } = idbTimeline(LAUNCH);
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out' });
+    expect(fake.launches).toEqual([]);
+    expect(trace).toContainEqual({ action: 'state logged_out', detail: 'already active' });
+    expect(trace[0]).toEqual({
+      action: '⚠ detect',
+      detail:
+        'element id:"login_screen" treated as not detected — every UI tree read was bare, ' +
+        'the last one 7 nodes (roles: other ×4, button ×1, container ×1, text ×1) of only wrappers and unlabeled decoration',
+    });
+  });
+
+  it('SpringBoard for the whole second look: ⛔, nothing launches', async () => {
+    const { fake } = idbTimeline(() => STATUS_ONLY);
+    const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
+    expect(fake.launches).toEqual([]);
+    expect(actions(error.trace)).toEqual(['⚠ detect', '⚠ detect', '⛔ reach fresh_launch']);
+  });
+
+  it('assert absent on the launch tree does not pass: could not verify; once the PIN screen renders, "still visible"', async () => {
+    const early = idbTimeline(() => ICON_ZOOM);
+    expect(await new Verifier(early.fake, { pollMs: 5, timeoutMs: 60 }).assert({ element: { text: 'Enter your PIN to log in' }, absent: true })).toMatchObject({
+      pass: false,
+      detail: expect.stringMatching(/^could not verify within 0\.06 s \(the last UI tree read was bare, 7 nodes/),
+    });
+    // The PIN screen renders: the prompt is visible, so the absence fails as "still visible", not passed early.
+    const later = idbTimeline(LAUNCH);
+    expect(await new Verifier(later.fake, { pollMs: 5, timeoutMs: 400 }).assert({ element: { text: 'Enter your PIN to log in' }, absent: true })).toMatchObject({
+      pass: false,
+      detail: 'still visible after 0.4 s',
+    });
   });
 });

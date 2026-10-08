@@ -159,6 +159,17 @@ export const KEYBOARD_ROLE = 'keyboard';
  * constant moved to the one place both may read.
  */
 export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'other']);
+/**
+ * A node whose area reaches this fraction of the screen is screen-sized — a
+ * window or application, whatever label the framework gave it. 0.9 leaves
+ * room for a status-bar inset or a rounding difference between the wrapper and
+ * the screen, while a content row (a Cell, a Pressable) sits far below it.
+ * `ui-tree/bare-tree.ts` reads it for a wrapper by size and, since 2026-10-08,
+ * `ui-tree/geometry.ts#shadowing` for a screen-sized host — moved here from
+ * bare-tree.ts the same day, for STRUCTURAL_ROLES' reason above: neither
+ * ui-tree module imports the other for a constant.
+ */
+export const SCREEN_SIZED_FRACTION = 0.9;
 
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
