@@ -527,11 +527,16 @@ export function sameRect(a: Rect, b: Rect): boolean {
 }
 
 /**
- * The one way a sentence quotes a rect: `x,y wxh`, in tree points. Owned here
+ * How a sentence quotes a NODE's rect: `x,y wxh`, in tree units. Owned here
  * (2026-10-06) because two failure sentences in verify/ spelled it inline —
  * the text table's off-screen region and the pixel poll's position change.
  * The pixel poll's soft-keyboard miss quotes both of its rects through it too
- * (later that day); there they are device pixels, Android's tree units.
+ * (later that day); there they are device pixels, Android's tree units. Not
+ * the only rect spelling (corrected 2026-10-08): the keyboard guard's
+ * refusals in interact/ quote the keyboard's FRAME as dumpsys prints it,
+ * `[x,y][x2,y2]`, through `interact/keyboard-model.ts#frameText` — so a
+ * verify/ sentence reads like the tree and a guard sentence like the
+ * window state it is checked against.
  */
 export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;

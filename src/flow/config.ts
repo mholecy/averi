@@ -27,7 +27,7 @@ import { conditionStateRefs, type Condition } from './condition.js';
 // since 2026-10-08; re-exported here with the rest of the schema's types.
 export type { Condition } from './condition.js';
 
-export interface FillSpec extends ElementSpec {
+interface FillSpec extends ElementSpec {
   value: string;
   /** Delete the field's current content before typing (opt-in: pre-filled login fields must survive). */
   clear?: boolean;
@@ -50,7 +50,7 @@ export interface FillSpec extends ElementSpec {
  * a label must never tap the button), and a spec that names an interactive
  * `role:` outright is refused at parse time, where the author reads it.
  */
-export type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
+type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
 
 /**
  * `app.ios.keyboardDismiss` set where it cannot act (review round 1): the

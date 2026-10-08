@@ -289,6 +289,28 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
     expect(bands(tree).map((n) => n.rect)).toEqual([{ x: 0, y: 539, width: 402, height: 335 }]);
   });
 
+  // usableRect reads rectArea (adapters/types.ts) since 2026-10-08: a rect
+  // that is present but has no area — zero, negative or NaN on either side —
+  // is skipped like a missing one. Without the area test each of these
+  // band-shaped wrappers (y below the window's top, height under the bound)
+  // would be crowned the band, and the band would cover nothing.
+  it.each([
+    ['0×0', { x: 0, y: 520, width: 0, height: 0 }],
+    ['zero height', { x: 0, y: 520, width: 402, height: 0 }],
+    ['zero width', { x: 0, y: 520, width: 0, height: 300 }],
+    ['negative height', { x: 0, y: 520, width: 402, height: -300 }],
+    ['negative width', { x: 0, y: 520, width: -402, height: 300 }],
+    ['NaN width', { x: 0, y: 520, width: Number.NaN, height: 300 }],
+    ['NaN height', { x: 0, y: 520, width: 402, height: Number.NaN }],
+  ])('an ancestor with a degenerate rect (%s) is skipped, never crowned', (_name, rect) => {
+    const tree = root(
+      el('Window', {
+        children: [el('Other', { rect, children: [el('Other', { rect: { x: 0, y: 539, width: 402, height: 335 }, children: [el('Keyboard', { rect: { x: 0, y: 583, width: 402, height: 233 } })] })] })],
+      }),
+    );
+    expect(bands(tree).map((n) => n.rect)).toEqual([{ x: 0, y: 539, width: 402, height: 335 }]);
+  });
+
   it('with no Window ancestor the root stands in for it; a Keyboard that IS the root is its own band', () => {
     const noWindow = parseWdaSourceValue(el('Application', { children: [el('Other', { rect: { x: 0, y: 539, width: 402, height: 335 }, children: [el('Keyboard', { rect: { x: 0, y: 583, width: 402, height: 233 } })] })] }));
     expect(bands(noWindow).map((n) => n.rect)).toEqual([{ x: 0, y: 539, width: 402, height: 335 }]);

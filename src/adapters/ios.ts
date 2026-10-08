@@ -256,8 +256,10 @@ export class IosAdapter implements DeviceAdapter {
   // Windows that are its own UI) and read by ui-tree/soft-keyboard.ts off
   // the tree that resolved the target; the in-tree keyboard model (interact/
   // keyboard-in-tree.ts, what an adapter without the oracle gets) queries no
-  // device here and presses no key — a covered target is refused, with the
-  // sentence below. The idb source carries no keyboard, so under it the
+  // device here and presses no key of its own — a covered target is refused,
+  // with the sentence below, unless `app.ios.keyboardDismiss` names a
+  // dismissal on screen, which the guard taps first (stage B, 2026-10-07;
+  // the advice's doc). The idb source carries no keyboard, so under it the
   // guard is as it was. Until 2026-10-04 this class answered `unknown` from
   // two stub methods without running anything.
 

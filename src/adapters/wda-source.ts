@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, rectsOverlap, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type Rect, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -238,7 +238,7 @@ export const MAX_BAND_FRACTION = 0.6;
  * than one band-bearing ancestor were not measured (the first on-screen
  * Keyboard's band is the one `keyboardInTree` reads).
  *
- * `rectsOverlap` comes from adapters/types.ts, not ui-tree/geometry.ts:
+ * `rectsOverlap` and `rectArea` come from adapters/types.ts, not ui-tree/geometry.ts:
  * adapters/ sits below ui-tree/ (ARCHITECTURE.md §2). The band-shape tests
  * (`usableRect`, `isBand`, below) are this file's own — nothing above
  * asks them.
@@ -318,9 +318,17 @@ const onScreen = (el: WdaElement, screen: Rect | undefined): boolean => {
   return screen === undefined || rectsOverlap(rect, screen);
 };
 
-/** The rect when it has positive area, else undefined — a missing or degenerate rect decides nothing here. */
+/**
+ * The rect when it has positive area, else undefined — a missing or
+ * degenerate rect decides nothing here. "Positive area" is `rectArea`'s
+ * (adapters/types.ts) since 2026-10-08, not a third spelling of it: the
+ * same both-sides-positive test, which NaN fails too. It differs only where
+ * the product is not a positive finite number — an infinite side (WDA's
+ * JSON never writes one), a product past Number.MAX_VALUE or one under the
+ * smallest double (sides near 1e±154): WDA's points are none of these.
+ */
 const usableRect = (rect: Rect | undefined): Rect | undefined =>
-  rect !== undefined && rect.width > 0 && rect.height > 0 ? rect : undefined;
+  rect !== undefined && rectArea(rect) > 0 ? rect : undefined;
 
 /** A band of its window: starts below the window's top edge and is under MAX_BAND_FRACTION of its height. */
 const isBand = (rect: Rect, screen: Rect): boolean =>

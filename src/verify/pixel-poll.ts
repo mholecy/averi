@@ -162,7 +162,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * were measured, on `Verifier.poll` (verify/assert.ts).
  */
 
-export interface PixelPollSpec {
+interface PixelPollSpec {
   element: ElementSpec;
   timeoutMs: number;
   /**

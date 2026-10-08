@@ -49,10 +49,12 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * poll that follows adds its own two tree reads on top (a uiautomator dump
  * is about a second each), so this is the floor, not the whole wait: it
  * keeps the FIRST of those reads from seeing the pre-resize layout twice
- * and calling it settled. On iOS, unmeasured — the in-tree model's looks
- * take the same pause for the same reason (a hide animation caught mid-way
- * must not be a refusal), and its KEYBOARD_HIDE_CONFIRM_LOOKS says how many
- * of them it takes.
+ * and calling it settled. On iOS the hide animation's length is still
+ * unmeasured (as of 2026-10-08) — the in-tree model's looks take the same
+ * pause for the same reason (a hide animation caught mid-way must not be a
+ * refusal), and its KEYBOARD_HIDE_CONFIRM_LOOKS says how many of them it
+ * takes; what was observed there is that pause plus the first read of a
+ * settled look, not the animation (that constant's doc).
  */
 export const KEYBOARD_HIDE_DELAY_MS = 300;
 
@@ -147,7 +149,14 @@ export const keyboardOver = (keyboard: SoftKeyboard, point: Point): CoverReading
       ? { over: 'covering', frame: keyboard.frame }
       : { over: 'clear' };
 
-/** `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling in every message that quotes one, on either model. */
+/**
+ * `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling of the
+ * KEYBOARD's frame (the oracle's, or the in-tree band) in the guard's and the
+ * dismissal's messages, on either model. verify/ quotes the same frame as
+ * `x,y wxh` beside the element's (the pixel poll's soft-keyboard miss,
+ * `ui-tree/geometry.ts#rectText`): the layer picks the spelling, not the
+ * subject (2026-10-08: the two docs each claimed to be the one way).
+ */
 export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
 
 /** The guard's answer: the node, with the keyboard sentence folded into the resolution note and kept alone beside it. */

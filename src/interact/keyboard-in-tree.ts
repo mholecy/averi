@@ -54,9 +54,17 @@ import { describeTarget, findTarget, type Ambiguity } from './resolve.js';
  * apart (each look is a settled resolution, two agreeing reads), and
  * `dismissKeyboard` re-reads the tree the same number of times; only the
  * LAST still-covering look refuses. Two, not more: a keyboard still up a
- * second or so after a tap meant to hide it is not animating. Unmeasured on
- * iOS — the animation's length is not in the bug note; the figure is the
- * stage A second look's shape, applied once more.
+ * second or so after a tap meant to hide it is not animating. The iOS
+ * animation's length is still unmeasured (as of 2026-10-08) — the figure is
+ * the stage A second look's shape, applied once more — but the stage B
+ * device check (2026-10-07, iPhone 17 simulator, WDA source;
+ * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, "Device check of
+ * the fix (stage B)", B2 and B4b), after both a title tap and the
+ * accessory's Done, three runs of three, observed the band GONE at the
+ * first read of the FIRST confirm look (the settled pair, 162/162 in B2) —
+ * within the 300 ms pause plus one ~0.55 s read; the second slot was never
+ * used, so the figure has headroom there, not a measured margin. The
+ * dismissal's one-read looks (`dismiss`) were not reached on the device.
  */
 export const KEYBOARD_HIDE_CONFIRM_LOOKS = 2;
 
