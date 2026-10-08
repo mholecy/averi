@@ -145,15 +145,19 @@ git check-ignore .env.averi   # must print the path — if not, fix .gitignore f
 Copy the skill so future sessions know the golden path (build → install → `ensure_state` →
 navigate → assert → `verify`) without re-deriving it:
 
+The skill is a directory: `SKILL.md` plus `references/`, which it links to. Copy the whole directory
+from the published package, the same version the MCP server runs (`averi@<version>` when pinned):
+
 ```bash
 mkdir -p .claude/skills/averi
-curl -fsSL https://raw.githubusercontent.com/mholecy/averi/main/skill/SKILL.md \
-  -o .claude/skills/averi/SKILL.md
+curl -fsSL "$(npm view averi dist.tarball)" \
+  | tar -xz -C .claude/skills/averi --strip-components=2 package/skill
 ```
 
-(For agents other than Claude Code, put it wherever that agent loads skills/instructions from.)
+(For agents other than Claude Code, put the directory wherever that agent loads skills/instructions from.)
 
-**Check:** the file exists and its YAML frontmatter has `name: averi`.
+**Check:** `.claude/skills/averi/SKILL.md` exists and its YAML frontmatter has `name: averi`, and
+`.claude/skills/averi/references/` holds `averi-yaml.md` and `troubleshooting.md`.
 
 ---
 
@@ -300,7 +304,7 @@ Then report to the user:
 
 - [ ] MCP server registered (personal or team `.mcp.json`, version pinned for teams)
 - [ ] `.env.averi` created and confirmed gitignored; which variable names it defines
-- [ ] Skill installed at `.claude/skills/averi/SKILL.md`
+- [ ] Skill installed at `.claude/skills/averi/` (`SKILL.md` + `references/`)
 - [ ] `averi.yaml` committed-ready: which states and flows it defines
 - [ ] Cold + warm `ensure_state` both passed (include the timings)
 - [ ] If `treeSource: wda` is enabled: `ui_snapshot` on iOS returned a tree (proves WDA built and started)
@@ -325,13 +329,14 @@ one happens by itself.
    - *Team `.mcp.json`:* bump the pinned version and commit; teammates get it on their next
      session start.
 
-3. **Re-sync the skill copy — it does not update itself.** The file at
-   `.claude/skills/averi/SKILL.md` was copied once at setup. Replace it with the copy shipped
-   inside the exact version now in use:
+3. **Re-sync the skill copy — it does not update itself.** The directory
+   `.claude/skills/averi/` was copied once at setup. Replace it with the copy shipped inside
+   the exact version now in use (removing it first drops files a newer version no longer has):
 
    ```bash
+   rm -rf .claude/skills/averi && mkdir -p .claude/skills/averi
    curl -fsSL "$(npm view averi@<version> dist.tarball)" \
-     | tar -xzO package/skill/SKILL.md > .claude/skills/averi/SKILL.md
+     | tar -xz -C .claude/skills/averi --strip-components=2 package/skill
    ```
 
    Commit it alongside the `.mcp.json` bump so the skill and server never drift apart.

@@ -123,7 +123,7 @@ On a Linux/Windows box you get the full Android toolset — pass `platforms: ["a
 | Doc | For | What's in it |
 |---|---|---|
 | [SETUP.md](SETUP.md) | your agent (and you) | Step-by-step setup with verification checks |
-| [skill/SKILL.md](skill/SKILL.md) | the agent, every session | Golden path, rules, recipes, yaml reference |
+| [skill/SKILL.md](skill/SKILL.md) | the agent, every session | Golden path, short rules, the `averi.yaml` reach ladder; [references/](skill/references/) hold the full yaml reference and a troubleshooting guide by symptom |
 | [docs/verification.md](docs/verification.md) | reference | Assert semantics, forms, layout/color/text contracts |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | contributors | Design, adapters, tool surface, roadmap |
 
