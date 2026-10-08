@@ -187,7 +187,10 @@ describe('AndroidAdapter — every user value reaches the device command as one 
   // literal quotes into the device command's argument. No caller sends a
   // non-plain word today; this pins the invariant for the first one that does.
   it('execOut: a non-plain word arrives once-quoted — adb escapes it, the adapter does not', async () => {
-    const { fn, commands } = deviceShExec();
+    // screencap answers with a PNG signature: screenshot() refuses anything else (screenshot-bytes.ts).
+    const { fn, commands } = deviceShExec((argv) =>
+      argv[1] === 'screencap' ? { stdout: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) } : {},
+    );
     const adapter = new AndroidAdapter({ serial: 'e', exec: fn });
     await adapter['execOut'](['uiautomator', 'dump', "/sdcard/a b&c;'d'.xml"]);
     await adapter.screenshot();

@@ -4,7 +4,7 @@ import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
+import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
 
@@ -32,6 +32,20 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  *   moving frame, decides (2026-10-05); one capture (`unjudged`) is no verdict
  *   and says nothing; an undecodable png is a miss that fails closed, and the
  *   poll keeps going because the capture may have raced a transition.
+ *   A capture the ADAPTER refuses is not a miss either (2026-10-08): since
+ *   the adapters refuse an empty or non-PNG capture as a transport error
+ *   (adapters/screenshot-bytes.ts), `captureFrame` throws for a dead device,
+ *   and that ends THIS assert at once — no polling to the deadline: a device
+ *   that cannot capture will not answer the next round either, and the
+ *   timeout would only bury the transport's own words — as a fail-closed
+ *   failure quoting the adapter's first line (`screenshot failed: …`).
+ *   The assert RESOLVES, it does not reject: `assertAll` goes on to the next
+ *   assert (a tree assert on the same dead device fails on its own, "not
+ *   found … (last UI tree read failed: …)"), so a `verify` leg keeps its
+ *   trace and results and a flow's `assert:` step fails with this reason.
+ *   (Until a review the same day the throw went through the tree poll and
+ *   rejected the whole batch.) Only a png that came back and does not
+ *   decode is a miss, and the poll goes on.
  * - the memory and the wording at the deadline (`PixelPollMemory`, private).
  *
  * Since 2026-10-06 the round hands the capture the first match's rect as its
@@ -383,6 +397,19 @@ async function keyboardOver(
   return { frame: keyboard.frame, remedy };
 }
 
+/** A capture the adapter refused, carried out of the tree poll (header, "A capture the ADAPTER refuses"). */
+class CaptureRefused {
+  constructor(readonly reason: string) {}
+}
+
+/**
+ * The fail-closed sentence of a refused capture — the pixel asserts' and the baseline diff's. The adapter's
+ * sentence ends with a full stop and failClosed appends `; failing closed, …`, so the stop is dropped here
+ * rather than printing `attention.; failing closed` (seen on device, 2026-10-08).
+ */
+export const screenshotFailed = (reason: string, unchecked: Unchecked): string =>
+  failClosed(`screenshot failed: ${reason.replace(/\.$/, '')}`, unchecked);
+
 /**
  * Poll until `measure` passes on a settled, decoded frame of the element, or
  * the deadline passes. `{ pass: true }` carries the passing verdict's
@@ -410,7 +437,10 @@ export async function pollPixels(
     const keyboard = await keyboardOver(adapter, tree, found[0]);
     if (keyboard !== undefined) return memory.covered(rect, keyboard.frame, keyboard.remedy);
     memory.uncovered();
-    const frame = await captureFrame(adapter, { tree, deadline, region: rect });
+    // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
+    const frame = await captureFrame(adapter, { tree, deadline, region: rect }).catch((e: unknown) => {
+      throw new CaptureRefused(captureRefusal(e));
+    });
     if (frame.stability !== 'settled') return memory.unsettled(frame);
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).
     if (frame.settledOver === 'region' && (previous === undefined || !sameRect(previous, rect))) return memory.unconfirmed(previous, rect);
@@ -438,7 +468,12 @@ export async function pollPixels(
       }
     },
     { timeoutMs, pollMs },
-  );
+  ).catch((e: unknown) => {
+    // pollTree propagates the predicate's own errors; only the refusal is ours to word.
+    if (e instanceof CaptureRefused) return e;
+    throw e;
+  });
+  if (outcome instanceof CaptureRefused) return { pass: false, detail: screenshotFailed(outcome.reason, unchecked) };
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
   return { pass: false, detail: memory.timeoutDetail(timeoutMs, outcome) };
 }

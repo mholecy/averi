@@ -7,7 +7,7 @@ import { refuseUnknownEnvironment } from './preflight.js';
 import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { errorMessage } from '../util/error-message.js';
-import { captureFrame, unsettledNote, type Frame, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
+import { captureFrame, captureRefusal, unsettledNote, type Frame, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -92,18 +92,46 @@ export interface VerificationOutput {
   screenshots: Buffer[];
 }
 
-/** What one platform's leg produced. */
-interface VerificationLeg {
+/**
+ * The final capture of a run that has already done its work — a `verify`
+ * leg, `ensure_state` — or the one line saying why there is none
+ * (2026-10-08). Since the adapters refuse a capture that is not a PNG as a
+ * transport error (adapters/screenshot-bytes.ts), `captureFrame` can throw
+ * for a device that died AFTER the run, and a throw here would discard the
+ * trace, the assert results, the health line and the ⚠ lines of a run that
+ * took minutes — the same loss the leg's comment below forbids for a tree or
+ * screen read. So it is caught here, for this one capture, and the run
+ * returns no image and says so. Only `captureFrame` is inside: its own doc
+ * says nothing past the screenshot itself throws.
+ */
+export type FinalFrame = { frame: Frame; failed?: undefined } | { frame?: undefined; failed: string };
+
+export async function finalFrame(
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  opts: { readTree?: boolean } = {},
+): Promise<FinalFrame> {
+  try {
+    return { frame: await captureFrame(adapter, { readTree: opts.readTree === true }) };
+  } catch (e) {
+    return { failed: captureRefusal(e) };
+  }
+}
+
+/** The line a run prints when its final capture failed — where the `⚠ frame:` note of an unsettled one goes. */
+export const screenshotFailedLine = (failed: string): string => `⚠ screenshot: ${failed} — no image is returned`;
+
+/**
+ * What one platform's leg produced. `frame` is the settled frame the leg
+ * ended on — the png returned to the caller and, with a contract, the tree
+ * and the one scale the parity tables measure against; absent parts carry
+ * their reason (verify/capture.ts). Absent altogether, with `failed`, when
+ * the capture itself threw (`finalFrame`).
+ */
+type VerificationLeg = {
   trace: TraceEntry[];
   results: AssertResult[];
-  /**
-   * The settled frame the leg ended on — the png returned to the caller and,
-   * with a contract, the tree and the one scale the parity tables measure
-   * against. Absent parts carry their reason (verify/capture.ts).
-   */
-  frame: Frame;
   health: string;
-}
+} & FinalFrame;
 
 /**
  * appAlive check (ARCHITECTURE.md §8): is the app-under-test still running?
@@ -211,6 +239,7 @@ const noTreeNote = (p: Platform, reason: string): string =>
  * types cannot rule out.
  */
 const withTree = (leg: VerificationLeg, p: Platform): Contribution<TreeFrame> => {
+  if (leg.frame === undefined) return { note: `(${p}: no screenshot — ${leg.failed} — compared without it)` };
   const m = leg.frame.measured;
   // The frame is spread, not re-spelled, so what it says about itself
   // (`stability`, `captures`, whatever comes next) reaches every table.
@@ -495,9 +524,11 @@ export async function runVerification(
     // would discard the trace, assert results and screenshot of a minutes-long
     // device run over an optional extra read — so both land on the frame as
     // reasons the tables quote.
-    const frame = await captureFrame(adapter, { readTree: contract !== undefined });
+    // The capture itself throwing (a dead device's refused screenshot) is
+    // caught the same way, by finalFrame: no image, one ⚠ line, the rest kept.
+    const final = await finalFrame(adapter, { readTree: contract !== undefined });
     const health = await appHealth(adapter, cfg);
-    return { trace, results, frame, health };
+    return { trace, results, health, ...final };
   };
 
   const runs = await Promise.allSettled(platforms.map(runOne));
@@ -510,14 +541,15 @@ export async function runVerification(
       sections.push(`## ${p}\nFAILED: ${errorMessage(run.reason)}`);
       return;
     }
-    const { trace, results, frame, health } = run.value;
+    const { trace, results, frame, failed, health } = run.value;
     const verdict = specs.length === 0 ? '' : `\n${assertSummary(results)}`;
     // One line when the leg's frame did not settle (2026-10-05): the picture
     // below may be mid-animation, and the tables that read it say nothing.
-    const unsettled = unsettledNote(frame);
-    const frameLine = unsettled === undefined ? '' : `\n${unsettled}`;
+    // In the same place, one line when there is no frame at all (2026-10-08).
+    const note = frame === undefined ? screenshotFailedLine(failed) : unsettledNote(frame);
+    const frameLine = note === undefined ? '' : `\n${note}`;
     sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${frameLine}${health}`);
-    screenshots.push(frame.shot);
+    if (frame !== undefined) screenshots.push(frame.shot);
   });
 
   if (contract !== undefined) {

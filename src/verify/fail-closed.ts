@@ -8,8 +8,12 @@
  * a bare "failing closed"). A leaf module because all three files need it and
  * assert.ts imports the other two.
  */
-/** What went unchecked — the noun the sentence ends with. The pixel asserts use the first two. */
-export type Unchecked = 'color' | 'rendered text' | 'geometry';
+/**
+ * What went unchecked — the noun the sentence ends with. The pixel asserts
+ * use the first two; `baseline match` is the screenshot assert's, for a
+ * capture the adapter refused (2026-10-08, pixel-poll.ts#screenshotFailed).
+ */
+export type Unchecked = 'color' | 'rendered text' | 'geometry' | 'baseline match';
 
 export const failClosed = (reason: string, unchecked: Unchecked): string =>
   `${reason}; failing closed, ${unchecked} unchecked`;

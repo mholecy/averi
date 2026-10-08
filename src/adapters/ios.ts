@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
 import { runIdb } from './idb.js';
+import { screenshotPng } from './screenshot-bytes.js';
 import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
@@ -233,7 +234,14 @@ export class IosAdapter implements DeviceAdapter {
     const file = join(dir, 'screen.png');
     try {
       await this.simctl(['io', this.target(), 'screenshot', file]);
-      return await readFile(file);
+      // simctl exits 0 and the file is read after it — an empty or foreign
+      // file is judged here, as on Android (screenshot-bytes.ts).
+      return screenshotPng(await readFile(file), {
+        device: `simulator ${this.target()}`,
+        command: `xcrun simctl io ${this.target()} screenshot <file>`,
+        remedy: `Re-check \`xcrun simctl list devices booted\` and retry; if it repeats, reboot the simulator ` +
+          `(xcrun simctl shutdown ${this.udid ?? '<udid>'} && xcrun simctl boot ${this.udid ?? '<udid>'}).`,
+      });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

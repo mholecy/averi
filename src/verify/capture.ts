@@ -557,8 +557,12 @@ export async function captureFrame(
         tree,
         window,
         error:
+          // No platform command here (2026-10-08): the adapter refuses bytes
+          // that are not a PNG at all, naming its own command
+          // (adapters/screenshot-bytes.ts), so what reaches this decode
+          // started like one and broke after its signature.
           `screenshot PNG decode failed: ${errorMessage(e)} — re-run; if it repeats, the device is returning ` +
-          'something other than a PNG (check `adb exec-out screencap -p` / `xcrun simctl io <udid> screenshot` by hand)',
+          'a damaged PNG (it starts like one but does not decode) — capture one by hand on the device and open it',
       },
     };
   }
@@ -598,7 +602,7 @@ export async function captureBaselineFrame(
   let captures = frame.captures;
   for (const delayMs of BASELINE_CONFIRMATION_DELAYS_MS) {
     if (delayMs > 0) await sleep(delayMs);
-    const shot = await adapter.screenshot();
+    const shot = await screenshotOf(adapter);
     captures += 1;
     if (!shot.equals(frame.shot)) return { ...frame, stability, captures, confirmed: false };
   }
@@ -783,14 +787,14 @@ async function stableScreenshot(
   region?: SizedRegion,
 ): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'> & { png?: PNG }> {
   const memo = lastDecodeMemo();
-  let previous = await adapter.screenshot();
+  let previous = await screenshotOf(adapter);
   let captures = 1;
   let recaptureMs = 0; // measured cost of the last re-capture (delay + screencap); 0 until one has run
   for (let i = 0; i < STABILITY_ATTEMPTS; i++) {
     if (deadline !== undefined && Date.now() + recaptureMs >= deadline) break;
     const started = Date.now();
     await sleep(STABILITY_DELAY_MS);
-    const current = await adapter.screenshot();
+    const current = await screenshotOf(adapter);
     captures += 1;
     if (current.equals(previous)) return { shot: current, stability: 'settled', settledOver: 'screen', captures };
     if (region !== undefined) {
@@ -807,6 +811,41 @@ async function stableScreenshot(
   // consumer reads `stability`, never the count.
   return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures, png: memo.decoded(previous) };
 }
+
+/**
+ * One capture, refused when it holds no bytes (2026-10-08). Every capture in
+ * this module goes through here. The adapter is the owner of "these bytes are
+ * a screenshot" — each platform's `screenshot()` refuses an empty or non-PNG
+ * result as a transport error naming its device and command
+ * (adapters/screenshot-bytes.ts) — so in production this never fires; it is
+ * the wait's own floor under that contract, for an adapter that breaks it:
+ * `Buffer.equals` holds for two empty buffers, and before the adapters
+ * checked, a dead emulator's two 0-byte captures came back as a SETTLED
+ * frame the `screenshot` tool returned with no note. Length only, not the
+ * signature: the frames here are opaque bytes (the tests' fakes use short
+ * tags), and a non-PNG that reaches a measuring caller already fails its
+ * decode, with its own wording, in `captureFrame`.
+ */
+async function screenshotOf(adapter: Pick<DeviceAdapter, 'screenshot'>): Promise<Buffer> {
+  const shot = await adapter.screenshot();
+  if (shot.length === 0) {
+    throw new Error(
+      'the device adapter returned an empty screenshot (0 bytes) — no frame can settle on nothing; ' +
+        'DeviceAdapter.screenshot must throw on a failed capture instead (adapters/screenshot-bytes.ts)',
+    );
+  }
+  return shot;
+}
+
+/**
+ * Why a capture threw, in one line: the first line of the error — the
+ * adapter's own sentence naming its device and command
+ * (adapters/screenshot-bytes.ts). `captureFrame` throws for nothing else (its
+ * doc), so a caller that catches it quotes this — the pixel and baseline
+ * asserts as a fail-closed reason (2026-10-08), a run's final capture as its
+ * `⚠ screenshot:` line (run/verify.ts#finalFrame).
+ */
+export const captureRefusal = (e: unknown): string => errorMessage(e).split('\n')[0];
 
 /** The caller's element for a region-judged wait: its rect, and the tree that rect (and, when the device will not say, the scale) comes from. */
 interface StabilityRegion {

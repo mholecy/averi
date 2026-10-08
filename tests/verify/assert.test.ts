@@ -2074,3 +2074,70 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
     }
   });
 });
+
+/**
+ * A capture the adapter REFUSES (adapters/screenshot-bytes.ts, 2026-10-08) is
+ * not a poll miss: it ends THAT assert at once — one capture, no polling to
+ * the deadline — failing closed with the adapter's first line, and
+ * `assertAll` goes on to the next assert (pixel-poll.ts's header). Only a
+ * png that came back and does not decode is a miss (the "not a png" tests above).
+ */
+describe('a capture the adapter refuses fails that assert closed, and the batch goes on', () => {
+  const REFUSAL = '`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG';
+  const refusing = () => {
+    resetLayout();
+    const fake = new FakeAdapter({ s: screen(node({ identifier: 'card', rect: { x: 0, y: 0, width: 100, height: 40 } })) }, 's');
+    let captures = 0;
+    fake.screenshot = async () => {
+      captures += 1;
+      // The adapter's sentence ends with a full stop; the detail must not read `PNG.; failing closed`.
+      throw new Error(`${REFUSAL}.\nsecond line, not quoted`);
+    };
+    return { fake, captures: () => captures };
+  };
+
+  it('color: fails closed with the transport message after one capture, and the element assert after it is still evaluated', async () => {
+    const { fake, captures } = refusing();
+    const results = await new Verifier(fake, FAST).assertAll([
+      { element: { id: 'card' }, color: { expected: '#FDFDFD' } },
+      { element: { id: 'card' } },
+    ]);
+    expect(results.map((r) => r.pass)).toEqual([false, true]);
+    expect(results[0].detail).toBe(`screenshot failed: ${REFUSAL}; failing closed, color unchecked`);
+    expect(captures()).toBe(1);
+  });
+
+  it('screenshot baseline, creating: fails closed after one capture, nothing written, and the batch goes on', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-baselines-'));
+    try {
+      const { fake, captures } = refusing();
+      const results = await new Verifier(fake, { ...FAST, baselineDir: dir }).assertAll([
+        { screenshot: { baseline: 'dash' } },
+        { element: { id: 'card' } },
+      ]);
+      expect(results.map((r) => r.pass)).toEqual([false, true]);
+      expect(results[0].detail).toBe(`screenshot failed: ${REFUSAL}; failing closed, baseline match unchecked`);
+      expect(captures()).toBe(1);
+      await expect(readFile(join(dir, fake.platform, 'dash.png'))).rejects.toThrow();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('screenshot baseline, diffing: fails closed after one capture', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-baselines-'));
+    try {
+      const still = dashboardFake();
+      still.nextScreenshot = png(50, 50);
+      await new Verifier(still, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+      const { fake, captures } = refusing();
+      // The diff path: the baseline exists for this platform.
+      expect(await readFile(join(dir, fake.platform, 'dash.png'))).toBeDefined();
+      const [result] = await new Verifier(fake, { ...FAST, baselineDir: dir }).assertAll([{ screenshot: { baseline: 'dash' } }]);
+      expect(result).toMatchObject({ pass: false, detail: `screenshot failed: ${REFUSAL}; failing closed, baseline match unchecked` });
+      expect(captures()).toBe(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

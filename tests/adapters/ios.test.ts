@@ -347,3 +347,38 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     );
   });
 });
+
+/**
+ * `simctl io … screenshot` exits 0 and the file is read after it
+ * (2026-10-08, adapters/screenshot-bytes.ts): an empty or non-PNG file is a
+ * transport error naming the simulator and the command, as on Android.
+ */
+describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => {
+  /** simctl's stand-in: writes `bytes` to the path it is given, as `simctl io <udid> screenshot <file>` does. */
+  function writesScreenshot(bytes: Buffer): ExecFn {
+    return async (cmd, args): Promise<ExecResult> => {
+      if (cmd === 'xcrun' && args[0] === 'simctl' && args[1] === 'io') await writeFile(args.at(-1) as string, bytes);
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+  }
+
+  it('passes a file that starts with the PNG signature through unchanged', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(png) }).screenshot();
+    expect(shot.equals(png)).toBe(true);
+  });
+
+  it('an empty file is a transport error naming the simulator, the command and the reboot', async () => {
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(Buffer.alloc(0)) }).screenshot()).rejects.toThrow(
+      '`xcrun simctl io AAAA-1111 screenshot <file>` on simulator AAAA-1111 returned 0 bytes — not a PNG, though the ' +
+        'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
+        'screen. Re-check `xcrun simctl list devices booted` and retry; if it repeats, reboot the simulator ' +
+        '(xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111).',
+    );
+  });
+
+  it('a file that is not a PNG is refused too, quoting its start', async () => {
+    const exec = writesScreenshot(Buffer.from('JFIF not a png'));
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec }).screenshot()).rejects.toThrow(/returned 14 bytes starting "JFIF not a png" — not a PNG/);
+  });
+});

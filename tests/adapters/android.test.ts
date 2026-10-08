@@ -887,3 +887,44 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
     await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('unknown');
   });
 });
+
+/**
+ * `adb exec-out` exits 0 with whatever the guest wrote (2026-10-08,
+ * adapters/screenshot-bytes.ts): an empty or non-PNG capture is a transport
+ * error naming the device and the command, never bytes handed upward — the
+ * stability wait would have read two empty captures as a settled frame.
+ */
+describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', () => {
+  const PNG_HEAD = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+
+  it('passes a capture that starts with the PNG signature through unchanged', async () => {
+    const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': PNG_HEAD });
+    const shot = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot();
+    expect(shot.equals(PNG_HEAD)).toBe(true);
+    expect(calls).toEqual(['adb -s emulator-5554 exec-out screencap -p']);
+  });
+
+  it('the signature alone — exactly 8 bytes — is enough; 7 of them is not', async () => {
+    const signature = PNG_HEAD.subarray(0, 8);
+    const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': signature });
+    expect((await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot()).equals(signature)).toBe(true);
+    const short = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': signature.subarray(0, 7) });
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: short.fn }).screenshot()).rejects.toThrow(/returned 7 bytes starting ".PNG/);
+  });
+
+  it('an empty capture (exit 0, no bytes) is a transport error naming the device and the command', async () => {
+    const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': Buffer.alloc(0) });
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
+      '`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG, though the ' +
+        'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
+        'screen. Re-check `adb devices` and retry; if it repeats, the emulator, not the app, needs attention.',
+    );
+  });
+
+  it('text on stdout (`Killed`, the measured dying-guest shape) is refused too, quoting what came back', async () => {
+    const { fn } = fakeExec({ 'adb exec-out screencap -p': 'Killed\n' });
+    await expect(new AndroidAdapter({ exec: fn }).screenshot()).rejects.toThrow(
+      /^`adb exec-out screencap -p` on the default adb device returned 7 bytes starting "Killed" — not a PNG/,
+    );
+  });
+});

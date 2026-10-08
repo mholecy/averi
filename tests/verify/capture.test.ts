@@ -431,7 +431,9 @@ describe('captureFrame — the tree beside the png', () => {
     expect(got.measured.png).toBeUndefined();
     // The frame's one sentence: pngjs's own words, then how to recover.
     expect(got.measured.error).toMatch(/^screenshot PNG decode failed: unrecognised content at end of stream — re-run; if it repeats/);
-    expect(got.measured.error).toContain('adb exec-out screencap -p');
+    // No adb or simctl here since 2026-10-08: a non-PNG is the adapter's refusal to word.
+    expect(got.measured.error).toContain('a damaged PNG (it starts like one but does not decode)');
+    expect(got.measured.error).not.toMatch(/adb|simctl/);
   });
 });
 
@@ -578,5 +580,33 @@ describe('pngRegion — the one rect → png mapping', () => {
   it('is undefined for a rect fully off the png, and the inset never empties a tiny one', () => {
     expect(pngRegion({ x: 0, y: 300, width: 10, height: 10 }, 1, png)).toBeUndefined();
     expect(pngRegion({ x: 0, y: 0, width: 2, height: 2 }, 1, png, 0.12)).toMatchObject({ x0: 0, y0: 0, x1: 2, y1: 2 });
+  });
+});
+
+/**
+ * The wait's floor under the adapter contract (2026-10-08): DeviceAdapter
+ * .screenshot throws on a failed capture (adapters/screenshot-bytes.ts), and
+ * an adapter that returns 0 bytes anyway fails the capture here — two empty
+ * buffers are `equals`, and before this they came back `settled`.
+ */
+describe('captureFrame — an empty capture is no frame', () => {
+  const EMPTY = /^the device adapter returned an empty screenshot \(0 bytes\) — no frame can settle on nothing/;
+
+  it('two empty captures throw rather than settle', async () => {
+    const fake = device([Buffer.alloc(0)]);
+    await expect(captureFrame(fake)).rejects.toThrow(EMPTY);
+    expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it('an empty re-capture after a real one throws too — every capture of the wait is checked', async () => {
+    const fake = device([frame('a'), Buffer.alloc(0)]);
+    await expect(captureFrame(fake)).rejects.toThrow(EMPTY);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('an empty capture in a baseline\'s confirmation window throws', async () => {
+    const fake = device([frame('a'), frame('a'), Buffer.alloc(0)]);
+    await expect(captureBaselineFrame(fake)).rejects.toThrow(EMPTY);
+    expect(fake.screenshots).toHaveLength(3);
   });
 });

@@ -470,7 +470,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         { state, project, environment: envName, session },
         (cfg) => registry.get(p, treeOpts(iosToolSettings(cfg, p))),
       );
-      return { content: [...text(report).content, image(shot)] };
+      // No image when the final capture failed — the report's ⚠ screenshot: line says why.
+      return { content: [...text(report).content, ...(shot === undefined ? [] : [image(shot)])] };
     },
   );
 
@@ -524,7 +525,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'verify',
     {
       description:
-        'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (first image android, second ios when both run). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
+        'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default: both android and ios) and return per-platform results plus screenshots. Legs always run in android-then-ios order regardless of input order (images in that order, one per leg that returned a screenshot; a leg whose section says FAILED or `⚠ screenshot:` has none). Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
         'contract points at a layout-contract JSON (screen anchors in Figma-frame units) → a per-anchor geometry table is appended (## rect parity), when anchors carry bg/bg_dark/sample fields the legs\' screenshots are sampled per anchor into a ## color parity table (CIEDE2000; ALWAYS the light axis — bg values — since averi cannot switch device themes; bg_dark anchors wait for the dark-mode round), and when anchors carry text/text_dynamic a ## text parity table compares the RENDERED copy and type size (OCR off the same screenshots; macOS-only, falls back to the tree with a note): numbers over impressions. A contract field a requested table cannot read (a bg that is neither hex nor token, an unknown sample mode, a non-string text, a non-boolean text_dynamic, a tolerance_de / tolerance_size_pct / tolerance_aspect_pct that is not a positive number) REFUSES the call before any device is touched, listing every such field — it no longer runs both legs to report FAILED in that table. An `environment` averi.yaml does not declare is refused the same way, before any device, naming the known ones.',
       inputSchema: {
         platforms: z

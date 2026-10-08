@@ -248,3 +248,23 @@ describe('baselineDirFor', () => {
     expect(baselineDirFor()).toBe(join(process.cwd(), '.averi', 'baselines'));
   });
 });
+
+/**
+ * ensure_state whose final capture throws (2026-10-08, run/verify.ts#finalFrame):
+ * the state WAS ensured — the trace and health line stand, one `⚠ screenshot:`
+ * line says why there is no image, and no shot is returned.
+ */
+describe('runEnsureState — a refused final screenshot', () => {
+  it('keeps the trace and the health line, adds the ⚠ line, and returns no shot', async () => {
+    const fake = home();
+    fake.screenshot = async () => {
+      throw new Error('`adb exec-out screencap -p` on the default adb device returned 0 bytes — not a PNG\nmore');
+    };
+    const out = await runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolver(fake).resolve);
+    expect(out.shot).toBeUndefined();
+    expect(out.text).toMatch(/home[\s\S]*\nappAlive: true\n⚠ screenshot: /);
+    expect(out.text.split('\n').at(-1)).toBe(
+      '⚠ screenshot: `adb exec-out screencap -p` on the default adb device returned 0 bytes — not a PNG — no image is returned',
+    );
+  });
+});

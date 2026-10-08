@@ -1156,3 +1156,81 @@ describe('tap and type_text under the Android soft keyboard', () => {
     expect(fake.taps).toEqual([]);
   });
 });
+
+/**
+ * A dead device's capture fails the `screenshot` tool (2026-10-08): before,
+ * `adb exec-out screencap -p` exiting 0 with nothing came back as a SETTLED
+ * 0-byte image with no note. The adapter refuses it, naming its device and
+ * command (adapters/screenshot-bytes.ts); the capture refuses an adapter that
+ * returns 0 bytes anyway.
+ */
+describe('screenshot: an empty capture is an error, not an image', () => {
+  it('the adapter\'s refusal reaches the agent as isError, with no image', async () => {
+    const fake = home();
+    fake.screenshot = async () => {
+      throw new Error('`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG, though the command reported success');
+    };
+    const { call } = await connect({ android: fake });
+    const result = await call('screenshot', { platform: 'android' });
+    expect(result.isError).toBe(true);
+    expect(result.images).toEqual([]);
+    expect(result.text).toContain('`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG');
+  });
+
+  it('an adapter that returns 0 bytes anyway is refused by the capture', async () => {
+    const fake = withFrames(home(), [Buffer.alloc(0)]);
+    const { call } = await connect({ android: fake });
+    const result = await call('screenshot', { platform: 'android' });
+    expect(result.isError).toBe(true);
+    expect(result.images).toEqual([]);
+    expect(result.text).toContain('the device adapter returned an empty screenshot (0 bytes)');
+  });
+});
+
+/** ensure_state and verify after a refused final capture: the report stands, no image block (run/verify.ts#finalFrame). */
+describe('ensure_state and verify: a refused final screenshot is a ⚠ line, not an image or an error', () => {
+  const refusing = () => {
+    const fake = home();
+    fake.screenshot = async () => {
+      throw new Error('`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG');
+    };
+    return fake;
+  };
+
+  it('ensure_state: the report alone, with the ⚠ line', async () => {
+    const { call } = await connect({ android: refusing() });
+    const result = await call('ensure_state', { platform: 'android', state: 'home', configPath: await validConfig() });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text']]);
+    expect(result.text).toContain('appAlive: true\n⚠ screenshot: `adb -s emulator-5554 exec-out screencap -p`');
+  });
+
+  it('verify: the leg\'s section with the ⚠ line, and no image for it', async () => {
+    const { call } = await connect({ android: refusing() });
+    const result = await call('verify', { platforms: ['android'], state: 'home', configPath: await validConfig() });
+    expect(result.isError).toBe(false);
+    expect(result.shape).toEqual([['text']]);
+    expect(result.text).toContain('## android\n');
+    expect(result.text).toContain('⚠ screenshot: `adb -s emulator-5554 exec-out screencap -p`');
+    expect(result.text).not.toContain('FAILED');
+  });
+});
+
+/** The assert tool on a device whose capture is refused: that assert fails closed, the rest is evaluated (2026-10-08, pixel-poll.ts's header). */
+describe('assert: a refused capture is one failed assert, not a failed call', () => {
+  it('the color assert FAILs with the transport message; the element assert beside it PASSes', async () => {
+    const fake = home();
+    fake.screenshot = async () => {
+      throw new Error('`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG');
+    };
+    const { call } = await connect({ android: fake });
+    const result = await call('assert', {
+      platform: 'android',
+      asserts: [{ element: { id: 'home_root' }, color: { expected: '#FFFFFF' }, timeout: '50ms' }, { element: { id: 'home_root' } }],
+      configPath: missing(),
+    });
+    expect(result.text).toContain('1/2');
+    expect(result.text).toContain('screenshot failed: `adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG; failing closed, color unchecked');
+    expect(result.text).toContain('PASS  element id:"home_root" exists');
+  });
+});

@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { shellCommandLine, shellQuote } from './adb-shell.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
+import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { zeroRect, type Device, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
@@ -342,7 +343,13 @@ export class AndroidAdapter implements DeviceAdapter {
 
   async screenshot(): Promise<Buffer> {
     const { stdout } = await this.execOut(['screencap', '-p']);
-    return stdout;
+    // exec-out exits 0 with whatever the guest wrote — nothing, or `Killed`,
+    // on a dying emulator — so the bytes are judged here (screenshot-bytes.ts).
+    return screenshotPng(stdout, {
+      device: this.serial ? `device ${this.serial}` : 'the default adb device',
+      command: `adb${this.serial ? ` -s ${this.serial}` : ''} exec-out screencap -p`,
+      remedy: 'Re-check `adb devices` and retry; if it repeats, the emulator, not the app, needs attention.',
+    });
   }
 
   async uiTree(opts: { settle?: boolean } = {}): Promise<UiNode> {

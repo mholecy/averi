@@ -327,7 +327,14 @@ export interface DeviceAdapter {
    */
   openDeepLink(url: string): Promise<void>;
 
-  screenshot(): Promise<Buffer>; // PNG bytes
+  /**
+   * PNG bytes. Throws rather than returning anything else: a capture command
+   * that exits 0 with no bytes, or with text (`Killed` on a dying emulator), is
+   * a transport error naming the device and command — screenshot-bytes.ts,
+   * since 2026-10-08. verify/capture.ts relies on it (an empty buffer equals
+   * an empty buffer, which its stability wait would read as settled).
+   */
+  screenshot(): Promise<Buffer>;
   /**
    * `settle`: a one-shot caller (an MCP tool, not a poller) may ask for one
    * bounded retry when the device answers "no window yet" right after a launch.

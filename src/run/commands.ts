@@ -5,8 +5,8 @@ import { configDir, projectConfigPath, type ProjectConfig } from '../flow/load.j
 import { refuseUnknownEnvironment } from './preflight.js';
 import { FlowEngine, type EngineContext, type RunRequest } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
-import { captureFrame, unsettledNote } from '../verify/capture.js';
-import { appHealth, assertSummary, formatAsserts, formatTrace } from './verify.js';
+import { unsettledNote } from '../verify/capture.js';
+import { appHealth, assertSummary, finalFrame, formatAsserts, formatTrace, screenshotFailedLine } from './verify.js';
 
 /**
  * The single-platform tool compositions: what one `ensure_state`, `run_flow`
@@ -86,13 +86,19 @@ async function runOnEngine(
   return { adapter, text: formatTrace(trace) + (await appHealth(adapter, cfg)) };
 }
 
-/** `ensure_state`: the trace and health line, and the frame the state was left in — settled, as `screenshot` settles it. */
+/**
+ * `ensure_state`: the trace and health line, and the frame the state was left
+ * in — settled, as `screenshot` settles it. No `shot` when the capture itself
+ * failed (2026-10-08, run/verify.ts#finalFrame): the state WAS ensured, so the
+ * trace stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
+ */
 export async function runEnsureState(
   call: EngineCall & { state: string },
   resolveAdapter: ResolveAdapterFor,
-): Promise<{ text: string; shot: Buffer }> {
+): Promise<{ text: string; shot?: Buffer }> {
   const { adapter, text } = await runOnEngine(call, resolveAdapter, { state: call.state });
-  const frame = await captureFrame(adapter);
+  const { frame, failed } = await finalFrame(adapter);
+  if (frame === undefined) return { text: `${text}\n${screenshotFailedLine(failed)}` };
   const unsettled = unsettledNote(frame);
   return { text: unsettled === undefined ? text : `${text}\n${unsettled}`, shot: frame.shot };
 }

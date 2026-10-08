@@ -105,7 +105,12 @@ export class FakeAdapter implements DeviceAdapter {
   appRunning = true;
   swipes: { from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
   screenshots: Buffer[] = [];
-  nextScreenshot: Buffer = Buffer.alloc(0);
+  /**
+   * Opaque bytes, not a png — enough for every caller that never decodes.
+   * Not empty (2026-10-08): DeviceAdapter.screenshot never returns 0 bytes,
+   * and the capture refuses an adapter that does (verify/capture.ts#screenshotOf).
+   */
+  nextScreenshot: Buffer = Buffer.from('fake:screen');
   logLines: string[] = [];
 
   constructor(

@@ -1292,3 +1292,59 @@ describe('formatLogExcerpt', () => {
     expect(out).not.toContain('drop');
   });
 });
+
+/**
+ * A leg whose final capture THROWS (2026-10-08: the adapter refuses an empty
+ * or non-PNG capture, adapters/screenshot-bytes.ts) keeps everything the leg
+ * already did — trace, asserts, health — with one `⚠ screenshot:` line and no
+ * image (run/verify.ts#finalFrame). Until then the throw rejected the leg and
+ * the section read only "FAILED: …".
+ */
+describe('a leg whose final screenshot is refused', () => {
+  const STATE_CFG = parseConfig(
+    [
+      'app:',
+      '  android: { package: com.example.app }',
+      '  ios: { bundleId: com.example.app }',
+      'states:',
+      '  ready:',
+      '    detect: { element: { id: card } }',
+    ].join('\n'),
+  );
+  const REFUSAL = '`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG';
+  const refusing = (platform: Platform): FakeAdapter => {
+    const adapter = fake(platform);
+    adapter.screenshot = async () => {
+      throw new Error(`${REFUSAL}\nsecond line, not quoted`);
+    };
+    return adapter;
+  };
+
+  it('keeps the trace, the asserts and the health line, adds the ⚠ line, and returns no image for that leg', async () => {
+    const adapters = { android: refusing('android'), ios: fake('ios') };
+    const out = await runVerification(
+      request({ cfg: STATE_CFG, state: 'ready', specs: [{ element: { id: 'card' } }] }),
+      async (p) => adapters[p],
+    );
+    const android = out.sections[0];
+    expect(android).toMatch(/^## android\n/);
+    expect(android).not.toContain('FAILED');
+    expect(android).toContain('state ready: already active');
+    expect(android).toContain('PASS');
+    expect(android).toContain(`\n⚠ screenshot: ${REFUSAL} — no image is returned\nappAlive: true`);
+    expect(android).not.toContain('second line');
+    // The ios leg is untouched, and its image is the only one.
+    expect(out.sections[1]).not.toContain('⚠ screenshot');
+    expect(out.screenshots).toEqual([adapters.ios.nextScreenshot]);
+  });
+
+  it('a parity table notes the leg without a screenshot and compares what is left', async () => {
+    const adapters = { android: refusing('android'), ios: fake('ios') };
+    const out = await runVerification(
+      request({ contract: { screen: 's', figma_frame_width: 100, anchors: [{ id: 'card', x: 10, w: 40 }] } }),
+      async (p) => adapters[p],
+    );
+    const rect = out.sections.find((s) => s.startsWith('## rect parity'));
+    expect(rect).toContain(`(android: no screenshot — ${REFUSAL} — compared without it)`);
+  });
+});

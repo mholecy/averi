@@ -14,13 +14,15 @@ import {
   type BaselineFrame,
   captureBaselineFrame,
   captureFrame,
+  captureRefusal,
+  type Frame,
   ScreenWitness,
   unconfirmedReason,
   unsettledNote,
   unsettledReason,
 } from './capture.js';
 import { failClosed } from './fail-closed.js';
-import { pollPixels } from './pixel-poll.js';
+import { pollPixels, screenshotFailed } from './pixel-poll.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrEngineFor, type OcrEngine } from './ocr.js';
@@ -585,7 +587,14 @@ export class Verifier {
     try {
       baseline = await readFile(path);
     } catch {
-      const candidate = await captureBaselineFrame(this.adapter);
+      // A capture the adapter refuses fails THIS assert, closed, and assertAll
+      // goes on (2026-10-08) — pixel-poll.ts's header has the rule.
+      let candidate: BaselineFrame;
+      try {
+        candidate = await captureBaselineFrame(this.adapter);
+      } catch (e) {
+        return { description, pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
+      }
       // Fail closed (review 2026-10-06): ONLY a confirmed window creates.
       // The first cut refused on `confirmed === false`, so a frame without
       // the field — `unjudged`, which a deadline on this path would produce —
@@ -598,7 +607,12 @@ export class Verifier {
       await writeFile(path, candidate.shot);
       return { description, pass: true, detail: `baseline created at ${path}` };
     }
-    const frame = await captureFrame(this.adapter);
+    let frame: Frame;
+    try {
+      frame = await captureFrame(this.adapter);
+    } catch (e) {
+      return { description, pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
+    }
     const current = frame.shot;
     const note = unsettledNote(frame);
     const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);
