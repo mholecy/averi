@@ -409,7 +409,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       expect(fake.taps).toEqual(['login_title', 'login_password']);
       expect(fake.typed).toEqual(['abc']);
       const sentence = 'the soft keyboard covered id:login_password; hidden by tapping id:"login_title" before tapping';
-      expect(result).toEqual({ note: sentence, keyboardHidden: sentence, warning: undefined });
+      expect(result).toEqual({ note: sentence, keyboardHidden: sentence, warning: undefined, role: 'textfield', readBack: 'landed' });
     });
 
     describe('on the real dumps', () => {
@@ -605,7 +605,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     const result = await fillField(fake, 'id:login_password', 'abc', FAST);
     expect(fake.tapPoints).toEqual([{ x: 201, y: 489 }]);
     expect(fake.typed).toEqual(['abc']);
-    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined });
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined, role: 'textfield', readBack: 'landed' });
   });
 
   it('an ElementSpec target is named in the flow vocabulary, in the message and the trace line', async () => {

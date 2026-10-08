@@ -345,3 +345,33 @@ export function recorded(fake: FakeAdapter): string[] {
   wrap(fake, 'tap', (x: number, y: number) => `tap:${x},${y}`);
   return events;
 }
+
+/**
+ * The measured iOS idb form field (docs/bugs/2026-10-08-ios-fill-unverified-
+ * reports-filled-and-cleared.md, mp-native SWIFT payment): a `textfield`
+ * holding the value with no label, and a sibling `text` node carrying the
+ * floating label, both `identifier: "TextFieldWithComponentStyle"`, in points.
+ * `value` set: the label has floated ABOVE the input (`{42,351,35,15}`) and a
+ * tap on it focuses nothing. `value` null: the label lies over the empty
+ * input, and the fake's tap — first sibling drawn under wins — focuses the
+ * field, as measured ("that time the text did land").
+ */
+export function idbFloatingLabelFake(label: string, value: string | null): FakeAdapter {
+  const id = 'TextFieldWithComponentStyle';
+  const input: Rect = { x: 26, y: 366, width: 350, height: 30 };
+  const labelRect: Rect = value === null ? { x: 42, y: 372, width: 120, height: 18 } : { x: 42, y: 351, width: 35, height: 15 };
+  const fake = new FakeAdapter(
+    {
+      form: node({
+        role: 'container',
+        rect: { x: 0, y: 0, width: 402, height: 874 },
+        children: [node({ role: 'textfield', identifier: id, value, rect: input }), node({ role: 'text', identifier: id, label, rect: labelRect })],
+      }),
+    },
+    'form',
+  );
+  fake.platform = 'ios';
+  fake.treeSourceKind = 'idb';
+  fake.keyboard = undefined; // as IosAdapter: no oracle
+  return fake;
+}

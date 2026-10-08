@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
-import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
 // is a sequence of delays, and asserting the sequence is exact where a wall
@@ -44,7 +44,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([]);
     expect(fake.typed).toEqual(['2.50']);
-    expect(result).toEqual({ note: undefined, warning: undefined });
+    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: 'landed' });
   });
 
   it('accepts the selector-string vocabulary too', async () => {
@@ -165,7 +165,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value ?? '').toBe(''); // the fake appends the "" to a cleared (null) field: nothing held
     expect(reads).toBe(4); // the settle wait, the post-focus read the loop counts from, the one that confirms the clear — no value poll
-    expect(result).toEqual({ note: undefined, warning: undefined });
+    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: 'nothing-typed' });
   });
 
   it('value "" with clear: true clears what the field holds AFTER focus — a field that autofills on focus ends empty', async () => {
@@ -197,7 +197,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value).toHaveLength(20);
     expect(reads).toBe(2); // the settle wait only
-    expect(result).toEqual({ note: undefined, warning: undefined });
+    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: 'nothing-typed' });
   });
 
   it("in 'refuse' mode a second match appearing MID-fill is a refusal in its own wording, not a device hint", async () => {
@@ -415,5 +415,85 @@ describe('fillField refuses a control character before anything is sent', () => 
     const fake = formFake();
     await fillField(fake, { id: 'amount_input' }, 'a b é\u0085', FAST);
     expect(fake.typed).toEqual(['a b é\u0085']);
+  });
+});
+
+// docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
+// a floating-label `text` node selected by its label was reported "Filled …
+// (22 characters, cleared first)" with nothing cleared and nothing typed.
+describe('fillField — what it did, not what was asked (measured iOS idb shapes, 2026-10-08)', () => {
+  const inputOf = (fake: FakeAdapter) => fake.live().children.find((n) => n.role === 'textfield');
+
+  it('a floated label (value held, label above the input): no delete, nothing typed — NOT verified, cleared 0, the input named', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const result = await fillField(fake, 'text:"IBAN*"', 'DE89370400440532013000', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([]); // the label has no value: no length, no delete
+    expect(inputOf(fake)?.value).toBe('XX12345'); // nothing reached the field — as measured
+    expect(result).toMatchObject({ role: 'text', cleared: 0, readBack: 'no-value' });
+    expect(result.notInput).toEqual({
+      input: { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 366, width: 350, height: 30 }, overlaps: false },
+    });
+  });
+
+  it('a label over the empty input: the tap focuses the field and the text lands — still NOT verified (the label is read back), warned not refused', async () => {
+    const fake = idbFloatingLabelFake('Value*', null);
+    const result = await fillField(fake, 'text:"Value*"', '7.25', { ...FAST, clear: true });
+    expect(inputOf(fake)?.value).toBe('7.25'); // a refusal would have broken this fill
+    expect(result).toMatchObject({ role: 'text', cleared: 0, readBack: 'no-value' });
+    expect(result.notInput).toEqual({ input: expect.objectContaining({ overlaps: true }) });
+  });
+
+  it('the input itself by its old value: the clear and the read-back find it again by identity, so the fill is verified', async () => {
+    // Before 2026-10-08 the `value:` selector stopped matching after the
+    // clear, which read as "empty" (clear done) and as "no value" (read-back).
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89370400440532013000', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([7]);
+    expect(inputOf(fake)?.value).toBe('DE89370400440532013000');
+    expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: 'landed', notInput: undefined });
+  });
+
+  it('a field that MOVED after focus is not found by identity: the read-back stays NOT verified rather than guessing', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', null);
+    fake.onTap = (_id, self) => {
+      const input = self.live().children.find((n) => n.role === 'textfield');
+      if (input !== undefined) input.rect = { ...input.rect, y: 200 }; // the keyboard pushed the form up
+    };
+    const result = await fillField(fake, 'role:textfield', 'abc', FAST);
+    expect(result).toMatchObject({ role: 'textfield', readBack: 'landed' }); // a role selector still matches the moved field
+    const byValue = idbFloatingLabelFake('IBAN*', 'XX');
+    byValue.onTap = fake.onTap;
+    const moved = await fillField(byValue, 'role:textfield value:"XX"', 'abc', { ...FAST, clear: true });
+    expect(moved).toMatchObject({ readBack: 'no-value' });
+  });
+
+  it('a node of another role whose value TOOK the text is an input whatever its role: no not-input finding', async () => {
+    resetLayout();
+    const search = el({ role: 'other', identifier: 'search', value: null }); // an iOS SearchField reads `other`
+    const fake = new FakeAdapter({ s: screen(search) }, 's');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      const live = fake.live().children[0];
+      live.value = (live.value ?? '') + text;
+    };
+    const result = await fillField(fake, 'id:search', 'milk', FAST);
+    expect(result).toMatchObject({ role: 'other', readBack: 'landed', notInput: undefined });
+  });
+
+  it('a non-input whose value never changes fails as before, and the error names the input it is not', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { s: screen(node({ role: 'text', identifier: 'title', value: 'Hello', rect: { x: 0, y: 0, width: 100, height: 10 } }), el({ role: 'textfield', identifier: 'name' })) },
+      's',
+    );
+    await expect(fillField(fake, 'id:title', 'abc', FAST)).rejects.toThrow(
+      /^fill: typed 3 characters but the field shows 5 \(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"name"/,
+    );
+  });
+
+  it('Android: an EditText resolved directly is verified, says what it cleared, and carries no finding', async () => {
+    const fake = formFake('2.50');
+    const result = await fillField(fake, { id: 'amount_input' }, '7', { ...FAST, clear: true });
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: 'landed', notInput: undefined });
   });
 });

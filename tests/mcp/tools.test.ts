@@ -9,7 +9,7 @@ import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory, type DeviceDiscovery } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
-import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
 
@@ -604,11 +604,44 @@ describe('type_text with an empty text', () => {
     const { call } = await connect({ ios: fake });
     const result = await call('type_text', { platform: 'ios', selector: 'id:amount_input', text: '', clear: true, configPath: missing() });
     expect(result.isError).toBe(false);
-    expect(result.text).toBe('Filled id:amount_input (0 characters, cleared first)');
+    expect(result.text).toBe('Filled id:amount_input (0 characters, cleared 4 characters first)');
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([4]);
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value ?? '').toBe(''); // the fake appends the "" to a cleared (null) field: nothing held
+  });
+});
+
+// docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
+// the measured reply was `Filled text:"IBAN*" (22 characters, cleared first)`
+// with nothing cleared and nothing typed.
+describe('type_text on the measured iOS idb floating label (2026-10-08)', () => {
+  it('a floated label: "Typed … — NOT verified", no "cleared", and a ⚠ line naming the input', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', selector: 'text:"IBAN*"', text: 'DE89370400440532013000', clear: true, configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe(
+      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
+        'clear sent no delete — the node gave no length to delete\n' +
+        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
+        'the nearest input is textfield id:"TextFieldWithComponentStyle" at 26,366 350x30 — ' +
+        'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
+    );
+    expect(fake.deletes).toEqual([]);
+  });
+
+  it('the input itself by its old value: "Filled", verified, with the characters it cleared', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', {
+      platform: 'ios',
+      selector: 'role:textfield value:"XX12345"',
+      text: 'DE89370400440532013000',
+      clear: true,
+      configPath: missing(),
+    });
+    expect(result.text).toBe('Filled role:textfield value:"XX12345" (22 characters, cleared 7 characters first)');
   });
 });
 

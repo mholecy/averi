@@ -431,7 +431,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields), ' +
-        `then verifies the text landed and retries a dropped clear-fill once. The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
+        `then verifies the text landed and retries a dropped clear-fill once; a matched node that exposes no value is reported as "Typed … — NOT verified" (never "Filled"), "cleared" counts the characters actually deleted, and a match that is not a textfield (e.g. an iOS idb floating label) gets a ⚠ line naming the nearest input. The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
         'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first). ' +
         'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting an unverified fill. Without selector: types into whatever is focused. ' +
         'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android, and on iOS (treeSource: wda) hidden by the first on-screen entry of averi.yaml app.ios.keyboardDismiss then refocused, or refused with none (nothing typed). The keyboard is NOT dismissed after typing here (a flow\'s fill: has dismissKeyboard for that).',
@@ -451,8 +451,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         await typeIntoFocused(adapter, value);
         return text(`Typed ${value.length} characters`);
       }
-      const { note, warning } = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });
-      return text(fillText(selector, { length: value.length, cleared: clear === true, note, warning }));
+      const fill = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });
+      return text(fillText(selector, { length: value.length, ...fill }));
     },
   );
 

@@ -1,4 +1,5 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { rectText } from '../ui-tree/geometry.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
@@ -25,6 +26,37 @@ export interface FillOptions extends GuardOptions {
   clear?: boolean;
 }
 
+/**
+ * The normalised role of every text input (adapters/ios-node.ts: TextField,
+ * SecureTextField, TextView; adapters/android.ts: EditText,
+ * AutoCompleteTextView and the Compose input that dumps as a focusable,
+ * long-clickable scroll view). The one role a fill expects to type into.
+ */
+export const INPUT_ROLE = 'textfield';
+
+/**
+ * An input on the screen near a matched node that is not one — what the
+ * caller probably meant. Identifier and rect only: never the label or the
+ * value (on Android an EditText's label falls back to its text, and a field
+ * may hold a credential).
+ */
+export interface NearbyInput {
+  identifier: string | null;
+  rect: Rect;
+  /** The input's rect shares area with the matched node's (a label laid over its field). */
+  overlaps: boolean;
+}
+
+/**
+ * What the fill DID, as facts — the MCP reply (mcp/tool-text.ts#fillText)
+ * and the flow line (flow/engine.ts#runFill) render from these through the
+ * wording below, and neither restates the request. Until 2026-10-08 both
+ * printed the REQUESTED `clear` ("cleared first", "(cleared)") and an
+ * unreadable read-back passed as landed: on iOS idb a floating-label `text`
+ * node was "Filled … (22 characters, cleared first)" with nothing cleared
+ * and nothing typed (docs/bugs/2026-10-08-ios-fill-unverified-reports-
+ * filled-and-cleared.md).
+ */
 export interface FillResult {
   /** How the field was chosen when several nodes matched (see resolveNow). */
   note?: string;
@@ -32,6 +64,116 @@ export interface FillResult {
   keyboardHidden?: string;
   /** The fill was legal but suspicious — a masked field already held text and `clear` is off. */
   warning?: string;
+  /** The matched node's role (the one tapped, typed into and read back). */
+  role: string;
+  /**
+   * With `clear` only: how many characters the field held when the clear
+   * began — what clearText deleted, the field verified empty after. 0 when
+   * there was nothing to delete OR nothing to measure (a node exposing no
+   * value): no delete was sent. Absent when `clear` was not asked for.
+   */
+  cleared?: number;
+  /**
+   * How the typed text was checked:
+   * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
+   * - `no-value`: the node exposed no value on two reads in a row — the
+   *   text may or may not be there; nothing was compared.
+   * - `nothing-typed`: the value was empty — a focus (and clear) alone.
+   */
+  readBack: 'landed' | 'no-value' | 'nothing-typed';
+  /**
+   * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
+   * read-back did not show the text in it — a node whose value took the
+   * text is an input whatever its role (an iOS search field reads `other`).
+   * `input` is the nearest input on the screen; `none` when the screen has
+   * no input; `unread` when the tree to look in could not be read (a hint,
+   * not a verdict: the fill does not fail for it).
+   */
+  notInput?: { input: NearbyInput | 'none' | 'unread' };
+}
+
+/** `cleared N character(s) first`, only when a delete was actually sent. */
+export function fillClearedText(r: Pick<FillResult, 'cleared'>): string | undefined {
+  return r.cleared === undefined || r.cleared === 0 ? undefined : `cleared ${r.cleared} character${r.cleared === 1 ? '' : 's'} first`;
+}
+
+/**
+ * `NOT verified: the matched node exposes no value (role <role>)` when the
+ * read-back had nothing to compare, plus — when `clear` was asked for —
+ * that no delete was sent (the node gave no length). undefined otherwise.
+ */
+export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cleared'>): string | undefined {
+  if (r.readBack !== 'no-value') return undefined;
+  return (
+    `NOT verified: the matched node exposes no value (role ${r.role})` +
+    (r.cleared === 0 ? '; clear sent no delete — the node gave no length to delete' : '')
+  );
+}
+
+/**
+ * The sentences that go on lines of their own (`⚠` in the reply, `⚠ fill`
+ * in a flow): the not-an-input finding, then the masked-append warning.
+ */
+export function fillCaveats(r: Pick<FillResult, 'role' | 'notInput' | 'warning'>): string[] {
+  const out: string[] = [];
+  if (r.notInput !== undefined) out.push(notInputText(r.role, r.notInput.input));
+  if (r.warning !== undefined) out.push(r.warning);
+  return out;
+}
+
+function notInputText(role: string, input: NearbyInput | 'none' | 'unread'): string {
+  const head = `the matched node is role ${role}, not a ${INPUT_ROLE} — typing goes wherever the focus tap left the focus`;
+  if (input === 'none') return `${head}; no ${INPUT_ROLE} is on the screen`;
+  if (input === 'unread') return `${head}; the screen could not be read again to name the input`;
+  const id = input.identifier === null ? '' : ` id:"${input.identifier}"`;
+  return (
+    `${head}; the ${input.overlaps ? 'input overlapping it' : 'nearest input'} is ${INPUT_ROLE}${id} at ${rectText(input.rect)} — ` +
+    `select the input itself (role:${INPUT_ROLE} with its id:, or its current value: when inputs share an id)`
+  );
+}
+
+/**
+ * The input a non-input match most likely labels: the one overlapping it
+ * most, else the one nearest it (gap between the rects). Zero-area nodes are
+ * never candidates, as in resolveNow.
+ */
+function nearestInput(tree: UiNode, near: UiNode): NearbyInput | 'none' {
+  let best: { node: UiNode; overlap: number; gap: number } | undefined;
+  for (const n of everyNode(tree)) {
+    if (n.role !== INPUT_ROLE || rectArea(n.rect) === 0) continue;
+    const overlap = overlapArea(n.rect, near.rect);
+    const gap = rectGap(n.rect, near.rect);
+    if (best === undefined || overlap > best.overlap || (overlap === best.overlap && gap < best.gap)) best = { node: n, overlap, gap };
+  }
+  return best === undefined ? 'none' : { identifier: best.node.identifier, rect: { ...best.node.rect }, overlaps: best.overlap > 0 };
+}
+
+function overlapArea(a: Rect, b: Rect): number {
+  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  return Math.max(0, w) * Math.max(0, h);
+}
+
+function rectGap(a: Rect, b: Rect): number {
+  const dx = Math.max(0, a.x - (b.x + b.width), b.x - (a.x + a.width));
+  const dy = Math.max(0, a.y - (b.y + b.height), b.y - (a.y + a.height));
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * The node chosen at focus, found again in a fresh tree by identity — same
+ * role, identifier and rect, exactly one such node. The read-back's
+ * fallback when the selector no longer matches: a `value:"…"` selector
+ * stops matching the moment the clear or the typing changes the value, and
+ * until 2026-10-08 that read as "nothing there" (a clear counted as done,
+ * a read-back as unverifiable). A field that MOVED (the keyboard pushed the
+ * form up) is not found this way and stays unverifiable, as before.
+ */
+function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {
+  const twins = [...everyNode(tree)].filter(
+    (n) => n.role === chosen.role && n.identifier === chosen.identifier && sameRect(n.rect, chosen.rect),
+  );
+  return twins.length === 1 ? twins[0] : undefined;
 }
 
 /**
@@ -53,8 +195,12 @@ export interface FillResult {
  * - type without clear: the typed value must appear IN the field (contiguous
  *   insert at the cursor); no destructive retry — clear stays opt-in, so a
  *   mismatch throws instead of corrupting content the field came with.
- * Fields that never expose text (masked/password) verify as best-effort;
- * fields that expose BULLETS verify by length (see `landed`).
+ * A node that never exposes text is NOT verified, and the result says so
+ * (`readBack: 'no-value'`) — until 2026-10-08 it passed as landed, and a
+ * floating-label `text` node on iOS idb was reported filled with nothing
+ * typed. Fields that expose BULLETS verify by length (see `landed`). A
+ * matched node that is not an input (INPUT_ROLE) is warned about, with the
+ * nearest input named — not refused (see `notInput` below).
  * An EMPTY value is the focus tap and the optional clear alone: nothing is
  * read back, no append warning is raised, and the adapter is still handed
  * the "" — a no-op by its contract (DeviceAdapter.typeText), so the step
@@ -92,6 +238,7 @@ export async function fillField(
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
   const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);
+  let lastTree: UiNode | undefined; // the newest tree refetch read — the not-input finding looks for the input in it
   const refetch = async (): Promise<UiNode | undefined> => {
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
@@ -106,7 +253,8 @@ export async function fillField(
           'xcrun simctl list), then retry with clear: true so the field is reset',
       );
     }
-    return resolveNow(tree, target, opts)?.node;
+    lastTree = tree;
+    return resolveNow(tree, target, opts)?.node ?? sameField(tree, node);
   };
   const point = tapPoint(node);
   await adapter.tap(point.x, point.y);
@@ -136,6 +284,7 @@ export async function fillField(
       warning = `masked field already held ${preLen} characters and clear is not set — typing APPENDS; pass clear: true to replace`;
     }
   }
+  let cleared: number | undefined;
   if (clear) {
     if (value === '') {
       // A clear ALONE has no read-back behind it, so what the loop counts
@@ -151,6 +300,7 @@ export async function fillField(
     }
     for (let attempt = 0; ; attempt++) {
       const existing = current?.value?.length ?? 0;
+      cleared ??= existing; // the first pass's count: what the field held when the clear began
       if (existing === 0) break;
       await adapter.clearText(existing);
       current = await refetch();
@@ -163,7 +313,26 @@ export async function fillField(
   }
 
   await adapter.typeText(value);
-  const result: FillResult = { note, keyboardHidden, warning };
+  let readBack: FillResult['readBack'] = 'nothing-typed';
+  // Not an input, and nothing shows the text landed in it: name the input
+  // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
+  // floating label is a separate `text` node over its field, and a tap on it
+  // focuses the field when the two still overlap (measured: that fill did
+  // land) — a refusal would break flows that work, and the label is the only
+  // selector idb leaves for inputs that share an identifier. A read-back
+  // that SHOWS the text proves the node took it, whatever its role.
+  const notInput = async (): Promise<FillResult['notInput']> => {
+    if (node.role === INPUT_ROLE) return undefined;
+    let tree = lastTree;
+    if (tree === undefined) {
+      try {
+        tree = await adapter.uiTree();
+      } catch {
+        return { input: 'unread' }; // a hint, not a verdict: the fill does not fail for it
+      }
+    }
+    return { input: nearestInput(tree, node) };
+  };
   if (value !== '') {
     // A masked (secure) field shows one bullet per character to uiautomator
     // and WDA alike, so its content can never EQUAL the value — measured
@@ -186,7 +355,8 @@ export async function fillField(
           ? observed === value
           : observed.includes(value);
     let observed = await pollValue(refetch, landed, pollMs);
-    // undefined: the field withholds its text — best effort, nothing to compare.
+    // undefined: the node withholds its text — nothing to compare. Since
+    // 2026-10-08 that is SAID (readBack 'no-value'), never passed as landed.
     if (observed !== undefined && !landed(observed)) {
       if (clear) {
         await adapter.clearText(observed.length);
@@ -194,16 +364,19 @@ export async function fillField(
         observed = await pollValue(refetch, landed, pollMs);
       }
       if (observed !== undefined && !landed(observed)) {
+        const wrong = await notInput();
         throw new Error(
           `fill: typed ${value.length} characters but the field shows ${observed.length} ` +
             (isMaskedValue(observed)
               ? `(masked field — compared by length${clear ? '' : `; it held ${preLen} after focus`})`
-              : '(content withheld from this error)'),
+              : '(content withheld from this error)') +
+            (wrong === undefined ? '' : `; ${notInputText(node.role, wrong.input)}`),
         );
       }
     }
+    readBack = observed === undefined ? 'no-value' : 'landed';
   }
-  return result;
+  return { note, keyboardHidden, warning, role: node.role, cleared, readBack, notInput: readBack === 'landed' ? undefined : await notInput() };
 }
 
 /** Poll the field until its exposed value satisfies `ok`; returns the last observation. */

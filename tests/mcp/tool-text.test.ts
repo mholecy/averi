@@ -10,20 +10,57 @@ describe('tap and type_text response lines', () => {
     );
   });
 
-  it('fillText names the selector, the length, whether it cleared first, the note, and the ⚠ warning on its own line', () => {
-    expect(fillText('id:amount', { length: 4, cleared: false })).toBe('Filled id:amount (4 characters)');
-    expect(fillText('id:amount', { length: 4, cleared: true })).toBe('Filled id:amount (4 characters, cleared first)');
-    expect(fillText('id:pw', { length: 16, cleared: false, note: '2 matches; picked the only interactive one (textfield)' })).toBe(
+  const landed = { role: 'textfield', readBack: 'landed' } as const;
+
+  it('fillText names the selector, the length, the characters it cleared, the note, and the ⚠ warning on its own line', () => {
+    expect(fillText('id:amount', { length: 4, ...landed })).toBe('Filled id:amount (4 characters)');
+    expect(fillText('id:amount', { length: 4, ...landed, cleared: 7 })).toBe('Filled id:amount (4 characters, cleared 7 characters first)');
+    expect(fillText('id:amount', { length: 4, ...landed, cleared: 1 })).toBe('Filled id:amount (4 characters, cleared 1 character first)');
+    expect(fillText('id:pw', { length: 16, ...landed, note: '2 matches; picked the only interactive one (textfield)' })).toBe(
       'Filled id:pw (16 characters) (2 matches; picked the only interactive one (textfield))',
     );
     expect(
       fillText('id:pw', {
         length: 16,
-        cleared: false,
+        ...landed,
         warning: 'masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
       }),
     ).toBe(
       'Filled id:pw (16 characters)\n⚠ masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
+    );
+  });
+
+  // docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
+  // the reply printed the REQUESTED clear and passed an unreadable read-back.
+  it('a clear that sent no delete is not "cleared": an empty field says nothing, a node with no value says so', () => {
+    expect(fillText('id:amount', { length: 4, ...landed, cleared: 0 })).toBe('Filled id:amount (4 characters)');
+    expect(fillText('text:"IBAN*"', { length: 22, role: 'text', readBack: 'no-value', cleared: 0 })).toBe(
+      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
+        'clear sent no delete — the node gave no length to delete',
+    );
+  });
+
+  it('an unverified fill is "Typed … into", never "Filled", and the not-an-input finding gets its own ⚠ line naming the input', () => {
+    expect(
+      fillText('text:"IBAN*"', {
+        length: 22,
+        role: 'text',
+        readBack: 'no-value',
+        notInput: { input: { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 343, width: 350, height: 56 }, overlaps: true } },
+      }),
+    ).toBe(
+      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text)\n' +
+        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
+        'the input overlapping it is textfield id:"TextFieldWithComponentStyle" at 26,343 350x56 — ' +
+        'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
+    );
+    expect(fillText('text:"Hi"', { length: 2, role: 'text', readBack: 'no-value', notInput: { input: 'none' } })).toBe(
+      'Typed 2 characters into text:"Hi" — NOT verified: the matched node exposes no value (role text)\n' +
+        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; no textfield is on the screen',
+    );
+    expect(fillText('text:"Hi"', { length: 0, role: 'text', readBack: 'nothing-typed', notInput: { input: 'unread' } })).toBe(
+      'Filled text:"Hi" (0 characters)\n' +
+        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; the screen could not be read again to name the input',
     );
   });
 });
