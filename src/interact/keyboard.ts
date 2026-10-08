@@ -194,7 +194,8 @@ export function dismissKeyboard(adapter: KeyboardAdapter, opts: DismissOptions):
 /**
  * Does the input method report a keyboard that `window` — a reading the
  * caller already holds (`readSoftKeyboard`'s) — places nowhere? (2026-10-08,
- * the floating-Gboard row: docs/bugs/2026-10-05-android-floating-gboard-keyboard.md.)
+ * the `unlocated` row, written for a floating Gboard:
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md.)
  * Only the window model can say: an adapter without the oracle has no
  * second source, and is never `unlocated`. The rule is the dismissal's own
  * row (keyboard-window.ts#dismissal, `clear · witness shown`); this is how a

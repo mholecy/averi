@@ -142,8 +142,8 @@ type WindowReading = 'covering' | 'clear' | 'unknown';
 /**
  * What `dismissal` decides for ONE call: press `back`, press nothing, or —
  * since 2026-10-08 — press nothing and SAY that the input method reports a
- * keyboard the window state gives no area (`unlocated`, the floating-Gboard
- * row below). A decision, not a capability — `DismissalMeans`
+ * keyboard the window state gives no area (`unlocated`, the
+ * `dismissal` row below). A decision, not a capability — `DismissalMeans`
  * (ui-tree/soft-keyboard.ts, `'back' | 'none'`) says what the ADAPTER has to
  * hide a keyboard with, fixed per adapter, and an adapter with `back` in hand
  * still decides `nothing` here when the state is hidden or the witness denies
@@ -510,7 +510,7 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
      *   denies the keyboard: then nothing is pressed, and nothing is waited for;
      * - hidden  → nothing: there is nothing to dismiss — unless, since
      *   2026-10-08, the witness says a keyboard IS shown: still nothing
-     *   pressed, and a `warning` saying so (the floating-Gboard row);
+     *   pressed, and a `warning` saying so (the `unlocated` row);
      * - unknown → back, exactly as before, the witness not asked.
      * One oracle query per dismissal (its cost: AndroidAdapter's
      * keyboardState), and the witness query when that query says shown or

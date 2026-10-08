@@ -1147,7 +1147,7 @@ export class FlowEngine {
       ...rest,
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),
     });
-    // ⚠ for a clipped stop, and (2026-10-08) for one the floating-keyboard
+    // ⚠ for a clipped stop, and (2026-10-08) for one the `unlocated`
     // row qualifies: the input method says a keyboard is up that nothing
     // could place, so "fully visible" is not established either. A stop
     // judged above a docked keyboard is not ⚠ on its own: the judgement

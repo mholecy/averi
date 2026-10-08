@@ -707,7 +707,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
   });
 
-  it('window hidden, witness SHOWN (the floating-Gboard row, inferred): no back — it could pop the screen — and a warning instead of silent success', async () => {
+  it('window hidden, witness SHOWN (the `unlocated` row): no back — it could pop the screen — and a warning instead of silent success', async () => {
     const fake = withOracle({ state: 'hidden' }, 'shown');
     fake.backTo = 'previous'; // a back here would navigate: the hazard the row refuses
     const result = await dismissKeyboard(fake, FIRST);

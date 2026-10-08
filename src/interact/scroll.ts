@@ -156,8 +156,9 @@ type Edge = 'top' | 'bottom' | 'left' | 'right';
  *
  * `topCover` is the HIGHEST covered rect (`highestCover`) — named so by the
  * code review of round 2 (it was `band`, and callers read `band.y` as the
- * keyboard's top): since 2026-10-08 not always the inset band: with a floating Gboard (measured that day, API 33)
- * it is the panel, [359,1269][1040,1912], 681 px wide and mid-screen. The
+ * keyboard's top): since 2026-10-08 not always the inset band: with a
+ * floating Gboard (measured that day, API 33) it is the panel,
+ * [359,1269][1040,1912], 681 px wide and mid-screen. The
  * invariant: only its `.y` is meaningful as a cut — the rect need not be
  * full width nor reach the bottom; the rest of it is quoted in messages.
  * The cost of the full-width cut, accepted (it never certifies a covered
@@ -608,8 +609,8 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * read off the tree being judged. The rounds — strokes and confirming
  * reads alike — number at most 1 + (1 + SETTLE_CONFIRM_READS) ×
  * `maxSwipes`, 25 at the defaults, and stop at the deadline whichever
- * comes first. A failed or `fully: true` stop may add one more, the floating
- * row's (below). A band that does not change the round is not reported
+ * comes first. A failed or `fully: true` stop may add one more, the
+ * `unlocated` row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
  * judged under one this round — a clip at its edge, or another of several
  * matches judged. The witness is no longer remembered, so one that times

@@ -399,8 +399,8 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(witnessQueries);
   });
 
-  it('Android floating keyboard (inferred): window hidden, input method shown — on a fully: true stop the result says the keyboard could not be placed, asked ONCE, and the line is not a clean "fully visible"', async () => {
-    // Where a floating keyboard lies is unmeasured: here it eats no stroke.
+  it('window hidden, input method shown — the `unlocated` row: on a fully: true stop the result says the keyboard could not be placed, asked ONCE, and the line is not a clean "fully visible"', async () => {
+    // Where an unlocated keyboard lies is unmeasured: here it eats no stroke.
     const { fake } = androidForm({ startY: 2900, window: { state: 'hidden' }, witness: 'shown', keyboardTop: undefined });
     const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
     expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }); // judged over the whole screen: there is no frame to exclude
@@ -412,13 +412,13 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.keys).toEqual([]);
   });
 
-  it('Android floating keyboard on a DEFAULT clean stop: not asked (review 2026-10-08 — a witness query on every clean stop buys a sentence nobody acts on)', async () => {
+  it('the `unlocated` row on a DEFAULT clean stop: not asked (review 2026-10-08 — a witness query on every clean stop buys a sentence nobody acts on)', async () => {
     const { fake } = androidForm({ startY: 500, window: { state: 'hidden' }, witness: 'shown' });
     expect(await scrollUntilVisible(fake, 'id:priority_select', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
   });
 
-  it('Android floating keyboard at a failed stop: named, with the swipes it may have eaten', async () => {
+  it('the `unlocated` row at a failed stop: named, with the swipes it may have eaten', async () => {
     const { fake } = androidForm({ startY: 0, window: { state: 'hidden' }, witness: 'shown' });
     const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toBe(
