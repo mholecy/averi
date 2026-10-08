@@ -1,4 +1,4 @@
-import { everyNode, KEYBOARD_ROLE, rectArea, sameRect, type DeviceAdapter, type KeyboardOracle, type KeyboardTouchable, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, sameRect, type DeviceAdapter, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
 import { rectText } from './geometry.js';
 
 /**
@@ -170,17 +170,50 @@ export function cannotHide(advice: string | undefined): string {
 }
 
 /**
+ * Why `panelsBeyond` refused a region, or part of one — a closed set, one
+ * case per rule it applies (code review of round 2, 2026-10-08: until then a
+ * free string, so a test or a caller could only match its wording):
+ * - `unreadable`: the input method answered (the call ran) and the region
+ *   line was missing or could not be read whole;
+ * - `witness-not-shown`: the region held rects beside the band, but the
+ *   input method said `hidden` or `unknown` in the same call;
+ * - `no-band-rect`: no rect of the region is the band, byte for byte;
+ * - `rects-dropped`: `dropped` of its rects lie outside the screen the band
+ *   spans or have no area (the rest are admitted).
+ * Rendered in one place, `regionRefusalText`.
+ */
+export type RegionRefusal =
+  | { kind: 'unreadable' }
+  | { kind: 'witness-not-shown'; witness: Exclude<KeyboardWitness, 'shown'> }
+  | { kind: 'no-band-rect' }
+  | { kind: 'rects-dropped'; dropped: number };
+
+/** The clause `oracleKeyboard`'s notice says for a refusal — the one rendering of `RegionRefusal`. */
+export function regionRefusalText(refusal: RegionRefusal): string {
+  switch (refusal.kind) {
+    case 'unreadable':
+      return 'the region could not be read';
+    case 'witness-not-shown':
+      return `the input method said ${refusal.witness} in the same call`;
+    case 'no-band-rect':
+      return 'no rect of it is the band';
+    case 'rects-dropped':
+      return `${refusal.dropped} of its rects lie outside the screen the band spans, or have no area`;
+  }
+}
+
+/**
  * What `panelsBeyond` made of one region: the rects admitted beside the
  * band, and — when the region held something it did NOT admit, or could not
- * be read although the input method answered — why, as a clause, for the
- * one-line notice `oracleKeyboard` writes (review 2026-10-08: a device check
- * must be able to tell "no panel" from "a panel refused, and for which
- * reason"). `ignored` is absent for a region that is just the band (docked)
- * and for a call that failed whole (nothing was learned).
+ * be read although the input method answered — why (`RegionRefusal`), for
+ * the one-line notice `oracleKeyboard` writes (review 2026-10-08: a device
+ * check must be able to tell "no panel" from "a panel refused, and for
+ * which reason"). `refused` is absent for a region that is just the band
+ * (docked) and for a call that failed whole (nothing was learned).
  */
 export interface RegionVerdict {
   panels: readonly Rect[];
-  ignored?: string;
+  refused?: RegionRefusal;
 }
 
 /**
@@ -221,24 +254,24 @@ export interface RegionVerdict {
  * would merge a panel sharing its rows into other rects — has its whole
  * region dropped, and the panel goes back to being invisible: the `d`-key
  * tap of the device check, no worse than before this date. None of these is
- * measured; each refusal is SAID once (`ignored`, `oracleKeyboard`), so a
+ * measured; each refusal is SAID once (`refused`, `oracleKeyboard`), so a
  * device check can tell them apart.
  */
 export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): RegionVerdict {
   const { witness, region } = touchable;
   if (region === undefined) {
     // Said only when the input method answered: then the call ran, and the region line was missing or unreadable.
-    return witness === 'shown' ? { panels: [], ignored: 'the region could not be read' } : { panels: [] };
+    return witness === 'shown' ? { panels: [], refused: { kind: 'unreadable' } } : { panels: [] };
   }
   const beyond = region.filter((r) => !sameRect(r, band));
   if (beyond.length === 0) return { panels: [] }; // the band alone (docked), or an empty region
-  if (witness !== 'shown') return { panels: [], ignored: `the input method said ${witness} in the same call` };
-  if (!region.some((r) => sameRect(r, band))) return { panels: [], ignored: 'no rect of it is the band' };
+  if (witness !== 'shown') return { panels: [], refused: { kind: 'witness-not-shown', witness } };
+  if (!region.some((r) => sameRect(r, band))) return { panels: [], refused: { kind: 'no-band-rect' } };
   const right = band.x + band.width;
   const bottom = band.y + band.height;
   const panels = beyond.filter((r) => rectArea(r) > 0 && r.x >= 0 && r.y >= 0 && r.x + r.width <= right && r.y + r.height <= bottom);
   const dropped = beyond.length - panels.length;
-  return dropped === 0 ? { panels } : { panels, ignored: `${dropped} of its rects lie outside the screen the band spans, or have no area` };
+  return dropped === 0 ? { panels } : { panels, refused: { kind: 'rects-dropped', dropped } };
 }
 
 /** The notices `oracleKeyboard` has written in this process — each distinct one once. */
@@ -271,12 +304,12 @@ export async function oracleKeyboard(oracle: KeyboardOracle): Promise<SoftKeyboa
   const keyboard = await oracle.state();
   if (keyboard.state !== 'shown') return keyboard;
   const touchable = await oracle.touchable();
-  const { panels, ignored } = panelsBeyond(keyboard.frame, touchable);
-  if (ignored !== undefined) {
+  const { panels, refused } = panelsBeyond(keyboard.frame, touchable);
+  if (refused !== undefined) {
     const region = touchable.region === undefined ? 'region' : `region ${touchable.region.map(rectText).join(' + ') || '(empty)'}`;
     const line =
       `averi: the soft keyboard window's touchable ${region} beside its band ${rectText(keyboard.frame)} — ` +
-      `${ignored}, so ${panels.length === 0 ? 'no panel of it is' : 'only part of it is'} judged as covered ` +
+      `${regionRefusalText(refused)}, so ${panels.length === 0 ? 'no panel of it is' : 'only part of it is'} judged as covered ` +
       '(docs/bugs/2026-10-05-android-floating-gboard-keyboard.md)';
     if (!noticed.has(line)) {
       noticed.add(line);

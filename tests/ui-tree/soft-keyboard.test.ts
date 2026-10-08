@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KEYBOARD_ROLE, type KeyboardTouchable, type UiNode } from '../../src/adapters/types.js';
-import { accessoryDismissButton, highestCover, keyboardInTree, keyboardRects, oracleKeyboard, panelsBeyond, partOfKeyboard, readSoftKeyboard } from '../../src/ui-tree/soft-keyboard.js';
+import { accessoryDismissButton, highestCover, keyboardInTree, keyboardRects, oracleKeyboard, panelsBeyond, partOfKeyboard, readSoftKeyboard, regionRefusalText } from '../../src/ui-tree/soft-keyboard.js';
 import { parseTouchableRegion } from '../../src/adapters/android.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, screen } from '../helpers/fake.js';
@@ -153,7 +153,7 @@ const touchableOf = (out: string, witness: KeyboardTouchable['witness']): Keyboa
 describe('panelsBeyond — which rects of the keyboard window count beside the band (the floating-Gboard device check, 2026-10-08)', () => {
   const DOCKED_BAND = { x: 0, y: 1398, width: 1080, height: 822 };
 
-  it('floating, the input method saying shown: the panel — the strip, being the band, is not repeated; nothing ignored', () => {
+  it('floating, the input method saying shown: the panel — the strip, being the band, is not repeated; nothing refused', () => {
     expect(panelsBeyond(GBOARD_STRIP, touchableOf(GBOARD.floating.touchable, 'shown'))).toStrictEqual({ panels: [GBOARD_PANEL] });
   });
 
@@ -167,11 +167,11 @@ describe('panelsBeyond — which rects of the keyboard window count beside the b
     ['the input method says hidden', 'hidden' as const],
     ['the input method could not be asked (unknown — no veto, but no evidence either)', 'unknown' as const],
   ])('nothing unless the input method says SHOWN in the same call: %s — and the refusal says so', (_name, witness) => {
-    expect(panelsBeyond(GBOARD_STRIP, touchableOf(GBOARD.floating.touchable, witness))).toEqual({ panels: [], ignored: `the input method said ${witness} in the same call` });
+    expect(panelsBeyond(GBOARD_STRIP, touchableOf(GBOARD.floating.touchable, witness))).toEqual({ panels: [], refused: { kind: 'witness-not-shown', witness } });
   });
 
   it('nothing from a region that does not hold the band exactly — the stale landscape one, the hidden strip beside a docked band', () => {
-    const noBand = { panels: [], ignored: 'no rect of it is the band' };
+    const noBand = { panels: [], refused: { kind: 'no-band-rect' } };
     expect(panelsBeyond(DOCKED_BAND, touchableOf(GBOARD.staleLandscape.touchable, 'shown'))).toEqual(noBand);
     expect(panelsBeyond(DOCKED_BAND, touchableOf(GBOARD.hidden.touchable, 'shown'))).toEqual(noBand);
     // A strip one pixel off the inset frame (another nav mode, unmeasured): the whole region is dropped, said.
@@ -179,17 +179,25 @@ describe('panelsBeyond — which rects of the keyboard window count beside the b
     // The stale rect beside a band it does hold: it does not fit the screen the band spans (2220 > 1080 wide).
     expect(panelsBeyond(GBOARD_STRIP, { witness: 'shown', region: [GBOARD_PANEL, { x: 0, y: 948, width: 2220, height: 132 }, GBOARD_STRIP] })).toEqual({
       panels: [GBOARD_PANEL],
-      ignored: '1 of its rects lie outside the screen the band spans, or have no area',
+      refused: { kind: 'rects-dropped', dropped: 1 },
     });
   });
 
   it('an unreadable region is none — said only when the input method answered (the call ran); a zero-area or off-screen rect is dropped', () => {
-    expect(panelsBeyond(GBOARD_STRIP, { witness: 'shown', region: undefined })).toEqual({ panels: [], ignored: 'the region could not be read' });
+    expect(panelsBeyond(GBOARD_STRIP, { witness: 'shown', region: undefined })).toEqual({ panels: [], refused: { kind: 'unreadable' } });
     expect(panelsBeyond(GBOARD_STRIP, { witness: 'unknown', region: undefined })).toStrictEqual({ panels: [] });
     const flat = { x: 359, y: 1269, width: 681, height: 0 };
     const negative = { x: -10, y: 1269, width: 100, height: 100 };
     const below = { x: 0, y: 2200, width: 100, height: 100 };
     expect(panelsBeyond(GBOARD_STRIP, { witness: 'shown', region: [flat, negative, below, GBOARD_PANEL, GBOARD_STRIP] }).panels).toEqual([GBOARD_PANEL]);
+  });
+
+  it('each refusal is rendered in one place, regionRefusalText — the notice\'s clause per case', () => {
+    expect(regionRefusalText({ kind: 'unreadable' })).toBe('the region could not be read');
+    expect(regionRefusalText({ kind: 'witness-not-shown', witness: 'hidden' })).toBe('the input method said hidden in the same call');
+    expect(regionRefusalText({ kind: 'witness-not-shown', witness: 'unknown' })).toBe('the input method said unknown in the same call');
+    expect(regionRefusalText({ kind: 'no-band-rect' })).toBe('no rect of it is the band');
+    expect(regionRefusalText({ kind: 'rects-dropped', dropped: 2 })).toBe('2 of its rects lie outside the screen the band spans, or have no area');
   });
 
   it('keyboardRects is the band, then the panels; highestCover the one whose top is highest (ties keep the band)', () => {
