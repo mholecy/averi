@@ -17,6 +17,7 @@ import {
 } from '../../src/interact/resolve.js';
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
+import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { dropBand, el, FakeAdapter, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
@@ -555,9 +556,11 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
 
     it('probe E: a walked width turns the box (852x393 on a 393x852 panel), but witnesses nothing — (100,500) is TAPPED', async () => {
       const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
-      const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 480, width: 100, height: 40 } })), { width: 393, height: 852 });
+      // 200x40: not screen-shaped, so it does not discredit the walked width (geometry.ts#walkExtent).
+      const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 480, width: 200, height: 40 } })), { width: 393, height: 852 });
+      expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 852, height: 393 }); // the turn this probe is about
       await tapElement(fake, 'id:go', OPTS);
-      expect(fake.tapPoints).toEqual([{ x: 100, y: 500 }]);
+      expect(fake.tapPoints).toEqual([{ x: 150, y: 500 }]);
     });
 
     it('the measured case on an unwitnessed screen: below the fold either way up — still refused, and says it judged both ways', async () => {
@@ -651,6 +654,18 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       /^id:login_submit is off screen at \(107,924\) on a 402x874 screen \(rect 36,900 141x48\) — scroll_until it first; nothing was tapped$/,
     );
     expect(fake.taps).toEqual([]);
+  });
+
+  it('review round 2 — probe J: on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {
+    const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
+    const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 580, width: 200, height: 40 } })), { width: 393, height: 852 });
+    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 852, height: 393 });
+    expect(await scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    await tapElement(fake, 'id:go', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 150, y: 600 }]);
+    // Outside both ways up: still never intersected, and said so.
+    fake.live().children[8].rect = { x: 50, y: 900, width: 200, height: 40 };
+    await expect(scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 852x393 viewport either way up');
   });
 
   it('M2 — probe I: scroll_until judges on the tap\'s screen, turned in landscape (WDA root 874x402 on a 402x874 panel): y 500 is NOT visible', async () => {

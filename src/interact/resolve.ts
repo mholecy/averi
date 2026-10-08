@@ -431,7 +431,9 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
  * `wm size` change would otherwise refuse taps for the server's life (review
  * 2026-10-08, M3; the same re-read verify/capture.ts makes before refusing a
  * window as wider than the screen). The refusal names the size read again
- * when it differs from the first.
+ * when it differs from the first. A fresh read that FAILS is dropped by the
+ * memo (adapters/viewport-memo.ts), so `tapScreen` then asks the device once
+ * more — one extra read on a refusal path, accepted.
  *
  * `sent`, when the keyboard guard acted before this look — `back was
  * pressed …`, `id:"login_title" was tapped …` (`Hiding.sent`) — fronts the
