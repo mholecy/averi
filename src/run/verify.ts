@@ -22,7 +22,6 @@ import {
   formatRectParity,
   validateRectContract,
   type RectLeg,
-  type RectParityOptions,
 } from '../verify/rect-parity.js';
 import {
   compareTextParity,
@@ -31,7 +30,6 @@ import {
   textMeasurement,
   validateTextContract,
   type TextCapture,
-  type TextParityOptions,
 } from '../verify/text-parity.js';
 import type { Contribution } from '../verify/contribution.js';
 
@@ -202,6 +200,15 @@ export const assertSummary = (results: AssertResult[]): string => {
 export const LOG_GREP_FLAGS = 'i';
 
 /**
+ * How many matching lines a log excerpt keeps when the caller names no
+ * budget — the tail, where the failure is. Owned here, where the limit is
+ * applied; the MCP get_logs tool's schema default and description quote it.
+ * (Until 2026-10-08 this function defaulted to 2000 while the tool's schema
+ * said 400, two defaults for one limit.)
+ */
+export const LOG_MAX_LINES = 400;
+
+/**
  * Device-log excerpt: filter to a regex, keep the tail, and say what that did.
  * Pure — it takes the lines rather than the device — because the COUNTING is
  * the part that misleads when it is wrong: a grep that silently matched
@@ -209,7 +216,7 @@ export const LOG_GREP_FLAGS = 'i';
  * not admit it reads like the whole story. Worth a test; untestable inside a
  * tool handler.
  */
-export function formatLogExcerpt(all: string[], grep: string | undefined, maxLines = 2000): string {
+export function formatLogExcerpt(all: string[], grep: string | undefined, maxLines = LOG_MAX_LINES): string {
   const re = grep === undefined ? undefined : new RegExp(grep, LOG_GREP_FLAGS);
   const lines = re === undefined ? all : all.filter((l) => re.test(l));
   const tail = lines.slice(-maxLines);
@@ -275,9 +282,8 @@ const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFra
 
 /**
  * The parity dimensions a contract can add to a run: the table's title, the
- * predicate deciding whether THIS contract produces it, the options its
- * comparator runs under, and the comparator's own validator for the fields it
- * will read.
+ * predicate deciding whether THIS contract produces it, and the comparator's
+ * own validator for the fields it will read.
  *
  * One owner for "is this table produced", on purpose: the same `produced` is
  * asked twice per run — before the legs, to decide whose fields are validated,
@@ -289,12 +295,19 @@ const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFra
  * One owner for the OPTIONS for the same reason (review 2026-10-03): the
  * validator answers "what would the comparator raise" only if both are asked
  * under the same options — the colour theme picks the contract key that is
- * read. `options` is the ONE object handed to both `validate` (dimensionProblems)
- * and the compare call below; a dark-mode round that set the theme for the
- * comparator alone would let a bad `bg_dark` through validation and fail it
- * after the legs, which is the cost this whole check exists to remove.
+ * read. `COLOR_OPTIONS` is the ONE object handed to both the colour `validate`
+ * (dimensionProblems) and the compare call below; a dark-mode round that set
+ * the theme for the comparator alone would let a bad `bg_dark` through
+ * validation and fail it after the legs, which is the cost this whole check
+ * exists to remove. Colour is the only dimension with options (2026-10-08):
+ * the rect and text comparators, and their validators, read everything from
+ * the contract — each comparator used to take a test-only tolerance override
+ * production never passed (`{}` here), which the validators had to take too
+ * only to mirror it (parity review 2026-10-07 P2; rect-parity.ts#
+ * tolerancesOf). Until then this record carried an `options` field per
+ * dimension, two of three always `{}`.
  *
- * The table holds FACTS only — title, produced, options, validate — the four
+ * The table holds FACTS only — title, produced, validate — the three
  * that are asked at two moments (before the legs, after them) and must agree
  * between the two. Everything about HOW one table is built — what a leg
  * contributes, what the section says when no leg could, what the run decided
@@ -309,39 +322,38 @@ const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFra
  * the record and one loop over the three, which would have needed type
  * erasure to iterate a heterogeneous record.
  */
-interface ParityDimension<Options> {
+interface ParityDimension {
   title: string;
   produced: (contract: LayoutContract) => boolean;
-  options: Options;
-  validate: (contract: LayoutContract, options: Options) => string[];
+  validate: (contract: LayoutContract) => string[];
 }
 
-const DIMENSIONS: {
-  rect: ParityDimension<RectParityOptions>;
-  color: ParityDimension<ColorParityOptions>;
-  text: ParityDimension<TextParityOptions>;
-} = {
+/**
+ * The colour table's options — validated under and compared under, both
+ * through this one object (see ParityDimension).
+ *
+ * Theme is always 'light' — deliberate: verify exposes no theme input
+ * because averi cannot switch device themes, and sampling a light capture
+ * against bg_dark hexes would fake dark evidence. The comparator's theme
+ * option (and its tests) is the plumbing for the deferred dark-mode round.
+ */
+const COLOR_OPTIONS: ColorParityOptions = { theme: 'light' };
+
+const DIMENSIONS: { rect: ParityDimension; color: ParityDimension; text: ParityDimension } = {
   // Geometry is what a contract IS: the rect table exists whenever one does.
   rect: {
     title: 'rect parity',
     produced: () => true,
-    options: {},
     validate: validateRectContract,
   },
   // Opt-in: any anchor carrying bg / bg_dark / sample. Reuses each leg's
   // frame — the exact pixels already returned to the caller, the tree read
   // beside them and the scale derived once — never a second capture that
-  // could race a UI change.
-  //
-  // Theme is always 'light' — deliberate: verify exposes no theme input
-  // because averi cannot switch device themes, and sampling a light capture
-  // against bg_dark hexes would fake dark evidence. The comparator's theme
-  // option (and its tests) is the plumbing for the deferred dark-mode round.
+  // could race a UI change. Under COLOR_OPTIONS, the one theme verify runs.
   color: {
     title: 'color parity',
     produced: contractHasColorAnchors,
-    options: { theme: 'light' },
-    validate: validateColorContract,
+    validate: (contract) => validateColorContract(contract, COLOR_OPTIONS),
   },
   // Opt-in: any anchor carrying text / text_dynamic. The recognizer runs on
   // the bytes each leg already returned; when it cannot run at all the run
@@ -349,7 +361,6 @@ const DIMENSIONS: {
   text: {
     title: 'text parity',
     produced: contractHasTextAnchors,
-    options: {},
     validate: validateTextContract,
   },
 };
@@ -358,8 +369,8 @@ const DIMENSIONS: {
 const SKIPPED_NO_TREE = 'SKIPPED: no leg produced a UI tree.';
 
 /** One dimension's problems — none when this contract does not produce its table. */
-const dimensionProblems = <Options>(d: ParityDimension<Options>, contract: LayoutContract): string[] =>
-  d.produced(contract) ? d.validate(contract, d.options) : [];
+const dimensionProblems = (d: ParityDimension, contract: LayoutContract): string[] =>
+  d.produced(contract) ? d.validate(contract) : [];
 
 /**
  * Every problem the run's own tables would raise about the contract's field
@@ -375,9 +386,9 @@ const dimensionProblems = <Options>(d: ParityDimension<Options>, contract: Layou
  * A dimension is asked only if this contract would produce its table, so a
  * contract with no colour anchors is never refused over `tolerance_de`.
  *
- * Each validator is handed its dimension's `options` — the same object the
- * table below hands the comparator — so what is refused here is what would
- * have failed there.
+ * Each validator asks what its comparator will ask — the contract, and for
+ * colour the same COLOR_OPTIONS the table below hands the comparator — so
+ * what is refused here is what would have failed there.
  *
  * The lines are the comparators' messages UNTOUCHED: each already opens with
  * its dimension's title, which is what names the dimension per line (pinned
@@ -553,8 +564,8 @@ export async function runVerification(
   });
 
   if (contract !== undefined) {
-    // The options are the dimension's, shared with the validation that ran
-    // before the legs (see ParityDimension). The three sections are produced
+    // The colour options are COLOR_OPTIONS, shared with the validation that
+    // ran before the legs (see ParityDimension). The three sections are produced
     // the same way — one `paritySection` call each, handed what one leg
     // contributes and what the section says when none could; only the
     // comparator differs.
@@ -563,7 +574,7 @@ export async function runVerification(
         await paritySection(DIMENSIONS.rect.title, platforms, runs, {
           collect: rectLegOf,
           empty: SKIPPED_NO_TREE,
-          format: (trees) => formatRectParity(compareRectParity(contract, trees, DIMENSIONS.rect.options)),
+          format: (trees) => formatRectParity(compareRectParity(contract, trees)),
         }),
       );
     }
@@ -572,7 +583,7 @@ export async function runVerification(
         await paritySection(DIMENSIONS.color.title, platforms, runs, {
           collect: measuredOf,
           empty: 'SKIPPED: no leg produced both a UI tree and a decodable screenshot.',
-          format: (captures) => formatColorParity(compareColorParity(contract, captures, DIMENSIONS.color.options)),
+          format: (captures) => formatColorParity(compareColorParity(contract, captures, COLOR_OPTIONS)),
         }),
       );
     }
@@ -589,7 +600,7 @@ export async function runVerification(
           },
           empty: SKIPPED_NO_TREE,
           runNotes: text.runNotes,
-          format: (captures) => formatTextParity(compareTextParity(contract, captures, DIMENSIONS.text.options)),
+          format: (captures) => formatTextParity(compareTextParity(contract, captures)),
         }),
       );
     }

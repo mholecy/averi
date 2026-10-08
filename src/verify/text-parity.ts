@@ -138,15 +138,6 @@ export interface TextCapture {
   ocr?: TextOcr;
 }
 
-export interface TextParityOptions {
-  /**
-   * Overrides the contract's `tolerance_size_pct`. Test-facing only, same
-   * stance as rect and color parity: the tolerance belongs to the committed
-   * contract, not to the caller of a run.
-   */
-  sizeTolerancePct?: number;
-}
-
 // ------------------------------------------------------------- extraction
 
 /**
@@ -537,15 +528,14 @@ function isDynamic(anchor: LayoutAnchor): boolean {
 }
 
 /**
- * The size tolerance in force: the test-facing override, else the contract's
- * `tolerance_size_pct`, else the default — and never a non-number. Shared by
- * the comparator and `validateTextContract`.
+ * The size tolerance in force: the contract's `tolerance_size_pct`, else the
+ * default — and never a non-number. Shared by the comparator and
+ * `validateTextContract`. The contract is its only source (2026-10-08; a
+ * `sizeTolerancePct` option nothing ever passed is gone —
+ * rect-parity.ts#tolerancesOf has the account).
  */
-function sizeTolerancePctOf(contract: LayoutContract, opts: TextParityOptions): number {
-  return positiveTolerance(
-    opts.sizeTolerancePct ?? contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT,
-    'text parity: tolerance_size_pct',
-  );
+function sizeTolerancePctOf(contract: LayoutContract): number {
+  return positiveTolerance(contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT, 'text parity: tolerance_size_pct');
 }
 
 /**
@@ -561,9 +551,9 @@ function sizeTolerancePctOf(contract: LayoutContract, opts: TextParityOptions): 
  * nothing here depends on the device: the comparator parses both fields of
  * every opted-in anchor before it measures anything.
  */
-export function validateTextContract(contract: LayoutContract, opts: TextParityOptions = {}): string[] {
+export function validateTextContract(contract: LayoutContract): string[] {
   return problemsThrownBy('text parity: ', [
-    () => void sizeTolerancePctOf(contract, opts),
+    () => void sizeTolerancePctOf(contract),
     ...contract.anchors
       .filter(wantsTextCheck)
       .flatMap((anchor) => [() => void expectedTextOf(anchor), () => void isDynamic(anchor)]),
@@ -651,12 +641,11 @@ function measure(
 export function compareTextParity(
   contract: LayoutContract,
   captures: Partial<Record<Platform, TextCapture>>,
-  opts: TextParityOptions = {},
 ): TextParityResult {
   const platforms = (['android', 'ios'] as const).filter((p) => captures[p] !== undefined);
   if (platforms.length === 0) throw new Error('text parity: no platform capture provided');
 
-  const sizeTolerancePct = sizeTolerancePctOf(contract, opts);
+  const sizeTolerancePct = sizeTolerancePctOf(contract);
 
   const rows: TextRow[] = [];
   const findings: TextFinding[] = [];

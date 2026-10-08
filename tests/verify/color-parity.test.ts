@@ -210,6 +210,7 @@ describe('compareColorParity — themes', () => {
   it('dark theme uses bg_dark; an anchor with only bg gets vs-contract skipped with a note', () => {
     const c = contract({
       screen: 's',
+      tolerance_de: 6,
       anchors: [
         { id: 'card', bg: WHITE, bg_dark: '#363644' },
         { id: 'pill', bg: WHITE },
@@ -223,7 +224,7 @@ describe('compareColorParity — themes', () => {
         return measured(root(200, 400, [leaf('card', 20, 20, 100, 60), leaf('pill', 20, 100, 100, 40)]), png);
       })(),
     };
-    const r = compareColorParity(c, captures, { theme: 'dark', toleranceDe: 6 });
+    const r = compareColorParity(c, captures, { theme: 'dark' });
     expect(r.theme).toBe('dark');
     expect(r.rows[0]).toMatchObject({ deAc: 0, verdict: 'OK' });
     expect(r.rows[1].deAc).toBeUndefined();
@@ -311,13 +312,16 @@ describe('compareColorParity — single-platform runs', () => {
     );
   });
 
-  // NaN cannot reach here through a contract — that is JSON, `NaN` serializes
-  // to `null`, and `null ?? DEFAULT` takes the default. It IS reachable from
-  // the programmatic override, which is where the finite check earns its keep.
-  it('a NaN tolerance override is rejected, and a null in the JSON just defaults', () => {
-    const c = contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE }] });
+  // NaN cannot reach here through a contract FILE — that is JSON, `NaN`
+  // serializes to `null`, and `null ?? DEFAULT` takes the default. It IS
+  // reachable from a contract built in code (the field is `unknown`), which
+  // is where the finite check earns its keep. Until 2026-10-08 this was
+  // pinned through a test-only `toleranceDe` option, now gone (parity
+  // review P2): the contract is the one way in.
+  it('a NaN tolerance_de in a contract built in code is rejected, and a null in the JSON just defaults', () => {
+    const c: LayoutContract = { ...contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE }] }), tolerance_de: Number.NaN };
     const captures = { android: capturePair(WHITE, WHITE).android };
-    expect(() => compareColorParity(c, captures, { toleranceDe: Number.NaN })).toThrow(
+    expect(() => compareColorParity(c, captures)).toThrow(
       'color parity: tolerance_de must be a positive number, got null',
     );
     const nulled = contract({ screen: 's', tolerance_de: null, anchors: [{ id: 'card', bg: WHITE }] });

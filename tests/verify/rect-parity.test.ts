@@ -28,7 +28,6 @@ const screenOf = (tree: UiNode): DeviceScreen | undefined =>
 const compare = (
   c: LayoutContract,
   trees: Partial<Record<Platform, UiNode>>,
-  opts?: Parameters<typeof compareRectParity>[2],
   screens: Partial<Record<Platform, DeviceScreen>> = {},
 ) =>
   compareRectParity(
@@ -39,7 +38,6 @@ const compare = (
         { tree, window: windowWidth(tree, screens[p as Platform] ?? screenOf(tree)) },
       ]),
     ),
-    opts,
   );
 
 /** The `rect` assert primitive, its window judged the way Verifier judges it. */
@@ -181,7 +179,7 @@ describe('compareRectParity — normalization and width inference', () => {
   });
 
   it('prints what the device screen witnessed above the table: a window narrower than the screen', () => {
-    const r = compare(contract(), { android: androidTree(), ios: iosTree() }, undefined, {
+    const r = compare(contract(), { android: androidTree(), ios: iosTree() }, {
       ios: { width: 786, height: 1704 }, // twice the window: a half-width split view
     });
     expect(r.widths).toEqual([
@@ -197,7 +195,7 @@ describe('compareRectParity — normalization and width inference', () => {
     // A pixel-scale window in a point tree: the 2026-08-26 junk shape, 3x the panel.
     const pixelScale = root(1179, 2556, [leaf('header', 72, 300, 1035, 180), leaf('card', 72, 540, 1035, 387)]);
     expect(() =>
-      compare(contract(), { ios: pixelScale }, undefined, { ios: { width: 393, height: 852 } }),
+      compare(contract(), { ios: pixelScale }, { ios: { width: 393, height: 852 } }),
     ).toThrow(/^rect parity: ios: the tree's window is 1179 wide but the 393x852 device screen is 393 on the short side/);
   });
 
@@ -461,29 +459,31 @@ describe('compareRectParity — finding semantics', () => {
     expect(r.findings.every((f) => Number.isFinite(f.delta))).toBe(true);
   });
 
-  it('respects contract tolerance_pct default (2.0) and the option override', () => {
+  // 2026-10-08: the tolerance lives in the contract only — the comparator's
+  // test-facing `tolerancePct` option is gone (parity review P2), so the
+  // looser threshold is set where production sets it.
+  it('respects contract tolerance_pct: default 2.0 when unset, the contract\'s value when set', () => {
     const c = contract();
     delete c.tolerance_pct;
     const android = androidTree();
     findAnchorRect(android, 'card').rect.x = px(46);
-    expect(compare(c, { android, ios: iosTree() }).tolerancePct).toBe(2.0);
-    const loose = compare(c, { android, ios: iosTree() }, { tolerancePct: 10 });
+    const strict = compare(c, { android, ios: iosTree() });
+    expect(strict.tolerancePct).toBe(2.0);
+    expect(strict.pass).toBe(false); // 5.6% > 2%
+    const loose = compare({ ...c, tolerance_pct: 10 }, { android, ios: iosTree() });
+    expect(loose.tolerancePct).toBe(10);
     expect(loose.pass).toBe(true); // 5.6% < 10%
   });
 
-  // 2026-10-03: the option is the test-facing WIDTH override. The comparator's
-  // comment said it does not reach the shape threshold; the code let it,
-  // whenever the contract left tolerance_aspect_pct unset.
-  it('the tolerancePct option never becomes the aspect threshold: that falls back to the CONTRACT\'s tolerance_pct', () => {
+  it('the aspect threshold falls back to the contract\'s tolerance_pct, and to the default when the contract names neither', () => {
     const c = contract();
-    c.tolerance_pct = 5;
+    c.tolerance_pct = 50;
     delete c.tolerance_aspect_pct;
-    const r = compare(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 });
+    const r = compare(c, { android: androidTree(), ios: iosTree() });
     expect(r.tolerancePct).toBe(50);
-    expect(r.aspectTolerancePct).toBe(5);
-    // … and to the default when the contract names neither.
+    expect(r.aspectTolerancePct).toBe(50);
     delete c.tolerance_pct;
-    expect(compare(c, { android: androidTree(), ios: iosTree() }, { tolerancePct: 50 }).aspectTolerancePct).toBe(2.0);
+    expect(compare(c, { android: androidTree(), ios: iosTree() }).aspectTolerancePct).toBe(2.0);
   });
 });
 
@@ -744,19 +744,6 @@ describe('validateRectContract — the read-time diagnosis, without a tree', () 
     expect(validateRectContract(c)).toEqual([readTime]);
   });
 
-  // The validator takes the comparator's options so both derive the thresholds
-  // through one function. No option can change the ANSWER today — the override
-  // only replaces the fallback, which is never validated — so what is pinned is
-  // that the answer under an override is still the comparator's own, both ways.
-  it('under the comparator\'s options it still answers as the comparator does', () => {
-    const opts = { tolerancePct: 5 };
-    expect(validateRectContract(contract(), opts)).toEqual([]);
-    expect(() => compare(contract(), { android: androidTree(), ios: iosTree() }, opts)).not.toThrow();
-    const bad: LayoutContract = { ...contract(), tolerance_aspect_pct: 0 };
-    const readTime = thrownBy(() => compare(bad, { android: androidTree(), ios: iosTree() }, opts));
-    expect(validateRectContract(bad, opts)).toEqual([readTime]);
-  });
-
   // The shared derivation, comparator side: an undeclared tolerance_aspect_pct
   // takes the contract's tolerance_pct, not the default (2).
   it('the aspect threshold the comparator reports falls back to the contract\'s tolerance_pct', () => {
@@ -833,7 +820,7 @@ describe('a window that starts inset: x is measured from its left edge', () => {
   });
 
   it('the table: the anchor\'s x is window-relative, and it is within tolerance', () => {
-    const r = compare({ screen: 't', figma_frame_width: 2290, anchors: [{ id: 'card', x: 100, w: 1000 }] }, { android: inset() }, undefined, {
+    const r = compare({ screen: 't', figma_frame_width: 2290, anchors: [{ id: 'card', x: 100, w: 1000 }] }, { android: inset() }, {
       android: ANDROID,
     });
     expect(r.widths).toEqual([{ platform: 'android', width: 2290, note: undefined }]);

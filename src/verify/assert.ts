@@ -174,8 +174,12 @@ export interface AssertResult {
  */
 export const DEFAULT_BASELINE_DIR = '.averi/baselines';
 
-/** The default budget of a tree assert (element, absent, rect, text) that names no `timeout`. */
-const ASSERT_TIMEOUT_MS = 3_000;
+/**
+ * The default budget of a tree assert (element, absent, rect, text) that names
+ * no `timeout`. Exported for the MCP tool descriptions and the bare-tree note
+ * (mcp/tools.ts, mcp/tool-text.ts), which quote it rather than restate it.
+ */
+export const ASSERT_TIMEOUT_MS = 3_000;
 
 /**
  * The default budget of a color or ocr assert that names no `timeout`
@@ -191,8 +195,9 @@ const ASSERT_TIMEOUT_MS = 3_000;
  * the capture overran it, which 4954ab4 stopped. 12 s covers two rounds
  * there with a margin for a slower emulator; a poll that passes returns as
  * soon as it does, so the larger budget costs only a failing assert.
+ * Exported for the `assert` tool's description, which quotes it.
  */
-const PIXEL_ASSERT_TIMEOUT_MS = 12_000;
+export const PIXEL_ASSERT_TIMEOUT_MS = 12_000;
 
 export interface VerifierOptions {
   baselineDir?: string;

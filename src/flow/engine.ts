@@ -271,6 +271,14 @@ export const runRequestOf = (state?: string, flow?: string): RunRequest | undefi
   return s !== undefined ? { state: s, flow: f } : f !== undefined ? { flow: f } : undefined;
 };
 
+/**
+ * How long a state may take to appear when the caller names no
+ * `ensureTimeoutMs`: the wait after the reach flows AND the second look
+ * before a destructive rung (see the refusal comment in ensureStateInner).
+ * Exported for the `ensure_state` tool's description, which quotes it.
+ */
+export const DEFAULT_ENSURE_TIMEOUT_MS = 20_000;
+
 export interface EngineOptions {
   /**
    * Poll interval for waits — and ONLY that (2026-10-05). It is handed to the
@@ -419,7 +427,7 @@ export class FlowEngine {
     this.pollMs = opts.pollMs ?? 500;
     this.tapTimeoutMs = opts.tapTimeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
     this.waitTimeoutMs = opts.waitTimeoutMs ?? 10_000;
-    this.ensureTimeoutMs = opts.ensureTimeoutMs ?? 20_000;
+    this.ensureTimeoutMs = opts.ensureTimeoutMs ?? DEFAULT_ENSURE_TIMEOUT_MS;
     this.optionalTimeoutMs = opts.optionalTimeoutMs ?? 1_500;
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;

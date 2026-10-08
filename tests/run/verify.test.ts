@@ -11,6 +11,7 @@ import {
   assertSummary,
   contractProblems,
   formatLogExcerpt,
+  LOG_MAX_LINES,
   paritySection,
   runVerification,
 } from '../../src/run/verify.js';
@@ -1276,6 +1277,15 @@ describe('formatLogExcerpt', () => {
     const out = formatLogExcerpt(['ERROR boom', 'info ok'], 'error');
     expect(out).toBe('[grep /error/i matched 1 of 2 lines]\nERROR boom');
     expect(formatLogExcerpt(['info ok'], 'crash')).toBe('[grep /crash/i matched 0 of 1 lines]');
+  });
+
+  // One limit, one owner: the get_logs tool's schema default is this same
+  // constant (tests/mcp/tool-descriptions.test.ts); until 2026-10-08 the
+  // function alone defaulted to 2000.
+  it('keeps LOG_MAX_LINES lines when the caller names no budget', () => {
+    const out = formatLogExcerpt(lines(LOG_MAX_LINES + 1), undefined).split('\n');
+    expect(out[0]).toBe(`[truncated: showing last ${LOG_MAX_LINES} of ${LOG_MAX_LINES + 1} lines]`);
+    expect(out).toHaveLength(LOG_MAX_LINES + 1);
   });
 
   it('keeps the TAIL when truncating and admits it', () => {

@@ -5,14 +5,16 @@ import { findAll } from '../ui-tree/selectors.js';
 import { fillField } from '../interact/fill.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
-import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { tapElement } from '../interact/tap.js';
 import { fillText, launchText, snapshotNote, tapText } from './tool-text.js';
 import { resolveLaunchActivity } from '../flow/config.js';
 import { appBuildPath } from '../flow/load.js';
 import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
 import { TOOL_CONFIG } from './config-policy.js';
-import { assertSpecSchema } from '../verify/assert.js';
+import { ASSERT_TIMEOUT_MS, assertSpecSchema, PIXEL_ASSERT_TIMEOUT_MS } from '../verify/assert.js';
+import { DEFAULT_ENSURE_TIMEOUT_MS } from '../flow/engine.js';
+import { formatSeconds } from '../util/duration.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
@@ -23,7 +25,7 @@ import {
   runEnsureState,
   runNamedFlow,
 } from '../run/commands.js';
-import { formatLogExcerpt, LOG_GREP_FLAGS, runVerification } from '../run/verify.js';
+import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
 import type { Platform, UiNode } from '../adapters/types.js';
@@ -134,8 +136,18 @@ const launchIntentInput = z
   })
   .strict();
 
-/** The settle budget as the tool descriptions quote it — derived, so the number has one owner (interact/resolve.ts). */
-const SETTLE_BUDGET = `${DEFAULT_SETTLE_TIMEOUT_MS / 1000} s`;
+/**
+ * The operation defaults as the tool descriptions quote them — each derived
+ * from the constant its module owns, so a default changed there cannot leave
+ * a description stale (architecture review 2026-10-07, mcp-surface candidate
+ * 3: half the numbers were derived, half were literals — "3 s" in three
+ * places, "12 s", "Default 6", "~20 s"). tests/mcp/tool-descriptions.test.ts pins each
+ * description against its constant.
+ */
+const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/resolve.ts
+const ASSERT_BUDGET = formatSeconds(ASSERT_TIMEOUT_MS); // verify/assert.ts
+const PIXEL_ASSERT_BUDGET = formatSeconds(PIXEL_ASSERT_TIMEOUT_MS); // verify/assert.ts
+const ENSURE_BUDGET = formatSeconds(DEFAULT_ENSURE_TIMEOUT_MS); // flow/engine.ts
 
 const assertsInput = z
   .array(z.unknown())
@@ -308,7 +320,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
         'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id. ' +
-        'A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (3 s by default; set "timeout" in the spec). Does not itself wait. ' +
+        `A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds only wrappers and unlabeled decoration — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (${ASSERT_BUDGET} by default; set "timeout" in the spec). Does not itself wait. ` +
         'iOS wda with the software keyboard up: one node has role "keyboard" — its rect is the band the keyboard covers (keys, AutoFill bar, accessory toolbar slot), where a tap is refused — and the two Windows that ARE the keyboard\'s UI carry "ofKeyboard": true (their descendants — keys, Done, the Passwords bar — are tappable); an input-accessory toolbar (the Done above a number pad) has role "toolbar".',
       inputSchema: {
         platform,
@@ -424,7 +436,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         platform,
         selector: z.string().describe('Element to scroll into view, e.g. \'id:submit_button\''),
         direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Default down'),
-        maxSwipes: z.number().int().min(1).optional().describe('Default 6'),
+        maxSwipes: z.number().int().min(1).optional().describe(`Default ${DEFAULT_MAX_SWIPES}`),
         fully: z
           .boolean()
           .optional()
@@ -457,7 +469,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'ensure_state',
     {
       description:
-        'Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. If the UI tree cannot be read (e.g. iOS idb stuck on a 0×0 tree) or holds nothing rendered (a cold launch\'s decor or splash) for the whole ~20 s second look, a destructive (clearState) reach flow is refused rather than run blind: the call fails with "Refused to run reach flow …" and a ⛔ line in the trace — nothing was wiped; compare with screenshot and retry once the screen has rendered, or run_flow the rung deliberately. Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.',
+        `Get the app into a named state from averi.yaml (e.g. "logged_in"): detects if already there, otherwise runs the reach flows (login etc.) and confirms. Idempotent — always prefer this over manual login taps. If the UI tree cannot be read (e.g. iOS idb stuck on a 0×0 tree) or holds nothing rendered (a cold launch's decor or splash) for the whole ~${ENSURE_BUDGET} second look, a destructive (clearState) reach flow is refused rather than run blind: the call fails with "Refused to run reach flow …" and a ⛔ line in the trace — nothing was wiped; compare with screenshot and retry once the screen has rendered, or run_flow the rung deliberately. Returns the step trace and a final screenshot, settled the same way \`screenshot\` settles it.`,
       inputSchema: {
         platform,
         state: z.string().describe('State name from averi.yaml'),
@@ -507,7 +519,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots. ' +
         'A `match` (element or ocr) that is not a valid JavaScript regex is refused with the arguments, naming the field, before any device is touched. ' +
         'With averi.yaml naming the app for the platform, an appAlive health line follows the results; without averi.yaml the asserts run alone, and an invalid one fails the call on either platform. ' +
-        'Budgets: an assert without its own `timeout` waits up to 3 s (tree asserts) or 12 s (color/ocr — a round is a tree read plus a settled pair of captures, ~4.3 s on an Android emulator, and a screen with a clock or caret needs two); a passing assert returns at once, a color/ocr assert whose measurement keeps failing spends its whole budget — pass `timeout` to shorten it.',
+        `Budgets: an assert without its own \`timeout\` waits up to ${ASSERT_BUDGET} (tree asserts) or ${PIXEL_ASSERT_BUDGET} (color/ocr — a round is a tree read plus a settled pair of captures, ~4.3 s on an Android emulator, and a screen with a clock or caret needs two); a passing assert returns at once, a color/ocr assert whose measurement keeps failing spends its whole budget — pass \`timeout\` to shorten it.`,
       inputSchema: { platform, asserts: assertsInput, configPath },
     },
     async ({ platform: p, asserts, configPath: cp }) => {
@@ -595,8 +607,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           .number()
           .int()
           .positive()
-          .default(400)
-          .describe('Keep only the last N matching lines (default 400). A grep alone is not a budget — a broad one matched 2,002 lines / 483k characters in one measured session.'),
+          .default(LOG_MAX_LINES)
+          .describe(`Keep only the last N matching lines (default ${LOG_MAX_LINES}). A grep alone is not a budget — a broad one matched 2,002 lines / 483k characters in one measured session.`),
       },
     },
     async ({ platform: p, sinceSeconds, grep, maxLines }) => {

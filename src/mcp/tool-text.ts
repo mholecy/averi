@@ -18,6 +18,8 @@
 import { everyNode, type Platform, type UiNode } from '../adapters/types.js';
 import { isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import type { FillResult } from '../interact/fill.js';
+import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
+import { formatSeconds } from '../util/duration.js';
 
 /** `Tapped <selector>`, with the resolution note in parentheses when there was one. */
 export const tapText = (selector: string, note: string | undefined): string =>
@@ -71,7 +73,8 @@ export const launchText = (launch: {
  *   without a filter: ⚠, the two readings (still loading; or the tree
  *   source stuck on a rendered screen), the one check that tells them apart
  *   (screenshot), the one thing not to do (read the element as absent), and
- *   `assert` as the poller (3 s by default — verify/assert.ts). The
+ *   `assert` as the poller (its default budget quoted from verify/assert.ts's
+ *   ASSERT_TIMEOUT_MS, not restated). The
  *   unfiltered case gets it too: a root with no children reads as "nothing
  *   on screen" just as a `[]` does, and the rule is the tree's, not the
  *   filter's.
@@ -88,7 +91,7 @@ export const snapshotNote = (tree: UiNode, match?: { selector: string; matched: 
       `⚠ ${lead} tree is bare: ${nodeCount([...everyNode(tree)])}, none readable or interactive (only wrappers and unlabeled decoration). ` +
       'The accessibility tree is empty or unrendered: the screen may still be loading, or — measured on iOS idb 2026-10-06 — ' +
       'the tree stays empty for minutes on a rendered screen. Compare with screenshot: if the screen is rendered, the tree source is stuck, ' +
-      'not the app — do not read the element as absent. assert polls (3 s by default; set "timeout" in the spec).'
+      `not the app — do not read the element as absent. assert polls (${formatSeconds(ASSERT_TIMEOUT_MS)} by default; set "timeout" in the spec).`
     );
   }
   if (match === undefined) return undefined;

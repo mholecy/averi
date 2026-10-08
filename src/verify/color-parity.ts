@@ -234,15 +234,14 @@ function contractTargetOf(anchor: LayoutAnchor, id: string, theme: ColorTheme): 
 const themeOf = (opts: ColorParityOptions): ColorTheme => opts.theme ?? 'light';
 
 /**
- * The primary-axis tolerance in force: the test-facing override, else the
- * contract's `tolerance_de`, else the default — and never a non-number.
- * Shared by the comparator and `validateColorContract`.
+ * The primary-axis tolerance in force: the contract's `tolerance_de`, else
+ * the default — and never a non-number. Shared by the comparator and
+ * `validateColorContract`. The contract is its only source (2026-10-08; a
+ * test-only `toleranceDe` option that production never passed is gone —
+ * rect-parity.ts#tolerancesOf has the account).
  */
-function toleranceDeOf(contract: LayoutContract, opts: ColorParityOptions): number {
-  return positiveTolerance(
-    opts.toleranceDe ?? contract.tolerance_de ?? DEFAULT_TOLERANCE_DE,
-    'color parity: tolerance_de',
-  );
+function toleranceDeOf(contract: LayoutContract): number {
+  return positiveTolerance(contract.tolerance_de ?? DEFAULT_TOLERANCE_DE, 'color parity: tolerance_de');
 }
 
 /**
@@ -270,7 +269,7 @@ function toleranceDeOf(contract: LayoutContract, opts: ColorParityOptions): numb
 export function validateColorContract(contract: LayoutContract, opts: ColorParityOptions = {}): string[] {
   const theme = themeOf(opts);
   return problemsThrownBy('color parity: ', [
-    () => void toleranceDeOf(contract, opts),
+    () => void toleranceDeOf(contract),
     ...contract.anchors.flatMap((anchor) => [
       () => void sampleModeOf(anchor, anchor.id),
       () => void contractTargetOf(anchor, anchor.id, theme),
@@ -336,14 +335,14 @@ export interface ColorParityResult {
   pass: boolean;
 }
 
+/**
+ * What varies between calls of the colour table that the contract cannot
+ * say: the theme the captures were taken in. The tolerance is not here — it
+ * belongs to the committed contract (`tolerance_de`), not to the caller of a
+ * run, and tests set it there too.
+ */
 export interface ColorParityOptions {
   theme?: ColorTheme;
-  /**
-   * Overrides the contract's `tolerance_de` (default 8). Test-facing only,
-   * same stance as rect parity: the tolerance belongs to the committed
-   * contract, not to the caller of a run.
-   */
-  toleranceDe?: number;
 }
 
 /**
@@ -412,7 +411,7 @@ export function compareColorParity(
   if (platforms.length === 0) throw new Error('color parity: no platform capture provided');
   const theme = themeOf(opts);
 
-  const tol = toleranceDeOf(contract, opts);
+  const tol = toleranceDeOf(contract);
   const ctol = tol * CONTRACT_TOL_FACTOR;
 
   // Per-platform stats + scale — failing closed on anything degenerate: a

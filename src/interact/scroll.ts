@@ -8,10 +8,13 @@ import { swipeVector, type Direction } from './swipe.js';
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
 
+/** The swipe bound when the caller has none — the MCP scroll_until tool's documented default is derived from it too. */
+export const DEFAULT_MAX_SWIPES = 6;
+
 export interface ScrollOptions {
   /** Where the CONTENT lies relative to the current view (down = below the fold → finger swipes up). Default down. */
   direction?: Direction;
-  /** Default 6. */
+  /** Default DEFAULT_MAX_SWIPES. */
   maxSwipes?: number;
   /** Require the element ENTIRELY inside the viewport, not merely overlapping it. Default false. */
   fully?: boolean;
@@ -106,7 +109,7 @@ export async function scrollUntilVisible(
   opts: ScrollOptions = {},
 ): Promise<ScrollUntilResult> {
   const direction = opts.direction ?? 'down';
-  const maxSwipes = opts.maxSwipes ?? 6;
+  const maxSwipes = opts.maxSwipes ?? DEFAULT_MAX_SWIPES;
   const fully = opts.fully === true;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS;
   const settleMs = opts.settleMs ?? 400;
