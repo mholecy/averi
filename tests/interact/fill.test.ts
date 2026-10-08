@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillCaveats, fillField } from '../../src/interact/fill.js';
+import { charactersText, DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillCaveats, fillField, fillUnverifiedText } from '../../src/interact/fill.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
@@ -464,7 +464,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const byValue = idbFloatingLabelFake('IBAN*', 'XX');
     byValue.onTap = fake.onTap;
     const moved = await fillField(byValue, 'role:textfield value:"XX"', 'abc', { ...FAST, clear: true });
-    expect(moved).toMatchObject({ readBack: 'no-value' });
+    expect(moved).toMatchObject({ readBack: 'lost', lost: 'unmatched' }); // not found — not "exposes no value"
   });
 
   it('a node of another role whose value TOOK the text is an input whatever its role: no not-input finding', async () => {
@@ -575,7 +575,51 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       fake.current = 'next'; // typing submitted and navigated
     };
     const result = await fillField(fake, 'role:textfield value:"XX12345"', 'abc', { ...FAST, clear: true });
-    expect(result.readBack).toBe('no-value'); // not a false "landed" off screen B's field
+    expect(result).toMatchObject({ readBack: 'lost', lost: 'screen-changed' }); // not a false "landed" off screen B's field
+  });
+
+  // iOS device check (2026-10-08, re-run at e9e6509): the IBAN field held
+  // `XX12345` with an inline `iban_input_error` under it; the clear and the
+  // typing landed, the error went away and an `iban_notice` appeared — the
+  // screen's id set changed, so the identity fallback rightly refused. The
+  // reply then said the TEXTFIELD "exposes no value" — a node that had just
+  // had 7 characters deleted. Not found is said as not found, and an input
+  // that was not found gets no not-a-textfield ⚠.
+  it('the screen\'s ids change while typing (an inline error goes, a notice comes): readBack lost, screen-changed — not no-value, no not-input finding', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const children = () => fake.live().children;
+    children().push(node({ role: 'text', identifier: 'iban_input_error', label: 'Invalid IBAN', rect: { x: 26, y: 400, width: 350, height: 15 } }));
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      await origType(text);
+      const at = children().findIndex((n) => n.identifier === 'iban_input_error');
+      children().splice(at, 1, node({ role: 'text', identifier: 'iban_notice', label: 'Check the IBAN', rect: { x: 26, y: 400, width: 350, height: 15 } }));
+    };
+    const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89370400440532013000', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([7]);
+    expect(inputOf(fake)?.value).toBe('DE89370400440532013000'); // the field DID hold the text — as measured
+    expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: 'lost', lost: 'screen-changed', notInput: undefined });
+    expect(fillUnverifiedText(result)).toBe('NOT verified: the field could not be found again (the screen changed while typing)');
+    expect(fillCaveats(result)).toEqual([]);
+  });
+
+  it('counts are singular for one: `1 character` in the clear-twice error and charactersText itself', async () => {
+    expect([0, 1, 2].map(charactersText)).toEqual(['0 characters', '1 character', '2 characters']);
+    resetLayout();
+    const fake = new FakeAdapter({ s: screen(el({ role: 'textfield', identifier: 'pin', value: 'xy' })) }, 's');
+    fake.clearText = async (count: number) => {
+      fake.deletes.push(count);
+      const f = fake.live().children[0];
+      f.value = 'x'; // one character never goes
+    };
+    await expect(fillField(fake, 'id:pin', '', { ...FAST, clear: true })).rejects.toThrow('fill: field still shows 1 character after clearing twice');
+  });
+
+  it('a node that IS found but shows no value is still no-value, with no `lost`', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const result = await fillField(fake, 'text:"IBAN*"', 'DE89', FAST);
+    expect(result.readBack).toBe('no-value');
+    expect(result).not.toHaveProperty('lost');
   });
 
   it('the identity fallback is not asked after typing when nothing was read before it', async () => {
@@ -585,7 +629,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const fake = idbFloatingLabelFake('IBAN*', 'XX');
     const result = await fillField(fake, 'role:textfield value:"XX"', 'abc', FAST);
     expect(inputOf(fake)?.value).toBe('XXabc');
-    expect(result.readBack).toBe('no-value');
+    expect(result).toMatchObject({ readBack: 'lost', lost: 'unmatched' });
   });
 
   describe('sameField matches exactly one node of the same role, id and rect', () => {
@@ -600,7 +644,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
       fake.live().children.push(node({ role: 'textfield', identifier: 'TextFieldWithComponentStyle', value: 'other', rect: { ...at } }));
       const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89', { ...FAST, clear: true });
-      expect(result.readBack).toBe('no-value');
+      expect(result).toMatchObject({ readBack: 'lost', lost: 'unmatched' });
     });
     it('a node at the same rect with another role, or another id, is not a twin: verified', async () => {
       expect((await fill(node({ role: 'text', identifier: 'TextFieldWithComponentStyle', rect: { ...at } }))).readBack).toBe('landed');

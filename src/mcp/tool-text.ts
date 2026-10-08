@@ -17,7 +17,7 @@
 
 import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
-import { fillCaveats, fillClearedText, fillUnverifiedText, type FillResult } from '../interact/fill.js';
+import { charactersText, fillCaveats, fillClearedText, fillUnverifiedText, type FillResult } from '../interact/fill.js';
 import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
@@ -31,10 +31,14 @@ export const tapText = (selector: string, note: string | undefined): string =>
  * wording of each fact is fill.ts's, shared with the flow line:
  * - read back and landed (or nothing to type):
  *   `Filled <selector> (N characters[, cleared M characters first])[ (note)]`
- * - nothing to read back (`readBack: 'no-value'`):
- *   `Typed N characters into <selector> — NOT verified: the matched node
- *   exposes no value (role R)[; clear sent no delete …][ (note)]` — a
- *   different verb, so "Filled" never stands for a fill nobody saw.
+ * - nothing to read back (`readBack: 'no-value'`, `not-taken`, `lost`):
+ *   `Typed N characters into <selector> — NOT verified: <reason>[; clear
+ *   sent no delete …][ (note)]`, the reason e.g. `the matched node exposes
+ *   no value (role R)` or `the field could not be found again (the screen
+ *   changed while typing)` — a different verb, so "Filled" never stands for
+ *   a fill nobody saw.
+ * Every count is fill.ts#charactersText: `1 character`, never `1
+ * characters` (2026-10-08 device checks).
  * Then each caveat (fill.ts#fillCaveats: a matched node that is not an
  * input, the masked-append warning) on its own `⚠` line, so it is not lost
  * inside the parentheses. "cleared" is what was SENT, never the requested
@@ -47,10 +51,17 @@ export const fillText = (selector: string, fill: { length: number } & FillResult
   const cleared = fillClearedText(fill);
   const head =
     unverified === undefined
-      ? `Filled ${selector} (${fill.length} characters${cleared === undefined ? '' : `, ${cleared}`})`
-      : `Typed ${fill.length} characters into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
+      ? `Filled ${selector} (${charactersText(fill.length)}${cleared === undefined ? '' : `, ${cleared}`})`
+      : `Typed ${charactersText(fill.length)} into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
   return head + (fill.note ? ` (${fill.note})` : '') + fillCaveats(fill).map((c) => `\n⚠ ${c}`).join('');
 };
+
+/**
+ * `Typed N characters` — type_text without a selector: the focused field
+ * is typed into and nothing is read back, so there is no fill to render.
+ * Moved out of the handler 2026-10-08 with the singular (charactersText).
+ */
+export const typedText = (length: number): string => `Typed ${charactersText(length)}`;
 
 /**
  * `Swiped[ <direction>] (x,y) → (x,y)` — the stroke actually sent, for a

@@ -9,7 +9,7 @@ import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
-import { fillText, launchText, snapshotNote, swipeText, tapText } from './tool-text.js';
+import { fillText, launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
 import { resolveLaunchActivity } from '../flow/config.js';
 import { appBuildPath } from '../flow/load.js';
 import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
@@ -433,7 +433,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields), ' +
-        `then verifies the text landed and retries a dropped clear-fill once; a matched node that exposes no value is reported as "Typed … — NOT verified" (never "Filled"), "cleared" counts the characters actually deleted, and a match that is not a textfield (e.g. an iOS idb floating label) gets a ⚠ line naming the nearest input unless its value changed to show the text (then it took it) — clear sends it no delete (its length is not the field's). The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
+        `then verifies the text landed and retries a dropped clear-fill once; a matched node that exposes no value, or a field the read-back could not find again (the screen changed while typing), is reported as "Typed … — NOT verified" with that reason (never "Filled"), "cleared" counts the characters actually deleted, and a match that is not a textfield (e.g. an iOS idb floating label) gets a ⚠ line naming the nearest input unless its value changed to show the text (then it took it) — clear sends it no delete (its length is not the field's). The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
         'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first); ' +
         'a field whose centre lies off the screen is refused, nothing tapped or typed — scroll_until it first. ' +
         'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting a fill it could not re-read. Without selector: types into whatever is focused. ' +
@@ -452,7 +452,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       if (selector === undefined) {
         if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
         await typeIntoFocused(adapter, value);
-        return text(`Typed ${value.length} characters`);
+        return text(typedText(value.length));
       }
       const fill = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });
       return text(fillText(selector, { length: value.length, ...fill }));
