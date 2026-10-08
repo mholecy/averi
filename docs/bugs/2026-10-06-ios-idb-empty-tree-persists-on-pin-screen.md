@@ -1,5 +1,9 @@
 # BUG (measured addendum): the iOS idb tree stayed EMPTY for 4+ minutes after a cold relaunch to the PIN screen, not just "right after launch"
 
+> **Status (2026-10-08):** fixed on main in `1e0501d` (2026-10-06) — the "bug-fix branch (not yet on `main`)" below is on main; the prevention listed under "Deferred" shipped in `73eea5f` (2026-10-07), and since `b546c98` (2026-10-08) `ui_snapshot`'s settle read re-reads an empty idb tree once after 1 s; the in-place cure is still not implemented.
+>
+> Shas below are pre-squash branch commits; on main: `d69511e` → `b413ae8`.
+
 **Measured 2026-10-06 17:02–17:07 CEST**, mp-native `com.finshape.dbosbanking` on `iPhone 17` (iOS 26.5), default idb
 tree source, server built from `d69511e`. This extends `2026-10-06-ui-snapshot-empty-right-after-launch.md`, which
 measured the problem only within seconds of `launch_app`.
@@ -90,7 +94,7 @@ Same direction as the existing note, made stronger. A tree whose root has zero a
 
 ## Fix
 
-**Shipped (branch `fix/bugs-2026-10-06`).**
+**Shipped (branch `fix/bugs-2026-10-06`).** On main as `1e0501d`.
 - **The read.** `IdbTreeSource.read` (`src/adapters/ios-tree-source.ts`) throws `IdbEmptyTreeError` when the payload
   is `[]` or no element has a positive-area frame. The message names the cause, the screenshot check and
   `app.ios.treeSource: wda`.
@@ -126,3 +130,7 @@ Same direction as the existing note, made stronger. A tree whose root has zero a
 - A first-read delay after launch.
 - Widening the signature, for example to a lone framed `Application` lasting seconds inside an episode. Only if the
   raw JSON shows such a phase.
+
+Prevention shipped 2026-10-07 in `73eea5f` (see
+[2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md](2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md));
+the in-place cure is still deferred.

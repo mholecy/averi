@@ -1,5 +1,7 @@
 # Phase 1 — Adapter Core (weeks 1–3)
 
+> **Status (2026-10-08):** complete (historical plan). Since then `verify_both` is `verify` (`04dfae5`) and `setClipboard` was removed (`8413120`); licensing (Phase 4) is not implemented, and the idb-or-WDA decision below was settled by keeping idb the default with WDA opt-in ([ios-wda-tree-source.md](ios-wda-tree-source.md)).
+
 Goal (from ARCHITECTURE.md §9): adb + simctl/idb adapters, screenshot, tap/type/swipe, normalized `ui_snapshot`, MCP wiring, manual smoke test on a real app.
 
 Exit criteria: from a coding agent connected over stdio, on both a booted Android emulator and an iOS simulator, you can `list_devices`, `install_app`, `screenshot`, `ui_snapshot`, and drive `tap`/`type_text`/`swipe`/`press_key` reliably.
@@ -18,7 +20,7 @@ Exit criteria: from a coding agent connected over stdio, on both a booted Androi
 - [x] `uiTree` — `uiautomator dump /dev/tty` → XML (fast-xml-parser) → normalized `UiNode`; role mapping table (android.widget.* → button/text/textfield/...)
 - [x] input — `input tap/swipe/text/keyevent`; text escaping (spaces → %s, shell metachars)
 - [x] `logs` — `adb logcat -d -T <epoch>`
-- [ ] `setClipboard` — no reliable pure-adb path found; deferred (throws with a clear message)
+- [ ] `setClipboard` — no reliable pure-adb path found; deferred (throws with a clear message). **Removed** 2026-10-08 in `8413120`: no caller, gone from the interface and both adapters.
 - Unit tests run against recorded fixtures (sample `uiautomator` XML, `adb devices` output); no emulator needed in tests.
 
 ### 1.3 iOS adapter (`src/adapters/ios.ts`) — simctl + idb
@@ -45,7 +47,7 @@ Exit criteria: from a coding agent connected over stdio, on both a booted Androi
 ### 1.6 Smoke test (manual, real devices)
 - [x] Stdio round-trip verified: initialize → tools/list → `list_devices` found a real booted device (Pixel 8 Pro over adb); `screenshot` returned a real PNG
 - [x] Full walk on booted Android emulator + iOS simulator (2026-07-08): `launch_app` Settings on both → `ui_snapshot` → selector tap (`text~"Network"` / `label:General`) → screenshot confirmed the navigation happened → `press_key back` / `get_logs`. Every tool worked on both platforms.
-- [ ] Repeat against the banking app dev build with paired screenshots (needs the app build — first real dogfood, ties into Phase 2 `averi.yaml`)
+- [ ] Repeat against the banking app dev build with paired screenshots (needs the app build — first real dogfood, ties into Phase 2 `averi.yaml`) — dogfooded on the skeleton dev build in 2026-08 (see [2026-08-26-ensure-state-no-recovery-pass.md](../bugs/2026-08-26-ensure-state-no-recovery-pass.md), [2026-08-27-user-settings-run-four-findings.md](../bugs/2026-08-27-user-settings-run-four-findings.md)); paired screenshots there not confirmed
 
 **Findings (feeds §10 risk assessment):**
 - Android Settings tree is rich: stable `resource-id`s (`title`, `summary`), labels intact. `uiautomator dump /dev/tty` worked as expected.

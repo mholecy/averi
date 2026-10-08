@@ -2,6 +2,14 @@
 
 *2026-08-14 · reviewed at commit `683dc45` plus the uncommitted color-parity work in the tree.*
 
+> **Status (2026-10-08):** a dated snapshot. Most of §5 landed, some under other names: the verify run is
+> `src/run/verify.ts`, tested by `tests/run/verify.test.ts` (not the `tests/verify/run.test.ts` step 6 proposes);
+> `tapElement` is in `src/interact/tap.ts`; the poll is `src/verify/poll-verdict.ts`; tables are `src/verify/table.ts`;
+> `verify/layout-contract.ts`, `ui-tree/geometry.ts`, `util/duration.ts`, `util/sleep.ts` and `swipeVector` exist. The
+> `server.ts:…` line numbers refer to `683dc45` plus that uncommitted work.
+>
+> `683dc45` is a pre-squash branch commit; on main: `683dc45` → `9c5ae14`.
+
 Scope: separation of concerns, clean-code alignment (function size / parameter count / readability), and
 abstraction extraction for shared code — with an explicit bias against over-abstraction.
 

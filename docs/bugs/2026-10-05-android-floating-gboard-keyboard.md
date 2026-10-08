@@ -1,5 +1,7 @@
 # BUG: Android floating Gboard is invisible to the keyboard handling (Maestro `hideKeyboard` measured; averi suspected)
 
+> **Status (2026-10-08):** open — the code quoted below as `src/interact/keyboard.ts dismissKeyboard()` moved in `0e48a63` (2026-10-07): the decision is `src/interact/keyboard-window.ts#dismissal`, which still maps a `clear` window to nothing.
+
 **Measured 2026-10-05** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`), emulator-5554 (Pixel_3a AVD,
 API 33, 1080x2220), app `com.finshape.skeleton.dev`, flow `android/.maestro/own-transfer.yaml` run through
 `scripts/run-maestro.sh`. Filed from the SWIFT-payment journey-developer run (run folder

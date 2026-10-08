@@ -1,5 +1,7 @@
 # BUG: the "this rung is DESTRUCTIVE" warning fires on a one-tap flow whose `requires` is already satisfied
 
+> **Status (2026-10-08):** fixed on main in `b2b3d02` (2026-10-06) — the DESTRUCTIVE warning now speaks for the rung's own steps only, so "Why (read from the source)" below describes the code before the fix.
+
 **Measured 2026-10-05 21:26 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`), averi 0.9.0-era tree
 (`src/flow/engine.ts`, `src/flow/config.ts` as of `a6df808`), both platforms (emulator-5554 Pixel_3a API 33, iPhone 17
 simulator iOS 26.5). Filed from the SWIFT-payment journey-developer run (`debug-ai-logger/2026-10-05-1304-swift-payment/`).

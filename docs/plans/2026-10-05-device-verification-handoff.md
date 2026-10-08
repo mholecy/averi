@@ -1,5 +1,9 @@
 # Handoff: on-device verification of the 2026-10-04/05 architecture series
 
+> **Status (2026-10-08):** run 2026-10-06 under [2026-10-06-device-test-agent-instructions.md](2026-10-06-device-test-agent-instructions.md); its findings are the `docs/bugs/2026-10-06-*.md` notes (the first four in `d0c7764`) and their device-check sections.
+>
+> Shas below are pre-squash branch commits; on main: `ea5c66a` → `1f5473a`.
+
 *For the next agent. Written 2026-10-05 after the second architecture pass landed; the device run was
 deferred by the user. Nothing below has been run against the final tree — the numbers and screens quoted
 are from the 2026-10-05 run against `5473982` (the end of the first series), which is the baseline to

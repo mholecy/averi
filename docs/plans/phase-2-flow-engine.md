@@ -1,5 +1,7 @@
 # Phase 2 — Flow Engine (weeks 4–6)
 
+> **Status (2026-10-08):** complete (historical plan). Since then `verify_both` is `verify` (`04dfae5`); licensing (Phase 4), OTP `prompt_human` and `record_flow`, listed under "Out of scope", are not implemented.
+
 Goal (ARCHITECTURE.md §4, §9): `averi.yaml` schema, `ensure_state`, branch/optional/wait, secret injection; login works end-to-end on both platforms after reinstall.
 
 Exit criteria: with an `averi.yaml` checked into an app repo and credentials in env vars, `ensure_state("logged_in")` detects the current state, runs the right login path (PIN vs. fresh), dismisses interstitials, and confirms the target state — without the agent ever seeing a credential.
@@ -32,7 +34,7 @@ Exit criteria: with an `averi.yaml` checked into an app repo and credentials in 
 - [x] Verified end-to-end on real devices (2026-07-08) with a Settings-app averi.yaml: cold `ensure_state` navigates and confirms on BOTH platforms; second call is an idempotent no-op ("already active")
 
 ### 2.4 Dogfood (manual)
-- [ ] Write `averi.yaml` for the banking app dev build; `ensure_state("logged_in")` end-to-end on both platforms after reinstall — needs the app build + test credentials
+- [ ] Write `averi.yaml` for the banking app dev build; `ensure_state("logged_in")` end-to-end on both platforms after reinstall — needs the app build + test credentials — `averi.yaml` written and ensure_state run on the skeleton dev build in 2026-08 (see [2026-08-26-ensure-state-no-recovery-pass.md](../bugs/2026-08-26-ensure-state-no-recovery-pass.md), [2026-08-27-user-settings-run-four-findings.md](../bugs/2026-08-27-user-settings-run-four-findings.md)); "both platforms after reinstall" not confirmed
 
 ## Out of scope
 `assert`, `verify_both`, log-scan `appAlive`, baselines (Phase 3); licensing (Phase 4); OTP `prompt_human`, `record_flow` (v2).

@@ -1,5 +1,9 @@
 # Device check: round 2, phase 1 — ElementNotFoundError and the averi.yaml read policy (2026-10-08)
 
+> **Status (2026-10-08):** on main.
+>
+> Shas below are pre-squash branch commits; on main: `fb171ef` → `1225d63`.
+
 **Measured 2026-10-08 09:58–10:04 CEST (07:58–08:04 UTC)**, averi `dist/` built from `fb171ef` (branch
 `architecture/round2-2026-10-08`; commits `8040351` refactor(interact) ElementNotFoundError, `fb171ef` refactor(mcp)
 one averi.yaml read per tool call). Driven through the handoff's stdio MCP driver `run-tools.mts`

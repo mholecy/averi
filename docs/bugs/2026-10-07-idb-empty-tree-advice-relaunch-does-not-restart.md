@@ -1,5 +1,7 @@
 # The empty-idb-tree advice says `launch_app` clears it, but `launch_app` does not restart a running app
 
+> **Status (2026-10-08):** fixed on main in `79b458e` (2026-10-07).
+
 *Found 2026-10-07 in the device check of `73eea5f` (see
 [2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md](2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md),
 "Device check of the fix", I5). finportal, iPhone 17 iOS 26.5 (`D34212DB-…`), `treeSource: idb` scratch config.*

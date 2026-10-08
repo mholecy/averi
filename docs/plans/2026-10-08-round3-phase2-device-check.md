@@ -1,5 +1,9 @@
 # Device check: round 3, phase 2 — the swipe box, derived descriptions, OCR decided once, the reboot hint (2026-10-08)
 
+> **Status (2026-10-08):** on main.
+>
+> The build sha below is a pre-squash branch commit; on main: `2a4fc84` → `49d4bae`.
+
 **Measured 2026-10-08 13:04–13:13 CEST**, averi `dist/` rebuilt (`npm run build`) from `2a4fc84`, the head of branch
 `architecture/round3-2026-10-08` at the time (the shas below are the commits as squashed after this check), which carries the four phase-2 commits under test: `326503a` (the simulator reboot hint
 has one owner and names the bound UDID), `882e28f` (tool descriptions derive their numbers from the owning constants),
@@ -108,7 +112,8 @@ left (864,1110)→(216,1110). iOS 402x874 gives up (201,699)→(201,175) and lef
    re-reads an idb empty tree once a second later …` (not device-checked): `ui_snapshot`'s `settle` read now re-reads an
    idb empty tree once after 1 s (`IosAdapter.uiTree`, `IDB_EMPTY_RETRY_MS`), and a second empty tree fails with the same
    first line and advice opening `The read was retried once after 1 s and was still empty`; pollers and the stuck path
-   are unchanged.
+   are unchanged. Closed later: device-checked in round 4 ([2026-10-08-round4-device-check.md](2026-10-08-round4-device-check.md)
+   §I: 12 of 13 cold-launch snapshots returned a rendered tree; the retried error was not provoked on device).
 6. **`scroll_until` "found after N>0 swipes" was not exercised.** The login screen fits the viewport on both platforms,
    and no scrollable screen is reachable without logging in.
 7. **The iOS rotate path was not exercised.** No iOS rotation was done.

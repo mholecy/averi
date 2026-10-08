@@ -1,5 +1,9 @@
 # BUG: with the default 3 s timeout a `color`/`ocr` assert cannot pass on the Android emulator, and passes only sometimes on iOS
 
+> **Status (2026-10-08):** fixed on main in `23e144d` (2026-10-06) — color and ocr asserts default to `PIXEL_ASSERT_TIMEOUT_MS` (12 s).
+>
+> Shas below are pre-squash branch commits; on main: `d69511e` → `b413ae8`, `c444c79` → `9adf9c0`, `610864a` → `d0c7764`, `c5ff1c8` → `23e144d`.
+
 **Measured 2026-10-06 16:45–17:00 CEST** against `d69511e` (`dist/` built from it), driven by the handoff's stdio driver.
 Android `emulator-5554` (Pixel_3a AVD, API 33, 1080x2220). iOS `iPhone 17` iOS 26.5 (finportal: `treeSource: wda`;
 mp-native: idb). Logs: `$RUN/out/b-android-static*.log`, `b-ios*.log`, `c-a-form.log`, `c-a-spinner.log`, where

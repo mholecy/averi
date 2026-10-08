@@ -5,6 +5,20 @@ flow deferred to the RN project session (MyPort has no `averi.yaml` flows yet); 
 (idb describe-all median 167 ms vs WDA /source median 322 ms on the deep screen, first call ~2.9 s)
 → `wda` stays opt-in, no `auto` promotion for now.
 
+> **Status (2026-10-08):** implemented and in use — finportal (`sk.finportal.myport`, the MyPort app) now runs
+> `treeSource: wda` with its own `averi.yaml` flows, and the 2026-10 device checks drove it. Since then:
+>
+> - `verify_both` is `verify` (renamed in `04dfae5`, 2026-08-14).
+> - `appium-webdriveragent` is an optional dependency of averi, no longer a devDependency (Decisions, item 1 below).
+> - One WDA session left every later idb launch on the simulator with an empty tree until a reboot; since `73eea5f`
+>   (2026-10-07) every launch and deep link first re-enables the simulator's accessibility keys
+>   ([2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md](../bugs/2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md)).
+> - The WDA tree shows the iOS soft keyboard: a tap whose point it covers is refused (`6f41787`), unless
+>   `app.ios.keyboardDismiss` names a dismissal on screen, which the guard taps first (`0036762`)
+>   ([2026-10-05-ios-tap-lands-on-soft-keyboard.md](../bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md)).
+> - The unidentified `StaticText` echo WDA nests under every React Native text is dropped when the tree is parsed
+>   (`wda-source.ts#isTextEcho`, `6a93602`), so an RN text reads once.
+
 ## Problem
 
 `idb ui describe-all --json` returns the flattened list of **accessibility elements**. React Native

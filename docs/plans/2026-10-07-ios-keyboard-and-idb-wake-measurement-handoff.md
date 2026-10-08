@@ -1,5 +1,7 @@
 # Handoff: device measurements before fixing the iOS keyboard tap and the stuck idb tree
 
+> **Status (2026-10-08):** run 2026-10-07; the results are the "Measured 2026-10-07 (pre-fix)" sections of the two bug notes linked below (2026-10-05-ios-tap-lands-on-soft-keyboard.md, 2026-10-06-wda-read-wakes-stuck-idb-tree.md) and [2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md](../bugs/2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md). The fixes are on main: `73eea5f` (idb), `6f41787` and `0036762` (keyboard).
+
 *For the agent that runs the measurement. Written 2026-10-07 from two read-only assessments of
 [2026-10-05-ios-tap-lands-on-soft-keyboard.md](../bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md) (bug K) and
 [2026-10-06-wda-read-wakes-stuck-idb-tree.md](../bugs/2026-10-06-wda-read-wakes-stuck-idb-tree.md) (bug I, parent:

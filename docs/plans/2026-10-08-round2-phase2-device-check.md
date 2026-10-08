@@ -1,5 +1,9 @@
 # Device check: round 2, phase 2 — regex at parse, PNG-or-transport-error, empty secrets, state cycles (2026-10-08)
 
+> **Status (2026-10-08):** on main.
+>
+> Shas below are pre-squash branch commits; on main: `0bde46f` → `2794f5e`, `1e0d0bf` → `3400e12`, `25cb887` → `069c7c0`.
+
 **Measured 2026-10-08 11:04–11:12 CEST (09:04–09:12 UTC)**, averi `dist/` built from `25cb887` (branch
 `architecture/round2-2026-10-08`; phase-2 commits `cb2192b` fix(interact) AfterDismissalTap, `83f99bb` fix(verify)
 regex refused at parse, `0bde46f` fix(adapters) a screenshot is a PNG or a transport error, `1e0d0bf` fix(flow) empty

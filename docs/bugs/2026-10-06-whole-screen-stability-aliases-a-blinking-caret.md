@@ -1,5 +1,9 @@
 # BUG (measurement): whole-screen stability calls a blinking-caret screen "settled", so no `⚠ frame:` appears and a baseline is created from it
 
+> **Status (2026-10-08):** baseline creation fixed on main in `51ee4f1` (2026-10-06); the general stability wait's blind spot (no `⚠ frame:` on a caret screen) stays, recorded in `src/verify/capture.ts`.
+>
+> Shas below are pre-squash branch commits; on main: `d69511e` → `b413ae8`, `4b1f7fa` → `9e0ebbb`, `1382df4` → `51ee4f1`.
+
 **Measured 2026-10-06 16:47–16:52 CEST** against `d69511e`, finportal login screen with `login_username` focused.
 Android `emulator-5554` (API 33) and iOS `iPhone 17` (iOS 26.5, WDA). Logs: `$RUN/out/b-android-caret*.log`,
 `$RUN/out/b-ios.log`, with `RUN=/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/9f3935d1-240c-470b-93c9-c353ad95f1dd/scratchpad/device-run`.

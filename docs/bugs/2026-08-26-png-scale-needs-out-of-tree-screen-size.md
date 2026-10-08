@@ -99,6 +99,7 @@ the real bytes on the next device round), plus cases in `tests/ui-tree/geometry.
 
 **Still open: the acceptance run.** Nobody has yet run the §Acceptance asserts on the device
 against this build. Until that happens, this is a fix that passes its tests.
+*Closed later: see §Acceptance run — PASSED on device (2026-08-27, averi 0.6.0) below.*
 
 ## Review round (2026-08-27) — two ways the first cut reintroduced the bug
 

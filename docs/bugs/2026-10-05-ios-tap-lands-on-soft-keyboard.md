@@ -1,5 +1,7 @@
 # BUG: on iOS a tap under the soft keyboard presses the keyboard, and the trace reports it done
 
+> **Status (2026-10-08):** fixed on main in `6f41787` (stage A, 2026-10-07) and `0036762` (stage B, 2026-10-07) — `tests/interact/keyboard.test.ts`, named in a device-check section below, was split in `0e48a63` into `keyboard-in-tree.test.ts` and `keyboard-window.test.ts`.
+
 Measured 2026-10-05 during the on-device verification of the 2026-10-04/05 series
 (`docs/plans/2026-10-05-device-verification-handoff.md`), tree at `56a111f`, finportal `login` flow,
 iPhone 17 simulator (iOS 26.5), `app.ios.treeSource: wda`.

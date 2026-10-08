@@ -1,5 +1,7 @@
 # BUG: an iOS `fill` / `type_text` with an empty value fails in idb after the field was tapped
 
+> **Status (2026-10-08):** fixed on main in `5786fc3` (2026-10-07).
+
 **Measured 2026-10-07** during the stage B keyboard device check (`0036762`), finportal, iPhone 17 iOS 26.5
 (`D34212DB-…`), scratch config with `treeSource: wda`. Found while trying to focus a field without typing, so that the
 keyboard would stay up for `dismissKeyboard: true`. See

@@ -1,5 +1,9 @@
 # BUG (measured): the bare-tree ⚠ never fires during a React Native splash read through WDA — the splash image carries an identifier
 
+> **Status (2026-10-08):** fixed on main in `1ebd539` (2026-10-06) — "Code says" below quotes the pre-fix `|| Boolean(n.identifier)`; `ui-tree/bare-tree.ts` now counts a decoration node as content only when it is labelled (`return Boolean(n.label)`), and the splash fixture is pinned in `tests/ui-tree/bare-tree.test.ts`.
+>
+> Shas below are pre-squash branch commits; on main: `ae6245f` → `1ebd539` (squashed together with this fix).
+
 **Measured 2026-10-06 18:10–18:16 CEST**, finportal `sk.finportal.myport` (Expo / React Native debug build, Metro
 running), `iPhone 17` simulator iOS 26.5, server built from `ae6245f` (branch `fix/bugs-2026-10-06`), driver
 `run-tools.mts` from the device-verification handoff. Found while device-checking the `ui_snapshot` note added by

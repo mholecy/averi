@@ -1,5 +1,9 @@
 # Instructions: on-device verification of the architecture/deepening series
 
+> **Status (2026-10-08):** run 2026-10-06; its findings are the `docs/bugs/2026-10-06-*.md` notes (the first four in `d0c7764`).
+>
+> Shas below are pre-squash branch commits; on main: `ea5c66a` → `1f5473a`, `c444c79` → `9adf9c0`, `d69511e` → `b413ae8`.
+
 *For the agent that runs the device test. Written 2026-10-06. The authoritative scenario list and the
 expected results are in [2026-10-05-device-verification-handoff.md](2026-10-05-device-verification-handoff.md);
 this file adds what that handoff lacks: the run order, the mp-native mechanics (taken from the mp-native

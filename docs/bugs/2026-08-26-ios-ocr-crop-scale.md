@@ -130,7 +130,7 @@ Shutting 1 and 2 needs a screen size from OUTSIDE the tree — `simctl` device m
 `/window/size`, `wm size` — which is what "Expected fix shape" above actually asks for. That is
 the follow-up; this change is not it.
 
-**Still open:** on-device confirmation. The fix removes the failure class for root-bearing trees
+**Still open:** on-device confirmation. *(Closed later: see §On-device confirmation and §CLOSED below.)* The fix removes the failure class for root-bearing trees
 (WDA, single-root uiautomator), but nobody has yet dumped the real WDA tree with the sheet up,
 so which node inflated the width is still unknown.
 

@@ -1,5 +1,7 @@
 # Phase 3 — Verification + Skill (weeks 7–8)
 
+> **Status (2026-10-08):** complete (historical plan). Since then `verify_both` is `verify` (`04dfae5`, 2026-08-14); of the backlog, auto-scroll-into-view for tap/assert is not implemented (the `scroll_until` tool scrolls explicitly).
+
 Goal (ARCHITECTURE.md §5, §7, §8, §9): `assert`, `verify_both`, crash detection (`appAlive` + log scan), and the SKILL.md that teaches agents the workflow.
 
 Exit criteria: an agent can run the golden path — `ensure_state` → navigate → `assert`/`verify_both` — and get deterministic pass/fail results with paired screenshots, plus fail-fast crash excerpts when the app dies.

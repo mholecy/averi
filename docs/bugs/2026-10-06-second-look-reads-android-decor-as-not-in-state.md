@@ -1,5 +1,9 @@
 # OBSERVATION (measured): on Android the ladder's 5 s second look ends on the RN decor tree and reads "not in state", so `ensure_state` right after a cold launch wipes an app that was already in the state
 
+> **Status (2026-10-08):** fixed on main in `ed19b3d` (2026-10-07).
+>
+> Shas below are pre-squash branch commits; on main: `06c74a0` → `ed19b3d`.
+
 **Measured 2026-10-06 23:44–23:47 CEST**, finportal `sk.finportal.myport` (Expo / React Native debug build, Metro
 running), `emulator-5554` (Android 13), averi built from `1e0501d` (branch `fix/bugs-2026-10-06`). Scenario 4 of the
 device check of `1e0501d`. This is not a regression: before `1e0501d` the rung ran on the first unreadable probe

@@ -1,5 +1,9 @@
 # Device check: the top-4 architecture refactors (2026-10-07)
 
+> **Status (2026-10-08):** the four refactors are on main (mapped below).
+>
+> Shas below are pre-squash branch commits; on main: `7f423bf` → `187a308`, `f30fdd0` → `571d29a`, `9a3e691` → `9136ee6`, `45fd47e` → `b80d566`, `016b737` → `00c6892`.
+
 **Measured 2026-10-07 23:25–23:36 CEST (21:25–21:36 UTC)**, averi `dist/` built from `45fd47e` (branch
 `architecture/top4-2026-10-07`; commits `7f423bf` C1 adb argv, `f30fdd0` C2 start detection, `9a3e691` C4 flow
 engine, `45fd47e` C3 parity window width). Driven through the handoff's stdio MCP driver `run-tools.mts`
@@ -212,6 +216,7 @@ Chrome all report full-display frames in landscape). Not tried: `cutout.emulatio
 None. Observation (wording, nit): the refusal quotes the character with `JSON.stringify`, which escapes C0 but
 not DEL, so U+007F prints as an invisible character inside the quotes — `cannot type U+007F ("", a control
 character)`. The code point before it still names it; `\u007f` in the quote would read better.
+Closed later: fixed before merge in `187a308` — `type-text.ts#visibleEscape` quotes it as `"\u007f"`.
 
 ### State left
 

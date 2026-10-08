@@ -1,5 +1,7 @@
 # FINDING (measured): one WebDriverAgent session makes every later launch's idb tree stick, until the simulator reboots
 
+> **Status (2026-10-08):** prevention fixed on main in `73eea5f` (2026-10-07); a stuck tree that does occur is still cured only by terminate-then-launch or a reboot (advice since `79b458e`).
+
 **Measured 2026-10-07 09:33–09:42 CEST**, finportal `sk.finportal.myport` (debug build, Metro up), iOS 26.5, during
 the pre-fix measurement for [2026-10-06-wda-read-wakes-stuck-idb-tree.md](2026-10-06-wda-read-wakes-stuck-idb-tree.md)
 (its "## Measured 2026-10-07 (pre-fix)", rows I4/I5). Parent:

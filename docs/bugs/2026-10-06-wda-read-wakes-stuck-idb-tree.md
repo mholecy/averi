@@ -1,5 +1,7 @@
 # FINDING (measured): one WebDriverAgent read ends a stuck idb tree at once, and every relaunch re-enters it
 
+> **Status (2026-10-08):** superseded — "Code says" below (no cure but waiting) is no longer the current state: since `73eea5f` (2026-10-07) every launch and deep link first re-enables the simulator's accessibility keys, which prevents the stuck tree, and since `79b458e` (2026-10-07) the empty-tree advice says terminate then launch. See [2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md](2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md).
+
 **Measured 2026-10-06 23:23–23:47 CEST**, finportal `sk.finportal.myport` (Expo / React Native debug build, Metro
 running), `iPhone 17` simulator iOS 26.5 (`D34212DB-…`), averi built from `1e0501d` (branch `fix/bugs-2026-10-06`).
 idb was exercised from a scratch copy of finportal's `averi.yaml` with `app.ios.treeSource: idb`. The WDA reads used

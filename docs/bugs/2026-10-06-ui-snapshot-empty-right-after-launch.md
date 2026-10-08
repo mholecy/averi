@@ -1,5 +1,7 @@
 # BUG: `ui_snapshot` right after `launch_app` returns `[]` — indistinguishable from "no such element"
 
+> **Status (2026-10-08):** fixed on main in `1ebd539` (2026-10-06) — `ui_snapshot` says why beside the `[]` (the bare-tree ⚠); for idb an empty tree is `IdbEmptyTreeError` since `1e0501d`, and since `b546c98` (2026-10-08) `ui_snapshot`'s settle read re-reads it once after `IDB_EMPTY_RETRY_MS` (1 s) before failing.
+
 **Measured 2026-10-05/06** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS default idb tree source),
 iPhone 17 simulator iOS 26.5, app `com.finshape.dbosbanking`. Filed from the SWIFT / SEPA journey-developer runs
 (`debug-ai-logger/2026-10-05-1304-swift-payment/`, `debug-ai-logger/2026-10-06-1009-sepa-payment/`).

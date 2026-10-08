@@ -1,5 +1,9 @@
 # Device check: round 3, phase 1 — discovery in the registry and the three-valued condition (2026-10-08)
 
+> **Status (2026-10-08):** on main.
+>
+> Shas below are pre-squash branch commits; on main: `c809293` → `820226a`, `1d67ced` → `326503a`, `7ce3ff1` → `882e28f`, `3e248fe` → `4de6a2a`.
+
 **Measured 2026-10-08 12:45–13:05 CEST**, averi `dist/` rebuilt (`npm run build`) from `c809293`, the head of branch
 `architecture/round3-2026-10-08` before phase 2's code-review fixups were squashed in (they move swipe code and touch no phase-1 code path), which carries the two phase-1 commits under test: `8413120` refactor(adapters),
 device discovery is the registry's own seam, and `d165ce4` refactor(flow), a Condition is one module that can say "this
