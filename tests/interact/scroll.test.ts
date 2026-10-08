@@ -173,9 +173,8 @@ describe('scrollUntilVisible — the soft keyboard', () => {
       expect(from.y).toBeLessThan(IME.y);
       expect(to.y).toBeLessThan(from.y); // content below → finger up
     }
-    // swipeVectorAbove (2026-10-08, the iOS device check): the whole screen's stroke (1776 → 444) with its start, on a
-    // key, pulled up to the clear line — 0.8 of the 1398 above the IME, where the first fix's in-box stroke started.
-    expect(fake.swipes[0]).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 444 } });
+    // The same swipeVector over the box above the IME: centre 699, reach 0.3 × 1398 (swipeVectorAbove keeps a content-down stroke as is).
+    expect(fake.swipes[0]).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } });
   });
 
   it('Android, partly under the IME: CLIPPED at the keyboard\'s edge, never "fully visible"', async () => {
@@ -462,39 +461,45 @@ describe('scrollUntilVisible — the soft keyboard', () => {
 
 /**
  * 2026-10-08, the two "Device check" sections of
- * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md: the
- * stroke over a keyboard, the settled stop, the fling past the target, and
- * the row wholly under the IME at the end of the content.
+ * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
+ * review round 1: the stroke over a keyboard, the settled stop, the turn
+ * after a fling past the target, and a target off the frame that the
+ * strokes no longer move.
  */
 describe('scrollUntilVisible — after the device check', () => {
   /** The measured WDA pad on the iPhone 17 (402x874 pt): `role:keyboard 0 572 402 302`. */
   const WDA_BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
-  /** The app's top bar under WDA (status bar + nav bar, title at y 73–95, ending ≈ y 116): a stroke starting in it is ignored. */
+  /** The app's top bar under WDA (status bar + nav bar, title at y 73–95, ending ≈ y 116): a stroke touching down in it is ignored. */
   const TOP_BAR_BOTTOM = 116;
   const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
 
   /**
-   * The SwiftUI form under WDA with the pad up. A stroke that starts in the
-   * top bar or on the pad moves nothing; any other moves the content by the
-   * finger's travel — or, when `fling` is given, the reads after it see the
-   * rects it lists (one per read, the last one standing): a fling the settle
+   * The SwiftUI form under WDA with the pad up. A stroke that touches down
+   * in the top bar or on the pad moves nothing; any other moves the content
+   * by the finger's travel — or, when `fling` is given, the reads after it
+   * see the y values it lists (one per read, the last one standing; `null`:
+   * gone from the tree, as a lazy list drops a row): a fling the settle
    * read catches mid-way.
    */
-  function wdaForm(startY: number, fling?: (rect: Rect, travel: number) => number[]) {
+  function wdaForm(startY: number, fling?: (rect: Rect, travel: number) => (number | null)[], height = 52) {
     resetLayout();
-    const target = node({ role: 'button', identifier: 'row', rect: { x: 24, y: startY, width: 354, height: 52 } });
+    const target = node({ role: 'button', identifier: 'row', rect: { x: 24, y: startY, width: 354, height } });
     const root = node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [target, bandNode(WDA_BAND)] });
-    let queued: number[] = [];
+    let queued: (number | null)[] = [];
     class WdaFake extends FakeAdapter {
       reads = 0;
+      /** Called inside each swipe — a test's clock. */
+      onSwipe: () => Promise<void> = async () => {};
       override async uiTree() {
         this.reads++;
         const next = queued.shift();
-        if (next !== undefined) target.rect = { ...target.rect, y: next };
+        if (next === null) root.children = root.children.filter((c) => c !== target);
+        else if (next !== undefined) target.rect = { ...target.rect, y: next };
         return super.uiTree();
       }
       override async swipe(from: Point, to: Point): Promise<void> {
         await super.swipe(from, to);
+        await this.onSwipe();
         if (from.y < TOP_BAR_BOTTOM || from.y >= WDA_BAND.y) return;
         const travel = to.y - from.y;
         if (fling === undefined) target.rect = { ...target.rect, y: target.rect.y + travel };
@@ -507,46 +512,81 @@ describe('scrollUntilVisible — after the device check', () => {
     fake.keyboardAdvice = 'ADVICE';
     return fake;
   }
+  /** Content down = finger up. */
+  const fingerUp = (s: { from: Point; to: Point }): boolean => s.to.y < s.from.y;
 
-  it('iOS (WDA), item 1: with the pad up a content-UP scroll starts below the top bar (y 175) and moves the content — the stroke over the box above the pad started at y 114 and moved nothing', async () => {
+  it('iOS (WDA): with the pad up a content-UP scroll touches down below the top bar (y 175) and moves the content — the stroke over the box above the pad touched down at y 114 and moved nothing', async () => {
     const fake = wdaForm(-586); // the measured debit_select, from a scrolled form
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, direction: 'up', fully: true });
     expect(result).toEqual({ swipes: 3, visible: 1, clipped: [] }); // -586 → -303 → -20 → 263
     expect(fake.swipes[0]).toEqual({ from: { x: 201, y: 175 }, to: { x: 201, y: 458 } });
   });
 
-  it('iOS (WDA), item 2: a stop the settle read caught MID-FLING is not reported — the confirming read finds the row past the top, and the next stroke brings it back', async () => {
+  it('iOS (WDA): a stop the settle read caught MID-FLING is not reported — the confirming read finds the row past the top, and the next stroke brings it back', async () => {
     // The measured priority_select: y 681 under the pad; the settle read sees it at 300, it comes to rest at -48 (4 pt left on screen).
     const fake = wdaForm(681, (rect, travel) => (travel < 0 ? [300, -48] : [rect.y + travel]));
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
     expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] }); // not "fully visible after 1 swipe"
     expect(fake.swipes[1]).toEqual({ from: { x: 201, y: 175 }, to: { x: 201, y: 458 } }); // turned round: content up, finger down
-    // Reads: round 0; 300 (stop) and its confirmation -48; 235 (stop) and its confirmation 235.
-    expect(fake.reads).toBe(5);
+    expect(fake.reads).toBe(5); // round 0; 300 (stop) and its confirmation -48; 235 (stop) and its confirmation 235
   });
 
-  it('iOS (WDA), item 2, the worse case: a fling that carries the row across the whole viewport between two reads (613 → -357) turns the next stroke round instead of swiping on DOWN into exhausted content', async () => {
+  it('iOS (WDA), the worse case: a fling that carries the row across the whole viewport between two reads (613 → -357) turns the next stroke round instead of swiping on DOWN into exhausted content', async () => {
     const fake = wdaForm(613, (rect, travel) => [travel < 0 ? -357 : rect.y + travel]);
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
     expect(result).toEqual({ swipes: 3, visible: 1, clipped: [] }); // -357 → -74 → 209
-    expect(fake.swipes.map((s) => s.to.y > s.from.y)).toEqual([false, true, true]); // down, then back up twice
+    expect(fake.swipes.map(fingerUp)).toEqual([true, false, false]); // down, then back up twice
   });
 
-  it('a target read beyond the far edge before any read saw it short of it is the caller\'s direction to honour: no turn', async () => {
-    const fake = wdaForm(-357, (rect) => [rect.y]); // above the screen from the start, a scroll down that moves nothing
+  it('a target read beyond the far edge before any read saw it short of it is the caller\'s direction to honour — on every round it stays there, not only round 0', async () => {
+    const fake = wdaForm(-357); // above the screen from the start; each content-down stroke carries it further up
     await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true }).catch(() => undefined);
-    expect(fake.swipes.length).toBeGreaterThan(0);
-    for (const s of fake.swipes) expect(s.to.y).toBeLessThan(s.from.y); // every stroke content-down, as asked
+    expect(fake.swipes).toHaveLength(4);
+    expect(fake.swipes.every(fingerUp)).toBe(true);
   });
 
-  it('a target still moving inside the viewport is read again until it holds still; one that never does is reported after SETTLE_CONFIRM_READS (3) more reads', async () => {
+  it('the turn is judged in the frame the round judged in: with the pad up, a row a content-up fling carried WHOLLY under the pad is beyond the frame\'s far edge, though inside the screen', async () => {
+    const fake = wdaForm(-200, (rect, travel) => (travel > 0 ? [600] : [rect.y + travel])); // short (top clipped), flung to 600–652
+    const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, direction: 'up', fully: true });
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] }); // 600 → 256
+    expect(fingerUp(fake.swipes[1])).toBe(true); // turned round: content down
+  });
+
+  it.each([
+    ['down', 300, [true, true]], // 300–1000 → -44–656: clipped at the top AND under the pad
+    ['up', -400, [false, false]], // -400–300 → -117–583: clipped at the top AND under the pad
+  ] as const)('a row TALLER than the frame, clipped at both edges, is not beyond either: no turn (%s)', async (direction, startY, strokes) => {
+    const fake = wdaForm(startY, undefined, 700);
+    await scrollUntilVisible(fake, 'id:row', { ...FAST, direction, fully: true, maxSwipes: 2 }).catch(() => undefined);
+    expect(fake.swipes.map(fingerUp)).toEqual(strokes);
+  });
+
+  it('a target still moving inside the viewport is read again until it holds still; one that never does is reported after SETTLE_CONFIRM_READS (3) more reads with settled: false, and the reply says so', async () => {
     const slowing = wdaForm(681, () => [300, 250, 250]);
     expect(await scrollUntilVisible(slowing, 'id:row', { ...FAST, fully: true })).toEqual({ swipes: 1, visible: 1, clipped: [] });
     expect(slowing.reads).toBe(4); // round 0, 300, 250, 250
     const restless = wdaForm(681, () => [300, 301, 302, 303, 304, 305, 306]);
-    expect(await scrollUntilVisible(restless, 'id:row', { ...FAST, fully: true })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    const result = await scrollUntilVisible(restless, 'id:row', { ...FAST, fully: true });
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
     expect(restless.reads).toBe(5); // round 0, the stop at 300, then three confirming reads — reported at 303
     expect(restless.swipes).toHaveLength(1);
+    expect(describeScrollResult(result)).toBe(
+      'fully visible after 1 swipe; still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match',
+    );
+  });
+
+  it('the confirming budget is per stroke: a stop after a turn gets its own SETTLE_CONFIRM_READS', async () => {
+    // Stroke 1 spends two confirming reads (300 → 290 → -48, beyond); the turned stroke's stop needs three (235 → 240 → 245 → 245).
+    const fake = wdaForm(681, (_rect, travel) => (travel < 0 ? [300, 290, -48] : [235, 240, 245, 245]));
+    expect(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('a stop reached at the deadline is reported unconfirmed — no confirming read past it', async () => {
+    const fake = wdaForm(681, () => [300, 300]);
+    fake.onSwipe = () => new Promise((r) => setTimeout(r, 60)); // the deadline passes during the stroke
+    const result = await scrollUntilVisible(fake, 'id:row', { fully: true, settleMs: 1, timeoutMs: 30 });
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
+    expect(fake.reads).toBe(2);
   });
 
   it('a stop at 0 swipes was not stroked: reported on its one read, no confirming read', async () => {
@@ -567,6 +607,31 @@ describe('scrollUntilVisible — after the device check', () => {
     expect(fake.swipes).toHaveLength(1);
   });
 
+  it('a target flung past and turned round, which the turned strokes no longer move: the failure names the turns and the direction last swiped', async () => {
+    const fake = wdaForm(613, (rect, travel) => [travel < 0 ? -357 : rect.y]); // carried past, then nothing moves it
+    const error = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(
+      /^scroll_until id:row failed after 3 swipes \(the last 2, swiping up, did not move it: content exhausted, or the swipes were not taken\) — element in tree but never intersected the 402x572 screen above the soft keyboard over \[0,572\]\[402,874\] \(last rect \{"x":24,"y":-357,"width":354,"height":52\}\)\. It was turned round 2 times: a swipe carried it past the viewport \(a fling\), so the next was drawn the other way\. The soft keyboard was up/,
+    );
+  });
+
+  it('in the viewport after a swipe and gone by the last read: the failure says it was there — not "never appeared" (a lazy list drops what a fling carries off)', async () => {
+    const fake = wdaForm(681, () => [300, null]);
+    const error = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(
+      /failed after 4 swipes \(maxSwipes\) — element was in the viewport after swipe 1 but did not stay — it is no longer in the tree \(a fling carried it off\? a lazy list drops what scrolls away\)/,
+    );
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('in the viewport after a swipe and off the frame at the last read: "was in the viewport after swipe 1 but did not stay", not "never intersected"', async () => {
+    const fake = wdaForm(681, (rect, travel) => (travel < 0 && rect.y === 681 ? [300, 700] : [rect.y])); // bounces back under the pad, then stuck
+    const error = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(
+      /failed after 3 swipes \(the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken\) — element was in the viewport after swipe 1 but did not stay \(a fling\?\) — in tree, off the 402x572 screen above the soft keyboard over \[0,572\]\[402,874\] at the last read \(last rect/,
+    );
+  });
+
   /** The form's last field under an IME its container does not resize for: nothing moves it. */
   function lastFieldUnderIme(rect: Rect) {
     resetLayout();
@@ -576,26 +641,117 @@ describe('scrollUntilVisible — after the device check', () => {
     return fake;
   }
 
-  it('Android, item 3: a row WHOLLY under the IME at the end of the content fails after the one swipe that did not move it — not at the 15 s timeout — in the stop bound\'s words, naming the keyboard', async () => {
+  it('Android: a row WHOLLY under the IME at the end of the content fails after the two identical swipes that did not move it — not at the 15 s timeout — in the stop bound\'s words, naming the keyboard', async () => {
     const fake = lastFieldUnderIme({ x: 66, y: 1769, width: 948, height: 143 }); // the measured my_note_input
     const error = await scrollUntilVisible(fake, 'id:my_note_input', { fully: true, settleMs: 1 }).catch((e: unknown) => e);
     expect(error).not.toBeInstanceOf(ElementNotFoundError); // it was in the tree
     expect((error as Error).message).toBe(
-      'scroll_until id:my_note_input failed after 1 swipe (content exhausted: swiping down no longer moves it) — element in tree ' +
-        'but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect ' +
-        '{"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 2 of the 2 rounds read: ' +
-        'in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it ' +
+      'scroll_until id:my_note_input failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes ' +
+        'were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] ' +
+        '(last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 3 of the 3 rounds ' +
+        'read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it ' +
         'first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again',
     );
-    expect(fake.swipes).toHaveLength(1);
+    expect(fake.swipes).toHaveLength(2);
   });
 
-  it('Android, item 3: a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', async () => {
+  it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', async () => {
     const fake = lastFieldUnderIme({ x: 66, y: 1769, width: 948, height: 0 });
     await expect(scrollUntilVisible(fake, 'id:my_note_input', FAST)).rejects.toThrow(/failed after 4 swipes \(maxSwipes\)/);
   });
 
-  it('item 3 only after a stroke: a confirming read that finds the stop\'s target unmoved but under a keyboard the stop round did not apply is not "content exhausted"', async () => {
+  it('one stroke that moves nothing is a transient (a snackbar dismissed by the first touch), not exhausted content: the next one scrolls', async () => {
+    const fake = scrollingFake(3100);
+    const swipe = fake.swipe.bind(fake);
+    let strokes = 0;
+    fake.swipe = async (from, to) => (strokes++ === 0 ? void fake.swipes.push({ from, to }) : swipe(from, to));
+    const result = await scrollUntilVisible(fake, 'id:submit_button', { ...FAST, maxSwipes: 6 });
+    expect(result).toEqual({ swipes: 3, visible: 1, clipped: [] });
+  });
+
+  it('several matches off the frame: exhausted only when NO match moved — a static duplicate first in tree order is not the target the strokes move (review round 1)', async () => {
+    resetLayout();
+    const ghost = node({ role: 'button', identifier: 'submit_button', rect: { x: 5000, y: 100, width: 100, height: 40 } }); // another page
+    const real = node({ role: 'button', identifier: 'submit_button', rect: { x: 0, y: 3700, width: 100, height: 40 } });
+    class TwoFake extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        real.rect = { ...real.rect, y: real.rect.y - 600 };
+      }
+    }
+    const fake = new TwoFake({ s: screen(ghost, real) }, 's');
+    expect(await scrollUntilVisible(fake, 'id:submit_button', FAST)).toEqual({ swipes: 3, visible: 1, clipped: [] }); // 3700 → 1900
+  });
+
+  it('a match that LEAVES the tree is a change: the set the strokes compare is every match, counted — a static duplicate left behind starts the count afresh', async () => {
+    resetLayout();
+    const ghost = node({ role: 'button', identifier: 'submit_button', rect: { x: 5000, y: 100, width: 100, height: 40 } });
+    const real = node({ role: 'button', identifier: 'submit_button', rect: { x: 0, y: 3700, width: 100, height: 40 } });
+    const root = screen(ghost, real);
+    class DropFake extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        root.children = root.children.filter((c) => c !== real); // a lazy list drops the real one; the ghost stays
+      }
+    }
+    const fake = new DropFake({ s: root }, 's');
+    // Stroke 1: the set changed (two → one); strokes 2 and 3 leave the one where it was.
+    await expect(scrollUntilVisible(fake, 'id:submit_button', { ...FAST, maxSwipes: 6 })).rejects.toThrow(/^scroll_until id:submit_button failed after 3 swipes \(the last 2/);
+  });
+
+  it('two unmoved strokes count only when they are the SAME stroke: a whole-screen stroke on an IME still coming up, then one drawn above it, is two attempts, not exhaustion', async () => {
+    resetLayout();
+    const target = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 2900, width: 948, height: 73 } });
+    let strokes = 0;
+    class FormFake extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        if (strokes++ < 2) return; // the first two are not taken
+        target.rect = { ...target.rect, y: target.rect.y - 600 };
+      }
+    }
+    const fake = new FormFake({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [target] }) }, 's');
+    fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+    fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'shown']; // round 0: the stale window denied, so a whole-screen stroke
+    const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, maxSwipes: 6 });
+    expect(fake.swipes.slice(0, 2).map((s) => s.from.y)).toEqual([1776, 1118]);
+    expect(result).toEqual({ swipes: 5, visible: 1, clipped: [] }); // 2900 → 2300 → 1700 → 1100
+  });
+
+  /** An Android form whose window state is scripted read by read; every stroke moves the content 600 px up except those listed. */
+  function windowScripted(startY: number, windows: SoftKeyboard[], notTaken: number[] = []) {
+    resetLayout();
+    const target = node({ role: 'button', identifier: 'row', rect: { x: 66, y: startY, width: 948, height: 73 } });
+    let strokes = 0;
+    class FormFake extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        if (notTaken.includes(strokes++)) return;
+        target.rect = { ...target.rect, y: target.rect.y - 600 };
+      }
+    }
+    const fake = new FormFake({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [target] }) }, 's');
+    fake.attachKeyboard(windows[0], 'shown');
+    fake.attachedKeyboard.windowAnswers.queue = [...windows];
+    return fake;
+  }
+
+  it('a confirming read is not a stroke for the exhausted count: the stop read without the band, its confirmation under it, then ONE stroke not taken — not "content exhausted"', async () => {
+    const shown: SoftKeyboard = { state: 'shown', frame: IME };
+    // Round 0 under the IME (stroke above it: 2506 → 1906); the stop at 1906 read with the window hidden; its confirmation with
+    // it shown (off the frame); the next stroke is not taken; the one after scrolls (1306).
+    const fake = windowScripted(2506, [shown, { state: 'hidden' }, shown], [1]);
+    expect(await scrollUntilVisible(fake, 'id:row', FAST)).toEqual({ swipes: 3, visible: 1, clipped: [] });
+  });
+
+  it('a confirming read is not a stroke for the fully: true stuck test either: a stop it finds clipped at the band, unmoved, is swiped on — not "content exhausted"', async () => {
+    const shown: SoftKeyboard = { state: 'shown', frame: IME };
+    // 1960 under the IME → 1360; the stop read with the window hidden (fully visible); its confirmation clips it at 1398.
+    const fake = windowScripted(1960, [shown, { state: 'hidden' }, shown]);
+    expect(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] }); // → 760
+  });
+
+  it('a confirming read sent no stroke: a target it finds unmoved but under a keyboard the stop round did not apply is not counted against the content', async () => {
     resetLayout();
     const target = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 2506, width: 948, height: 73 } });
     class FormFake extends FakeAdapter {
