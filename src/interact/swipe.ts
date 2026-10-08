@@ -1,5 +1,5 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Rect, type Stroke } from '../adapters/types.js';
-import { inferScreenSize, SCREEN_AGREEMENT_PCT, windowTurnsScreen } from '../ui-tree/geometry.js';
+import { inferScreenSize, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -67,25 +67,33 @@ export interface ScreenBox {
    *
    * - `[box]` when a window WITNESSED the orientation — the tree has a
    *   window with its own height (`reliable`, `trustworthyHeight`) matching
-   *   the panel side for side, as built or turned, within
+   *   the box side for side, as built or turned, within
    *   SCREEN_AGREEMENT_PCT — or the box IS the tree's window (the fallback).
-   * - `[box]` too when nothing suggests a turn: the box as built and the
-   *   tree's size (an unreliable window's, a walked one) no wider than tall
-   *   relative to the panel. The portrait carousel case (review 2026-10-08,
-   *   item 1): a card straddling the right edge of a portrait idb window
-   *   makes the window unreliable, and an item at x 450 of 402 must still be
-   *   off screen — scroll_until swipes for it, a tap refuses it.
-   * - `[box, box turned]` when a turn is SUGGESTED but not witnessed: the
-   *   box was turned on weaker evidence (a walked width — the 852-wide walk
-   *   over a 393x852 panel that is really portrait, probes E/J), or the
-   *   tree's size is landscape-shaped against a portrait panel (or the
-   *   reverse) — an idb landscape window a straddling card made unreliable
-   *   (probe A), an iPad strip (A2), an Android inset window beside a nav
-   *   bar. Inside either counts: refusing on a guessed turn would refuse
-   *   ordinary taps (review B1).
+   * - `[box, box turned]` when a turn is SUGGESTED but not witnessed: a
+   *   window's own sides (`ScreenSize.windowLeg`, reliable or not) match the
+   *   panel turned — an idb landscape window a straddling card made
+   *   unreliable (probe A), an iPad landscape window (A2) — or the box was
+   *   turned on other evidence: a walked width (the 852-wide walk over a
+   *   393x852 panel that is really portrait, probes E/J), an Android inset
+   *   window beside a nav bar. Inside either counts: refusing on a guessed
+   *   turn would refuse ordinary taps (review B1).
+   * - Otherwise the panel AS BUILT alone, whatever box the gesture uses:
+   *   a portrait window a straddling card made unreliable (the carousel
+   *   case: an item at x 450 of 402 is off screen, scroll_until swipes, the
+   *   tap refuses); a walked extent of any shape (code review round 2: a
+   *   walk is content, and its height never votes — geometry.ts
+   *   #windowTurnsScreen; a carousel walked to x 1500 made the shape vote
+   *   "turned" and brought the carousel case back); a landscape-shaped
+   *   window that fits the panel unturned (a top split-screen pane); a
+   *   child window that matches the panel neither way — an oversized node
+   *   or a banner at the origin crowned as the window, whose turn of the
+   *   gesture box is a swipe's accepted cost and no evidence here.
    *
-   * Not decided either way: an iPad split pane whose window is neither the
-   * panel nor landscape-shaped (unmeasured) gets `[box]`.
+   * Lost, stated: a landscape tree with NO window at all (idb with no
+   * Application node) whose walk the windowless rules cannot turn is judged
+   * on the panel as built, so a point right of x 402 is refused (code review
+   * round 2, P5). An iPad split pane (unmeasured) gets the panel as built.
+   * `judgingScreen`'s `box` is the first of these — what a reply quotes.
    */
   boxes: Rect[];
 }
@@ -105,13 +113,16 @@ export interface JudgingScreen {
  * item 2: each had its own, with its own turn policy). `undefined` when
  * there is no box at all (no usable device size and no window in the tree);
  * what that means is the caller's: the tap goes ahead (resolve.ts#onScreen
- * falls back to the root rect, then fails open), the scroll judges the
- * device's size as built, as it did before the box existed.
+ * falls back to the root rect, then fails open), the scroll keeps the last
+ * round's frame (the device as built only when no round had a box).
+ * `box` is the first of `boxes` — the box judged first and quoted — which
+ * is the panel as built, not the gesture's turned box, when the turn is no
+ * evidence (`judgedBoxes`).
  */
 export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<JudgingScreen | undefined> {
   try {
-    const { box, boxes } = await screenBox(adapter, read);
-    return { box, boxes };
+    const { boxes } = await screenBox(adapter, read);
+    return { box: boxes[0], boxes };
   } catch {
     return undefined;
   }
@@ -180,12 +191,10 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
     const sideways = size !== undefined && windowTurnsScreen(size, device);
     const { width, height } = sideways ? { width: device.height, height: device.width } : device;
     const box = { x: 0, y: 0, width, height };
-    const witnessed = size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, box);
-    const suggested = sideways || (size !== undefined && usableScreen(size) && landscape(size) !== landscape(device));
     return {
       box,
       ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
-      boxes: witnessed || !suggested ? [box] : [box, turnedBox(box)],
+      boxes: judgedBoxes(size, device, box, sideways),
     };
   }
   if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
@@ -206,8 +215,32 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   );
 }
 
-/** Wider than tall. */
-const landscape = (s: { width: number; height: number }): boolean => s.width > s.height;
+/**
+ * The boxes a judgement counts (`ScreenBox.boxes`; the rule is there),
+ * given the tree's size, the panel as built, the gesture's box and whether
+ * that box was turned:
+ * - witnessed — a window with its own height matching `box` side for side:
+ *   `[box]`;
+ * - a window's own sides (`windowLeg`, reliable or not — never a walked
+ *   extent, whose height is a content maximum) matching the panel TURNED
+ *   side for side: a turn suggested, `[box, box turned]` (an idb landscape
+ *   window a straddling card made unreliable, an iPad landscape window);
+ * - the box turned on other evidence (a walked width, an inset window) and
+ *   NOT by a child window that matches neither way — an oversized node
+ *   crowned as the window, a banner at the origin, whose turn is a swipe's
+ *   accepted cost and no evidence for a judgement: suggested too;
+ * - otherwise the panel as built alone — whatever box the gesture uses. A
+ *   landscape-shaped window that fits the panel unturned (a top split-screen
+ *   pane) or a landscape-shaped walk suggests nothing.
+ */
+function judgedBoxes(size: ScreenSize | undefined, device: DeviceScreen, box: Rect, sideways: boolean): Rect[] {
+  if (size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, box)) return [box];
+  const panelTurned = { width: device.height, height: device.width };
+  const windowSaysTurned = size?.windowLeg !== undefined && sameSides(size, panelTurned);
+  const crownedChild = size?.windowLeg === 'child' && !windowSaysTurned;
+  if (windowSaysTurned || (sideways && !crownedChild)) return [box, turnedBox(box)];
+  return [{ x: 0, y: 0, width: device.width, height: device.height }];
+}
 
 /** The window and the box agree side for side, within SCREEN_AGREEMENT_PCT — the window IS the screen, held the way the box is. */
 const sameSides = (a: { width: number; height: number }, b: { width: number; height: number }): boolean =>

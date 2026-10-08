@@ -47,6 +47,16 @@ interface ScreenWidth {
 
 export interface ScreenSize extends ScreenWidth {
   /**
+   * Set when the numbers are a WINDOW rect's own sides — the root's (`root`:
+   * the window by construction) or a screen-shaped child of a rectless root
+   * (`child`: a guessed window, which may be an oversized node crowned as
+   * one) — reliable or not; absent when the walk answered, whose height is
+   * a content maximum. Read by interact/swipe.ts#screenBox (2026-10-08, code
+   * review of the off-screen judgement): only a window's own sides may
+   * suggest that the screen is turned, never a walked extent.
+   */
+  windowLeg?: 'root' | 'child';
+  /**
    * CONTENT height unless `trustworthyHeight` says otherwise: the fallback
    * walk reports the lowest bottom edge in the tree, which a scroll view's
    * off-screen content inflates without limit.
@@ -135,6 +145,7 @@ export function inferScreenSize(tree: UiNode): ScreenSize {
       height: window.rect.height,
       reliable: settled,
       trustworthyHeight: settled,
+      windowLeg: window.leg,
     };
   }
   const walked = walkExtent(tree);
@@ -395,13 +406,11 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * screen lands off-centre, not off-screen in the short axis; the tree
  * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
  * refusal (interact/resolve.ts#onScreen) does not take this answer alone —
- * swipe.ts#screenBox says which boxes count (`ScreenBox.boxes`): the box
- * alone when a window matching the panel side for side witnessed it or
- * nothing suggests a turn, the box either way up when a turn is suggested
- * but not witnessed (the off-screen reviews, 2026-10-08: a straddling card,
- * an iPad strip or a walked width would otherwise have refused ordinary
- * taps, and a portrait window must still refuse a carousel page past its
- * right edge).
+ * swipe.ts#screenBox says which boxes count (`ScreenBox.boxes`), and a
+ * child window that matches the panel neither way — this crowned node —
+ * is no evidence there: the judgement uses the panel as built. A window
+ * whose own sides match the panel turned, or a turn on a walked width,
+ * counts the box either way up (the off-screen reviews, 2026-10-08).
  */
 export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {
   if (!usableScreen(screen)) return false;

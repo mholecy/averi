@@ -47,6 +47,7 @@ describe('inferScreenSize', () => {
       height: 874,
       reliable: true,
       trustworthyHeight: true,
+      windowLeg: 'root',
     });
   });
 
@@ -56,12 +57,12 @@ describe('inferScreenSize', () => {
   // gone false and every png scale on the shape failed closed.
   it('ignores an off-viewport sibling parked at x = screen width', () => {
     const tree = treeWith(node({ x: 402, y: 0, width: 402, height: 874 }));
-    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true });
+    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true, windowLeg: 'root' });
   });
 
   it('ignores an oversized node anchored at x=0 — the variant `reliable` cannot see', () => {
     const tree = treeWith(node({ x: 0, y: 0, width: 804, height: 874 }));
-    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true });
+    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true, windowLeg: 'root' });
   });
 
   /**
@@ -119,7 +120,7 @@ describe('inferScreenSize', () => {
 
   it('takes the window one level down when the root carries no rect (idb, multi-root dumps, WDA sheets)', () => {
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [node(SCREEN), node(APPLY, 'apply')]);
-    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true });
+    expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true, windowLeg: 'child' });
   });
 
   it('keeps a tall scroll container out of the running — a screen is not that shape', () => {
@@ -226,6 +227,7 @@ describe('inferScreenSize on the real iOS filter-sheet shape', () => {
       height: 874,
       reliable: true,
       trustworthyHeight: true,
+      windowLeg: 'child',
     });
   });
 });

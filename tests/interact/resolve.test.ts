@@ -19,7 +19,7 @@ import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
-import { dropBand, el, FakeAdapter, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
@@ -673,6 +673,85 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     await expect(scrollUntilVisible(fake, 'id:next_item', { maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
     expect(fake.swipes).toHaveLength(1);
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  describe('code review round 2: only a WINDOW\'s own sides suggest a turn (2026-10-08)', () => {
+    it('P1: a portrait idb tree with no window, a carousel walked to x 1500 — the walk suggests nothing: (450,100) refused, scroll_until swipes', async () => {
+      const cells = [0, 300, 600, 900, 1200].map((x) => node({ role: 'cell', rect: { x, y: 80, width: 300, height: 40 } }));
+      const rows = [200, 400, 600, 800].map((y) => node({ role: 'text', rect: { x: 0, y, width: 402, height: 40 } }));
+      const fake = ios(idbRoot(...cells, ...rows, node({ role: 'button', identifier: 'item', rect: { x: 425, y: 80, width: 50, height: 40 } })), PORTRAIT);
+      expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
+      await expect(tapElement(fake, 'id:item', OPTS)).rejects.toThrow('id:item is off screen at (450,100) on a 402x874 screen (rect');
+      await expect(scrollUntilVisible(fake, 'id:item', { maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
+      expect(fake.swipes).toHaveLength(1);
+    });
+
+    it('P1b: a walk that happens to measure the panel turned (874x402 of content on a portrait screen) is still no window — (450,100) refused', async () => {
+      const fake = ios(
+        idbRoot(
+          node({ role: 'cell', rect: { x: 574, y: 80, width: 300, height: 40 } }),
+          node({ role: 'text', rect: { x: 0, y: 362, width: 402, height: 40 } }),
+          node({ role: 'button', identifier: 'item', rect: { x: 425, y: 80, width: 50, height: 40 } }),
+        ),
+        PORTRAIT,
+      );
+      await expect(tapElement(fake, 'id:item', OPTS)).rejects.toThrow('id:item is off screen at (450,100) on a 402x874 screen (rect');
+    });
+
+    it('P5, the stated LOSS: a landscape idb tree with no window and a straddling card — nothing says turned, so a right-side button at (650,120) is refused', async () => {
+      const rows = [0, 400, 800, 1600, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 874, height: 50 } }));
+      const fake = ios(
+        idbRoot(...rows, node({ role: 'other', rect: { x: 820, y: 50, width: 300, height: 200 } }), node({ role: 'button', identifier: 'right', rect: { x: 600, y: 100, width: 100, height: 40 } })),
+        PORTRAIT,
+      );
+      await expect(tapElement(fake, 'id:right', OPTS)).rejects.toThrow('id:right is off screen at (650,120) on a 402x874 screen');
+    });
+
+    it('P8: an Android top split-screen pane (1080x1000 on 1080x2400) fits the panel unturned — no turn suggested: (1500,500) refused, (500,500) tapped', async () => {
+      const fake = new FakeAdapter(
+        {
+          s: node({
+            role: 'container',
+            rect: { x: 0, y: 0, width: 1080, height: 1000 },
+            children: [
+              node({ role: 'button', identifier: 'far', rect: { x: 1450, y: 480, width: 100, height: 40 } }),
+              node({ role: 'button', identifier: 'near', rect: { x: 450, y: 480, width: 100, height: 40 } }),
+            ],
+          }),
+        },
+        's',
+      );
+      fake.viewportSize = { width: 1080, height: 2400 };
+      await expect(tapElement(fake, 'id:far', OPTS)).rejects.toThrow('id:far is off screen at (1500,500) on a 1080x2400 screen (rect');
+      await tapElement(fake, 'id:near', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 500, y: 500 }]);
+    });
+
+    it('P2: a 500x300 banner at the origin crowned as an idb window turns the gesture box, but is no evidence for a judgement — (450,420) refused on the panel as built', async () => {
+      const fake = ios(
+        idbRoot(node({ role: 'image', rect: { x: 0, y: 0, width: 500, height: 300 } }), node({ role: 'button', identifier: 'next', rect: { x: 425, y: 400, width: 50, height: 40 } })),
+        PORTRAIT,
+      );
+      const judged = await screenBox(fake, { tree: await fake.uiTree() });
+      expect(judged.box).toEqual({ x: 0, y: 0, width: 874, height: 402 }); // the swipe's accepted cost (geometry.ts#windowTurnsScreen)
+      expect(judged.boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
+      await expect(tapElement(fake, 'id:next', OPTS)).rejects.toThrow('id:next is off screen at (450,420) on a 402x874 screen (rect');
+    });
+
+    it('a two-box failure under an applied keyboard cover names the screen above the keyboard, never "either way up"', async () => {
+      const tree = idbRoot(
+        node({
+          role: 'other',
+          rect: { x: 0, y: 0, width: 874, height: 402 },
+          children: [node({ role: 'other', rect: { x: 820, y: 50, width: 300, height: 200 } }), node({ role: 'button', identifier: 'pay', rect: { x: 50, y: 1000, width: 100, height: 40 } })],
+        }),
+        bandNode({ x: 0, y: 250, width: 874, height: 152 }),
+      );
+      const fake = ios(tree, PORTRAIT);
+      expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toHaveLength(2);
+      const error = await scrollUntilVisible(fake, 'id:pay', { maxSwipes: 0 }).catch((e: unknown) => e);
+      expect((error as Error).message).toContain('never intersected the 402x250 screen above the soft keyboard over [0,250][874,402] (last rect');
+    });
   });
 
   it('review round 2 — probe J: on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {

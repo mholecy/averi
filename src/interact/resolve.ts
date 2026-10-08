@@ -372,9 +372,9 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * of the off-screen refusal: the picker had judged by the root's rect alone.
  *
  * - Inside any of the screen's `boxes` (swipe.ts#ScreenBox.boxes has the
- *   rule): the box alone when a window witnessed the orientation or
- *   nothing suggests a turn; the box EITHER way up when a turn is suggested
- *   but not witnessed (review 2026-10-08, B1: refusing on a guessed turn
+ *   rule): the box alone when a window witnessed the orientation; the box
+ *   EITHER way up when a window's own sides, or a walked-width turn,
+ *   suggest a turn no window witnessed; the panel as built otherwise (review 2026-10-08, B1: refusing on a guessed turn
  *   refused every tap past x 402 in an idb landscape tree whose window a
  *   straddling card made unreliable, an iPad strip, a walked-width turn).
  *   A portrait carousel page at x 450 of 402 is refused even when its
