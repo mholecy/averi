@@ -353,7 +353,10 @@ one happens by itself.
   unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a `clearState`
   rung on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
   (`treeSource: wda` in any project, or another XCTest driver): every app process launched after it starts stuck, and
-  waiting does not end it (18+ min measured). averi re-enables the simulator's accessibility automation before each
+  waiting does not end it (18+ min measured). The same 0×0 shape is also a healthy app's first read right after a
+  launch (0.4 s after `launch_app`, measured 2026-10-08): `ui_snapshot` reads once more a second later before failing,
+  and its error then says `The read was retried once after 1 s and was still empty` (a healthy launch had a tree by
+  then); waits and asserts poll past it. averi re-enables the simulator's accessibility automation before each
   launch it makes, but a process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app`
   on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
   <udid> && xcrun simctl boot <udid>` — the error spells it with the simulator's UDID), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.

@@ -32,12 +32,15 @@ import type { Verdict } from './verdict.js';
  *   is one confirming capture after the read, and which capture confirms what
  *   is a tree-read/poll concern, not a frame concern. Not done here — it is a
  *   behaviour change with no measured incident behind it.
- * - Android's `uiTree({ settle: true })` — one bounded retry inside the
- *   adapter when uiautomator says "null root node", opted into by the
- *   one-shot MCP tools only. Pollers leave it off because their interval
- *   already is the retry (adapters/android.ts). It is below this layer and
- *   stays there: the adapter is the only thing that can tell "no window yet"
- *   from "no XML at all".
+ * - `uiTree({ settle: true })` — one bounded retry inside the adapter when
+ *   the device answers "no window yet": uiautomator's "null root node" on
+ *   Android, and since 2026-10-08 idb's empty tree (IdbEmptyTreeError) on
+ *   iOS, which a healthy idb was measured returning 0.4 s after a launch
+ *   (adapters/ios.ts). Opted into by the one-shot MCP tools only. Pollers
+ *   leave it off because their interval already is the retry
+ *   (adapters/android.ts). It is below this layer and stays there: the
+ *   adapter is the only thing that can tell "no window yet" from "no XML at
+ *   all".
  *
  * Three read policies is one more than the ideal, but each has a different
  * caller shape (poll, bounded one-shot, adapter-internal) and folding them

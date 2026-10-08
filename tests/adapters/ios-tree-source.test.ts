@@ -253,6 +253,30 @@ describe('IdbTreeSource — an empty tree is a read error, not a screen on which
     );
   });
 
+  // 2026-10-08 (round-3 device check, finding 5): a healthy idb can return
+  // this shape 0.4 s after a launch. The adapter's `settle` re-read
+  // (IosAdapter.uiTree) throws the error again with `reread`, and only that
+  // form says so; the source's own, unretried form — what every poller
+  // quotes — carries no re-read clause and no launch sentence.
+  it('the source\'s error is the unretried form: no re-read clause, no "read again" advice', async () => {
+    const error = (await read([{ type: 'Application', frame: ZERO }]).catch((e: unknown) => e)) as IdbEmptyTreeError;
+    expect(error.reread).toBeUndefined();
+    expect(error.message).not.toMatch(/retried|read again|one more read|launch_app returned/);
+  });
+
+  it('with `reread`, the first line is verbatim and the advice opens with the re-read, then the unretried advice whole', () => {
+    const plain = new IdbEmptyTreeError('AAAA-1111', ['Application']).message;
+    const retried = new IdbEmptyTreeError('AAAA-1111', ['Application'], { reread: 1_000 }).message;
+    const [head, ...advice] = plain.split('\n');
+    expect(retried).toBe(
+      `${head}\n` +
+        'The read was retried once after 1 s and was still empty; a healthy idb had a tree with area ' +
+        'by +1 s on 10 of 10 measured launches, so the rest of this applies (a first render slower than that on ' +
+        'a loaded host is unmeasured: if launch_app returned under about two seconds ago, one more read settles it). ' +
+        advice.join('\n'),
+    );
+  });
+
   // 2026-10-08 (iOS adapter stack review, candidate 2): the reboot names the
   // simulator the source is BOUND to — not `<udid>`, not simctl's `booted` —
   // and nothing in the advice points at the server's stderr, which the agent

@@ -1,6 +1,7 @@
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { runIdb } from './idb.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
+import { formatSeconds } from '../util/duration.js';
 import { attachFieldErrors } from './field-errors.js';
 import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
 import { WdaTreeSource } from './wda-tree-source.js';
@@ -154,18 +155,42 @@ function idbTree(elements: IdbElement[]): UiNode {
  * bare shapes (a splash, a spinner): they are loading and will change.
  * Widening it waits on the device protocol's raw payloads. The synthetic root
  * is always 0×0 (parseIdbDescribeAll), so only the elements are asked.
+ *
+ * Not only the stuck state wears it (2026-10-08, docs/plans/2026-10-08-
+ * round3-phase2-device-check.md, finding 5): on a healthy idb a read 0.4 s
+ * after launch_app came back as this same 0×0 Application, and was bare a
+ * moment later. The signature stays — the shapes are identical, and it is
+ * still an unread device, never a rendered one — and the two are told apart
+ * by time: IosAdapter.uiTree's one `settle` re-read (IDB_EMPTY_RETRY_MS) for
+ * a one-shot caller, which throws this error again with `reread` set so the
+ * message says the read was already retried — as Android's settle error says
+ * "retried once after 1 s" or "read once" (android.ts), the adapter being
+ * the one thing that knows. The unretried form carries no launch sentence:
+ * its readers are pollers (assert, scroll, wait timeouts, the keyboard
+ * looks), which have read past the launch's first second over their budget,
+ * and a one-shot read without `settle` has no reader to advise.
+ * IdbTreeSource.read stays one read.
  */
 export class IdbEmptyTreeError extends Error {
-  /**
-   * `udid`: the simulator the read was made on — the one the reboot advice names.
-   * `types`: the raw payload's element types, in order — what the message names as the shape.
-   */
-  constructor(udid: string, types: readonly (string | undefined)[]) {
+  /** The simulator the read was made on — the one the reboot advice names. */
+  readonly udid: string;
+  /** The raw payload's element types, in order — what the message names as the shape. */
+  readonly types: readonly (string | undefined)[];
+  /** Set when this is a RE-read's error: how long after the first empty read it was made, in ms. */
+  readonly reread?: number;
+
+  constructor(udid: string, types: readonly (string | undefined)[], opts: { reread?: number } = {}) {
     // The cause on the first line, the advice after a newline: a trace entry
     // quotes only the first line (flow/engine.ts `headline`), so a probe
     // that fails every round repeats the cause, not a paragraph of advice.
+    // The first line is the same in both forms for that reason.
     super(
       `idb returned an empty accessibility tree (${describeEmptyPayload(types)})\n` +
+        (opts.reread === undefined
+          ? ''
+          : `The read was retried once after ${formatSeconds(opts.reread)} and was still empty; a healthy idb had a tree with area ` +
+            'by +1 s on 10 of 10 measured launches, so the rest of this applies (a first render slower than that on ' +
+            'a loaded host is unmeasured: if launch_app returned under about two seconds ago, one more read settles it). ') +
         'The app may still be rendered: idb can stay stuck like this for minutes on a rendered screen. ' +
         'Compare with screenshot; if the screen is rendered, the tree source is stuck, not the app. ' +
         'The measured trigger is an earlier WebDriverAgent session on this simulator (e.g. treeSource: wda; ' +
@@ -176,6 +201,9 @@ export class IdbEmptyTreeError extends Error {
         'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
     );
     this.name = 'IdbEmptyTreeError';
+    this.udid = udid;
+    this.types = types;
+    this.reread = opts.reread;
   }
 }
 

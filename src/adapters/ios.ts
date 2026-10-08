@@ -7,10 +7,25 @@ import { runIdb } from './idb.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
-import type { IosTreeSource } from './ios-tree-source.js';
+import { IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
 import { ViewportMemo } from './viewport-memo.js';
+import { sleep } from '../util/sleep.js';
+
+/**
+ * How long uiTree({ settle: true }) waits before its one re-read of an idb
+ * tree that came back empty (2026-10-08). One second because that is where
+ * the measurements put the line: on a simulator whose idb was healthy all 10
+ * launches had a tree with area at +1 s (0 of 30 reads empty at +1/+5/+15 s,
+ * docs/bugs/2026-10-06-wda-read-wakes-stuck-idb-tree.md, I4), and
+ * the transient seen on a healthy idb was empty 0.4–0.5 s after launch_app
+ * returned (two cold launches) and, the once it was re-read, bare — no longer
+ * empty — at +0.7 s (docs/plans/2026-10-08-round3-phase2-device-check.md, row
+ * R1 and finding 5). The same length as Android's NULL_ROOT_RETRY_MS, by
+ * measurement, not by copying it.
+ */
+export const IDB_EMPTY_RETRY_MS = 1_000;
 
 /**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
@@ -69,11 +84,47 @@ export class IosAdapter implements DeviceAdapter {
     return this.idb(['ui', ...args]);
   }
 
-  // `settle` (DeviceAdapter.uiTree) is accepted and ignored here on purpose:
-  // neither idb nor WDA has uiautomator's "no window yet" transient — a
-  // launching app simply appears in the next read.
-  uiTree(): Promise<UiNode> {
-    return this.treeSource.read();
+  /**
+   * The source's read, and with `settle` (DeviceAdapter.uiTree — a one-shot
+   * caller, `ui_snapshot` today) one bounded retry of an idb read that came
+   * back with no tree: IdbEmptyTreeError, once, after IDB_EMPTY_RETRY_MS —
+   * Android's null-root retry (android.ts), for iOS's own launch transient.
+   * Until 2026-10-08 `settle` was ignored here on the belief that neither idb
+   * nor WDA had a "no window yet" transient; the round-3 device check
+   * (docs/plans/2026-10-08-round3-phase2-device-check.md, finding 5)
+   * falsified it for idb: a single `ui_snapshot` 0.4 s after launch_app read
+   * the 0×0 Application that IdbEmptyTreeError names, a read 0.3 s later was a
+   * bare tree, and the screen rendered within ~4 s. WDA has shown no such
+   * shape, and its errors are not retried.
+   *
+   * Only the one error, only once: any other error propagates unchanged, and
+   * a second empty tree is thrown again with `reread` set — the same first
+   * line (what a trace quotes), and a message that says the read was already
+   * retried, so the rest of the advice applies — telling the reader to read
+   * again only for the unmeasured case of a first render slower than the
+   * re-read (launch_app under about two seconds ago). A stuck idb (measured empty from +0.3 s to 30.4 s and for
+   * 18 min, docs/bugs/2026-10-06-wda-read-wakes-stuck-idb-tree.md) therefore
+   * still fails the call, one second later. Here and not in
+   * IdbTreeSource.read: the source stays one read per call, so the pollers —
+   * which never pass `settle`, their interval already is the retry — pay
+   * nothing, and the stuck path every waiting caller and the ensure_state
+   * ladder's refusal sees is the one it was.
+   */
+  async uiTree(opts: { settle?: boolean } = {}): Promise<UiNode> {
+    try {
+      return await this.treeSource.read();
+    } catch (e) {
+      if (!opts.settle || !(e instanceof IdbEmptyTreeError)) throw e;
+    }
+    await sleep(IDB_EMPTY_RETRY_MS);
+    try {
+      return await this.treeSource.read();
+    } catch (e) {
+      // Still empty: the same error, saying it was a re-read — the cause line
+      // unchanged, the advice that of a stuck idb.
+      if (e instanceof IdbEmptyTreeError) throw new IdbEmptyTreeError(e.udid, e.types, { reread: IDB_EMPTY_RETRY_MS });
+      throw e;
+    }
   }
 
   /**

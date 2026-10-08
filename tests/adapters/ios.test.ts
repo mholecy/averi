@@ -3,10 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
-import { IosAdapter } from '../../src/adapters/ios.js';
-import { IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { IDB_EMPTY_RETRY_MS, IosAdapter } from '../../src/adapters/ios.js';
+import { IdbEmptyTreeError, IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+
+// The one sleep owner, recorded and not waited on: uiTree's settle re-read
+// waits IDB_EMPTY_RETRY_MS, pinned by value rather than spent in real time.
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 function fakeExec(responses: Record<string, string | Buffer>) {
   const calls: { full: string; stdin?: string }[] = [];
@@ -147,6 +152,8 @@ describe('IosAdapter interactions', () => {
 });
 
 describe('IosAdapter.uiTree and dispose — one delegation each to the tree source', () => {
+  beforeEach(() => resetSleeps());
+
   // A nested tree of the shape the WDA source returns; the fake stands at the
   // seam so these tests pin the ADAPTER's half of the contract alone.
   const TREE: UiNode = {
@@ -188,15 +195,88 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     return { source, state };
   };
 
-  it("uiTree is the source's read: no idb call for the tree, `settle` accepted and ignored", async () => {
+  it("uiTree is the source's read: one read, no idb call for the tree", async () => {
     const { fn, calls } = fakeExec({});
     const { source, state } = fakeSource();
-    // Through the interface: `settle` is DeviceAdapter's option, and iOS has no transient to wait out.
+    // Through the interface: `settle` is DeviceAdapter's option. A read that
+    // succeeds is read once, with or without it, and nothing waits.
     const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source });
-    const tree = await adapter.uiTree({ settle: true });
-    expect(tree).toEqual(TREE);
-    expect(state.reads).toBe(1);
+    expect(await adapter.uiTree({ settle: true })).toEqual(TREE);
+    expect(await adapter.uiTree()).toEqual(TREE);
+    expect(state.reads).toBe(2);
+    expect(sleeps).toEqual([]);
     expect(calls.filter((c) => c.full.startsWith('idb'))).toEqual([]); // the tree read left idb entirely
+  });
+
+  // 2026-10-08 (docs/plans/2026-10-08-round3-phase2-device-check.md, finding
+  // 5): a healthy idb read 0.4 s after launch_app can be the same 0×0
+  // Application the stuck state is, and is bare at +0.7 s. With `settle` (a
+  // one-shot caller — ui_snapshot) that one error is read again, once, after
+  // IDB_EMPTY_RETRY_MS; anything else, and a poller's read, is as it was.
+  describe('settle: one re-read of an idb empty tree', () => {
+    /** A source whose reads answer in turn: a tree, or an error thrown. */
+    const scripted = (...answers: (UiNode | Error)[]) => {
+      const state = { reads: 0 };
+      const source: IosTreeSource = {
+        kind: 'idb',
+        read: async () => {
+          const answer = answers[state.reads++];
+          if (answer === undefined) throw new Error('read past the script');
+          if (answer instanceof Error) throw answer;
+          return structuredClone(answer);
+        },
+        dispose: () => Promise.resolve(),
+      };
+      return { source, state };
+    };
+    const empty = () => new IdbEmptyTreeError('AAAA-1111', ['Application']);
+    const adapterOn = (source: IosTreeSource): DeviceAdapter => new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: source });
+
+    it('the waited value is one second, as measured', () => {
+      expect(IDB_EMPTY_RETRY_MS).toBe(1_000);
+    });
+
+    it('an empty tree then a tree: two reads, one wait of IDB_EMPTY_RETRY_MS between them, and the tree', async () => {
+      const { source, state } = scripted(empty(), TREE);
+      expect(await adapterOn(source).uiTree({ settle: true })).toEqual(TREE);
+      expect(state.reads).toBe(2);
+      expect(sleeps).toEqual([IDB_EMPTY_RETRY_MS]);
+    });
+
+    it('empty twice (the stuck state): two reads, and an IdbEmptyTreeError that states the re-read and keeps the first line', async () => {
+      // The second read's shape, not the first's, is the one reported.
+      const second = new IdbEmptyTreeError('AAAA-1111', []);
+      const { source, state } = scripted(empty(), second);
+      const error = await adapterOn(source).uiTree({ settle: true }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(IdbEmptyTreeError);
+      const retried = error as IdbEmptyTreeError;
+      expect(retried.reread).toBe(IDB_EMPTY_RETRY_MS);
+      expect(retried.udid).toBe('AAAA-1111');
+      const [first, ...rest] = retried.message.split('\n');
+      expect(first).toBe(second.message.split('\n')[0]); // what a trace quotes, verbatim
+      expect(rest.join('\n')).toMatch(/^The read was retried once after 1 s and was still empty; /);
+      expect(state.reads).toBe(2);
+      expect(sleeps).toEqual([IDB_EMPTY_RETRY_MS]);
+    });
+
+    it('without settle (a poller): one read, the error thrown as the source threw it (no re-read clause), nothing waited — the poll interval is the retry', async () => {
+      const first = empty();
+      const { source, state } = scripted(first, TREE);
+      const error = await adapterOn(source).uiTree().catch((e: unknown) => e);
+      expect(error).toBe(first);
+      expect((error as IdbEmptyTreeError).reread).toBeUndefined();
+      expect(state.reads).toBe(1);
+      expect(sleeps).toEqual([]);
+    });
+
+    it('settle and any OTHER read error (a WDA failure, an idb exec error): one read, rethrown, nothing waited', async () => {
+      const other = new Error('WebDriverAgent /source failed: socket hang up');
+      const { source, state } = scripted(other, TREE);
+      const error = await adapterOn(source).uiTree({ settle: true }).catch((e: unknown) => e);
+      expect(error).toBe(other);
+      expect(state.reads).toBe(1);
+      expect(sleeps).toEqual([]);
+    });
   });
 
   it("taps resolve against the source's tree and still go through idb — only the tree read is the source's", async () => {

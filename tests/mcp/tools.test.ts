@@ -734,6 +734,25 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.text).toContain('app.ios.treeSource: wda');
   });
 
+  // 2026-10-08 (docs/plans/2026-10-08-round3-phase2-device-check.md, finding
+  // 5): ui_snapshot is the one-shot read that asks the adapter to wait out a
+  // launch transient — Android's null root, iOS idb's empty tree — so it must
+  // pass `settle: true`; the retry itself is the adapter's (ios.test.ts,
+  // android.test.ts). Both platforms, since the handler does not branch.
+  it.each(['android', 'ios'] as const)('ui_snapshot on %s reads the tree with settle: true — the one-shot caller of the adapter\'s transient retry', async (platform) => {
+    const seen: ({ settle?: boolean } | undefined)[] = [];
+    const recording = home();
+    const read = recording.uiTree.bind(recording);
+    recording.uiTree = async (opts?: { settle?: boolean }) => {
+      seen.push(opts);
+      return read();
+    };
+    const { call } = await connect({ [platform]: recording, [platform === 'ios' ? 'android' : 'ios']: home() });
+    const result = await call('ui_snapshot', { platform, configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(seen).toEqual([{ settle: true }]);
+  });
+
   it('ui_snapshot: an EMPTY filter string means no filter, as it always did — the whole tree, alone', async () => {
     const { call } = await connect({ android: pin(), ios: home() });
     const result = await call('ui_snapshot', { platform: 'android', filter: '' });

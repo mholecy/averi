@@ -104,7 +104,11 @@ left (864,1110)→(216,1110). iOS 402x874 gives up (201,699)→(201,175) and lef
    `launch_app` returned. A read 0.3 s later was a bare 2-node tree, and the rendered tree came within about 4 s. So
    the error, with its reboot advice, also fires on a transient pre-render 0×0 Application, not only on the stuck tree
    it describes. `ui_snapshot` does not wait, as documented, and `assert` polls past it (`PASS element role:"button"`
-   1.1 s later). This behaviour predates phase 2. Only the wording was under test.
+   1.1 s later). This behaviour predates phase 2. Only the wording was under test. Addressed after this check by `fix(ios): ui_snapshot's settle read
+   re-reads an idb empty tree once a second later …` (not device-checked): `ui_snapshot`'s `settle` read now re-reads an
+   idb empty tree once after 1 s (`IosAdapter.uiTree`, `IDB_EMPTY_RETRY_MS`), and a second empty tree fails with the same
+   first line and advice opening `The read was retried once after 1 s and was still empty`; pollers and the stuck path
+   are unchanged.
 6. **`scroll_until` "found after N>0 swipes" was not exercised.** The login screen fits the viewport on both platforms,
    and no scrollable screen is reachable without logging in.
 7. **The iOS rotate path was not exercised.** No iOS rotation was done.
