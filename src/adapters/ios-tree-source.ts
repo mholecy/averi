@@ -7,6 +7,7 @@ import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios
 import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import { rectArea, zeroRect, type Rect, type UiNode } from './types.js';
+import { countOf } from '../util/count.js';
 
 /**
  * The iOS tree-source seam (2026-10-02). `simctl` cannot read the
@@ -211,7 +212,7 @@ export class IdbEmptyTreeError extends Error {
 const describeEmptyPayload = (types: readonly (string | undefined)[]): string => {
   if (types.length === 0) return 'an empty list';
   if (types.length === 1 && types[0] === 'Application') return 'only a 0×0 Application';
-  return `${types.length} element${types.length === 1 ? '' : 's'}, none with any area`;
+  return `${countOf(types.length, 'element')}, none with any area`;
 };
 
 /** The budget uiTree() gave describe-all before the seam existed — a busy screen is slower than a tap. */

@@ -32,6 +32,7 @@ import {
   type TextCapture,
 } from '../verify/text-parity.js';
 import type { Contribution } from '../verify/contribution.js';
+import { countOf } from '../util/count.js';
 
 /**
  * The `verify` tool's orchestration: run the same sequence on each requested
@@ -427,7 +428,7 @@ export function contractProblems(contract: LayoutContract): string[] {
  */
 const contractRefusal = (problems: string[], source?: string): string =>
   `verify: the layout contract${source === undefined ? '' : ` ${source}`} has ` +
-  `${problems.length} invalid field${problems.length === 1 ? '' : 's'} ` +
+  `${countOf(problems.length, 'invalid field')} ` +
   'in the tables this run would produce — refused before the run:\n' +
   problems.map((problem) => `- ${problem}`).join('\n') +
   '\nFix the contract and re-run; nothing was run on a device.';

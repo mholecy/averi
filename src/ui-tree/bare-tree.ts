@@ -1,5 +1,6 @@
 import { everyNode, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Rect, type UiNode } from '../adapters/types.js';
 import { rectArea } from './geometry.js';
+import { countOf } from '../util/count.js';
 
 /**
  * Does the tree hold anything a user could read or act on? If not it is
@@ -258,7 +259,7 @@ const rolesPresent = (nodes: readonly UiNode[]): string => {
  * ui_snapshot's bare note (mcp/tool-text.ts `snapshotNote`, which counts
  * without the roles); until the 2026-10-07 review each spelled its own.
  */
-export const nodeCount = (nodes: readonly UiNode[]): string => `${nodes.length} node${nodes.length === 1 ? '' : 's'}`;
+export const nodeCount = (nodes: readonly UiNode[]): string => countOf(nodes.length, 'node');
 
 /**
  * What a bare tree holds, as every sentence that reports one says it

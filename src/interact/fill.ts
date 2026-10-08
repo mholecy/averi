@@ -7,6 +7,7 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
+import { countOf } from '../util/count.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -41,7 +42,7 @@ export const INPUT_ROLE = 'textfield';
  * cleared.md read `Typed 1 characters` and `(1 characters, cleared 3
  * characters first)` on both platforms.
  */
-export const charactersText = (n: number): string => `${n} character${n === 1 ? '' : 's'}`;
+export const charactersText = (n: number): string => countOf(n, 'character');
 
 /**
  * An input on the screen near a matched node that is not one — what the

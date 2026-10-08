@@ -7,6 +7,7 @@ import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './k
 import { frameText } from './keyboard-model.js';
 import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
 import { judgingScreen, sameStroke, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
+import { countOf } from '../util/count.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -102,7 +103,7 @@ function describeClip(edges: readonly string[], visible: number, topCover?: Rect
 }
 
 /** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
-const swipesText = (n: number): string => `${n} swipe${n === 1 ? '' : 's'}`;
+const swipesText = (n: number): string => countOf(n, 'swipe');
 
 /** The honest one-line summary both call sites print. */
 export function describeScrollResult(r: ScrollUntilResult): string {
@@ -899,7 +900,7 @@ export async function scrollUntilVisible(
           : `after ${timeoutMs}ms (timeout)`;
       const turned =
         motion.turns > 0
-          ? `. It was turned round ${motion.turns} time${motion.turns === 1 ? '' : 's'}: a swipe carried it past the viewport (a fling), so the next was drawn the other way`
+          ? `. It was turned round ${countOf(motion.turns, 'time')}: a swipe carried it past the viewport (a fling), so the next was drawn the other way`
           : '';
       // The keyboard, when any round applied one: the reader must not take a
       // scroll that worked around it — or one it hid the element under — for
