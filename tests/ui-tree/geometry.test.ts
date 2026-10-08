@@ -348,30 +348,59 @@ describe('shadowing — the later content node drawn over a point (the dismissal
     expect(shadowing(screen(target, fullScreen({ ofKeyboard: true, children: [band, key] })), target, P)).toBe(key);
   });
 
-  it('a later screen-sized NON-structural node is not a cover by itself — the WDA SwiftUI toolbar host (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md)', () => {
+  it('a later screen-sized HOST is not a cover by itself — the WDA SwiftUI toolbar host (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md)', () => {
     // The measured tree, abridged: the title in the top bar, then (pre-order) a 402×874 `toolbar 'Toolbar'`
     // holding a 402×874 container, then the host's hidden tab bar elsewhere.
     const full = { x: 0, y: 0, width: 402, height: 874 };
+    const at = { x: 200, y: 84 };
     const title = uiNode({ role: 'text', label: 'SWIFT PAYMENT', identifier: 'swift_payment.form.title', rect: { x: 135, y: 73, width: 131, height: 22 } });
     const form = uiNode({ role: 'container', rect: full, children: [uiNode({ role: 'button', label: 'Continue to summary', rect: { x: 24, y: 512, width: 354, height: 44 } })] });
-    const toolbar = uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: full, children: [uiNode({ role: 'container', rect: full })] });
+    const toolbar = (rect = full) => uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect, children: [uiNode({ role: 'container', rect })] });
     const home = uiNode({ role: 'button', label: 'Home', rect: { x: 69, y: 711, width: 67, height: 52 } });
-    const tree = uiNode({ role: 'application', rect: full, children: [uiNode({ role: 'other', rect: full, children: [title, form, toolbar, home] })] });
-    expect(shadowing(tree, title, { x: 200, y: 84 })).toBeUndefined();
-    // Just under SCREEN_SIZED_FRACTION (0.9) of the largest rect it is a cover again: a sheet or card covers as itself.
-    const sheet = uiNode({ role: 'toolbar', rect: { x: 0, y: 0, width: 402, height: 786 } }); // 786/874 ≈ 0.899
-    expect(shadowing(uiNode({ role: 'application', rect: full, children: [title, sheet] }), title, { x: 200, y: 84 })).toBe(sheet);
+    const app = (...children: UiNode[]) => uiNode({ role: 'application', rect: full, children });
+    expect(shadowing(app(uiNode({ role: 'other', rect: full, children: [title, form, toolbar(), home] })), title, at)).toBeUndefined();
+    // The screen is the ROOT's rect, not the largest: a tall scroll content (WDA keeps off-screen nodes) earlier in the tree does not shrink the host below it.
+    const tall = uiNode({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 3000 } });
+    expect(shadowing(app(tall, title, toolbar()), title, at)).toBeUndefined();
+    // An inset host (402×820, 94 % of the screen: a status-bar inset) is still a host.
+    expect(shadowing(app(title, toolbar({ x: 0, y: 54, width: 402, height: 820 })), title, { x: 200, y: 84 })).toBeUndefined();
+    // Just under SCREEN_SIZED_FRACTION (0.9) it covers as itself: 402×786 is 89.9 %.
+    const under = toolbar({ x: 0, y: 0, width: 402, height: 786 });
+    expect(shadowing(app(title, under), title, at)).toBe(under);
   });
 
-  it('a screen-sized sheet or alert WITH content over the point still covers, through that content', () => {
+  it('the host rule\'s edge: exactly SCREEN_SIZED_FRACTION of the root is a host; a root with no rect falls back to the largest rect', () => {
+    const target = text({ label: 'title' });
+    const host = (height: number) => uiNode({ role: 'toolbar', rect: { x: 0, y: 0, width: 400, height }, children: [uiNode({ role: 'container', rect: { x: 0, y: 0, width: 400, height } })] });
+    expect(shadowing(screen(target, host(720)), target, P)).toBeUndefined(); // 288000 = 0.9 × 320000
+    const below = host(719);
+    expect(shadowing(screen(target, below), target, P)).toBe(below);
+    const rootless = (h: UiNode) => uiNode({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [fullScreen(), target, h] });
+    expect(shadowing(rootless(host(800)), target, P)).toBeUndefined();
+    const small = host(700);
+    expect(shadowing(rootless(small), target, P)).toBe(small);
+  });
+
+  it('a screen-sized node that is interactive or childless still covers: a full-screen backdrop button (an RN transparent Modal\'s Pressable), an image, a leaf toolbar', () => {
+    const target = text({ label: 'title' });
+    const rect = { x: 0, y: 0, width: 400, height: 800 };
+    const backdrop = uiNode({ role: 'button', label: 'Close', rect, children: [text({ label: 'elsewhere', rect: { x: 0, y: 600, width: 400, height: 100 } })] });
+    const image = uiNode({ role: 'image', rect });
+    const leaf = uiNode({ role: 'toolbar', rect });
+    expect(shadowing(screen(target, backdrop), target, P)).toBe(backdrop);
+    expect(shadowing(screen(target, image), target, P)).toBe(image);
+    expect(shadowing(screen(target, leaf), target, P)).toBe(leaf);
+  });
+
+  it('a screen-sized host with content over the point still covers, through that content', () => {
     const target = text({ label: 'title' });
     const message = text({ label: 'Session expired' });
-    const card = uiNode({ role: 'alert', rect: { x: 60, y: 60, width: 280, height: 160 } });
-    const sheet = (...children: UiNode[]) => uiNode({ role: 'alert', label: 'Sheet', rect: { x: 0, y: 0, width: 400, height: 800 }, children });
-    expect(shadowing(screen(target, sheet(message)), target, P)).toBe(message);
-    expect(shadowing(screen(target, sheet(card)), target, P)).toBe(card);
-    expect(shadowing(screen(target, sheet(fullScreen({ children: [message] }))), target, P)).toBe(message);
-    // The accepted trade-off: the same full-screen sheet with nothing of its own at the point reads as not covering.
-    expect(shadowing(screen(target, sheet(text({ label: 'elsewhere', rect: { x: 0, y: 600, width: 400, height: 100 } }))), target, P)).toBeUndefined();
+    const host = (...children: UiNode[]) => uiNode({ role: 'toolbar', rect: { x: 0, y: 0, width: 400, height: 800 }, children });
+    expect(shadowing(screen(target, host(message)), target, P)).toBe(message);
+    expect(shadowing(screen(target, host(fullScreen({ children: [message] }))), target, P)).toBe(message);
+    // WDA's alert shape (Alert → container, structural) over the point: its text covers, as before.
+    expect(shadowing(screen(target, host(uiNode({ role: 'container', rect: { x: 60, y: 60, width: 280, height: 160 }, children: [message] }))), target, P)).toBe(message);
+    // The accepted trade-off: the same host with nothing of its own at the point reads as not covering.
+    expect(shadowing(screen(target, host(text({ label: 'elsewhere', rect: { x: 0, y: 600, width: 400, height: 100 } }))), target, P)).toBeUndefined();
   });
 });

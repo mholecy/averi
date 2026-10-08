@@ -74,7 +74,7 @@ Failure lines:
 - **`no dismissal, nothing sent` / `none of the configured dismissals is usable …`** (each entry is listed with its reason): nothing was tapped.
   - From the tools: tap a neutral, non-interactive element (the screen title), then tap again.
   - In a flow: add such an element to `app.ios.keyboardDismiss`. Use a title or label, never a button; for a number pad's Done toolbar, add an `accessory: true` entry.
-  - `covered by <role> "…"`: something drawn later sits over that entry's centre (an alert, a sheet, a bar's label). Close it first, or configure an element it does not cover. A screen-sized node with nothing of its own at that point (WDA's full-screen SwiftUI `Toolbar`) is not counted as cover.
+  - `covered by <role> "…"`: something drawn later sits over that entry's centre (an alert, a sheet, a bar's label). Close it first, or configure an element it does not cover. A screen-sized, non-interactive container with nothing of its own at that point (WDA's full-screen SwiftUI `Toolbar`) is not counted as cover.
 - **`tapped id:"…" to hide it, still covered`**: the dismissal was tapped ONCE and may have changed the screen. Take a `screenshot` before you retry, and configure a dismissal that works on this screen.
 - **The keyboard's return key** (`tap: { label: search }`) is tappable. Use it only while `ui_snapshot` shows the `keyboard` band. After a `fill`, the keyboard is usually parked below the screen and a tap there lands off screen.
 
