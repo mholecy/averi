@@ -46,9 +46,10 @@ export interface ScrollUntilResult {
    * The soft keyboard at the stop, when it changed what the result means
    * (2026-10-08) — absent when none was read, so a run without a keyboard
    * reports what it always did:
-   * - `shown`: the stop was judged against the screen ABOVE `frame`, not the
-   *   whole screen, and that changed it — the part under it is not visible,
-   *   whatever the tree says
+   * - `shown`: the stop was judged against the screen ABOVE `frame` (the
+   *   highest covered rect, `Cover.topCover`: the band, or a floating
+   *   panel above it), not the whole screen, and that changed it — the
+   *   part under it is not visible, whatever the tree says
    *   (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md).
    *   Only where the band changed the stop: a clip at its edge, or — when
    *   several nodes match — a different match judged (one under the band
@@ -92,11 +93,11 @@ export interface ScrollUntilResult {
  * without judging it again — including `describeScrollResult`, which holds a
  * result and no rect at all.
  */
-function describeClip(edges: readonly string[], visible: number, band?: Rect): string {
+function describeClip(edges: readonly string[], visible: number, topCover?: Rect): string {
   // Never round a clipped element up to a reassuring 100%: the whole point of
   // the line is that something is missing.
   const pct = Math.min(Math.round(visible * 100), 99);
-  const where = band === undefined ? 'the viewport' : `the viewport above the soft keyboard over ${frameText(band)}`;
+  const where = topCover === undefined ? 'the viewport' : `the viewport above the soft keyboard over ${frameText(topCover)}`;
   return `CLIPPED at ${edges.join('/')}, ${pct}% of it is in ${where}`;
 }
 
@@ -109,15 +110,15 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   // `shown` comes where the band changed the stop — a clip at its edge, or a
   // different match judged, which can be clean; `unlocated` only with a
   // clean `fully: true` stop (scrollUntilVisible).
-  const band = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
+  const topCover = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
   const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
   if (r.clipped.length === 0) {
-    const above = band === undefined ? '' : `, judged above the soft keyboard over ${frameText(band)}`;
+    const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
     return `fully visible after ${n}${above}${unlocated}${moving}`;
   }
   return (
-    `visible after ${n} — ${describeClip(r.clipped, r.visible, band)}` +
+    `visible after ${n} — ${describeClip(r.clipped, r.visible, topCover)}` +
     `. A rect assert or screenshot on this element will measure the CLIPPED box${moving}`
   );
 }
@@ -152,8 +153,9 @@ type Edge = 'top' | 'bottom' | 'left' | 'right';
  * what is under it. `above` undefined: the band starts at or above y 0 and
  * leaves nothing (a full-screen extract-mode IME, unmeasured).
  *
- * `band` is the HIGHEST covered rect (`highestCover`), since 2026-10-08 not
- * always the inset band: with a floating Gboard (measured that day, API 33)
+ * `topCover` is the HIGHEST covered rect (`highestCover`) — named so by the
+ * code review of round 2 (it was `band`, and callers read `band.y` as the
+ * keyboard's top): since 2026-10-08 not always the inset band: with a floating Gboard (measured that day, API 33)
  * it is the panel, [359,1269][1040,1912], 681 px wide and mid-screen. The
  * invariant: only its `.y` is meaningful as a cut — the rect need not be
  * full width nor reach the bottom; the rest of it is quoted in messages.
@@ -166,7 +168,7 @@ type Edge = 'top' | 'bottom' | 'left' | 'right';
  * stroke box (a residual).
  */
 interface Cover {
-  band: Rect;
+  topCover: Rect;
   above: DeviceScreen | undefined;
   remedy: KeyboardRemedy;
 }
@@ -179,9 +181,9 @@ function coverOf(reading: SoftKeyboardReading | undefined, viewport: DeviceScree
   // (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md) — so a target
   // behind it is judged under the cover and the stroke starts above it. Full
   // width above its top, as for any band that does not reach the sides.
-  const band = highestCover(reading.keyboard);
-  if (band.y >= viewport.height) return undefined;
-  return { band, above: band.y <= 0 ? undefined : { width: viewport.width, height: band.y }, remedy: reading };
+  const topCover = highestCover(reading.keyboard);
+  if (topCover.y >= viewport.height) return undefined;
+  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: reading };
 }
 
 /** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the cover it was judged under (none for a whole-screen judgement or a keyboard-side node). */
@@ -236,7 +238,7 @@ const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
 const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
   cover?.above === undefined
     ? `${viewport.width}x${viewport.height} viewport`
-    : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.band)}`;
+    : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
@@ -633,7 +635,7 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  *   a content-up stroke touched down in the app's top bar and moved nothing
  *   under WDA. It is still the uncovered box's stroke, its touch-down never
  *   inside the keyboard clearance nor higher than without a keyboard; the
- *   length is not cut. Only the covered area's top edge (`band.y`) is read:
+ *   length is not cut. Only the covered area's top edge (`topCover.y`) is read:
  *   the band need not be full width nor reach the bottom.
  * - The stop is SETTLED (`SETTLE_CONFIRM_READS`, `Motion.stopVerdict`): a
  *   stop reached after a stroke is reported only once a further read, after
@@ -793,7 +795,7 @@ export async function scrollUntilVisible(
         // by this round — never a band checked on an earlier round.
         const keyboard: ScrollUntilResult['keyboard'] =
           best.under !== undefined
-            ? { state: 'shown', frame: best.under.band }
+            ? { state: 'shown', frame: best.under.topCover }
             : fully && (await unlocatedAt(reading?.keyboard))
               ? { state: 'unlocated' }
               : undefined;
@@ -816,7 +818,7 @@ export async function scrollUntilVisible(
         if (best.under !== undefined && best.clipped.includes('bottom')) {
           throw new Error(
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-              `${describeClip(best.clipped, best.visible, best.under.band)}, and the content is exhausted: swiping ${motion.lastStroke} ` +
+              `${describeClip(best.clipped, best.visible, best.under.topCover)}, and the content is exhausted: swiping ${motion.lastStroke} ` +
               `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(best.under.remedy)}; only if it ` +
               `stays clipped with the keyboard down is it a layout defect. ` +
               `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
@@ -824,7 +826,7 @@ export async function scrollUntilVisible(
         }
         throw new Error(
           `scroll_until ${describe} failed after ${n} — ` +
-            `element is in the viewport but ${describeClip(best.clipped, best.visible, best.under?.band)}, ` +
+            `element is in the viewport but ${describeClip(best.clipped, best.visible, best.under?.topCover)}, ` +
             `and the content is exhausted: swiping ${motion.lastStroke} no longer moves it. ` +
             `The element cannot be fully revealed — that is a layout defect ` +
             `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
@@ -850,7 +852,7 @@ export async function scrollUntilVisible(
       const seenAs = everFound ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
       throw absenceError(
         `scroll_until ${describe} failed after ${swipesText(swipes)} — ${seenAs}; the soft keyboard over ` +
-          `${frameText(cover.band)} ${cover.band.y + cover.band.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
+          `${frameText(cover.topCover)} ${cover.topCover.y + cover.topCover.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
           hideToJudgeWholeScreen(cover.remedy),
         { sighted: everFound, treesRead, readError: lastReadError },
       );
@@ -865,7 +867,7 @@ export async function scrollUntilVisible(
     if (exhausted || swipes >= maxSwipes || Date.now() >= deadline) {
       const partial =
         best !== undefined && best.visible > 0
-          ? `element reached the viewport but stayed ${describeClip(best.clipped, best.visible, best.under?.band)} ` +
+          ? `element reached the viewport but stayed ${describeClip(best.clipped, best.visible, best.under?.topCover)} ` +
             `(last rect ${JSON.stringify(best.node.rect)})`
           : undefined;
       // In the frame on an earlier read and not on this one: "never" would
@@ -901,7 +903,7 @@ export async function scrollUntilVisible(
       // `unlocated` row, asked of the last round's reading whatever came before.
       const shown =
         lastCover !== undefined
-          ? `. The soft keyboard was up over ${frameText(lastCover.band)} in ${coveredRounds} of the ${treesRead} rounds read: ` +
+          ? `. The soft keyboard was up over ${frameText(lastCover.topCover)} in ${coveredRounds} of the ${treesRead} rounds read: ` +
             `in those, visibility was judged, and the swipe drawn, in the screen above it — ${hideToJudgeWholeScreen(lastCover.remedy)}`
           : '';
       const unlocated = (await unlocatedAt(reading?.keyboard))
@@ -932,7 +934,7 @@ export async function scrollUntilVisible(
     // last saw.
     const { box } = await screenBox(adapter, read);
     const strokeCover = tree === undefined ? lastReadCover : cover;
-    const drawn = strokeCover === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, strokeCover.band.y, toward, 'content');
+    const drawn = strokeCover === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, strokeCover.topCover.y, toward, 'content');
     const stroke = shortenStroke(drawn, reach, toward === 'up' || toward === 'down' ? box.height : box.width);
     await adapter.swipe(stroke.from, stroke.to);
     swipes++;
