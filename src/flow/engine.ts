@@ -101,13 +101,13 @@ const readFailed = (e: unknown): string => `last UI tree read failed: ${headline
 /**
  * What an unread probe (or the refusal's cause) learned, as one clause:
  * `last UI tree read failed: …` or `every UI tree read was bare, the last
- * one 7 nodes (roles: …) of only wrappers and unlabeled decoration`. One
+ * one 7 nodes (roles: …) holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)`. One
  * spelling for the probe's `⚠ detect` line, the no-reach SetupError and the
  * refusal, so they cannot drift apart; each sentence around it is its own.
  */
 const describeUnreadCause = (cause: UnreadCause): string => {
   if (cause.answer === 'unknown') return readFailed(cause.readError);
-  const bare = `every UI tree read was bare, the last one ${cause.shape} of only wrappers and unlabeled decoration`;
+  const bare = `every UI tree read was bare, the last one ${cause.shape} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)`;
   return cause.answer === 'bare' ? bare : `${bare}, and every read after it failed (${readFailed(cause.readError)})`;
 };
 

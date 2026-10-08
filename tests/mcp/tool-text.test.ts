@@ -142,14 +142,14 @@ describe('ui_snapshot note (2026-10-06: `[]` right after launch_app was indistin
 
   it('no match in a bare tree: ⚠, both readings, the screenshot check, "do not read as absent", assert — no promise that a retry helps', () => {
     expect(snapshotNote(emptyTree(), match('role:button'))).toBe(
-      `⚠ 0 matches for role:button, and the tree is bare: 2 nodes, none readable or interactive (only wrappers and unlabeled decoration). ${BARE_TAIL}`,
+      `⚠ 0 matches for role:button, and the tree is bare: 2 nodes, nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon). ${BARE_TAIL}`,
     );
   });
 
   it('an unfiltered bare tree gets the same note without the match clause — the whole tree reads as "nothing on screen" just the same', () => {
     expect(snapshotNote(emptyTree())).toBe(
-      `⚠ The tree is bare: 2 nodes, none readable or interactive (only wrappers and unlabeled decoration). ${BARE_TAIL}`,
+      `⚠ The tree is bare: 2 nodes, nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon). ${BARE_TAIL}`,
     );
-    expect(snapshotNote(node({ role: 'container', rect: ZERO }))).toMatch(/^⚠ The tree is bare: 1 node, none/);
+    expect(snapshotNote(node({ role: 'container', rect: ZERO }))).toMatch(/^⚠ The tree is bare: 1 node, nothing of the app's/);
   });
 });

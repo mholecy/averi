@@ -5,7 +5,7 @@ import { absentFromViewport } from './geometry.js';
 /**
  * What one tree says about one element question, in three values
  * (2026-10-08, flow-engine review candidate 2): `yes`, `no`, or `unknown` —
- * the tree is BARE (bare-tree.ts: only wrappers and unlabeled decoration, a
+ * the tree is BARE (bare-tree.ts: only wrappers, unlabeled decoration, or iOS's status bar and launch icon, a
  * cold launch's Android decor for ~9 s, WDA's 7-node splash, iOS 27's
  * SpringBoard status bar and launch icon for ~2 s) and the answer
  * it would give is the one a bare tree gives for ANY selector, so it says
@@ -75,7 +75,7 @@ export const absenceVerdict = (
 
 /**
  * `the last UI tree read was bare, 7 nodes (roles: container ×6, image ×1)
- * of only wrappers and unlabeled decoration, so it could not decide this —
+ * holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), so it could not decide this —
  * the screen had not rendered by the deadline; compare with screenshot, and
  * a longer timeout may be all it needs` — the whole note a poll that timed
  * out on an `unknown` puts beneath its headline, its advice included: the
@@ -88,6 +88,6 @@ export const absenceVerdict = (
  * own sentence around the same shape.
  */
 export const bareTimeoutNote = (tree: UiNode): string =>
-  `the last UI tree read was bare, ${treeShape(tree)} of only wrappers and unlabeled decoration, ` +
+  `the last UI tree read was bare, ${treeShape(tree)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), ` +
   'so it could not decide this — the screen had not rendered by the deadline; ' +
   'compare with screenshot, and a longer timeout may be all it needs';

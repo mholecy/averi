@@ -187,7 +187,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
       action: '⚠ detect',
       detail:
         'element id:"login_screen" treated as not detected — every UI tree read was bare, ' +
-        'the last one 7 nodes (roles: container ×6, image ×1) of only wrappers and unlabeled decoration',
+        'the last one 7 nodes (roles: container ×6, image ×1) holding nothing of the app\'s (only wrappers, unlabeled decoration, or iOS\'s status bar and launch icon)',
     });
   });
 
@@ -208,7 +208,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
     expect(refused?.detail).toBe(
       'refused: the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
         'before it never read a RENDERED UI tree, a second look included — every UI tree read was bare, the last one ' +
-        `${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration — so whether the app is in "logged_out" is unknown. ` +
+        `${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon) — so whether the app is in "logged_out" is unknown. ` +
         'Compare with screenshot; retry once the screen has rendered, or run_flow "fresh_launch" runs it deliberately',
     );
     expect(error.message.split('\n')[0]).toBe(`Refused to run reach flow "fresh_launch" for state "logged_out": ${refused?.detail?.slice('refused: '.length)}`);
@@ -222,7 +222,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
   it('the second look\'s ⚠ detect line names the second look and its window, so it never repeats the entry probe\'s', async () => {
     const { fake } = timeline(() => ANDROID_DECOR);
     const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
-    const bare = `every UI tree read was bare, the last one ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration`;
+    const bare = `every UI tree read was bare, the last one ${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)`;
     expect(error.trace.filter((t) => t.action === '⚠ detect').map((t) => t.detail)).toEqual([
       `element id:"login_screen" treated as not detected — ${bare}`,
       `element id:"login_screen" treated as not detected (second look over 0.12 s) — ${bare}`,
@@ -248,7 +248,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
     expect(error.trace.find((t) => t.action === '⛔ reach fresh_launch')?.detail).toBe(
       'refused: the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
         'before it never read a RENDERED UI tree, a second look included — every UI tree read was bare, the last one ' +
-        `${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, and every read after it failed ` +
+        `${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), and every read after it failed ` +
         `(last UI tree read failed: ${ANDROID_NULL_ROOT.message}) — so whether the app is in "logged_out" is unknown. ` +
         'Compare with screenshot; retry once the screen has rendered, or run_flow "fresh_launch" runs it deliberately',
     );
@@ -262,7 +262,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
     expect(error.trace.find((t) => t.action === '⛔ reach fresh_launch')?.detail).toBe(
       'refused: the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe ' +
         'before it never read a RENDERED UI tree, a second look included — every UI tree read was bare, the last one ' +
-        `${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration — so whether the app is in "logged_out" is unknown. ` +
+        `${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon) — so whether the app is in "logged_out" is unknown. ` +
         'Compare with screenshot; retry once the screen has rendered, or run_flow "fresh_launch" runs it deliberately',
     );
     expect(actions(error.trace)).toEqual(['⚠ detect', '⚠ detect', '⛔ reach fresh_launch']);
@@ -381,7 +381,7 @@ describe('a state with no reach flows says honestly that a bare read could not c
     const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'no_reach' }));
     expect(error.message.split('\n')[0]).toBe(
       'State "no_reach" could not be checked (every UI tree read was bare, the last one 7 nodes (roles: container ×6, image ×1) ' +
-        'of only wrappers and unlabeled decoration) and it has no reach flows',
+        'holding nothing of the app\'s (only wrappers, unlabeled decoration, or iOS\'s status bar and launch icon)) and it has no reach flows',
     );
   });
 });
@@ -440,7 +440,7 @@ flows:
       action: '⚠ detect',
       detail:
         'element id:"some_modal" treated as not detected — every UI tree read was bare, the last one ' +
-        `${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration`,
+        `${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)`,
     });
     expect(state.reads).toBeGreaterThan(1);
   });
@@ -457,7 +457,7 @@ flows:
     const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { state: 'no_modal_no_reach' }));
     expect(error.message.split('\n')[0]).toBe(
       'State "no_modal_no_reach" could not be checked (every UI tree read was bare, the last one 7 nodes (roles: container ×6, image ×1) ' +
-        'of only wrappers and unlabeled decoration) and it has no reach flows',
+        'holding nothing of the app\'s (only wrappers, unlabeled decoration, or iOS\'s status bar and launch icon)) and it has no reach flows',
     );
   });
 
@@ -473,7 +473,7 @@ flows:
     const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { flow: 'wait_no_modal' }));
     expect(error.message.split('\n').slice(0, 2)).toEqual([
       'Timed out after 60ms waiting for state no_modal',
-      `  (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, so it could not ` +
+      `  (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), so it could not ` +
         'decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
     ]);
   });
@@ -522,7 +522,7 @@ flows:
     const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { flow: 'branch_on_absence' }));
     expect(error.message.split('\n').slice(0, 2)).toEqual([
       'Timed out after 60ms waiting for any branch condition (element id:"some_modal")',
-      '  (the last UI tree read was bare, 7 nodes (roles: container ×6, image ×1) of only wrappers and unlabeled decoration, ' +
+      '  (the last UI tree read was bare, 7 nodes (roles: container ×6, image ×1) holding nothing of the app\'s (only wrappers, unlabeled decoration, or iOS\'s status bar and launch icon), ' +
         'so it could not decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
     ]);
   });
@@ -533,7 +533,7 @@ flows:
     expect(await v.assert({ element: { id: 'some_modal' }, absent: true })).toEqual({
       description: 'element id:"some_modal" is absent',
       pass: false,
-      detail: `could not verify within 0.06 s (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, so it could not ` +
+      detail: `could not verify within 0.06 s (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), so it could not ` +
         'decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
     });
     // Bare, then a rendered screen SHOWING the modal: the verdict is the last tree's — "still visible", not could-not-verify.
@@ -594,7 +594,7 @@ describe('iOS 27 idb: SpringBoard\'s launch tree is bare — no wipe, no absence
       action: '⚠ detect',
       detail:
         'element id:"login_screen" treated as not detected — every UI tree read was bare, ' +
-        'the last one 7 nodes (roles: other ×4, button ×1, container ×1, text ×1) of only wrappers and unlabeled decoration',
+        'the last one 7 nodes (roles: other ×4, button ×1, container ×1, text ×1) holding nothing of the app\'s (only wrappers, unlabeled decoration, or iOS\'s status bar and launch icon)',
     });
   });
 

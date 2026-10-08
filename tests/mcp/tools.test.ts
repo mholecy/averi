@@ -746,7 +746,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.isError).toBe(false);
     expect(result.shape).toEqual([['text'], ['text']]);
     expect(result.texts[0]).toBe('[]');
-    expect(result.texts[1]).toMatch(/^⚠ 0 matches for role:button, and the tree is bare: 1 node, none readable or interactive .*\. The accessibility tree is empty or unrendered/);
+    expect(result.texts[1]).toMatch(/^⚠ 0 matches for role:button, and the tree is bare: 1 node, nothing of the app's .*\. The accessibility tree is empty or unrendered/);
     expect(result.texts[1]).toContain('do not read the element as absent. assert polls (3 s by default');
   });
 
@@ -758,7 +758,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     const empty = await call('ui_snapshot', { platform: 'ios', configPath: missing() });
     expect(empty.shape).toEqual([['text'], ['text']]);
     expect(JSON.parse(empty.texts[0])).toEqual({ role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 }, children: [] });
-    expect(empty.texts[1]).toMatch(/^⚠ The tree is bare: 1 node, none readable or interactive/);
+    expect(empty.texts[1]).toMatch(/^⚠ The tree is bare: 1 node, nothing of the app's/);
   });
 
   // 2026-10-06 (docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-

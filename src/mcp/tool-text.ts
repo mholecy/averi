@@ -113,7 +113,7 @@ export const snapshotNote = (tree: UiNode, match?: { selector: string; matched: 
   if (isBareTree(tree)) {
     const lead = match === undefined ? 'The' : `0 matches for ${match.selector}, and the`;
     return (
-      `⚠ ${lead} tree is bare: ${nodeCount([...everyNode(tree)])}, none readable or interactive (only wrappers and unlabeled decoration). ` +
+      `⚠ ${lead} tree is bare: ${nodeCount([...everyNode(tree)])}, nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon). ` +
       'The accessibility tree is empty or unrendered: the screen may still be loading, or — measured on iOS idb 2026-10-06 — ' +
       'the tree stays empty for minutes on a rendered screen. Compare with screenshot: if the screen is rendered, the tree source is stuck, ' +
       `not the app — do not read the element as absent. assert polls (${formatSeconds(ASSERT_TIMEOUT_MS)} by default; set "timeout" in the spec).`

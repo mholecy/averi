@@ -374,7 +374,7 @@ one happens by itself.
   on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
   <udid> && xcrun simctl boot <udid>` — the error spells it with the simulator's UDID), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
 - **`ensure_state` stops with `Refused to run reach flow …` and `every UI tree read was bare` (either platform)** — every
-  tree the detect probe read held only wrappers and unlabeled decoration: a cold launch's Android decor
+  tree the detect probe read held nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon): a cold launch's Android decor
   (`android:id/content`, `action_bar_root`; measured +5.3…+13.8 s after launch on an RN debug build) or the WDA splash
   (7 nodes, `SplashScreenLogo`). Before a destructive rung (`clearState`, or a flow marked `destructive: true`) — and
   since 2026-10-08 before any rung when the screen read bare — averi takes a second look of up to 20 s: it ends at once

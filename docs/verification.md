@@ -45,7 +45,7 @@ flows:
   tree, or its rect does not intersect the visible viewport*. This is the one portable meaning —
   Android prunes off-screen nodes from its tree while iOS keeps them with off-viewport rects, so
   a raw tree check would pass on one platform and fail on the other for the same screen. On a
-  BARE tree (only wrappers and unlabeled decoration — a cold launch's decor or splash) absence is
+  BARE tree (only wrappers, unlabeled decoration, or iOS's status bar and launch icon — a cold launch's decor or splash) absence is
   undecided, never satisfied: the assert fails `could not verify …`, `wait:`/`branch:` keep
   polling, and a state `detect:` reads it as unknown.
 - **`fill`** clears opt-in only: typing APPENDS on both platforms, but dev flavors may pre-fill
