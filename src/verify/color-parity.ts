@@ -380,9 +380,36 @@ function statsFor(platform: Platform, capture: MeasuredFrame): ColorPlatformStat
 }
 
 /**
- * One anchor's fill on one platform: locate its rect, scale it into png
- * pixels, sample. Returns either the sample or the reason it is absent —
- * never both — plus any caveats about how trustworthy the sample is.
+ * One rect's fill, sampled the ONE way the table row and the single-element
+ * assert both sample (2026-10-08, parity review 2026-10-07 P3): scale the
+ * rect into png pixels with the 12% inset, split into patches when asked,
+ * take the dominant bucket, and word the caveats. Until that date the chain
+ * was written out at both callers, as `sampleCaveats` had been before it
+ * (and had drifted). Either the sample with its caveats or why there is
+ * none — `off-png` (the rect lands nowhere on the png: off-screen in this
+ * capture) or `empty` (nothing left after inset and clamp) — never both;
+ * the callers word the absence, each in its own terms: a MISSING cell in
+ * the table, a fail-closed sentence in the assert. The scale and its
+ * policy stay with the callers too (the table fails a platform closed on
+ * an unusable one in `statsFor`, the assert in its detail).
+ */
+function sampleFill(
+  png: RgbaImage,
+  rect: Rect,
+  scale: number,
+  mode: ColorSampleMode,
+): { hex: string; share: number; caveats: string[]; absent?: undefined } | { absent: 'off-png' | 'empty' } {
+  const region = sampleRegion(rect, scale, png);
+  if (region === undefined) return { absent: 'off-png' };
+  const s = sampleDominant(png, mode === 'patches' ? patchRegions(region) : [region]);
+  if (s === undefined) return { absent: 'empty' };
+  return { hex: rgbToHex(s.rgb), share: s.share, caveats: sampleCaveats(region, s) };
+}
+
+/**
+ * One anchor's fill on one platform: locate its rect, then `sampleFill`.
+ * Returns either the sample or the reason it is absent — never both — plus
+ * any caveats about how trustworthy the sample is.
  */
 function sampleAnchor(
   id: string,
@@ -393,13 +420,12 @@ function sampleAnchor(
   mode: ColorSampleMode,
 ): { sample?: ColorSample; absent?: string; notes: string[] } {
   if (rect === undefined) return { absent: 'no id in tree', notes: [] };
-  const got = sampleRegion(rect, scale, capture.png);
-  if (got === undefined) return { absent: 'rect outside png (off-screen)', notes: [] };
-  const regions = mode === 'patches' ? patchRegions(got) : [got];
-  const s = sampleDominant(capture.png, regions);
-  if (s === undefined) return { absent: 'empty sample region', notes: [] };
-  const notes = sampleCaveats(got, s).map((caveat) => `${id} [${platform}]: ${caveat}.`);
-  return { sample: { hex: rgbToHex(s.rgb), share: s.share }, notes };
+  const got = sampleFill(capture.png, rect, scale, mode);
+  if (got.absent !== undefined) {
+    return { absent: got.absent === 'off-png' ? 'rect outside png (off-screen)' : 'empty sample region', notes: [] };
+  }
+  const notes = got.caveats.map((caveat) => `${id} [${platform}]: ${caveat}.`);
+  return { sample: { hex: got.hex, share: got.share }, notes };
 }
 
 export function compareColorParity(
@@ -685,33 +711,26 @@ export function evaluateColorAssert(
     return { pass: false, detail: failClosed(scaled.error, 'color') };
   }
   const scale = scaled.scale;
-  const got = sampleRegion(rect, scale, png);
-  if (got === undefined) {
-    return {
-      pass: false,
-      detail: failClosed(
-        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)}) — scroll it on-screen and re-run`,
-        'color',
-      ),
-    };
-  }
   const mode: ColorSampleMode = expectation.sample ?? 'dominant';
-  const regions = mode === 'patches' ? patchRegions(got) : [got];
-  const s = sampleDominant(png, regions);
-  if (s === undefined) {
-    return { pass: false, detail: failClosed('sample region is empty after inset/clamp', 'color') };
+  const got = sampleFill(png, rect, scale, mode);
+  if (got.absent !== undefined) {
+    const reason =
+      got.absent === 'off-png' ?
+        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)}) — scroll it on-screen and re-run`
+      : 'sample region is empty after inset/clamp';
+    return { pass: false, detail: failClosed(reason, 'color') };
   }
-  const hex = rgbToHex(s.rgb);
+  const { hex, share } = got;
   const expectedHex = normalizeHex(expectation.expected);
   const de = deltaEHex(hex, expectedHex);
   const pass = de <= tol;
-  const notes = sampleCaveats(got, s);
+  const notes = [...got.caveats];
   // Carries the implausible-scale remark too, when there is one (verify/scale.ts).
   if (scaled.note !== undefined) notes.push(scaled.note);
   return {
     pass,
     detail:
-      `sampled ${hex} (${mode}, ${Math.round(s.share * 100)}% of region) vs expected ${expectedHex} → ` +
+      `sampled ${hex} (${mode}, ${Math.round(share * 100)}% of region) vs expected ${expectedHex} → ` +
       `dE00 ${de.toFixed(2)} ${pass ? '≤' : '>'} ${tol}; scale ${scale.toFixed(3)}` +
       (notes.length > 0 ? `; ${notes.join('; ')}` : ''),
   };

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
+import { exec as defaultExec, ExecError, type ExecFn } from '../adapters/exec.js';
 import { errorMessage } from '../util/error-message.js';
 
 /**
@@ -65,8 +65,29 @@ export interface OcrRegionResult {
 }
 
 export interface OcrEngine {
+  /**
+   * Rejects when nothing could be read at all. A rejection with
+   * `OcrUnavailableError` is PERMANENT for this engine — no later call can
+   * succeed — and the `ocr` assert ends at once on it (text-parity.ts#
+   * measureOcrAssert); any other rejection is one failed read.
+   */
   recognize(png: Buffer, regions: OcrRegion[]): Promise<OcrRegionResult[]>;
 }
+
+/**
+ * OCR cannot run with this engine, and asking again will not change that:
+ * the host has no Vision, `swiftc` is missing or exits non-zero on its
+ * probe, or the recognizer did not compile — `VisionOcr` memoizes its build,
+ * so a failed one is the answer to every later call on the same instance (a
+ * probe that timed out or hit EAGAIN is a plain error and is not memoized) (2026-10-08, review 2026-10-07
+ * assert-capture-ocr C2). A class rather than a message match so the `ocr`
+ * assert can tell "this engine will never read" from "this read failed":
+ * until then the assert's catch swallowed both and polled a missing
+ * compiler for the whole 12 s budget. Not a SetupError (flow/errors): the
+ * assert fails closed with it as a reason and `assertAll` goes on; it never
+ * ends a flow by itself.
+ */
+export class OcrUnavailableError extends Error {}
 
 /**
  * Below this, a "recognized" string is noise rather than copy. Vision returned
@@ -188,6 +209,15 @@ const COMPILE_TIMEOUT_MS = 180_000;
 const RECOGNIZE_TIMEOUT_MS = 120_000;
 
 /**
+ * The probe timed out or the spawn was refused for want of resources
+ * (EAGAIN) — a transient host condition, not the compiler's answer. The real
+ * exec reports a spawn failure as an ExecError with no exit code and the
+ * spawn's message (`spawn swiftc EAGAIN`), so the code is read off the message.
+ */
+const probeDidNotAnswer = (e: unknown): boolean =>
+  (e instanceof ExecError && e.timedOut) || /\bEAGAIN\b/.test(errorMessage(e));
+
+/**
  * Vision-backed engine. The recognizer is compiled ONCE and cached under the
  * system temp dir, keyed by a hash of the source and the toolchain version:
  * `swift <file>` recompiles on every invocation and that cost dominates a run
@@ -201,7 +231,7 @@ export class VisionOcr implements OcrEngine {
 
   async recognize(png: Buffer, regions: OcrRegion[]): Promise<OcrRegionResult[]> {
     const unavailable = ocrUnavailableReason();
-    if (unavailable !== undefined) throw new Error(unavailable);
+    if (unavailable !== undefined) throw new OcrUnavailableError(unavailable);
     if (regions.length === 0) return [];
 
     const binary = await this.binary();
@@ -233,9 +263,20 @@ export class VisionOcr implements OcrEngine {
     }
   }
 
-  /** Compile-once-and-cache; concurrent callers share one promise per instance. */
+  /**
+   * Compile-once-and-cache; concurrent callers share one promise per instance
+   * — a rejected one too when the rejection is an `OcrUnavailableError`: a
+   * missing compiler or a failed compile is this instance's answer from then
+   * on. Any other rejection is dropped and the next call builds again.
+   */
   private binary(): Promise<string> {
-    this.binaryPromise ??= this.buildBinary();
+    this.binaryPromise ??= this.buildBinary().catch((e: unknown) => {
+      // Only a permanent failure is this instance's answer from then on; a
+      // transient one (a probe that timed out, a spawn refused with EAGAIN)
+      // is forgotten so the next read builds again.
+      if (!(e instanceof OcrUnavailableError)) this.binaryPromise = undefined;
+      throw e;
+    });
     return this.binaryPromise;
   }
 
@@ -245,9 +286,21 @@ export class VisionOcr implements OcrEngine {
       const { stdout } = await this.exec('swiftc', ['--version']);
       toolchain = stdout.toString('utf8');
     } catch (e) {
-      throw new Error(
+      // A probe that did not ANSWER says nothing about the compiler: a plain
+      // error, not memoized (`binary`), so one flaky probe does not fail every
+      // OCR read of the run (review 2026-10-08). A missing binary (ENOENT) or
+      // a non-zero exit is the compiler's answer, and permanent.
+      // One line: the reason ends up inside an assert's one-line fail-closed
+      // sentence and the text table's note, and ExecError puts the spawn
+      // error under its own line (`Command failed (exit null): swiftc
+      // --version⏎spawn swiftc ENOENT`, device check 2026-10-08).
+      const cause = errorMessage(e).replace(/\s*\n\s*/g, ' — ');
+      if (probeDidNotAnswer(e)) {
+        throw new Error(`the Swift compiler probe (\`swiftc --version\`) did not answer: ${cause}`);
+      }
+      throw new OcrUnavailableError(
         'OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line ' +
-          `Tools (xcode-select --install). Underlying error: ${errorMessage(e)}`,
+          `Tools (xcode-select --install). Underlying error: ${cause}`,
       );
     }
     const key = createHash('sha256').update(RECOGNIZER_SWIFT).update(toolchain).digest('hex').slice(0, 16);
@@ -267,6 +320,8 @@ export class VisionOcr implements OcrEngine {
     try {
       await this.exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
       await rename(staging, binary);
+    } catch (e) {
+      throw new OcrUnavailableError(`the OCR recognizer did not compile (swiftc -O): ${errorMessage(e)}`);
     } finally {
       await rm(source, { force: true });
     }

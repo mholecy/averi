@@ -17,7 +17,7 @@ import {
 } from '../../src/run/verify.js';
 import { Verifier } from '../../src/verify/assert.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
-import { ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
+import { ocrEngineFor, ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
@@ -34,8 +34,16 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 // the sequence is what the production budget IS (review 2026-10-03, round
 // 2). Yields a macrotask so deadline loops stay cooperative.
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+// The one OCR decision of a run is COUNTED, not changed (2026-10-08, C1):
+// the real rule runs, so every other test here sees the behaviour it always
+// did.
+vi.mock('../../src/verify/ocr.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/verify/ocr.js')>();
+  return { ...real, ocrEngineFor: vi.fn(real.ocrEngineFor) };
+});
 beforeEach(() => {
   resetSleeps();
+  vi.mocked(ocrEngineFor).mockClear();
 });
 
 const CFG = parseConfig(
@@ -946,6 +954,71 @@ describe('OCR unavailable — one reason, quoted by both callers', () => {
       });
       expect(result.pass).toBe(false);
       expect(result.detail).toContain(reason!);
+    } finally {
+      Object.defineProperty(process, 'platform', real);
+    }
+  });
+});
+
+describe('one OCR choice per run — the text table and every leg\'s ocr asserts', () => {
+  /**
+   * Review 2026-10-07 (assert-capture-ocr C1): `req.ocrEngine` reached only
+   * the text table; each leg's Verifier chose the host's engine itself, so a
+   * run-level fake never reached the ocr asserts and a two-platform run built
+   * up to three VisionOcr instances, each probing `swiftc --version`. The
+   * run now decides once (`ocrEngineFor`, counted through the mock above)
+   * and hands the same choice to the table and to both legs.
+   */
+  const recording = () => {
+    const regionIds: string[] = [];
+    const engine: OcrEngine = {
+      recognize: async (_png, regions) => {
+        regionIds.push(...regions.map((r) => r.id));
+        return regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 10, h: 10 }] }));
+      },
+    };
+    return { engine, regionIds };
+  };
+
+  it('the request\'s engine reaches both legs\' ocr asserts and the table, decided once', async () => {
+    const { engine, regionIds } = recording();
+    const adapters = { android: fake('android'), ios: fake('ios') };
+    // On a host without Vision, so an assert that chose its own engine fails at once instead of compiling one.
+    const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    const out = await runVerification(
+      request({
+        contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+        specs: [{ element: { id: 'card' }, ocr: { text: 'CONTINUE' } }],
+        ocrEngine: engine,
+      }),
+      async (p) => adapters[p],
+    ).finally(() => Object.defineProperty(process, 'platform', real));
+    expect(vi.mocked(ocrEngineFor)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ocrEngineFor)).toHaveBeenCalledWith(engine);
+    // Each leg's assert read its element once ('element' is the assert's region id), the table each leg's anchor.
+    expect(regionIds.filter((id) => id === 'element')).toHaveLength(2);
+    expect(regionIds.filter((id) => id === 'card')).toHaveLength(2);
+    expect(out.sections[0]).toContain('## android');
+    expect(out.sections[0]).toMatch(/PASS.*renders text "CONTINUE"/);
+    expect(out.sections[1]).toMatch(/PASS.*renders text "CONTINUE"/);
+  });
+
+  it('with no engine on a host without Vision, every leg\'s ocr assert fails closed on the run\'s one reason', async () => {
+    const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    try {
+      const out = await runVerification(
+        request({
+          contract: contract([{ id: 'card', text: 'CONTINUE' }]),
+          specs: [{ element: { id: 'card' }, ocr: { text: 'CONTINUE' } }],
+        }),
+        async (p) => fake(p),
+      );
+      expect(vi.mocked(ocrEngineFor)).toHaveBeenCalledTimes(1);
+      const failed = `${ocrUnavailableReason()}; failing closed, rendered text unchecked`;
+      expect(out.sections[0]).toContain(failed);
+      expect(out.sections[1]).toContain(failed);
     } finally {
       Object.defineProperty(process, 'platform', real);
     }

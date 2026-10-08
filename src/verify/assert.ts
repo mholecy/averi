@@ -4,10 +4,9 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
-import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTree, Undecided } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
-import { errorMessage } from '../util/error-message.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
 import {
@@ -25,9 +24,9 @@ import { failClosed } from './fail-closed.js';
 import { pollPixels, screenshotFailed } from './pixel-poll.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
 import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
-import { ocrEngineFor, type OcrEngine } from './ocr.js';
+import { ocrEngineFor, type OcrEngineChoice } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
-import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
+import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
 import { containsTextHint, flattenTree } from './text-hint.js';
@@ -208,8 +207,14 @@ export interface VerifierOptions {
    * color and ocr asserts (see `PIXEL_ASSERT_TIMEOUT_MS`).
    */
   timeoutMs?: number;
-  /** Test seam: the recognizer behind the `ocr` assert. */
-  ocrEngine?: OcrEngine;
+  /**
+   * The OCR choice every `ocr` assert of this Verifier reads with: the
+   * verify run's one decision (run/verify.ts, 2026-10-08 — the same value
+   * its text table reads with) or a test's fake (`{ engine }`). Unset, the
+   * host's (`ocrEngineFor()`) is chosen on the first `ocr` assert and kept
+   * for the Verifier's life.
+   */
+  ocr?: OcrEngineChoice;
 }
 
 interface PollSpec {
@@ -232,8 +237,13 @@ export class Verifier {
   private readonly pollMs: number;
   /** The caller's budget for every assert, when it set one; else each kind's default applies. */
   private readonly timeoutMs: number | undefined;
-  /** Built on first `ocr` assert so non-OCR runs never probe for a toolchain. */
-  private ocr: OcrEngine | undefined;
+  /**
+   * The caller's OCR choice, else the host's, decided on the first `ocr`
+   * assert and memoized — one VisionOcr per Verifier, so its compiled binary
+   * (and its one `swiftc --version` probe) is reused across asserts. Building
+   * it costs nothing: the engine probes for its toolchain on its first read.
+   */
+  private ocr: OcrEngineChoice | undefined;
 
   constructor(
     private readonly adapter: DeviceAdapter,
@@ -242,7 +252,7 @@ export class Verifier {
     this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
     this.timeoutMs = opts.timeoutMs;
-    this.ocr = opts.ocrEngine;
+    this.ocr = opts.ocr;
   }
 
   async assertAll(specs: AssertSpec[]): Promise<AssertResult[]> {
@@ -278,7 +288,7 @@ export class Verifier {
       : match !== undefined ? ` matching /${match}/`
       : error !== undefined ? ` with error ${JSON.stringify(error)}`
       : '';
-    const description = `element ${describe(element)}${wants} exists`;
+    const description = `element ${describeElementSpec(element)}${wants} exists`;
     const contentMatches = (n: UiNode): boolean => {
       const values = [n.label, n.value].filter((v): v is string => v !== null);
       if (text !== undefined) return values.includes(text);
@@ -349,7 +359,7 @@ export class Verifier {
     timeoutMs: number,
   ): Promise<AssertResult> {
     const tolerance = expected.tolerancePct ?? DEFAULT_TOLERANCE_PCT;
-    const description = `element ${describe(element)} rect within ${tolerance}% of screen width (figma frame ${expected.frameWidth})`;
+    const description = `element ${describeElementSpec(element)} rect within ${tolerance}% of screen width (figma frame ${expected.frameWidth})`;
     // The witness, read once (memoized by the adapter), and re-read fresh at
     // most once for the whole assert, before a wider-than-screen refusal
     // (capture.ts#ScreenWitness). A failed read is not a failed assert: the
@@ -375,9 +385,12 @@ export class Verifier {
    * BOTH the tree (the element's rect) and a screenshot (pixels), scaled
    * together. The round — find, capture against that tree, wait for the png
    * to settle, decode, and only then measure — is the pixel poll's
-   * (verify/pixel-poll.ts); what is here is the measurement: crop the rect,
-   * recognize, compare. The recognizer is closed over, so the poll never
-   * learns OCR exists.
+   * (verify/pixel-poll.ts); the measurement — crop the rect, recognize,
+   * compare, and every fail-closed sentence on the way — is
+   * text-parity.ts#measureOcrAssert's since 2026-10-08, as the colour
+   * assert's is evaluateColorAssert's. What is here is the description and
+   * the engine. The recognizer is closed over, so the poll never learns OCR
+   * exists.
    *
    * Unavailable OCR fails the assert with the reason rather than skipping it:
    * a check the caller asked for and did not get must never read as a pass.
@@ -392,13 +405,11 @@ export class Verifier {
       expectation.match !== undefined ? `matching /${expectation.match}/` : undefined,
       expectation.heightPct !== undefined ? `ink height ${expectation.heightPct}% of width` : undefined,
     ].filter((v): v is string => v !== undefined);
-    const description = `element ${describe(element)} renders ${wants.join(' and ')}`;
-    const choice = ocrEngineFor(this.ocr);
-    if (choice.unavailable !== undefined) {
-      return { description, pass: false, detail: failClosed(choice.unavailable, 'rendered text') };
+    const description = `element ${describeElementSpec(element)} renders ${wants.join(' and ')}`;
+    const { engine, unavailable } = (this.ocr ??= ocrEngineFor());
+    if (unavailable !== undefined) {
+      return { description, pass: false, detail: failClosed(unavailable, 'rendered text') };
     }
-    // Memoized: one VisionOcr per Verifier, so its compiled binary is reused across asserts.
-    const engine = (this.ocr ??= choice.engine);
     // The rect is the FIRST match's (the pixel poll's rule, the same as
     // rect-parity's). The whole-screen text table deliberately does the
     // opposite; here the caller named ONE element and gets that element's rect.
@@ -407,22 +418,7 @@ export class Verifier {
       timeoutMs,
       pollMs: this.pollMs,
       unchecked: 'rendered text',
-      measure: async ({ rect, shot, measured }) => {
-        try {
-          const { region, note, error } = ocrRegionForRect('element', rect, measured);
-          if (region === undefined) {
-            return { pass: false, detail: failClosed(error, 'rendered text') };
-          }
-          const [read] = await engine.recognize(shot, [region]);
-          if (read?.error !== undefined) return { pass: false, detail: read.error };
-          const verdict = evaluateOcrAssert(expectation, read?.lines ?? [], measured.png.width);
-          return note === undefined ? verdict : { ...verdict, detail: `${verdict.detail}; ${note}` };
-        } catch (e) {
-          // Keep polling — the capture may have raced a transition — but stay
-          // failed so a deadline reached this way reports the reason.
-          return { pass: false, detail: `OCR failed: ${errorMessage(e)}` };
-        }
-      },
+      measure: (input) => measureOcrAssert(engine, input, expectation),
     });
     return { description, ...result };
   }
@@ -445,7 +441,7 @@ export class Verifier {
     const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
     const expectedHex = normalizeHex(expectation.expected);
     const description =
-      `element ${describe(element)} fill within dE00 ${tol} of ${expectedHex}` +
+      `element ${describeElementSpec(element)} fill within dE00 ${tol} of ${expectedHex}` +
       (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
     const result = await pollPixels(this.adapter, {
       element,
@@ -532,7 +528,7 @@ export class Verifier {
    * tell", never "still visible".
    */
   private async assertAbsent(element: ElementSpec, timeoutMs: number): Promise<AssertResult> {
-    const description = `element ${describe(element)} is absent`;
+    const description = `element ${describeElementSpec(element)} is absent`;
     // Read before polling: a viewport that cannot be read is an error, not a
     // failed assert — absence is meaningless without a reference frame.
     // (Memoized by the adapter — adapters/types.ts — so this is one device

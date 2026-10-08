@@ -4,12 +4,13 @@ import { measuredFrameFor, type MeasuredFrame, type TreeFrame, type Undecoded } 
 import { sizeOnlyPng } from '../helpers/fake.js';
 import { windowWidth } from '../../src/verify/scale.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
-import { ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
+import { OcrUnavailableError, ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
 import {
   compareTextParity,
   contractHasTextAnchors,
   evaluateOcrAssert,
   formatTextParity,
+  measureOcrAssert,
   normalizeText,
   ocrRegionsFor,
   renderedTextFromTree,
@@ -586,7 +587,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
     const { engine, calls } = recording();
     // Scaled by the device screen, so the scale has no caveat of its own to carry.
     const f = frame(ios, 1206, 2622, { width: 402, height: 874 });
-    const got = await textMeasurement(c, engine).measure('ios', leg(f));
+    const got = await textMeasurement(c, { engine }).measure('ios', leg(f));
     expect(calls).toEqual([[{ id: 'cta', x: 72, y: 2340, w: 1062, h: 132 }]]);
     expect(got.notes).toEqual([]);
     expect(got.value.tree).toBe(ios);
@@ -597,7 +598,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
   it('a tree without pixels is an OCR failure in this table\'s words: tree only, the frame\'s reason quoted', async () => {
     const { engine, calls } = recording();
     const undecoded: Undecoded = { tree: ios, window: windowWidth(ios), error: 'screenshot PNG decode failed: not a png' };
-    const got = await textMeasurement(c, engine).measure('android', leg(undecoded));
+    const got = await textMeasurement(c, { engine }).measure('android', leg(undecoded));
     expect(calls).toEqual([]);
     expect(got).toEqual({
       value: { tree: ios },
@@ -607,7 +608,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
 
   it('a recognizer that throws degrades to tree evidence with the note, never an exception', async () => {
     const failing: OcrEngine = { recognize: async () => { throw new Error('swiftc not found'); } };
-    const got = await textMeasurement(c, failing).measure('ios', leg(frame(ios, 1206, 2622)));
+    const got = await textMeasurement(c, { engine: failing }).measure('ios', leg(frame(ios, 1206, 2622)));
     expect(got).toEqual({
       value: { tree: ios },
       notes: ['(ios: OCR failed — swiftc not found — that platform compared from the tree.)'],
@@ -616,7 +617,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
 
   it('an unusable scale is this table\'s per-platform note (color fails closed on the same frame)', async () => {
     const { engine, calls } = recording();
-    const got = await textMeasurement(c, engine).measure('android', leg(frame(root(402, [n({ identifier: 'cta' })]), 0, 800)));
+    const got = await textMeasurement(c, { engine }).measure('android', leg(frame(root(402, [n({ identifier: 'cta' })]), 0, 800)));
     expect(calls).toEqual([]);
     expect(got.value).toEqual({ tree: expect.anything() });
     expect(got.notes).toHaveLength(1);
@@ -625,7 +626,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
 
   it('nothing scaled, nothing to caveat: an anchor missing from the tree asks the recognizer nothing', async () => {
     const { engine, calls } = recording();
-    const got = await textMeasurement(c, engine).measure('ios', leg(frame(root(402, [n({ identifier: 'other' })]), 1206, 2622)));
+    const got = await textMeasurement(c, { engine }).measure('ios', leg(frame(root(402, [n({ identifier: 'other' })]), 1206, 2622)));
     expect(calls).toEqual([]);
     expect(got.notes).toEqual([]);
     expect(got.value.ocr).toBeUndefined();
@@ -639,7 +640,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
     const f = frame(tree, 200, 400, { width: 200, height: 400 });
     const { note } = ocrRegionsFor(c, f);
     expect(note).toMatch(/DEVICE screen/);
-    const got = await textMeasurement(c, engine).measure('android', leg(f));
+    const got = await textMeasurement(c, { engine }).measure('android', leg(f));
     expect(got.notes).toEqual([`(android: ${note})`]);
     expect(got.value.ocr?.pngWidth).toBe(200);
   });
@@ -674,7 +675,7 @@ describe('textMeasurement — the text table\'s one run-level decision', () => {
         return regions.map((r) => ({ id: r.id, lines: [line('CONTINUE', 36)] }));
       },
     };
-    const run = textMeasurement(c, engine);
+    const run = textMeasurement(c, { engine });
     expect(run.runNotes).toEqual([]);
     const got = await run.measure('ios', leg(frame(ios, 1206, 2622, { width: 402, height: 874 })));
     expect(calls).toHaveLength(1);
@@ -723,6 +724,106 @@ describe('evaluateOcrAssert', () => {
   it('supports a regex instead of an exact string', () => {
     expect(evaluateOcrAssert({ match: '^\\d+[.,]\\d{2}$' }, [line('1 121,00', 30)], 1080).pass).toBe(false);
     expect(evaluateOcrAssert({ match: 'CONTIN' }, [line('CONTINUE', 30)], 1080).pass).toBe(true);
+  });
+});
+
+describe('measureOcrAssert — the ocr assert\'s one measurement, every "not read" failing closed', () => {
+  /**
+   * Review 2026-10-07 (assert-capture-ocr C2): the crop → recognize → region
+   * error → verdict chain was a closure in assert.ts, and its unread
+   * sentences had drifted from fail-closed.ts — a region error came back raw,
+   * a throw as a bare "OCR failed: …", the two in evaluateOcrAssert were
+   * hand-written. Each is pinned whole here, on a measuredFrameFor fixture,
+   * with no poll around it.
+   */
+  const cta = n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } });
+  const input = (f = frame(root(402, [cta], 874), 402, 874, { width: 402, height: 874 })) => ({ rect: cta.rect, shot: Buffer.from('png bytes'), measured: f });
+  const reading = (result: Omit<OcrRegionResult, 'id'>): OcrEngine => ({
+    recognize: async (_png, regions) => regions.map((r) => ({ id: r.id, ...result })),
+  });
+  const throwing = (e: Error): OcrEngine => ({
+    recognize: async () => {
+      throw e;
+    },
+  });
+
+  it('reads the element\'s crop and passes on the rendered string', async () => {
+    const regions: OcrRegion[][] = [];
+    const engine: OcrEngine = {
+      recognize: async (_png, r) => {
+        regions.push(r);
+        return r.map(({ id }) => ({ id, lines: [line('CONTINUE', 30)] }));
+      },
+    };
+    expect(await measureOcrAssert(engine, input(), { text: 'CONTINUE' })).toEqual({ pass: true, detail: 'read "CONTINUE"; vs expected "CONTINUE" =' });
+    expect(regions).toEqual([[{ id: 'element', x: 24, y: 780, w: 354, h: 44 }]]);
+  });
+
+  it('a rect the scale leaves off the png fails closed without asking the recognizer', async () => {
+    let asked = 0;
+    const engine: OcrEngine = { recognize: async () => (asked++, []) };
+    const off = { ...input(), rect: { x: 24, y: 2000, width: 354, height: 44 } };
+    expect(await measureOcrAssert(engine, off, { text: 'CONTINUE' })).toEqual({
+      pass: false,
+      detail: 'element rect 24,2000 354x44 scaled by 1.000 leaves nothing on-screen; failing closed, rendered text unchecked',
+    });
+    expect(asked).toBe(0);
+  });
+
+  it('a region the recognizer could not read fails closed, quoting its error', async () => {
+    expect(await measureOcrAssert(reading({ lines: [], error: 'region outside the screenshot' }), input(), { text: 'CONTINUE' })).toEqual({
+      pass: false,
+      detail: 'OCR could not read the element: region outside the screenshot; failing closed, rendered text unchecked',
+    });
+  });
+
+  it('a recognizer that throws is a fail-closed miss (the poll goes on), its message without a doubled full stop', async () => {
+    expect(await measureOcrAssert(throwing(new Error('recognizer exited 2.')), input(), { text: 'CONTINUE' })).toEqual({
+      pass: false,
+      detail: 'OCR failed: recognizer exited 2; failing closed, rendered text unchecked',
+    });
+  });
+
+  it('an engine that will never read ends the assert: the same sentence, marked final for the poll', async () => {
+    const missing = new OcrUnavailableError('OCR needs the Swift compiler: `swiftc --version` failed');
+    expect(await measureOcrAssert(throwing(missing), input(), { text: 'CONTINUE' })).toEqual({
+      pass: false,
+      final: true,
+      detail: 'OCR failed: OCR needs the Swift compiler: `swiftc --version` failed; failing closed, rendered text unchecked',
+    });
+  });
+
+  it('only the recognizer is caught: a fault of the measurement itself propagates, never dressed as an OCR reading', async () => {
+    // A pattern the schema refuses (83f99bb), handed in past it: the verdict's own compile throws.
+    await expect(measureOcrAssert(reading({ lines: [line('CONTINUE', 30)] }), input(), { match: '(' })).rejects.toThrow(SyntaxError);
+  });
+
+  it('nothing recognized fails closed with the causes, likeliest first', async () => {
+    expect(await measureOcrAssert(reading({ lines: [] }), input(), { text: 'CONTINUE' })).toEqual({
+      pass: false,
+      detail:
+        'the recognizer read no text in this element rect (likeliest first: the element is off-screen or occluded in ' +
+        'this capture, the rect is the id-bearing sub-extent rather than the visual element, or the text is an image ' +
+        'or genuinely absent); failing closed, rendered text unchecked',
+    });
+  });
+
+  it('the frame\'s scale note rides along, BEFORE a fail-closed tail — the sentence always ends the detail', async () => {
+    // The device screen reads twice the tree: the scale carries a note.
+    const tree = root(100, [n({ identifier: 'cta', rect: { x: 10, y: 10, width: 40, height: 10 } })], 200);
+    const f = frame(tree, 200, 400, { width: 200, height: 400 });
+    const note = f.scale.note!;
+    expect(note).toMatch(/DEVICE screen/);
+    const at = { rect: { x: 10, y: 10, width: 40, height: 10 }, shot: Buffer.from('png bytes'), measured: f };
+    const twoLines = reading({ lines: [line('one', 10), line('two', 10)] });
+    expect((await measureOcrAssert(twoLines, at, { text: 'one two', heightPct: 5 })).detail).toBe(
+      `read "one two"; vs expected "one two" =; ${note}; 2 lines recognized — ink height is single-line only ` +
+        '(multi-line boxes do not compose into one height); failing closed, ink height unchecked',
+    );
+    expect((await measureOcrAssert(reading({ lines: [] }), at, { text: 'x' })).detail).toMatch(
+      new RegExp(`genuinely absent\\); ${note.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}; failing closed, rendered text unchecked$`),
+    );
+    expect((await measureOcrAssert(reading({ lines: [line('x', 10)] }), at, { text: 'x' })).detail).toBe(`read "x"; vs expected "x" =; ${note}`);
   });
 });
 

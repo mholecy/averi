@@ -1,4 +1,6 @@
+import type { Rect } from '../adapters/types.js';
 import { PollMiss } from '../ui-tree/read-tree.js';
+import type { MeasuredFrame } from './capture.js';
 
 /**
  * The verifier's poll vocabulary, shared by `Verifier.poll` (the tree-only
@@ -21,6 +23,31 @@ import { PollMiss } from '../ui-tree/read-tree.js';
 export interface PollVerdict {
   pass: boolean;
   detail?: string;
+  /**
+   * A miss no later round can change (2026-10-08): the poll ends at once with
+   * this verdict instead of polling to the deadline, which would only repeat
+   * it and bury it under the timeout wording. Only a failing verdict carries
+   * it, and only the pixel poll honours it (verify/pixel-poll.ts, the one
+   * place that turns it into control flow) — today for the ocr assert's
+   * engine that will never read (text-parity.ts#measureOcrAssert, on an
+   * `OcrUnavailableError`). The tree-only asserts never set it.
+   */
+  final?: true;
+}
+
+/**
+ * What a pixel assert's `measure` is handed (verify/pixel-poll.ts): the
+ * element's rect and the frame captured against the same round's tree.
+ * Named here, beside the verdict it returns, so the measurements that take
+ * it (text-parity.ts#measureOcrAssert) do not respell it (2026-10-08).
+ */
+export interface PixelMeasureInput {
+  /** The first `findBySpec` match's rect — the same duplicate-id rule as rect-parity — from the tree handed to the capture. */
+  rect: Rect;
+  /** The settled screenshot bytes. */
+  shot: Buffer;
+  /** The decoded frame — never undecoded, never treeless. Its `scale` may still carry an error: the measurement's policy. */
+  measured: MeasuredFrame;
 }
 
 /**

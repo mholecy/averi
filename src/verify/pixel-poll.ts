@@ -6,7 +6,7 @@ import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
-import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
+import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } from './poll-verdict.js';
 
 /**
  * The pixel poll: what a polling pixel assert does, owned once.
@@ -45,7 +45,11 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  *   trace and results and a flow's `assert:` step fails with this reason.
  *   (Until a review the same day the throw went through the tree poll and
  *   rejected the whole batch.) Only a png that came back and does not
- *   decode is a miss, and the poll goes on.
+ *   decode is a miss, and the poll goes on. The same exit is open to a
+ *   `measure` since 2026-10-08: a verdict it marks `final`
+ *   (poll-verdict.ts) ends the assert the same way with its own sentence —
+ *   the ocr assert's, for a recognizer that will never read (no `swiftc`,
+ *   a recognizer that did not compile).
  * - the memory and the wording at the deadline (`PixelPollMemory`, private).
  *
  * Since 2026-10-06 the round hands the capture the first match's rect as its
@@ -148,24 +152,15 @@ import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
  * silently, as the Android residuals above.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
- * `measure`), the scale policy (`measured.scale` may carry a derivation error;
- * the colour sampler fails closed on it, the OCR region builder returns an
- * error its assert words — the parity modules own that, this gates on decode),
+ * `measure`, which is text-parity.ts#measureOcrAssert since 2026-10-08, as
+ * the colour assert's is color-parity.ts#evaluateColorAssert), the scale
+ * policy (`measured.scale` may carry a derivation error; both measurements
+ * fail closed on it — the parity modules own that, this gates on decode),
  * the description and the `AssertResult` (the Verifier's), the tree poll's
  * loop (ui-tree/read-tree.ts) and the capture's budget (verify/capture.ts).
  * The before/after figures for threading the deadline in stay where they
  * were measured, on `Verifier.poll` (verify/assert.ts).
  */
-
-/** What `measure` is handed: the element's rect and the frame captured against the same round's tree. */
-export interface PixelMeasureInput {
-  /** The first `findBySpec` match's rect — the same duplicate-id rule as rect-parity — from the tree handed to the capture. */
-  rect: Rect;
-  /** The settled screenshot bytes. */
-  shot: Buffer;
-  /** The decoded frame — never undecoded, never treeless. Its `scale` may still carry an error: the measurement's policy. */
-  measured: MeasuredFrame;
-}
 
 export interface PixelPollSpec {
   element: ElementSpec;
@@ -178,7 +173,13 @@ export interface PixelPollSpec {
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
   unchecked: Exclude<Unchecked, 'geometry'>;
-  /** The assert's own measurement, called only on a settled, decoded frame. A throw propagates out of the poll. */
+  /**
+   * The assert's own measurement, called only on a settled, decoded frame.
+   * A verdict marked `final` ends the assert at once with its detail — a
+   * failure no later round can change (poll-verdict.ts; the ocr assert's
+   * unavailable engine). A throw propagates out of the poll: it is the
+   * measurement's own bug, not a verdict.
+   */
   measure: (input: PixelMeasureInput) => Promise<PollVerdict> | PollVerdict;
 }
 
@@ -397,18 +398,26 @@ async function keyboardOver(
   return { frame: keyboard.frame, remedy };
 }
 
-/** A capture the adapter refused, carried out of the tree poll (header, "A capture the ADAPTER refuses"). */
-class CaptureRefused {
-  constructor(readonly reason: string) {}
+/**
+ * A miss no later round can change, carried out of the tree poll to end it
+ * at once — a capture the adapter refused (header, "A capture the ADAPTER
+ * refuses"), or a `measure` verdict marked `final` (poll-verdict.ts). Private:
+ * this module is the one place that turns "final" into control flow; a
+ * measurement says it with a value (2026-10-08; until then the refusal had
+ * its own `CaptureRefused`). `detail` is already the whole fail-closed
+ * sentence.
+ */
+class FinalMiss {
+  constructor(readonly detail: string) {}
 }
 
 /**
  * The fail-closed sentence of a refused capture — the pixel asserts' and the baseline diff's. The adapter's
- * sentence ends with a full stop and failClosed appends `; failing closed, …`, so the stop is dropped here
- * rather than printing `attention.; failing closed` (seen on device, 2026-10-08).
+ * sentence ends with a full stop; failClosed drops it (fail-closed.ts) rather than printing
+ * `attention.; failing closed` (seen on device, 2026-10-08).
  */
 export const screenshotFailed = (reason: string, unchecked: Unchecked): string =>
-  failClosed(`screenshot failed: ${reason.replace(/\.$/, '')}`, unchecked);
+  failClosed(`screenshot failed: ${reason}`, unchecked);
 
 /**
  * Poll until `measure` passes on a settled, decoded frame of the element, or
@@ -439,7 +448,7 @@ export async function pollPixels(
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
     const frame = await captureFrame(adapter, { tree, deadline, region: rect }).catch((e: unknown) => {
-      throw new CaptureRefused(captureRefusal(e));
+      throw new FinalMiss(screenshotFailed(captureRefusal(e), unchecked));
     });
     if (frame.stability !== 'settled') return memory.unsettled(frame);
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).
@@ -447,7 +456,10 @@ export async function pollPixels(
     const { shot, measured } = frame;
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
-    return measure({ rect, shot, measured });
+    const verdict = await measure({ rect, shot, measured });
+    // A failure no later round can change leaves the poll at once, as a refused capture does.
+    if (verdict.final && !verdict.pass) throw new FinalMiss(verdict.detail ?? '');
+    return verdict;
   };
   // Each round is timed from the start of its read, for the timeout wording;
   // pollTree's loop and what it reads are unchanged.
@@ -469,11 +481,12 @@ export async function pollPixels(
     },
     { timeoutMs, pollMs },
   ).catch((e: unknown) => {
-    // pollTree propagates the predicate's own errors; only the refusal is ours to word.
-    if (e instanceof CaptureRefused) return e;
+    // pollTree propagates the predicate's own errors; only a final miss — a
+    // refused capture, or a verdict `measure` marked final — is ours to turn into the verdict.
+    if (e instanceof FinalMiss) return e;
     throw e;
   });
-  if (outcome instanceof CaptureRefused) return { pass: false, detail: screenshotFailed(outcome.reason, unchecked) };
+  if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
   return { pass: false, detail: memory.timeoutDetail(timeoutMs, outcome) };
 }

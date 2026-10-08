@@ -8,6 +8,7 @@ import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { KEYBOARD_ROLE } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
+import { OcrUnavailableError } from '../../src/verify/ocr.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
@@ -493,7 +494,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
     const below = { x: 100, y: 500, width: 800, height: 100 };
     const fake = new FakeAdapter({ detail: screen(node({ identifier: 'card', rect: below })) }, 'detail');
     fake.nextScreenshot = png(1000, 320);
-    const result = await new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') }).assert({
+    const result = await new Verifier(fake, { ...FAST, ocr: { engine: engine('CONTINUE') } }).assert({
       element: { id: 'card' },
       ocr: { text: 'CONTINUE' },
     });
@@ -504,7 +505,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
   });
 
   it('passes on the rendered string and says what it read', async () => {
-    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(cardFake(), { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(true);
     expect(result.description).toContain('renders text "CONTINUE"');
@@ -546,7 +547,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
   };
 
   it('scales the crop by the device screen, so a tree that cannot describe one no longer fails closed', async () => {
-    const verifier = new Verifier(sheetFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(sheetFake(), { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(true);
     // The tree disagrees with the device, and the assert says which it used.
@@ -558,7 +559,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
     fake.viewport = async () => {
       throw new Error('idb describe: no such device');
     };
-    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(fake, { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toMatch(/CONTENT width.*failing closed, rendered text unchecked/);
@@ -569,7 +570,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
     fake.viewport = async () => {
       throw new Error('idb describe: no such device');
     };
-    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(fake, { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(true);
     expect(result.detail).toContain('read "CONTINUE"');
@@ -577,7 +578,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
 
   it('fails with a timeout detail when the element never appears (no screenshot burned)', async () => {
     const fake = cardFake();
-    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(fake, { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'ghost' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toContain('not found within');
@@ -587,14 +588,14 @@ describe('ocr asserts (what the element RENDERS)', () => {
   it('fails closed (with the decode error) when the screenshot is not decodable', async () => {
     const fake = cardFake();
     fake.nextScreenshot = Buffer.from('not a png');
-    const verifier = new Verifier(fake, { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(fake, { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toMatch(/screenshot PNG decode failed: .*; failing closed, rendered text unchecked/);
   });
 
   it('fails on drift and quotes both sides', async () => {
-    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('0.00') });
+    const verifier = new Verifier(cardFake(), { ...FAST, ocr: { engine: engine('0.00') } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'Enter amount' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toContain('read "0.00"');
@@ -602,18 +603,18 @@ describe('ocr asserts (what the element RENDERS)', () => {
   });
 
   it('checks rendered ink height in % of screen width (screen 1000 wide, png 1000 → 30px = 3.00%)', async () => {
-    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE', 30) });
+    const verifier = new Verifier(cardFake(), { ...FAST, ocr: { engine: engine('CONTINUE', 30) } });
     const ok = await verifier.assert({ element: { id: 'card' }, ocr: { heightPct: 3.0 } });
     expect(ok.pass).toBe(true);
     expect(ok.detail).toContain('ink height 3.00% of width');
 
-    const tooBig = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE', 41) });
+    const tooBig = new Verifier(cardFake(), { ...FAST, ocr: { engine: engine('CONTINUE', 41) } });
     const bad = await tooBig.assert({ element: { id: 'card' }, ocr: { heightPct: 3.0 } });
     expect(bad.pass).toBe(false);
   });
 
   it('fails closed when the recognizer read nothing — unread is not verified-as-empty', async () => {
-    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine(undefined) });
+    const verifier = new Verifier(cardFake(), { ...FAST, ocr: { engine: engine(undefined) } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toContain('failing closed');
@@ -621,14 +622,56 @@ describe('ocr asserts (what the element RENDERS)', () => {
 
   it('fails closed when the recognizer itself throws, naming the reason', async () => {
     const engineThrows = { recognize: async () => { throw new Error('swiftc not found'); } };
-    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engineThrows });
+    const verifier = new Verifier(cardFake(), { ...FAST, ocr: { engine: engineThrows } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toContain('swiftc not found');
   });
 
+  /**
+   * Review 2026-10-07 (assert-capture-ocr C2): the measure's catch turned
+   * every recognizer throw into a miss, so a host without `swiftc` polled the
+   * whole 12 s default before saying so. An `OcrUnavailableError` now ends
+   * the assert after its one read, fail-closed, in the shape a refused
+   * capture does (2794f5e) — and a passing element assert after it in the
+   * same batch is still evaluated. The read count is the guard: a poll that
+   * went on would read again every few ms of its 2 s budget.
+   */
+  it('an engine that will never read ends the assert after one read, and the batch goes on', async () => {
+    let reads = 0;
+    const missing = {
+      recognize: async () => {
+        reads += 1;
+        throw new OcrUnavailableError('OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line Tools.');
+      },
+    };
+    const results = await new Verifier(cardFake(), { pollMs: 5, timeoutMs: 2_000, ocr: { engine: missing } }).assertAll([
+      { element: { id: 'card' }, ocr: { text: 'CONTINUE' } },
+      { element: { id: 'card' } },
+    ]);
+    expect(results.map((r) => r.pass)).toEqual([false, true]);
+    expect(results[0].detail).toBe(
+      'OCR failed: OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line Tools; ' +
+        'failing closed, rendered text unchecked',
+    );
+    expect(reads).toBe(1);
+  });
+
+  it('…while one failed read is a miss: the poll reads again, and the deadline quotes it in the one sentence', async () => {
+    let reads = 0;
+    const flaky = {
+      recognize: async () => {
+        reads += 1;
+        throw new Error('recognizer exited 2');
+      },
+    };
+    const result = await new Verifier(cardFake(), { ...FAST, ocr: { engine: flaky } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    expect(result).toMatchObject({ pass: false, detail: 'OCR failed: recognizer exited 2; failing closed, rendered text unchecked' });
+    expect(reads).toBeGreaterThan(1);
+  });
+
   it('a missing element times out like every other assert', async () => {
-    const verifier = new Verifier(cardFake(), { ...FAST, ocrEngine: engine('CONTINUE') });
+    const verifier = new Verifier(cardFake(), { ...FAST, ocr: { engine: engine('CONTINUE') } });
     const result = await verifier.assert({ element: { id: 'ghost' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toContain('not found within');
@@ -1191,7 +1234,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     // Round 1's six captures end at 1.5 s; round 2 (from 1.8 s) is cut by the
     // deadline after TWO — and the failure still says six: the most any round
     // took, so a cut round never understates the one that spent the budget.
-    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 2000, ocrEngine: engine as never });
+    const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 2000, ocr: { engine: engine as never } });
     const result = await verifier.assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toBe(
@@ -1370,7 +1413,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       return fake;
     };
     const { probe, engine } = countingEngine();
-    const ocr = await new Verifier(moving(), { pollMs: 300, timeoutMs: 2000, ocrEngine: engine }).assert({
+    const ocr = await new Verifier(moving(), { pollMs: 300, timeoutMs: 2000, ocr: { engine } }).assert({
       element: { id: 'card' },
       ocr: { text: 'CONTINUE' },
     });
@@ -1404,7 +1447,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
       return shot;
     };
     const { probe, engine } = countingEngine();
-    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000, ocrEngine: engine }).assert({
+    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000, ocr: { engine } }).assert({
       element: { id: 'card' },
       ocr: { text: 'CONTINUE' },
     });
@@ -1421,7 +1464,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const fake = cardFake();
     fake.nextScreenshot = Buffer.from('not a png');
     const { probe, engine } = countingEngine();
-    const result = await new Verifier(fake, { ...FAST, ocrEngine: engine }).assert({
+    const result = await new Verifier(fake, { ...FAST, ocr: { engine } }).assert({
       element: { id: 'card' },
       ocr: { text: 'CONTINUE' },
     });
@@ -1501,7 +1544,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const fake = deviceTimed(false);
     const { probe, engine } = countingEngine();
     const t0 = Date.now();
-    const result = await new Verifier(fake, { ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    const result = await new Verifier(fake, { ocr: { engine } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result.pass).toBe(true);
     expect(probe.recognized).toBe(1);
     expect(Date.now() - t0).toBe(4300);
@@ -1855,7 +1898,7 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     const ocr = cardFake();
     ocr.attachKeyboard({ state: 'shown', frame: COVERING });
     const { probe, engine } = countingEngine();
-    const o = await new Verifier(ocr, { ...SLOW, ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    const o = await new Verifier(ocr, { ...SLOW, ocr: { engine } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(o.pass).toBe(false);
     expect(o.detail).toBe(`${COVERED}; failing closed, rendered text unchecked`);
     expect(ocr.screenshots).toHaveLength(0);
@@ -1875,7 +1918,7 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
       const ocr = cardFake();
       ocr.attachKeyboard({ state: 'shown', frame });
       const { probe, engine } = countingEngine();
-      const o = await new Verifier(ocr, { ...FAST, ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+      const o = await new Verifier(ocr, { ...FAST, ocr: { engine } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
       expect(o.pass).toBe(true);
       expect(probe.recognized).toBe(1);
     }
@@ -2038,7 +2081,7 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
         return regions.map((r) => ({ id: r.id, lines: [{ text: 'CONTINUE', confidence: 1, x: 0, y: 0, w: 200, h: 30 }] }));
       },
     };
-    const o = await new Verifier(ocr, { ...SLOW, ocrEngine: engine }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    const o = await new Verifier(ocr, { ...SLOW, ocr: { engine } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(o.pass).toBe(false);
     expect(o.detail).toBe(`${COVERED}; failing closed, rendered text unchecked`);
     expect(recognized).toBe(0);

@@ -16,7 +16,7 @@ import {
   type ColorParityOptions,
 } from '../verify/color-parity.js';
 import { parseLayoutContract, type LayoutContract } from '../verify/layout-contract.js';
-import type { OcrEngine } from '../verify/ocr.js';
+import { ocrEngineFor, type OcrEngine } from '../verify/ocr.js';
 import {
   compareRectParity,
   formatRectParity,
@@ -56,7 +56,13 @@ interface VerificationRequestBase extends EngineContext {
   state?: string;
   flow?: string;
   baselineDir: string;
-  /** Test seam: the OCR recognizer behind the text-parity table. */
+  /**
+   * Test seam: the OCR recognizer behind every OCR read the run makes itself
+   * — the text-parity table AND each leg's `ocr` asserts (2026-10-08; until
+   * then only the table's, and the asserts chose the host's engine on their
+   * own). A flow's `assert:` steps build their own Verifier in the engine
+   * and are outside this choice.
+   */
   ocrEngine?: OcrEngine;
 }
 
@@ -511,6 +517,18 @@ export async function runVerification(
   // used to be a contained per-leg FAILED section after resolveAdapter.
   refuseUnknownEnvironment(cfg, env, req.environment);
 
+  // The run's ONE OCR decision (2026-10-08, review 2026-10-07 assert-capture-
+  // ocr C1): the text table and every leg's Verifier read with the same
+  // engine, or fail closed on the same reason. Until then only the table
+  // got `req.ocrEngine`; each leg's Verifier called `ocrEngineFor` itself,
+  // so a run-level fake never reached the ocr asserts (on a host without
+  // Vision they failed closed with the fake unused) and a two-platform run
+  // built up to three VisionOcr instances, each probing `swiftc --version`
+  // (0.1–0.5 s) before its binary cache. Deciding costs nothing — the
+  // engine probes its toolchain on its first read — so a run with no OCR in
+  // it still never asks for a compiler.
+  const ocr = ocrEngineFor(req.ocrEngine);
+
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);
     // ONE engine run per leg (2026-10-07): the state and the flow share its
@@ -525,7 +543,7 @@ export async function runVerification(
       request === undefined ?
         []
       : await FlowEngine.run(cfg, adapter, { env, environment: req.environment, session: req.session }, request);
-    const results = await new Verifier(adapter, { baselineDir: req.baselineDir }).assertAll(specs);
+    const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr }).assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one
     // frame the color assert's own doc rules out: a mid-animation one. With a
@@ -588,10 +606,10 @@ export async function runVerification(
       );
     }
     if (DIMENSIONS.text.produced(contract)) {
-      // Decided ONCE, inside the guard: a host without OCR prints its one
-      // caveat once rather than per leg, and a rect-only contract never asks
-      // whether OCR can run here — the question is not reached.
-      const text = textMeasurement(contract, req.ocrEngine);
+      // Inside the guard: a host without OCR prints its one caveat once
+      // rather than per leg, and a rect-only contract prints none. The
+      // engine is the run's one choice, the one its asserts read with.
+      const text = textMeasurement(contract, ocr);
       sections.push(
         await paritySection(DIMENSIONS.text.title, platforms, runs, {
           collect: (leg, p) => {

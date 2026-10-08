@@ -5,7 +5,17 @@ import { pngRegion, type MeasuredFrame, type TreeFrame } from './capture.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import type { Contributed } from './contribution.js';
-import { ocrEngineFor, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from './ocr.js';
+import {
+  ocrEngineFor,
+  OcrUnavailableError,
+  type OcrEngine,
+  type OcrEngineChoice,
+  type OcrLine,
+  type OcrRegion,
+  type OcrRegionResult,
+} from './ocr.js';
+import { failClosed } from './fail-closed.js';
+import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
 /**
@@ -404,8 +414,8 @@ function regionForRect(
 
 /**
  * The text table's measurement for ONE run, decided once: the engine choice
- * (verify/ocr.ts#ocrEngineFor — the `ocr` assert fails closed on the same
- * choice) and BOTH halves of this table's policy on an absent engine, in one
+ * (verify/ocr.ts#ocrEngineFor, made by the run — the `ocr` assert fails
+ * closed on the same choice, the same value since 2026-10-08) and BOTH halves of this table's policy on an absent engine, in one
  * value — the run-level caveat the section prints before any leg, and the
  * per-leg `measure` that then stands on tree evidence without a note of its
  * own. One function owns the two because they are one rule: a run that
@@ -425,8 +435,12 @@ export interface TextMeasurementRun {
   measure: (platform: Platform, frame: TreeFrame) => Promise<Contributed<TextCapture>>;
 }
 
-export function textMeasurement(contract: LayoutContract, override?: OcrEngine): TextMeasurementRun {
-  const choice = ocrEngineFor(override);
+/**
+ * `choice` is the run's one OCR decision (run/verify.ts makes it once and
+ * hands the same value to every leg's Verifier, 2026-10-08); left out, the
+ * host's is asked here.
+ */
+export function textMeasurement(contract: LayoutContract, choice: OcrEngineChoice = ocrEngineFor()): TextMeasurementRun {
   const runNotes =
     choice.unavailable === undefined
       ? []
@@ -970,27 +984,85 @@ export interface OcrExpectation {
 }
 
 /**
+ * The `ocr` assert's measurement of ONE settled, decoded frame, owned here
+ * as the colour assert's is owned by color-parity.ts#evaluateColorAssert
+ * (2026-10-08, review 2026-10-07 assert-capture-ocr C2): crop the element's
+ * rect → recognize → the region's own error → the verdict. Until that date
+ * the crop, the recognizer call and the error handling were a closure in
+ * verify/assert.ts, and its fail-closed wording had drifted from the one
+ * sentence (fail-closed.ts): a region the recognizer could not read came
+ * back as its raw error ("region outside the screenshot") with no "failing
+ * closed", and a recognizer that threw as "OCR failed: …", also without it.
+ * Every "not read" now ends `failing closed, rendered text unchecked`:
+ *
+ * - a rect the frame's scale leaves nowhere on the png, or a scale that
+ *   could not be derived — `ocrRegionForRect`'s reason;
+ * - a region the recognizer could not read — `OCR could not read the
+ *   element: <its error>`;
+ * - a recognizer that threw — `OCR failed: <its message>`. A miss: the poll
+ *   goes on, since one failed read says nothing about the next — UNLESS it
+ *   is an `OcrUnavailableError` (no Vision, no `swiftc`, a recognizer that
+ *   did not compile; verify/ocr.ts), which no later round can change: the
+ *   same sentence comes back marked `final` (poll-verdict.ts), the pixel
+ *   poll ends the assert at once and `assertAll` goes on. A value, not a
+ *   throw: ending the poll is the pixel poll's control flow, not this
+ *   measurement's. Until 2026-10-08 a missing compiler polled the whole
+ *   12 s default before saying so;
+ * - nothing recognized, and a height asked of multi-line text —
+ *   `evaluateOcrAssert`'s.
+ *
+ * Only the recognizer call is caught. A throw from anything else here is
+ * this code's own bug, not an OCR failure, and propagates out of the poll
+ * rather than being dressed as a reading (the regex, the one thing in the
+ * verdict that could throw on input, is refused at parse since 83f99bb).
+ * The frame's scale note rides along on every verdict, before the
+ * fail-closed tail when there is one.
+ */
+export async function measureOcrAssert(
+  engine: OcrEngine,
+  { rect, shot, measured }: PixelMeasureInput,
+  expectation: OcrExpectation,
+): Promise<PollVerdict & { detail: string }> {
+  const { region, note, error } = ocrRegionForRect('element', rect, measured);
+  if (region === undefined) return { pass: false, detail: failClosed(error, 'rendered text') };
+  let read: OcrRegionResult | undefined;
+  try {
+    [read] = await engine.recognize(shot, [region]);
+  } catch (e) {
+    const detail = failClosed(`OCR failed: ${errorMessage(e)}`, 'rendered text');
+    return e instanceof OcrUnavailableError ? { pass: false, final: true, detail } : { pass: false, detail };
+  }
+  const notes = note === undefined ? [] : [note];
+  if (read?.error !== undefined) {
+    return { pass: false, detail: failClosed([`OCR could not read the element: ${read.error}`, ...notes].join('; '), 'rendered text') };
+  }
+  return evaluateOcrAssert(expectation, read?.lines ?? [], measured.png.width, notes);
+}
+
+/**
  * Single-element rendered-text check over one region's recognizer output.
- * Pure: the caller does the cropping and recognizing, this decides the verdict,
- * so the whole decision is testable without a Swift toolchain.
+ * Pure: `measureOcrAssert` does the cropping and recognizing, this decides
+ * the verdict, so the whole decision is testable without a Swift toolchain.
+ * `notes` (the frame's scale caveat) go after the findings and BEFORE a
+ * fail-closed tail, which always ends the detail (fail-closed.ts).
  *
  * Fails closed when nothing was recognized — an element whose text could not be
- * read is unverified, not verified-as-empty.
+ * read is unverified, not verified-as-empty — and on a height asked of
+ * multi-line text, where only the size goes unchecked.
  */
 export function evaluateOcrAssert(
   expectation: OcrExpectation,
   lines: OcrLine[],
   pngWidth: number,
+  notes: string[] = [],
 ): { pass: boolean; detail: string } {
   const seen = normalizeText(lines.map((l) => l.text).join(' '));
   if (lines.length === 0) {
-    return {
-      pass: false,
-      detail:
-        'the recognizer read no text in this element rect; failing closed. Causes, in order: the ' +
-        'element is off-screen or occluded in this capture; the rect is the id-bearing sub-extent ' +
-        'rather than the visual element; the text is an image or is genuinely absent.',
-    };
+    const reason =
+      'the recognizer read no text in this element rect (likeliest first: the element is off-screen or ' +
+      'occluded in this capture, the rect is the id-bearing sub-extent rather than the visual element, ' +
+      'or the text is an image or genuinely absent)';
+    return { pass: false, detail: failClosed([reason, ...notes].join('; '), 'rendered text') };
   }
   const parts: string[] = [`read ${JSON.stringify(seen)}`];
   let pass = true;
@@ -1005,14 +1077,16 @@ export function evaluateOcrAssert(
     if (!ok) pass = false;
     parts.push(`vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}`);
   }
+  let heightUnchecked: string | undefined;
   if (expectation.heightPct !== undefined) {
     const tol = expectation.tolerancePct ?? DEFAULT_SIZE_TOLERANCE_PCT;
     const ink = inkPctOf(lines, pngWidth);
     if (ink === undefined) {
       pass = false;
-      parts.push(
-        `height unchecked: ${lines.length} lines recognized — ink height is single-line only ` +
-          '(multi-line boxes do not compose into one height); failing closed',
+      heightUnchecked = failClosed(
+        `${lines.length} lines recognized — ink height is single-line only ` +
+          '(multi-line boxes do not compose into one height)',
+        'ink height',
       );
     } else {
       const delta = (Math.abs(ink - expectation.heightPct) / Math.max(ink, expectation.heightPct)) * 100;
@@ -1024,5 +1098,7 @@ export function evaluateOcrAssert(
       );
     }
   }
+  parts.push(...notes);
+  if (heightUnchecked !== undefined) parts.push(heightUnchecked);
   return { pass, detail: parts.join('; ') };
 }
