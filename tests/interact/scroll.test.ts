@@ -258,7 +258,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
   it('Android, a vetoed band is not claimed at a failed stop either', async () => {
     const { fake } = androidForm({ startY: 0, witness: 'hidden' });
     const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
-    expect((error as Error).message).toBe('scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree');
+    expect((error as Error).message).toBe('scroll_until id:nope failed after 1 swipe (maxSwipes) — element never appeared in the tree');
   });
 
   it('Android, a vetoed band leaves the stroke whole-screen too — and a denial is not kept: the witness is asked again on every round the band matters', async () => {
@@ -422,7 +422,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     const { fake } = androidForm({ startY: 0, window: { state: 'hidden' }, witness: 'shown' });
     const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toBe(
-      'scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree; the input method reports a ' +
+      'scroll_until id:nope failed after 1 swipe (maxSwipes) — element never appeared in the tree; the input method reports a ' +
         'soft keyboard shown, but the window state gives it no area on screen (one still coming up? not measured), so ' +
         'where it lies is unknown — the swipes may have landed on it; hide or dock it and scroll again',
     );
@@ -450,7 +450,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     const { fake } = iosForm(0, 52);
     const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toBe(
-      'scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree. The soft keyboard was up over ' +
+      'scroll_until id:nope failed after 1 swipe (maxSwipes) — element never appeared in the tree. The soft keyboard was up over ' +
         '[0,589][402,874] in 2 of the 2 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — ' +
         'to reach it with the keyboard ' +
         'down, hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and scroll again; this ' +

@@ -223,7 +223,7 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
       children: [node({ identifier: 'far', rect: { x: 0, y: 90_000, width: 100, height: 10 } })],
     });
     const scrolled = device(root, { width: 1080, height: 2400 });
-    await expect(scrollUntilVisible(scrolled, 'id:far', { maxSwipes: 1 })).rejects.toThrow(/after 1 swipes/);
+    await expect(scrollUntilVisible(scrolled, 'id:far', { maxSwipes: 1 })).rejects.toThrow(/after 1 swipe \(maxSwipes\)/);
     const swiped = device(root, { width: 1080, height: 2400 });
     await swipeScreen(swiped, { direction: 'up', meaning: 'finger' });
     expect(scrolled.swipes).toEqual([{ from: { x: 1200, y: 864 }, to: { x: 1200, y: 216 } }]);

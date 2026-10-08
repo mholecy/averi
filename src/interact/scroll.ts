@@ -896,7 +896,7 @@ export async function scrollUntilVisible(
       const cause = exhausted
         ? `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${motion.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`
         : swipes >= maxSwipes
-          ? `after ${swipes} swipes (maxSwipes)`
+          ? `after ${swipesText(swipes)} (maxSwipes)`
           : `after ${timeoutMs}ms (timeout)`;
       const turned =
         motion.turns > 0
