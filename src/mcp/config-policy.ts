@@ -1,4 +1,5 @@
 import type { Platform } from '../adapters/types.js';
+import type { Direction } from '../interact/swipe.js';
 import { launchConsultsConfigActivity, type LaunchEntry } from '../flow/config.js';
 import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } from '../flow/tool-config.js';
 
@@ -17,9 +18,10 @@ import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } 
  * tests/mcp/tools.test.ts the behaviour through the protocol and that the
  * table's tools are exactly the ones whose schema takes a `configPath`.
  *
- * Each entry takes only what its decision reads. One depends on the call:
+ * Each entry takes only what its decision reads. Two depend on the call:
  * `launch_app` reads averi.yaml only when the `app.android.activity`
- * fallback can apply (flow/config.ts's own `launchConsultsConfigActivity`).
+ * fallback can apply (flow/config.ts's own `launchConsultsConfigActivity`),
+ * `swipe` only for a `direction` (2026-10-08).
  * `install_app` does NOT take the call, by design: its entry is plain
  * `required`, and a call that names a path never asks it — the handler's
  * `path ?? appBuildPath(…)` short-circuits before the read. Folding the path
@@ -38,6 +40,9 @@ export const TOOL_CONFIG = {
   tap: onIos,
   type_text: onIos,
   scroll_until: onIos,
+  // Only a DIRECTION reads a tree (the orientation witness, the fallback
+  // box): coordinates are sent as given and read nothing.
+  swipe: (call: { platform: Platform; direction: Direction | undefined }) => (call.direction !== undefined ? onIos(call.platform) : NO_CONFIG),
   // Both platforms: the health line asks about the app averi.yaml names for
   // the platform, and iOS also reads its tree source from it.
   assert: () => OPTIONAL_CONFIG,

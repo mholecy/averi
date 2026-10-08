@@ -1114,8 +1114,13 @@ export class FlowEngine {
 
   private async runSwipe(spec: StepPayload<'swipe'>): Promise<void> {
     const times = spec.times ?? 1;
-    await swipeScreen(this.adapter, { direction: spec.direction, meaning: 'finger', times }); // a swipe: names the FINGER's movement
-    this.log('swipe', `${spec.direction}${times > 1 ? ` ×${times}` : ''}`);
+    // A swipe: names the FINGER's movement. The box is the device screen
+    // (interact/swipe.ts#screenBox); the note appears whenever the box was
+    // not witnessed as the screen held the way it is now — the tree's window
+    // stood in for the device size, or the tree could not be read and the
+    // panel was taken as built (ScreenBox.note).
+    const { note } = await swipeScreen(this.adapter, { direction: spec.direction, meaning: 'finger', times });
+    this.log('swipe', `${spec.direction}${times > 1 ? ` ×${times}` : ''}${note !== undefined ? ` — ${note}` : ''}`);
   }
 
   private async runScrollUntil(spec: ScrollUntilSpec): Promise<void> {

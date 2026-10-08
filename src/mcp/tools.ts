@@ -6,8 +6,9 @@ import { fillField } from '../interact/fill.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
-import { fillText, launchText, snapshotNote, tapText } from './tool-text.js';
+import { fillText, launchText, snapshotNote, swipeText, tapText } from './tool-text.js';
 import { resolveLaunchActivity } from '../flow/config.js';
 import { appBuildPath } from '../flow/load.js';
 import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
@@ -148,6 +149,7 @@ const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/reso
 const ASSERT_BUDGET = formatSeconds(ASSERT_TIMEOUT_MS); // verify/assert.ts
 const PIXEL_ASSERT_BUDGET = formatSeconds(PIXEL_ASSERT_TIMEOUT_MS); // verify/assert.ts
 const ENSURE_BUDGET = formatSeconds(DEFAULT_ENSURE_TIMEOUT_MS); // flow/engine.ts
+const SWIPE_REACH = `${Number((SWIPE_REACH_FRACTION * 100).toFixed(2))}%`; // interact/swipe.ts
 
 const assertsInput = z
   .array(z.unknown())
@@ -381,17 +383,46 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   registerTool(
     'swipe',
     {
-      description: 'Swipe in a direction (up/down/left/right over the screen center is approximated by the given coordinates).',
+      description:
+        'Swipe across the screen, by direction OR by coordinates — exactly one of the two. ' +
+        'direction (up/down/left/right) names the FINGER\'s movement, as a flow\'s swipe: step does (up = the finger travels up, revealing content below): ' +
+        `a stroke through the screen centre, ${SWIPE_REACH} of the screen either side, over the device's screen size (adb wm size / idb describe) turned the way the UI tree's window is; ` +
+        'when that size cannot be read the UI tree\'s window stands in, and when the tree cannot be read the screen is taken as built — the reply says either; with neither size the swipe is refused and nothing is sent. ' +
+        'A direction on iOS reads the tree source from averi.yaml (optional, like scroll_until); coordinates read no config. ' +
+        'Coordinates (fromX, fromY, toX, toY — all four) are sent as given, in the platform\'s tree units (Android pixels, iOS points). ' +
+        'To bring an element into view use scroll_until instead.',
       inputSchema: {
         platform,
-        fromX: z.number(), fromY: z.number(),
-        toX: z.number(), toY: z.number(),
+        direction: z.enum(['up', 'down', 'left', 'right']).optional()
+          .describe('Finger movement over the screen centre — instead of the four coordinates'),
+        fromX: z.number().optional(), fromY: z.number().optional(),
+        toX: z.number().optional(), toY: z.number().optional(),
         durationMs: z.number().optional(),
+        configPath,
       },
     },
-    async ({ platform: p, fromX, fromY, toX, toY, durationMs }) => {
-      await (await registry.get(p)).swipe({ x: fromX, y: fromY }, { x: toX, y: toY }, durationMs);
-      return text(`Swiped (${fromX},${fromY}) → (${toX},${toY})`);
+    async ({ platform: p, direction, fromX, fromY, toX, toY, durationMs, configPath: cp }) => {
+      // Exactly one of the two, checked before a device is bound: the SDK
+      // takes a raw shape, which cannot say "one of", so the handler does.
+      const given = [fromX, fromY, toX, toY].filter((c) => c !== undefined).length;
+      if (direction !== undefined) {
+        if (given > 0) throw new Error('Provide either direction or fromX/fromY/toX/toY, not both');
+        // The tree it reads is the one tap and scroll_until read: the iOS
+        // tree source averi.yaml names, when there is one.
+        const { cfg } = await loadForCall(TOOL_CONFIG.swipe({ platform: p, direction }), cp);
+        const adapter = await registry.get(p, treeOpts(iosToolSettings(cfg, p)));
+        return text(swipeText({ direction, ...(await swipeScreen(adapter, { direction, meaning: 'finger', durationMs })) }));
+      }
+      if (fromX === undefined || fromY === undefined || toX === undefined || toY === undefined) {
+        throw new Error(
+          given === 0
+            ? 'Provide either direction (up/down/left/right) or all four of fromX, fromY, toX, toY'
+            : 'Coordinates need all four of fromX, fromY, toX, toY (or use direction instead)',
+        );
+      }
+      const stroke = { from: { x: fromX, y: fromY }, to: { x: toX, y: toY } };
+      await (await registry.get(p)).swipe(stroke.from, stroke.to, durationMs);
+      return text(swipeText(stroke));
     },
   );
 

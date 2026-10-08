@@ -1,4 +1,4 @@
-import type { Rect } from '../adapters/types.js';
+import type { Point, Rect } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { inTreeModel } from './keyboard-in-tree.js';
@@ -12,7 +12,6 @@ import {
   type GuardOptions,
   type KeyboardAdapter,
   type KeyboardModel,
-  type Point,
   type ResolvedClear,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';

@@ -1,4 +1,4 @@
-import type { DeviceAdapter, Rect, SoftKeyboard } from '../adapters/types.js';
+import type { DeviceAdapter, Point, Rect, SoftKeyboard } from '../adapters/types.js';
 import { containsPoint } from '../ui-tree/geometry.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
@@ -131,12 +131,6 @@ export interface DismissResult {
   hiddenBy?: string;
   /** The in-tree keyboard was up and nothing usable was configured: left up, said so — the flow logs it as a `⚠ fill` line. */
   warning?: string;
-}
-
-/** A tap point, in the tree's units. */
-export interface Point {
-  x: number;
-  y: number;
 }
 
 /** The guard's reading of one keyboard state against the tap point, with the frame when it covers — so a message can quote it without a second look. */

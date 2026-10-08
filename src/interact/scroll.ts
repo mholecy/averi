@@ -3,7 +3,7 @@ import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { sleep } from '../util/sleep.js';
 import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
-import { swipeVector, type Direction } from './swipe.js';
+import { screenBox, swipeVector, type Direction } from './swipe.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -114,14 +114,9 @@ export async function scrollUntilVisible(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS;
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
+  // The visibility reference frame: read before the loop, so a device whose
+  // screen cannot be read fails here rather than as "never intersected".
   const viewport = await adapter.viewport();
-  // `direction` here names where the CONTENT lies — the finger moves the other
-  // way (content below → finger up). See swipeVector.
-  const { from, to } = swipeVector(
-    { x: 0, y: 0, width: viewport.width, height: viewport.height },
-    direction,
-    'content',
-  );
 
   const deadline = Date.now() + timeoutMs;
   let lastFound: UiNode[] = [];
@@ -136,7 +131,8 @@ export async function scrollUntilVisible(
   let prevRect: Rect | undefined;
   for (let swipes = 0; ; swipes++) {
     // A failed read is a miss, not a failure — see readTreeOrError.
-    const { tree, error } = await readTreeOrError(adapter);
+    const read = await readTreeOrError(adapter);
+    const { tree, error } = read;
     lastReadError = error;
     if (tree !== undefined) treesRead++;
     lastFound = tree === undefined ? [] : findTarget(tree, target);
@@ -186,6 +182,16 @@ export async function scrollUntilVisible(
       const message = `scroll_until ${describe} failed ${cause} — ${why}`;
       throw absenceError(message, { sighted: everFound, treesRead, readError: lastReadError });
     }
+    // The gesture's box is swipe.ts#screenBox's — the same owner as a
+    // `swipe:` step's, oriented by this round's tree (after a failed read:
+    // the device box as built; its note is not reported here, the stop
+    // already quotes the read error). Worked out per swipe because the
+    // round's tree is the witness; the device size is memoized. A 0×0
+    // viewport does not throw above (pre-existing): the stroke then falls
+    // back to the tree's window while the stop still judges against 0×0.
+    // `direction` here names where the CONTENT lies — the finger moves the
+    // other way (content below → finger up). See swipeVector.
+    const { from, to } = swipeVector((await screenBox(adapter, read)).box, direction, 'content');
     await adapter.swipe(from, to);
     await sleep(settleMs);
   }

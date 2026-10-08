@@ -1,4 +1,4 @@
-import type { Selector, UiNode } from '../adapters/types.js';
+import type { Point, Selector, UiNode } from '../adapters/types.js';
 import { SELECTOR_FIELDS, type ElementSpec } from './element-spec.js';
 
 /**
@@ -194,7 +194,7 @@ export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string
 // are geometry, not selection, and sit in geometry.ts with the rest of it.
 
 /** Center of the node's rect — where taps land. */
-export function tapPoint(node: UiNode): { x: number; y: number } {
+export function tapPoint(node: UiNode): Point {
   return {
     x: Math.round(node.rect.x + node.rect.width / 2),
     y: Math.round(node.rect.y + node.rect.height / 2),

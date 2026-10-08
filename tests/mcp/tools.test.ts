@@ -754,6 +754,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     tap: { selector: 'id:home_root' },
     type_text: { text: 'x' },
     scroll_until: { selector: 'id:home_root' },
+    swipe: { direction: 'up' },
     assert: { asserts: [{ element: { id: 'home_root' } }] },
   };
 
@@ -773,7 +774,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
   });
 
-  it.each(['ui_snapshot', 'tap', 'type_text', 'scroll_until'])('android %s: an INVALID averi.yaml is not read at all, and the call works', async (tool) => {
+  it.each(['ui_snapshot', 'tap', 'type_text', 'scroll_until', 'swipe'])('android %s: an INVALID averi.yaml is not read at all, and the call works', async (tool) => {
     const harness = await connect();
     const configPath = await invalidConfig();
     reads.paths.length = 0;
@@ -796,6 +797,18 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     const { result, bound } = await snapshot('ios', configPath);
     expect(result.isError).toBe(false);
     expect(bound).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
+  });
+
+  it('ios swipe: a direction reads the tree through the configured source; coordinates read no config at all', async () => {
+    const harness = await connect();
+    const configPath = await file('averi.yaml', 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
+    expect((await harness.call('swipe', { platform: 'ios', direction: 'up', configPath })).isError).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
+    const invalid = await invalidConfig();
+    reads.paths.length = 0;
+    const coords = await harness.call('swipe', { platform: 'ios', fromX: 1, fromY: 2, toX: 3, toY: 4, configPath: invalid });
+    expect(coords.isError).toBe(false);
+    expect(configReads(invalid)).toBe(0);
   });
 });
 
@@ -1022,6 +1035,65 @@ describe('scroll_until', () => {
     expect(fake.swipes.length).toBeLessThan(200);
     expect(sleeps.length).toBe(fake.swipes.length);
     expect(new Set(sleeps)).toEqual(new Set([400]));
+  });
+});
+
+describe('swipe — by direction or by coordinates, exactly one (2026-10-08)', () => {
+  it('direction swipes the finger over the device screen, as a flow swipe: step does, and the reply gives the stroke', async () => {
+    const { call, fakes } = await connect();
+    fakes.android!.viewportSize = { width: 1080, height: 2400 }; // the panel, not the 1000x2000 tree root
+    const result = await call('swipe', { platform: 'android', direction: 'up' });
+    expect(result.isError).toBe(false);
+    expect(fakes.android!.swipes).toEqual([{ from: { x: 540, y: 1920 }, to: { x: 540, y: 480 } }]);
+    expect(result.text).toBe('Swiped up (540,1920) → (540,480)');
+  });
+
+  it('durationMs is handed to the adapter', async () => {
+    const { call, fakes } = await connect();
+    await call('swipe', { platform: 'android', direction: 'left', durationMs: 750 });
+    await call('swipe', { platform: 'android', fromX: 1, fromY: 2, toX: 3, toY: 4, durationMs: 120 });
+    expect(fakes.android!.swipes.map((s) => s.durationMs)).toEqual([750, 120]);
+  });
+
+  it('a device size that cannot be read: the tree window stands in and the reply carries the ⚠ note', async () => {
+    const { call, fakes } = await connect();
+    fakes.android!.viewport = async () => {
+      throw new Error('Cannot parse wm size output: nope');
+    };
+    const result = await call('swipe', { platform: 'android', direction: 'up' });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe(
+      "Swiped up (500,1600) → (500,400)\n⚠ the device screen size could not be read (Cannot parse wm size output: nope); swiped over the UI tree's window, 1000x2000",
+    );
+  });
+
+  it('a direction with no usable screen box is refused and nothing is swiped', async () => {
+    const blank = new FakeAdapter({ s: node({ rect: { x: 0, y: 0, width: 0, height: 0 } }) }, 's');
+    const { call } = await connect({ android: blank });
+    const result = await call('swipe', { platform: 'android', direction: 'down' });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('No screen box to swipe in');
+    expect(blank.swipes).toEqual([]);
+  });
+
+  it('coordinates are sent as given', async () => {
+    const { call, fakes } = await connect();
+    const result = await call('swipe', { platform: 'android', fromX: 10, fromY: 900, toX: 10, toY: 100 });
+    expect(result.isError).toBe(false);
+    expect(fakes.android!.swipes).toEqual([{ from: { x: 10, y: 900 }, to: { x: 10, y: 100 } }]);
+    expect(result.text).toBe('Swiped (10,900) → (10,100)');
+  });
+
+  it.each([
+    ['both', { direction: 'up', fromX: 1, fromY: 2, toX: 3, toY: 4 }, 'not both'],
+    ['neither', {}, 'Provide either direction (up/down/left/right) or all four of fromX, fromY, toX, toY'],
+    ['some of the coordinates', { fromX: 1, fromY: 2, toX: 3 }, 'Coordinates need all four'],
+  ])('%s is refused before a device is bound', async (_, args, message) => {
+    const { call, bound } = await connect();
+    const result = await call('swipe', { platform: 'android', ...args });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(message);
+    expect(bound()).toEqual([]);
   });
 });
 

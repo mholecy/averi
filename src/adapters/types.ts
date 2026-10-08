@@ -39,6 +39,34 @@ export interface DeviceScreen {
   windowsBesideSystemBars?: boolean;
 }
 
+/**
+ * A screen size that can be divided by, or swiped in: finite and positive on
+ * both axes. The one spelling of "this size is usable" — verify/scale.ts's
+ * witness and interact/swipe.ts's gesture box both read it (until 2026-10-08
+ * each had its own copy).
+ */
+export const usableScreen = ({ width, height }: { width: number; height: number }): boolean =>
+  Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
+
+/**
+ * A point in the platform's tree units (Android pixels, iOS points) — a tap
+ * point, a swipe's end. Named here, beside the screen it lies on, because
+ * `DeviceAdapter.swipe` takes it: until 2026-10-08 the adapters and
+ * ui-tree's point helpers (`tapPoint`, `containsPoint`, `shadowing`) spelled
+ * `{ x, y }` inline and interact/ named it twice (keyboard-model.ts's tap
+ * point, swipe.ts's stroke end).
+ */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** One swipe's from/to points — what interact/swipe.ts#swipeVector returns and `DeviceAdapter.swipe` draws. */
+export interface Stroke {
+  from: Point;
+  to: Point;
+}
+
 /** Integer points (iOS) or pixels (Android), as the platform reports them. */
 export interface Rect {
   x: number;
@@ -372,11 +400,7 @@ export interface DeviceAdapter {
 
   tap(x: number, y: number): Promise<void>;
   longPress(x: number, y: number, durationMs?: number): Promise<void>;
-  swipe(
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    durationMs?: number,
-  ): Promise<void>;
+  swipe(from: Point, to: Point, durationMs?: number): Promise<void>;
   /**
    * Type `text` into whatever is focused. An EMPTY string types nothing and
    * does not fail: it is what a `fill` with `value: ""` hands over (a clear

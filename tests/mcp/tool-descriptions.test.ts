@@ -30,6 +30,10 @@ vi.mock('../../src/interact/scroll.js', async (orig) => ({
   DEFAULT_MAX_SWIPES: 17,
   DEFAULT_SCROLL_TIMEOUT_MS: 15_250,
 }));
+vi.mock('../../src/interact/swipe.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/interact/swipe.js')>()),
+  SWIPE_REACH_FRACTION: 0.275,
+}));
 vi.mock('../../src/verify/assert.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/assert.js')>()),
   ASSERT_TIMEOUT_MS: 3_250,
@@ -105,6 +109,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
   it('scroll_until: the swipe and time bounds (interact/scroll.ts DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS)', () => {
     expect(property('scroll_until', 'maxSwipes').description).toBe('Default 17');
     expect(property('scroll_until', 'timeoutMs').description).toBe('Default 15250');
+  });
+
+  it('swipe: how far a direction stroke reaches from the centre (interact/swipe.ts SWIPE_REACH_FRACTION)', () => {
+    expect(description('swipe')).toContain('a stroke through the screen centre, 27.5% of the screen either side');
+    expect(description('swipe')).not.toMatch(/(?<![\d.])30%/);
   });
 
   it('get_logs: the line budget, schema default and description alike (run/verify.ts LOG_MAX_LINES)', () => {

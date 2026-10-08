@@ -1,5 +1,5 @@
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -103,7 +103,8 @@ export class FakeAdapter implements DeviceAdapter {
   typed: string[] = [];
   launches: ({ appId: string } & LaunchOptions)[] = [];
   appRunning = true;
-  swipes: { from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
+  /** Every swipe drawn, with the duration when the caller passed one (absent otherwise, so a `{ from, to }` literal still equals it). */
+  swipes: (Stroke & { durationMs?: number })[] = [];
   screenshots: Buffer[] = [];
   /**
    * Opaque bytes, not a png — enough for every caller that never decodes.
@@ -273,8 +274,8 @@ export class FakeAdapter implements DeviceAdapter {
   async terminate(): Promise<void> {}
   async openDeepLink(): Promise<void> {}
   async longPress(): Promise<void> {}
-  async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
-    this.swipes.push({ from, to });
+  async swipe(from: Point, to: Point, durationMs?: number): Promise<void> {
+    this.swipes.push({ from, to, ...(durationMs !== undefined && { durationMs }) });
   }
 }
 

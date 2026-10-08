@@ -1,5 +1,5 @@
-import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
-import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
+import { inferScreenSize, SCREEN_AGREEMENT_PCT, type ScreenSize } from '../ui-tree/geometry.js';
+import { usableScreen, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * The tree-points → png-pixels scale: THE one owner. Every crop, sample and
@@ -83,13 +83,6 @@ const TREE_SCALED =
  */
 const AMBIGUOUS_ROTATION = 1.25;
 
-/**
- * How far the tree's own width may sit from the device's before the mismatch
- * is worth saying out loud. Whole-point rects and a rounded screen size move
- * it by well under a percent; 2% is comfortably above that and well below the
- * signatures that matter (a system-bar inset, a half-width split view).
- */
-const SCREEN_AGREEMENT_PCT = 2;
 
 // The shape is the adapter's (adapters/types.ts), because the units contract
 // belongs with the read. Re-exported so verify/ callers keep one import.
@@ -293,17 +286,13 @@ const TREE_WIDTH_UNWITNESSED =
  * or a cutout (the A1/A2 shapes are pinned from the platform's layout
  * rules, not a dump).
  */
-/** A screen size that can be divided by: finite and positive on both axes. */
-const usable = ({ width, height }: DeviceScreen): boolean =>
-  Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
-
 export function windowWidth(
   tree: UiNode,
   screen?: DeviceScreen,
   /** The tree's `inferScreenSize`, when the caller already walked it for this frame (capture.ts). */
   size: ScreenSize = inferScreenSize(tree),
 ): WindowWidth {
-  const witnessed = screen !== undefined && usable(screen) ? screen : undefined;
+  const witnessed = screen !== undefined && usableScreen(screen) ? screen : undefined;
   // A1: an Android window beside a left-hand nav bar or cutout starts inset,
   // so the walk calls it a CONTENT width — with the device as witness, and
   // only in the shape `besideSystemBars` admits, it is the window.
@@ -475,7 +464,7 @@ function orient(
   pngHeight: number,
 ): { screen: DeviceScreen; rotated: boolean; rotatedFit: number } | undefined {
   if (screen === undefined) return undefined;
-  if (!usable(screen)) return undefined;
+  if (!usableScreen(screen)) return undefined;
   const { width, height } = screen;
   const swapped = { ...screen, width: height, height: width };
   const asIs = axisDisagreement(screen, pngWidth, pngHeight);

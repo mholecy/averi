@@ -1,5 +1,5 @@
 /**
- * The one-line responses of the tap, type_text and launch_app tools, as pure functions.
+ * The one-line responses of the tap, type_text, swipe and launch_app tools, as pure functions.
  *
  * They are here rather than inline in server.ts because server.ts connects a
  * transport at module load and cannot be imported by a test — and these lines
@@ -15,9 +15,10 @@
  * without building a server, a registry or a fake device to provoke each one.
  */
 
-import { everyNode, type Platform, type UiNode } from '../adapters/types.js';
+import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import type { FillResult } from '../interact/fill.js';
+import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
 
@@ -38,6 +39,18 @@ export const fillText = (
 ): string =>
   `Filled ${selector} (${fill.length} characters${fill.cleared ? ', cleared first' : ''})${fill.note ? ` (${fill.note})` : ''}` +
   (fill.warning ? `\n⚠ ${fill.warning}` : '');
+
+/**
+ * `Swiped[ <direction>] (x,y) → (x,y)` — the stroke actually sent, for a
+ * direction and for raw coordinates alike — and on its own line below,
+ * `⚠ <note>` when the direction's screen box was not witnessed as the screen
+ * (interact/swipe.ts#ScreenBox's note). Both forms were spelled inline in the
+ * handler until 2026-10-08 (code review of the swipe commit).
+ */
+export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string }): string =>
+  `Swiped ${swipe.direction !== undefined ? `${swipe.direction} ` : ''}` +
+  `(${swipe.from.x},${swipe.from.y}) → (${swipe.to.x},${swipe.to.y})` +
+  (swipe.note !== undefined ? `\n⚠ ${swipe.note}` : '');
 
 /**
  * `Launched <appId>[/<Activity>] on <platform>[ (state cleared)]`. The

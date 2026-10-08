@@ -45,6 +45,17 @@ import type { Verdict } from './verdict.js';
  */
 
 /**
+ * What one tree read gave the caller: the tree, or the error that stood in
+ * for it — `readTreeOrError`'s result. Named so a caller that hands a read
+ * on (interact/swipe.ts#screenBox, whose note quotes the cause) does not
+ * respell it.
+ */
+export interface TreeRead {
+  tree?: UiNode;
+  error?: Error;
+}
+
+/**
  * Read the UI tree, reporting a failure as a value instead of throwing.
  *
  * A failed tree read is a POLL MISS, not a failure — the rule every waiting
@@ -66,9 +77,7 @@ import type { Verdict } from './verdict.js';
  * `Pick<…, 'uiTree'>` keeps it callable from anything that can read a tree,
  * fakes included, without dragging in the rest of the adapter surface.
  */
-export async function readTreeOrError(
-  adapter: Pick<DeviceAdapter, 'uiTree'>,
-): Promise<{ tree?: UiNode; error?: Error }> {
+export async function readTreeOrError(adapter: Pick<DeviceAdapter, 'uiTree'>): Promise<TreeRead> {
   try {
     return { tree: await adapter.uiTree() };
   } catch (e) {

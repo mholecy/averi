@@ -1510,6 +1510,44 @@ flows:
     expect(from.x).toBe(to.x); // vertical gesture
     expect(to.y).toBeGreaterThan(from.y); // finger moves down
   });
+
+  it('says so in the trace when the tree window stood in for an unreadable device size', async () => {
+    const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - swipe: { direction: up }
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    fake.viewport = async () => {
+      throw new Error('device offline');
+    };
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
+    expect(trace).toContainEqual({
+      action: 'swipe',
+      detail: "up — the device screen size could not be read (device offline); swiped over the UI tree's window, 1000x2000",
+    });
+  });
+
+  it('says so in the trace when the tree could not be read and the screen was taken as built', async () => {
+    const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - swipe: { direction: down }
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    fake.uiTree = async () => {
+      throw new Error('null root node');
+    };
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
+    expect(trace).toContainEqual({
+      action: 'swipe',
+      detail: 'down — the UI tree could not be read (null root node); swiped over the device screen as built, 1000x2000',
+    });
+  });
 });
 
 describe('tap stability', () => {

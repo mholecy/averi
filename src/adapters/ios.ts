@@ -9,7 +9,7 @@ import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, UiNode } from './types.js';
+import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
 import { ViewportMemo } from './viewport-memo.js';
 
 /**
@@ -219,11 +219,7 @@ export class IosAdapter implements DeviceAdapter {
     await this.idbUi(['tap', String(x), String(y), '--duration', String(durationMs / 1000)]);
   }
 
-  async swipe(
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    durationMs = 300,
-  ): Promise<void> {
+  async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
     await this.idbUi(['swipe',
       String(from.x), String(from.y), String(to.x), String(to.y),
       '--duration', String(durationMs / 1000)]);

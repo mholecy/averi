@@ -1,4 +1,4 @@
-import { rectArea, rectsOverlap, STRUCTURAL_ROLES, zeroRect, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectsOverlap, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -314,6 +314,109 @@ export function collectRects(tree: UiNode): Map<string, Rect> {
   return out;
 }
 
+// ─── Orientation ─────────────────────────────────────────────────────────────
+
+/**
+ * How far two readings of one screen side — the tree's and the device's —
+ * may sit apart and still be the same side. Whole-point rects and a rounded
+ * screen size move it by well under a percent; 2% is comfortably above that
+ * and well below the signatures that matter (a system-bar inset, a
+ * half-width split view). verify/scale.ts reads it for when a tree width's
+ * mismatch with the device is worth saying out loud; `FIT_SLACK` below is
+ * the same allowance for a window's reach. Owned by verify/scale.ts until
+ * 2026-10-08, when `windowTurnsScreen` moved here with it.
+ */
+export const SCREEN_AGREEMENT_PCT = 2;
+
+/**
+ * How far a window may reach past a screen side and still be said to fit it.
+ * Every parser rounds rects to whole units and `wm size` / `idb describe`
+ * report the panel exactly, so this is slack for rounding, not a tolerance
+ * for a different screen. The same allowance as `SCREEN_AGREEMENT_PCT`.
+ */
+const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
+
+/**
+ * Is the screen turned sideways from how the device reports it, by the tree's
+ * window? `wm size` and `idb describe` report the panel as built — portrait
+ * on a phone — whichever way it is held; the tree's window is laid out as the
+ * screen is now. The one owner of "which way does this window say the screen
+ * faces" (2026-10-08, for interact/swipe.ts#screenBox, the box a gesture
+ * swipes in). Here rather than in verify/scale.ts, where it was written:
+ * `interact/` may not import `verify/` (ARCHITECTURE.md §2), and the
+ * question is rect arithmetic over a tree's size and the device's — the
+ * reason the absent-in-viewport rule both engines need lives in this file
+ * (code review of the swipe commit, 2026-10-08).
+ *
+ * The witness is the window's REACH — its right and bottom edges, so a window
+ * laid out beside a left-hand nav bar or a cutout counts with the bar it
+ * starts after — and it says "turned" only when that reach fits the panel
+ * turned sideways AND does not fit it as built. "Does not fit as built" is
+ * the guard: a top split-screen pane (1080x1000 on 1080x2400) is
+ * landscape-SHAPED yet fits the panel unturned, and turning for it would put
+ * a gesture's centre past the right edge; a square-ish window that fits
+ * either says nothing.
+ *
+ * Which window: the tree's own when it is `reliable`, else — on a platform
+ * whose windows sit beside system bars at all (`windowsBesideSystemBars`,
+ * Android) — the `insetWindow` geometry.ts surfaces for the window's
+ * position: the A1 shapes (126,0 2274x1080 beside a left nav bar) and the non-edge-to-edge
+ * one below a status bar as well (126,63 2274x1017), which
+ * verify/scale.ts#besideSystemBars does not admit because it MEASURES a width and
+ * needs the full short side; turning a box needs only the reach. An inset
+ * rect in an iOS tree is content, never a window, and witnesses nothing.
+ *
+ * verify/scale.ts#windowWidth does not read this: it bounds a WIDTH by the side the
+ * window's own aspect faces and accepts a split pane against either side —
+ * a different question from which way the panel is held, which a split pane
+ * cannot answer.
+ *
+ * A WALKED height never votes (review round 2, 2026-10-08). It is the
+ * lowest content edge, which a scroll view inflates without limit — the same
+ * incident verify/scale.ts#orient records as why the tree lost its vote on a png's
+ * orientation: a landscape iPhone whose scroll container made the tree read
+ * "portrait". `orient` has the capture to decide by instead; a gesture has
+ * no png, so the tree is its only witness, and only its trustworthy parts
+ * vote: with no window's own height (`trustworthyHeight`), a reliable width
+ * decides alone — turned when it is wider than the panel's side as built
+ * and fits the other (an 852-wide walk over rows down to y=3000 on a
+ * 393x852 panel is a landscape screen, 852x393). Residual: an onLayout
+ * sibling parked one screen to the right of a portrait window inflates a
+ * walked width the same way (the 2026-08-26 inflator, which `walkExtent`'s
+ * corroboration catches only when something screen-shaped is in the tree)
+ * and turns the box — the tree cannot tell that width from a landscape one,
+ * as verify/scale.ts#windowWidth's walked-width note says.
+ *
+ * Accepted cost (review 2026-10-08): a rectless root whose only
+ * screen-shaped child is wider than the panel as built but fits it turned —
+ * an oversized node crowned as the window, the sheet class geometry.ts
+ * describes — turns the box. A gesture over a turned box on an unturned
+ * screen lands off-centre, not off-screen in the short axis; the tree
+ * offers nothing to tell the two apart.
+ */
+export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {
+  if (!usableScreen(screen)) return false;
+  // Only the tree's trustworthy parts vote. A walked height is a content
+  // maximum (scale.ts#orient lost the tree's vote to exactly that), so a
+  // reliable tree without a window's own height is judged by its WIDTH:
+  // wider than the panel as built, within it turned (the split-pane guard is
+  // the first half).
+  if (size.reliable && usableScreen(size) && !size.trustworthyHeight) {
+    return size.width > screen.width * FIT_SLACK && size.width <= screen.height * FIT_SLACK;
+  }
+  const window: Rect | undefined =
+    size.reliable && usableScreen(size)
+      ? { x: 0, y: 0, width: size.width, height: size.height }
+      : screen.windowsBesideSystemBars === true
+        ? size.insetWindow
+        : undefined;
+  if (window === undefined) return false;
+  const reach = { width: window.x + window.width, height: window.y + window.height };
+  const fits = (s: { width: number; height: number }): boolean =>
+    reach.width <= s.width * FIT_SLACK && reach.height <= s.height * FIT_SLACK;
+  return fits({ width: screen.height, height: screen.width }) && !fits(screen);
+}
+
 // ─── Viewport predicates ─────────────────────────────────────────────────────
 
 /**
@@ -389,7 +492,7 @@ export { rectArea, rectsOverlap };
  * root's rect, and `shadowing` below of every candidate. Until 2026-10-07 it
  * was interact/keyboard.ts's `inside`, with a `covers` wrapper beside it.
  */
-export function containsPoint(rect: Rect, point: { x: number; y: number }): boolean {
+export function containsPoint(rect: Rect, point: Point): boolean {
   return point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
 }
 
@@ -457,7 +560,7 @@ export function rectText(r: Rect): string {
  * a draw-order question over rects asked of any tree — the keyboard is one
  * more thing that can be drawn over a point, not what the question is about.
  */
-export function shadowing(tree: UiNode, node: UiNode, point: { x: number; y: number }): UiNode | undefined {
+export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
   let after = false;
   let over: UiNode | undefined;
   const walk = (n: UiNode): void => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillText, launchText, snapshotNote, tapText } from '../../src/mcp/tool-text.js';
+import { fillText, launchText, snapshotNote, swipeText, tapText } from '../../src/mcp/tool-text.js';
 import { el, node, screen } from '../helpers/fake.js';
 
 describe('tap and type_text response lines', () => {
@@ -24,6 +24,18 @@ describe('tap and type_text response lines', () => {
       }),
     ).toBe(
       'Filled id:pw (16 characters)\n⚠ masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
+    );
+  });
+});
+
+describe('swipe response line', () => {
+  const stroke = { from: { x: 540, y: 1920 }, to: { x: 540, y: 480 } };
+
+  it('swipeText names the stroke sent, the direction when one was given, and the box note on its own ⚠ line', () => {
+    expect(swipeText(stroke)).toBe('Swiped (540,1920) → (540,480)');
+    expect(swipeText({ ...stroke, direction: 'up' })).toBe('Swiped up (540,1920) → (540,480)');
+    expect(swipeText({ ...stroke, direction: 'left', note: 'the UI tree could not be read; swiped over the device screen as built, 1080x2400' })).toBe(
+      'Swiped left (540,1920) → (540,480)\n⚠ the UI tree could not be read; swiped over the device screen as built, 1080x2400',
     );
   });
 });

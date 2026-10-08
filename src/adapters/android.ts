@@ -5,7 +5,7 @@ import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
-import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -448,11 +448,7 @@ export class AndroidAdapter implements DeviceAdapter {
       String(x), String(y), String(x), String(y), String(durationMs)]);
   }
 
-  async swipe(
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    durationMs = 300,
-  ): Promise<void> {
+  async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
     await this.shell(['input', 'swipe',
       String(from.x), String(from.y), String(to.x), String(to.y), String(durationMs)]);
   }
