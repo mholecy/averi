@@ -516,7 +516,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
   const idbRoot = (...children: UiNode[]) => node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children });
   const PORTRAIT = { width: 402, height: 874 };
 
-  describe('B1 — an orientation no window witnessed refuses only a point outside the screen BOTH ways up', () => {
+  describe('B1 — a turn suggested but witnessed by no window refuses only a point outside the screen BOTH ways up', () => {
     // Probe A: an idb landscape tree whose Application window a carousel card
     // straddling the right edge makes unreliable — the box is not turned.
     const landscapeWithCard = (...extra: UiNode[]) =>
@@ -632,7 +632,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'button', identifier: 'ok', rect: { x: 100, y: 2500, width: 100, height: 40 } })] });
       const { fake } = folding(tree, { width: 1080, height: 2200 }, { width: 1080, height: 2400 });
       await expect(tapElement(fake, 'id:ok', OPTS)).rejects.toThrow(
-        'id:ok is off screen at (150,2520) on a 1080x2400 screen either way up (read again before refusing; it was 1080x2200) (rect 100,2500 100x40)',
+        'id:ok is off screen at (150,2520) on a 1080x2400 screen (read again before refusing; it was 1080x2200) (rect 100,2500 100x40)',
       );
       expect(fake.tapPoints).toEqual([]);
     });
@@ -654,6 +654,25 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       /^id:login_submit is off screen at \(107,924\) on a 402x874 screen \(rect 36,900 141x48\) — scroll_until it first; nothing was tapped$/,
     );
     expect(fake.taps).toEqual([]);
+  });
+
+  it('code review item 1: a PORTRAIT idb window a straddling card makes unreliable suggests no turn — a carousel item past the right edge is refused, and scroll_until swipes for it', async () => {
+    const tree = idbRoot(
+      node({
+        role: 'other',
+        rect: { x: 0, y: 0, width: 402, height: 874 },
+        children: [
+          node({ role: 'other', identifier: 'card', rect: { x: 300, y: 80, width: 300, height: 200 } }), // straddles x 402: the window is unreliable
+          node({ role: 'button', identifier: 'next_item', rect: { x: 425, y: 80, width: 50, height: 40 } }), // centre (450,100)
+        ],
+      }),
+    );
+    const fake = ios(tree, PORTRAIT);
+    expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
+    await expect(tapElement(fake, 'id:next_item', OPTS)).rejects.toThrow('id:next_item is off screen at (450,100) on a 402x874 screen (rect');
+    await expect(scrollUntilVisible(fake, 'id:next_item', { maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
+    expect(fake.swipes).toHaveLength(1);
+    expect(fake.tapPoints).toEqual([]);
   });
 
   it('review round 2 — probe J: on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {

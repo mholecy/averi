@@ -395,11 +395,13 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * screen lands off-centre, not off-screen in the short axis; the tree
  * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
  * refusal (interact/resolve.ts#onScreen) does not take this answer alone —
- * swipe.ts#screenBox says whether a window matching the panel side for
- * side witnessed it (`ScreenBox.witnessed`), and an unwitnessed box refuses
- * only a point outside it both ways up (the off-screen review, 2026-10-08:
- * a straddling card, an iPad strip, a walked width or a split pane would
- * otherwise have refused ordinary taps).
+ * swipe.ts#screenBox says which boxes count (`ScreenBox.boxes`): the box
+ * alone when a window matching the panel side for side witnessed it or
+ * nothing suggests a turn, the box either way up when a turn is suggested
+ * but not witnessed (the off-screen reviews, 2026-10-08: a straddling card,
+ * an iPad strip or a walked width would otherwise have refused ordinary
+ * taps, and a portrait window must still refuse a carousel page past its
+ * right edge).
  */
 export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {
   if (!usableScreen(screen)) return false;

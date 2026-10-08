@@ -56,20 +56,65 @@ export interface ScreenBox {
    */
   note?: string;
   /**
-   * The box's ORIENTATION is witnessed by a window (2026-10-08, review of
-   * the off-screen tap refusal): the tree has a window with its own height
-   * (`reliable` and `trustworthyHeight`) that matches the panel side for
-   * side — as built or turned, whichever the box is, within
-   * SCREEN_AGREEMENT_PCT — or the box IS the tree's window (the fallback).
-   * False when the turn was decided, or left undecided, on weaker evidence:
-   * a walked width, an inset window, a tree whose window is unreliable (a
-   * carousel card straddling the right edge of a rectless idb root), a
-   * split pane, or no tree. A swipe does not care — a stroke over the wrong
-   * box lands off-centre — but a REFUSAL does: the tap's on-screen rule
-   * (interact/resolve.ts#onScreen) refuses an unwitnessed box's point only
-   * when it lies outside the box both ways up.
+   * The boxes a point or a rect is judged ON SCREEN in (2026-10-08, the
+   * off-screen tap refusal and its reviews) — read through `judgingScreen`,
+   * the one owner both judges share: the tap's on-screen rule
+   * (interact/resolve.ts#onScreen) and `scroll_until`'s stop
+   * (interact/scroll.ts), so the scroll and the tap after it agree on the
+   * screen by construction. A swipe does not read it: a stroke over the
+   * wrong box lands off-centre, a judgement over it is a false refusal or a
+   * false "visible".
+   *
+   * - `[box]` when a window WITNESSED the orientation — the tree has a
+   *   window with its own height (`reliable`, `trustworthyHeight`) matching
+   *   the panel side for side, as built or turned, within
+   *   SCREEN_AGREEMENT_PCT — or the box IS the tree's window (the fallback).
+   * - `[box]` too when nothing suggests a turn: the box as built and the
+   *   tree's size (an unreliable window's, a walked one) no wider than tall
+   *   relative to the panel. The portrait carousel case (review 2026-10-08,
+   *   item 1): a card straddling the right edge of a portrait idb window
+   *   makes the window unreliable, and an item at x 450 of 402 must still be
+   *   off screen — scroll_until swipes for it, a tap refuses it.
+   * - `[box, box turned]` when a turn is SUGGESTED but not witnessed: the
+   *   box was turned on weaker evidence (a walked width — the 852-wide walk
+   *   over a 393x852 panel that is really portrait, probes E/J), or the
+   *   tree's size is landscape-shaped against a portrait panel (or the
+   *   reverse) — an idb landscape window a straddling card made unreliable
+   *   (probe A), an iPad strip (A2), an Android inset window beside a nav
+   *   bar. Inside either counts: refusing on a guessed turn would refuse
+   *   ordinary taps (review B1).
+   *
+   * Not decided either way: an iPad split pane whose window is neither the
+   * panel nor landscape-shaped (unmeasured) gets `[box]`.
    */
-  witnessed: boolean;
+  boxes: Rect[];
+}
+
+/** The box, its side lengths swapped — the same screen held the other way. */
+export const turnedBox = (b: Rect): Rect => ({ x: b.x, y: b.y, width: b.height, height: b.width });
+
+/** The screen a judgement of "on screen" uses: `ScreenBox.box` (what a reply quotes) and `ScreenBox.boxes` (what counts). */
+export interface JudgingScreen {
+  box: Rect;
+  boxes: Rect[];
+}
+
+/**
+ * `screenBox` for a JUDGEMENT rather than a gesture — the one try/catch the
+ * tap's on-screen rule and `scroll_until`'s stop share (review 2026-10-08,
+ * item 2: each had its own, with its own turn policy). `undefined` when
+ * there is no box at all (no usable device size and no window in the tree);
+ * what that means is the caller's: the tap goes ahead (resolve.ts#onScreen
+ * falls back to the root rect, then fails open), the scroll judges the
+ * device's size as built, as it did before the box existed.
+ */
+export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<JudgingScreen | undefined> {
+  try {
+    const { box, boxes } = await screenBox(adapter, read);
+    return { box, boxes };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -134,19 +179,18 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   if (device !== undefined && usableScreen(device)) {
     const sideways = size !== undefined && windowTurnsScreen(size, device);
     const { width, height } = sideways ? { width: device.height, height: device.width } : device;
-    const witnessed = size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, { width, height });
+    const box = { x: 0, y: 0, width, height };
+    const witnessed = size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, box);
+    const suggested = sideways || (size !== undefined && usableScreen(size) && landscape(size) !== landscape(device));
     return {
-      box: { x: 0, y: 0, width, height },
+      box,
       ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
-      witnessed,
+      boxes: witnessed || !suggested ? [box] : [box, turnedBox(box)],
     };
   }
   if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
-    return {
-      box: { x: 0, y: 0, width: size.width, height: size.height },
-      note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`,
-      witnessed: true,
-    };
+    const box = { x: 0, y: 0, width: size.width, height: size.height };
+    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`, boxes: [box] };
   }
   const treeProblem =
     size === undefined
@@ -161,6 +205,9 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
       'Check the device answers (`adb shell wm size` / `idb describe`) and retry.',
   );
 }
+
+/** Wider than tall. */
+const landscape = (s: { width: number; height: number }): boolean => s.width > s.height;
 
 /** The window and the box agree side for side, within SCREEN_AGREEMENT_PCT — the window IS the screen, held the way the box is. */
 const sameSides = (a: { width: number; height: number }, b: { width: number; height: number }): boolean =>

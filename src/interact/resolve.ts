@@ -3,7 +3,7 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { containsPoint, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { screenBox } from './swipe.js';
+import { judgingScreen, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -343,19 +343,18 @@ export async function resolvePresent(
  */
 export class OffScreenRefusal extends Error {}
 
-/** The screen a tap point is judged against: `swipe.ts#ScreenBox`'s box, and whether a window witnessed which way up it is. */
-export interface TapScreen {
-  box: Rect;
-  witnessed: boolean;
-}
+/** The screen a tap point is judged against: `swipe.ts#judgingScreen` — the box a reply quotes and the boxes that count. */
+export type TapScreen = JudgingScreen;
 
 /**
- * The screen for the on-screen rule: `swipe.ts#screenBox`, the one owner of
- * "the device's screen as the tree's coordinates see it" — the device's
- * `viewport()` (memoized by the adapter; in the tree's units, px on Android,
- * pt on iOS), turned when `tree`'s window says the screen is held sideways,
- * the tree's window when the device size cannot be read — with its
- * `witnessed` flag (onScreen says what it changes).
+ * The screen for the on-screen rule: `swipe.ts#judgingScreen`, the one
+ * owner of "the device's screen as the tree's coordinates see it" for a
+ * judgement — the device's `viewport()` (memoized by the adapter; in the
+ * tree's units, px on Android, pt on iOS), turned when `tree`'s window says
+ * the screen is held sideways, the tree's window when the device size
+ * cannot be read, and the boxes a point may lie in (`ScreenBox.boxes`: the
+ * box, or the box either way up when a turn is suggested but not
+ * witnessed). `scroll_until`'s stop reads the same, so the two agree.
  *
  * `undefined` — no box at all — leaves the judgement to the tree's root rect
  * (`onScreen`), and with no root rect either the tap goes ahead as it did
@@ -363,19 +362,7 @@ export interface TapScreen {
  * (keyboard.ts). The rule exists to stop a false "Tapped", and must never
  * be why a tap on a device that could not report its size did not happen.
  */
-export async function tapScreen(adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<TapScreen | undefined> {
-  try {
-    const { box, witnessed } = await screenBox(adapter, { tree });
-    return { box, witnessed };
-  } catch {
-    return undefined;
-  }
-}
-
-const turned = (b: Rect): Rect => ({ x: b.x, y: b.y, width: b.height, height: b.width });
-
-/** The boxes a point may lie in to count as on screen: the box, and — when no window witnessed which way up it is — the box turned. */
-const screenBoxes = (screen: TapScreen): Rect[] => (screen.witnessed ? [screen.box] : [screen.box, turned(screen.box)]);
+export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<TapScreen | undefined> => judgingScreen(adapter, { tree });
 
 /**
  * THE on-screen rule for a point about to be tapped (2026-10-08) — the
@@ -384,17 +371,18 @@ const screenBoxes = (screen: TapScreen): Rect[] => (screen.witnessed ? [screen.b
  * scrolled above the top is still in the tree). One owner since the review
  * of the off-screen refusal: the picker had judged by the root's rect alone.
  *
- * - A screen whose orientation a window witnessed (`TapScreen.witnessed`):
- *   inside its box.
- * - One no window witnessed: inside the box EITHER way up. Review
- *   2026-10-08 (B1): the turn is a swipe's question first, where a wrong
- *   box costs an off-centre stroke; refusing on it would refuse every tap
- *   past x 402 in an idb landscape tree whose window a straddling carousel
- *   card made unreliable, an iPad strip, a walked-width turn, a split pane.
- *   What this gives up: a point off a portrait screen's right edge but
- *   within its height turned (a carousel page at x 450, y 300 on 402×874)
- *   is not refused on an unwitnessed screen. The measured case — below the
- *   fold, (94,895) on 402×874 — lies outside both and is refused either way.
+ * - Inside any of the screen's `boxes` (swipe.ts#ScreenBox.boxes has the
+ *   rule): the box alone when a window witnessed the orientation or
+ *   nothing suggests a turn; the box EITHER way up when a turn is suggested
+ *   but not witnessed (review 2026-10-08, B1: refusing on a guessed turn
+ *   refused every tap past x 402 in an idb landscape tree whose window a
+ *   straddling card made unreliable, an iPad strip, a walked-width turn).
+ *   A portrait carousel page at x 450 of 402 is refused even when its
+ *   straddling neighbour makes the window unreliable (the review's item 1:
+ *   until then every unwitnessed box was judged either way up). What is
+ *   still given up: on a screen whose turn is suggested but not witnessed,
+ *   a point inside the other orientation only. The measured case — below
+ *   the fold, (94,895) on 402×874 — lies outside both and is refused.
  * - No screen at all: inside the tree's root rect when it has one; with
  *   none, on screen (fail open).
  *
@@ -403,7 +391,7 @@ const screenBoxes = (screen: TapScreen): Rect[] => (screen.witnessed ? [screen.b
  */
 export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefined): boolean {
   if (screen === undefined) return rectArea(tree.rect) === 0 || containsPoint(tree.rect, point);
-  return screenBoxes(screen).some((box) => containsPoint(box, point));
+  return screen.boxes.some((box) => containsPoint(box, point));
 }
 
 /**
@@ -456,15 +444,14 @@ export async function refuseOffScreen(
   }
   const again = await tapScreen(adapter, tree);
   if (onScreen(at, tree, again)) return again;
-  const judged: TapScreen = again ?? screen ?? { box: tree.rect, witnessed: true };
-  const boxes = screenBoxes(judged);
-  const visible = Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
+  const judged: TapScreen = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
+  const visible = Math.max(...judged.boxes.map((b) => visibleFractionInViewport(node.rect, b)));
   const size = `${judged.box.width}x${judged.box.height}`;
   const reread =
     again !== undefined && screen !== undefined && (again.box.width !== screen.box.width || again.box.height !== screen.box.height)
       ? ` (read again before refusing; it was ${screen.box.width}x${screen.box.height})`
       : '';
-  const where = `at (${at.x},${at.y}) on a ${size} screen${judged.witnessed ? '' : ' either way up'}${reread}`;
+  const where = `at (${at.x},${at.y}) on a ${size} screen${judged.boxes.length > 1 ? ' either way up' : ''}${reread}`;
   const part =
     visible > 0
       ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — scroll_until it with fully: true first`
