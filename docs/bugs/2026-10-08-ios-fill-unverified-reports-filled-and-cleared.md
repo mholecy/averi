@@ -4,6 +4,8 @@
 
 > **Follow-up (2026-10-08, review m-8, not changed):** the read-back asks the selector BEFORE identity, so a `value:` selector that, once the clear or the typing has changed the chosen field, still matches ANOTHER node (two rows `id:qty value:"1"`, the first picked) reads that other node instead of finding the chosen one by identity. Pre-existing; identity-first would need the moved-field case settled first.
 
+> **Follow-up (2026-10-08, bundle C review round 2, not changed):** a clear alone (`value: ""`) whose post-focus read misses a field that read empty before the tap sends no delete and has no read-back, so it is unverified yet said as `Filled … (0 characters)`. Narrow and pre-existing (the clear loop's post-delete miss is fixed: it reads `lost`).
+
 **Measured 2026-10-08 16:30–16:41 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS tree source
 default `idb`), SWIFT payment form of PR #6 (branch `feature/swift-payment`), iPhone 17 simulator iOS 27.0
 (`37956039-94EA-4F51-93E5-94F7723A4578`), averi = mobile-verify @ `c35388a` built from source.

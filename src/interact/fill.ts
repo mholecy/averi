@@ -93,8 +93,9 @@ export interface FillResult {
    * How the typed text was checked:
    * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
    * - `no-value`: the field WAS found (by the selector or by identity) and
-   *   exposed no value, on two reads in a row — the text may or may not be
-   *   there; nothing was compared. Not to be confused with `lost` (the last
+   *   exposed no value on the last read (the poll stops on the second
+   *   read that shows none, whether or not a read before it missed the
+   *   field) — the text may or may not be there; nothing was compared. Not to be confused with `lost` (the last
    *   read found no field at all) or with a read that showed a value
    *   (`landed`, `not-taken`, or the mismatch error).
    * - `not-taken`: the node is not an input and its value does not show the
