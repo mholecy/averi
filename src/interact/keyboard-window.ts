@@ -417,6 +417,7 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
       return {
         hiding: {
           perform: () => pressBack(adapter),
+          sent: 'back was pressed to hide the soft keyboard',
           // The look after the one `back`, to confirm the keyboard went: the
           // skeleton's one confirming look (`lookAgain` — the first look's
           // reading rule, the oracle asked once more), the branch its shared

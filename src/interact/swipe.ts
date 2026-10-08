@@ -1,5 +1,5 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Rect, type Stroke } from '../adapters/types.js';
-import { inferScreenSize, windowTurnsScreen } from '../ui-tree/geometry.js';
+import { inferScreenSize, SCREEN_AGREEMENT_PCT, windowTurnsScreen } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -55,6 +55,21 @@ export interface ScreenBox {
    * reply; absent on the ordinary path — a device size and a read tree.
    */
   note?: string;
+  /**
+   * The box's ORIENTATION is witnessed by a window (2026-10-08, review of
+   * the off-screen tap refusal): the tree has a window with its own height
+   * (`reliable` and `trustworthyHeight`) that matches the panel side for
+   * side — as built or turned, whichever the box is, within
+   * SCREEN_AGREEMENT_PCT — or the box IS the tree's window (the fallback).
+   * False when the turn was decided, or left undecided, on weaker evidence:
+   * a walked width, an inset window, a tree whose window is unreliable (a
+   * carousel card straddling the right edge of a rectless idb root), a
+   * split pane, or no tree. A swipe does not care — a stroke over the wrong
+   * box lands off-centre — but a REFUSAL does: the tap's on-screen rule
+   * (interact/resolve.ts#onScreen) refuses an unwitnessed box's point only
+   * when it lies outside the box both ways up.
+   */
+  witnessed: boolean;
 }
 
 /**
@@ -119,15 +134,18 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   if (device !== undefined && usableScreen(device)) {
     const sideways = size !== undefined && windowTurnsScreen(size, device);
     const { width, height } = sideways ? { width: device.height, height: device.width } : device;
+    const witnessed = size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, { width, height });
     return {
       box: { x: 0, y: 0, width, height },
       ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
+      witnessed,
     };
   }
   if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
     return {
       box: { x: 0, y: 0, width: size.width, height: size.height },
       note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`,
+      witnessed: true,
     };
   }
   const treeProblem =
@@ -143,6 +161,10 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
       'Check the device answers (`adb shell wm size` / `idb describe`) and retry.',
   );
 }
+
+/** The window and the box agree side for side, within SCREEN_AGREEMENT_PCT — the window IS the screen, held the way the box is. */
+const sameSides = (a: { width: number; height: number }, b: { width: number; height: number }): boolean =>
+  Math.abs(a.width - b.width) <= (b.width * SCREEN_AGREEMENT_PCT) / 100 && Math.abs(a.height - b.height) <= (b.height * SCREEN_AGREEMENT_PCT) / 100;
 
 export interface SwipeOptions {
   direction: Direction;

@@ -10,12 +10,16 @@ import {
   AmbiguityRefusal,
   DEFAULT_SETTLE_TIMEOUT_MS,
   ElementNotFoundError,
+  OffScreenRefusal,
   resolveNow,
   resolvePresent,
   resolveSettled,
 } from '../../src/interact/resolve.js';
+import { fillField } from '../../src/interact/fill.js';
+import { scrollUntilVisible } from '../../src/interact/scroll.js';
+import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
-import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { dropBand, el, FakeAdapter, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
@@ -333,5 +337,341 @@ describe('tapElement', () => {
       /Selector matches 2 elements: role:textfield/,
     );
     expect(fake.taps).toEqual([]);
+  });
+});
+
+/**
+ * A tap on a resolved node whose centre lies off the screen is refused,
+ * nothing sent (2026-10-08, docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md):
+ * idb lists a scroll view's content below the fold with its real rects, and
+ * the tap went to a point below the 874-pt screen and reported "Tapped".
+ */
+describe('a tap target off the screen (2026-10-08)', () => {
+  /** The measured SWIFT form, in points: 402×874, the amount field on screen, two fields below the fold. */
+  const swiftForm = () => {
+    const fake = new FakeAdapter(
+      {
+        form: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 402, height: 874 },
+          children: [
+            node({ role: 'textfield', identifier: 'amount', rect: { x: 24, y: 300, width: 354, height: 44 } }),
+            node({ role: 'text', label: 'Payee’s street', identifier: 'TextFieldWithComponentStyle', rect: { x: 42, y: 885, width: 103, height: 20 } }),
+            node({ role: 'text', label: 'Payee’s bank city*', rect: { x: 42, y: 1157, width: 136, height: 20 } }),
+          ],
+        }),
+      },
+      'form',
+    );
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  };
+
+  it('the measured rects (y 885, y 1157 on a 402x874 screen): refused, nothing tapped', async () => {
+    const fake = swiftForm();
+    const street = await tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 }).catch((e: unknown) => e);
+    expect(street).toBeInstanceOf(OffScreenRefusal);
+    expect((street as Error).message).toBe(
+      'text:"Payee’s street" is off screen at (94,895) on a 402x874 screen (rect 42,885 103x20) — scroll_until it first; nothing was tapped',
+    );
+    await expect(tapElement(fake, 'text:"Payee’s bank city*"', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(
+      'text:"Payee’s bank city*" is off screen at (110,1167) on a 402x874 screen (rect 42,1157 136x20)',
+    );
+    expect(fake.tapPoints).toEqual([]);
+    // The on-screen field beside them taps as before.
+    await tapElement(fake, 'id:amount', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    expect(fake.taps).toEqual(['amount']);
+  });
+
+  it('partly on screen: the centre decides — on screen, tapped at the centre as before; off, refused with how much shows', async () => {
+    const fake = swiftForm();
+    const street = () => fake.live().children[1];
+    street().rect = { x: 42, y: 860, width: 103, height: 20 }; // centre (94,870): on screen, 14 of 20 pt visible
+    await tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    expect(fake.tapPoints).toEqual([{ x: 94, y: 870 }]);
+    street().rect = { x: 42, y: 866, width: 103, height: 20 }; // centre (94,876): off, 8 of 20 pt visible
+    await expect(tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(
+      'text:"Payee’s street" is off screen at (94,876) on a 402x874 screen — only 40% of it (rect 42,866 103x20) is on screen, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([{ x: 94, y: 870 }]);
+  });
+
+  it('above the top and past either side edge: off screen too', async () => {
+    const fake = swiftForm();
+    const street = () => fake.live().children[1];
+    for (const [rect, at] of [
+      [{ x: 42, y: -40, width: 103, height: 20 }, '(94,-30)'],
+      [{ x: 450, y: 400, width: 100, height: 20 }, '(500,410)'], // a carousel page to the right
+      [{ x: -200, y: 400, width: 100, height: 20 }, '(-150,410)'],
+    ] as const) {
+      street().rect = { ...rect };
+      await expect(tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(`is off screen at ${at} on a 402x874 screen`);
+    }
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('landscape: the screen is the device box TURNED when the tree\'s window is (swipe.ts#screenBox) — x 600 of 874 is on screen', async () => {
+    const fake = swiftForm();
+    fake.live().rect = { x: 0, y: 0, width: 874, height: 402 }; // the window held sideways; the device reports the panel as built
+    fake.live().children[1].rect = { x: 550, y: 100, width: 100, height: 20 };
+    await tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    expect(fake.tapPoints).toEqual([{ x: 600, y: 110 }]);
+    fake.live().children[1].rect = { x: 42, y: 500, width: 103, height: 20 }; // below the turned screen's 402
+    await expect(tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow('is off screen at (94,510) on a 874x402 screen');
+  });
+
+  it('no screen to judge by — the device size unreadable and no window in the tree: the tap goes ahead as before (fail open)', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'button', identifier: 'go', rect: { x: 40, y: 3000, width: 100, height: 20 } })] }) }, 's');
+    fake.viewport = async () => {
+      throw new Error('idb describe: no screen_dimensions');
+    };
+    await tapElement(fake, 'id:go', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    expect(fake.taps).toEqual(['go']);
+  });
+
+  it('the fill\'s focus tap goes through the same check: refused before anything is tapped or typed', async () => {
+    const fake = swiftForm();
+    fake.live().children[1].role = 'textfield';
+    await expect(fillField(fake, 'text:"Payee’s street"', 'Main St 1', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toBeInstanceOf(OffScreenRefusal);
+    expect(fake.tapPoints).toEqual([]);
+    expect(fake.typed).toEqual([]);
+  });
+
+  it('a node the keyboard guard\'s dismissal moved off screen (the keyboard-avoiding layout scrolling back): refused, quoting what was sent first', async () => {
+    const fake = iosLoginFake({
+      onTap: (id, self) => {
+        if (id !== 'login_title') return;
+        dropBand(self.live());
+        self.live().children[2].rect = { x: 36, y: 900, width: 141, height: 48 }; // login_submit, below the fold once the keyboard is gone
+      },
+    });
+    fake.viewportSize = { width: 402, height: 874 };
+    const error = await tapElement(fake, 'id:login_submit', { ...REFUSE, timeoutMs: 60, pollMs: 2, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OffScreenRefusal);
+    expect((error as Error).message).toBe(
+      'id:login_submit was not tapped: after id:"login_title" was tapped at (201,303) to hide the soft keyboard, it is off screen at (107,924) on a 402x874 screen (rect 36,900 141x48) — scroll_until it first',
+    );
+    expect(fake.taps).toEqual(['login_title']);
+  });
+});
+
+describe('a selector that matched only 0×0 nodes: the never-found timeout says so (2026-10-08)', () => {
+  // idb reports a node scrolled ABOVE the top of a scroll view as 0×0; the
+  // zero-area rule skips it, and the wait read "to appear" for a node the
+  // snapshot showed.
+  const scrolledAbove = () => {
+    resetLayout();
+    return new FakeAdapter({ s: screen(node({ role: 'textfield', identifier: 'iban', rect: { x: 0, y: 0, width: 0, height: 0 } })) }, 's');
+  };
+  const HINT = '\n  (it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first)';
+
+  it('resolveSettled (tap, type_text, a flow tap:/fill:): still ElementNotFoundError, the hint beneath the headline', async () => {
+    const error = await resolveSettled(scrolledAbove(), 'id:iban', { ...REFUSE, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element id:iban to appear${HINT}`);
+  });
+
+  it('resolvePresent (the optional tap\'s presence check): the same', async () => {
+    const error = await resolvePresent(scrolledAbove(), { id: 'iban' }, { ...FIRST, timeoutMs: 0, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(`Timed out after 0ms waiting for element id:"iban" to appear${HINT}`);
+  });
+
+  it('only the LAST read counts: a 0×0 node that left before the deadline is plain absence, no hint', async () => {
+    const fake = scrolledAbove();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++ === 0 ? real() : screen());
+    const error = await resolveSettled(fake, 'id:iban', { ...REFUSE, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('Timed out after 20ms waiting for element id:iban to appear');
+  });
+
+  it('a last read that FAILED drops the hint: the read error is the story', async () => {
+    const fake = scrolledAbove();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (reads++ === 0) return real();
+      throw new Error('device offline');
+    };
+    const error = await resolveSettled(fake, 'id:iban', { ...REFUSE, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('Timed out after 20ms waiting for element id:iban to appear\n  (last UI tree read failed: device offline)');
+  });
+});
+
+/** Review of the off-screen refusal (2026-10-08): the probes it measured the first cut against. */
+describe('the off-screen rule — review round 1 (2026-10-08)', () => {
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  /** An iOS fake whose device reports `device` and whose tree is `tree` (idb: a rectless root unless the test gives it a rect). */
+  const ios = (tree: UiNode, device: { width: number; height: number }) => {
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = device;
+    return fake;
+  };
+  const idbRoot = (...children: UiNode[]) => node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children });
+  const PORTRAIT = { width: 402, height: 874 };
+
+  describe('B1 — an orientation no window witnessed refuses only a point outside the screen BOTH ways up', () => {
+    // Probe A: an idb landscape tree whose Application window a carousel card
+    // straddling the right edge makes unreliable — the box is not turned.
+    const landscapeWithCard = (...extra: UiNode[]) =>
+      idbRoot(
+        node({
+          role: 'other',
+          rect: { x: 0, y: 0, width: 874, height: 402 },
+          children: [
+            node({ role: 'button', identifier: 'right_btn', rect: { x: 700, y: 100, width: 100, height: 40 } }),
+            node({ role: 'other', identifier: 'card', rect: { x: 820, y: 50, width: 300, height: 200 } }),
+            ...extra,
+          ],
+        }),
+      );
+
+    it('probe A: idb landscape, a straddling card — right_btn at (750,120) is TAPPED', async () => {
+      const fake = ios(landscapeWithCard(), PORTRAIT);
+      await tapElement(fake, 'id:right_btn', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 750, y: 120 }]);
+    });
+
+    it('probe A2: iPad landscape (1180x820 window on an 820x1180 panel) with a 2400-wide strip — Save at (1100,50) is TAPPED', async () => {
+      const tree = idbRoot(
+        node({
+          role: 'other',
+          rect: { x: 0, y: 0, width: 1180, height: 820 },
+          children: [
+            node({ role: 'other', identifier: 'strip', rect: { x: 0, y: 600, width: 2400, height: 100 } }),
+            node({ role: 'button', identifier: 'save', rect: { x: 1060, y: 30, width: 80, height: 40 } }),
+          ],
+        }),
+      );
+      const fake = ios(tree, { width: 820, height: 1180 });
+      await tapElement(fake, 'id:save', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 1100, y: 50 }]);
+    });
+
+    it('probe E: a walked width turns the box (852x393 on a 393x852 panel), but witnesses nothing — (100,500) is TAPPED', async () => {
+      const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
+      // 200x40: not screen-shaped, so it does not discredit the walked width (geometry.ts#walkExtent).
+      const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 480, width: 200, height: 40 } })), { width: 393, height: 852 });
+      expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 852, height: 393 }); // the turn this probe is about
+      await tapElement(fake, 'id:go', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 150, y: 500 }]);
+    });
+
+    it('the measured case on an unwitnessed screen: below the fold either way up — still refused, and says it judged both ways', async () => {
+      const fake = ios(landscapeWithCard(node({ role: 'text', identifier: 'street', rect: { x: 42, y: 885, width: 103, height: 20 } })), PORTRAIT);
+      await expect(tapElement(fake, 'id:street', OPTS)).rejects.toThrow(
+        'id:street is off screen at (94,895) on a 402x874 screen either way up (rect 42,885 103x20) — scroll_until it first; nothing was tapped',
+      );
+      expect(fake.tapPoints).toEqual([]);
+    });
+
+    it('a WITNESSED portrait screen still refuses a carousel page off its right edge within its turned height', async () => {
+      const fake = ios(
+        node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'button', identifier: 'page2', rect: { x: 450, y: 280, width: 100, height: 40 } })] }),
+        PORTRAIT,
+      );
+      await expect(tapElement(fake, 'id:page2', OPTS)).rejects.toThrow('id:page2 is off screen at (500,300) on a 402x874 screen (rect');
+    });
+  });
+
+  it('m5 — the edge: the last column is on screen, the width is not (right and bottom exclusive)', async () => {
+    const fake = ios(node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'button', identifier: 'b', rect: { x: 400, y: 100, width: 2, height: 2 } })] }), PORTRAIT);
+    await tapElement(fake, 'id:b', OPTS); // (401,101)
+    expect(fake.tapPoints).toEqual([{ x: 401, y: 101 }]);
+    fake.live().children[0].rect = { x: 401, y: 100, width: 2, height: 2 }; // (402,101)
+    await expect(tapElement(fake, 'id:b', OPTS)).rejects.toThrow('is off screen at (402,101)');
+    fake.live().children[0].rect = { x: 100, y: 872, width: 2, height: 4 }; // (101,874)
+    await expect(tapElement(fake, 'id:b', OPTS)).rejects.toThrow('is off screen at (101,874)');
+  });
+
+  it('m5 — probe C: the device size unreadable, the tree\'s window stands in (not fail-open): y 885 on its 402x874 is refused', async () => {
+    const fake = ios(node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'text', identifier: 'street', rect: { x: 42, y: 885, width: 103, height: 20 } })] }), PORTRAIT);
+    fake.viewport = async () => {
+      throw new Error('idb describe: no screen_dimensions');
+    };
+    await expect(tapElement(fake, 'id:street', OPTS)).rejects.toThrow('id:street is off screen at (94,895) on a 402x874 screen');
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  describe('M3 — the memoized screen size is read again before a refusal', () => {
+    /** A device whose memo holds `stale` until a fresh read, which answers `now`. */
+    const folding = (tree: UiNode, stale: { width: number; height: number }, now: { width: number; height: number }) => {
+      const fake = new FakeAdapter({ s: tree }, 's');
+      let memo = stale;
+      const fresh: boolean[] = [];
+      fake.viewport = async (o?: { fresh?: boolean }) => {
+        fresh.push(o?.fresh === true);
+        if (o?.fresh === true) memo = now;
+        return memo;
+      };
+      return { fake, fresh };
+    };
+
+    it('probe B: an unfold the memo missed (1080x2400 kept, the tree 2208x1840) — re-read, then id:ok at (1600,1650) is TAPPED', async () => {
+      const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 2208, height: 1840 }, children: [node({ role: 'button', identifier: 'ok', rect: { x: 1550, y: 1630, width: 100, height: 40 } })] });
+      const { fake, fresh } = folding(tree, { width: 1080, height: 2400 }, { width: 2208, height: 1840 });
+      await tapElement(fake, 'id:ok', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 1600, y: 1650 }]);
+      expect(fresh.filter(Boolean)).toHaveLength(1); // once, on the refusal path
+    });
+
+    it('the clear path never re-reads', async () => {
+      const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2400 }, children: [node({ role: 'button', identifier: 'ok', rect: { x: 100, y: 100, width: 100, height: 40 } })] });
+      const { fake, fresh } = folding(tree, { width: 1080, height: 2400 }, { width: 1, height: 1 });
+      await tapElement(fake, 'id:ok', OPTS);
+      expect(fresh.some(Boolean)).toBe(false);
+    });
+
+    it('still off after the re-read: refused, naming the size read again and the one it replaced', async () => {
+      const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'button', identifier: 'ok', rect: { x: 100, y: 2500, width: 100, height: 40 } })] });
+      const { fake } = folding(tree, { width: 1080, height: 2200 }, { width: 1080, height: 2400 });
+      await expect(tapElement(fake, 'id:ok', OPTS)).rejects.toThrow(
+        'id:ok is off screen at (150,2520) on a 1080x2400 screen either way up (read again before refusing; it was 1080x2200) (rect 100,2500 100x40)',
+      );
+      expect(fake.tapPoints).toEqual([]);
+    });
+  });
+
+  it('m1 — the in-tree guard handed the node back clear (the keyboard gone on the second look), nothing sent: the plain refusal', async () => {
+    const fake = iosLoginFake();
+    fake.viewportSize = PORTRAIT;
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (++reads === 3) {
+        dropBand(fake.live());
+        fake.live().children[2].rect = { x: 36, y: 900, width: 141, height: 48 };
+      }
+      return real();
+    };
+    await expect(tapElement(fake, 'id:login_submit', { ...OPTS, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }] })).rejects.toThrow(
+      /^id:login_submit is off screen at \(107,924\) on a 402x874 screen \(rect 36,900 141x48\) — scroll_until it first; nothing was tapped$/,
+    );
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('review round 2 — probe J: on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {
+    const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
+    const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 580, width: 200, height: 40 } })), { width: 393, height: 852 });
+    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 852, height: 393 });
+    expect(await scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    await tapElement(fake, 'id:go', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 150, y: 600 }]);
+    // Outside both ways up: still never intersected, and said so.
+    fake.live().children[8].rect = { x: 50, y: 900, width: 200, height: 40 };
+    await expect(scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 852x393 viewport either way up');
+  });
+
+  it('M2 — probe I: scroll_until judges on the tap\'s screen, turned in landscape (WDA root 874x402 on a 402x874 panel): y 500 is NOT visible', async () => {
+    const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 874, height: 402 }, children: [node({ role: 'button', identifier: 'pay', rect: { x: 50, y: 500, width: 100, height: 40 } })] });
+    const fake = ios(tree, PORTRAIT);
+    await expect(scrollUntilVisible(fake, 'id:pay', { maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 874x402 viewport');
+    await expect(tapElement(fake, 'id:pay', OPTS)).rejects.toThrow('id:pay is off screen at (100,520) on a 874x402 screen');
   });
 });

@@ -393,7 +393,13 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * an oversized node crowned as the window, the sheet class geometry.ts
  * describes — turns the box. A gesture over a turned box on an unturned
  * screen lands off-centre, not off-screen in the short axis; the tree
- * offers nothing to tell the two apart.
+ * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
+ * refusal (interact/resolve.ts#onScreen) does not take this answer alone —
+ * swipe.ts#screenBox says whether a window matching the panel side for
+ * side witnessed it (`ScreenBox.witnessed`), and an unwitnessed box refuses
+ * only a point outside it both ways up (the off-screen review, 2026-10-08:
+ * a straddling card, an iPad strip, a walked width or a split pane would
+ * otherwise have refused ordinary taps).
  */
 export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {
   if (!usableScreen(screen)) return false;

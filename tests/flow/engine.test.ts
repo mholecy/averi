@@ -2019,6 +2019,15 @@ flows:
       expect(fake.swipes).toEqual([]);
     });
 
+    it('a tap on an element BELOW THE FOLD is not (not present): it was found — skipped with the off-screen refusal, nothing tapped (2026-10-08)', async () => {
+      const fake = formFake();
+      fake.live().children.push(node({ role: 'button', identifier: 'promo_close', rect: { x: 40, y: 2100, width: 100, height: 40 } })); // below the 1000x2000 screen
+      expect(await skipOf(fake, 'tap: { id: promo_close }')).toEqual([
+        'skipped id:"promo_close" (id:"promo_close" is off screen at (90,2120) on a 1000x2000 screen (rect 40,2100 100x40) — scroll_until it first; nothing was tapped)',
+      ]);
+      expect(fake.taps).toEqual([]);
+    });
+
     it('a tap on a DEAD device is not (not present): the skip carries the read error, so it never reads as a slow screen', async () => {
       const fake = formFake();
       fake.uiTree = async () => {
@@ -2736,6 +2745,40 @@ flows:
     const error = (await FlowEngine.run(flow('tap: { id: nope }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
     expect(error.trace.slice(1).map((t) => t.action)).toEqual(['✗ tap id:"nope"']);
     expect(fake.keys).toEqual([]);
+  });
+
+  it('a tap: on a node below the screen fails with the off-screen refusal BEFORE the keyboard is asked — no back, no ⚠ tap, nothing tapped (2026-10-08)', async () => {
+    const fake = loginFake();
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    fake.live().children[1].rect = { x: 99, y: 2300, width: 300, height: 132 }; // centre (249,2366), below the 2220-px screen
+    const error = (await FlowEngine.run(flow('tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1)).toEqual([
+      {
+        action: '✗ tap id:"login_submit"',
+        detail: 'failed — id:"login_submit" is off screen at (249,2366) on a 1080x2220 screen (rect 99,2300 300x132) — scroll_until it first; nothing was tapped',
+      },
+    ]);
+    expect(fake.keys).toEqual([]);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('an optional tap: whose target the keyboard\'s re-layout moved off screen AFTER back: the skip\'s one line says back was pressed (2026-10-08, review m2)', async () => {
+    const fake = loginFake();
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    const relayout = fake.onKey;
+    fake.onKey = (key, self) => {
+      relayout?.(key, self);
+      self.live().children[1].rect = { x: 99, y: 2300, width: 300, height: 132 };
+    };
+    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' });
+    expect(trace).toContainEqual({
+      action: 'optional',
+      detail:
+        'skipped id:"login_submit" (id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is off screen at ' +
+        '(249,2366) on a 1080x2220 screen (rect 99,2300 300x132) — scroll_until it first)',
+    });
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.taps).toEqual([]);
   });
 
   it('a fill: that fails after the dismissal traces ⚠ fill … back pressed before its ✗ line', async () => {

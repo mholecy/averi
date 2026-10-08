@@ -1,5 +1,5 @@
 import type { DeviceAdapter, Rect, SoftKeyboard, UiNode } from '../adapters/types.js';
-import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { cannotHide, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
@@ -176,6 +176,14 @@ function judge(found: readonly UiNode[], viewport: Box, cover?: { cover: Cover; 
   return scored.sort((a, b) => b.visible - a.visible)[0];
 }
 
+/** The whole-screen judgement on a box no window witnessed: the better of the box and the box turned (onScreen's "either way up"); the box alone otherwise. */
+function judgeEitherWay(found: readonly UiNode[], box: Box, turned: Box | undefined): Judged | undefined {
+  const asChosen = judge(found, box);
+  if (turned === undefined) return asChosen;
+  const other = judge(found, turned);
+  return other !== undefined && (asChosen === undefined || other.visible > asChosen.visible) ? other : asChosen;
+}
+
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
 const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== undefined && j.visible > 0 && (!fully || j.clipped.length === 0);
 
@@ -240,10 +248,14 @@ const frameWords = (viewport: Box, cover: Cover | undefined): string =>
  * reads them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
  * as before — the guard's fail-open rule; an unread tree strokes in the box
  * the last read round's band left (review 2026-10-08), the stop already
- * quoting the read error. Landscape is not handled: the band and the
- * judgement use `viewport()` as built while the stroke box is turned
- * (swipe.ts#screenBox) — the pre-existing gap ARCHITECTURE.md records for
- * the visibility judgements.
+ * quoting the read error. Landscape: since 2026-10-08 the judgement, the
+ * band's `above` box and the stroke all use the round's `screenBox` box —
+ * turned when the tree's window says so — the screen the tap's on-screen
+ * rule judges too (resolve.ts#tapScreen); the band's frame is the oracle's
+ * or the tree's, in the tree's coordinates already. A box no window
+ * witnessed is judged both ways up (the better of the two), as the tap
+ * accepts a point inside either; the band's `above` box stays the chosen
+ * one. Unmeasured on a device held sideways.
  *
  * The band is APPLIED only when it changes the round — the two judgements
  * differ, or the round ends in a stroke or a failure rather than a clean
@@ -303,9 +315,37 @@ export async function scrollUntilVisible(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS;
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
-  // The visibility reference frame: read before the loop, so a device whose
-  // screen cannot be read fails here rather than as "never intersected".
-  const viewport = await adapter.viewport();
+  // The device's screen, read before the loop, so a device whose screen
+  // cannot be read fails here rather than as "never intersected".
+  const asBuilt = await adapter.viewport();
+  // The visibility reference frame (2026-10-08, review of the off-screen tap
+  // refusal, M2): the box `screenBox` gives this round's tree — the tap's
+  // screen owner (resolve.ts#tapScreen), so a stop the scroll calls visible
+  // is judged on the screen the next tap is judged on, turned in landscape
+  // as the stroke already was. Until then it was `viewport()` as built: in
+  // landscape a button at y 500 of a 874x402 window was "fully visible" on
+  // a 402x874 panel and the tap after it refused. A round whose tree did
+  // not read keeps the last frame; a box screenBox cannot give (a 0×0
+  // device and no window) is the device as built, as before.
+  // A box no window WITNESSED (`ScreenBox.witnessed`: a walked width, an
+  // unreliable landscape window) is judged both ways up — the whole-screen
+  // judgement takes the better of the box and the box turned — as the tap's
+  // on-screen rule refuses only a point outside it both ways up
+  // (resolve.ts#onScreen; review round 2, 2026-10-08: a walked width turned a
+  // 393x852 portrait box to 852x393, and a plainly visible button at y 600
+  // "never intersected" while the tap after it went through). The keyboard
+  // cover is still cut from the box as chosen: a band is in the tree's
+  // coordinates, and above it is the box's width.
+  let viewport: Box = asBuilt;
+  let turned: Box | undefined;
+  const frameOf = async (read: TreeRead): Promise<{ box: Box; turned?: Box }> => {
+    try {
+      const { box, witnessed } = await screenBox(adapter, read);
+      return { box, ...(!witnessed && { turned: { width: box.height, height: box.width } }) };
+    } catch {
+      return { box: asBuilt };
+    }
+  };
 
   const deadline = Date.now() + timeoutMs;
   let lastFound: UiNode[] = [];
@@ -330,14 +370,17 @@ export async function scrollUntilVisible(
     const read = await readTreeOrError(adapter);
     const { tree, error } = read;
     lastReadError = error;
-    if (tree !== undefined) treesRead++;
+    if (tree !== undefined) {
+      treesRead++;
+      ({ box: viewport, turned } = await frameOf(read));
+    }
     lastFound = tree === undefined ? [] : findTarget(tree, target);
     if (lastFound.length > 0) everFound = true;
     // The keyboard this round, off this round's tree (no subject: every match
     // is judged against it, the keyboard's own exempted in `judge`).
     const reading = tree === undefined ? undefined : await readSoftKeyboard(adapter, tree);
     const offered = coverOf(reading, viewport);
-    const whole = judge(lastFound, viewport);
+    const whole = judgeEitherWay(lastFound, viewport, turned);
     let cover: Cover | undefined;
     let best = whole;
     if (offered !== undefined && tree !== undefined) {
@@ -429,7 +472,7 @@ export async function scrollUntilVisible(
             ? partial
             : lastFound.length === 0
               ? 'element never appeared in the tree'
-              : `element in tree but never intersected the ${frameWords(viewport, cover)} ` +
+              : `element in tree but never intersected the ${frameWords(viewport, cover)}${turned !== undefined && cover?.above === undefined ? ' either way up' : ''} ` +
                 `(last rect ${JSON.stringify(lastFound[0].rect)})`;
       const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
       // The keyboard, when any round applied one: the reader must not take a

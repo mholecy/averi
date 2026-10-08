@@ -1,6 +1,6 @@
-import type { DeviceAdapter } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
+import type { KeyboardAdapter } from './keyboard-model.js';
 import type { Target } from './resolve.js';
 
 /**
@@ -19,6 +19,12 @@ import type { Target } from './resolve.js';
  * happened the note says so, and `keyboardHidden` carries the sentence alone
  * for the one caller that prints no notes (the flow trace's `⚠ tap`).
  *
+ * Since 2026-10-08 the same call refuses a node whose centre lies off the
+ * screen — an OffScreenRefusal (resolve.ts#refuseOffScreen), nothing tapped —
+ * where it used to tap the point and report done: idb lists a scroll view's
+ * content below the fold with real rects
+ * (docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md).
+ *
  * Moved from ui-tree/tap-element.ts on 2026-10-03, where it read the tree
  * once with the adapter's `settle` retry and threw on ambiguity. The poll is
  * now the retry, so `settle` is not asked for (adapters/types.ts: pollers
@@ -28,7 +34,7 @@ import type { Target } from './resolve.js';
  * to import the selector layer above it (ARCHITECTURE.md §3).
  */
 export async function tapElement(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>,
+  adapter: KeyboardAdapter,
   target: Target,
   opts: GuardOptions,
 ): Promise<{ note?: string; keyboardHidden?: string }> {

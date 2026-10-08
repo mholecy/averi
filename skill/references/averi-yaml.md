@@ -83,6 +83,8 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
   - `skipped … (not present)`: the element was never found on a readable screen.
   - Any other text in the parentheses is the step's own failure. For example, `Timed out … to appear` after the presence check saw the element means it WAS there and the step failed on it. That is a descriptor or app bug, not a missing interstitial.
   - `(last UI tree read failed: …)`: the device could not be read, which is not the same as the element being missing.
+  - `(… is off screen at (x,y) …)`: the element is in the tree but its centre is outside the screen (iOS keeps content below the fold in the tree). Nothing was tapped. Put a `scroll_until` before the step if the element should be reached.
+- Since 2026-10-08 a `tap:` or `fill:` on an element whose centre is off screen FAILS the flow, outside `optional:` too. Before, the tap went to a point off the screen and the step passed; the failure surfaced steps later. Add a `scroll_until` before such a step (`fully: true` if the element sits at a screen edge).
 
 ## `dismissKeyboard` on `fill`
 
