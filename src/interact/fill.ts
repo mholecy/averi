@@ -153,9 +153,21 @@ export type ReadBack =
   | { kind: 'lost'; why: LostWhy }
   | { kind: 'nothing-typed' };
 
-/** `cleared N character(s) first`, only when a delete was actually sent. */
-export function fillClearedText(r: Pick<FillResult, 'cleared'>): string | undefined {
-  return typeof r.cleared !== 'number' || r.cleared === 0 ? undefined : `cleared ${charactersText(r.cleared)} first`;
+/**
+ * What the clear sent, only when a delete was actually sent — the one
+ * clause the MCP reply and the flow line both print:
+ * - `cleared N character(s) first`, normally;
+ * - `N delete(s) sent` for a clear ALONE (`typed` 0) that could not be
+ *   verified (code review of round 2, 2026-10-08): nothing typed after it
+ *   and nothing seen empty, so "cleared … first" claimed both a result and
+ *   a sequel that never came. Counted as deletes, not characters: what is
+ *   known is what went out.
+ * `typed` is the length of the text the fill typed (the result does not
+ * carry it).
+ */
+export function fillClearedText(r: Pick<FillResult, 'cleared' | 'readBack' | 'role'>, typed: number): string | undefined {
+  if (typeof r.cleared !== 'number' || r.cleared === 0) return undefined;
+  return typed === 0 && fillUnverifiedText(r) !== undefined ? `${countOf(r.cleared, 'delete')} sent` : `cleared ${charactersText(r.cleared)} first`;
 }
 
 /**

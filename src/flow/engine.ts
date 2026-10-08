@@ -1202,7 +1202,7 @@ export class FlowEngine {
     // nothing to compare makes the line itself `⚠ fill … — NOT verified: …`
     // (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
     // an idb label node printed `(cleared)` on a field nothing reached).
-    const cleared = fillClearedText(filled);
+    const cleared = fillClearedText(filled, value.length);
     const unverified = fillUnverifiedText(filled);
     this.log(
       unverified === undefined ? 'fill' : '⚠ fill',

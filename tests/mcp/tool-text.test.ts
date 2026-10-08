@@ -73,7 +73,7 @@ describe('tap and type_text response lines', () => {
     );
     // m-1 (review 2026-10-08, bundle C round 1): a clear alone whose read after the delete lost the field.
     expect(fillText('role:textfield value:"XX12345"', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 7 })).toBe(
-      'Cleared role:textfield value:"XX12345" (7 characters sent as deletes) — ' +
+      'Cleared role:textfield value:"XX12345" (7 deletes sent) — ' +
         'NOT verified: the field could not be found again (the selector no longer matches it)',
     );
   });
@@ -99,7 +99,7 @@ describe('tap and type_text response lines', () => {
     // A VERIFIED clear alone keeps its head: what was deleted, seen gone.
     expect(fillText('id:amount', { length: 0, ...landed, readBack: { kind: 'nothing-typed' }, cleared: 4 })).toBe('Filled id:amount (0 characters, cleared 4 characters first)');
     expect(fillText('role:textfield value:"X"', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 1 })).toBe(
-      'Cleared role:textfield value:"X" (1 character sent as deletes) — NOT verified: the field could not be found again (the selector no longer matches it)',
+      'Cleared role:textfield value:"X" (1 delete sent) — NOT verified: the field could not be found again (the selector no longer matches it)',
     );
     // No delete sent is never "Cleared", whatever else is unverified (not produced by fillField today: a lost clear has deleted).
     expect(fillText('id:x', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 0 })).toBe(

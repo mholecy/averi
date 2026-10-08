@@ -2250,6 +2250,21 @@ flows:
       expect(fake.deletes).toEqual([]);
     });
 
+    it('a clear alone whose read after the delete loses the field: "(7 deletes sent)", the MCP reply\'s clause — never "cleared … first" (code review of round 2)', async () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      fake.clearText = async (count: number) => {
+        fake.deletes.push(count);
+        const f = fake.live().children.find((n) => n.role === 'textfield')!;
+        f.value = (f.value ?? '').slice(0, -5) || null; // only 5 of the 7 went
+        f.rect = { ...f.rect, y: 200 }; // and the keyboard pushed the form up
+      };
+      const trace = await FlowEngine.run(iosCfg('{ role: textfield, text: "XX12345", value: "", clear: true }'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({
+        action: '⚠ fill',
+        detail: 'text:"XX12345" role:"textfield" =  (7 deletes sent) — NOT verified: the field could not be found again (the selector no longer matches it)',
+      });
+    });
+
     it('the input itself, by role and its old value: a plain fill line with the characters it cleared', async () => {
       const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
       const trace = await FlowEngine.run(iosCfg('{ role: textfield, text: "XX12345", value: "DE89", clear: true }'), fake, FAST, { flow: 'f' });
