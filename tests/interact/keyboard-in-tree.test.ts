@@ -6,7 +6,7 @@ import { KEYBOARD_HIDE_DELAY_MS } from '../../src/interact/keyboard-model.js';
 import { KEYBOARD_HIDE_CONFIRM_LOOKS } from '../../src/interact/keyboard-in-tree.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { AmbiguityRefusal } from '../../src/interact/resolve.js';
-import { dropBand, FAST, FakeAdapter, hidesKeyboardOn, IOS_LOGIN_BAND, iosLoginFake, node, recorded } from '../helpers/fake.js';
+import { bandNode, dropBand, FAST, FakeAdapter, hidesKeyboardOn, IOS_LOGIN_BAND, iosLoginFake, node, recorded } from '../helpers/fake.js';
 import { readFile } from 'node:fs/promises';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 
@@ -27,6 +27,51 @@ vi.mock('../../src/util/sleep.js', () => ({
 beforeEach(() => {
   sleeps.length = 0;
 });
+
+/**
+ * The measured SWIFT payment form under WDA (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md,
+ * "Device check", iPhone 17, 402×874 pt), in pre-order: the title in the top bar at {135,73,131,22}, then the screen's
+ * container holding the form's `scrollable 0 0 402 512` (its frame under the translucent bar, its first row at y 150,
+ * `priority_select` at y 681 — centre (201,707), under the pad), then — when `toolbar` — SwiftUI's screen-sized
+ * `toolbar 'Toolbar'` host, then the decimal pad's band {0,572,402,302}. A tap on the title hides the pad, as measured
+ * with idb on the same screen.
+ */
+const SWIFT_TITLE_TAP: KeyboardDismissal = { kind: 'tap', target: { id: 'swift_payment.form.title' } };
+function swiftFormFake(toolbar: boolean): FakeAdapter {
+  const full = { x: 0, y: 0, width: 402, height: 874 };
+  const row = (identifier: string, y: number) => node({ role: 'button', identifier, rect: { x: 16, y, width: 370, height: 52 } });
+  const form = node({
+    role: 'scrollable',
+    rect: { x: 0, y: 0, width: 402, height: 512 },
+    children: [row('swift_payment.form.debit_select', 150), node({ role: 'textfield', identifier: 'swift_payment.form.amount_input', rect: { x: 16, y: 300, width: 370, height: 44 } }), row('swift_payment.form.priority_select', 681)],
+  });
+  const fake = new FakeAdapter(
+    {
+      form: node({
+        role: 'application',
+        rect: full,
+        children: [
+          node({
+            role: 'other',
+            rect: full,
+            children: [
+              node({ role: 'text', label: 'SWIFT PAYMENT', identifier: 'swift_payment.form.title', rect: { x: 135, y: 73, width: 131, height: 22 } }),
+              node({ role: 'container', rect: full, children: [form] }),
+              ...(toolbar ? [node({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: full, children: [node({ role: 'container', rect: full })] })] : []),
+            ],
+          }),
+          bandNode({ x: 0, y: 572, width: 402, height: 302 }),
+        ],
+      }),
+    },
+    'form',
+    hidesKeyboardOn('swift_payment.form.title'),
+  );
+  fake.platform = 'ios';
+  fake.keyboard = undefined;
+  fake.keyboardAdvice = 'ADVICE';
+  return fake;
+}
 
 /**
  * The in-tree keyboard (2026-10-07, docs/bugs/2026-10-05-ios-tap-lands-on-
@@ -362,6 +407,16 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         const result = await tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] });
         expect(fake.taps).toEqual(['login_title', 'login_submit']);
         expect(result.keyboardHidden).toBe(HIDDEN);
+      });
+
+      it('the measured SWIFT form (device check at e9e6509): the form\'s scrollable after the title — its frame under the top bar, no content at the point — is not a cover, with or without the toolbar host; the title is tapped, then the select', async () => {
+        for (const withToolbar of [true, false]) {
+          const fake = swiftFormFake(withToolbar);
+          const result = await tapElement(fake, 'id:swift_payment.form.priority_select', { ...FAST, dismissals: [SWIFT_TITLE_TAP] });
+          expect(fake.taps).toEqual(['swift_payment.form.title', 'swift_payment.form.priority_select']);
+          expect(fake.tapPoints[1]).toEqual({ x: 201, y: 707 });
+          expect(result.keyboardHidden).toBe('the soft keyboard covered id:swift_payment.form.priority_select; hidden by tapping id:"swift_payment.form.title" before tapping');
+        }
       });
 
       it('a root without a rect: the DEVICE screen judges — the tap\'s own on-screen rule (resolve.ts#onScreen, one owner since 2026-10-08)', async () => {
@@ -741,6 +796,15 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS]);
     expect(fake.keys).toEqual([]);
     expect(result).toEqual({ hiddenBy: 'tapping id:"login_title"' });
+  });
+
+  it('the measured SWIFT form (device check at e9e6509), the pad left up by a fill: the form\'s scrollable over the title\'s point is not a cover — the title is tapped and the result says so', async () => {
+    for (const withToolbar of [true, false]) {
+      const fake = swiftFormFake(withToolbar);
+      const events = recorded(fake);
+      expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [SWIFT_TITLE_TAP] })).toEqual({ hiddenBy: 'tapping id:"swift_payment.form.title"' });
+      expect(events).toEqual(['read', 'tap:201,84', 'read']);
+    }
   });
 
   it('a tap strategy matching TWO neutral nodes: under `first` the first is tapped and the result says which; under `refuse` it is skipped with the count — a warning, no tap', async () => {
