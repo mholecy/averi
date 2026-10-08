@@ -262,7 +262,10 @@ const noticed = new Set<string>();
  * A region `panelsBeyond` refused is said ONCE per distinct case, as a
  * one-line `averi:` notice on stderr — the channel the adapters already use
  * for a non-fatal note (adapters/wda.ts, adapters/ios.ts); stdout is the MCP
- * protocol's. Nothing else changes: the band alone, as before 2026-10-08.
+ * protocol's. It reaches ONLY the server's stderr — not an MCP tool result,
+ * not a flow trace — so a device check that wants to know why a panel was
+ * not judged reads the server's log. Nothing else changes: the band alone,
+ * as before 2026-10-08.
  */
 export async function oracleKeyboard(oracle: KeyboardOracle): Promise<SoftKeyboard> {
   const keyboard = await oracle.state();
