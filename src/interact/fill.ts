@@ -82,12 +82,14 @@ export interface FillResult {
    * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
    * - `no-value`: the node exposed no value on two reads in a row — the
    *   text may or may not be there; nothing was compared.
-   * - `unchanged`: the node is not an input and its value never moved from
-   *   what it showed before the tap — a label echoing its own text (WDA
-   *   StaticText), not the field; nothing it shows proves anything.
+   * - `not-taken`: the node is not an input and its value does not show the
+   *   text — it never moved from what it showed before the tap (a WDA
+   *   StaticText echoing its label), or it moved without taking the typing
+   *   (a label `Name` turning `Name*` on focus). Not the field; nothing it
+   *   shows proves anything, and its length is never deleted.
    * - `nothing-typed`: the value was empty — a focus (and clear) alone.
    */
-  readBack: 'landed' | 'no-value' | 'unchanged' | 'nothing-typed';
+  readBack: 'landed' | 'no-value' | 'not-taken' | 'nothing-typed';
   /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
@@ -108,7 +110,7 @@ export function fillClearedText(r: Pick<FillResult, 'cleared'>): string | undefi
  * `NOT verified: …` with every reason the fill could not be checked, or
  * undefined when it was:
  * - the read-back had nothing to compare (`no-value`) or showed a node that
- *   never took the text (`unchanged`);
+ *   never took the text (`not-taken`);
  * - a clear sent no delete because the length it needed was not the
  *   field's (`cleared: 'unmeasured'`) or not there (0 on a node with no
  *   value). Said whatever else happened, EXCEPT when the read-back landed:
@@ -118,7 +120,7 @@ export function fillClearedText(r: Pick<FillResult, 'cleared'>): string | undefi
 export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cleared'>): string | undefined {
   const reasons: string[] = [];
   if (r.readBack === 'no-value') reasons.push(`the matched node exposes no value (role ${r.role})`);
-  if (r.readBack === 'unchanged') reasons.push(`the matched node's value never changed (role ${r.role}) — it is not the field`);
+  if (r.readBack === 'not-taken') reasons.push(`the matched node's value does not show the typed text (role ${r.role}) — it is not the field`);
   if (r.readBack !== 'landed') {
     if (r.cleared === 'unmeasured') reasons.push(`clear sent no delete — a role ${r.role} node's length is not the field's`);
     else if (r.cleared === 0 && r.readBack === 'no-value') reasons.push('clear sent no delete — the node gave no length to delete');
@@ -407,10 +409,16 @@ export async function fillField(
     // after focus plus what was typed. It cannot tell a correct append from
     // typing onto an autofilled password (both read `held + typed`); that
     // case is the `warning` above, not a failure.
-    // A non-input proves it took the text only by CHANGING: a WDA StaticText
-    // exposes its label as its value, and "Meno".includes("e") is no fill
-    // (review 2026-10-08).
-    const tookText = (observed: string) => isInput || observed !== node.value;
+    // A non-input proves it took the text only by CHANGING to show it: a WDA
+    // StaticText exposes its label as its value, and "Meno".includes("e") is
+    // no fill; a label that changes on focus (`Name` → `Name*`) is no fill
+    // either, and the mismatch retry below would delete ITS length into the
+    // focused field (review 2026-10-08, rounds 1 and 2). An input-like node
+    // of another role (an iOS search field reads `other`) shows the typed
+    // text, so it still gets the retry. Masked values cannot show it: for
+    // them the change alone is the proof, as their length is for inputs.
+    const tookText = (observed: string) =>
+      isInput || (observed !== node.value && (isMaskedValue(observed) || observed.includes(value)));
     const landed = (observed: string) =>
       tookText(observed) &&
       (isMaskedValue(observed)
@@ -427,7 +435,7 @@ export async function fillField(
     // wiped (its length is not the field's) and never a failure — the text
     // may well have reached the field the tap focused.
     if (observed !== undefined && !tookText(observed)) {
-      readBack = 'unchanged';
+      readBack = 'not-taken';
     } else if (observed !== undefined && !landed(observed)) {
       if (clear) {
         await adapter.clearText(observed.length);
@@ -445,7 +453,7 @@ export async function fillField(
         );
       }
     }
-    if (readBack !== 'unchanged') readBack = observed === undefined ? 'no-value' : 'landed';
+    if (readBack !== 'not-taken') readBack = observed === undefined ? 'no-value' : 'landed';
   }
   return { note, keyboardHidden, warning, role: node.role, cleared, readBack, notInput: readBack === 'landed' ? undefined : await notInput() };
 }

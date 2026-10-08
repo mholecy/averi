@@ -48,8 +48,8 @@ describe('tap and type_text response lines', () => {
     );
     // A clear whose read-back LANDED needs no caveat: the field shows exactly the value.
     expect(fillText('id:search', { length: 4, role: 'other', readBack: 'landed', cleared: 'unmeasured' })).toBe('Filled id:search (4 characters)');
-    expect(fillText('id:title', { length: 1, role: 'text', readBack: 'unchanged' })).toBe(
-      "Typed 1 characters into id:title — NOT verified: the matched node's value never changed (role text) — it is not the field",
+    expect(fillText('id:title', { length: 1, role: 'text', readBack: 'not-taken' })).toBe(
+      "Typed 1 characters into id:title — NOT verified: the matched node's value does not show the typed text (role text) — it is not the field",
     );
   });
 

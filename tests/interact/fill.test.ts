@@ -481,30 +481,53 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
   });
 
   // m-4 (review 2026-10-08): a WDA StaticText exposes its label as its value.
-  it('a non-input whose value never changes is NOT the field: no throw, no delete, readBack unchanged, the input named', async () => {
+  it('a non-input whose value never changes is NOT the field: no throw, no delete, readBack not-taken, the input named', async () => {
     resetLayout();
     const fake = new FakeAdapter(
       { s: screen(node({ role: 'text', identifier: 'title', value: 'Meno', rect: { x: 0, y: 0, width: 100, height: 10 } }), el({ role: 'textfield', identifier: 'name' })) },
       's',
     );
     const appended = await fillField(fake, 'id:title', 'e', FAST); // "Meno".includes("e") — no proof
-    expect(appended).toMatchObject({ role: 'text', readBack: 'unchanged', notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
+    expect(appended).toMatchObject({ role: 'text', readBack: 'not-taken', notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
     const cleared = await fillField(fake, 'id:title', 'abc', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]); // m-5: "Meno".length is not the field's
-    expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: 'unchanged' });
+    expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: 'not-taken' });
   });
 
-  it('a non-input whose value MOVES but not to the value still fails, and the error names the input it is not', async () => {
+  // m2-1 (review 2026-10-08, round 2): the retry deleted the label's length into the focused field.
+  it('a label whose value changes on focus (`Name` → `Name*`) is not the field: no delete into the focused one, not-taken', async () => {
     resetLayout();
-    const title = node({ role: 'text', identifier: 'title', value: 'Hello', rect: { x: 0, y: 0, width: 100, height: 10 } });
+    const label = node({ role: 'text', identifier: 'name_label', value: 'Name', rect: { x: 0, y: 0, width: 100, height: 10 } });
+    const field = node({ role: 'textfield', identifier: 'name', value: 'jan.novak', rect: { x: 0, y: 20, width: 100, height: 10 } });
+    const fake = new FakeAdapter({ s: screen(label, field) }, 's');
+    const liveField = () => fake.live().children[1];
+    fake.onTap = (_id, self) => {
+      self.live().children[0].value = 'Name*'; // the label marks focus
+      self.focused = liveField(); // and the tap focused the field under it
+    };
+    const result = await fillField(fake, 'id:name_label', 'abc', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([]); // not clearText(5) into "jan.novak"
+    expect(liveField().value).toBe('jan.novakabc'); // typed, unchecked — as the reply says
+    expect(result).toMatchObject({ cleared: 'unmeasured', readBack: 'not-taken', notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
+  });
+
+  it('a non-input that shows the typed text but never exactly the value fails after the retry, and the error names the input it is not', async () => {
+    resetLayout();
+    const title = node({ role: 'text', identifier: 'title', value: null, rect: { x: 0, y: 0, width: 100, height: 10 } });
     const fake = new FakeAdapter({ s: screen(title, el({ role: 'textfield', identifier: 'name' })) }, 's');
+    const live = () => fake.live().children[0];
     fake.typeText = async (text: string) => {
       fake.typed.push(text);
-      fake.live().children[0].value = 'Hellx'; // it changed — but not by what was typed
+      live().value = (live().value ?? '') + text + '!'; // it takes the text, and decorates it
     };
-    await expect(fillField(fake, 'id:title', 'abc', FAST)).rejects.toThrow(
-      /^fill: typed 3 characters but the field shows 5 \(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"name"/,
+    fake.clearText = async (count: number) => {
+      fake.deletes.push(count);
+      live().value = (live().value ?? '').slice(0, -count) || null;
+    };
+    await expect(fillField(fake, 'id:title', 'abc', { ...FAST, clear: true })).rejects.toThrow(
+      /^fill: typed 3 characters but the field shows 4 \(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"name"/,
     );
+    expect(fake.deletes).toEqual([4]); // the retry's wipe of what it showed: "abc!"
   });
 
   it('M-1: a clear ALONE on a label with no value sends no delete and says so — not an empty field', async () => {
