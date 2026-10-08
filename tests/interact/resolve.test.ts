@@ -676,6 +676,52 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
   });
 
   describe('code review round 2: only a WINDOW\'s own sides suggest a turn (2026-10-08)', () => {
+    it.each([
+      ['874x380, unreliable (a straddling card)', { width: 874, height: 380 }, true],
+      ['874x380, reliable', { width: 874, height: 380 }, false],
+      ['874x390, unreliable', { width: 874, height: 390 }, true],
+      ['852x402 (2.5 % short), unreliable', { width: 852, height: 402 }, true],
+    ])('review round 3: a landscape idb window a few percent short of the panel still says turned — %s: (750,120) tapped, and scroll_until sees it', async (_n, win, card) => {
+      const tree = idbRoot(
+        node({
+          role: 'other',
+          rect: { x: 0, y: 0, ...win },
+          children: [
+            node({ role: 'button', identifier: 'right_btn', rect: { x: 700, y: 100, width: 100, height: 40 } }),
+            ...(card ? [node({ role: 'other', rect: { x: 820, y: 50, width: 300, height: 200 } })] : []),
+          ],
+        }),
+      );
+      const fake = ios(tree, PORTRAIT);
+      expect(await scrollUntilVisible(fake, 'id:right_btn', { maxSwipes: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+      await tapElement(fake, 'id:right_btn', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 750, y: 120 }]);
+    });
+
+    it('review round 3: a window as wide as the panel turned but TALLER than its short side (an 874x874 node crowned on a portrait idb tree) says nothing — (450,100) refused', async () => {
+      const fake = ios(
+        idbRoot(node({ role: 'other', rect: { x: 0, y: 0, width: 874, height: 874 } }), node({ role: 'button', identifier: 'item', rect: { x: 425, y: 80, width: 50, height: 40 } })),
+        PORTRAIT,
+      );
+      await expect(tapElement(fake, 'id:item', OPTS)).rejects.toThrow('id:item is off screen at (450,100) on a 402x874 screen (rect');
+    });
+
+    it('review round 3: an iPad landscape window 20 pt short (1180x800 on 820x1180) with a 2400-wide strip — Save at (1100,50) tapped', async () => {
+      const tree = idbRoot(
+        node({
+          role: 'other',
+          rect: { x: 0, y: 0, width: 1180, height: 800 },
+          children: [
+            node({ role: 'other', rect: { x: 0, y: 600, width: 2400, height: 100 } }),
+            node({ role: 'button', identifier: 'save', rect: { x: 1060, y: 30, width: 80, height: 40 } }),
+          ],
+        }),
+      );
+      const fake = ios(tree, { width: 820, height: 1180 });
+      await tapElement(fake, 'id:save', OPTS);
+      expect(fake.tapPoints).toEqual([{ x: 1100, y: 50 }]);
+    });
+
     it('P1: a portrait idb tree with no window, a carousel walked to x 1500 — the walk suggests nothing: (450,100) refused, scroll_until swipes', async () => {
       const cells = [0, 300, 600, 900, 1200].map((x) => node({ role: 'cell', rect: { x, y: 80, width: 300, height: 40 } }));
       const rows = [200, 400, 600, 800].map((y) => node({ role: 'text', rect: { x: 0, y, width: 402, height: 40 } }));

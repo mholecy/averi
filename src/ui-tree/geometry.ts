@@ -409,7 +409,8 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * swipe.ts#screenBox says which boxes count (`ScreenBox.boxes`), and a
  * child window that matches the panel neither way — this crowned node —
  * is no evidence there: the judgement uses the panel as built. A window
- * whose own sides match the panel turned, or a turn on a walked width,
+ * whose own sides say the panel is turned (its width the long side within
+ * 5 %, its height within the short side), or a turn on a walked width,
  * counts the box either way up (the off-screen reviews, 2026-10-08).
  */
 export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {

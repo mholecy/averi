@@ -70,8 +70,9 @@ export interface ScreenBox {
    *   the box side for side, as built or turned, within
    *   SCREEN_AGREEMENT_PCT — or the box IS the tree's window (the fallback).
    * - `[box, box turned]` when a turn is SUGGESTED but not witnessed: a
-   *   window's own sides (`ScreenSize.windowLeg`, reliable or not) match the
-   *   panel turned — an idb landscape window a straddling card made
+   *   window's own sides (`ScreenSize.windowLeg`, reliable or not) say the
+   *   panel is turned (its width the long side within 5 %, its height
+   *   within the short side; `judgedBoxes`) — an idb landscape window a straddling card made
    *   unreliable (probe A), an iPad landscape window (A2) — or the box was
    *   turned on other evidence: a walked width (the 852-wide walk over a
    *   393x852 panel that is really portrait, probes E/J), an Android inset
@@ -216,15 +217,37 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
 }
 
 /**
+ * How far a window's width may fall short of (or pass) the panel's long
+ * side and still say the screen is turned (review 2026-10-08, round 3): a
+ * landscape Application window is often a few percent short of the panel —
+ * 852 of 874 is 2.5 % — and the 2 % side-for-side match judged it a
+ * crowned child, refusing the right-hand taps B1 had restored. 5 % admits
+ * those and none of the crowned shapes pinned (a 500-wide banner, a
+ * 1206-wide strip, a 1080x1000 split pane against a 2400-long panel). What
+ * it also admits: a node crowned as the window that happens to span the
+ * panel's long side within 5 % and no taller than its short side — its
+ * judgement counts both ways up (refusals relaxed, never added).
+ */
+const TURNED_WIDTH_SLACK_PCT = 5;
+
+/** A window's own sides say the panel is turned: width the turned panel's within TURNED_WIDTH_SLACK_PCT, height within its height (SCREEN_AGREEMENT_PCT of slack) — a window may be short, never taller. */
+const turnedWindow = (size: { width: number; height: number }, panelTurned: { width: number; height: number }): boolean =>
+  Math.abs(size.width - panelTurned.width) <= (panelTurned.width * TURNED_WIDTH_SLACK_PCT) / 100 &&
+  size.height <= panelTurned.height * (1 + SCREEN_AGREEMENT_PCT / 100);
+
+/**
  * The boxes a judgement counts (`ScreenBox.boxes`; the rule is there),
  * given the tree's size, the panel as built, the gesture's box and whether
  * that box was turned:
  * - witnessed — a window with its own height matching `box` side for side:
  *   `[box]`;
  * - a window's own sides (`windowLeg`, reliable or not — never a walked
- *   extent, whose height is a content maximum) matching the panel TURNED
- *   side for side: a turn suggested, `[box, box turned]` (an idb landscape
- *   window a straddling card made unreliable, an iPad landscape window);
+ *   extent, whose height is a content maximum) saying TURNED: its width
+ *   the panel's long side within TURNED_WIDTH_SLACK_PCT, its height within
+ *   the panel's short side (`turnedWindow`) — a turn suggested,
+ *   `[box, box turned]` (an idb landscape window a straddling card made
+ *   unreliable, an iPad landscape window, either a few percent short of
+ *   the panel: 874x380 and 852x402 on 402x874, 1180x800 on 820x1180);
  * - the box turned on other evidence (a walked width, an inset window) and
  *   NOT by a child window that matches neither way — an oversized node
  *   crowned as the window, a banner at the origin, whose turn is a swipe's
@@ -236,7 +259,7 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
 function judgedBoxes(size: ScreenSize | undefined, device: DeviceScreen, box: Rect, sideways: boolean): Rect[] {
   if (size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, box)) return [box];
   const panelTurned = { width: device.height, height: device.width };
-  const windowSaysTurned = size?.windowLeg !== undefined && sameSides(size, panelTurned);
+  const windowSaysTurned = size?.windowLeg !== undefined && turnedWindow(size, panelTurned);
   const crownedChild = size?.windowLeg === 'child' && !windowSaysTurned;
   if (windowSaysTurned || (sideways && !crownedChild)) return [box, turnedBox(box)];
   return [{ x: 0, y: 0, width: device.width, height: device.height }];
