@@ -1,4 +1,4 @@
-import { everyNode, KEYBOARD_ROLE, rectArea, type DeviceAdapter, type SoftKeyboard, type UiNode } from '../adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, sameRect, type DeviceAdapter, type KeyboardTouchable, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
 
 /**
  * What the TREE says about the soft keyboard (2026-10-07): the in-tree half
@@ -168,6 +168,66 @@ export function cannotHide(advice: string | undefined): string {
   return advice === undefined ? CANNOT_HIDE : `${CANNOT_HIDE} (${advice})`;
 }
 
+/**
+ * Which rects of the keyboard window's touchable region count as covered
+ * BESIDE the inset band (2026-10-08, the floating-Gboard device check:
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Measured on
+ * API 33 (emulator-5554, 1080x2220): a floating Gboard's band was its
+ * 132-px collapse strip `[0,2088][1080,2220]` and its region
+ * `SkRegion((359,1269,1040,1912)(0,2088,1080,2220))` — the panel is the
+ * second rect; a docked one's region was exactly its band; a HIDDEN one's
+ * region was not empty, and after a landscape keyboard it was stale, in
+ * landscape coordinates, in portrait. So the region is never evidence on
+ * its own, and the rules are:
+ * - only beside a `shown` band — the caller (`readSoftKeyboard`) asks the
+ *   region only then;
+ * - only when the input method, in the same call, says SHOWN — `hidden` and
+ *   `unknown` alike admit nothing: this is a precondition for new evidence,
+ *   not the veto over a band the window state already reported
+ *   (interact/keyboard-window.ts#witnessDenies), so a witness that cannot be
+ *   asked leaves the band alone, as before this date;
+ * - only a region that holds the band itself, exactly — every shown
+ *   region measured did; one that does not is not of this moment (the
+ *   stale-rotation case) or not of a shape that was measured, and is
+ *   ignored whole. A panel abutting the band in the same rows would merge
+ *   with it into other rects and fail this test: the band alone, as before
+ *   (a residual, unmeasured);
+ * - of the rest, every rect with positive area that lies inside the screen
+ *   the band spans — from 0,0 to the band's right and bottom edges, the
+ *   current orientation by construction (a docked or collapsed band runs
+ *   the screen's width to its bottom) — and is not the band.
+ * Fail open everywhere, as the rest of the reader: an unreadable region
+ * (`undefined`) is none. Docked: nothing beyond the band — behaviour
+ * unchanged.
+ */
+export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): readonly Rect[] {
+  const { witness, region } = touchable;
+  if (witness !== 'shown' || region === undefined || !region.some((r) => sameRect(r, band))) return [];
+  const right = band.x + band.width;
+  const bottom = band.y + band.height;
+  return region.filter(
+    (r) => !sameRect(r, band) && rectArea(r) > 0 && r.x >= 0 && r.y >= 0 && r.x + r.width <= right && r.y + r.height <= bottom,
+  );
+}
+
+/**
+ * Every rect a `shown` keyboard covers — the band, then its panels
+ * (`panelsBeyond`) — the one list the readers test a point or a rect
+ * against: the tap guard (interact/keyboard-model.ts#keyboardOver), the
+ * pixel poll (verify/pixel-poll.ts) and `scroll_until`'s cover
+ * (interact/scroll.ts#coverOf, through `highestCover`).
+ */
+export const keyboardRects = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): readonly Rect[] => [keyboard.frame, ...(keyboard.panels ?? [])];
+
+/**
+ * The covered rect whose TOP edge is highest — the band, or a floating
+ * panel above it — for a reader that keeps the screen above the keyboard
+ * (`scroll_until`): above that edge, nothing of the keyboard lies. Ties keep
+ * the band.
+ */
+export const highestCover = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): Rect =>
+  keyboardRects(keyboard).reduce((top, r) => (r.y < top.y ? r : top));
+
 /** One reading of the soft keyboard for one subject node, and what the adapter can do about a covering one. */
 export interface SoftKeyboardReading extends KeyboardRemedy {
   /** The keyboard's state and frame; `unknown` when the subject is part of the keyboard's own UI, whatever is on screen. */
@@ -201,6 +261,16 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  * `scroll_until` (interact/scroll.ts) judges every match against one
  * reading per round and exempts the keyboard's own nodes itself, with
  * `partOfKeyboard`, so one round still costs one oracle query.
+ *
+ * Since 2026-10-08 a `shown` oracle reading costs a SECOND query:
+ * `touchable()`, the keyboard window's region beside the input method's
+ * word, read into `panels` (`panelsBeyond` — a floating Gboard's panel,
+ * which the band does not cover). Only on `shown`: a hidden or unknown
+ * reading costs one query, as before. So a tap whose first look finds the
+ * keyboard up pays two adb calls (AndroidAdapter's keyboardState and
+ * keyboardTouchable have the figures), a pixel-poll or `scroll_until` round
+ * with the keyboard up two, and every reader tests the band and the panels
+ * alike (`keyboardRects`).
  */
 export async function readSoftKeyboard(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
@@ -210,6 +280,11 @@ export async function readSoftKeyboard(
   const dismissal = adapter.keyboard === undefined ? 'none' : 'back';
   const advice = dismissal === 'none' ? adapter.keyboardAdvice : undefined;
   if (subject !== undefined && partOfKeyboard(tree, subject)) return { keyboard: { state: 'unknown' }, dismissal, advice };
-  const keyboard = adapter.keyboard === undefined ? keyboardInTree(tree) : await adapter.keyboard.state();
-  return { keyboard, dismissal, advice };
+  if (adapter.keyboard === undefined) return { keyboard: keyboardInTree(tree), dismissal, advice };
+  const keyboard = await adapter.keyboard.state();
+  if (keyboard.state !== 'shown') return { keyboard, dismissal, advice };
+  // The band is up: its window may cover more than its inset (a floating
+  // panel, 2026-10-08 — `panelsBeyond` has the rules).
+  const panels = panelsBeyond(keyboard.frame, await adapter.keyboard.touchable());
+  return { keyboard: panels.length === 0 ? keyboard : { ...keyboard, panels }, dismissal, advice };
 }

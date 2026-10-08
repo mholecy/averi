@@ -397,7 +397,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
     expect(describeScrollResult(result)).toBe(
       'fully visible after 2 swipes; the input method reports a soft keyboard shown, but the window state gives it no area on ' +
-        'screen (a floating keyboard? inferred, not measured), so where it lies is unknown — it was not judged and may cover the element',
+        'screen (one still coming up? not measured), so where it lies is unknown — it was not judged and may cover the element',
     );
     expect(fake.keys).toEqual([]);
   });
@@ -413,7 +413,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     const error = await scrollUntilVisible(fake, 'id:nope', { ...FAST, maxSwipes: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toBe(
       'scroll_until id:nope failed after 1 swipes (maxSwipes) — element never appeared in the tree; the input method reports a ' +
-        'soft keyboard shown, but the window state gives it no area on screen (a floating keyboard? inferred, not measured), so ' +
+        'soft keyboard shown, but the window state gives it no area on screen (one still coming up? not measured), so ' +
         'where it lies is unknown — the swipes may have landed on it; hide or dock it and scroll again',
     );
   });

@@ -6,7 +6,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -158,10 +158,14 @@ export class AndroidAdapter implements DeviceAdapter {
    * adb call with its own budget: keyboardState (`dumpsys window displays`,
    * the frame) and keyboardWitness (`dumpsys input_method`, the input
    * method's own word). Their measured costs are on those two methods.
+   * Since 2026-10-08 a third, keyboardTouchable (the IME window's touchable
+   * region with `mInputShown`, one adb call), asked only once `state()` has
+   * read the band up — the floating-Gboard panel.
    */
   readonly keyboard: KeyboardOracle = {
     state: () => this.keyboardState(),
     witness: () => this.keyboardWitness(),
+    touchable: () => this.keyboardTouchable(),
   };
   private readonly exec: ExecFn;
   /**
@@ -529,7 +533,10 @@ export class AndroidAdapter implements DeviceAdapter {
    * Rejected: `dumpsys input_method | grep mInputShown` plus a second call
    * for the frame (two calls, the first alone ~300 ms); the IME window's
    * touchable region (an SkRegion string whose shape differs with a floating
-   * or split keyboard, and present while hidden too, as the nav-bar strip).
+   * or split keyboard, and present while hidden too, as the nav-bar strip)
+   * — rejected as THE frame, still; since 2026-10-08 it is read BESIDE this
+   * one, only once this has said shown, for a floating keyboard's panel
+   * (keyboardTouchable, below).
    *
    * FAILS OPEN: any failure of the call — adb exit, timeout, offline device —
    * is `unknown`, not a throw. This question exists to make a tap safer; it
@@ -607,6 +614,49 @@ export class AndroidAdapter implements DeviceAdapter {
     return parseInputShown(out);
   }
 
+  /**
+   * The IME window's touchable region, and `mInputShown` beside it, in ONE
+   * adb call (2026-10-08, the floating-Gboard device check —
+   * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md, the three
+   * "Device check" sections; emulator-5554, API 33, 1080x2220). Why: a
+   * floating Gboard keeps an IME inset of only its 132-px collapse strip
+   * (`ITYPE_IME frame=[0,2088][1080,2220] visible=true`), so keyboardState's
+   * band missed the panel drawn at x 359–1040, y 1269–1912 — a guarded tap on
+   * a field there pressed Gboard's `d` key, and `scroll_until … fully` called
+   * a row behind it "fully visible after 0 swipes". The panel is in
+   * `dumpsys window InputMethod` only, as a second rect of
+   *   touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))
+   * Docked, the region was one rect equal to the band (`SkRegion((0,1398,1080,2220))`).
+   * Hidden, it was NOT empty (`SkRegion((0,2088,1080,2220))`), and after a
+   * landscape keyboard it was stale, in landscape coordinates, back in
+   * portrait (`SkRegion((0,948,2220,1080))`) — which is why this is read only
+   * once `state()` said shown, why `mInputShown` comes from the same call
+   * (the two are of one moment), and why what counts is decided by
+   * ui-tree/soft-keyboard.ts#panelsBeyond, not here.
+   *
+   * Cost: one adb call running two filtered dumpsys commands on the device
+   * (TOUCHABLE_COMMAND) — UNMEASURED as one command (written in a round with
+   * no adb access); its parts were measured from a shell at 20–32 ms
+   * (`dumpsys input_method | grep -m1 mInputShown`, keyboardWitness) and
+   * 76–83 ms (`dumpsys window InputMethod`, the table on keyboardState). Asked
+   * per keyboard READ that finds the band up (the tap guard's looks, a pixel
+   * poll round, a scroll_until round), never while the keyboard reads hidden
+   * or unknown. `; true` ends the line so a grep that matched nothing does not
+   * fail the call: the other half is still read.
+   *
+   * Never throws: a failed or timed-out call is `{ witness: 'unknown',
+   * region: undefined }` — no panel, the band alone, as before this date.
+   */
+  private async keyboardTouchable(): Promise<KeyboardTouchable> {
+    let out: string;
+    try {
+      out = (await this.rawShell(TOUCHABLE_COMMAND, { timeoutMs: KEYBOARD_QUERY_TIMEOUT_MS })).stdout.toString('utf8');
+    } catch {
+      return { witness: 'unknown', region: undefined };
+    }
+    return { witness: parseInputShown(out), region: parseTouchableRegion(out) };
+  }
+
   async clearText(count: number): Promise<void> {
     if (count <= 0) return;
     // One keyevent per adb call: batched multi-keycode calls drop events in
@@ -668,6 +718,54 @@ export function parseInputShown(out: string): KeyboardWitness {
   const values = new Set([...out.matchAll(INPUT_SHOWN_RE)].map((m) => m[1]));
   if (values.size !== 1) return 'unknown';
   return values.has('true') ? 'shown' : 'hidden';
+}
+
+/**
+ * keyboardTouchable's one `rawShell` line: the witness's own filtered read,
+ * then every `touchable region=` line of the IME window's dump (no `-m1`:
+ * two that disagree must be seen, parseTouchableRegion reads them as none),
+ * then `true`, so a grep that matched nothing does not fail the call. Every
+ * word a constant.
+ */
+const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
+
+/** `touchable region=SkRegion(<rects>)` — the whole line's value, the rects read by TOUCHABLE_RECT_RE. */
+const TOUCHABLE_REGION_RE = /(?:^|\s)touchable region=SkRegion\(((?:\s*\(\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*\))*)\s*\)/;
+/** One `(l,t,r,b)` of an SkRegion. */
+const TOUCHABLE_RECT_RE = /\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/g;
+
+/**
+ * The IME window's touchable region out of (a grep of) `dumpsys window
+ * InputMethod` (2026-10-08). The shape, measured on API 33:
+ *   touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))   floating Gboard
+ *   touchable region=SkRegion((0,1398,1080,2220))                       docked
+ * — Skia's region as `(left,top,right,bottom)` per rect, any number of them,
+ * in screen pixels (uiautomator's units). Read as rects `{x, y, width,
+ * height}`; whitespace between the numbers and groups is tolerated. Never
+ * guessed: no such line, a line whose region is not wholly `(l,t,r,b)`
+ * groups (a different notation, a truncated dump), a rect with right < left
+ * or bottom < top, or several lines that do not all say the same thing →
+ * `undefined`, and the caller reads no panel (the band alone, as before the
+ * question existed). `SkRegion()` — an empty region — is `[]`.
+ */
+export function parseTouchableRegion(out: string): readonly Rect[] | undefined {
+  const lines = out.split('\n').filter((line) => line.includes('touchable region='));
+  if (lines.length === 0) return undefined;
+  const bodies = new Set<string>();
+  for (const line of lines) {
+    const body = line.match(TOUCHABLE_REGION_RE)?.[1];
+    if (body === undefined) return undefined;
+    bodies.add(body.replace(/\s+/g, ''));
+  }
+  if (bodies.size !== 1) return undefined;
+  const [body] = bodies;
+  const rects: Rect[] = [];
+  for (const [, l, t, r, b] of body.matchAll(TOUCHABLE_RECT_RE)) {
+    const [left, top, right, bottom] = [l, t, r, b].map(Number);
+    if (right < left || bottom < top) return undefined;
+    rects.push({ x: left, y: top, width: right - left, height: bottom - top });
+  }
+  return rects;
 }
 
 /** One `InsetsSource …` entry of a display's InsetsState, as `dumpsys window displays` lists it. */

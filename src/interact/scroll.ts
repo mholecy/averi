@@ -1,7 +1,7 @@
 import type { DeviceAdapter, DeviceScreen, Rect, SoftKeyboard, UiNode } from '../adapters/types.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { cannotHide, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, highestCover, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
@@ -145,7 +145,12 @@ interface Cover {
 /** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
 function coverOf(reading: SoftKeyboardReading | undefined, viewport: DeviceScreen): Cover | undefined {
   if (reading?.keyboard.state !== 'shown') return undefined;
-  const band = reading.keyboard.frame;
+  // The highest covered rect, not always the inset band (2026-10-08): a
+  // floating Gboard's panel mid-screen above its 132-px strip
+  // (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md) — so a target
+  // behind it is judged under the cover and the stroke starts above it. Full
+  // width above its top, as for any band that does not reach the sides.
+  const band = highestCover(reading.keyboard);
   if (band.y >= viewport.height) return undefined;
   return { band, above: band.y <= 0 ? undefined : { width: viewport.width, height: band.y }, remedy: reading };
 }
@@ -240,7 +245,8 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
  * nothing for 15 s; the same on iOS 27 with the pad up (y ≈ 699 of 874). So
  * every round reads the keyboard the way the tap guard and the pixel poll do
  * — `readSoftKeyboard` on the round's tree (the oracle's `state()` on
- * Android, one query a round; the WDA band on iOS, no device read) — and
+ * Android, one query a round, two with the keyboard up since 2026-10-08 —
+ * its window's region, for a floating panel; the WDA band on iOS, no device read) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
  * shown keyboard (`coverOf`): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke is the same `swipeVector` over that

@@ -1,7 +1,7 @@
 import type { DeviceAdapter, Point, Rect, SoftKeyboard } from '../adapters/types.js';
 import { containsPoint } from '../ui-tree/geometry.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
+import { keyboardRects, readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type TapScreen, type Target } from './resolve.js';
@@ -141,13 +141,26 @@ export type CoverReading = { over: 'covering'; frame: Rect } | ClearReading;
 /** A reading that lets the tap go ahead: nothing over the point, or a state that could not be read (fail open — the guard's one rule, stated in `keyboard.ts`). */
 export type ClearReading = { over: 'clear' } | { over: 'unknown' };
 
-/** Is the keyboard over the point about to be tapped? Geometry only (`containsPoint`, ui-tree/geometry.ts); the models judge. One reading for both models: the oracle's frame and the tree's band are both a `SoftKeyboard` (named `windowOver` until the review of the model split, which was the window model's word). */
-export const keyboardOver = (keyboard: SoftKeyboard, point: Point): CoverReading =>
-  keyboard.state === 'unknown'
-    ? { over: 'unknown' }
-    : keyboard.state === 'shown' && containsPoint(keyboard.frame, point)
-      ? { over: 'covering', frame: keyboard.frame }
-      : { over: 'clear' };
+/**
+ * Is the keyboard over the point about to be tapped? Geometry only
+ * (`containsPoint`, ui-tree/geometry.ts); the models judge. One reading for
+ * both models: the oracle's frame and the tree's band are both a
+ * `SoftKeyboard` (named `windowOver` until the review of the model split,
+ * which was the window model's word). Since 2026-10-08 the point is tested
+ * against every rect the keyboard covers (`keyboardRects`: the band, then a
+ * floating panel `readSoftKeyboard` found beside it —
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md, where a tap
+ * inside the panel pressed Gboard's `d` key), and `frame` is the rect that
+ * holds it, so a message quotes the panel, not the band, when the panel is
+ * what covered. A point under a panel takes the path a point under the band
+ * always took: the witness, one `back` (measured that day to hide the
+ * floating keyboard without popping the form), one look.
+ */
+export const keyboardOver = (keyboard: SoftKeyboard, point: Point): CoverReading => {
+  if (keyboard.state === 'unknown') return { over: 'unknown' };
+  const frame = keyboard.state === 'shown' ? keyboardRects(keyboard).find((r) => containsPoint(r, point)) : undefined;
+  return frame === undefined ? { over: 'clear' } : { over: 'covering', frame };
+};
 
 /**
  * `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling of the

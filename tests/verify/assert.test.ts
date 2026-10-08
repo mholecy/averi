@@ -1935,6 +1935,27 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     }
   });
 
+  it('a FLOATING keyboard (2026-10-08): its panel over the element is the same covered miss, quoting the panel — the band below it covers nothing here', async () => {
+    // The measured shape (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md): the band a strip at the
+    // bottom, the panel mid-screen — a second rect of the IME window's region, read once the band is up.
+    const PANEL = { x: 300, y: 150, width: 400, height: 300 };
+    const fake = cardFake();
+    fake.nextScreenshot = png(1000, 320, (p) => fill(p, '#FFFFFF'));
+    fake.attachKeyboard({ state: 'shown', frame: BELOW });
+    fake.attachedKeyboard.touchableAnswers.current = { witness: 'shown', region: [PANEL, BELOW] };
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('the soft keyboard covers the element (element 100,200 800x100, keyboard 300,150 400x300)');
+    expect(fake.screenshots).toHaveLength(0);
+    expect(fake.attachedKeyboard.touchableAnswers.queries).toBeGreaterThan(0);
+
+    // The input method not saying shown in the same call: no panel, the band alone — measured as before.
+    const unconfirmed = cardFake();
+    unconfirmed.attachKeyboard({ state: 'shown', frame: BELOW });
+    unconfirmed.attachedKeyboard.touchableAnswers.current = { witness: 'unknown', region: [PANEL, BELOW] };
+    expect((await new Verifier(unconfirmed, FAST).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } })).pass).toBe(true);
+  });
+
   it('a keyboard that goes away between rounds costs one round, not the verdict', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake();

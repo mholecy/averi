@@ -2734,7 +2734,7 @@ flows:
       action: '⚠ fill',
       detail:
         'id:"login_password": the input method reports a soft keyboard shown, but the window state gives it no area on screen ' +
-        '(a floating keyboard? inferred, not measured), so where it lies is unknown — nothing was pressed (back would pop the ' +
+        '(one still coming up? not measured), so where it lies is unknown — nothing was pressed (back would pop the ' +
         'screen if no keyboard is up); if one is, hide or dock it before the next step',
     });
   });

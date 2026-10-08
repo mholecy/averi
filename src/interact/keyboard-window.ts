@@ -207,19 +207,23 @@ export function recheck(witness: KeyboardWitness, waitedMs: number): 'back' | 'h
  *     The row that did not exist until 2026-10-08
  *     (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md): the input
  *     method says a keyboard is shown, the window manager gives it no area.
- *     The inferred cause — NOT measured on averi — is a floating Gboard,
- *     whose window contributes no IME insets; measured is only Maestro's
- *     `hideKeyboard` failing on one, and one `back` closing it. Not `back`:
+ *     It was written for a floating Gboard, inferred to contribute no IME
+ *     insets; the device check the same evening MEASURED otherwise on API 33:
+ *     a floating Gboard keeps a 132-px inset band (`covering` here, `back`
+ *     by the row below — which hid it and left the form, measured), its
+ *     panel being a second rect of the IME window's region that the tap
+ *     guard, the pixel poll and `scroll_until` now read beside the band
+ *     (`panels`, ui-tree/soft-keyboard.ts#panelsBeyond). The row stays, for
+ *     the disagreement it names — the one window-hidden read seen with an IME
+ *     on screen was the panel still coming up, right after the focus tap, and
+ *     another IME or Android version is unmeasured. Not `back`:
  *     the row is the 2026-10-04 disagreement turned over, and there the
  *     side that lagged was measured to be the window state, but `mInputShown`
  *     is not known NOT to lag a navigation — and a `back` on a screen with
  *     no keyboard pops it (the same note, step 2: the form was popped). So
  *     nothing is pressed and the caller is told (`UNLOCATED_KEYBOARD`), as
  *     the note's "at minimum, surface it" direction asks, instead of the
- *     silent success this row was before. If the floating window turns
- *     out to read `unknown` rather than `hidden` (`mIsImeShowing=true`
- *     beside an invisible IME entry — adapters/android.ts#parseImeInsets),
- *     the `unknown` row below presses `back` for it, as it always has.
+ *     silent success this row was before.
  *   window unknown                            → back
  *     The ONE place unknown means back, exactly as before 2026-10-03: the
  *     adapter could not tell (the command failed, or printed a format it does
@@ -249,11 +253,17 @@ export function dismissal(window: WindowReading, witness?: KeyboardWitness): Dis
  * The `unlocated` row's sentence — the one wording, for the post-fill
  * dismissal's warning and for `scroll_until`'s report (interact/scroll.ts),
  * which asks the same question at its stop (`keyboardUnlocated`, below).
- * "Floating" is the inferred cause and is said as a question.
+ * The cause is said as a question. Until the device check of 2026-10-08 it
+ * was "a floating keyboard?"; measured that day on API 33, a floating Gboard
+ * does NOT read this way (a 132-px band plus its panel, read as `panels` —
+ * ui-tree/soft-keyboard.ts#panelsBeyond), and the one window-hidden read
+ * seen beside an IME on screen was the panel still coming up, right after
+ * the focus tap (whether `mInputShown` was already true then was not
+ * captured).
  */
 export const UNLOCATED_KEYBOARD =
   'the input method reports a soft keyboard shown, but the window state gives it no area on screen ' +
-  '(a floating keyboard? inferred, not measured), so where it lies is unknown';
+  '(one still coming up? not measured), so where it lies is unknown';
 
 /**
  * The `unlocated` row asked outside the dismissal (2026-10-08): given a

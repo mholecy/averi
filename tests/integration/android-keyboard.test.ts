@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { tapElement } from '../../src/interact/tap.js';
-import { INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
+import { GBOARD, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
 
 /**
  * The soft-keyboard guard driven END TO END through the real AndroidAdapter
@@ -23,6 +23,8 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => {} }));
 const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
 const query = 'adb -s emulator-5554 shell dumpsys window displays';
 const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
+// The keyboard window's region beside the input method's word (2026-10-08): asked once state() read the band up.
+const touchable = "adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true";
 // The screen the tap point is judged against (2026-10-08, interact/resolve.ts#refuseOffScreen):
 // asked once per adapter, after the first settle, before the keyboard — the adapter memoizes it.
 const wmSize = 'adb -s emulator-5554 shell wm size';
@@ -59,7 +61,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
     // The witness is asked ONCE, right before the key, and not again for the check after it.
-    expect(calls).toEqual([dump, dump, wmSize, query, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
+    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
     expect(note).toBe('the soft keyboard covered id:login_submit; hidden before tapping');
   });
 
@@ -83,8 +85,42 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       return out('');
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
-    expect(calls).toEqual([dump, dump, wmSize, query, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
+    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
     expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
+  });
+
+  it('a FLOATING Gboard (device check 2026-10-08): a target inside the panel, above the 132-px band, is covered — back, then the tap; outside both, one region read and the tap', async () => {
+    // The measured SEPA form: message_for_payee_input at y 1515–1658 (1657 here, so the centre is the reported (540,1586)), inside the panel;
+    // the IBAN field above it, centre (540,1000), clear of both.
+    const tree = hierarchy(
+      '<node index="0" text="" resource-id="com.example.app:id/iban_input" class="android.widget.EditText" package="com.example.app" content-desc="" bounds="[0,930][1080,1070]"/>' +
+        '<node index="1" text="" resource-id="com.example.app:id/message_for_payee_input" class="android.widget.EditText" package="com.example.app" content-desc="" bounds="[0,1515][1080,1657]"/>',
+    );
+    let keyboardUp = true;
+    const calls: string[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
+      if (full.endsWith('input keyevent 4')) keyboardUp = false;
+      if (full.includes('uiautomator dump')) return out(tree);
+      if (full.includes('dumpsys window displays')) return out(keyboardUp ? GBOARD.floating.displays : GBOARD.hidden.displays);
+      if (full === touchable) return out(keyboardUp ? GBOARD.floating.touchable : GBOARD.hidden.touchable);
+      if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(keyboardUp));
+      if (full === wmSize) return out(PHYSICAL);
+      return out('');
+    };
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const { note } = await tapElement(adapter, 'id:message_for_payee_input', { ambiguous: 'refuse', pollMs: 1 });
+    // Until 2026-10-08: [dump, dump, wmSize, query, tap 540 1586] — Gboard's `d` key, typed into the IBAN field.
+    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 540 1586']);
+    expect(note).toBe('the soft keyboard covered id:message_for_payee_input; hidden before tapping');
+
+    keyboardUp = true;
+    calls.length = 0;
+    const clear = await tapElement(adapter, 'id:iban_input', { ambiguous: 'refuse', pollMs: 1 });
+    expect(calls).toEqual([dump, dump, query, touchable, 'adb -s emulator-5554 shell input tap 540 1000']);
+    expect(clear.note).toBeUndefined();
   });
 
   it('a target below the screen: refused BEFORE the keyboard is asked — the screen read, re-read once, no dumpsys, no key, no tap (2026-10-08)', async () => {
