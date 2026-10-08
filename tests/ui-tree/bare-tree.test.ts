@@ -289,10 +289,91 @@ describe('isBareTree: a status bar is not a reason to call a loaded screen bare'
     expect(isBareTree(parseUiautomatorXml(androidXml('')))).toBe(true);
   });
 
-  it('a status-bar clock in other locales (inferred): 6:29, Finnish 18.29, Arabic-Indic digits, an iPad\'s "6:29 PM"; not a number that is no time', () => {
+  it('a status-bar clock in other locales (inferred): the WHOLE label is a time — 6:29, Finnish 18.29, Arabic-Indic digits, "6:29 PM", "6:29 p.m.", 下午6:29; not a price, a date or a title', () => {
     const withClock = (clock: string) =>
-      parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), axv('StaticText', clock, { x: 50, y: 22, width: 48, height: 22 }, null, null)]));
-    for (const clock of ['6:29', '18.29', '٦:٢٩', '6:29 PM', '下午6:29']) expect(isBareTree(withClock(clock)), clock).toBe(true);
-    for (const text of ['Loading', '100 %', '1.200 EUR']) expect(isBareTree(withClock(text)), text).toBe(false);
+      parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), axv('StaticText', clock, { x: 50, y: 22, width: 48, height: 22 }, null, null), STATUS_BAR[3]]));
+    for (const clock of ['18:29', '6:29', '18.29', '٦:٢٩', '6:29 PM', '6:29 p.m.', '下午6:29']) expect(isBareTree(withClock(clock)), clock).toBe(true);
+    for (const text of ['Loading', '100 %', '1.200 EUR', 'Departs 10:30', 'Total €12.50', '$4.99', '08.10.2026', '18 h 29', '18:29x9', '18:290']) expect(isBareTree(withClock(text)), text).toBe(false);
+  });
+});
+
+/**
+ * Review of 2026-10-08 (M1): with a clock found anywhere in a label inside
+ * the top 8 %, these loaded screens — none with a status bar — read bare.
+ * Each must stay content.
+ */
+describe('isBareTree: app content shaped like a clock is not a status bar', () => {
+  const IPAD = { x: 0, y: 0, width: 1024, height: 1366 };
+  const wdaOn = (rect: typeof IPAD, ...children: Record<string, unknown>[]) =>
+    parseWdaSourceValue({ value: { type: 'Application', label: 'Trips', rect, children: [{ type: 'Window', rect, children }] } });
+  const LANDSCAPE = { x: 0, y: 0, width: 874, height: 402 };
+
+  it('iPad WDA navigation bar "Departs 10:30" + Back + Share, and one "Check in" button', () => {
+    expect(isBareTree(wdaOn(IPAD,
+      { type: 'StaticText', label: 'Departs 10:30', rect: { x: 440, y: 36, width: 144, height: 22 }, children: [] },
+      { type: 'Button', label: 'Back', rect: { x: 8, y: 30, width: 80, height: 40 }, children: [] },
+      { type: 'Button', label: 'Share', rect: { x: 960, y: 30, width: 50, height: 40 }, children: [] },
+      { type: 'Button', label: 'Check in', rect: { x: 20, y: 1200, width: 984, height: 56 }, children: [] },
+    ))).toBe(false);
+  });
+  it('iPad navigation bar "Total €12.50" + Back, and an unlabeled image', () => {
+    expect(isBareTree(wdaOn(IPAD,
+      { type: 'StaticText', label: 'Total €12.50', rect: { x: 440, y: 36, width: 144, height: 22 }, children: [] },
+      { type: 'Button', label: 'Back', rect: { x: 8, y: 30, width: 80, height: 40 }, children: [] },
+      { type: 'Image', label: null, rect: { x: 312, y: 400, width: 400, height: 400 }, children: [] },
+    ))).toBe(false);
+  });
+  it('iPhone landscape idb (no status bar): compact navigation bar "Meeting 10:30" + Back, and "Join"', () => {
+    expect(isBareTree(parseIdbDescribeAll(JSON.stringify([
+      axv('Application', 'Meet', LANDSCAPE, null, null),
+      axv('StaticText', 'Meeting 10:30', { x: 337, y: 4, width: 200, height: 24 }, null, null),
+      axv('Button', 'Back', { x: 8, y: 0, width: 60, height: 32 }, null, null),
+      axv('Button', 'Join', { x: 700, y: 340, width: 150, height: 44 }, null, null),
+    ])))).toBe(false);
+  });
+  it('an edge-to-edge camera: a recording timer "00:12" at y 54 and a "Stop recording" button — a clock with no status item beside it', () => {
+    expect(isBareTree(idb(
+      ax('StaticText', '00:12', { x: 170, y: 54, width: 62, height: 14 }),
+      ax('Button', 'Stop recording', { x: 161, y: 760, width: 80, height: 80 }),
+    ))).toBe(false);
+  });
+  it('a price "$4.99" at y 50 and a "Buy" button', () => {
+    expect(isBareTree(idb(ax('StaticText', '$4.99', { x: 20, y: 50, width: 60, height: 18 }), ax('Button', 'Buy', { x: 20, y: 760, width: 362, height: 48 })))).toBe(false);
+  });
+});
+
+/** The status bar's edges (review of 2026-10-08, m3): each pin fails if the band is widened or its gates are dropped. */
+describe('isBareTree: what the status bar takes, and no more', () => {
+  const onSpringBoard = (...els: Record<string, unknown>[]) => springBoard(...els);
+  const BUTTON = axv('Button', 'Start', { x: 20, y: 760, width: 362, height: 48 }, null, null);
+
+  it('a node straddling the status bar\'s line (top inside it, bottom below the clock + slack) counts', () => {
+    expect(isBareTree(onSpringBoard(axv('StaticText', 'Hello', { x: 120, y: 40, width: 100, height: 20 }, null, null), BUTTON))).toBe(false);
+  });
+  it('a clock-shaped text below the cap is no clock: the labelled items at the top count, beside a button', () => {
+    expect(isBareTree(parseIdbDescribeAll(JSON.stringify([
+      axv('Application', ' ', FULL, null, null),
+      ...STATUS_BAR.slice(1),
+      axv('StaticText', '18:29', { x: 40, y: 400, width: 100, height: 30 }, null, null),
+      BUTTON,
+    ])))).toBe(false);
+  });
+  it('a navigation title holding a time at 62…106 is past the 8 % cap (70), even beside a labelled item in its row', () => {
+    expect(isBareTree(idb(
+      ax('StaticText', '10:30', { x: 170, y: 62, width: 62, height: 44 }),
+      ax('Other', 'Timer header', { x: 0, y: 62, width: 402, height: 44 }),
+      ax('Button', 'Start', { x: 20, y: 760, width: 362, height: 48 }),
+    ))).toBe(false);
+  });
+  it('the clock is a `text`: an `other` reading 18:29 makes no status bar, and the items count', () => {
+    expect(isBareTree(parseIdbDescribeAll(JSON.stringify([
+      axv('Application', ' ', FULL, null, null),
+      axv('StatusItem', '18:29', { x: 50, y: 22, width: 48, height: 22 }, null, null),
+      ...STATUS_BAR.slice(1),
+      LAUNCH_ICON,
+    ])))).toBe(false);
+  });
+  it('a clock alone, with no status item beside it, is no status bar', () => {
+    expect(isBareTree(parseIdbDescribeAll(JSON.stringify([axv('Application', ' ', FULL, null, null), STATUS_BAR[0], LAUNCH_ICON])))).toBe(false);
   });
 });
