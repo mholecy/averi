@@ -88,7 +88,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
 
 ## `dismissKeyboard` on `fill`
 
-- **Android:** presses `back` unless averi can see the keyboard is already hidden. If the input method says a keyboard is up but the window gives it no area (a floating Gboard, probably), it presses nothing and the trace has a `⚠ fill` line saying so.
+- **Android:** presses `back` unless averi can see the keyboard is already hidden. If the input method says a keyboard is up but the window gives it no area (a keyboard still coming up, for example), it presses nothing and the trace has a `⚠ fill` line saying so. A floating Gboard is pressed `back` for like a docked one (measured on Android 13).
 - **iOS (`treeSource: wda`):** taps the first usable `keyboardDismiss` entry when the keyboard is up, and otherwise does nothing. The trace says when the keyboard was left up.
 - **iOS (`treeSource: idb`):** has no effect.
 
