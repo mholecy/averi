@@ -783,6 +783,30 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS, KEYBOARD_HIDE_DELAY_MS]); // two confirming reads, then the refusal
   });
 
+  it('a confirming read that THROWS after the strategy tap (WDA or idb gone): AfterDismissalTap — the guard\'s one wrap — saying what was tapped, the read\'s error as the cause, no second read or tap (review 2026-10-07 #1)', async () => {
+    const fake = withBand();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      reads++;
+      if (fake.taps.length > 0) throw new Error('WDA /source failed: connection refused\n(the session is gone)');
+      return real();
+    };
+    const error = (await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] }).catch((e: unknown) => e)) as AfterDismissalTap;
+    expect(error).toBeInstanceOf(AfterDismissalTap);
+    expect(error.message).toBe(
+      'After tapping id:"login_title" at (201,303) to hide the soft keyboard after the fill: WDA /source failed: connection refused. ' +
+        'That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot)\n' +
+        '(the session is gone)',
+    );
+    expect(error.traceLine).toBe('the soft keyboard was up after the fill; tapped id:"login_title" to hide it, and the read after it failed');
+    expect((error.cause as Error).message).toBe('WDA /source failed: connection refused\n(the session is gone)');
+    expect(fake.taps).toEqual(['login_title']);
+    expect(fake.keys).toEqual([]);
+    expect(reads).toBe(2); // the dismissal's read, then the first confirming read — which ends it: no second confirming read
+    expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS]);
+  });
+
   it('the band is gone only on the SECOND confirming read (a hide animation caught mid-way): hidden, not a refusal', async () => {
     const fake = withBand('nothing');
     let reads = 0;

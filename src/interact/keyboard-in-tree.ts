@@ -91,11 +91,12 @@ export class KeyboardWithoutDismissal extends KeyboardGuardError {
  * accessory toolbar's button). The tap cannot be taken back, and whether it
  * hid the keyboard, did something of its own, or both, is only known from
  * the look after it: still covered → this, with the band; the target not
- * coming back → this, wrapping the resolution's error as `cause`. Never a
- * second strategy after a tap: a tap that did not hide the keyboard has
- * changed the screen in a way this layer cannot judge, and a second one
- * would compound it. The message says the screen may have changed;
- * `traceLine` says which strategy was tapped.
+ * coming back → this, wrapping the resolution's error as `cause` (after
+ * the post-fill dismissal's tap, a confirming read that throws — the same
+ * wrap, `afterTapFailed`). Never a second strategy after a tap: a tap that
+ * did not hide the keyboard has changed the screen in a way this layer
+ * cannot judge, and a second one would compound it. The message says the
+ * screen may have changed; `traceLine` says which strategy was tapped.
  */
 export class AfterDismissalTap extends KeyboardGuardError {
   constructor(message: string, traceLine: string, options?: ErrorOptions) {
@@ -105,8 +106,9 @@ export class AfterDismissalTap extends KeyboardGuardError {
 }
 
 /**
- * What a dismissal tap's refusal says in all three places (the guard's
- * still-up look, its failed look, and `dismissKeyboard`'s still-up read):
+ * What a dismissal tap's refusal says in all four places (the guard's
+ * still-up look and its failed look, `dismissKeyboard`'s still-up read and
+ * its failed read):
  * the tap cannot be untapped, and the screen is the reader's to look at.
  * Not the window model's sentence after a failed look (keyboard-window.ts,
  * the `hint` its Hiding carries): that one says back may have NAVIGATED if
@@ -114,6 +116,34 @@ export class AfterDismissalTap extends KeyboardGuardError {
  * different fact about a different key, so it is written there.
  */
 const MAY_HAVE_CHANGED = 'That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot)';
+
+/**
+ * THE wrap for a look that failed after a dismissal tap — the one owner of
+ * "a read after the dismissal tap failed", for both protocols that tap: the
+ * guard's confirming looks (`Hiding.failed`, the target not coming back or
+ * coming back ambiguous) and the post-fill dismissal's confirming reads (a
+ * tree read that throws — WDA or idb gone between the tap and the read).
+ * Until 2026-10-08 the second had no wrap at all: the read's own error left
+ * `dismiss` raw, not a KeyboardGuardError, so the flow engine's
+ * `tracingGuardFailure` logged no `⚠ fill` line and the `✗` line never said
+ * a tap had been sent (architecture review 2026-10-07, #1 and small
+ * correction 12). `did` is the tap as both sentences name it (`tapping
+ * <strategy> at (x,y) to hide the soft keyboard …`); `traceLine` is the
+ * caller's, since each protocol's trace sentence starts from its own fact.
+ * The message is `failedLookMessage`'s shape with MAY_HAVE_CHANGED after
+ * it, as on the still-up refusals: the tap cannot be untapped. The refused
+ * sentence ("This was the look after …") is the guard's: a tree read cannot
+ * be refused for ambiguity, so the dismissal only ever gets the `failed`
+ * one.
+ */
+const afterTapFailed =
+  (did: string, traceLine: string) =>
+  (e: unknown): AfterDismissalTap =>
+    new AfterDismissalTap(
+      failedLookMessage(e, `This was the look after ${did}. ${MAY_HAVE_CHANGED}`, (headline) => `After ${did}: ${headline}. ${MAY_HAVE_CHANGED}`),
+      traceLine,
+      { cause: e },
+    );
 
 // ─── The dismissal picker ────────────────────────────────────────────────────
 
@@ -340,12 +370,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           // Something WAS tapped this time, so the wording is the dismissal
           // tap's (MAY_HAVE_CHANGED, as on its still-up look), not the second
           // look's: say what was tapped and that the screen may have changed.
-          failed: (e) =>
-            new AfterDismissalTap(
-              failedLookMessage(e, `This was the look after ${did}. ${MAY_HAVE_CHANGED}`, (headline) => `After ${did}: ${headline}. ${MAY_HAVE_CHANGED}`),
-              `${tapped}, and the look after it failed`,
-              { cause: e },
-            ),
+          failed: afterTapFailed(did, `${tapped}, and the look after it failed`),
           // As on the second look: a band still in the tree after the tap, with
           // the target now clear of it, is said as such — the tap moved the
           // layout, or something else did; it did not hide the keyboard.
@@ -399,6 +424,8 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * keyboard was left up, so that refusal is not a surprise. A dismissal
      * that WAS tapped and did not hide the keyboard throws
      * (AfterDismissalTap): that is not "nothing done", the screen was touched.
+     * So does a confirming read that throws (2026-10-08, `afterTapFailed`,
+     * the guard's wrap): the tap was sent whatever the read says next.
      */
     async dismiss({ dismissals = [], ambiguous }: DismissOptions): Promise<DismissResult> {
       const tree = await adapter.uiTree();
@@ -408,12 +435,27 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
         return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, skipped)} — the next tap under it will be refused` };
       }
       const at = tapPoint(picked.node);
+      // The one wrap the guard's looks use (`afterTapFailed`): a read that
+      // throws after the tap is AfterDismissalTap, so the trace gets its
+      // `⚠ fill` line and the message says what was tapped. Only the read is
+      // wrapped — the tap itself failing is the tap's own error, nothing
+      // having been sent that this layer knows of.
+      const failed = afterTapFailed(
+        `tapping ${picked.what} at (${at.x},${at.y}) to hide the soft keyboard after the fill`,
+        `the soft keyboard was up after the fill; tapped ${picked.what} to hide it, and the read after it failed`,
+      );
       await adapter.tap(at.x, at.y);
       // The same confirmation as the guard's, each look one tree read.
       return confirmHidden<DismissResult, Rect>(
         KEYBOARD_HIDE_CONFIRM_LOOKS,
         async () => {
-          const after = keyboardInTree(await adapter.uiTree());
+          let reread: UiNode;
+          try {
+            reread = await adapter.uiTree();
+          } catch (e) {
+            throw failed(e);
+          }
+          const after = keyboardInTree(reread);
           return after.state !== 'shown' ? { gone: { hiddenBy: `tapping ${picked.what}` } } : { stillUp: after.frame };
         },
         (frame, reads) =>

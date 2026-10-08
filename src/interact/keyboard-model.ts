@@ -230,7 +230,7 @@ export type ConfirmLook<T, S> = { gone: T } | { stillUp: S };
  * before each — the first that finds the keyboard gone answers, and only
  * the LAST still-up look refuses, with the caller's error over what that
  * look saw and how many looks there were. A look that throws (the target
- * not coming back) ends it there. Never a second side effect between the
+ * not coming back, or the tree not reading) ends it there. Never a second side effect between the
  * looks: that is the invariant both models' failure classes rest on —
  * "back was pressed", "that tap cannot be untapped" — and the loop has no
  * way to act.

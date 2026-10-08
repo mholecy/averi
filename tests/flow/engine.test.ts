@@ -2868,6 +2868,25 @@ ${steps}
       expect(fake.taps).toEqual(['login_password', 'login_title']);
     });
 
+    it('fill … dismissKeyboard: true whose confirming read THROWS after the dismissal tap: the ⚠ fill line naming the tap, then the ✗ saying it was sent (review 2026-10-07 #1: the raw read error had neither)', async () => {
+      const fake = hidingFake();
+      const real = fake.uiTree.bind(fake);
+      fake.uiTree = async () => {
+        if (fake.taps.includes('login_title')) throw new Error('WDA /source failed: connection refused');
+        return real();
+      };
+      const error = (await FlowEngine.run(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.trace.slice(1)).toEqual([
+        { action: '⚠ fill', detail: 'the soft keyboard was up after the fill; tapped id:"login_title" to hide it, and the read after it failed' },
+        {
+          action: '✗ fill id:"login_password"',
+          detail: expect.stringMatching(/^failed — After tapping id:"login_title" at \(201,303\) to hide the soft keyboard after the fill: WDA \/source failed: connection refused\. That tap may have changed the screen/),
+        },
+      ]);
+      expect(fake.taps).toEqual(['login_password', 'login_title']);
+    });
+
     it('…and inside optional: the skip quotes that headline, never "(not present)" — a tap was sent', async () => {
       const fake = iosFake();
       const trace = await FlowEngine.run(configured('      - optional:\n          - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
