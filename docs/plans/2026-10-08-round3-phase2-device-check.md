@@ -90,8 +90,16 @@ left (864,1110)→(216,1110). iOS 402x874 gives up (201,699)→(201,175) and lef
    (the wording comes from `ExecError` and ocr.ts's probe message). Not a phase-2 defect. Fixed after this check in `4de6a2a`: the probe folds the cause onto one line (`… swiftc --version — spawn swiftc ENOENT`), pinned by tests/verify/ocr.test.ts.
 4. **The iOS text table's tree fallback reads "Login Login" (pre-existing).** With OCR unavailable, the ios column of
    `## text parity` reads the WDA tree as `Login Login` and the maintenance text doubled. So the fallback reports 4 TEXT
-   FINDINGS that working OCR does not. This is the tree fallback's long-standing join over a labelled container and its
-   text child, not something phase 2 touched.
+   FINDINGS that working OCR does not. This predates phase 2. The cause, found in round 4 (2026-10-08), is not the
+   tree fallback's join over a labelled container (that case was already read once): WebDriverAgent reports every
+   React Native `<Text>` as a `StaticText` carrying the `testID` that holds exactly ONE unidentified `StaticText` with
+   the identical label, value and rect (`login_title` → child `Prihlásenie`, both 36,291 330x24, in
+   `tests/fixtures/wda-source-myport-login-no-keyboard.json`; every text in the MyPort fixtures, none in the SwiftUI
+   skeleton). `renderedTextFromTree` walked into the echo and joined both strings. The same echo made a
+   `text:"Prihlásenie"` selector match two nodes and `ui_snapshot` print each text twice. Android (one TextView) was
+   never affected. Fixed in the round-4 commit `fix(ios): a React Native <Text> read through WebDriverAgent is one
+   element, not two — …`: `wda-source.ts#isTextEcho` drops the echo when the WDA tree is parsed, and keeps the outer
+   element, the one that carries the `testID` when there is one.
 5. **`IdbEmptyTreeError` on a just-launched app.** The error was raised by a single `ui_snapshot` 0.4 s after
    `launch_app` returned. A read 0.3 s later was a bare 2-node tree, and the rendered tree came within about 4 s. So
    the error, with its reboot advice, also fires on a transient pre-render 0×0 Application, not only on the stuck tree

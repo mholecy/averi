@@ -210,8 +210,12 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
     for (const n of found) expect(partOfKeyboard(tree, n)).toBe(expected);
   });
 
-  it('keeps every node of the dumps (225 / 216 / 174 / 170 / 159 — the measured counts)', () => {
-    expect([LOGIN_BAR, LOGIN_NO_BAR, TWOFA_TOOLBAR, TWOFA_PARKED, LOGIN_NONE].map((t) => [...everyNode(t)].length)).toEqual([225, 216, 174, 170, 159]);
+  it('keeps every node of the dumps but the text echoes (218 / 208 / 167 / 163 / 152)', () => {
+    // The measured counts are 225 / 216 / 174 / 170 / 159; since 2026-10-08
+    // the parser drops the one unidentified StaticText child each React
+    // Native <Text> echoes (wda-source.ts#isTextEcho) — 7 / 8 / 7 / 7 / 7
+    // of them, one per text on screen — and nothing else.
+    expect([LOGIN_BAR, LOGIN_NO_BAR, TWOFA_TOOLBAR, TWOFA_PARKED, LOGIN_NONE].map((t) => [...everyNode(t)].length)).toEqual([218, 208, 167, 163, 152]);
   });
 
   it('the fixtures carry no real credential — the one filled username was replaced by a placeholder', () => {

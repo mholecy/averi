@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { measuredFrameFor, type MeasuredFrame, type TreeFrame, type Undecoded } from '../../src/verify/capture.js';
 import { sizeOnlyPng } from '../helpers/fake.js';
@@ -429,6 +431,22 @@ describe('compareTextParity — regressions found in review', () => {
       n({ role: 'container', identifier: 'amount', children: [text('amount', 'Enter amount')] }),
     ]);
     expect(renderedTextFromTree(nested, 'amount')).toEqual(['Enter amount']);
+  });
+
+  it('a React Native <Text> read through WDA is ONE string, not "Prihlásenie Prihlásenie" (2026-10-08)', async () => {
+    // The real capture (MyPort login, iPhone 17, WDA, 2026-10-07): WDA
+    // reports the <Text> as a StaticText `login_title` holding one
+    // unidentified StaticText with the identical label, value and rect. The
+    // walk above read both and joined them, so the tree fallback (no OCR)
+    // reported android-vs-ios and ios-vs-contract drift that was not on
+    // screen. The adapter now drops the echo (wda-source.ts#isTextEcho).
+    const ios = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-no-keyboard.json', import.meta.url), 'utf8'));
+    expect(renderedTextFromTree(ios, 'login_title')).toEqual(['Prihlásenie']);
+    // Android's uiautomator reports the same <Text> as one TextView.
+    const android = root(1080, [text('login_title', 'Prihlásenie', { x: 97, y: 782, width: 886, height: 64 })]);
+    const r = compareTextParity(contract([{ id: 'login_title', text: 'Prihlásenie' }]), { android: { tree: android }, ios: { tree: ios } });
+    expect(r.findings).toEqual([]);
+    expect(r.rows[0].verdict).toBe('OK');
   });
 
   it('a platform whose tree carries no rendered copy is UNREAD, never compared as ""', () => {

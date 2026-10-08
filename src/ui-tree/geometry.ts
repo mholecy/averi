@@ -1,4 +1,4 @@
-import { rectArea, rectsOverlap, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -480,8 +480,10 @@ export function visibleFractionInViewport(
  * re-exported here, where the rect arithmetic's callers look for it.
  * `rectsOverlap` joined it on 2026-10-07 for the same reason: the WDA
  * parser's keyboard band test (wda-source.ts) had a copy of its arithmetic.
+ * `sameRect` joined them on 2026-10-08 (round 4): the WDA parser's text-echo
+ * rule (wda-source.ts#isTextEcho) asks the same question.
  */
-export { rectArea, rectsOverlap };
+export { rectArea, rectsOverlap, sameRect };
 
 /**
  * Is the point inside the rect — left and top inclusive, right and bottom
@@ -515,16 +517,6 @@ export function clippedEdges(
 }
 
 // ─── Rect identity and wording ───────────────────────────────────────────────
-
-/**
- * Exactly the same rect — x, y, width AND height; a resize is a change.
- * Since 2026-10-06 the pixel poll's rect confirmation (verify/pixel-poll.ts)
- * asks it of two consecutive tree reads; exact, because tree rects are whole
- * points and "nearly the same place" is the stale-crop case it exists to catch.
- */
-export function sameRect(a: Rect, b: Rect): boolean {
-  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
-}
 
 /**
  * How a sentence quotes a NODE's rect: `x,y wxh`, in tree units. Owned here

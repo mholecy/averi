@@ -18,6 +18,9 @@ const fixture = (name: string) =>
 // Real /source dumps (iPhone 17 / iOS 26.5, WDA 16.1.7, captured 2026-08-12).
 const RN_MYPORT = await fixture('wda-source-rn-myport.json');
 const SKELETON_LOGIN = await fixture('wda-source-skeleton-login.json');
+// The same app's login screen, nothing focused (captured 2026-10-07; the
+// keyboard fixtures' K3 — see wda-source-keyboard.test.ts for the capture).
+const MYPORT_LOGIN = await fixture('wda-source-myport-login-no-keyboard.json');
 
 function flatten(root: UiNode): UiNode[] {
   const out: UiNode[] = [];
@@ -48,8 +51,11 @@ describe('parseWdaSource — RN fixture (the idb-invisible identifiers)', () => 
   const tree = parseWdaSource(RN_MYPORT);
   const nodes = flatten(tree);
 
-  it('keeps the whole nested tree, including invisible nodes (35 total)', () => {
-    expect(nodes).toHaveLength(35);
+  it('keeps the whole nested tree, including invisible nodes, but the text echoes (31 of 35)', () => {
+    // 35 elements in the dump; the 4 unidentified StaticText children that
+    // echo their <Text> parent (placeholder_title/status/gateway/scope) are
+    // dropped since 2026-10-08 (wda-source.ts#isTextEcho).
+    expect(nodes).toHaveLength(31);
   });
 
   it('root is the Application node normalized to container, not a synthetic wrapper', () => {
@@ -112,6 +118,80 @@ describe('parseWdaSource — native skeleton fixture', () => {
     const resolved = resolveNow(tree, 'text:"Password login"', { ambiguous: 'refuse' }); // the tools' mode — and it does not need to refuse
     expect(resolved?.node.role).toBe('button');
     expect(resolved?.note).toContain('picked the only interactive one');
+  });
+});
+
+describe('parseWdaSource — a React Native <Text> is one element, not its echo (2026-10-08)', () => {
+  // WDA reports every RN <Text> as a StaticText (the testID's) holding ONE
+  // unidentified StaticText with the identical label, value and rect. Kept,
+  // the copy read "Prihlásenie Prihlásenie" in the text table's tree
+  // fallback and a text: selector matched twice (wda-source.ts#isTextEcho).
+  const tree = parseWdaSource(MYPORT_LOGIN);
+
+  it('login_title on the real capture is a leaf text node carrying the id, label and value', () => {
+    const title = findOne(tree, 'id:login_title');
+    expect(title).toMatchObject({
+      role: 'text', label: 'Prihlásenie', value: 'Prihlásenie',
+      rect: { x: 36, y: 291, width: 330, height: 24 }, children: [],
+    });
+  });
+
+  it('no StaticText in any MyPort capture keeps an echo child', async () => {
+    const names = ['wda-source-rn-myport.json', 'wda-source-myport-login-no-keyboard.json', 'wda-source-myport-login-keyboard.json',
+      'wda-source-myport-login-keyboard-bar.json', 'wda-source-myport-2fa-keyboard-toolbar.json', 'wda-source-myport-2fa-keyboard-parked.json'];
+    for (const name of names) {
+      const texts = flatten(parseWdaSource(await fixture(name))).filter((n) => n.role === 'text');
+      expect(texts.length, name).toBeGreaterThan(0);
+      expect(texts.filter((n) => n.children.length > 0), name).toEqual([]);
+    }
+  });
+
+  it('text:"Prihlásenie" resolves to login_title alone — no ambiguity note, no refusal', () => {
+    expect(findAll(tree, 'text:"Prihlásenie"')).toHaveLength(1);
+    const resolved = resolveNow(tree, 'text:"Prihlásenie"', { ambiguous: 'refuse' });
+    expect(resolved?.node.identifier).toBe('login_title');
+    expect(resolved?.note).toBeUndefined();
+    expect(resolveNow(tree, 'text:"Prihlásenie"', { ambiguous: 'first' })?.note).toBeUndefined();
+  });
+
+  const rect = { x: 36, y: 291, width: 330, height: 24 };
+  const text = (over: Record<string, unknown> = {}) => el('StaticText', { label: 'Prihlásenie', value: 'Prihlásenie', rect, ...over });
+
+  it('the synthetic echo is dropped, empty and null strings alike', () => {
+    expect(parseWdaSourceValue(text({ rawIdentifier: 'login_title', children: [text()] })).children).toEqual([]);
+    expect(parseWdaSourceValue(text({ value: null, children: [text({ value: '', rawIdentifier: '' })] })).children).toEqual([]);
+  });
+
+  it.each([
+    ['a child with another label', text({ children: [text({ label: 'Prihlásiť sa' })] })],
+    ['a child with another value', text({ children: [text({ value: 'other' })] })],
+    ['an identified child', text({ children: [text({ rawIdentifier: 'login_title_inner' })] })],
+    ['two echo children', text({ children: [text(), text()] })],
+    ['a child of another type', text({ children: [el('Other', { label: 'Prihlásenie', value: 'Prihlásenie', rect })] })],
+    ['a non-StaticText parent', el('Other', { label: 'Prihlásenie', value: 'Prihlásenie', rect, children: [text()] })],
+    ['a Button parent', el('Button', { label: 'Prihlásenie', value: 'Prihlásenie', rect, children: [text()] })],
+  ])('keeps the child as WDA reported it: %s', (_name, raw) => {
+    const node = parseWdaSourceValue(raw);
+    const expected = (raw.children as unknown[]).length;
+    expect(node.children).toHaveLength(expected);
+  });
+
+  it.each(['x', 'y', 'width', 'height'] as const)('keeps a child whose rect differs in %s alone', (side) => {
+    const node = parseWdaSourceValue(text({ children: [text({ rect: { ...rect, [side]: rect[side] + 5 } })] }));
+    expect(node.children).toHaveLength(1);
+    expect(node.children[0].rect[side]).toBe(rect[side] + 5);
+  });
+
+  it('keeps the whole subtree of a child that has a child of its own (not its echo)', () => {
+    const node = parseWdaSourceValue(text({ children: [text({ children: [text({ label: 'Prihlásiť sa' })] })] }));
+    expect(node.children).toHaveLength(1);
+    expect(node.children[0]).toMatchObject({ label: 'Prihlásenie', children: [{ label: 'Prihlásiť sa', value: 'Prihlásenie', children: [] }] });
+    expect(node.children[0].children).toHaveLength(1);
+  });
+
+  it('collapses an (unmeasured) chain of three identical StaticTexts whole, never half-way', () => {
+    const node = parseWdaSourceValue(text({ rawIdentifier: 'login_title', children: [text({ children: [text()] })] }));
+    expect(node).toMatchObject({ identifier: 'login_title', label: 'Prihlásenie', children: [] });
   });
 });
 

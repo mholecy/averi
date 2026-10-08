@@ -98,6 +98,19 @@ export function rectArea(rect: Rect): number {
 }
 
 /**
+ * Exactly the same rect — x, y, width AND height; a resize is a change.
+ * Since 2026-10-06 the pixel poll's rect confirmation (verify/pixel-poll.ts)
+ * asks it of two consecutive tree reads; exact, because tree rects are whole
+ * points and "nearly the same place" is the stale-crop case it exists to catch.
+ * Since 2026-10-08 the WDA parser's text-echo rule (wda-source.ts#isTextEcho)
+ * asks it of a StaticText and its one child; moved here from ui-tree/
+ * geometry.ts (which re-exports it) so adapters/ need no second spelling.
+ */
+export function sameRect(a: Rect, b: Rect): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+/**
  * Do two rects share any area at all? Positive area only: rects that merely
  * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —
  * do not overlap, and neither does a zero-area rect with anything. Added

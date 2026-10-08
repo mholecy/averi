@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, type Rect, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -137,7 +137,68 @@ function toUiNode(el: WdaElement, marks: KeyboardMarks): UiNode {
   // label, identifier and children stay what WDA reported.
   if (marks.bands.has(el)) node.role = KEYBOARD_ROLE;
   if (marks.roots.has(el)) node.ofKeyboard = true;
+  if (isTextEcho(el, node)) node.children = [];
   return node;
+}
+
+/**
+ * Is this a `StaticText` whose one child is its own echo — one rendered
+ * string that WDA reports as two elements? Measured on every React Native
+ * `<Text>` in the MyPort fixtures (iPhone 17 / iOS 26.5, WDA 16.1.7:
+ * wda-source-rn-myport.json captured 2026-08-12, the five
+ * wda-source-myport-*.json captured 2026-10-07): the `StaticText` carrying
+ * the `testID` — `login_title`, label and value "Prihlásenie", 36,291
+ * 330x24 in …-login-no-keyboard.json — holds exactly ONE `StaticText` child
+ * whose `rawIdentifier` is null and whose label, value and rect are the
+ * parent's own. 4 of the scaffold fixture's 9 StaticTexts and 7 of 14 up to
+ * 8 of 17 in the login and 2FA ones are such echoes, and no `StaticText`
+ * holding a `StaticText` in any fixture is anything else; the native
+ * (SwiftUI) wda-source-skeleton-login.json has none. Kept, the echo is a
+ * second element for one piece of copy: verify/text-parity.ts
+ * #renderedTextFromTree joined both into "Prihlásenie Prihlásenie", so the
+ * text table's tree fallback (the source when OCR is unavailable) reported
+ * android-vs-ios and ios-vs-contract drift that is not on screen — Android's
+ * uiautomator reports the same `<Text>` as ONE TextView; a `text:` selector
+ * matched two nodes (interact/resolve.ts's "2 matches … picked the first",
+ * a refusal under `ambiguous: 'refuse'`); ui_snapshot printed the line twice
+ * (round 3 phase 2 device check, finding 4).
+ *
+ * The rule (2026-10-08): the outer element is the one element — the one
+ * that carries the `testID` when there is one (no id is required: the
+ * unidentified `podpora@finportal.sk` is echoed too, in …-login-keyboard.json
+ * and both 2FA fixtures, and loses its echo the same way) —
+ * and the echo is dropped, ONLY when the parent is a `StaticText` with
+ * exactly one child, and that child is a `StaticText` with no identifier, no
+ * children (once its own echo is gone), and a label, value and rect equal to
+ * the parent's AS NORMALIZED (empty and null strings alike, rects in rounded
+ * points — the values every reader above this file sees; the measured echoes
+ * are equal raw as well). The rule runs bottom-up, so an unmeasured chain of
+ * identical StaticTexts (A → B → C) collapses whole to A: C is B's echo,
+ * then B, a leaf, is A's — never left half-way with the string still
+ * doubled. Anything else stays as WDA reported it: a child with another
+ * label, value or rect, an identified child (an element the app named), two
+ * children, a child keeping a child of its own (one that is not its echo —
+ * the whole subtree is kept), a child or a parent of any other type (an
+ * `Other` host view or a Button whose label propagates to a descendant — the
+ * skeleton fixture's "Password login" — is a different element, and
+ * resolve.ts's to disambiguate). Here, beside the keyboard
+ * marks and the Toolbar role, because this is where WDA's reported shape
+ * becomes elements; idb's flat AX list (ios-tree-source.ts) has no nesting
+ * to echo and no idb payload in the tests shows a doubled text, so it is
+ * left alone.
+ */
+function isTextEcho(el: WdaElement, node: UiNode): boolean {
+  // node.children is el.children mapped one to one, so one count is both.
+  if (el.type !== 'StaticText' || node.children.length !== 1) return false;
+  const echo = node.children[0];
+  return (
+    el.children?.[0]?.type === 'StaticText' &&
+    echo.identifier === null &&
+    echo.children.length === 0 && // after the child's own echo, if any, was dropped: a chain collapses whole
+    echo.label === node.label &&
+    echo.value === node.value &&
+    sameRect(echo.rect, node.rect)
+  );
 }
 
 /**
