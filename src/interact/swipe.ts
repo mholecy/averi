@@ -44,6 +44,126 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
   return meaning === 'finger' ? finger[direction] : finger[awayFrom[direction]];
 }
 
+/**
+ * `swipeVector` over `box` with a soft keyboard whose top edge lies at
+ * `keyboardTop` — the stroke `scroll_until` draws while a keyboard covers
+ * the bottom of the screen (interact/scroll.ts). Two facts, one owner each:
+ *
+ * (a) THE TOUCH-DOWN — here. A gesture belongs to the view the finger
+ *     first touches; where it ends does not matter (the scroll view keeps a
+ *     drag that leaves it). So only the touch-down is placed, by two rules:
+ *     never inside the keyboard clearance (`keyboardClearance`: the lower
+ *     point of `swipeVector`'s vertical stroke over the box the keyboard
+ *     leaves — y 458 of the 572 above the WDA pad, 1118 of the 1398 above
+ *     the Android IME, the touch-downs both device checks measured landing
+ *     on the content), and never higher than the keyboard-less stroke's
+ *     touch-down. The second rule is the 2026-10-08 iOS device check
+ *     (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
+ *     the stroke over the box above the pad touched down for a content-UP
+ *     scroll at 0.2 of 572 — y 114, in the app's top bar (≈ y 0–116) — and
+ *     six swipes moved nothing; by hand `(201,114) → (201,458)` moved
+ *     nothing, `(201,160) → (201,458)` moved the row. Keyboard-less it
+ *     touches down at 0.2 of 874, y 175, below the bar. The clearance is
+ *     also why not "just above the keyboard's edge": the measured form pins
+ *     its CONTINUE bar at y 512–556 over the pad's 572, and a touch-down
+ *     there drags a button.
+ * (b) THE LENGTH — none of this function's business: the stroke is the one
+ *     over the uncovered box (`swipeVector`), its touch-down moved by (a).
+ *     The first fix's content-down stroke over that box (458 → 114 under
+ *     WDA, 344 pt) flung the SwiftUI form ~730–800 pt, past its target; that
+ *     is answered where it is seen — scroll.ts confirms a stop on a settled
+ *     read, turns the stroke round after a fling past the target and halves
+ *     its reach on every turn (`shortenStroke`) — not by a shorter first
+ *     stroke here, which would be one app's fling tuned into every app's
+ *     gesture (Android's 838-px stroke moved the Compose form 637 px a
+ *     swipe and needed no cut).
+ *
+ * The strokes this gives (re-measured 2026-10-08 against the tests):
+ * content down (finger up) is the uncovered box's own — iOS 458 → 114,
+ * Android 1118 → 280, both as the device checks ran them; content up
+ * (finger down) touches down where it would without a keyboard — iOS
+ * 175 → 458, Android 444 → 1118; left/right run along the keyboard-less
+ * centre line (y 437 / 1110) unless that lies inside the clearance (a
+ * keyboard over more than ~37 % of the screen, unmeasured), then along the
+ * clearance line.
+ *
+ * Fallback: when (a) leaves a vertical stroke shorter than half the
+ * uncovered box's own — a content-up stroke under a keyboard over 60 % of
+ * the screen or more (landscape, unmeasured), where the keyboard-less
+ * touch-down comes near the clearance — the uncovered box's stroke as it
+ * is: a near-zero drag is a tap, and a tap is never what a scroll should
+ * send. Only `keyboardTop` — the covered area's top edge — is read, never
+ * the covered rect's width or height: a floating panel need not span the
+ * screen nor reach its bottom, and everything below its top is treated as
+ * covered. A top near the screen's top (a floating panel dragged up,
+ * unmeasured) leaves a short uncovered box, and the stroke is then that
+ * box's own, as short as the box: a short drag on the content rather than
+ * a stroke on the panel. `keyboardTop` must lie inside the box (the caller
+ * fails before stroking when a keyboard leaves nothing above it;
+ * scroll.ts#coverOf). Pure.
+ */
+export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Direction, meaning: SwipeMeaning): Stroke {
+  const uncovered = { ...box, height: Math.min(box.height, keyboardTop - box.y) };
+  const inUncovered = swipeVector(uncovered, direction, meaning);
+  const keyboardLess = swipeVector(box, direction, meaning);
+  const downY = Math.min(Math.max(inUncovered.from.y, keyboardLess.from.y), keyboardClearance(uncovered));
+  if (direction === 'left' || direction === 'right') {
+    return { from: { x: keyboardLess.from.x, y: downY }, to: { x: keyboardLess.to.x, y: downY } };
+  }
+  const placed = { from: { x: inUncovered.from.x, y: downY }, to: inUncovered.to };
+  const reach = (s: Stroke): number => Math.abs(s.to.y - s.from.y);
+  return reach(placed) < reach(inUncovered) / 2 ? inUncovered : placed;
+}
+
+/**
+ * The distance a finger must travel before a scroll view takes the touch as
+ * a drag rather than a tap, in tree units — ASSUMED, not measured on either
+ * platform: Android's ViewConfiguration touch slop is 8 dp (22 px at the
+ * Pixel_3a's 2.75 density), a UIScrollView's pan starts after ~10 pt. 24
+ * covers both units with room. `shortenStroke` never draws a stroke shorter
+ * than twice this, so a shortened stroke is still a drag, never a tap.
+ */
+export const TOUCH_SLOP = 24;
+
+/**
+ * The other floor on a shortened stroke, as a fraction of the box's side
+ * along it (review round 3): TOUCH_SLOP is a fixed number in tree units,
+ * points on iOS and pixels on Android, so on a dense Android panel twice it
+ * is a smaller finger travel than on iOS. 3 % of the side scales with the
+ * screen whatever its units: 26 pt of an 874-pt iPhone height (below the
+ * 48 of the slop floor, which stands), 67 px of a 2220-px Pixel_3a height.
+ */
+export const MIN_STROKE_FRACTION = 0.03;
+
+/**
+ * `stroke` with its reach scaled by `factor` (0 < factor ≤ 1), its
+ * touch-down kept: the end moves along the stroke toward the touch-down,
+ * so whatever placed the touch-down (`swipeVectorAbove`'s rules: never in
+ * the keyboard clearance, never higher than without a keyboard) still
+ * holds, and the stroke still runs the same way. Never shorter than twice
+ * TOUCH_SLOP nor than MIN_STROKE_FRACTION of `side` — the gesture box's
+ * side along the stroke (its height for up/down, its width for
+ * left/right) — and never longer than the stroke given. Used by `scroll_until`
+ * to shorten the stroke after each turn round a target a fling carried past
+ * (interact/scroll.ts, Motion.nextStroke), so the distance left shrinks
+ * however far the app flings. Pure.
+ */
+export function shortenStroke(stroke: Stroke, factor: number, side: number): Stroke {
+  const dx = stroke.to.x - stroke.from.x;
+  const dy = stroke.to.y - stroke.from.y;
+  const reach = Math.hypot(dx, dy);
+  if (factor >= 1 || reach === 0) return stroke;
+  const floor = Math.max(2 * TOUCH_SLOP, side * MIN_STROKE_FRACTION);
+  const k = Math.min(reach, Math.max(reach * factor, floor)) / reach;
+  return { from: stroke.from, to: { x: Math.round(stroke.from.x + dx * k), y: Math.round(stroke.from.y + dy * k) } };
+}
+
+/** The lowest y a touch-down over a keyboard may take (`swipeVectorAbove` (a)): the lower point of `swipeVector`'s vertical stroke over the box the keyboard leaves — read off it, so a change to SWIPE_REACH_FRACTION moves both together. */
+function keyboardClearance(uncovered: Rect): number {
+  const { from, to } = swipeVector(uncovered, 'up', 'finger');
+  return Math.max(from.y, to.y);
+}
+
 /** The box a screen gesture swipes in, and what the caller should say about where it came from. */
 export interface ScreenBox {
   box: Rect;

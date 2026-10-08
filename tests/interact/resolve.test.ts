@@ -818,4 +818,18 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     await expect(scrollUntilVisible(fake, 'id:pay', { maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 874x402 viewport');
     await expect(tapElement(fake, 'id:pay', OPTS)).rejects.toThrow('id:pay is off screen at (100,520) on a 874x402 screen');
   });
+
+  it('review round 1 (2026-10-08): the turn after a fling is judged in EVERY box that counts — a target beyond the far edge one way up but clipped at both edges the other is not turned for', async () => {
+    const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
+    const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 300, y: 900, width: 450, height: 40 } })), { width: 393, height: 852 });
+    expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toHaveLength(2);
+    const swipe = fake.swipe.bind(fake);
+    fake.swipe = async (from, to) => {
+      await swipe(from, to);
+      fake.live().children[8].rect = { x: -30, y: 100, width: 450, height: 40 }; // left edge cut: beyond it on 852x393, across both edges on 393x852
+    };
+    await scrollUntilVisible(fake, 'id:go', { direction: 'right', fully: true, maxSwipes: 2, settleMs: 0 }).catch(() => undefined);
+    expect(fake.swipes).toHaveLength(2);
+    for (const s of fake.swipes) expect(s.to.x).toBeLessThan(s.from.x); // content to the right both times: finger left, never turned
+  });
 });

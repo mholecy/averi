@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { screenBox, swipeScreen } from '../../src/interact/swipe.js';
+import { MIN_STROKE_FRACTION, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -228,5 +228,89 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     await swipeScreen(swiped, { direction: 'up', meaning: 'finger' });
     expect(scrolled.swipes).toEqual([{ from: { x: 1200, y: 864 }, to: { x: 1200, y: 216 } }]);
     expect(swiped.swipes).toEqual([{ from: { x: 1200, y: 864 }, to: { x: 1200, y: 216 } }]);
+  });
+});
+
+/**
+ * 2026-10-08, the iOS device check of
+ * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
+ * review round 1: the stroke drawn over a keyboard is the uncovered box's,
+ * its TOUCH-DOWN never inside the keyboard clearance (0.8 of the uncovered
+ * height) nor higher than the keyboard-less stroke's touch-down.
+ */
+describe('swipeVectorAbove — the touch-down placed clear of a keyboard, never higher than without one', () => {
+  /** The measured iPhone 17 (402x874 pt) and the WDA pad's band top (0 572 402 302). */
+  const IOS = { x: 0, y: 0, width: 402, height: 874 };
+  /** The measured Pixel_3a (1080x2220) and its IME's top edge ([0,1398][1080,2220]). */
+  const ANDROID = { x: 0, y: 0, width: 1080, height: 2220 };
+
+  it('iOS, content UP (finger down): touches down at y 175, as without a keyboard — not at 114 in the top bar, where the stroke over the box above the pad touched down and moved nothing', () => {
+    expect(swipeVectorAbove(IOS, 572, 'up', 'content')).toEqual({ from: { x: 201, y: 175 }, to: { x: 201, y: 458 } });
+    expect(swipeVector({ ...IOS, height: 572 }, 'up', 'content').from.y).toBe(114); // the first fix's touch-down, measured dead
+  });
+
+  it('content DOWN (finger up) is the uncovered box\'s own stroke, as both device checks ran it: iOS 458 → 114, Android 1118 → 280 — no length cut', () => {
+    expect(swipeVectorAbove(IOS, 572, 'down', 'content')).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 114 } });
+    expect(swipeVectorAbove(ANDROID, 1398, 'down', 'content')).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } });
+  });
+
+  it('Android, content UP: touches down at the keyboard-less 444, not 280', () => {
+    expect(swipeVectorAbove(ANDROID, 1398, 'up', 'content')).toEqual({ from: { x: 540, y: 444 }, to: { x: 540, y: 1118 } });
+  });
+
+  it('the touch-down is never inside the clearance: a band low on the screen pulls the keyboard-less 1776 up to 0.8 of the 2100 above it', () => {
+    expect(swipeVectorAbove(ANDROID, 2100, 'down', 'content').from).toEqual({ x: 540, y: 1680 });
+  });
+
+  it('left/right: along the keyboard-less centre line (y 437 on iOS, not the 286 centre of the box above the pad), pulled up to the clearance only when that line lies inside it', () => {
+    expect(swipeVectorAbove(IOS, 572, 'right', 'content')).toEqual(swipeVector(IOS, 'right', 'content'));
+    expect(swipeVectorAbove(IOS, 572, 'left', 'content').from.y).toBe(437);
+    // A keyboard from y 400: the centre line 437 lies inside the clearance (0.8 × 400 = 320).
+    expect(swipeVectorAbove(IOS, 400, 'left', 'content')).toEqual({ from: { x: 80, y: 320 }, to: { x: 322, y: 320 } });
+  });
+
+  it('a keyboard over most of the screen (unmeasured): a content-up stroke left shorter than half the uncovered box\'s own falls back to that stroke — never a near-zero drag, which is a tap', () => {
+    // Band at 262 of 874: the keyboard-less touch-down 175 against a clearance of 210 — a 35-pt drag; the box's own is 158.
+    expect(swipeVectorAbove(IOS, 262, 'up', 'content')).toEqual(swipeVector({ ...IOS, height: 262 }, 'up', 'content'));
+  });
+
+  it('the fallback\'s boundary: a stroke of EXACTLY half the uncovered box\'s reach is kept', () => {
+    // 400x1000, band at 400: box stroke 80 → 320 (240); keyboard-less touch-down 200 → placed 200 → 320 (120 = 240 / 2).
+    const box = { x: 0, y: 0, width: 400, height: 1000 };
+    expect(swipeVectorAbove(box, 400, 'up', 'content')).toEqual({ from: { x: 200, y: 200 }, to: { x: 200, y: 320 } });
+    // Just below it falls back: band at 398 → box stroke 80 → 318 (238), placed 200 → 318 (118 < 119).
+    expect(swipeVectorAbove(box, 398, 'up', 'content')).toEqual({ from: { x: 200, y: 80 }, to: { x: 200, y: 318 } });
+  });
+});
+
+/** Review round 2 (2026-10-08): the stroke `scroll_until` shortens after each turn round a target a fling carried past. */
+describe('shortenStroke — the touch-down kept, the reach scaled, never a tap', () => {
+  const down = { from: { x: 201, y: 458 }, to: { x: 201, y: 114 } }; // the WDA content-down stroke, 344 pt
+
+  it('scales the reach toward the touch-down, which stays where it was placed', () => {
+    expect(shortenStroke(down, 0.5, 874)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 286 } });
+    expect(shortenStroke(down, 1, 874)).toEqual(down);
+  });
+
+  it('never below twice TOUCH_SLOP (assumed 24) on an 874-pt iPhone, where 3 % of the side is only 26: 344 × 1/16 = 21.5 becomes 48', () => {
+    expect(TOUCH_SLOP).toBe(24);
+    expect(shortenStroke(down, 1 / 16, 874)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 410 } });
+  });
+
+  it('never below MIN_STROKE_FRACTION (3 %) of the side along the stroke: on the 2220-px Pixel_3a 67 px, not the slop floor\'s 48', () => {
+    expect(MIN_STROKE_FRACTION).toBe(0.03);
+    const androidDown = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } }; // 838 px; × 1/32 = 26
+    expect(shortenStroke(androidDown, 1 / 32, 2220)).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 1051 } });
+    // Sideways the side is the width: 3 % of 1080 = 32.4, under the slop floor — 48.
+    expect(shortenStroke({ from: { x: 216, y: 1110 }, to: { x: 864, y: 1110 } }, 1 / 32, 1080)).toEqual({ from: { x: 216, y: 1110 }, to: { x: 264, y: 1110 } });
+  });
+
+  it('never longer than the stroke given: a stroke already under the floor is left as it is', () => {
+    const short = { from: { x: 10, y: 50 }, to: { x: 10, y: 30 } };
+    expect(shortenStroke(short, 0.5, 874)).toEqual(short);
+  });
+
+  it('sideways too: along the stroke, x scaled, y kept', () => {
+    expect(shortenStroke({ from: { x: 80, y: 437 }, to: { x: 322, y: 437 } }, 0.5, 402)).toEqual({ from: { x: 80, y: 437 }, to: { x: 201, y: 437 } });
   });
 });
