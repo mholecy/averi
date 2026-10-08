@@ -39,8 +39,8 @@ export const tapText = (selector: string, note: string | undefined): string =>
  *   a fill nobody saw. A clear alone (no text) has its own head there,
  *   `Cleared <selector> (N deletes sent)` or `Focused
  *   <selector>` (`clearAloneHead`).
- * Every count is fill.ts#charactersText: `1 character`, never `1
- * characters` (2026-10-08 device checks).
+ * Every count goes through util/count.ts#countOf: `1 character`,
+ * `1 delete`, never the plural for one (2026-10-08 device checks).
  * Then each caveat (fill.ts#fillCaveats: a matched node that is not an
  * input, the masked-append warning) on its own `⚠` line, so it is not lost
  * inside the parentheses. "cleared" is what was SENT, never the requested
