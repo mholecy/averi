@@ -576,8 +576,11 @@ export function rectText(r: Rect): string {
  * transparent Modal's Pressable — takes the tap) and a childless one (a
  * full-screen image or text draws itself). The measured refusals above are
  * kept. Accepted trade-off: a full-screen non-interactive host with nothing
- * of its own at the point (a host whose content sits elsewhere) reads as not
- * covering, and the dismissal tap lands on it. On the guard's path a
+ * of its own at the point (a host whose content sits elsewhere — a
+ * full-screen `scrollable` or `webview`, such as an RN ScrollView in a
+ * transparent modal whose rows are below the title) reads as not covering,
+ * and the dismissal tap lands on it. "Has children" is a weak signal: the
+ * measured toolbar's only child is an empty container. On the guard's path a
  * keyboard that stays ends in `AfterDismissalTap`; on the post-fill
  * `dismiss()` path (interact/keyboard-in-tree.ts) a tap that changed the
  * screen and took the keyboard with it is reported as `hiddenBy: tapping
