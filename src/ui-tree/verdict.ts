@@ -1,5 +1,5 @@
 import type { UiNode } from '../adapters/types.js';
-import { isBareTree, treeShape } from './bare-tree.js';
+import { BARE_TREE_CONTENTS, isBareTree, treeShape } from './bare-tree.js';
 import { absentFromViewport } from './geometry.js';
 
 /**
@@ -88,6 +88,6 @@ export const absenceVerdict = (
  * own sentence around the same shape.
  */
 export const bareTimeoutNote = (tree: UiNode): string =>
-  `the last UI tree read was bare, ${treeShape(tree)} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), ` +
+  `the last UI tree read was bare, ${treeShape(tree)} holding ${BARE_TREE_CONTENTS}, ` +
   'so it could not decide this — the screen had not rendered by the deadline; ' +
   'compare with screenshot, and a longer timeout may be all it needs';

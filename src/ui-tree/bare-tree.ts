@@ -260,6 +260,15 @@ const rolesPresent = (nodes: readonly UiNode[]): string => {
  */
 export const nodeCount = (nodes: readonly UiNode[]): string => `${nodes.length} node${nodes.length === 1 ? '' : 's'}`;
 
+/**
+ * What a bare tree holds, as every sentence that reports one says it
+ * (2026-10-08, code review: hand-copied in four places until then) — the
+ * flow's unread-tree failure, the verdict's undecided wait, ui_snapshot's
+ * bare note and the ui_snapshot tool description. isBareTree is what it
+ * describes.
+ */
+export const BARE_TREE_CONTENTS = "nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)";
+
 /** `7 nodes (roles: container ×6, image ×1)` — a tree by its shape, for a line that says what a bare read held. */
 export const treeShape = (tree: UiNode): string => {
   const nodes = [...everyNode(tree)];

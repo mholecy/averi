@@ -4,6 +4,14 @@ import type { KeyboardAdapter } from './keyboard-model.js';
 import type { Target } from './resolve.js';
 
 /**
+ * What a tap on a resolved node needs of the device: the keyboard guard's
+ * surface (keyboard-model.ts#KeyboardAdapter — the tree, the tap, the
+ * keyboard, the key, and since 2026-10-08 the screen size the on-screen rule
+ * judges by), named for the caller that is not about the keyboard.
+ */
+export type TapAdapter = KeyboardAdapter;
+
+/**
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
  * node's center. Returns the resolution note, if any, for the caller to
@@ -34,7 +42,7 @@ import type { Target } from './resolve.js';
  * to import the selector layer above it (ARCHITECTURE.md §3).
  */
 export async function tapElement(
-  adapter: KeyboardAdapter,
+  adapter: TapAdapter,
   target: Target,
   opts: GuardOptions,
 ): Promise<{ note?: string; keyboardHidden?: string }> {

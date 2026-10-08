@@ -9,7 +9,7 @@ import { dismissKeyboard, KeyboardGuardError, type DismissResult, type KeyboardD
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
-import { treeShape } from '../ui-tree/bare-tree.js';
+import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
@@ -107,7 +107,7 @@ const readFailed = (e: unknown): string => `last UI tree read failed: ${headline
  */
 const describeUnreadCause = (cause: UnreadCause): string => {
   if (cause.answer === 'unknown') return readFailed(cause.readError);
-  const bare = `every UI tree read was bare, the last one ${cause.shape} holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)`;
+  const bare = `every UI tree read was bare, the last one ${cause.shape} holding ${BARE_TREE_CONTENTS}`;
   return cause.answer === 'bare' ? bare : `${bare}, and every read after it failed (${readFailed(cause.readError)})`;
 };
 

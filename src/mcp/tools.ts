@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AdapterOpts, AdapterRegistry } from './registry.js';
+import { BARE_TREE_CONTENTS } from '../ui-tree/bare-tree.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { fillField } from '../interact/fill.js';
 import { typeIntoFocused } from '../interact/type-text.js';
@@ -322,7 +323,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Normalized accessibility tree as JSON — cheap text-based verification. Optional selector filter (e.g. \'role:button\', \'id:login_button\', \'label~"Pay.*"\') returns only matching nodes. ' +
         'iOS: if `id:` finds nothing for a container — React Native static text/containers (identifier: null everywhere), a SwiftUI `.accessibilityElement(children: .contain)` identifier — that is the default idb tree source, which never exposes container identifiers — set `app.ios.treeSource: wda` in averi.yaml and retry, or use a button/row id. ' +
-        `A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon) — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (${ASSERT_BUDGET} by default; set "timeout" in the spec). Does not itself wait, but for one re-read a second later of an unreadable first read (Android's "null root node", iOS idb's empty tree — a launch's first second or a stuck idb); an iOS error that says it was retried was still empty a second later. ` +
+        `A filter that matches nothing returns [] plus a second text block: the unfiltered tree size and roles, or — when the tree holds ${BARE_TREE_CONTENTS} — a ⚠ that the accessibility tree is empty or unrendered: still loading, or stuck empty on a rendered screen. Compare with screenshot before reading the element as absent. On iOS idb the measured stuck tree (a 0×0 Application, for minutes on a rendered screen) fails the call instead, naming it; assert polls (${ASSERT_BUDGET} by default; set "timeout" in the spec). Does not itself wait, but for one re-read a second later of an unreadable first read (Android's "null root node", iOS idb's empty tree — a launch's first second or a stuck idb); an iOS error that says it was retried was still empty a second later. ` +
         'iOS wda with the software keyboard up: one node has role "keyboard" — its rect is the band the keyboard covers (keys, AutoFill bar, accessory toolbar slot), where a tap is refused — and the two Windows that ARE the keyboard\'s UI carry "ofKeyboard": true (their descendants — keys, Done, the Passwords bar — are tappable); an input-accessory toolbar (the Done above a number pad) has role "toolbar".',
       inputSchema: {
         platform,
@@ -432,7 +433,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'Type text. With selector: focuses that field first (and with clear: true deletes its current content — typing otherwise APPENDS to pre-filled fields), ' +
-        `then verifies the text landed and retries a dropped clear-fill once; a matched node that exposes no value is reported as "Typed … — NOT verified" (never "Filled"), "cleared" counts the characters actually deleted, and a match that is not a textfield (e.g. an iOS idb floating label) gets a ⚠ line naming the nearest input — clear sends it no delete (its length is not the field's). The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
+        `then verifies the text landed and retries a dropped clear-fill once; a matched node that exposes no value is reported as "Typed … — NOT verified" (never "Filled"), "cleared" counts the characters actually deleted, and a match that is not a textfield (e.g. an iOS idb floating label) gets a ⚠ line naming the nearest input unless its value changed to show the text (then it took it) — clear sends it no delete (its length is not the field's). The field is resolved like a tap: up to ${SETTLE_BUDGET} to appear and hold still (a timeout if it never does), zero-area nodes ignored, ` +
         'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first); ' +
         'a field whose centre lies off the screen is refused, nothing tapped or typed — scroll_until it first. ' +
         'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting a fill it could not re-read. Without selector: types into whatever is focused. ' +
