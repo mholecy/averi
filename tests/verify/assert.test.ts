@@ -83,7 +83,8 @@ describe('element asserts', () => {
       {
         s: screen(
           node({ identifier: 'card_face', rect: { x: 0, y: -300, width: 100, height: 100 } }), // iOS keeps it, scrolled above the top
-          el({ identifier: 'row_0' }),
+          // A rendered `text`: identified-unlabeled `other` nodes alone are a BARE tree, where absence is undecided (2026-10-08).
+          el({ role: 'text', identifier: 'row_0' }),
         ),
       },
       's',

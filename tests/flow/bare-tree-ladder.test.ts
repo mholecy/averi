@@ -9,8 +9,9 @@ import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, EngineSession, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, EngineSession, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
+import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
 /**
@@ -130,6 +131,8 @@ const WDA_LOGIN = parseWdaSource(readFileSync(new URL('../fixtures/wda-source-my
 function timeline(at: (ms: number, read: number) => UiNode | Error, platform: 'android' | 'ios' = 'android') {
   const fake = new FakeAdapter({}, 'unused');
   fake.platform = platform;
+  // The screen in the trees' own units (the absent conditions ask for it): uiautomator's pixels, WDA's points.
+  fake.viewportSize = platform === 'ios' ? { width: 402, height: 874 } : { width: 1080, height: 2400 };
   if (platform === 'ios') fake.treeSourceKind = 'wda';
   const state = { t0: undefined as number | undefined, reads: 0 };
   fake.uiTree = async () => {
@@ -272,10 +275,32 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
     expect(before.filter((t) => t.detail?.includes('every UI tree read was bare') === true)).toHaveLength(1);
   });
 
-  it('a CHEAP rung runs at once on a bare probe — no second look, no added wait — and the ladder goes on from there', async () => {
+  it('a CHEAP rung on a probe still bare after the second look runs (since 2026-10-08 it waits for that look first) — and the ladder goes on from there', async () => {
     // Decor until the cheap rung relaunches, the login after it.
     let relaunched = false;
     const { fake, state } = timeline(() => (relaunched ? ANDROID_LOGIN : ANDROID_DECOR));
+    const launch = fake.launch.bind(fake);
+    let readsBeforeLaunch = -1;
+    let msBeforeLaunch = -1;
+    const started = Date.now();
+    fake.launch = async (appId, opts) => {
+      readsBeforeLaunch = state.reads;
+      msBeforeLaunch = Date.now() - started;
+      relaunched = true;
+      return launch(appId, opts);
+    };
+    const trace = await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 150 }, { state: 'logged_out_cheap_first' });
+    expect(readsBeforeLaunch).toBeGreaterThan(2); // the entry probe AND the second look's polling
+    expect(msBeforeLaunch).toBeGreaterThanOrEqual(150); // the whole window, then the rung
+    expect(clearStateLaunches(fake)).toEqual([]);
+    expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
+    expect(actions(trace).slice(0, 2)).toEqual(['⚠ detect', '⚠ detect']); // both probes said they read only decor
+    expect(trace).toContainEqual({ action: 'state logged_out_cheap_first', detail: 'reached after open_app' });
+  });
+
+  it('an UNKNOWN probe (every read failed) still runs a cheap rung at once — no second look', async () => {
+    let relaunched = false;
+    const { fake, state } = timeline(() => (relaunched ? ANDROID_LOGIN : ANDROID_NULL_ROOT));
     const launch = fake.launch.bind(fake);
     let readsBeforeLaunch = -1;
     fake.launch = async (appId, opts) => {
@@ -283,13 +308,57 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
       relaunched = true;
       return launch(appId, opts);
     };
-    const started = Date.now();
     const trace = await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 5000 }, { state: 'logged_out_cheap_first' });
     expect(readsBeforeLaunch).toBe(1); // the entry probe's single read, nothing more
-    expect(Date.now() - started).toBeLessThan(2500); // nowhere near the 5 s window
-    expect(clearStateLaunches(fake)).toEqual([]);
-    expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
     expect(trace).toContainEqual({ action: 'state logged_out_cheap_first', detail: 'reached after open_app' });
+  });
+});
+
+/**
+ * A bare probe gets the second look before a CHEAP rung too (2026-10-08,
+ * review of the absent-on-bare change): with `absent:` undecided on the
+ * decor, the entry probe of a state detected by an absence is bare, and a
+ * cheap rung run at once taps a screen with nothing on it.
+ */
+describe('a bare probe looks again before a cheap rung', () => {
+  const PROMPT_CFG = parseConfig(`
+app:
+  android: { package: ${PKG} }
+states:
+  no_prompt:
+    detect: { element: { id: prompt }, absent: true }
+    reach: [dismiss]
+flows:
+  dismiss:
+    steps:
+      - tap: { id: later }
+`);
+  /** A rendered rating prompt with its "later" button. */
+  const ANDROID_PROMPT = parseUiautomatorXml(
+    androidXml(`
+          <node index="0" text="Ohodnoťte nás" resource-id="prompt" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,700][1020,840]"/>
+          <node index="1" text="Neskôr" resource-id="later" class="android.widget.Button" package="${PKG}" content-desc="" bounds="[60,1400][1020,1540]"/>`),
+  );
+
+  it('the decor outlasting tapTimeoutMs, then a screen with no prompt: "already active", nothing tapped', async () => {
+    const { fake } = timeline((ms) => (ms < 150 ? ANDROID_DECOR : ANDROID_LOGIN)); // 150 ms ≫ tapTimeoutMs 60
+    const trace = await FlowEngine.run(PROMPT_CFG, fake, FAST, { state: 'no_prompt' });
+    expect(fake.taps).toEqual([]);
+    expect(trace).toContainEqual({ action: 'state no_prompt', detail: 'already active' });
+  });
+
+  it('the decor, then the prompt rendered: the rung runs on the rendered tree and taps "later"', async () => {
+    let dismissed = false;
+    const { fake } = timeline((ms) => (dismissed ? ANDROID_LOGIN : ms < 150 ? ANDROID_DECOR : ANDROID_PROMPT));
+    const tapped: string[] = [];
+    fake.tap = async () => {
+      tapped.push('later');
+      dismissed = true;
+    };
+    const trace = await FlowEngine.run(PROMPT_CFG, fake, FAST, { state: 'no_prompt' });
+    expect(tapped).toEqual(['later']);
+    expect(trace).toContainEqual({ action: 'tap', detail: 'id:"later"' });
+    expect(trace).toContainEqual({ action: 'state no_prompt', detail: 'reached after dismiss' });
   });
 });
 
@@ -301,5 +370,170 @@ describe('a state with no reach flows says honestly that a bare read could not c
       'State "no_reach" could not be checked (every UI tree read was bare, the last one 7 nodes (roles: container ×6, image ×1) ' +
         'of only wrappers and unlabeled decoration) and it has no reach flows',
     );
+  });
+});
+
+/**
+ * An ABSENCE on a bare tree is not "yes" either (2026-10-08, flow-engine
+ * review candidate 2, flow/condition.ts): nothing in the decor matches any
+ * selector, so until then a state detected by `absent: true` was "already
+ * active" on a cold launch, a `wait:` on it passed at once, a `branch:` arm
+ * on it was taken, and the absent assert passed — all before the app had
+ * drawn anything.
+ */
+describe('an absent condition on a bare tree is undecided: not detected, not waited past, not branched on, not asserted', () => {
+  const ABSENT_CFG = parseConfig(`
+app:
+  android: { package: ${PKG} }
+  ios: { bundleId: ${PKG} }
+states:
+  no_modal:
+    detect: { element: { id: some_modal }, absent: true }
+    reach: [fresh_launch]
+  no_modal_no_reach:
+    detect: { element: { id: some_modal }, absent: true }
+flows:
+  fresh_launch:
+    steps:
+      - launch: { clearState: true }
+  wait_no_modal:
+    steps:
+      - wait: { state: no_modal }
+  wait_login:
+    steps:
+      - wait: { element: { id: login_screen } }
+  branch_on_absence:
+    steps:
+      - branch:
+          - when: { element: { id: some_modal }, absent: true }
+            do:
+              - wait: { element: { id: login_screen } }
+  branch_in_order:
+    steps:
+      - branch:
+          - when: { element: { id: login_screen } }
+            do: []
+          - when: { element: { id: content } }
+            do: []
+`);
+
+  it('ensure_state on a cold launch: the decor is NOT "already active" — the ladder looks again, and the rendered login is', async () => {
+    const { fake, state } = timeline((ms) => (ms < 100 ? ANDROID_DECOR : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(ABSENT_CFG, fake, FAST, { state: 'no_modal' });
+    expect(fake.launches).toEqual([]);
+    expect(trace).toContainEqual({ action: 'state no_modal', detail: 'already active' });
+    // The entry probe read the decor and said so; "already active" came from the second look.
+    expect(trace[0]).toEqual({
+      action: '⚠ detect',
+      detail:
+        'element id:"some_modal" treated as not detected — every UI tree read was bare, the last one ' +
+        `${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration`,
+    });
+    expect(state.reads).toBeGreaterThan(1);
+  });
+
+  it('decor for the whole window: the destructive rung is refused (⛔), nothing is wiped', async () => {
+    const { fake } = timeline(() => ANDROID_DECOR);
+    const error = await failure(FlowEngine.run(ABSENT_CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'no_modal' }));
+    expect(fake.launches).toEqual([]);
+    expect(actions(error.trace)).toEqual(['⚠ detect', '⚠ detect', '⛔ reach fresh_launch']);
+  });
+
+  it('no reach flows: "could not be checked", not "already active" — WDA splash', async () => {
+    const { fake } = timeline(() => WDA_SPLASH, 'ios');
+    const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { state: 'no_modal_no_reach' }));
+    expect(error.message.split('\n')[0]).toBe(
+      'State "no_modal_no_reach" could not be checked (every UI tree read was bare, the last one 7 nodes (roles: container ×6, image ×1) ' +
+        'of only wrappers and unlabeled decoration) and it has no reach flows',
+    );
+  });
+
+  it('wait: on a state detected by absence keeps polling through the decor and passes once the screen renders', async () => {
+    const { fake, state } = timeline((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(ABSENT_CFG, fake, { ...FAST, waitTimeoutMs: 1000 }, { flow: 'wait_no_modal' });
+    expect(trace).toContainEqual({ action: 'wait', detail: 'state no_modal' });
+    expect(state.reads).toBeGreaterThan(1);
+  });
+
+  it('wait: decor to the deadline times out, and the message says the last tree was bare', async () => {
+    const { fake } = timeline(() => ANDROID_DECOR);
+    const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { flow: 'wait_no_modal' }));
+    expect(error.message.split('\n').slice(0, 2)).toEqual([
+      'Timed out after 60ms waiting for state no_modal',
+      `  (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, so it could not ` +
+        'decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
+    ]);
+  });
+
+  it('wait: for a present element on the decor gets the bare note too; one rendered tree after it clears the note', async () => {
+    const bare = timeline(() => ANDROID_DECOR);
+    expect((await failure(FlowEngine.run(ABSENT_CFG, bare.fake, FAST, { flow: 'wait_login' }))).message.split('\n')[1]).toMatch(
+      /^ {2}\(the last UI tree read was bare, /,
+    );
+    const rendered = timeline((ms) => (ms < 20 ? ANDROID_DECOR : ANDROID_HOME));
+    const error = await failure(FlowEngine.run(ABSENT_CFG, rendered.fake, FAST, { flow: 'wait_login' }));
+    expect(error.message).toMatch(/^Timed out after 60ms waiting for element id:"login_screen"\n\nSteps that ran before the failure:/);
+  });
+
+  it('wait: on an id under iOS idb, a bare last tree gets the bare note — not the idb container-id hint, which is about what a rendered tree held', async () => {
+    const { fake } = timeline(() => WDA_SPLASH, 'ios');
+    fake.treeSourceKind = 'idb';
+    const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { flow: 'wait_login' }));
+    expect(error.message.split('\n')[1]).toMatch(/^ {2}\(the last UI tree read was bare, 7 nodes/);
+    expect(error.message).not.toContain(idbContainerIdHint('login_screen'));
+  });
+
+  it('branch: an absent arm is not taken on the decor; the poll goes on and takes it once the screen renders', async () => {
+    const { fake, state } = timeline((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(ABSENT_CFG, fake, { ...FAST, waitTimeoutMs: 1000 }, { flow: 'branch_on_absence' });
+    expect(trace).toContainEqual({ action: 'branch', detail: 'matched element id:"some_modal"' });
+    expect(state.reads).toBeGreaterThan(2); // the decor rounds, then the login (and the arm's wait)
+  });
+
+  it('branch: an earlier arm undecided on the decor holds the round even when a later arm matches the decor — written order is the priority', async () => {
+    // Arm 2 (`id: content`) is `yes` on the decor itself; arm 1 (`login_screen`) is `unknown` there and wins once the screen renders.
+    const { fake, state } = timeline((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(ABSENT_CFG, fake, { ...FAST, waitTimeoutMs: 1000 }, { flow: 'branch_in_order' });
+    expect(trace).toContainEqual({ action: 'branch', detail: 'matched element id:"login_screen"' });
+    expect(trace).not.toContainEqual({ action: 'branch', detail: 'matched element id:"content"' });
+    expect(state.reads).toBeGreaterThan(1);
+    // Decor to the deadline: arm 2 is never taken on it; the branch times out with the bare note.
+    const bare = timeline(() => ANDROID_DECOR);
+    const error = await failure(FlowEngine.run(ABSENT_CFG, bare.fake, FAST, { flow: 'branch_in_order' }));
+    expect(error.message.split('\n')[0]).toBe('Timed out after 60ms waiting for any branch condition (element id:"login_screen" | element id:"content")');
+    expect(error.message.split('\n')[1]).toMatch(/^ {2}\(the last UI tree read was bare, /);
+  });
+
+  it('branch: decor to the deadline times out with the bare note', async () => {
+    const { fake } = timeline(() => WDA_SPLASH, 'ios');
+    const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { flow: 'branch_on_absence' }));
+    expect(error.message.split('\n').slice(0, 2)).toEqual([
+      'Timed out after 60ms waiting for any branch condition (element id:"some_modal")',
+      '  (the last UI tree read was bare, 7 nodes (roles: container ×6, image ×1) of only wrappers and unlabeled decoration, ' +
+        'so it could not decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
+    ]);
+  });
+
+  it('assert absent: fails as "could not verify" on the decor, passes once the screen renders', async () => {
+    const decor = timeline(() => ANDROID_DECOR);
+    const v = new Verifier(decor.fake, { pollMs: 5, timeoutMs: 60 });
+    expect(await v.assert({ element: { id: 'some_modal' }, absent: true })).toEqual({
+      description: 'element id:"some_modal" is absent',
+      pass: false,
+      detail: `could not verify within 60ms (the last UI tree read was bare, ${treeShape(ANDROID_DECOR)} of only wrappers and unlabeled decoration, so it could not ` +
+        'decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
+    });
+    // Bare, then a rendered screen SHOWING the modal: the verdict is the last tree's — "still visible", not could-not-verify.
+    const modal = parseUiautomatorXml(
+      androidXml(`<node index="0" text="Nová verzia" resource-id="some_modal" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,900][1020,1040]"/>`),
+    );
+    const shown = timeline((ms) => (ms < 20 ? ANDROID_DECOR : modal));
+    expect(await new Verifier(shown.fake, { pollMs: 5, timeoutMs: 80 }).assert({ element: { id: 'some_modal' }, absent: true })).toMatchObject({
+      pass: false,
+      detail: 'still visible after 80ms',
+    });
+    const later = timeline((ms) => (ms < 20 ? ANDROID_DECOR : ANDROID_LOGIN));
+    expect(await new Verifier(later.fake, { pollMs: 5, timeoutMs: 1000 }).assert({ element: { id: 'some_modal' }, absent: true })).toMatchObject({ pass: true });
+    expect(later.state.reads).toBeGreaterThan(1);
   });
 });

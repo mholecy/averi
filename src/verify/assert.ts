@@ -5,7 +5,7 @@ import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollTree } from '../ui-tree/read-tree.js';
+import { pollOnVerdict, pollTree, Undecided } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { regexSource } from '../util/regex.js';
@@ -29,7 +29,7 @@ import { ocrEngineFor, type OcrEngine } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { evaluateOcrAssert, ocrRegionForRect, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import { absentFromViewport } from '../ui-tree/geometry.js';
+import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
 import { containsTextHint, flattenTree } from './text-hint.js';
 
 /**
@@ -219,7 +219,7 @@ interface PollSpec {
    * the numbers are the finding) — as the pixel poll does for the color and
    * ocr asserts (verify/pixel-poll.ts), which word theirs there.
    */
-  timeoutDetail: (last: { detail?: string; readError?: Error }) => string;
+  timeoutDetail: (last: { detail?: string; readError?: Error; undecidedTree?: UiNode }) => string;
 }
 
 export class Verifier {
@@ -492,11 +492,14 @@ export class Verifier {
    * from a frame that was still moving.
    */
   private async poll(
-    evaluate: (tree: UiNode) => PollVerdict | undefined | Promise<PollVerdict | undefined>,
+    evaluate: (tree: UiNode) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
-    const outcome = await pollTree(this.adapter, async (tree) => verdictToPoll(await evaluate(tree)), {
+    const outcome = await pollTree(this.adapter, async (tree) => {
+      const verdict = await evaluate(tree);
+      return verdict === Undecided ? Undecided : verdictToPoll(verdict);
+    }, {
       timeoutMs,
       pollMs: this.pollMs,
     });
@@ -504,7 +507,7 @@ export class Verifier {
     return {
       description,
       pass: false,
-      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError }),
+      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree }),
     };
   }
 
@@ -512,6 +515,16 @@ export class Verifier {
    * absent = gone from the tree OR present with a rect outside the visible
    * viewport. The raw trees disagree (Android prunes off-screen nodes, iOS
    * keeps them with off-viewport rects); this is the one portable meaning.
+   *
+   * And not on a BARE tree (2026-10-08, ui-tree/verdict.ts): nothing in a
+   * cold launch's Android decor or WDA's splash matches any selector, so
+   * until then this assert PASSED there before the app had drawn a pixel.
+   * The leaf rule is the flow engine's too (flow/condition.ts asks the same
+   * `absenceVerdict`), so an absent detect, wait, branch and assert cannot
+   * disagree about one tree. An `unknown` round keeps polling like a visible
+   * one; a timeout whose last tree was bare fails as "could not verify",
+   * the wording an unreadable tree already had — both are "we could not
+   * tell", never "still visible".
    */
   private async assertAbsent(element: ElementSpec, timeoutMs: number): Promise<AssertResult> {
     const description = `element ${describe(element)} is absent`;
@@ -523,22 +536,22 @@ export class Verifier {
     return this.poll(
       (tree) => {
         const found = findBySpec(tree, element);
-        if (!absentFromViewport(found, viewport)) return undefined;
-        return {
+        return pollOnVerdict(absenceVerdict(found, viewport, tree), {
           pass: true,
           detail:
             found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined,
-        };
+        });
       },
       {
         description,
         timeoutMs,
         // An unreadable tree is NOT evidence of absence — it is why we could
-        // not tell, so it outranks "still visible".
-        timeoutDetail: ({ readError }) =>
-          readError !== undefined
-            ? `could not verify within ${timeoutMs}ms (last UI tree read failed: ${readError.message})`
-            : `still visible after ${timeoutMs}ms`,
+        // not tell, so it outranks "still visible"; and the last read failing
+        // is the fresher fact than the bare tree before it.
+        timeoutDetail: ({ readError, undecidedTree }) =>
+          readError !== undefined ? `could not verify within ${timeoutMs}ms (last UI tree read failed: ${readError.message})`
+          : undecidedTree !== undefined ? `could not verify within ${timeoutMs}ms (${bareTimeoutNote(undecidedTree)})`
+          : `still visible after ${timeoutMs}ms`,
       },
     );
   }

@@ -14,7 +14,7 @@ You have the `averi` MCP tools. They drive booted iOS Simulators and Android Emu
 3. `ensure_state("logged_in", platform)` — detects, logs in only if needed, returns a screenshot.
 4. Navigate to the changed screen: `run_flow` if a flow exists, else `tap`/`scroll_until` with selectors.
 5. Verify, cheapest tier first:
-   - `assert` with element specs — deterministic, no vision needed: `{"element":{"id":"amount"},"text":"100.00"}`, `{"element":{"id":"error_banner"},"absent":true}`, `{"element":{"id":"amount"},"error":"Required"}` (validation message paired to the input, where the platform exposes it — `absent` means gone from the tree OR outside the viewport, the same on both platforms)
+   - `assert` with element specs — deterministic, no vision needed: `{"element":{"id":"amount"},"text":"100.00"}`, `{"element":{"id":"error_banner"},"absent":true}`, `{"element":{"id":"amount"},"error":"Required"}` (validation message paired to the input, where the platform exposes it — `absent` means gone from the tree OR outside the viewport, the same on both platforms — and never passes on a bare, not-yet-rendered tree)
    - `assert` with `{"element":{...},"ocr":{"text":"CONTINUE"}}` — what the element RENDERS, read back off the screenshot. Different question from `text` above: the tree carries what a11y is told, which on iOS is often an authored summary rather than the visible copy.
    - `screenshot` — look at it yourself for layout/visual judgment.
    - `assert` with `{"screenshot":{"baseline":"name"}}` — pixel regression vs. stored baseline (auto-created on first run under `.averi/baselines/` — but refused, not created, while the screen is still moving, so a baseline is never a mid-animation frame).
@@ -119,4 +119,4 @@ states:
             do: []                       # times out and FAILS the flow, so cover both
 ```
 
-State `detect:` conditions take `element`/`state`/`any`/`all`, and an element condition accepts `absent: true` — "row visible AND card face gone" is expressible, which disambiguates screens that embed the same reused list.
+State `detect:` conditions take `element`/`state`/`any`/`all`, and an element condition accepts `absent: true` — "row visible AND card face gone" is expressible, which disambiguates screens that embed the same reused list. A tree that is still BARE (a cold launch's decor or splash: nothing a user could read) decides no condition: an `absent: true` there is not satisfied — `ensure_state` treats it like an unread screen (it looks again, and never wipes on it), `wait:`/`branch:` keep polling and, if the screen never renders, time out saying the last tree was bare, and the `absent` assert fails as "could not verify". So right after `launch_app`, an absence check waits for the screen rather than passing on an empty one.

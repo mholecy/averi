@@ -11,6 +11,7 @@ import {
 import { INTERACTIVE_ROLES } from '../ui-tree/selectors.js';
 import { elementAssertSchema, type ElementAssert } from '../verify/element-assert.js';
 import type { KeyboardDismissal } from '../interact/keyboard.js';
+import { conditionStateRefs, type Condition } from './condition.js';
 
 /**
  * Schema for `averi.yaml` flow descriptors (ARCHITECTURE.md §4), the types it
@@ -22,14 +23,9 @@ import type { KeyboardDismissal } from '../interact/keyboard.js';
  * `process.env` write in the layer).
  */
 
-export interface Condition {
-  element?: ElementSpec;
-  /** With element: true inverts the check — element gone or off-viewport. */
-  absent?: boolean;
-  state?: string;
-  any?: Condition[];
-  all?: Condition[];
-}
+// Condition — the type and everything asked of it — lives in flow/condition.ts
+// since 2026-10-08; re-exported here with the rest of the schema's types.
+export type { Condition } from './condition.js';
 
 export interface FillSpec extends ElementSpec {
   value: string;
@@ -718,19 +714,6 @@ function stepsAreDestructive(steps: Step[]): boolean {
 }
 
 /**
- * Every state a condition names, at any depth of `any:`/`all:` — the one walk
- * over Condition's nesting, as `childSteps` is over Step's. The existence
- * check and the cycle check below both read it, so a combinator added to
- * Condition later is followed by both or by neither.
- */
-function conditionStateRefs(c: Condition): string[] {
-  return [
-    ...(c.state !== undefined ? [c.state] : []),
-    ...[...(c.any ?? []), ...(c.all ?? [])].flatMap(conditionStateRefs),
-  ];
-}
-
-/**
  * Cross-reference checks zod can't express: state/flow names must exist, and
  * no state's detect may lead back to itself (rejectDetectCycles).
  */
@@ -780,8 +763,8 @@ function validateReferences(cfg: AveriConfig, source: string): void {
  * A detect cycle is a config error, caught here rather than at run time.
  * Run after the existence checks, so every name below resolves.
  *
- * `matches` evaluates a `{ state: x }` condition by evaluating
- * `states.x.detect` on the same tree, at any depth of `any:`/`all:`. Nodes
+ * flow/condition.ts `evaluateCondition` evaluates a `{ state: x }` condition
+ * by evaluating `states.x.detect` on the same tree, at any depth of `any:`/`all:`. Nodes
  * are states; `a → b` when `b` appears anywhere in `a`'s detect. A cycle
  * never finishes — it overflows the stack when the cyclic arm is reached
  * synchronously (a pure `{ state }` chain: measured 2026-10-07,

@@ -1,5 +1,6 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
+import type { Verdict } from './verdict.js';
 
 /**
  * Reading the UI tree, and waiting on it.
@@ -88,6 +89,30 @@ export class PollMiss {
   constructor(readonly detail: string) {}
 }
 
+/**
+ * A poll round whose tree could not DECIDE the question (2026-10-08,
+ * ui-tree/verdict.ts: the tree is bare, and a selector's miss or an absence
+ * on it says nothing). Returned by a predicate in place of `undefined`: the
+ * poll goes on exactly as on a miss, and the outcome of a timeout carries
+ * the tree (`undecidedTree`) when it was the LAST tree read, so the caller
+ * can say the screen had not rendered rather than that the condition did
+ * not hold. One owner for that bookkeeping, shared by the flow engine's
+ * `wait:` and `branch:` and the verifier's absent assert since 2026-10-08.
+ */
+export const Undecided: unique symbol = Symbol('Undecided');
+
+/**
+ * A Verdict (ui-tree/verdict.ts) as a poll round's result: `yes` is `value`
+ * (the round decides), `no` is `undefined` (a miss) and `unknown` is
+ * `Undecided` (a bare tree, the poll goes on and the timeout can say so).
+ * The one spelling of that mapping — the flow engine's `wait:` and `branch:`
+ * and the verifier's absent assert all poll on a verdict.
+ */
+export const pollOnVerdict = <T>(verdict: Verdict, value: T): T | typeof Undecided | undefined =>
+  verdict === 'yes' ? value
+  : verdict === 'unknown' ? Undecided
+  : undefined;
+
 export interface PollOptions {
   timeoutMs: number;
   /** Pause between rounds. Owned by the caller: the engine and the verifier each have their own cadence. */
@@ -111,6 +136,15 @@ export type PollOutcome<T> =
        * it). `readError` cannot say this: it reports only the last round.
        */
       treesRead: number;
+      /**
+       * The last tree read, when its round returned `Undecided`. Cleared by
+       * any round that read a tree and decided — a value, `undefined` or a
+       * PollMiss — so it describes the LAST tree only; a round whose read
+       * failed leaves it standing (it is still the last TREE), and
+       * `readError` says that read failed — which fact a caller puts first
+       * is its own wording.
+       */
+      undecidedTree?: UiNode;
     };
 
 /**
@@ -185,7 +219,8 @@ export function readErrorLine(message: string): string | undefined {
  *   matched" from "never read".
  * - The predicate runs only on a tree it could read. A value ends the poll;
  *   `undefined` continues it; a `PollMiss` continues it and records a detail
- *   that a later silent round does not overwrite.
+ *   that a later silent round does not overwrite; `Undecided` continues it and
+ *   keeps the tree for the timeout while it is the last one read.
  * - At least one read happens BEFORE the deadline is checked, so a
  *   `timeoutMs` of 0 is a single probe, and a budget shorter than one device
  *   read still gets one honest look (the optional-tap finding of 2026-08-19).
@@ -215,23 +250,28 @@ export function readErrorLine(message: string): string | undefined {
  */
 export async function pollTree<T>(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
-  predicate: (tree: UiNode, round: { deadline: number }) => Promise<T | PollMiss | undefined> | T | PollMiss | undefined,
+  predicate: (
+    tree: UiNode,
+    round: { deadline: number },
+  ) => Promise<T | PollMiss | typeof Undecided | undefined> | T | PollMiss | typeof Undecided | undefined,
   opts: PollOptions,
 ): Promise<PollOutcome<T>> {
   const deadline = Date.now() + opts.timeoutMs;
   let detail: string | undefined;
   let readError: Error | undefined;
   let treesRead = 0;
+  let undecidedTree: UiNode | undefined;
   for (;;) {
     const read = await readTreeOrError(adapter);
     readError = read.error;
     if (read.tree !== undefined) {
       treesRead++;
       const verdict = await predicate(read.tree, { deadline });
+      undecidedTree = verdict === Undecided ? read.tree : undefined;
       if (verdict instanceof PollMiss) detail = verdict.detail;
-      else if (verdict !== undefined) return { timedOut: false, value: verdict };
+      else if (verdict !== undefined && verdict !== Undecided) return { timedOut: false, value: verdict };
     }
-    if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead };
+    if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree };
     await sleep(opts.pollMs);
   }
 }

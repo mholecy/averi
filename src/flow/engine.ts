@@ -7,11 +7,10 @@ import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js'
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type KeyboardDismissal } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
-import { describeElementSpec as describeSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollTimeoutMessage, pollTree, readErrorLine } from '../ui-tree/read-tree.js';
-import { findBySpec } from '../ui-tree/selectors.js';
-import { absentFromViewport } from '../ui-tree/geometry.js';
-import { isBareTree, treeShape } from '../ui-tree/bare-tree.js';
+import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
+import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
+import { treeShape } from '../ui-tree/bare-tree.js';
+import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -28,6 +27,7 @@ import {
   type Step,
   type TapSpec,
 } from './config.js';
+import { describeCondition, evaluateCondition } from './condition.js';
 import { resolveCredentials, type Credentials, type EnvValues, type ResolvedValue } from './credentials.js';
 
 export interface TraceEntry {
@@ -594,7 +594,42 @@ export class FlowEngine {
       // The rung's OWN steps, not what its `requires` might pull in — the
       // recovery pass below asks a different question; see
       // `flowItselfIsDestructive` for why the two predicates must stay apart.
-      if (flowItselfIsDestructive(this.cfg, flow)) {
+      const destructive = flowItselfIsDestructive(this.cfg, flow);
+      // The SECOND LOOK (below, at length): before a destructive rung on any
+      // probe that learned nothing, and — since 2026-10-08 — before ANY rung
+      // on a BARE probe. A bare probe read a window that has not rendered
+      // yet; until then a cheap rung ran on it at once, and since the same
+      // date an `absent:` detect is bare there rather than "yes" (flow/
+      // condition.ts), so a state like `no_prompt: { detect: { id: prompt,
+      // absent: true }, reach: [dismiss] }` — "already active" on the decor
+      // until 2026-10-08 — would tap `later` on a screen with nothing on it and
+      // fail with that tap's timeout once the decor outlasted tapTimeoutMs.
+      // Looking again first: rendered and detected ends the call; rendered
+      // and not detected runs the rung on a tree that means something;
+      // still bare runs a cheap rung as before (it is how a ladder gets a
+      // tree to read) and refuses a destructive one. An `unknown` probe —
+      // every read FAILED — keeps the old path for a cheap rung: a device
+      // that cannot be read is not a screen still drawing, and a relaunch
+      // may be its cure. The cost: a screen that is bare by bare-tree.ts's
+      // accepted miss (a map, a camera, an identified-only icon screen)
+      // delays a cheap rung by up to ensureTimeoutMs.
+      if (probe.answer === 'bare' || (destructive && learnedNothing(probe))) {
+        // The refusal's cause is what BOTH probes read (UnreadCause): a
+        // bare entry read is still worth naming when every read of the
+        // second look failed.
+        const before = probe;
+        probe = await this.detects(state.detect, this.ensureTimeoutMs);
+        if (probe.answer === 'yes') {
+          this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
+          return;
+        }
+        if (destructive && learnedNothing(probe)) {
+          const refusal = new UnreadTreeRefusal(name, flow, before, probe);
+          this.log(`⛔ reach ${flow}`, `refused: ${refusal.reason}`);
+          throw refusal;
+        }
+      }
+      if (destructive) {
         // ...unless the probe right before it never read a tree (2026-10-06,
         // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md)
         // or read only BARE ones (2026-10-07, docs/bugs/2026-10-06-second-
@@ -607,7 +642,8 @@ export class FlowEngine {
         // announced. Only the probe immediately before counts: a later probe
         // that READ a rendered tree and missed is real knowledge, and an
         // earlier readable one is stale. Cheap rungs still run on an unknown
-        // or bare probe, at once (they are how a ladder gets a tree to read),
+        // probe at once, and on a bare one after the same second look (since
+        // 2026-10-08, above) — they are how a ladder gets a tree to read —
         // and only a ladder applies the rule: `run_flow` never refuses the
         // flow's OWN body (the caller's own decision), though a `requires:`
         // inside it runs a ladder that does; the recovery pass never runs a
@@ -637,23 +673,8 @@ export class FlowEngine {
         // read nothing rendered is refused. It cannot outlast the measured
         // idb episode (minutes), so that is still refused; a transient longer
         // than the window is refused too, and retrying the call — or
-        // run_flow of the rung — is the fix.
-        if (learnedNothing(probe)) {
-          // The refusal's cause is what BOTH probes read (UnreadCause): a
-          // bare entry read is still worth naming when every read of the
-          // second look failed.
-          const before = probe;
-          probe = await this.detects(state.detect, this.ensureTimeoutMs);
-          if (probe.answer === 'yes') {
-            this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
-            return;
-          }
-          if (learnedNothing(probe)) {
-            const refusal = new UnreadTreeRefusal(name, flow, before, probe);
-            this.log(`⛔ reach ${flow}`, `refused: ${refusal.reason}`);
-            throw refusal;
-          }
-        }
+        // run_flow of the rung — is the fix. (The look itself is above, shared
+        // with the bare probe before a cheap rung.)
         this.log(
           `⚠ reach ${flow}`,
           'this rung is DESTRUCTIVE — it wipes app state, and any device registration with it. ' +
@@ -859,17 +880,23 @@ export class FlowEngine {
    */
   private async detects(cond: Condition, windowMs: number): Promise<Detection> {
     // Trees that held something rendered, and the last bare one's shape —
-    // asked only of a tree that MISSED: a match is "yes" whatever else the
-    // tree holds. (So an `absent: true` detect still answers "yes" on a bare
-    // tree, since nothing in it matches; that predates the bare answer and is
-    // not this probe's question.)
+    // asked only of a round that is not `yes`. Since 2026-10-08 `yes` is
+    // the condition module's three-valued answer (flow/condition.ts), which
+    // gives an `absent: true` leaf `unknown` on a bare tree rather than
+    // `yes` — until then "nothing in the decor matches" made an absent
+    // detect "already active" on a cold launch, the one hole this probe's
+    // bare answer left. A round that is not `yes` on a bare tree counts as
+    // bare whether the module said `unknown` or `no` (an absent leaf whose
+    // element the decor does show, `absent: { id: content }`): the probe's
+    // rule since 2026-10-07 is that a bare tree is not knowledge, and it is
+    // the side that never wipes.
     let rendered = 0;
     let lastBareTree: UiNode | undefined;
     const outcome = await pollTree(
       this.adapter,
       async (tree) => {
-        if (await this.matches(cond, tree)) return true;
-        if (isBareTree(tree)) lastBareTree = tree;
+        if ((await this.evaluate(cond, tree)) === 'yes') return true;
+        if (isBareTreeMemo(tree)) lastBareTree = tree;
         else rendered++;
         return undefined;
       },
@@ -1099,7 +1126,7 @@ export class FlowEngine {
     });
     this.log(
       result.clipped.length > 0 ? '⚠ scroll_until' : 'scroll_until',
-      `${describeSpec(element)} ${describeScrollResult(result)}`,
+      `${describeElementSpec(element)} ${describeScrollResult(result)}`,
     );
   }
 
@@ -1122,7 +1149,7 @@ export class FlowEngine {
     // not hide the keyboard) must not take the masked-append warning down
     // with it. The keyboard line (tracingDismissal's) comes first: it
     // happened first, before the focus tap.
-    if (warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${warning}`);
+    if (warning !== undefined) this.log('⚠ fill', `${describeElementSpec(spec)}: ${warning}`);
     // What the dismissal did (stage B, 2026-10-07): on the in-tree model it
     // may tap a configured element — said on the fill line, since the step
     // did it — or leave the keyboard up with a reason, a `⚠ fill` line like
@@ -1138,10 +1165,10 @@ export class FlowEngine {
         dismissKeyboard(this.adapter, { dismissals: this.dismissals, ambiguous: FLOW_AMBIGUITY }),
       );
     }
-    if (closed.warning !== undefined) this.log('⚠ fill', `${describeSpec(spec)}: ${closed.warning}`);
+    if (closed.warning !== undefined) this.log('⚠ fill', `${describeElementSpec(spec)}: ${closed.warning}`);
     this.log(
       'fill',
-      `${describeSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}` +
+      `${describeElementSpec(spec)} = ${secret ? '***' : value}${clear ? ' (cleared)' : ''}` +
         (closed.hiddenBy === undefined ? '' : `; keyboard hidden by ${closed.hiddenBy}`),
     );
   }
@@ -1178,11 +1205,23 @@ export class FlowEngine {
     return waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind);
   }
 
+  /**
+   * The first arm, in written order, whose `when:` is `yes` on a tree,
+   * polled for. Arm i is taken only when every arm before it is `no`: an
+   * earlier arm that is `unknown` (flow/condition.ts: a bare tree that
+   * cannot decide it) might win once the app renders, so that round decides
+   * nothing — not even a later arm that is `yes` on the same tree (an arm
+   * on the decor's own `content` is) — and the poll goes on; the timeout
+   * says when that was the last tree. Since 2026-10-08; until then an
+   * `absent: true` arm was taken on a cold launch's decor, where nothing
+   * matches anything.
+   */
   private async runBranch(arms: StepPayload<'branch'>): Promise<void> {
     const arm = await this.pollUntil(
       async (tree) => {
         for (const a of arms) {
-          if (await this.matches(a.when, tree)) return a;
+          const round = pollOnVerdict(await this.evaluate(a.when, tree), a);
+          if (round !== undefined) return round;
         }
         return undefined;
       },
@@ -1292,7 +1331,7 @@ export class FlowEngine {
         // when a target that did not come back is its `cause`: something was
         // sent.
         const absent = e instanceof ElementNotFoundError && !sighted;
-        this.log('optional', `skipped ${tap ? describeSpec(tap.spec) : 'step'} (${absent ? 'not present' : skipReason(e)})`);
+        this.log('optional', `skipped ${tap ? describeElementSpec(tap.spec) : 'step'} (${absent ? 'not present' : skipReason(e)})`);
       }
     }
   }
@@ -1318,7 +1357,7 @@ export class FlowEngine {
     await this.tracingDismissal('⚠ tap', () =>
       tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs, dismissals: this.dismissals }),
     );
-    if (!quiet) this.log('tap', describeSpec(spec));
+    if (!quiet) this.log('tap', describeElementSpec(spec));
   }
 
   /**
@@ -1364,35 +1403,36 @@ export class FlowEngine {
     }
   }
 
-  private async matches(cond: Condition, tree: UiNode): Promise<boolean> {
-    if (cond.element) {
-      const found = findBySpec(tree, cond.element);
-      if (!cond.absent) return found.length > 0;
-      // absent: gone from the tree OR nothing visibly on screen — the one
-      // meaning absentFromViewport owns, shared with the absent assert. The
-      // viewport is memoized by the adapter (adapters/types.ts): one device
-      // read per adapter, however many conditions ask.
-      return absentFromViewport(found, await this.adapter.viewport());
-    }
-    if (cond.state) {
-      const state = this.cfg.states[cond.state];
-      if (!state) throw new SetupError(`Unknown state "${cond.state}"`);
-      return this.matches(state.detect, tree);
-    }
-    if (cond.any) {
-      for (const c of cond.any) if (await this.matches(c, tree)) return true;
-      return false;
-    }
-    if (cond.all) {
-      for (const c of cond.all) if (!(await this.matches(c, tree))) return false;
-      return true;
-    }
-    return false;
+  /**
+   * One condition against one tree, three-valued — flow/condition.ts owns
+   * the rule; this supplies what it needs from the run: the states (an
+   * unknown name is the descriptor's fault, a SetupError, for a config
+   * parseConfig did not validate) and the viewport, memoized by the adapter
+   * (adapters/types.ts) — one device read per adapter, however many
+   * conditions ask. Until 2026-10-08 this was `matches`, a boolean, and its
+   * `absent` was absentFromViewport alone, `yes` on a bare tree.
+   */
+  private evaluate(cond: Condition, tree: UiNode): Promise<Verdict> {
+    return evaluateCondition(cond, tree, {
+      detectOf: (name) => {
+        const state = this.cfg.states[name];
+        if (!state) throw new SetupError(`Unknown state "${name}"`);
+        return state.detect;
+      },
+      viewport: () => this.adapter.viewport(),
+    });
   }
 
+  /**
+   * Wait for `cond` to be `yes`. `no` and `unknown` both keep polling: the
+   * screen may still change either way, and a wait on a state detected by
+   * an absence must not pass on a cold launch's decor (it did until
+   * 2026-10-08). A timeout whose last tree could not decide the condition
+   * says so beneath its headline (pollUntil), in place of `hint`.
+   */
   private async waitFor(cond: Condition, timeoutMs: number, what: string, hint?: string): Promise<void> {
     await this.pollUntil(
-      async (tree) => ((await this.matches(cond, tree)) ? true : undefined),
+      async (tree) => pollOnVerdict(await this.evaluate(cond, tree), true),
       timeoutMs,
       what,
       hint,
@@ -1408,16 +1448,31 @@ export class FlowEngine {
    * genuinely broken device stays diagnosable. A caller's `hint` (a probable
    * cause it knows, see waitTimeoutHint) is handed over as is — whether it
    * shows beneath a failed read is pollTimeoutMessage's rule, not this one's.
+   *
+   * Since 2026-10-08 the predicate is three-valued like the conditions it
+   * polls (flow/condition.ts): a value (done), `undefined` (the tree said
+   * no) or `Undecided` (the tree was bare and could not say; pollTree keeps
+   * that tree as `undecidedTree` while it is the last one read). Both misses
+   * keep polling. On a timeout, when the LAST tree read was undecided, the hint
+   * line is that tree's bareness (ui-tree/verdict.ts `bareTimeoutNote`) and
+   * what it means — the author's question is why a condition that may well
+   * hold was never seen to, and the answer is that the screen had not
+   * rendered. It replaces the caller's own hint (the idb container-id one):
+   * about a tree that held nothing, a hint on what the tree held would point
+   * the wrong way. A later rendered tree that said no clears it — the note
+   * is about the last tree only — and pollTimeoutMessage still drops it when
+   * the last READ failed, the fresher fact.
    */
   private async pollUntil<T>(
-    fn: (tree: UiNode) => Promise<T | undefined>,
+    fn: (tree: UiNode) => Promise<T | undefined | typeof Undecided>,
     timeoutMs: number,
     what: string,
     hint?: string,
   ): Promise<T> {
     const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
     if (!outcome.timedOut) return outcome.value;
-    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError, hint));
+    const bareNote = outcome.undecidedTree === undefined ? undefined : bareTimeoutNote(outcome.undecidedTree);
+    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? hint));
   }
 
   /**
@@ -1484,7 +1539,7 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
   // print the bare kind.
   const specSource = kind === 'wait' || kind === 'scroll_until' ? p.element : kind === 'tap' || kind === 'fill' ? p : undefined;
   if (specSource !== null && typeof specSource === 'object') {
-    const described = describeSpec(selectorOnly(specSource as Record<string, unknown>));
+    const described = describeElementSpec(selectorOnly(specSource as Record<string, unknown>));
     if (described !== '') return `${kind} ${described}`;
   }
   if (kind === 'wait' && typeof p.state === 'string') return `wait state:${JSON.stringify(p.state)}`;
@@ -1516,7 +1571,7 @@ export const idbContainerIdHint = (id: string): string =>
  * timeout a statement about the id: findBySpec ANDs every selector field
  * (ui-tree/selectors.ts conditionsOf), so `{ id, text }` can time out with
  * the id in every read and the text the one that never matched — and the
- * id-only presence check (`matches`: found.length > 0) is what makes "no
+ * id-only presence check (ui-tree/verdict.ts `presenceVerdict`: found.length > 0) is what makes "no
  * tree read contained this id" a fact rather than a guess. Under idb that
  * is what an identifier on a container looks like (idbContainerIdHint).
  * Everything else stays silent: `absent` waits are about something that
@@ -1537,17 +1592,9 @@ export function waitTimeoutHint(
   return idbContainerIdHint(spec.id);
 }
 
-function describeCondition(cond: Condition): string {
-  if (cond.element) return `element ${describeSpec(cond.element)}`;
-  if (cond.state) return `state ${cond.state}`;
-  if (cond.any) return `any(${cond.any.map(describeCondition).join(', ')})`;
-  if (cond.all) return `all(${cond.all.map(describeCondition).join(', ')})`;
-  return '(empty)';
-}
-
 /**
  * A tap step's `timeout:` is step configuration, not selector vocabulary —
- * strip it before the spec reaches findBySpec/describeSpec (it would match
+ * strip it before the spec reaches findBySpec/describeElementSpec (it would match
  * nothing and leak into traces). Returns the pure ElementSpec plus the parsed
  * override, if any.
  */

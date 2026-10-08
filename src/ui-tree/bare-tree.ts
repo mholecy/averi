@@ -9,10 +9,15 @@ import { rectArea } from './geometry.js';
  * by the flow engine's detect probe (flow/engine.ts `detects`: a probe whose
  * every tree was bare answers `bare`, not `no`, and the ladder will not run
  * a DESTRUCTIVE rung on it — docs/bugs/2026-10-06-second-look-reads-android-
- * decor-as-not-in-state.md). The question lives here, with the rest of what
- * is asked OF a tree, and so does the tree's shape (`treeShape`, `nodeCount`
- * at the end of this file) — a fact about the tree both askers quote; the
- * sentence around it lives with each asker.
+ * decor-as-not-in-state.md) — and, since 2026-10-08, by every element
+ * condition and the absent assert (ui-tree/verdict.ts: a selector's miss,
+ * or an absence, on a bare tree is `unknown`, never `yes`). The question
+ * lives here, with the rest of what is asked OF a tree, and so does the
+ * tree's shape (`treeShape`, `nodeCount` at the end of this file) — a fact
+ * about the tree every asker quotes. The sentence around it: ui_snapshot's
+ * note and the ladder's "every UI tree read was bare, the last one …" keep
+ * their own; the conditions' timeouts and the absent assert share ONE,
+ * verdict.ts#bareTimeoutNote.
  *
  * Measured (docs/bugs/2026-10-06-ui-snapshot-empty-right-after-launch.md,
  * and its addendum the same day): `role:button` → `[]` two seconds after
@@ -72,7 +77,13 @@ import { rectArea } from './geometry.js';
  * cannot be checked from the tree anyway and the note says to compare with
  * a screenshot before reading anything into it; and, on the safe side, a
  * small labelled overlay during load (LogBox, a Metro banner) makes a
- * loading tree non-bare; and a LOADED screen whose only non-wrapper nodes
+ * loading tree non-bare — safe for a presence check, but since 2026-10-08
+ * (verdict.ts) the unsafe direction for `absent:`, which such a tree now
+ * decides: measured on the iOS dev-client build, expo's "Downloading 100%…"
+ * banner over the splash let an absent-`login_username` wait pass ~1.6 s
+ * after a cold launch in 3 of 5 launches (docs/plans/
+ * 2026-10-08-round3-phase1-device-check.md); a development-build artefact,
+ * no release build shows it; and a LOADED screen whose only non-wrapper nodes
  * are identified-but-unlabeled images or spinners (icon-only RN Pressables
  * with a testID and no accessibilityLabel, an Android camera/QR screen whose
  * controls are clickable ImageViews without contentDescription) is called

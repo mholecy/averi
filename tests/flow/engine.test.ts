@@ -2167,13 +2167,17 @@ states:
 
   function fakeOn(screenName: 'transactions' | 'cards' | 'cards_offscreen') {
     resetLayout();
+    // The row is a rendered `text`: a screen of identified-but-unlabeled
+    // `other` nodes alone is BARE (ui-tree/bare-tree.ts), and since
+    // 2026-10-08 an absence on a bare tree is not "yes" (describe below).
+    const row = () => el({ role: 'text', identifier: 'row_0' });
     const screens = {
-      transactions: screen(el({ identifier: 'row_0' })),
-      cards: screen(el({ identifier: 'card_face' }), el({ identifier: 'row_0' })),
+      transactions: screen(row()),
+      cards: screen(el({ identifier: 'card_face' }), row()),
       // iOS-style: card face still in the tree but pushed off-viewport → counts as absent
       cards_offscreen: screen(
         node({ identifier: 'card_face', rect: { x: 0, y: -300, width: 100, height: 100 } }),
-        el({ identifier: 'row_0' }),
+        row(),
       ),
     };
     return new FakeAdapter(screens, screenName);
@@ -2373,7 +2377,10 @@ flows:
 
   it('falls through to a later arm when the earlier condition does not hold', async () => {
     resetLayout();
-    const fake = new FakeAdapter({ fresh: screen(el({ identifier: 'username_field' })) }, 'fresh');
+    // A rendered `textfield`: on a screen of identified-but-unlabeled `other`
+    // nodes alone (a BARE tree) arm 1 would be `unknown`, and an earlier arm
+    // that is `unknown` holds the round (runBranch) — nothing would be taken.
+    const fake = new FakeAdapter({ fresh: screen(el({ role: 'textfield', identifier: 'username_field' })) }, 'fresh');
     await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['username_field']);
   });
