@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
+import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillCaveats, fillField } from '../../src/interact/fill.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
@@ -424,12 +424,12 @@ describe('fillField refuses a control character before anything is sent', () => 
 describe('fillField — what it did, not what was asked (measured iOS idb shapes, 2026-10-08)', () => {
   const inputOf = (fake: FakeAdapter) => fake.live().children.find((n) => n.role === 'textfield');
 
-  it('a floated label (value held, label above the input): no delete, nothing typed — NOT verified, cleared 0, the input named', async () => {
+  it('a floated label (value held, label above the input): no delete, nothing typed — NOT verified, clear unmeasured, the input named', async () => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     const result = await fillField(fake, 'text:"IBAN*"', 'DE89370400440532013000', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]); // the label has no value: no length, no delete
     expect(inputOf(fake)?.value).toBe('XX12345'); // nothing reached the field — as measured
-    expect(result).toMatchObject({ role: 'text', cleared: 0, readBack: 'no-value' });
+    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: 'no-value' });
     expect(result.notInput).toEqual({
       input: { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 366, width: 350, height: 30 }, overlaps: false },
     });
@@ -439,7 +439,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const fake = idbFloatingLabelFake('Value*', null);
     const result = await fillField(fake, 'text:"Value*"', '7.25', { ...FAST, clear: true });
     expect(inputOf(fake)?.value).toBe('7.25'); // a refusal would have broken this fill
-    expect(result).toMatchObject({ role: 'text', cleared: 0, readBack: 'no-value' });
+    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: 'no-value' });
     expect(result.notInput).toEqual({ input: expect.objectContaining({ overlaps: true }) });
   });
 
@@ -480,15 +480,152 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result).toMatchObject({ role: 'other', readBack: 'landed', notInput: undefined });
   });
 
-  it('a non-input whose value never changes fails as before, and the error names the input it is not', async () => {
+  // m-4 (review 2026-10-08): a WDA StaticText exposes its label as its value.
+  it('a non-input whose value never changes is NOT the field: no throw, no delete, readBack unchanged, the input named', async () => {
     resetLayout();
     const fake = new FakeAdapter(
-      { s: screen(node({ role: 'text', identifier: 'title', value: 'Hello', rect: { x: 0, y: 0, width: 100, height: 10 } }), el({ role: 'textfield', identifier: 'name' })) },
+      { s: screen(node({ role: 'text', identifier: 'title', value: 'Meno', rect: { x: 0, y: 0, width: 100, height: 10 } }), el({ role: 'textfield', identifier: 'name' })) },
       's',
     );
+    const appended = await fillField(fake, 'id:title', 'e', FAST); // "Meno".includes("e") — no proof
+    expect(appended).toMatchObject({ role: 'text', readBack: 'unchanged', notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
+    const cleared = await fillField(fake, 'id:title', 'abc', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([]); // m-5: "Meno".length is not the field's
+    expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: 'unchanged' });
+  });
+
+  it('a non-input whose value MOVES but not to the value still fails, and the error names the input it is not', async () => {
+    resetLayout();
+    const title = node({ role: 'text', identifier: 'title', value: 'Hello', rect: { x: 0, y: 0, width: 100, height: 10 } });
+    const fake = new FakeAdapter({ s: screen(title, el({ role: 'textfield', identifier: 'name' })) }, 's');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      fake.live().children[0].value = 'Hellx'; // it changed — but not by what was typed
+    };
     await expect(fillField(fake, 'id:title', 'abc', FAST)).rejects.toThrow(
       /^fill: typed 3 characters but the field shows 5 \(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"name"/,
     );
+  });
+
+  it('M-1: a clear ALONE on a label with no value sends no delete and says so — not an empty field', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const result = await fillField(fake, 'text:"IBAN*"', '', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([]);
+    expect(inputOf(fake)?.value).toBe('XX12345');
+    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: 'nothing-typed' });
+  });
+
+  it('an input-like node of another role (an iOS search field reads `other`) with clear still ends as the value: the retry wipes it', async () => {
+    resetLayout();
+    const search = el({ role: 'other', identifier: 'search', value: 'old' });
+    const fake = new FakeAdapter({ s: screen(search) }, 's');
+    const live = () => fake.live().children[0];
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      live().value = (live().value ?? '') + text;
+    };
+    fake.clearText = async (count: number) => {
+      fake.deletes.push(count);
+      live().value = (live().value ?? '').slice(0, -count) || null;
+    };
+    const result = await fillField(fake, 'id:search', 'milk', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([7]); // "oldmilk" — the observed value, not the unmeasured start
+    expect(live().value).toBe('milk');
+    expect(result).toMatchObject({ role: 'other', cleared: 'unmeasured', readBack: 'landed', notInput: undefined });
+  });
+
+  // m-2 (review 2026-10-08): identity is not screen identity.
+  it('the identity fallback does not read a NEXT screen whose field shares the id and rect', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const next = node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        node({ role: 'textfield', identifier: 'TextFieldWithComponentStyle', value: 'DE89370400440532013000', rect: { x: 26, y: 366, width: 350, height: 30 } }),
+        node({ role: 'button', identifier: 'confirm', rect: { x: 26, y: 600, width: 350, height: 40 } }),
+      ],
+    });
+    (fake as unknown as { screens: Record<string, UiNode> }).screens.next = next;
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      await origType(text);
+      fake.current = 'next'; // typing submitted and navigated
+    };
+    const result = await fillField(fake, 'role:textfield value:"XX12345"', 'abc', { ...FAST, clear: true });
+    expect(result.readBack).toBe('no-value'); // not a false "landed" off screen B's field
+  });
+
+  it('the identity fallback is not asked after typing when nothing was read before it', async () => {
+    // Without clear on a plain field holding text, no tree is read before
+    // typing: there is no screen to compare with, so the value selector's
+    // read-back is honestly unverifiable.
+    const fake = idbFloatingLabelFake('IBAN*', 'XX');
+    const result = await fillField(fake, 'role:textfield value:"XX"', 'abc', FAST);
+    expect(inputOf(fake)?.value).toBe('XXabc');
+    expect(result.readBack).toBe('no-value');
+  });
+
+  describe('sameField matches exactly one node of the same role, id and rect', () => {
+    const at = { x: 26, y: 366, width: 350, height: 30 };
+    const fill = (extra: UiNode) => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      fake.live().children.push(extra);
+      return fillField(fake, 'role:textfield value:"XX12345"', 'DE89', { ...FAST, clear: true });
+    };
+    it('a second twin (same role, id, rect) makes it refuse: NOT verified', async () => {
+      // With the twin the selector is two matches pre-tap; 'first' picks the real field.
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      fake.live().children.push(node({ role: 'textfield', identifier: 'TextFieldWithComponentStyle', value: 'other', rect: { ...at } }));
+      const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89', { ...FAST, clear: true });
+      expect(result.readBack).toBe('no-value');
+    });
+    it('a node at the same rect with another role, or another id, is not a twin: verified', async () => {
+      expect((await fill(node({ role: 'text', identifier: 'TextFieldWithComponentStyle', rect: { ...at } }))).readBack).toBe('landed');
+      expect((await fill(node({ role: 'textfield', identifier: 'other_id', rect: { ...at } }))).readBack).toBe('landed');
+    });
+  });
+
+  it('the nearest input is named by its identifier only — never its label or value, which may be a credential', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        s: screen(
+          node({ role: 'text', identifier: 'pw_label', label: 'Password', rect: { x: 0, y: 0, width: 100, height: 10 } }),
+          node({ role: 'textfield', identifier: null, label: 'hunter2', value: 'hunter2', rect: { x: 0, y: 20, width: 100, height: 10 } }),
+          node({ role: 'textfield', identifier: 'collapsed', rect: { x: 50, y: 0, width: 0, height: 10 } }), // zero-area, touching the label: never a candidate
+        ),
+      },
+      's',
+    );
+    const result = await fillField(fake, 'id:pw_label', 'x', FAST);
+    expect(result.notInput).toEqual({ input: { identifier: null, rect: { x: 0, y: 20, width: 100, height: 10 }, overlaps: false } });
+    const sentence = fillCaveats(result).join('\n');
+    expect(sentence).not.toContain('hunter2');
+    expect(sentence).toContain('the nearest input is textfield at 0,20 100x10');
+  });
+
+  it('the not-input finding reuses the read-back\'s tree; only a fill with no read at all reads one', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++, real());
+    await fillField(fake, 'text:"IBAN*"', 'a', FAST);
+    expect(reads).toBe(5); // settle (2) + post-focus length read (1) + value poll (2) — no extra read for the finding
+    reads = 0;
+    await fillField(fake, 'text:"IBAN*"', '', FAST);
+    expect(reads).toBe(3); // settle (2) + the one read the finding needs
+  });
+
+  it('a dropped clear re-cleared on its second pass still reports what the field held when the clear BEGAN', async () => {
+    const fake = formFake('2.50');
+    let swallow = 1;
+    const origClear = fake.clearText.bind(fake);
+    fake.clearText = async (count: number) => {
+      if (swallow-- > 0) return origClear(Math.max(0, count - 2));
+      return origClear(count);
+    };
+    const result = await fillField(fake, { id: 'amount_input' }, '7', { ...FAST, clear: true });
+    expect(result.cleared).toBe(4); // not the 2 the second pass deleted
   });
 
   it('Android: an EditText resolved directly is verified, says what it cleared, and carries no finding', async () => {

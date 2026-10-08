@@ -623,11 +623,22 @@ describe('type_text on the measured iOS idb floating label (2026-10-08)', () => 
     expect(result.isError).toBe(false);
     expect(result.text).toBe(
       'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
-        'clear sent no delete — the node gave no length to delete\n' +
+        "clear sent no delete — a role text node's length is not the field's\n" +
         '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
         'the nearest input is textfield id:"TextFieldWithComponentStyle" at 26,366 350x30 — ' +
         'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
     );
+    expect(fake.deletes).toEqual([]);
+  });
+
+  it('M-1: an empty text with clear on the label (the documented way to empty a field) is NOT verified, not "Filled … (0 characters)"', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', selector: 'text:"IBAN*"', text: '', clear: true, configPath: missing() });
+    expect(result.text.split('\n')[0]).toBe(
+      "Typed 0 characters into text:\"IBAN*\" — NOT verified: clear sent no delete — a role text node's length is not the field's",
+    );
+    expect(result.text).toContain('⚠ the matched node is role text, not a textfield — nothing was deleted');
     expect(fake.deletes).toEqual([]);
   });
 

@@ -32,11 +32,24 @@ describe('tap and type_text response lines', () => {
 
   // docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
   // the reply printed the REQUESTED clear and passed an unreadable read-back.
-  it('a clear that sent no delete is not "cleared": an empty field says nothing, a node with no value says so', () => {
+  it('a clear that sent no delete is not "cleared": an empty field says nothing, a node with no value or no length of its own says so', () => {
     expect(fillText('id:amount', { length: 4, ...landed, cleared: 0 })).toBe('Filled id:amount (4 characters)');
-    expect(fillText('text:"IBAN*"', { length: 22, role: 'text', readBack: 'no-value', cleared: 0 })).toBe(
-      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
+    expect(fillText('id:pw', { length: 6, role: 'textfield', readBack: 'no-value', cleared: 0 })).toBe(
+      'Typed 6 characters into id:pw — NOT verified: the matched node exposes no value (role textfield); ' +
         'clear sent no delete — the node gave no length to delete',
+    );
+    expect(fillText('text:"IBAN*"', { length: 22, role: 'text', readBack: 'no-value', cleared: 'unmeasured' })).toBe(
+      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
+        "clear sent no delete — a role text node's length is not the field's",
+    );
+    // M-1 (review 2026-10-08): a clear ALONE on a label was "Filled … (0 characters)".
+    expect(fillText('text:"IBAN*"', { length: 0, role: 'text', readBack: 'nothing-typed', cleared: 'unmeasured' })).toBe(
+      'Typed 0 characters into text:"IBAN*" — NOT verified: clear sent no delete — a role text node\'s length is not the field\'s',
+    );
+    // A clear whose read-back LANDED needs no caveat: the field shows exactly the value.
+    expect(fillText('id:search', { length: 4, role: 'other', readBack: 'landed', cleared: 'unmeasured' })).toBe('Filled id:search (4 characters)');
+    expect(fillText('id:title', { length: 1, role: 'text', readBack: 'unchanged' })).toBe(
+      "Typed 1 characters into id:title — NOT verified: the matched node's value never changed (role text) — it is not the field",
     );
   });
 
@@ -60,7 +73,7 @@ describe('tap and type_text response lines', () => {
     );
     expect(fillText('text:"Hi"', { length: 0, role: 'text', readBack: 'nothing-typed', notInput: { input: 'unread' } })).toBe(
       'Filled text:"Hi" (0 characters)\n' +
-        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; the screen could not be read again to name the input',
+        '⚠ the matched node is role text, not a textfield — nothing was deleted, and the focus is wherever the tap left it; the screen could not be read again to name the input',
     );
   });
 });

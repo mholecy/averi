@@ -2225,10 +2225,20 @@ flows:
         action: '⚠ fill',
         detail:
           'text:"IBAN*" = DE89370400440532013000 — NOT verified: the matched node exposes no value (role text); ' +
-          'clear sent no delete — the node gave no length to delete',
+          "clear sent no delete — a role text node's length is not the field's",
       });
       expect(trace.some((t) => t.action === 'fill')).toBe(false);
       expect(trace.some((t) => (t.detail ?? '').includes('(cleared'))).toBe(false);
+    });
+
+    it('M-1: a clear-only fill on the label is a ⚠ fill line, NOT verified', async () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      const trace = await FlowEngine.run(iosCfg('{ text: "IBAN*", value: "", clear: true }'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({
+        action: '⚠ fill',
+        detail: "text:\"IBAN*\" =  — NOT verified: clear sent no delete — a role text node's length is not the field's",
+      });
+      expect(fake.deletes).toEqual([]);
     });
 
     it('the input itself, by role and its old value: a plain fill line with the characters it cleared', async () => {
