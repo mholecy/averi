@@ -1,4 +1,4 @@
-import { usableScreen, type DeviceAdapter, type DeviceScreen, type Rect, type Stroke } from '../adapters/types.js';
+import { usableScreen, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
 import { inferScreenSize, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
@@ -43,6 +43,72 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
   const awayFrom = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
   return meaning === 'finger' ? finger[direction] : finger[awayFrom[direction]];
 }
+
+/**
+ * `swipeVector` over `box` with a soft keyboard whose top edge lies at
+ * `keyboardTop` — the stroke `scroll_until` draws while a keyboard covers
+ * the bottom of the screen (interact/scroll.ts). The stroke over the WHOLE
+ * box, as without a keyboard, with only the point(s) that would land too
+ * close to the keyboard pulled up to `clearLine`; nothing else moves.
+ *
+ * Why not the stroke over the box above the keyboard (2026-10-08, the first
+ * fix of docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md,
+ * undone by its iOS device check the same day): that box's top is the
+ * screen's top, so every point of the stroke moved up with its centre. A
+ * content-UP stroke (finger down) then STARTED at 0.2 of the uncovered
+ * height — y 114 of the 0–572 box above the WDA pad on a 874-pt iPhone —
+ * inside the app's top bar (≈ y 0–116), and the app ignored it: six swipes,
+ * nothing moved. Without a keyboard it starts at 0.2 of the screen, y 175,
+ * below the bar, and works; measured by hand, `(201,114) → (201,458)` moved
+ * nothing, `(201,160) → (201,458)` moved the row. So the upper point stays
+ * where the keyboard-less stroke has it: no stroke starts or ends higher
+ * than it did without a keyboard.
+ *
+ * Why `clearLine` and not just above the keyboard's edge: the app's own
+ * chrome is often pinned right on top of the keyboard — the measured form
+ * keeps its CONTINUE bar at y 512–556 over the pad's 572 — and a stroke
+ * starting there drags a button, not the content. `clearLine` is the lower
+ * point of the stroke the first fix drew over the uncovered box, 0.8 of its
+ * height (y 458 of 572 on iOS, 1118 of 1398 on the Android IME), a fifth
+ * of the uncovered height clear of the keyboard: the one lower point both
+ * device checks measured starting on the content.
+ *
+ * What that does to the strokes (one rule, every direction):
+ * - content down (finger up): `clearLine` → the keyboard-less upper point.
+ *   iOS 458 → 175 (283 pt; the first fix's 458 → 114 was 344 pt and flung
+ *   the SwiftUI form ~730–800 pt, past the target — a shorter stroke is a
+ *   slower one at the adapter's fixed duration); Android 1118 → 444 (674 px;
+ *   the first fix's 1118 → 280, 838 px, moved the Compose form 637 px a
+ *   swipe on the device — the start is unchanged, the end 164 px lower).
+ * - content up (finger down): the same points the other way, starting at
+ *   the keyboard-less 175 / 444.
+ * - left/right: the keyboard-less horizontal stroke through the screen's
+ *   centre line, pulled up to `clearLine` only when the keyboard reaches
+ *   above it (a keyboard over more than ~60 % of the screen, unmeasured).
+ * - Fallback: when pulling the lower point leaves a vertical stroke shorter
+ *   than half the uncovered box's own stroke — a keyboard over more than
+ *   ~60 % of the screen (landscape, unmeasured) — the stroke over the
+ *   uncovered box, as the first fix drew it: a near-zero drag is a tap, and
+ *   a tap is never what a scroll should send.
+ *
+ * `keyboardTop` must lie inside the box (the caller fails before stroking
+ * when a keyboard leaves nothing above it; scroll.ts#coverOf). Pure.
+ */
+export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Direction, meaning: SwipeMeaning): Stroke {
+  const uncovered = { ...box, height: Math.min(box.height, keyboardTop - box.y) };
+  const inUncovered = swipeVector(uncovered, direction, meaning);
+  const line = clearLine(uncovered);
+  const whole = swipeVector(box, direction, meaning);
+  const pull = (p: Point): Point => ({ x: p.x, y: Math.min(p.y, line) });
+  const pulled = { from: pull(whole.from), to: pull(whole.to) };
+  const vertical = direction === 'up' || direction === 'down';
+  const reach = (s: Stroke): number => Math.abs(s.to.y - s.from.y);
+  return vertical && reach(pulled) < reach(inUncovered) / 2 ? inUncovered : pulled;
+}
+
+/** The lowest y a stroke over a keyboard may touch (`swipeVectorAbove`): the lower point of `swipeVector`'s vertical stroke over the box the keyboard leaves. */
+const clearLine = (uncovered: Rect): number =>
+  uncovered.y + Math.round(uncovered.height / 2) + Math.round(uncovered.height * SWIPE_REACH_FRACTION);
 
 /** The box a screen gesture swipes in, and what the caller should say about where it came from. */
 export interface ScreenBox {

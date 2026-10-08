@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { screenBox, swipeScreen } from '../../src/interact/swipe.js';
+import { screenBox, swipeScreen, swipeVector, swipeVectorAbove } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -223,10 +223,58 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
       children: [node({ identifier: 'far', rect: { x: 0, y: 90_000, width: 100, height: 10 } })],
     });
     const scrolled = device(root, { width: 1080, height: 2400 });
-    await expect(scrollUntilVisible(scrolled, 'id:far', { maxSwipes: 1 })).rejects.toThrow(/after 1 swipes/);
+    await expect(scrollUntilVisible(scrolled, 'id:far', { maxSwipes: 1 })).rejects.toThrow(/after 1 swipe\b/); // the node never moves: content exhausted after the one stroke
     const swiped = device(root, { width: 1080, height: 2400 });
     await swipeScreen(swiped, { direction: 'up', meaning: 'finger' });
     expect(scrolled.swipes).toEqual([{ from: { x: 1200, y: 864 }, to: { x: 1200, y: 216 } }]);
     expect(swiped.swipes).toEqual([{ from: { x: 1200, y: 864 }, to: { x: 1200, y: 216 } }]);
+  });
+});
+
+/**
+ * 2026-10-08, the iOS device check of
+ * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md: the
+ * stroke drawn over a keyboard is the whole screen's, with only the point on
+ * or near the keyboard pulled up to the clear line (0.8 of the uncovered
+ * height) — never the stroke over the box above it, whose content-up start
+ * lay in the app's top bar.
+ */
+describe('swipeVectorAbove — the whole screen\'s stroke, kept clear of a keyboard', () => {
+  /** The measured iPhone 17 (402x874 pt) and the WDA pad's band top (0 572 402 302). */
+  const IOS = { x: 0, y: 0, width: 402, height: 874 };
+  /** The measured Pixel_3a (1080x2220) and its IME's top edge ([0,1398][1080,2220]). */
+  const ANDROID = { x: 0, y: 0, width: 1080, height: 2220 };
+
+  it('iOS, content UP (finger down): starts at y 175, as without a keyboard — not at 114 in the top bar, where the stroke over the box above the pad started and moved nothing', () => {
+    expect(swipeVectorAbove(IOS, 572, 'up', 'content')).toEqual({ from: { x: 201, y: 175 }, to: { x: 201, y: 458 } });
+    expect(swipeVector({ ...IOS, height: 572 }, 'up', 'content').from.y).toBe(114); // the first fix's start, measured dead
+  });
+
+  it('iOS, content DOWN (finger up): from the clear line 458 (on the content, as measured) to 175 — 283 pt, shorter than the 344 pt that flung the form past its target', () => {
+    expect(swipeVectorAbove(IOS, 572, 'down', 'content')).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 175 } });
+  });
+
+  it('Android: the start stays where the device check measured it scrolling (y 1118), the end is the keyboard-less 444 — 674 px instead of 838', () => {
+    expect(swipeVectorAbove(ANDROID, 1398, 'down', 'content')).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 444 } });
+    expect(swipeVectorAbove(ANDROID, 1398, 'up', 'content')).toEqual({ from: { x: 540, y: 444 }, to: { x: 540, y: 1118 } });
+  });
+
+  it('a point clear of the keyboard is never moved: a band low on the screen leaves the keyboard-less stroke as it was, except a start within a fifth of the uncovered height of it', () => {
+    // Band at 2100: the clear line is 1680, so the keyboard-less start 1776 comes up; 444 stays.
+    expect(swipeVectorAbove(ANDROID, 2100, 'down', 'content')).toEqual({ from: { x: 540, y: 1680 }, to: { x: 540, y: 444 } });
+  });
+
+  it('left/right: the keyboard-less stroke through the screen\'s centre line (y 437 on iOS, not the 286 centre of the box above the pad)', () => {
+    expect(swipeVectorAbove(IOS, 572, 'right', 'content')).toEqual(swipeVector(IOS, 'right', 'content'));
+    expect(swipeVectorAbove(IOS, 572, 'left', 'content').from.y).toBe(437);
+    // A keyboard reaching above the centre line: the line is pulled up to the clear line (0.8 × 400 = 320).
+    expect(swipeVectorAbove(IOS, 400, 'left', 'content')).toEqual({ from: { x: 80, y: 320 }, to: { x: 322, y: 320 } });
+  });
+
+  it('a keyboard over most of the screen (unmeasured): when the pulled stroke would be shorter than half the uncovered box\'s own, the box\'s stroke — never a near-zero drag, which is a tap', () => {
+    // Band at 262 (0.3 of 874): the clear line is 210, the keyboard-less top 175 — a 35-pt drag; the box's own is 158.
+    expect(swipeVectorAbove(IOS, 262, 'down', 'content')).toEqual(swipeVector({ ...IOS, height: 262 }, 'down', 'content'));
+    // Band at 400: the pulled stroke (320 → 175, 145 pt) keeps more than half of the box's (240 pt): kept.
+    expect(swipeVectorAbove(IOS, 400, 'down', 'content')).toEqual({ from: { x: 201, y: 320 }, to: { x: 201, y: 175 } });
   });
 });

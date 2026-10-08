@@ -6,7 +6,7 @@ import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
 import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
-import { judgingScreen, screenBox, swipeVector, type Direction, type JudgingScreen } from './swipe.js';
+import { judgingScreen, screenBox, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -205,6 +205,63 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.band)}`;
 
 /**
+ * How many reads a stop reached after a stroke may spend waiting for the
+ * target to hold still before it is reported anyway (2026-10-08, the iOS
+ * device check of docs/bugs/2026-10-08-scroll-until-ignores-android-soft-
+ * keyboard.md). A stop after a stroke is CONFIRMED: one more read after a
+ * further settle, in which the target's rect is unchanged and the stop
+ * still holds. Measured under WDA: the 400 ms settle read caught a
+ * SwiftUI form mid-fling with the row inside the viewport — "fully visible
+ * after 1 swipe" — and a read 1 s later had it at y -48 / -121 / -133,
+ * behind the top bar, three runs of three. Settled at the first confirming
+ * read, the cost is that one read (a stop at 0 swipes sent no stroke and
+ * costs none). A target still moving inside the viewport is read again, up
+ * to this many reads a stroke, then reported as last read: a fling is over
+ * well inside 3 × 400 ms plus the reads, and a target that never holds
+ * still (an animated row, a marquee) must not hold the scroll until its
+ * timeout — the read before the report saw it inside the viewport, as
+ * every stop did before. The confirming reads count against `timeoutMs`
+ * (a stop reached at the deadline is reported unconfirmed), not against
+ * `maxSwipes`: they send nothing.
+ */
+const SETTLE_CONFIRM_READS = 3;
+
+/** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
+const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+/**
+ * The target lies BEYOND the edge of `frame` that a scroll toward
+ * `direction` moves content out through — past that far edge, or across
+ * it — and not across the near one: for content below (down) the content
+ * moves up, so its top above the frame's top and its bottom inside the
+ * frame or above it; for content above (up), mirrored at the frame's
+ * bottom (the keyboard's top edge, when the frame is the screen above
+ * one); likewise sideways. Content comes in through the near edge, so a
+ * target that was ever read short of this and is now beyond it was carried
+ * across the frame by a fling (`scrollUntilVisible`; measured under WDA:
+ * 613 → -357 in one swipe; 681 → -48 for a 52-pt row whose last 4 pt stay
+ * on screen behind the top bar) — and swiping the same way again only
+ * pushes it further out. A target clipped at BOTH edges (taller than the
+ * frame) is not beyond either: turning back could not help it.
+ */
+function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
+  const top = rect.y < frame.y;
+  const bottom = rect.y + rect.height > frame.y + frame.height;
+  const left = rect.x < frame.x;
+  const right = rect.x + rect.width > frame.x + frame.width;
+  switch (direction) {
+    case 'down':
+      return top && !bottom;
+    case 'up':
+      return bottom && !top;
+    case 'right':
+      return left && !right;
+    case 'left':
+      return right && !left;
+  }
+}
+
+/**
  * Swipe until the element is present AND visibly inside the viewport
  * (ARCHITECTURE.md §4, C1). Throws with a diagnosis of the last tree.
  *
@@ -243,8 +300,10 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
  * Android, one query a round; the WDA band on iOS, no device read) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
  * shown keyboard (`coverOf`): an element under it scores 0 or is clipped at
- * the keyboard's edge, and the stroke is the same `swipeVector` over that
- * smaller box, so it starts on the content. The keyboard's own nodes (a key
+ * the keyboard's edge, and the stroke keeps clear of it
+ * (`swipeVectorAbove`: the whole screen's stroke, its point on or near the
+ * keyboard pulled up — since the iOS device check, below), so it starts on
+ * the content. The keyboard's own nodes (a key
  * as the target) are judged against the whole screen, as `readSoftKeyboard`
  * reads them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
  * as before — the guard's fail-open rule; an unread tree strokes in the box
@@ -296,7 +355,33 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
  * the stroke moves it up out from under the band. What it cannot do — the
  * last rows of a container that does not resize for the keyboard stay under
  * it at the end of the content — is a `fully: true` failure that names the
- * keyboard and the way to hide it, not a "fully visible".
+ * keyboard and the way to hide it, not a "fully visible"; a row WHOLLY
+ * under it there fails the same way after the one swipe that did not move
+ * it (below), not at the timeout.
+ *
+ * The device check of that fix (2026-10-08, the note's two "Device check"
+ * sections) found three more things, each fixed where it lives:
+ * - The stroke (`swipeVectorAbove`): drawn over the box above the keyboard,
+ *   a content-up stroke started in the app's top bar and moved nothing
+ *   under WDA; it is now the whole screen's stroke with only its point on or
+ *   near the keyboard pulled up.
+ * - The stop is SETTLED (`SETTLE_CONFIRM_READS`): a stop reached after a
+ *   stroke is reported only once a further read, after another settle,
+ *   finds the target where the stop's read did and the stop still holds —
+ *   under WDA the settle read caught a flung row inside the viewport,
+ *   "fully visible after 1 swipe", and it came to rest at y -48 to -133.
+ *   A target that moved is judged from the new read like any round; one
+ *   that never holds still is reported after the budget. A fling that
+ *   carried the target across the frame — beyond its far edge, after a
+ *   read saw it short of that (`beyondFarEdge`) — turns the next stroke
+ *   round, instead of swiping on into exhausted content (measured: 613 →
+ *   -357, then five swipes down that moved nothing).
+ * - Exhausted off the frame: a target in the tree but off the frame whose
+ *   rect a stroke did not move fails then, with the stop bound's words
+ *   (they name the keyboard and the remedy), cause "content exhausted" —
+ *   measured on Android, the form's last field under the IME swiped for the
+ *   whole 15 s. The same stuck rule as the `fully: true` clipped stop, and
+ *   like it only after a stroke: a confirming read sent none.
  *
  * The floating keyboard (docs/bugs/2026-10-05-android-floating-gboard-
  * keyboard.md, inferred): on a failed stop, and on a `fully: true` stop —
@@ -344,12 +429,23 @@ export async function scrollUntilVisible(
   let everFound = false;
   let treesRead = 0;
   let lastReadError: Error | undefined;
-  // The best candidate seen so far, and whether the last swipe moved it. A
-  // swipe that does not move the element is the only honest signal that the
-  // container has nothing left to scroll — distinguishing "give it another
-  // swipe" from "this element CANNOT be fully revealed", which is a real
-  // layout defect rather than an impatient loop.
+  // The best candidate at the last read that had one, and whether the last
+  // swipe moved it. A swipe that does not move the element is the only
+  // honest signal that the container has nothing left to scroll —
+  // distinguishing "give it another swipe" from "this element CANNOT be
+  // fully revealed", which is a real layout defect rather than an impatient
+  // loop — and, for a target in the tree but off the frame, from "swipe
+  // until the timeout" (2026-10-08, below).
   let prevRect: Rect | undefined;
+  /** A stroke was sent since the last read: only then can an unmoved rect mean the content is exhausted. */
+  let stroked = false;
+  /** The last round stopped after a stroke and read again to confirm it (SETTLE_CONFIRM_READS); how many such reads this stroke has spent. */
+  let confirming = false;
+  let confirmReads = 0;
+  /** Some read saw the target SHORT of the far edge (`beyondFarEdge`) — so a later read beyond it means a fling carried it across. */
+  let seenShort = false;
+  /** Where the content lay for the last stroke sent: `direction`, or its opposite after a fling past the target. For "swiping … no longer moves it". */
+  let lastStroke: Direction = direction;
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   let lastCover: Cover | undefined;
   let coveredRounds = 0;
@@ -357,11 +453,16 @@ export async function scrollUntilVisible(
   let lastReadCover: Cover | undefined;
   /** On a failed or `fully: true` stop only: the floating row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
   const unlocatedAt = async (round: SoftKeyboard | undefined): Promise<boolean> => round !== undefined && (await keyboardUnlocated(adapter, round));
-  for (let swipes = 0; ; swipes++) {
+  let swipes = 0;
+  for (;;) {
     // A failed read is a miss, not a failure — see readTreeOrError.
     const read = await readTreeOrError(adapter);
     const { tree, error } = read;
     lastReadError = error;
+    const afterStroke = stroked;
+    stroked = false;
+    const wasConfirming = confirming;
+    confirming = false;
     if (tree !== undefined) {
       treesRead++;
       frame = await frameOf(read);
@@ -394,8 +495,25 @@ export async function scrollUntilVisible(
       coveredRounds++;
     }
     if (tree !== undefined) lastReadCover = cover;
+    // Did the target move since the last read that had one? `stuck` only
+    // when a stroke was sent in between — a confirming read sent none.
+    const previous = prevRect;
+    if (best !== undefined) prevRect = { ...best.node.rect };
+    const unmoved = best !== undefined && previous !== undefined && rectsEqual(previous, best.node.rect);
+    const stuck = afterStroke && unmoved;
     if (best !== undefined && best.visible > 0) {
       if (!fully || best.clipped.length === 0) {
+        // A stop after a stroke is reported only once a read finds the
+        // target where the last one did (SETTLE_CONFIRM_READS): a fling can
+        // carry it on, or out of the frame, after the settle read caught it
+        // inside. A stop at 0 swipes was not stroked: reported at once.
+        const settled = swipes === 0 || (wasConfirming && unmoved);
+        if (!settled && confirmReads < SETTLE_CONFIRM_READS && Date.now() < deadline) {
+          confirming = true;
+          confirmReads++;
+          await sleep(settleMs);
+          continue;
+        }
         // Shown only when THIS stop was judged under a band the witness stood
         // by this round — never a band checked on an earlier round.
         const keyboard: ScrollUntilResult['keyboard'] =
@@ -407,8 +525,6 @@ export async function scrollUntilVisible(
         return { swipes, visible: best.visible, clipped: best.clipped, ...(keyboard !== undefined && { keyboard }) };
       }
       // fully: true and still clipped — only a swipe that MOVES it can help.
-      const stuck = prevRect !== undefined && rectsEqual(prevRect, best.node.rect);
-      prevRect = { ...best.node.rect };
       if (stuck) {
         const n = swipesText(swipes);
         // Clipped at the keyboard's edge at the end of the content: the
@@ -419,7 +535,7 @@ export async function scrollUntilVisible(
         if (best.under !== undefined && best.clipped.includes('bottom')) {
           throw new Error(
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-              `${describeClip(best.clipped, best.visible, best.under.band)}, and the content is exhausted: swiping ${direction} ` +
+              `${describeClip(best.clipped, best.visible, best.under.band)}, and the content is exhausted: swiping ${lastStroke} ` +
               `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(best.under.remedy)}; only if it ` +
               `stays clipped with the keyboard down is it a layout defect. ` +
               `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
@@ -428,12 +544,20 @@ export async function scrollUntilVisible(
         throw new Error(
           `scroll_until ${describe} failed after ${n} — ` +
             `element is in the viewport but ${describeClip(best.clipped, best.visible, best.under?.band)}, ` +
-            `and the content is exhausted: swiping ${direction} no longer moves it. ` +
+            `and the content is exhausted: swiping ${lastStroke} no longer moves it. ` +
             `The element cannot be fully revealed — that is a layout defect ` +
             `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
             `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
         );
       }
+    }
+    // A confirming read that did not read: read again, within the same
+    // budget, rather than stroke away from a stop the last read saw.
+    if (wasConfirming && tree === undefined && confirmReads < SETTLE_CONFIRM_READS && Date.now() < deadline) {
+      confirming = true;
+      confirmReads++;
+      await sleep(settleMs);
+      continue;
     }
     // A keyboard that leaves nothing above it: nothing but its own UI can be
     // judged, and no stroke can start on the content — fail now, naming it,
@@ -452,7 +576,19 @@ export async function scrollUntilVisible(
         { sighted: everFound, treesRead, readError: lastReadError },
       );
     }
-    if (swipes >= maxSwipes || Date.now() >= deadline) {
+    // In the tree, off the frame, and the last stroke did not move it
+    // (2026-10-08, the Android device check: the form's last field, wholly
+    // under an IME its container does not resize for, swiped for the whole
+    // 15 s): the content is exhausted, so fail now with the stop bound's own
+    // words — they already name the keyboard and the way to hide it. Only
+    // after a stroke (a confirming read sent none), and only a rect with
+    // area: a zero-area rect carries no position to compare. A target that
+    // moves with the content off the frame is never equal; one that a
+    // stroke cannot reach (another scroller's content, a stroke the app
+    // ignored) is as stuck as the content, and swiping on would only spend
+    // the budget.
+    const exhausted = stuck && best !== undefined && best.visible === 0 && best.node.rect.width > 0 && best.node.rect.height > 0;
+    if (exhausted || swipes >= maxSwipes || Date.now() >= deadline) {
       const partial =
         best !== undefined && best.visible > 0
           ? `element reached the viewport but stayed ${describeClip(best.clipped, best.visible, best.under?.band)} ` +
@@ -466,8 +602,12 @@ export async function scrollUntilVisible(
             : lastFound.length === 0
               ? 'element never appeared in the tree'
               : `element in tree but never intersected the ${frameWords(viewport, cover)}${frame.boxes.length > 1 && cover?.above === undefined ? ' either way up' : ''} ` +
-                `(last rect ${JSON.stringify(lastFound[0].rect)})`;
-      const cause = swipes >= maxSwipes ? `after ${swipes} swipes (maxSwipes)` : `after ${timeoutMs}ms (timeout)`;
+                `(last rect ${JSON.stringify((best?.node ?? lastFound[0]).rect)})`;
+      const cause = exhausted
+        ? `after ${swipesText(swipes)} (content exhausted: swiping ${lastStroke} no longer moves it)`
+        : swipes >= maxSwipes
+          ? `after ${swipes} swipes (maxSwipes)`
+          : `after ${timeoutMs}ms (timeout)`;
       // The keyboard, when any round applied one: the reader must not take a
       // scroll that worked around it — or one it hid the element under — for
       // a wrong selector (the bug note's 15 s "never appeared"). And the
@@ -483,6 +623,21 @@ export async function scrollUntilVisible(
       const message = `scroll_until ${describe} failed ${cause} — ${why}${shown}${unlocated}`;
       throw absenceError(message, { sighted: everFound, treesRead, readError: lastReadError });
     }
+    // Which way this stroke goes (2026-10-08, the WDA device check): toward
+    // `direction` — unless a fling carried the target across the frame
+    // since a read saw it short of the far edge (`beyondFarEdge`; measured
+    // 613 → -357 in one swipe, then five more swipes DOWN into exhausted
+    // content). Then the other way, to bring it back; a stroke that throws
+    // it back past the near edge leaves it short again, and the next round
+    // strokes toward `direction`. Judged against the frame this round
+    // judged in: the screen above an applied keyboard, else the box. A
+    // target read beyond the far edge before any read saw it short of it —
+    // above the screen on round 0 of a scroll down — is the caller's
+    // `direction` to honour, as it always was.
+    const judgedFrame: Rect = cover?.above !== undefined ? { x: viewport.x, y: viewport.y, ...cover.above } : viewport;
+    const beyond = best !== undefined && beyondFarEdge(best.node.rect, direction, judgedFrame);
+    const strokeDirection = beyond && seenShort ? OPPOSITE[direction] : direction;
+    if (best !== undefined && !beyond) seenShort = true;
     // The gesture's box is swipe.ts#screenBox's — the same owner as a
     // `swipe:` step's, oriented by this round's tree (after a failed read:
     // the device box as built; its note is not reported here, the stop
@@ -490,18 +645,24 @@ export async function scrollUntilVisible(
     // round's tree is the witness; the device size is memoized. A 0×0
     // viewport does not throw above (pre-existing): the stroke then falls
     // back to the tree's window while the stop still judges against 0×0.
-    // `direction` here names where the CONTENT lies — the finger moves the
+    // `strokeDirection` names where the CONTENT lies — the finger moves the
     // other way (content below → finger up). See swipeVector. Under an
-    // applied cover (2026-10-08) the box is cut to the part above the band,
-    // so the stroke starts on the content, not on a key; a round whose tree
-    // did not read has no reading of its own and keeps the cover of the last
-    // round that DID read — none if that round applied none — rather than
-    // stroke through the keyboard it last saw.
+    // applied cover the stroke is `swipeVectorAbove` (2026-10-08, the iOS
+    // device check): the whole box's stroke with only the point that would
+    // land on or near the keyboard pulled up — not the stroke over the box
+    // above it, which started a content-up stroke in the app's top bar. A
+    // round whose tree did not read has no reading of its own and keeps the
+    // cover of the last round that DID read — none if that round applied
+    // none — rather than stroke through the keyboard it last saw.
     const { box } = await screenBox(adapter, read);
     const strokeCover = tree === undefined ? lastReadCover : cover;
-    const strokeBox = strokeCover === undefined ? box : { ...box, height: Math.min(box.height, strokeCover.band.y) };
-    const { from, to } = swipeVector(strokeBox, direction, 'content');
+    const { from, to } =
+      strokeCover === undefined ? swipeVector(box, strokeDirection, 'content') : swipeVectorAbove(box, strokeCover.band.y, strokeDirection, 'content');
     await adapter.swipe(from, to);
+    swipes++;
+    stroked = true;
+    confirmReads = 0;
+    lastStroke = strokeDirection;
     await sleep(settleMs);
   }
 }
