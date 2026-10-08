@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
@@ -246,10 +247,27 @@ describe('IdbTreeSource — an empty tree is a read error, not a screen on which
         'likely any XCTest-based driver): every app launched after it starts with an empty idb tree. ' +
         'averi re-enables accessibility automation before each launch, but only a NEW app process picks it up: ' +
         'terminate the app and launch it again through averi (terminate_app, then launch_app) — a launch_app on the ' +
-        'running app keeps the same stuck process; if that does not clear it, or the stderr said that write failed, ' +
-        'reboot the simulator (`xcrun simctl shutdown <udid> && xcrun simctl boot <udid>`); ' +
+        'running app keeps the same stuck process; if that does not clear it, ' +
+        'reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`); ' +
         'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
     );
+  });
+
+  // 2026-10-08 (iOS adapter stack review, candidate 2): the reboot names the
+  // simulator the source is BOUND to — not `<udid>`, not simctl's `booted` —
+  // and nothing in the advice points at the server's stderr, which the agent
+  // reading the tool result cannot see.
+  it('the reboot advice names the bound simulator, through the one owner, and never says stderr, <udid> or booted', async () => {
+    const error = await new IdbTreeSource({ udid: 'BBBB-2222', exec: fakeExec({ 'idb ui describe-all': '[]' }).fn })
+      .read()
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IdbEmptyTreeError);
+    const message = (error as Error).message;
+    expect(message).toContain(`if that does not clear it, ${rebootSimulatorAdvice('BBBB-2222')}; `);
+    expect(message).toContain('`xcrun simctl shutdown BBBB-2222 && xcrun simctl boot BBBB-2222`');
+    expect(message).not.toMatch(/stderr/i);
+    expect(message).not.toContain('<udid>');
+    expect(message).not.toMatch(/\bbooted\b/);
   });
 
   it('several elements, every one zero-area (or degenerate), still throws — area, not count, is the signature; and only an Application is called one', async () => {

@@ -5,6 +5,7 @@ import { exec as defaultExec, type ExecFn } from './exec.js';
 import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import { screenshotPng } from './screenshot-bytes.js';
+import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
@@ -149,7 +150,7 @@ export class IosAdapter implements DeviceAdapter {
         console.error(
           `averi: could not set com.apple.Accessibility ${key} on ${this.udid} before ${what} (${reason}) — ` +
             'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
-            `if it does, reboot the simulator (xcrun simctl shutdown ${this.udid} && xcrun simctl boot ${this.udid})`,
+            `if it does, ${rebootSimulatorAdvice(this.udid)}`,
         );
         return;
       }
@@ -184,8 +185,7 @@ export class IosAdapter implements DeviceAdapter {
       return screenshotPng(await readFile(file), {
         device: `simulator ${this.udid}`,
         command: `xcrun simctl io ${this.udid} screenshot <file>`,
-        remedy: `Re-check \`xcrun simctl list devices booted\` and retry; if it repeats, reboot the simulator ` +
-          `(xcrun simctl shutdown ${this.udid} && xcrun simctl boot ${this.udid}).`,
+        remedy: `Re-check \`xcrun simctl list devices booted\` and retry; if it repeats, ${rebootSimulatorAdvice(this.udid)}.`,
       });
     } finally {
       await rm(dir, { recursive: true, force: true });

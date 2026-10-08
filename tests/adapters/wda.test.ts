@@ -66,7 +66,11 @@ describe('WdaServer.ensureRunning', () => {
     expect(err?.message).toContain('did not start it');
     expect(err?.message).toContain(String(server.port));
     expect(err?.message).toContain('AAAA-1111');
-    expect(err?.message).toContain('pkill -f WebDriverAgentRunner');
+    // The way out names THIS simulator's reboot, from the one owner (simulator-reboot.ts, 2026-10-08).
+    expect(err?.message).toContain(
+      'Recover: `pkill -f WebDriverAgentRunner`, or reboot the simulator ' +
+        '(`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`), or pass an explicit `port`.',
+    );
     expect(spawner.spawns).toHaveLength(0);
   });
 

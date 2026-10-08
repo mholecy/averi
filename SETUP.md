@@ -356,7 +356,7 @@ one happens by itself.
   waiting does not end it (18+ min measured). averi re-enables the simulator's accessibility automation before each
   launch it makes, but a process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app`
   on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
-  <udid> && xcrun simctl boot <udid>`), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
+  <udid> && xcrun simctl boot <udid>` — the error spells it with the simulator's UDID), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
 - **`ensure_state` stops with `Refused to run reach flow …` and `every UI tree read was bare` (either platform)** — every
   tree the detect probe read held only wrappers and unlabeled decoration: a cold launch's Android decor
   (`android:id/content`, `action_bar_root`; measured +5.3…+13.8 s after launch on an RN debug build) or the WDA splash

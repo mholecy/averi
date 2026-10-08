@@ -6,6 +6,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { detectXcodeEnv } from './xcode-env.js';
+import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { sleep } from '../util/sleep.js';
 import { errorMessage } from '../util/error-message.js';
 
@@ -401,7 +402,7 @@ export class WdaServer {
           `WDA from a previous session: a server that was still busy when the host closed it took a SIGTERM, and ` +
           `before 0.8.1 nothing then stopped its WebDriverAgent (0.8.1 stops it and waits for the port to go quiet; ` +
           `a SIGKILL, or a second signal during that wait, still leaves it). ` +
-          'Recover: `pkill -f WebDriverAgentRunner`, or reboot the simulator, or pass an explicit `port`.',
+          `Recover: \`pkill -f WebDriverAgentRunner\`, or ${rebootSimulatorAdvice(this.udid)}, or pass an explicit \`port\`.`,
       );
     }
     assertNotStopped();

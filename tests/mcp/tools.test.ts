@@ -724,7 +724,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
   it('ui_snapshot: an idb read that returns no tree (IdbEmptyTreeError) is an error result naming the cause and the way out', async () => {
     const stuck = new FakeAdapter({}, 'none');
     stuck.uiTree = async () => {
-      throw new IdbEmptyTreeError(['Application']);
+      throw new IdbEmptyTreeError('AAAA-1111', ['Application']);
     };
     const { call } = await connect({ ios: stuck, android: home() });
     const result = await call('ui_snapshot', { platform: 'ios', filter: 'role:button', configPath: missing() });

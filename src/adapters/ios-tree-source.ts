@@ -1,5 +1,6 @@
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { runIdb } from './idb.js';
+import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { attachFieldErrors } from './field-errors.js';
 import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
 import { WdaTreeSource } from './wda-tree-source.js';
@@ -136,6 +137,17 @@ function idbTree(elements: IdbElement[]): UiNode {
  * relaunch-does-not-restart.md). Hence the advice names terminate-then-launch,
  * then a reboot.
  *
+ * The reboot names the simulator this source is bound to (2026-10-08, the iOS
+ * adapter stack review's candidate 2): the command comes from
+ * simulator-reboot.ts with the real UDID, not a `<udid>` placeholder the
+ * reader had to fill in. And the advice no longer says "or the stderr said
+ * that write failed": averi's reader is an agent reading a tool result, who
+ * never sees the server's stderr, and the reboot is the next step whether
+ * the pre-launch write failed or not — so the condition added nothing it
+ * could act on. (Saying WHICH it was would need the source to know the
+ * adapter's last write — the review's larger version, one module per
+ * simulator owning the write and this error; not done.)
+ *
  * The signature is deliberately narrow — no element with positive area, NOT
  * ui-tree/bare-tree.ts's `isBareTree`. A full-frame `Application` alone is
  * idb's normal launch transient and must stay a tree, and so must the other
@@ -144,8 +156,11 @@ function idbTree(elements: IdbElement[]): UiNode {
  * is always 0×0 (parseIdbDescribeAll), so only the elements are asked.
  */
 export class IdbEmptyTreeError extends Error {
-  /** `types`: the raw payload's element types, in order — what the message names as the shape. */
-  constructor(types: readonly (string | undefined)[]) {
+  /**
+   * `udid`: the simulator the read was made on — the one the reboot advice names.
+   * `types`: the raw payload's element types, in order — what the message names as the shape.
+   */
+  constructor(udid: string, types: readonly (string | undefined)[]) {
     // The cause on the first line, the advice after a newline: a trace entry
     // quotes only the first line (flow/engine.ts `headline`), so a probe
     // that fails every round repeats the cause, not a paragraph of advice.
@@ -157,8 +172,7 @@ export class IdbEmptyTreeError extends Error {
         'likely any XCTest-based driver): every app launched after it starts with an empty idb tree. ' +
         'averi re-enables accessibility automation before each launch, but only a NEW app process picks it up: ' +
         'terminate the app and launch it again through averi (terminate_app, then launch_app) — a launch_app on the ' +
-        'running app keeps the same stuck process; if that does not clear it, or the stderr said that write failed, ' +
-        'reboot the simulator (`xcrun simctl shutdown <udid> && xcrun simctl boot <udid>`); ' +
+        `running app keeps the same stuck process; if that does not clear it, ${rebootSimulatorAdvice(udid)}; ` +
         'app.ios.treeSource: wda in averi.yaml reads the tree through WebDriverAgent instead',
     );
     this.name = 'IdbEmptyTreeError';
@@ -197,7 +211,7 @@ export class IdbTreeSource implements IosTreeSource {
     const elements = idbElements(stdout.toString('utf8'));
     const tree = idbTree(elements);
     // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.
-    if (!tree.children.some((el) => rectArea(el.rect) > 0)) throw new IdbEmptyTreeError(elements.map((el) => el.type));
+    if (!tree.children.some((el) => rectArea(el.rect) > 0)) throw new IdbEmptyTreeError(this.udid, elements.map((el) => el.type));
     return tree;
   }
 

@@ -308,7 +308,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     expect(stderr.mock.calls[0]?.[0]).toBe(
       'averi: could not set com.apple.Accessibility AutomationEnabled on AAAA-1111 before launching com.app ' +
         '(Command failed (exit 1): xcrun simctl spawn …) — idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
-        'if it does, reboot the simulator (xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111)',
+        'if it does, reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`)',
     );
   });
 });
@@ -338,7 +338,7 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => 
       '`xcrun simctl io AAAA-1111 screenshot <file>` on simulator AAAA-1111 returned 0 bytes — not a PNG, though the ' +
         'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
         'screen. Re-check `xcrun simctl list devices booted` and retry; if it repeats, reboot the simulator ' +
-        '(xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111).',
+        '(`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`).',
     );
   });
 
