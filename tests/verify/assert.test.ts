@@ -1548,6 +1548,27 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
 });
 
 describe('assertSpecSchema', () => {
+  // Architecture review 2026-10-07 (assert-capture-ocr C3): a `match` that
+  // does not compile used to pass the schema and fail mid-run — an element
+  // assert threw out of assertAll a few ms in, losing the batch's other
+  // results, and an ocr assert polled its whole 12 s budget as "OCR failed".
+  // The schema is now where that mistake is caught, naming the field.
+  it.each([
+    ['element match', { element: { id: 'x' }, match: '(' }, ['match']],
+    ['ocr match', { element: { id: 'x' }, ocr: { match: '(' } }, ['ocr', 'match']],
+  ])('rejects an %s that is not a valid regex, at the field, with the engine\'s own diagnosis', (_, spec, path) => {
+    const result = assertSpecSchema.safeParse(spec);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path, message: expect.stringMatching(/^not a valid regular expression — .*Unterminated group/) }),
+    ]);
+  });
+
+  it('accepts a valid match on either kind — the refinement judges the pattern, not the field', () => {
+    expect(assertSpecSchema.parse({ element: { id: 'x' }, match: '^Pay \\d+' })).toBeDefined();
+    expect(assertSpecSchema.parse({ element: { id: 'x' }, ocr: { match: 'CONT(INUE)?' } })).toBeDefined();
+  });
+
   it('rejects absent combined with text or error', () => {
     expect(() => assertSpecSchema.parse({ element: { id: 'x' }, absent: true, text: 'y' })).toThrow();
     expect(() => assertSpecSchema.parse({ element: { id: 'x' }, absent: true, error: 'y' })).toThrow();

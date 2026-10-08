@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import { regexSource } from '../util/regex.js';
 
 /**
  * Element assert, shared by the `assert` tool (assert.ts builds its spec union
@@ -28,7 +29,8 @@ export const elementAssertSchema: z.ZodType<ElementAssert> = z
     element: elementSpecSchema,
     absent: z.boolean().optional(),
     text: z.string().optional(),
-    match: z.string().optional(),
+    /** Unanchored, no flags — assert.ts compiles it as `new RegExp(match)`; refused at parse when it does not compile. */
+    match: regexSource().optional(),
     error: z.string().optional(),
     timeout: z.union([z.number(), z.string()]).optional(),
   })

@@ -8,6 +8,7 @@ import { describeElementSpec as describe, elementSpecSchema, type ElementSpec } 
 import { pollTree } from '../ui-tree/read-tree.js';
 import { parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
+import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
 import {
   type BaselineFrame,
@@ -131,7 +132,8 @@ const ocrAssert = z
     ocr: z
       .object({
         text: z.string().optional(),
-        match: z.string().optional(),
+        /** Unanchored, no flags — text-parity.ts compiles it as `new RegExp(match)`; refused at parse when it does not compile. */
+        match: regexSource().optional(),
         /** Ink height in % of screen width, e.g. 3.8 — see text-parity.ts. */
         heightPct: z.number().positive().optional(),
         /** Relative tolerance for heightPct, in % (default 10). */

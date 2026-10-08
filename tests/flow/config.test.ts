@@ -234,6 +234,14 @@ flows:
     ).toThrow(/Invalid averi\.yaml/);
   });
 
+  // C3 (2026-10-07): an `assert:` step's match is validated when averi.yaml
+  // is parsed — it used to load clean and throw mid-flow, on a device.
+  it('rejects an assert step whose match is not a valid regex, naming the step\'s path', () => {
+    expect(() =>
+      parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - assert:\n          - { element: { id: x }, match: "(" }\n'),
+    ).toThrow(/flows\.f\.steps\.0\.assert\.0\.match: not a valid regular expression — .*Unterminated group/);
+  });
+
   it('accepts app.ios.treeSource wda, leaves it undefined by default, rejects unknown values', () => {
     const cfg = parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
     expect(cfg.app.ios?.treeSource).toBe('wda');

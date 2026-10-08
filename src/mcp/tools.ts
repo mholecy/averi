@@ -23,8 +23,9 @@ import {
   runEnsureState,
   runNamedFlow,
 } from '../run/commands.js';
-import { formatLogExcerpt, runVerification } from '../run/verify.js';
+import { formatLogExcerpt, LOG_GREP_FLAGS, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
+import { regexSource } from '../util/regex.js';
 import type { Platform, UiNode } from '../adapters/types.js';
 
 /**
@@ -502,6 +503,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'fill color vs an expected hex ({"element":{...},"color":{"expected":"#FDFDFD","deltaE":8}} — CIEDE2000 over the element\'s sampled region; hex only, token names resolve upstream), ' +
         'rendered text read back off the screenshot ({"element":{...},"ocr":{"text":"CONTINUE","heightPct":2.96}} — what the user SEES, which the tree often does not carry: on iOS SwiftUI collapses a button into one node whose label is an authored a11y summary, so the visible string is absent; heightPct is rendered ink height in % of screen width, the type-size check, single-line only; macOS-only, fails closed elsewhere), ' +
         'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots. ' +
+        'A `match` (element or ocr) that is not a valid JavaScript regex is refused with the arguments, naming the field, before any device is touched. ' +
         'With averi.yaml naming the app for the platform, an appAlive health line follows the results; without averi.yaml the asserts run alone, and an invalid one fails the call on either platform. ' +
         'Budgets: an assert without its own `timeout` waits up to 3 s (tree asserts) or 12 s (color/ocr — a round is a tree read plus a settled pair of captures, ~4.3 s on an Android emulator, and a screen with a clock or caret needs two); a passing assert returns at once, a color/ocr assert whose measurement keeps failing spends its whole budget — pass `timeout` to shorten it.',
       inputSchema: { platform, asserts: assertsInput, configPath },
@@ -577,11 +579,16 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'get_logs',
     {
       description:
-        'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions. grep filters to lines matching a case-insensitive regex (e.g. "tpm|validation") — prefer it, unfiltered pulls run to thousands of lines. Only the LAST maxLines matching lines come back (the tail is where the failure is); the header reports how many the grep matched against how many are shown, so raise it deliberately rather than by default.',
+        'Device logs (logcat / os_log) since N seconds ago — scan for crashes and exceptions. grep filters to lines matching a case-insensitive regex (e.g. "tpm|validation") — prefer it, unfiltered pulls run to thousands of lines. Only the LAST maxLines matching lines come back (the tail is where the failure is); the header reports how many the grep matched against how many are shown, so raise it deliberately rather than by default. A grep that is not a valid JavaScript regex is refused with the arguments, before any device is touched.',
       inputSchema: {
         platform,
         sinceSeconds: z.number().default(60).describe('How far back to read'),
-        grep: z.string().optional().describe('Case-insensitive regex; only matching lines are returned'),
+        // Validated with the flags formatLogExcerpt compiles it with, so a bad
+        // pattern is refused with the arguments — before the device is
+        // resolved and its logs pulled — instead of throwing after the pull.
+        grep: regexSource(LOG_GREP_FLAGS)
+          .optional()
+          .describe('Case-insensitive regex; only matching lines are returned'),
         maxLines: z
           .number()
           .int()

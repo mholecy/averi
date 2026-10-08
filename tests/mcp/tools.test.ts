@@ -954,6 +954,53 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
   });
 });
 
+/**
+ * C3 (architecture review 2026-10-07): a regex field that does not compile is
+ * refused with the arguments it came in — or with averi.yaml, at load — and
+ * never reaches a device. Before, an element assert's bad `match` threw out of
+ * the poll mid-batch, an ocr assert's polled its whole 12 s budget as "OCR
+ * failed", a flow's loaded clean and failed mid-run, and get_logs' grep threw
+ * after the logs were pulled.
+ */
+describe('a regex that does not compile is refused at parse, before a device is bound', () => {
+  it.each([
+    ['element match', { element: { id: 'home_root' }, match: '(' }],
+    ['ocr match', { element: { id: 'home_root' }, ocr: { match: '(' } }],
+  ])('assert: an %s → isError naming the regex error, nothing bound', async (_, bad) => {
+    const { call, bound } = await connect();
+    const result = await call('assert', {
+      platform: 'android',
+      asserts: [{ element: { id: 'home_root' } }, bad],
+      configPath: missing(),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('not a valid regular expression');
+    expect(result.text).toContain('Unterminated group');
+    expect(bound()).toEqual([]);
+  });
+
+  it('run_flow: averi.yaml with a bad match in an assert: step → a config error naming the step, nothing bound', async () => {
+    const configPath = await file(
+      'averi.yaml',
+      `${VALID_CONFIG}  checks_home:\n    steps:\n      - assert:\n          - { element: { id: home_root }, match: "(" }\n`,
+    );
+    const { call, bound } = await connect();
+    const result = await call('run_flow', { platform: 'android', flow: 'touch_home', configPath });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(result.text).toMatch(/flows\.checks_home\.steps\.0\.assert\.0\.match: not a valid regular expression/);
+    expect(bound()).toEqual([]);
+  });
+
+  it('get_logs: a grep that does not compile → isError before the device is resolved', async () => {
+    const { call, factoryCalls } = await connect();
+    const result = await call('get_logs', { platform: 'android', grep: 'tpm|(' });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('not a valid regular expression');
+    expect(factoryCalls).toEqual([]);
+  });
+});
+
 describe('scroll_until', () => {
   it('timeoutMs is plain milliseconds, passed through: the timeout error quotes it', async () => {
     const { call, fakes } = await connect();

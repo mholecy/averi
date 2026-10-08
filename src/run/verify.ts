@@ -164,6 +164,16 @@ export const assertSummary = (results: AssertResult[]): string => {
 };
 
 /**
+ * The flags a log grep compiles with — case-insensitive, nothing else. Named
+ * so get_logs' schema validates the pattern under the same flags
+ * (util/regex.ts) rather than a copy of them. Never `g` or `y`:
+ * formatLogExcerpt compiles the pattern once and calls `.test` on every line,
+ * and a global or sticky regex carries `lastIndex` from one line into the
+ * next, silently dropping matches.
+ */
+export const LOG_GREP_FLAGS = 'i';
+
+/**
  * Device-log excerpt: filter to a regex, keep the tail, and say what that did.
  * Pure — it takes the lines rather than the device — because the COUNTING is
  * the part that misleads when it is wrong: a grep that silently matched
@@ -172,10 +182,11 @@ export const assertSummary = (results: AssertResult[]): string => {
  * tool handler.
  */
 export function formatLogExcerpt(all: string[], grep: string | undefined, maxLines = 2000): string {
-  const lines = grep === undefined ? all : all.filter((l) => new RegExp(grep, 'i').test(l));
+  const re = grep === undefined ? undefined : new RegExp(grep, LOG_GREP_FLAGS);
+  const lines = re === undefined ? all : all.filter((l) => re.test(l));
   const tail = lines.slice(-maxLines);
   const header: string[] = [];
-  if (grep !== undefined) header.push(`[grep /${grep}/i matched ${lines.length} of ${all.length} lines]`);
+  if (grep !== undefined) header.push(`[grep /${grep}/${LOG_GREP_FLAGS} matched ${lines.length} of ${all.length} lines]`);
   if (lines.length > tail.length) {
     header.push(`[truncated: showing last ${maxLines} of ${lines.length} lines]`);
   }
