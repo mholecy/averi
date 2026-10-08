@@ -40,6 +40,11 @@ WDA comes from `appium-webdriveragent`, an optional dependency of averi. If an i
 
 Alternatively, detect on a button or row id.
 
+## A tap target off screen
+
+- **`… is off screen at (x,y) on a WxH screen … — scroll_until it first; nothing was tapped`**: the element is in the tree but its centre is outside the screen. iOS keeps a scroll view's content below the fold in the tree with real rects. Nothing was tapped, so focus did not move. Run `scroll_until` for the same selector, then tap again. `only N% of it … is on screen` means the element is clipped at an edge; scroll it further in.
+- **`… to appear` with `(found, but 0×0 (scrolled off screen, or collapsed) …)`**: the selector matched only zero-area nodes. iOS (idb) reports a node scrolled above the top that way. Run `scroll_until` with `direction: up`, then retry. If it is not in a scroll view, the view is collapsed or not laid out yet.
+
 ## Typing and fields
 
 - **`⚠ fill … typing APPENDS`**: the field already held text and `clear` was off. The length check passed, but the content may be wrong. Add `clear: true`, unless a pre-filled value must survive.
@@ -79,7 +84,7 @@ Failure lines:
   - In a flow: add such an element to `app.ios.keyboardDismiss`. Use a title or label, never a button; for a number pad's Done toolbar, add an `accessory: true` entry.
   - `covered by <role> "…"`: something drawn later sits over that entry's centre (an alert, a sheet, a bar's label). Close it first, or configure an element it does not cover. A screen-sized, non-interactive host (any non-interactive node with children, e.g. a toolbar, scrollable or webview) with nothing of its own at that point (WDA's full-screen SwiftUI `Toolbar`) is not counted as cover.
 - **`tapped id:"…" to hide it, still covered`**: the dismissal was tapped ONCE and may have changed the screen. Take a `screenshot` before you retry, and configure a dismissal that works on this screen.
-- **The keyboard's return key** (`tap: { label: search }`) is tappable. Use it only while `ui_snapshot` shows the `keyboard` band. After a `fill`, the keyboard is usually parked below the screen and a tap there lands off screen.
+- **The keyboard's return key** (`tap: { label: search }`) is tappable. Use it only while `ui_snapshot` shows the `keyboard` band. After a `fill`, the keyboard is usually parked below the screen, and a tap there is refused as off screen.
 
 ## Screenshots, pixels and visual checks
 

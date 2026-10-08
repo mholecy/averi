@@ -23,6 +23,10 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => {} }));
 const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
 const query = 'adb -s emulator-5554 shell dumpsys window displays';
 const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
+// The screen the tap point is judged against (2026-10-08, interact/resolve.ts#refuseOffScreen):
+// asked once per adapter, after the first settle, before the keyboard — the adapter memoizes it.
+const wmSize = 'adb -s emulator-5554 shell wm size';
+const PHYSICAL = 'Physical size: 1080x2220\n';
 
 const hierarchy = (nodes: string) => `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy rotation="0">
@@ -50,11 +54,12 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       if (full.includes('uiautomator dump')) return out(tree(keyboardUp ? 1400 : 1700));
       if (full.includes('dumpsys window displays')) return out(keyboardUp ? shown : hidden);
       if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(keyboardUp));
+      if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
     // The witness is asked ONCE, right before the key, and not again for the check after it.
-    expect(calls).toEqual([dump, dump, query, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
+    expect(calls).toEqual([dump, dump, wmSize, query, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
     expect(note).toBe('the soft keyboard covered id:login_submit; hidden before tapping');
   });
 
@@ -74,10 +79,11 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       if (full.includes('uiautomator dump')) return out(tree);
       if (full.includes('dumpsys window displays')) return out(++windowQueries <= 2 ? stale : caughtUp);
       if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(false));
+      if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
-    expect(calls).toEqual([dump, dump, query, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
+    expect(calls).toEqual([dump, dump, wmSize, query, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
     expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
   });
 });

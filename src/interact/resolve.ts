@@ -1,7 +1,9 @@
-import type { DeviceAdapter, Selector, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, Rect, Selector, UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
+import { containsPoint, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
-import { findAll, findBySpec, preferInteractive } from '../ui-tree/selectors.js';
+import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
+import { screenBox } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -209,10 +211,12 @@ export async function resolveSettled(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
   let sighted = false;
+  let zeroOnly = false;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
+      zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
       if (resolved === undefined) {
         lastRect = undefined;
         return undefined;
@@ -235,7 +239,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome);
+  throw notFound(target, timeoutMs, outcome, zeroOnly);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -260,10 +264,30 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
   return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message) : new Error(message);
 }
 
-/** A wait that never resolved its target, worded for what it waited for — nothing about settling. */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }): Error {
-  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError), { sighted: false, ...outcome });
+/**
+ * A wait that never resolved its target, worded for what it waited for —
+ * nothing about settling. `zeroOnly`: the last tree read matched the target,
+ * but only with zero-area nodes (2026-10-08,
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md: idb reports a
+ * node scrolled above the top of a scroll view as 0×0, and the wait read
+ * "to appear" for a node the snapshot showed). The hint says so beneath the
+ * headline (pollTimeoutMessage drops it when the last read failed). Still
+ * absence for ElementNotFoundError's purpose — nothing was ever ACTIONABLE,
+ * and a collapsed view, the case the zero-area rule was written for, carries
+ * its id at 0×0 too, which is why the hint names both.
+ */
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroOnly = false): Error {
+  return absenceError(
+    pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroOnly ? ZERO_AREA_HINT : undefined),
+    { sighted: false, ...outcome },
+  );
 }
+
+/** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
+export const ZERO_AREA_HINT = 'found, but 0×0 (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
+
+/** Did the target match in this tree, but only with zero-area nodes — resolveNow's filter, the reason it answered `undefined`? */
+const matchedOnlyZeroArea = (tree: UiNode, target: Target): boolean => findTarget(tree, target).length > 0;
 
 /**
  * Wait only for the target to APPEAR — one round that resolves it under the
@@ -285,10 +309,90 @@ export async function resolvePresent(
   opts: SettleOptions,
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
-  const outcome = await pollTree(adapter, (tree) => resolveNow(tree, target, opts), {
-    timeoutMs,
-    pollMs: opts.pollMs ?? DEFAULT_POLL_MS,
-  });
+  let zeroOnly = false;
+  const outcome = await pollTree(
+    adapter,
+    (tree) => {
+      const resolved = resolveNow(tree, target, opts);
+      zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
+      return resolved;
+    },
+    { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
+  );
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome);
+  throw notFound(target, timeoutMs, outcome, zeroOnly);
+}
+
+// ─── On screen ───────────────────────────────────────────────────────────────
+
+/**
+ * The target resolved and settled, but the point a tap on it would press —
+ * its centre, `tapPoint` — lies outside the screen (2026-10-08,
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md). Measured on
+ * iOS 27 (idb, 402×874 pt): the tree lists a scroll view's content below the
+ * fold with its real rects (y 885, y 1157), the tap went to (94,895), landed
+ * nowhere, and the reply said "Tapped" — the next `type_text` typed into the
+ * field that still had focus. Thrown with NOTHING sent.
+ *
+ * A class of its own, like AmbiguityRefusal, because it is neither of the
+ * wait's failures: the element WAS found (never ElementNotFoundError — an
+ * `optional:` tap of it is skipped with this headline, not "(not present)"),
+ * and nothing is moving. The remedy is in the message: scroll it in first.
+ */
+export class OffScreenRefusal extends Error {}
+
+/**
+ * The screen a tap point is judged against: `swipe.ts#screenBox`, the one
+ * owner of "the device's screen as the tree's coordinates see it" — the
+ * device's `viewport()` (memoized by the adapter; in the tree's units, px on
+ * Android, pt on iOS), turned when `tree`'s window says the screen is held
+ * sideways, the tree's window when the device size cannot be read. Reusing
+ * it, rather than `viewport()` alone, is what keeps a landscape tap at
+ * x 600 of 874 from being refused against the 402-wide panel as built.
+ *
+ * `undefined` — no box at all — means the check is skipped and the tap goes
+ * ahead as it did before the check existed: the keyboard guard's fail-open
+ * rule (keyboard.ts). The check exists to stop a false "Tapped", and must
+ * never be why a tap on a device that could not report its size did not
+ * happen.
+ */
+export async function tapScreen(adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<Rect | undefined> {
+  try {
+    return (await screenBox(adapter, { tree })).box;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Refuse a tap whose point lies off `screen` (OffScreenRefusal), or return.
+ * The rule every tap on a resolved node shares, applied by
+ * keyboard.ts#resolveClearOfKeyboard — behind `tapElement` (the flow `tap:`
+ * step, the MCP `tap` tool) and `fillField`'s focus tap — to the node it
+ * hands back.
+ *
+ * Judged on the tap POINT, not the rect: a node whose centre is on screen
+ * is tapped as before, however much of it is clipped. A node partly on
+ * screen with its centre off is REFUSED, not tapped at the centre of its
+ * visible part: the smallest change that makes the reply true. Moving the
+ * point would change what the keyboard guard judged (it tests the centre),
+ * and the visible part of such a node is a sliver at a screen edge — on iOS
+ * the bottom one is the home indicator's gesture zone, the top the status
+ * bar — where a tap is least likely to reach the element. `scroll_until`
+ * brings it in, and its reply says how much is visible.
+ *
+ * `after`, when the keyboard guard acted before this look (pressed `back`,
+ * tapped a dismissal), is quoted beneath the headline: something WAS sent.
+ */
+export function refuseOffScreen(target: Target, node: UiNode, screen: Rect | undefined, after?: string): void {
+  if (screen === undefined) return;
+  const at = tapPoint(node);
+  if (containsPoint(screen, at)) return;
+  const visible = visibleFractionInViewport(node.rect, screen);
+  const where = `at (${at.x},${at.y}) on a ${screen.width}x${screen.height} screen`;
+  const part = visible > 0 ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre` : ` (rect ${rectText(node.rect)})`;
+  throw new OffScreenRefusal(
+    `${describeTarget(target)} is off screen ${where}${part} — scroll_until it first; nothing was tapped` +
+      (after === undefined ? '' : `\n  (before that: ${after})`),
+  );
 }

@@ -1,4 +1,4 @@
-import type { Point, Rect, SoftKeyboard } from '../adapters/types.js';
+import type { DeviceAdapter, Point, Rect, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { inTreeModel } from './keyboard-in-tree.js';
@@ -15,7 +15,7 @@ import {
   type ResolvedClear,
 } from './keyboard-model.js';
 import { windowCorroborated, windowModel, windowUnlocated } from './keyboard-window.js';
-import { describeTarget, resolveSettled, type Resolved, type Target } from './resolve.js';
+import { describeTarget, refuseOffScreen, resolveSettled, tapScreen, type Resolved, type Target } from './resolve.js';
 
 /**
  * The soft-keyboard guard and the post-fill dismissal, written ONCE over
@@ -54,10 +54,12 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
 const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
 
 /**
- * resolveSettled, plus the one rule every tap on a resolved node shares
- * (2026-10-03): the point about to be tapped must not lie under the soft
- * keyboard. Used by tapElement (the flow `tap:` step and the MCP `tap` tool)
- * and by fillField's focus tap; there is no third tap on a resolved node.
+ * resolveSettled, plus the two rules every tap on a resolved node shares:
+ * the point about to be tapped must lie on the screen (2026-10-08 —
+ * resolve.ts#refuseOffScreen; an OffScreenRefusal, nothing sent, when it
+ * does not), and not under the soft keyboard (2026-10-03). Used by
+ * tapElement (the flow `tap:` step and the MCP `tap` tool) and by
+ * fillField's focus tap; there is no third tap on a resolved node.
  *
  * The problem, measured on a device that day (finportal login, Pixel_3a,
  * Android 13): after the password fill the keyboard was up, covering
@@ -101,8 +103,11 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  * (AndroidAdapter's keyboardWitness has its cost). A `type_pin` keypad taps
  * once per digit, so it asks once per digit — a 6-digit PIN is 6 dumpsys
  * calls, six times that figure, beside six tree-settle waits of seconds
- * each. On iOS: no device read for the keyboard on any look, ever. A raw
- * coordinate tap does not come through here: the caller chose that point.
+ * each. On iOS: no device read for the keyboard on any look, ever. The
+ * on-screen rule adds `viewport()` per tap, which the adapter memoizes:
+ * one `wm size` / `idb describe` per adapter, re-asked only after a failed
+ * read. A raw coordinate tap does not come through here: the caller chose
+ * that point.
  *
  * Rejected: hiding the keyboard before every tap (a `back` per tap, and a
  * navigation whenever the adapter is wrong); scrolling the target into view
@@ -116,8 +121,22 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  * a day in the tree (2026-10-04 → 2026-10-05): one decision table over all
  * four window-model phases — the dated banner in keyboard-window.ts.
  */
-export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: Target, opts: GuardOptions): Promise<ResolvedClear> {
+export async function resolveClearOfKeyboard(
+  adapter: KeyboardAdapter & Pick<DeviceAdapter, 'viewport'>,
+  target: Target,
+  opts: GuardOptions,
+): Promise<ResolvedClear> {
   const first = await resolveSettled(adapter, target, opts);
+  // The other rule every tap on a resolved node shares (2026-10-08): its
+  // point must lie ON the screen (resolve.ts#refuseOffScreen, the reasons
+  // there). Asked before the keyboard is, so a target below the fold costs
+  // no `back` and no dismissal tap; asked again of the node a guard that
+  // acted hands back, since the layout moves when the keyboard goes (an iOS
+  // keyboard-avoiding scroll view scrolls back down). The box comes from the
+  // first read's tree — the orientation does not turn inside one tap.
+  const screen = await tapScreen(adapter, first.tree);
+  refuseOffScreen(target, first.node, screen);
+  const onScreen = (r: ResolvedClear): ResolvedClear => (refuseOffScreen(target, r.node, screen, r.keyboardHidden), r);
   const at = tapPoint(first.node);
   const opening = keyboardOver((await readSoftKeyboard(adapter, first.tree, first.node)).keyboard, at);
   // THE guard's one fail-open rule, applied here and wherever a model reads
@@ -134,10 +153,10 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   const model = keyboardModel(adapter);
   const what = describeTarget(target);
   const ready = await model.guard({ target, opts, point: at, frame: opening.frame, what, covered: `the soft keyboard covered ${what}` });
-  if ('cleared' in ready) return ready.cleared;
+  if ('cleared' in ready) return onScreen(ready.cleared);
   const { hiding } = ready;
   await hiding.perform();
-  return confirmHidden<ResolvedClear, { frame: Rect; point: Point }>(
+  const cleared = await confirmHidden<ResolvedClear, { frame: Rect; point: Point }>(
     hiding.looks,
     async () => {
       const look = await lookAgain(adapter, target, opts, hiding.failed);
@@ -145,6 +164,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     },
     (seen, looks) => hiding.stillCovering(seen, looks),
   );
+  return onScreen(cleared);
 }
 
 /**
