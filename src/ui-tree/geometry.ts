@@ -556,6 +556,13 @@ export function rectText(r: Rect): string {
 // ─── Draw order ──────────────────────────────────────────────────────────────
 
 /**
+ * The roles whose frame is not a surface: a node of one, non-interactive and
+ * with children, covers a point only through its content (`shadowing`
+ * below, 2026-10-08). One role, deliberately — see the rejected ones there.
+ */
+const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
+
+/**
  * The node DRAWN OVER `point` on top of `node`, if any (review round 1): the
  * last node in pre-order AFTER `node`'s subtree — later siblings and their
  * descendants are drawn over earlier ones, later Windows over earlier (UIKit
@@ -597,17 +604,84 @@ export function rectText(r: Rect): string {
  * full-screen `scrollable` or `webview`, such as an RN ScrollView in a
  * transparent modal whose rows are below the title) reads as not covering,
  * and the dismissal tap lands on it. "Has children" is a weak signal: the
- * measured toolbar's only child is an empty container. On the guard's path a
- * keyboard that stays ends in `AfterDismissalTap`; on the post-fill
- * `dismiss()` path (interact/keyboard-in-tree.ts) a tap that changed the
- * screen and took the keyboard with it is reported as `hiddenBy: tapping
- * <title>` — the same as any dismissal tap whose side effect the band cannot
- * see. iOS dimming views come through as `other` (structural), never a
+ * measured toolbar's only child is an empty container. What a tap on it
+ * then does (corrected in review 2026-10-08): on the guard's path a keyboard
+ * that stays, or a target gone after the tap, ends in `AfterDismissalTap`;
+ * but a tap that DOES hide the keyboard and also did something of its own
+ * (an RN ScrollView with `keyboardShouldPersistTaps="never"` resigning on
+ * any touch, a row selection that resigns the keyboard) passes the guard
+ * silently — the note says `hidden by tapping <title> before tapping` and
+ * the target is tapped after it (interact/keyboard-in-tree.ts, the
+ * `hidden` wording). On the post-fill `dismiss()` path a tap that changed
+ * the screen and took the keyboard with it is reported as `hiddenBy:
+ * tapping <title>` — the same as any dismissal tap whose side effect the
+ * band cannot see. iOS dimming views come through as `other` (structural), never a
  * cover before this change, so they are not a new cost.
+ *
+ * A SCROLL VIEW with content is not a cover by itself either, whatever its
+ * size (2026-10-08, the device check of that fix in the same bug note, at
+ * e9e6509): with the toolbar host excused, the next node after the title
+ * in pre-order — the form's `scrollable 0 0 402 512`, 58 % of the screen,
+ * so no host by size — covered the title at (201,84) and the dismissal was
+ * refused "covered by scrollable". Its frame runs under the translucent
+ * top bar, as an iOS scroll view's does by default (the content inset, not
+ * the frame, keeps the rows below the bar); nothing of its content was at
+ * the point — the first row started at y 150. The first test was built
+ * from an abridged tree in which the later toolbar shadowed the
+ * scrollable, so it never asked. The rule: a non-interactive node in
+ * `CONTENT_FRAMED_ROLES` (`scrollable` alone — UIScrollView, Table and
+ * CollectionView; Android's scroll containers, whose guard has an oracle
+ * and never asks this) WITH children covers a point only through its
+ * descendants, never through its own frame — the screen-sized-host rule
+ * without the size. Why a scroll view and not every container with
+ * children — DRAW ORDER, not paint (a scroll view may well paint: the
+ * UITableView / UICollectionView behind a SwiftUI List or Form draws the
+ * grouped background, an RN ScrollView its `backgroundColor`): an iOS
+ * scroll view routinely extends under the bars around it, and WDA lists
+ * those bars' content (the navigation title) EARLIER in pre-order although
+ * they draw OVER the scroll view, so at such a point the scroll view's own
+ * frame is not what the user sees; pre-order alone cannot tell that point
+ * from one where the scroll view really is on top, and the scroll view's
+ * content is the only part of it that can be judged. Considered and rejected: `webview` under the
+ * screen size (a screen-sized one with children is a host already) — it paints
+ * its page itself (backgrounds, canvas, images without an accessibility
+ * node), its accessibility children are sparse, so its frame IS its
+ * surface; `toolbar` under the screen size — the input-accessory bar
+ * (48 pt) draws an opaque bar, measured 2026-10-07; and a rule over any
+ * non-interactive parent ("judge only by leaves"), which would also drop
+ * a smaller card or sheet whose own background is the cover. What still
+ * covers: a scrollable's own content at the point (a row's text, a
+ * button), so an alert's or a sheet's list whose row text sits over the
+ * title is refused as before; a childless scrollable (nothing to judge
+ * it by); an interactive node of any role. Accepted trade-off, this rule
+ * LOOSENS the guard: a scroll view that really is drawn over the point,
+ * with its opaque background and nothing non-structural there — a sheet's
+ * table whose row at the title is a bare `Cell` (container, structural:
+ * the tap would select that row) or an empty band — reads as not
+ * covering, and the dismissal tap lands on it. What then happens is the
+ * toolbar trade-off's above: on the guard's path a keyboard that stays (or
+ * a target gone) ends in `AfterDismissalTap` (the screen was touched, said
+ * so; never a second strategy), while a tap that hides the keyboard AND
+ * does something of its own (a row selected, an RN ScrollView with
+ * `keyboardShouldPersistTaps="never"`) passes silently: `hidden by tapping
+ * <title> before tapping`, then the target is tapped; on the post-fill
+ * `dismiss()` path a tap that changed the screen and took the keyboard
+ * with it is reported as `hiddenBy: tapping <title>`. Follow-up, deferred
+ * (review 2026-10-08) until a device re-run gives the full WDA tree:
+ * inside a scroll view any descendant with area at the point — a
+ * structural `Cell` included — could count as cover; not done now
+ * because a full-frame `Other` wrapper inside the form's collection view
+ * that reaches y 84 would re-break the measured case. A residual the
+ * other way (unchanged): content scrolled UNDER a translucent bar is
+ * after the bar's title in WDA's pre-order, so a row's text that has
+ * scrolled up under the title still reads as cover — a false refusal, the
+ * safe direction; telling it apart needs the bar's draw order, which the
+ * tree does not give.
  */
 export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
   const screen = rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
-  const host = (n: UiNode) => n.children.length > 0 && !isInteractive(n) && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION;
+  const coversOnlyThroughContent = (n: UiNode) =>
+    n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION);
   let after = false;
   let over: UiNode | undefined;
   const walk = (n: UiNode): void => {
@@ -615,7 +689,7 @@ export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | un
       after = true; // the node's own subtree is the node
       return;
     }
-    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && !host(n) && containsPoint(n.rect, point)) over = n;
+    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && !coversOnlyThroughContent(n) && containsPoint(n.rect, point)) over = n;
     for (const child of n.children) walk(child);
   };
   walk(tree);

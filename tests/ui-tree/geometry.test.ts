@@ -405,4 +405,45 @@ describe('shadowing — the later content node drawn over a point (the dismissal
     // The accepted trade-off: the same host with nothing of its own at the point reads as not covering.
     expect(shadowing(screen(target, host(text({ label: 'elsewhere', rect: { x: 0, y: 600, width: 400, height: 100 } }))), target, P)).toBeUndefined();
   });
+
+  /**
+   * The device check at e9e6509 (the same bug note, "Device check"): with the toolbar host excused, the form's
+   * `scrollable 0 0 402 512` — after the title in pre-order, 58 % of the screen, its frame under the translucent top
+   * bar, its first row at y 150 — covered the title at (201,84). The measured tree, in its full shape.
+   */
+  describe('a scroll view with content covers only through that content, whatever its size (device check 2026-10-08)', () => {
+    const full = { x: 0, y: 0, width: 402, height: 874 };
+    const at = { x: 201, y: 84 };
+    const title = uiNode({ role: 'text', label: 'SWIFT PAYMENT', identifier: 'swift_payment.form.title', rect: { x: 135, y: 73, width: 131, height: 22 } });
+    const row = (identifier: string, y: number) => uiNode({ role: 'button', identifier, rect: { x: 16, y, width: 370, height: 52 } });
+    const form = (...extra: UiNode[]) =>
+      uiNode({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 512 }, children: [row('swift_payment.form.debit_select', 150), row('swift_payment.form.priority_select', 681), ...extra] });
+    const toolbar = () => uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: full, children: [uiNode({ role: 'container', rect: full })] });
+    const keyboard = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: { x: 0, y: 572, width: 402, height: 302 } });
+    const app = (...screenChildren: UiNode[]) => uiNode({ role: 'application', rect: full, children: [uiNode({ role: 'other', rect: full, children: screenChildren }), keyboard] });
+
+    it('the full measured shape — title, container, the form\'s scrollable, the screen-sized toolbar, the keyboard: nothing covers the title', () => {
+      expect(shadowing(app(title, uiNode({ role: 'container', rect: full, children: [form()] }), toolbar()), title, at)).toBeUndefined();
+    });
+
+    it('the scrollable alone after the title (no toolbar to shadow it — the case the first test missed): not a cover', () => {
+      expect(shadowing(app(title, form()), title, at)).toBeUndefined();
+    });
+
+    it('its content at the point still covers — a row scrolled under the title, a sheet\'s list text — and is what is named', () => {
+      const under = uiNode({ role: 'text', label: 'Debit account', rect: { x: 16, y: 70, width: 370, height: 30 } });
+      expect(shadowing(app(title, form(under)), title, at)).toBe(under);
+      expect(shadowing(app(title, form(under), toolbar()), title, at)).toBe(under);
+    });
+
+    it('a childless scrollable, an interactive node of the same size, a same-sized webview with content and a smaller card still cover as themselves', () => {
+      const rect = { x: 0, y: 0, width: 402, height: 512 };
+      const elsewhere = () => [row('elsewhere', 400)];
+      const empty = uiNode({ role: 'scrollable', rect });
+      const backdrop = uiNode({ role: 'button', rect, children: elsewhere() });
+      const web = uiNode({ role: 'webview', rect, children: elsewhere() });
+      const card = uiNode({ role: 'toolbar', rect: { x: 20, y: 60, width: 362, height: 200 }, children: elsewhere() });
+      for (const cover of [empty, backdrop, web, card]) expect(shadowing(app(title, cover), title, at)).toBe(cover);
+    });
+  });
 });
