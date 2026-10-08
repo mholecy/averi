@@ -89,45 +89,8 @@ export interface FillResult {
    * read as an empty field).
    */
   cleared?: number | 'unmeasured';
-  /**
-   * How the typed text was checked:
-   * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
-   * - `no-value`: the field WAS found (by the selector or by identity) and
-   *   exposed no value on the last read (the poll stops on the second
-   *   read that shows none, whether or not a read before it missed the
-   *   field) — the text may or may not be there; nothing was compared. Not to be confused with `lost` (the last
-   *   read found no field at all) or with a read that showed a value
-   *   (`landed`, `not-taken`, or the mismatch error).
-   * - `not-taken`: the node is not an input and its value does not show the
-   *   text — it never moved from what it showed before the tap (a WDA
-   *   StaticText echoing its label), or it moved without taking the typing
-   *   (a label `Name` turning `Name*` on focus). Not the field; nothing it
-   *   shows proves anything, and its length is never deleted.
-   * - `lost`: the field itself was not found again — the selector stopped
-   *   matching (a `value:"…"` one, once the value changed) and the identity
-   *   fallback (sameField) found no single twin or was not asked; `lost`
-   *   says which. Also set when the clear's own read after a delete did not
-   *   find the field and nothing was typed (a clear alone, value ""): the
-   *   delete went out, nothing saw the field empty (review 2026-10-08,
-   *   m-1). Nothing was read, so nothing is known about the node's
-   *   value either way. Until 2026-10-08 (iOS device check of the bug note
-   *   below) this read as `no-value`, and a textfield that had just had 7
-   *   characters deleted and then held the typed text was said to "expose
-   *   no value": the refusal was right, the reason blamed the node.
-   * - `nothing-typed`: the value was empty — a focus (and clear) alone.
-   */
-  readBack: 'landed' | 'no-value' | 'not-taken' | 'lost' | 'nothing-typed';
-  /**
-   * With `readBack: 'lost'` only: why the last read did not find the field.
-   * - `screen-changed`: after typing, the screen's set of identified nodes
-   *   (screenSignature) was no longer the one read before typing, so the
-   *   identity fallback refused — the measured case (an inline error label
-   *   going away, a notice or the keyboard's own ids arriving).
-   * - `unmatched`: the selector no longer matches and no single node of the
-   *   field's role, id and rect is on the screen (the field moved, or has a
-   *   twin), or nothing was read before typing to compare the screen with.
-   */
-  lost?: 'screen-changed' | 'unmatched';
+  /** How the typed text was checked (`ReadBack`). */
+  readBack: ReadBack;
   /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
@@ -138,6 +101,56 @@ export interface FillResult {
    */
   notInput?: { input: NearbyInput | 'none' | 'unread' };
 }
+
+/**
+ * Why a `lost` read-back did not find the field:
+ * - `screen-changed`: after typing, the screen's set of identified nodes
+ *   (screenSignature) was no longer the one read before typing, so the
+ *   identity fallback refused — the measured case (an inline error label
+ *   going away, a notice or the keyboard's own ids arriving).
+ * - `unmatched`: the selector no longer matches and no single node of the
+ *   field's role, id and rect is on the screen (the field moved, or has a
+ *   twin), or nothing was read before typing to compare the screen with.
+ */
+export type LostWhy = 'screen-changed' | 'unmatched';
+
+/**
+ * How the typed text was checked — one fact per kind, the reason carried
+ * by the one kind that has one (code review of round 2, 2026-10-08: `lost`
+ * was a separate optional field beside `readBack: 'lost'`, so the two could
+ * be set apart — a `lost` without its reason was rendered, and pinned, as
+ * a sentence with none):
+ * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
+ * - `no-value`: the field WAS found (by the selector or by identity) and
+ *   exposed no value on the last read (the poll stops on the second
+ *   read that shows none, whether or not a read before it missed the
+ *   field) — the text may or may not be there; nothing was compared. Not to
+ *   be confused with `lost` (the last read found no field at all) or with a
+ *   read that showed a value (`landed`, `not-taken`, or the mismatch error).
+ * - `not-taken`: the node is not an input and its value does not show the
+ *   text — it never moved from what it showed before the tap (a WDA
+ *   StaticText echoing its label), or it moved without taking the typing
+ *   (a label `Name` turning `Name*` on focus). Not the field; nothing it
+ *   shows proves anything, and its length is never deleted.
+ * - `lost`: the field itself was not found again — the selector stopped
+ *   matching (a `value:"…"` one, once the value changed) and the identity
+ *   fallback (sameField) found no single twin or was not asked; `why` says
+ *   which (`LostWhy`). Also set when the clear's own read after a delete
+ *   did not find the field and nothing was typed (a clear alone, value
+ *   ""): the delete went out, nothing saw the field empty (review
+ *   2026-10-08, m-1). Nothing was read, so nothing is known about the
+ *   node's value either way. Until 2026-10-08 (iOS device check of the bug
+ *   note below) this read as `no-value`, and a textfield that had just had
+ *   7 characters deleted and then held the typed text was said to "expose
+ *   no value": the refusal was right, the reason blamed the node.
+ * - `nothing-typed`: the value was empty — a focus (and clear) alone.
+ */
+export type ReadBack =
+  | { kind: 'landed' }
+  | { kind: 'no-value' }
+  | { kind: 'not-taken' }
+  | { kind: 'lost'; why: LostWhy }
+  | { kind: 'nothing-typed' };
 
 /** `cleared N character(s) first`, only when a delete was actually sent. */
 export function fillClearedText(r: Pick<FillResult, 'cleared'>): string | undefined {
@@ -157,14 +170,15 @@ export function fillClearedText(r: Pick<FillResult, 'cleared'>): string | undefi
  *   with clear, `landed` is "the field shows exactly the value", which is
  *   what the clear was for.
  */
-export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cleared' | 'lost'>): string | undefined {
+export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cleared'>): string | undefined {
   const reasons: string[] = [];
-  if (r.readBack === 'no-value') reasons.push(`the matched node exposes no value (role ${r.role})`);
-  if (r.readBack === 'not-taken') reasons.push(`the matched node's value does not show the typed text (role ${r.role}) — it is not the field`);
-  if (r.readBack === 'lost') reasons.push(`the field could not be found again${lostWhyText(r.lost)}`);
-  if (r.readBack !== 'landed') {
+  const { readBack } = r;
+  if (readBack.kind === 'no-value') reasons.push(`the matched node exposes no value (role ${r.role})`);
+  if (readBack.kind === 'not-taken') reasons.push(`the matched node's value does not show the typed text (role ${r.role}) — it is not the field`);
+  if (readBack.kind === 'lost') reasons.push(`the field could not be found again${lostWhyText(readBack.why)}`);
+  if (readBack.kind !== 'landed') {
     if (r.cleared === 'unmeasured') reasons.push(`clear sent no delete — a role ${r.role} node's length is not the field's`);
-    else if (r.cleared === 0 && r.readBack === 'no-value') reasons.push('clear sent no delete — the node gave no length to delete');
+    else if (r.cleared === 0 && readBack.kind === 'no-value') reasons.push('clear sent no delete — the node gave no length to delete');
   }
   return reasons.length === 0 ? undefined : `NOT verified: ${reasons.join('; ')}`;
 }
@@ -175,24 +189,18 @@ export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cl
  */
 export function fillCaveats(r: Pick<FillResult, 'role' | 'notInput' | 'warning' | 'readBack'>): string[] {
   const out: string[] = [];
-  if (r.notInput !== undefined) out.push(notInputText(r.role, r.notInput.input, r.readBack !== 'nothing-typed'));
+  if (r.notInput !== undefined) out.push(notInputText(r.role, r.notInput.input, r.readBack.kind !== 'nothing-typed'));
   if (r.warning !== undefined) out.push(r.warning);
   return out;
 }
 
-/**
- * ` (why)` for a `lost` read-back, chosen per reason — an absent reason
- * says nothing rather than borrowing one (review 2026-10-08, n-3: it read
- * as "the selector no longer matches it").
- */
-function lostWhyText(lost: FillResult['lost']): string {
-  switch (lost) {
+/** ` (why)` for a `lost` read-back, chosen per reason (review 2026-10-08, n-3: it read as "the selector no longer matches it" whatever the reason). */
+function lostWhyText(why: LostWhy): string {
+  switch (why) {
     case 'screen-changed':
       return ' (the screen changed while typing)';
     case 'unmatched':
       return ' (the selector no longer matches it)';
-    case undefined:
-      return '';
   }
 }
 
@@ -343,7 +351,7 @@ export async function fillField(
   let screenBeforeTyping: string | null | undefined;
   // Why the newest refetch found nothing (undefined: it found the field) —
   // the read-back's `lost` when the poll ends on such a read (2026-10-08).
-  let lostOnLastRead: FillResult['lost'];
+  let lostOnLastRead: LostWhy | undefined;
   const isInput = node.role === INPUT_ROLE;
   const refetch = async (): Promise<UiNode | undefined> => {
     // Only the READ is wrapped: a refusal from resolveNow (a second match
@@ -404,7 +412,7 @@ export async function fillField(
   // Why the clear's read after a delete found no field (review 2026-10-08,
   // m-1): the loop then stops without calling the field empty, and a clear
   // alone (nothing typed, so no read-back) reports it as `lost`.
-  let clearLost: FillResult['lost'];
+  let clearLost: LostWhy | undefined;
   if (clear && !isInput) {
     // Not an input: what it shows is not the field's length — a label's own
     // text (deletes counted off it went into whatever had focus) or nothing
@@ -449,8 +457,7 @@ export async function fillField(
   }
 
   await startTyping(value);
-  let readBack: FillResult['readBack'] = value === '' && clearLost !== undefined ? 'lost' : 'nothing-typed';
-  let lost = value === '' ? clearLost : undefined;
+  let readBack: ReadBack = value === '' && clearLost !== undefined ? { kind: 'lost', why: clearLost } : { kind: 'nothing-typed' };
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -512,7 +519,7 @@ export async function fillField(
     // wiped (its length is not the field's) and never a failure — the text
     // may well have reached the field the tap focused.
     if (observed !== undefined && !tookText(observed)) {
-      readBack = 'not-taken';
+      readBack = { kind: 'not-taken' };
     } else if (observed !== undefined && !landed(observed)) {
       if (clear) {
         await adapter.clearText(observed.length);
@@ -530,8 +537,9 @@ export async function fillField(
         );
       }
     }
-    if (readBack !== 'not-taken') readBack = observed !== undefined ? 'landed' : lostOnLastRead !== undefined ? 'lost' : 'no-value';
-    if (readBack === 'lost') lost = lostOnLastRead;
+    if (readBack.kind !== 'not-taken') {
+      readBack = observed !== undefined ? { kind: 'landed' } : lostOnLastRead !== undefined ? { kind: 'lost', why: lostOnLastRead } : { kind: 'no-value' };
+    }
   }
   return {
     note,
@@ -540,8 +548,7 @@ export async function fillField(
     role: node.role,
     cleared,
     readBack,
-    ...(readBack === 'lost' ? { lost } : {}),
-    notInput: readBack === 'landed' ? undefined : await notInput(),
+    notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };
 }
 

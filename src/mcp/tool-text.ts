@@ -31,7 +31,7 @@ export const tapText = (selector: string, note: string | undefined): string =>
  * wording of each fact is fill.ts's, shared with the flow line:
  * - read back and landed (or nothing to type):
  *   `Filled <selector> (N characters[, cleared M characters first])[ (note)]`
- * - nothing to read back (`readBack: 'no-value'`, `not-taken`, `lost`):
+ * - nothing to read back (`readBack.kind` `no-value`, `not-taken`, `lost`):
  *   `Typed N characters into <selector> — NOT verified: <reason>[; clear
  *   sent no delete …][ (note)]`, the reason e.g. `the matched node exposes
  *   no value (role R)` or `the field could not be found again (the screen

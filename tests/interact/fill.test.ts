@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { charactersText, DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillCaveats, fillField, fillUnverifiedText } from '../../src/interact/fill.js';
+import { charactersText, DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillCaveats, fillField, fillUnverifiedText, type ReadBack } from '../../src/interact/fill.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
@@ -44,7 +44,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([]);
     expect(fake.typed).toEqual(['2.50']);
-    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: 'landed' });
+    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: { kind: 'landed' } });
   });
 
   it('accepts the selector-string vocabulary too', async () => {
@@ -165,7 +165,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value ?? '').toBe(''); // the fake appends the "" to a cleared (null) field: nothing held
     expect(reads).toBe(4); // the settle wait, the post-focus read the loop counts from, the one that confirms the clear — no value poll
-    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: 'nothing-typed' });
+    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: { kind: 'nothing-typed' } });
   });
 
   it('value "" with clear: true clears what the field holds AFTER focus — a field that autofills on focus ends empty', async () => {
@@ -197,7 +197,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value).toHaveLength(20);
     expect(reads).toBe(2); // the settle wait only
-    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: 'nothing-typed' });
+    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: { kind: 'nothing-typed' } });
   });
 
   it("in 'refuse' mode a second match appearing MID-fill is a refusal in its own wording, not a device hint", async () => {
@@ -429,7 +429,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const result = await fillField(fake, 'text:"IBAN*"', 'DE89370400440532013000', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]); // the label has no value: no length, no delete
     expect(inputOf(fake)?.value).toBe('XX12345'); // nothing reached the field — as measured
-    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: 'no-value' });
+    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: { kind: 'no-value' } });
     expect(result.notInput).toEqual({
       input: { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 366, width: 350, height: 30 }, overlaps: false },
     });
@@ -439,7 +439,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const fake = idbFloatingLabelFake('Value*', null);
     const result = await fillField(fake, 'text:"Value*"', '7.25', { ...FAST, clear: true });
     expect(inputOf(fake)?.value).toBe('7.25'); // a refusal would have broken this fill
-    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: 'no-value' });
+    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: { kind: 'no-value' } });
     expect(result.notInput).toEqual({ input: expect.objectContaining({ overlaps: true }) });
   });
 
@@ -450,7 +450,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89370400440532013000', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([7]);
     expect(inputOf(fake)?.value).toBe('DE89370400440532013000');
-    expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: 'landed', notInput: undefined });
+    expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: { kind: 'landed' }, notInput: undefined });
   });
 
   it('a field that MOVED after focus is not found by identity: the read-back stays NOT verified rather than guessing', async () => {
@@ -460,11 +460,11 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       if (input !== undefined) input.rect = { ...input.rect, y: 200 }; // the keyboard pushed the form up
     };
     const result = await fillField(fake, 'role:textfield', 'abc', FAST);
-    expect(result).toMatchObject({ role: 'textfield', readBack: 'landed' }); // a role selector still matches the moved field
+    expect(result).toMatchObject({ role: 'textfield', readBack: { kind: 'landed' } }); // a role selector still matches the moved field
     const byValue = idbFloatingLabelFake('IBAN*', 'XX');
     byValue.onTap = fake.onTap;
     const moved = await fillField(byValue, 'role:textfield value:"XX"', 'abc', { ...FAST, clear: true });
-    expect(moved).toMatchObject({ readBack: 'lost', lost: 'unmatched' }); // not found — not "exposes no value"
+    expect(moved).toMatchObject({ readBack: { kind: 'lost', why: 'unmatched' } }); // not found — not "exposes no value"
   });
 
   it('a node of another role whose value TOOK the text is an input whatever its role: no not-input finding', async () => {
@@ -477,7 +477,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       live.value = (live.value ?? '') + text;
     };
     const result = await fillField(fake, 'id:search', 'milk', FAST);
-    expect(result).toMatchObject({ role: 'other', readBack: 'landed', notInput: undefined });
+    expect(result).toMatchObject({ role: 'other', readBack: { kind: 'landed' }, notInput: undefined });
   });
 
   // m-4 (review 2026-10-08): a WDA StaticText exposes its label as its value.
@@ -488,10 +488,10 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       's',
     );
     const appended = await fillField(fake, 'id:title', 'e', FAST); // "Meno".includes("e") — no proof
-    expect(appended).toMatchObject({ role: 'text', readBack: 'not-taken', notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
+    expect(appended).toMatchObject({ role: 'text', readBack: { kind: 'not-taken' }, notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
     const cleared = await fillField(fake, 'id:title', 'abc', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]); // m-5: "Meno".length is not the field's
-    expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: 'not-taken' });
+    expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' } });
   });
 
   // m2-1 (review 2026-10-08, round 2): the retry deleted the label's length into the focused field.
@@ -508,7 +508,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const result = await fillField(fake, 'id:name_label', 'abc', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]); // not clearText(5) into "jan.novak"
     expect(liveField().value).toBe('jan.novakabc'); // typed, unchecked — as the reply says
-    expect(result).toMatchObject({ cleared: 'unmeasured', readBack: 'not-taken', notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
+    expect(result).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' }, notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
   });
 
   it('a non-input that shows the typed text but never exactly the value fails after the retry, and the error names the input it is not', async () => {
@@ -535,7 +535,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const result = await fillField(fake, 'text:"IBAN*"', '', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]);
     expect(inputOf(fake)?.value).toBe('XX12345');
-    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: 'nothing-typed' });
+    expect(result).toMatchObject({ role: 'text', cleared: 'unmeasured', readBack: { kind: 'nothing-typed' } });
   });
 
   it('an input-like node of another role (an iOS search field reads `other`) with clear still ends as the value: the retry wipes it', async () => {
@@ -554,7 +554,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const result = await fillField(fake, 'id:search', 'milk', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([7]); // "oldmilk" — the observed value, not the unmeasured start
     expect(live().value).toBe('milk');
-    expect(result).toMatchObject({ role: 'other', cleared: 'unmeasured', readBack: 'landed', notInput: undefined });
+    expect(result).toMatchObject({ role: 'other', cleared: 'unmeasured', readBack: { kind: 'landed' }, notInput: undefined });
   });
 
   // m-2 (review 2026-10-08): identity is not screen identity.
@@ -575,7 +575,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       fake.current = 'next'; // typing submitted and navigated
     };
     const result = await fillField(fake, 'role:textfield value:"XX12345"', 'abc', { ...FAST, clear: true });
-    expect(result).toMatchObject({ readBack: 'lost', lost: 'screen-changed' }); // not a false "landed" off screen B's field
+    expect(result).toMatchObject({ readBack: { kind: 'lost', why: 'screen-changed' } }); // not a false "landed" off screen B's field
   });
 
   // iOS device check (2026-10-08, re-run at e9e6509): the IBAN field held
@@ -598,7 +598,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89370400440532013000', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([7]);
     expect(inputOf(fake)?.value).toBe('DE89370400440532013000'); // the field DID hold the text — as measured
-    expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: 'lost', lost: 'screen-changed', notInput: undefined });
+    expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: { kind: 'lost', why: 'screen-changed' }, notInput: undefined });
     expect(fillUnverifiedText(result)).toBe('NOT verified: the field could not be found again (the screen changed while typing)');
     expect(fillCaveats(result)).toEqual([]);
   });
@@ -634,8 +634,8 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     };
     const result = await fillField(fake, 'text:"IBAN*"', 'DE89', FAST);
     expect(hidden).toBe(true);
-    expect(result.readBack).toBe('no-value');
-    expect(result).not.toHaveProperty('lost');
+    expect(result.readBack.kind).toBe('no-value');
+    expect(result.readBack).toEqual({ kind: 'no-value' }); // no reason rides on any kind but lost
   });
 
   // m-1 (review 2026-10-08, bundle C round 1): the read after the first
@@ -660,26 +660,34 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       const result = await fillField(fake, 'role:textfield value:"XX12345"', '', { ...FAST, clear: true });
       expect(fake.deletes).toEqual([7]); // sent once; the loop does not delete blind
       expect(input().value).toBe('XX');
-      expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: 'lost', lost: 'unmatched', notInput: undefined });
+      expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: { kind: 'lost', why: 'unmatched' }, notInput: undefined });
       expect(fillUnverifiedText(result)).toBe('NOT verified: the field could not be found again (the selector no longer matches it)');
     });
 
     it('with a value, the read-back decides: not landed, and still lost', async () => {
       const { fake } = probe();
       const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89', { ...FAST, clear: true });
-      expect(result).toMatchObject({ cleared: 7, readBack: 'lost' });
+      expect(result).toMatchObject({ cleared: 7, readBack: { kind: 'lost' } });
     });
   });
 
-  it('a lost read-back with no reason says none rather than borrowing one', () => {
-    expect(fillUnverifiedText({ role: 'textfield', readBack: 'lost' })).toBe('NOT verified: the field could not be found again');
+  it('a lost read-back carries its reason, and says it — a lost without one does not compile (code review of round 2)', () => {
+    expect(fillUnverifiedText({ role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' } })).toBe(
+      'NOT verified: the field could not be found again (the selector no longer matches it)',
+    );
+    expect(fillUnverifiedText({ role: 'textfield', readBack: { kind: 'lost', why: 'screen-changed' } })).toBe(
+      'NOT verified: the field could not be found again (the screen changed while typing)',
+    );
+    // @ts-expect-error — the reason is part of the kind: a `lost` read-back cannot be built without it.
+    const reasonless: ReadBack = { kind: 'lost' };
+    expect(reasonless.kind).toBe('lost');
   });
 
   it('a node that IS found but shows no value is still no-value, with no `lost`', async () => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     const result = await fillField(fake, 'text:"IBAN*"', 'DE89', FAST);
-    expect(result.readBack).toBe('no-value');
-    expect(result).not.toHaveProperty('lost');
+    expect(result.readBack.kind).toBe('no-value');
+    expect(result.readBack).toEqual({ kind: 'no-value' }); // no reason rides on any kind but lost
   });
 
   it('the identity fallback is not asked after typing when nothing was read before it', async () => {
@@ -689,7 +697,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const fake = idbFloatingLabelFake('IBAN*', 'XX');
     const result = await fillField(fake, 'role:textfield value:"XX"', 'abc', FAST);
     expect(inputOf(fake)?.value).toBe('XXabc');
-    expect(result).toMatchObject({ readBack: 'lost', lost: 'unmatched' });
+    expect(result).toMatchObject({ readBack: { kind: 'lost', why: 'unmatched' } });
   });
 
   describe('sameField matches exactly one node of the same role, id and rect', () => {
@@ -704,11 +712,11 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
       fake.live().children.push(node({ role: 'textfield', identifier: 'TextFieldWithComponentStyle', value: 'other', rect: { ...at } }));
       const result = await fillField(fake, 'role:textfield value:"XX12345"', 'DE89', { ...FAST, clear: true });
-      expect(result).toMatchObject({ readBack: 'lost', lost: 'unmatched' });
+      expect(result).toMatchObject({ readBack: { kind: 'lost', why: 'unmatched' } });
     });
     it('a node at the same rect with another role, or another id, is not a twin: verified', async () => {
-      expect((await fill(node({ role: 'text', identifier: 'TextFieldWithComponentStyle', rect: { ...at } }))).readBack).toBe('landed');
-      expect((await fill(node({ role: 'textfield', identifier: 'other_id', rect: { ...at } }))).readBack).toBe('landed');
+      expect((await fill(node({ role: 'text', identifier: 'TextFieldWithComponentStyle', rect: { ...at } }))).readBack.kind).toBe('landed');
+      expect((await fill(node({ role: 'textfield', identifier: 'other_id', rect: { ...at } }))).readBack.kind).toBe('landed');
     });
   });
 
@@ -758,6 +766,6 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
   it('Android: an EditText resolved directly is verified, says what it cleared, and carries no finding', async () => {
     const fake = formFake('2.50');
     const result = await fillField(fake, { id: 'amount_input' }, '7', { ...FAST, clear: true });
-    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: 'landed', notInput: undefined });
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: { kind: 'landed' }, notInput: undefined });
   });
 });

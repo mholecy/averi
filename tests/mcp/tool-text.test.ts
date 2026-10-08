@@ -10,7 +10,7 @@ describe('tap and type_text response lines', () => {
     );
   });
 
-  const landed = { role: 'textfield', readBack: 'landed' } as const;
+  const landed = { role: 'textfield', readBack: { kind: 'landed' } } as const;
 
   it('fillText names the selector, the length, the characters it cleared, the note, and the ⚠ warning on its own line', () => {
     expect(fillText('id:amount', { length: 4, ...landed })).toBe('Filled id:amount (4 characters)');
@@ -34,21 +34,21 @@ describe('tap and type_text response lines', () => {
   // the reply printed the REQUESTED clear and passed an unreadable read-back.
   it('a clear that sent no delete is not "cleared": an empty field says nothing, a node with no value or no length of its own says so', () => {
     expect(fillText('id:amount', { length: 4, ...landed, cleared: 0 })).toBe('Filled id:amount (4 characters)');
-    expect(fillText('id:pw', { length: 6, role: 'textfield', readBack: 'no-value', cleared: 0 })).toBe(
+    expect(fillText('id:pw', { length: 6, role: 'textfield', readBack: { kind: 'no-value' }, cleared: 0 })).toBe(
       'Typed 6 characters into id:pw — NOT verified: the matched node exposes no value (role textfield); ' +
         'clear sent no delete — the node gave no length to delete',
     );
-    expect(fillText('text:"IBAN*"', { length: 22, role: 'text', readBack: 'no-value', cleared: 'unmeasured' })).toBe(
+    expect(fillText('text:"IBAN*"', { length: 22, role: 'text', readBack: { kind: 'no-value' }, cleared: 'unmeasured' })).toBe(
       'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
         "clear sent no delete — a role text node's length is not the field's",
     );
     // M-1 (review 2026-10-08): a clear ALONE on a label was "Filled … (0 characters)".
-    expect(fillText('text:"IBAN*"', { length: 0, role: 'text', readBack: 'nothing-typed', cleared: 'unmeasured' })).toBe(
+    expect(fillText('text:"IBAN*"', { length: 0, role: 'text', readBack: { kind: 'nothing-typed' }, cleared: 'unmeasured' })).toBe(
       'Typed 0 characters into text:"IBAN*" — NOT verified: clear sent no delete — a role text node\'s length is not the field\'s',
     );
     // A clear whose read-back LANDED needs no caveat: the field shows exactly the value.
-    expect(fillText('id:search', { length: 4, role: 'other', readBack: 'landed', cleared: 'unmeasured' })).toBe('Filled id:search (4 characters)');
-    expect(fillText('id:title', { length: 1, role: 'text', readBack: 'not-taken' })).toBe(
+    expect(fillText('id:search', { length: 4, role: 'other', readBack: { kind: 'landed' }, cleared: 'unmeasured' })).toBe('Filled id:search (4 characters)');
+    expect(fillText('id:title', { length: 1, role: 'text', readBack: { kind: 'not-taken' } })).toBe(
       "Typed 1 character into id:title — NOT verified: the matched node's value does not show the typed text (role text) — it is not the field",
     );
   });
@@ -56,7 +56,7 @@ describe('tap and type_text response lines', () => {
   // Device checks of docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md (re-run at e9e6509).
   it('one character is `1 character`, typed or cleared, verified or not', () => {
     expect(fillText('role:textfield value:"1.5"', { length: 1, ...landed, cleared: 3 })).toBe('Filled role:textfield value:"1.5" (1 character, cleared 3 characters first)');
-    expect(fillText('id:bic', { length: 1, role: 'scrollable', readBack: 'no-value' })).toBe(
+    expect(fillText('id:bic', { length: 1, role: 'scrollable', readBack: { kind: 'no-value' } })).toBe(
       'Typed 1 character into id:bic — NOT verified: the matched node exposes no value (role scrollable)',
     );
     expect(typedText(1)).toBe('Typed 1 character');
@@ -64,15 +64,15 @@ describe('tap and type_text response lines', () => {
   });
 
   it('a field the read-back could not find again is said as not found, not as a node with no value — and a textfield gets no ⚠', () => {
-    expect(fillText('role:textfield value:"XX12345"', { length: 22, role: 'textfield', readBack: 'lost', lost: 'screen-changed', cleared: 7 })).toBe(
+    expect(fillText('role:textfield value:"XX12345"', { length: 22, role: 'textfield', readBack: { kind: 'lost', why: 'screen-changed' }, cleared: 7 })).toBe(
       'Typed 22 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
         'NOT verified: the field could not be found again (the screen changed while typing)',
     );
-    expect(fillText('role:textfield value:"XX"', { length: 3, role: 'textfield', readBack: 'lost', lost: 'unmatched' })).toBe(
+    expect(fillText('role:textfield value:"XX"', { length: 3, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' } })).toBe(
       'Typed 3 characters into role:textfield value:"XX" — NOT verified: the field could not be found again (the selector no longer matches it)',
     );
     // m-1 (review 2026-10-08, bundle C round 1): a clear alone whose read after the delete lost the field.
-    expect(fillText('role:textfield value:"XX12345"', { length: 0, role: 'textfield', readBack: 'lost', lost: 'unmatched', cleared: 7 })).toBe(
+    expect(fillText('role:textfield value:"XX12345"', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 7 })).toBe(
       'Typed 0 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
         'NOT verified: the field could not be found again (the selector no longer matches it)',
     );
@@ -83,7 +83,7 @@ describe('tap and type_text response lines', () => {
       fillText('text:"IBAN*"', {
         length: 22,
         role: 'text',
-        readBack: 'no-value',
+        readBack: { kind: 'no-value' },
         notInput: { input: { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 343, width: 350, height: 56 }, overlaps: true } },
       }),
     ).toBe(
@@ -92,11 +92,11 @@ describe('tap and type_text response lines', () => {
         'the input overlapping it is textfield id:"TextFieldWithComponentStyle" at 26,343 350x56 — ' +
         'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
     );
-    expect(fillText('text:"Hi"', { length: 2, role: 'text', readBack: 'no-value', notInput: { input: 'none' } })).toBe(
+    expect(fillText('text:"Hi"', { length: 2, role: 'text', readBack: { kind: 'no-value' }, notInput: { input: 'none' } })).toBe(
       'Typed 2 characters into text:"Hi" — NOT verified: the matched node exposes no value (role text)\n' +
         '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; no textfield is on the screen',
     );
-    expect(fillText('text:"Hi"', { length: 0, role: 'text', readBack: 'nothing-typed', notInput: { input: 'unread' } })).toBe(
+    expect(fillText('text:"Hi"', { length: 0, role: 'text', readBack: { kind: 'nothing-typed' }, notInput: { input: 'unread' } })).toBe(
       'Filled text:"Hi" (0 characters)\n' +
         '⚠ the matched node is role text, not a textfield — nothing was deleted, and the focus is wherever the tap left it; the screen could not be read again to name the input',
     );
