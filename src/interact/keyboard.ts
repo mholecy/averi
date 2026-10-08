@@ -1,4 +1,4 @@
-import type { Point, Rect } from '../adapters/types.js';
+import type { Point, Rect, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { inTreeModel } from './keyboard-in-tree.js';
@@ -14,7 +14,7 @@ import {
   type KeyboardModel,
   type ResolvedClear,
 } from './keyboard-model.js';
-import { windowModel } from './keyboard-window.js';
+import { windowModel, windowUnlocated } from './keyboard-window.js';
 import { describeTarget, resolveSettled, type Resolved, type Target } from './resolve.js';
 
 /**
@@ -28,7 +28,8 @@ import { describeTarget, resolveSettled, type Resolved, type Target } from './re
  * failures they catch are the classes re-exported below.
  */
 export { KeyboardGuardError, type DismissOptions, type DismissResult, type GuardOptions, type KeyboardDismissal, type ResolvedClear } from './keyboard-model.js';
-export { AfterKeyboardDismissal, KeyboardStateDisagreement } from './keyboard-window.js';
+export { AfterKeyboardDismissal, KeyboardStateDisagreement, UNLOCATED_KEYBOARD } from './keyboard-window.js';
+export { frameText } from './keyboard-model.js';
 export { AfterDismissalTap, KeyboardWithoutDismissal } from './keyboard-in-tree.js';
 
 /**
@@ -163,4 +164,21 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
  */
 export function dismissKeyboard(adapter: KeyboardAdapter, opts: DismissOptions): Promise<DismissResult> {
   return keyboardModel(adapter).dismiss(opts);
+}
+
+/**
+ * Does the input method report a keyboard that `window` — a reading the
+ * caller already holds (`readSoftKeyboard`'s) — places nowhere? (2026-10-08,
+ * the floating-Gboard row: docs/bugs/2026-10-05-android-floating-gboard-keyboard.md.)
+ * Only the window model can say: an adapter without the oracle has no
+ * second source, and is never `unlocated`. The rule is the dismissal's own
+ * row (keyboard-window.ts#dismissal, `clear · witness shown`); this is how a
+ * caller that does not dismiss — `scroll_until`'s stop (scroll.ts) — asks
+ * it, at the cost of one witness query, and only when the window read
+ * hidden. The tap guard does NOT ask it: its clear path is pinned to one
+ * oracle query per tap, and a frameless keyboard gives it no point to test
+ * against anyway (the bug note's residual).
+ */
+export function keyboardUnlocated(adapter: Pick<KeyboardAdapter, 'keyboard'>, window: SoftKeyboard): Promise<boolean> {
+  return adapter.keyboard === undefined ? Promise.resolve(false) : windowUnlocated(adapter.keyboard, window);
 }

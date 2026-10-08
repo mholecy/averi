@@ -1734,6 +1734,28 @@ flows:
       /element never appeared in the tree/,
     );
   });
+
+  // 2026-10-08 (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
+  // the keyboard on the line — and ⚠ only where it leaves the result unproven.
+  it('a stop judged above a docked soft keyboard says so, without ⚠: the judgement already excluded it', async () => {
+    const fake = scrollingFake(500);
+    fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1400, width: 1000, height: 600 } }, 'shown');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
+    expect(trace).toContainEqual({
+      action: 'scroll_until',
+      detail: 'id:"submit_button" fully visible after 0 swipes, above the soft keyboard over [0,1400][1000,2000]',
+    });
+  });
+
+  it('the floating-keyboard row (window hidden, input method shown) marks the line ⚠: "fully visible" is not established', async () => {
+    const fake = scrollingFake(500);
+    fake.attachKeyboard({ state: 'hidden' }, 'shown');
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
+    const row = trace.find((t) => t.action.endsWith('scroll_until'));
+    expect(row?.action).toBe('⚠ scroll_until');
+    expect(row?.detail).toMatch(/^id:"submit_button" fully visible after 0 swipes; the input method reports a soft keyboard shown, but the window state gives it no area/);
+    expect(fake.keys).toEqual([]);
+  });
 });
 
 describe('fill step', () => {
@@ -2626,6 +2648,21 @@ flows:
     await FlowEngine.run(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
     expect(fake.keys).toEqual([]);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+  });
+
+  it('fill … dismissKeyboard: true with the floating-keyboard row (window hidden, input method shown): no back, and a ⚠ fill line instead of silent success (2026-10-08)', async () => {
+    const fake = loginFake();
+    fake.attachedKeyboard.windowAnswers.current = { state: 'hidden' };
+    fake.attachedKeyboard.witnessAnswers.current = 'shown';
+    const trace = await FlowEngine.run(flow('fill: { id: login_password, value: "123456", dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
+    expect(fake.keys).toEqual([]);
+    expect(trace).toContainEqual({
+      action: '⚠ fill',
+      detail:
+        'id:"login_password": the input method reports a soft keyboard shown, but the window state gives it no area on screen ' +
+        '(a floating keyboard? inferred, not measured), so where it lies is unknown — nothing was pressed (back would pop the ' +
+        'screen if no keyboard is up); if one is, hide or dock it before the next step',
+    });
   });
 
   it('a tap: that fails with NO dismissal (the element is simply not there) gets no ⚠ tap line — only its ✗', async () => {

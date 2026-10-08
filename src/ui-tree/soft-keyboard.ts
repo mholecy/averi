@@ -126,7 +126,7 @@ export function accessoryDismissButton(tree: UiNode): UiNode | undefined {
  * hides it, witness-vetoed, interact/keyboard-window.ts), `none` on the in-tree
  * model, where no key does and the configured dismissals are tried instead.
  * The pixel poll words its remedy by it. What one call then DOES —
- * interact/keyboard-window.ts#dismissal's `'back' | 'nothing'` — is a different
+ * interact/keyboard-window.ts#dismissal's `'back' | 'nothing' | 'unlocated'` — is a different
  * question with its own literals, kept apart on purpose: with `back` in
  * hand the decision is still `nothing` when the state is hidden or the
  * witness denies the keyboard.
@@ -183,16 +183,20 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  * `subject` is the node the caller is about to act on or measure: when it
  * is the keyboard's own UI (`partOfKeyboard`) the reading is `unknown` —
  * nothing covers a key but the finger — and the oracle is not asked either,
- * which on Android changes nothing (no tree there is ever marked).
+ * which on Android changes nothing (no tree there is ever marked). Absent
+ * since 2026-10-08 for the one reader with no single subject:
+ * `scroll_until` (interact/scroll.ts) judges every match against one
+ * reading per round and exempts the keyboard's own nodes itself, with
+ * `partOfKeyboard`, so one round still costs one oracle query.
  */
 export async function readSoftKeyboard(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
-  subject: UiNode,
+  subject?: UiNode,
 ): Promise<SoftKeyboardReading> {
   const dismissal = adapter.keyboard === undefined ? 'none' : 'back';
   const advice = dismissal === 'none' ? adapter.keyboardAdvice : undefined;
-  if (partOfKeyboard(tree, subject)) return { keyboard: { state: 'unknown' }, dismissal, advice };
+  if (subject !== undefined && partOfKeyboard(tree, subject)) return { keyboard: { state: 'unknown' }, dismissal, advice };
   const keyboard = adapter.keyboard === undefined ? keyboardInTree(tree) : await adapter.keyboard.state();
   return { keyboard, dismissal, advice };
 }

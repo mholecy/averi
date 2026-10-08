@@ -462,7 +462,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Swipe until the element is visible in the viewport — the portable way to reach content below the fold (no coordinates). direction = where the content lies (down = below the current view). ' +
         'By default "visible" means INTERSECTS the viewport, so the element may still be clipped at an edge; a clipped stop says which edges clip it and what fraction is on screen, a clean one says "fully visible". ' +
-        'Pass fully: true when the next step MEASURES the element (a rect assert, a screenshot) — a clipped rect measures the clipped box, and fully: true fails loudly instead, naming the shortfall.',
+        'Pass fully: true when the next step MEASURES the element (a rect assert, a screenshot) — a clipped rect measures the clipped box, and fully: true fails loudly instead, naming the shortfall. ' +
+        'With the soft keyboard up (Android; iOS with treeSource: wda) the viewport is the screen ABOVE it: the part of an element under the keyboard does not count as visible, the swipes are drawn above it, and the reply names the keyboard. Nothing is pressed to hide it — press_key back first (Android) to judge the whole screen. ' +
+        'On Android, when the input method reports a keyboard the window state gives no area (a floating keyboard?), the reply says so: that keyboard was not judged. With treeSource: idb no keyboard is read (nothing in that tree is marked as one), so nothing changes there.',
       inputSchema: {
         platform,
         selector: z.string().describe('Element to scroll into view, e.g. \'id:submit_button\''),

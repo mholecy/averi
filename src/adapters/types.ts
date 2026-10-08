@@ -297,7 +297,12 @@ export interface KeyboardOracle {
    * a tap that navigated away the window state still read "shown" with the
    * full frame for a few seconds, while the input method itself already said
    * it was not. interact/keyboard-window.ts asks this immediately before it presses
-   * `back` for keyboard reasons, and only then — never on an ordinary tap.
+   * `back` for keyboard reasons — never on an ordinary tap. Since 2026-10-08
+   * also where `state()` read HIDDEN and the caller has no tap point: the
+   * post-fill dismissal, and `scroll_until` once at its stop
+   * (interact/keyboard.ts#keyboardUnlocated) — the floating-keyboard row
+   * (window hidden, input method shown), which presses nothing and is only
+   * reported.
    *
    * A method of its own rather than an option on `state()`: the caller needs
    * it at a different moment (after the frame has been tested against the

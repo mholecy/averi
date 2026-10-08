@@ -621,7 +621,9 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
   });
 
   it.each([
-    ['window clear (hidden): nothing to dismiss — back would navigate', ['clear'], 'nothing'],
+    ['window clear (hidden) · witness hidden: nothing to dismiss — back would navigate', ['clear', 'hidden'], 'nothing'],
+    ['window clear (hidden) · witness unknown: nothing, as before 2026-10-08', ['clear', 'unknown'], 'nothing'],
+    ['window clear (hidden) · witness shown: the floating-keyboard row — nothing pressed, said (2026-10-08)', ['clear', 'shown'], 'unlocated'],
     ['window unknown: back, as before 2026-10-03 — the witness is not asked', ['unknown'], 'back'],
     ['covering · witness shown', ['covering', 'shown'], 'back'],
     ['covering · witness unknown', ['covering', 'unknown'], 'back'],
@@ -691,13 +693,31 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     expect(fake.keys).toEqual(['back']);
   });
 
-  it.each([
-    ['hidden', 'nothing is pressed', [] as string[]],
-    ['unknown', 'back is pressed, as before 2026-10-03', ['back']],
-  ] as const)('window %s: the witness is not asked, and %s', async (state, _what, keys) => {
-    const fake = withOracle({ state }, 'hidden');
-    await dismissKeyboard(fake, FIRST);
-    expect(fake.keys).toEqual(keys);
+  it('window unknown: the witness is not asked, and back is pressed, as before 2026-10-03', async () => {
+    const fake = withOracle({ state: 'unknown' }, 'hidden');
+    expect(await dismissKeyboard(fake, FIRST)).toEqual({});
+    expect(fake.keys).toEqual(['back']);
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(0);
+  });
+
+  it.each(['hidden', 'unknown'] as const)('window hidden, witness %s: nothing pressed, nothing said — the witness asked once (2026-10-08: it can only add a sentence here)', async (witness) => {
+    const fake = withOracle({ state: 'hidden' }, witness);
+    expect(await dismissKeyboard(fake, FIRST)).toEqual({});
+    expect(fake.keys).toEqual([]);
+    expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
+  });
+
+  it('window hidden, witness SHOWN (the floating-Gboard row, inferred): no back — it could pop the screen — and a warning instead of silent success', async () => {
+    const fake = withOracle({ state: 'hidden' }, 'shown');
+    fake.backTo = 'previous'; // a back here would navigate: the hazard the row refuses
+    const result = await dismissKeyboard(fake, FIRST);
+    expect(fake.keys).toEqual([]);
+    expect(fake.current).toBe('s');
+    expect(result).toEqual({
+      warning:
+        'the input method reports a soft keyboard shown, but the window state gives it no area on screen (a floating keyboard? ' +
+        'inferred, not measured), so where it lies is unknown — nothing was pressed (back would pop the screen if no keyboard ' +
+        'is up); if one is, hide or dock it before the next step',
+    });
   });
 });

@@ -67,7 +67,7 @@ The recovery pass never re-runs a destructive flow, one whose `requires:` chain 
 | `fill` | element spec + `value`, optional `clear`, `dismissKeyboard` | Typing APPENDS: pass `clear: true` whenever the field may already hold text. |
 | `type_pin` | `{ value, keypad: { id_pattern: "pin_key_{digit}" } }` or `text_pattern: "{digit}"`; optional `twice: true` | Only the digits are used; a value with no digits is refused. `twice` covers set + confirm. |
 | `swipe` | `{ direction, times }` | |
-| `scroll_until` | `{ element, direction?, maxSwipes?, timeout?, fully? }` | `fully: true` before you measure the element, since by default "visible" means it only overlaps the viewport. |
+| `scroll_until` | `{ element, direction?, maxSwipes?, timeout?, fully? }` | `fully: true` before you measure the element, since by default "visible" means it only overlaps the viewport. With the soft keyboard up, the viewport is the screen above it. |
 | `assert` | a LIST of element asserts: `assert: [ { element: { id: x }, text: "…" } ]` | A failure fails the flow, with the diff in the trace. |
 | `wait` | `{ element: … }` or `{ state: … }`, `timeout:` | |
 | `branch` | list of `{ when: <condition>, do: [steps] }` | The first matching arm runs. With no matching arm the step times out and fails, so cover every outcome. |
@@ -86,7 +86,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
 
 ## `dismissKeyboard` on `fill`
 
-- **Android:** presses `back` unless averi can see the keyboard is already hidden.
+- **Android:** presses `back` unless averi can see the keyboard is already hidden. If the input method says a keyboard is up but the window gives it no area (a floating Gboard, probably), it presses nothing and the trace has a `⚠ fill` line saying so.
 - **iOS (`treeSource: wda`):** taps the first usable `keyboardDismiss` entry when the keyboard is up, and otherwise does nothing. The trace says when the keyboard was left up.
 - **iOS (`treeSource: idb`):** has no effect.
 

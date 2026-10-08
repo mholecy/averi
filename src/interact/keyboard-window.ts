@@ -1,4 +1,4 @@
-import type { KeyboardOracle, KeyboardWitness } from '../adapters/types.js';
+import type { KeyboardOracle, KeyboardWitness, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { sleep } from '../util/sleep.js';
 import {
@@ -139,15 +139,17 @@ export class KeyboardStateDisagreement extends KeyboardGuardError {
 type WindowReading = 'covering' | 'clear' | 'unknown';
 
 /**
- * What `dismissal` decides for ONE call: press `back`, or press nothing.
- * A decision, not a capability — `DismissalMeans` (ui-tree/soft-keyboard.ts,
- * `'back' | 'none'`) says what the ADAPTER has to hide a keyboard with,
- * fixed per adapter, and an adapter with `back` in hand still decides
- * `nothing` here when the state is hidden or the witness denies the
- * keyboard. Two literal sets on purpose: `none` is "no means", `nothing` is
- * "do nothing this time".
+ * What `dismissal` decides for ONE call: press `back`, press nothing, or —
+ * since 2026-10-08 — press nothing and SAY that the input method reports a
+ * keyboard the window state gives no area (`unlocated`, the floating-Gboard
+ * row below). A decision, not a capability — `DismissalMeans`
+ * (ui-tree/soft-keyboard.ts, `'back' | 'none'`) says what the ADAPTER has to
+ * hide a keyboard with, fixed per adapter, and an adapter with `back` in hand
+ * still decides `nothing` here when the state is hidden or the witness denies
+ * the keyboard. Two literal sets on purpose: `none` is "no means", `nothing`
+ * is "do nothing this time".
  */
-export type DismissalDecision = 'back' | 'nothing';
+export type DismissalDecision = 'back' | 'nothing' | 'unlocated';
 
 /**
  * One round of the bounded re-check that a vetoed first look starts, while
@@ -175,9 +177,26 @@ export function recheck(witness: KeyboardWitness, waitedMs: number): 'back' | 'h
  * The dismissal after a fill — no point, no second look; `covering` here
  * means shown anywhere.
  *
- *   window clear (hidden)                     → nothing
+ *   window clear (hidden) · witness hidden / unknown → nothing
  *     Nothing to dismiss — back with no keyboard up NAVIGATES (the
  *     2026-10-03 finding: a custom PIN pad, a hardware keyboard, a picker).
+ *   window clear (hidden) · witness shown            → unlocated (nothing pressed, said)
+ *     The row that did not exist until 2026-10-08
+ *     (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md): the input
+ *     method says a keyboard is shown, the window manager gives it no area.
+ *     The inferred cause — NOT measured on averi — is a floating Gboard,
+ *     whose window contributes no IME insets; measured is only Maestro's
+ *     `hideKeyboard` failing on one, and one `back` closing it. Not `back`:
+ *     the row is the 2026-10-04 disagreement turned over, and there the
+ *     side that lagged was measured to be the window state, but `mInputShown`
+ *     is not known NOT to lag a navigation — and a `back` on a screen with
+ *     no keyboard pops it (the same note, step 2: the form was popped). So
+ *     nothing is pressed and the caller is told (`UNLOCATED_KEYBOARD`), as
+ *     the note's "at minimum, surface it" direction asks, instead of the
+ *     silent success this row was before. If the floating window turns
+ *     out to read `unknown` rather than `hidden` (`mIsImeShowing=true`
+ *     beside an invisible IME entry — adapters/android.ts#parseImeInsets),
+ *     the `unknown` row below presses `back` for it, as it always has.
  *   window unknown                            → back
  *     The ONE place unknown means back, exactly as before 2026-10-03: the
  *     adapter could not tell (the command failed, or printed a format it does
@@ -189,12 +208,40 @@ export function recheck(witness: KeyboardWitness, waitedMs: number): 'back' | 'h
  *     As the guard's first look: the veto applies to the dismissal too (the
  *     stale window state after a navigation is where it was measured), and
  *     with nothing to wait for, a denied keyboard is simply left alone.
+ *
+ * The witness is asked for `clear` too since that date — one more filtered
+ * `dumpsys input_method` per dismissal whose window reads hidden (its cost:
+ * AndroidAdapter's keyboardWitness). It can only ADD a sentence there, never
+ * a key.
  */
-export function dismissal(window: 'clear' | 'unknown'): DismissalDecision;
-export function dismissal(window: 'covering', witness: KeyboardWitness): DismissalDecision;
+export function dismissal(window: 'unknown'): DismissalDecision;
+export function dismissal(window: 'clear' | 'covering', witness: KeyboardWitness): DismissalDecision;
 export function dismissal(window: WindowReading, witness?: KeyboardWitness): DismissalDecision {
-  if (window !== 'covering') return window === 'unknown' ? 'back' : 'nothing';
+  if (window === 'unknown') return 'back';
+  if (window === 'clear') return witness === 'shown' ? 'unlocated' : 'nothing';
   return witness === 'hidden' ? 'nothing' : 'back';
+}
+
+/**
+ * The `unlocated` row's sentence — the one wording, for the post-fill
+ * dismissal's warning and for `scroll_until`'s report (interact/scroll.ts),
+ * which asks the same question at its stop (`keyboardUnlocated`, below).
+ * "Floating" is the inferred cause and is said as a question.
+ */
+export const UNLOCATED_KEYBOARD =
+  'the input method reports a soft keyboard shown, but the window state gives it no area on screen ' +
+  '(a floating keyboard? inferred, not measured), so where it lies is unknown';
+
+/**
+ * The `unlocated` row asked outside the dismissal (2026-10-08): given a
+ * window reading the caller already holds, is it `hidden` while the witness
+ * says `shown`? Asks the witness only for a `hidden` reading — a `shown` one
+ * has its frame and an `unknown` one has nothing to contradict — and decides
+ * by `dismissal`'s own row, so the rule has one owner. For `scroll_until`'s
+ * stop (interact/scroll.ts), through keyboard.ts.
+ */
+export async function windowUnlocated(oracle: KeyboardOracle, window: SoftKeyboard): Promise<boolean> {
+  return window.state === 'hidden' && dismissal('clear', await oracle.witness()) === 'unlocated';
 }
 
 // ─── The model ───────────────────────────────────────────────────────────────
@@ -379,9 +426,11 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
               : confirmedAfterMs === undefined
                 ? `${covered}; hidden before tapping`
                 : `${covered}; hidden before tapping (after waiting ${confirmedAfterMs}ms for the input method to confirm it)`,
-          // Honest advice only (review 2026-10-03): scroll_until stops as soon
-          // as the target intersects the viewport, which a node under the
-          // keyboard already does; tapping outside a field does not close the
+          // Honest advice only (review 2026-10-03): scroll_until stopped as
+          // soon as the target intersected the viewport, which a node under
+          // the keyboard already did — since 2026-10-08 it judges above the
+          // keyboard, but still cannot lift a target the keyboard covers at
+          // the end of the content, the case this refusal is; tapping outside a field does not close the
           // Android IME; `enter` may submit the form; and a flow has neither a
           // key step nor a coordinate tap.
           //
@@ -414,21 +463,27 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
      * screen. The rows (and their reasons) are `dismissal`'s:
      * - shown   → back — unless, since 2026-10-04, the independent witness
      *   denies the keyboard: then nothing is pressed, and nothing is waited for;
-     * - hidden  → nothing: there is nothing to dismiss;
+     * - hidden  → nothing: there is nothing to dismiss — unless, since
+     *   2026-10-08, the witness says a keyboard IS shown: still nothing
+     *   pressed, and a `warning` saying so (the floating-Gboard row);
      * - unknown → back, exactly as before, the witness not asked.
      * One oracle query per dismissal (its cost: AndroidAdapter's
-     * keyboardState), and the witness query when that query says shown. No
-     * read after the `back` confirms it went: best effort, as the warning
-     * the in-tree model returns instead of a throw relies on. Reads none of
-     * the options and returns an empty result — a run with dismissals
-     * configured is byte-identical to one without.
+     * keyboardState), and the witness query when that query says shown or
+     * hidden. No read after the `back` confirms it went: best effort, as the
+     * warning the in-tree model returns instead of a throw relies on. Reads
+     * none of the options; its result is empty except for the `unlocated`
+     * warning — a run with dismissals configured is byte-identical to one
+     * without.
      */
     async dismiss(): Promise<DismissResult> {
       const state = await oracle.state();
       // Shown ANYWHERE is in the way — there is no point to test.
       const reading: WindowReading = state.state === 'shown' ? 'covering' : state.state === 'hidden' ? 'clear' : 'unknown';
-      const decision = reading === 'covering' ? dismissal(reading, await oracle.witness()) : dismissal(reading);
+      const decision = reading === 'unknown' ? dismissal(reading) : dismissal(reading, await oracle.witness());
       if (decision === 'back') await pressBack(adapter);
+      if (decision === 'unlocated') {
+        return { warning: `${UNLOCATED_KEYBOARD} — nothing was pressed (back would pop the screen if no keyboard is up); if one is, hide or dock it before the next step` };
+      }
       return {};
     },
   };
