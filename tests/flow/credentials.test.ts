@@ -135,6 +135,43 @@ describe('Credentials.resolve — $name, ${VAR}, plain', () => {
     expect(resolveCredentials(cfg, ENV).resolve('')).toEqual({ value: '', secret: false });
   });
 
+  // 2026-10-08 (after-ios-idb review #4): the empty check lived only in the
+  // `${VAR}` expansion, so a credential declared as "" — no variable in it —
+  // resolved to "", was typed as nothing, and the step passed. A secret is
+  // never empty, whichever path produced it; the remedy names the layer the
+  // "" was declared in.
+  it('a credential declared as "" is refused like an empty variable, naming the layer it was declared in', () => {
+    const literal = parseConfig(`
+app:
+  ios: { bundleId: md.bank.app }
+credentials:
+  password: ""
+  username: bank.user
+environments:
+  dev:
+    credentials:
+      username: ""
+  prod:
+    credentials:
+      password: hunter2
+`);
+    expect(() => resolveCredentials(literal, {}).resolve('$password')).toThrow(
+      'Credential "$password" is empty (declared as "" under credentials:) — give it a value there (a ${VAR} set in .env.averi keeps the secret out of averi.yaml), and retry',
+    );
+    // an environment that overrides a good base value with "" is named, not the base
+    expect(() => resolveCredentials(literal, {}, 'dev').resolve('$username')).toThrow(
+      'Credential "$username" is empty in environment "dev" (declared as "" under environments.dev.credentials) — give it a value there',
+    );
+    // inherited from the base inside an environment: the base is the layer to edit
+    expect(() => resolveCredentials(literal, {}, 'dev').resolve('$password')).toThrow(
+      'Credential "$password" is empty in environment "dev" (declared as "" under credentials:)',
+    );
+    // lazy: a base "" that the environment overrides is never refused
+    expect(resolveCredentials(literal, {}, 'prod').resolve('$password')).toEqual({ value: 'hunter2', secret: true });
+    // and an empty credential does not fail the resolution of another one
+    expect(resolveCredentials(literal, {}).resolve('$username')).toEqual({ value: 'bank.user', secret: true });
+  });
+
   it('expansion is lazy: a declared credential whose variable is unset fails only the step that uses it', () => {
     const creds = resolveCredentials(cfg, { AVERI_BANK_USERNAME: 'bank.user' }); // no pin
     expect(creds.resolve('$username').value).toBe('bank.user');

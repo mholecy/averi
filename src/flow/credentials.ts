@@ -57,8 +57,9 @@ export interface Credentials {
    * `$name` → credentials[name] → `${VAR}` expansion from the env; a bare
    * `${VAR}` expands too; plain strings pass through. Throws SetupError —
    * which aborts the reach ladder rather than escalating it — for an
-   * undeclared credential or an unset or EMPTY variable, naming what to
-   * declare or set.
+   * undeclared credential, an unset or EMPTY variable, or a credential
+   * declared as "" — a secret is never empty — naming what to declare or
+   * set.
    */
   resolve(raw: string): ResolvedValue;
 }
@@ -101,32 +102,72 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
   }
   const environment = name;
 
+  // " (needed for credential "x" in environment "y")" — who the refused value
+  // was for, empty for a bare `${VAR}` in a step.
+  const neededFor = (credential?: string): string =>
+    credential ?
+      ` (needed for credential "${credential}"` +
+      `${environment === undefined ? '' : ` in environment "${environment}"`})`
+    : '';
+
+  /**
+   * THE rule, one owner: a secret is never empty. Since 2026-10-07 the
+   * adapters type "" as a no-op on both platforms, so a step that typed an
+   * empty secret would pass — `fill` as `***`, `type_pin` as "0 digits" — and
+   * the bank would reject the login one screen later: the 2026-08-06
+   * misdiagnosis shape this module exists to prevent.
+   *
+   * An empty secret has exactly two origins, and each gets the remedy for
+   * its origin — one builder each, the pair below and nothing else in averi
+   * words this refusal:
+   * - emptyVariable: a `${VAR}` that is unset or set but EMPTY (a `PASSWORD=` line in
+   *   .env.averi parses to ""). Refused per VARIABLE, even when the text
+   *   around it would leave the whole value non-empty (`Bearer ${TOKEN}`):
+   *   an empty variable is the misconfiguration either way.
+   * - emptyCredential: a credential whose template is itself empty (`credentials:
+   *   { password: "" }`), the one way a `$name` can be empty once every
+   *   variable in it is non-empty. Until 2026-10-08 this was typed as
+   *   nothing and the step passed (after-ios-idb review #4) — the variable
+   *   check was the only one, and a literal never meets a variable.
+   *
+   * Lazy like every other refusal here: at the step that uses the value, not
+   * at load — a base `password: ""` that every environment overrides is
+   * never typed, and an unused credential must not fail a run that does not
+   * need it. A PLAIN step value (`fill: { value: "" }`, `type_text ""`) is
+   * not a secret and never comes through here: "clear this field" stays
+   * writable.
+   */
+  const emptyVariable = (variable: string, unset: boolean, credential?: string): SetupError =>
+    // An exported variable wins over .env.averi (flow/load.ts#envBeside), so
+    // an empty one in the shell or CI shadows a real value in the file: "set
+    // it in .env.averi" would then change nothing — say so.
+    new SetupError(
+      unset ?
+        `Environment variable ${variable} is not set${neededFor(credential)} — set it in .env.averi beside averi.yaml, or export it, and retry`
+      : `Environment variable ${variable} is set but empty${neededFor(credential)} — give it a value in .env.averi beside averi.yaml, or export it with one; ` +
+          'an empty variable exported in the shell or CI shadows the value in .env.averi, so unset it there, and retry',
+    );
+
+  const emptyCredential = (credential: string): SetupError => {
+    // Name the layer the empty template came from: the remedy is an edit
+    // THERE, and an environment that overrides a good base value with ""
+    // must not send the reader to the base.
+    const declaredUnder =
+      environment !== undefined && overriddenNames.includes(credential) ?
+        `environments.${environment}.credentials`
+      : 'credentials:';
+    return new SetupError(
+      `Credential "$${credential}" is empty` +
+        `${environment === undefined ? '' : ` in environment "${environment}"`} ` +
+        `(declared as "" under ${declaredUnder}) — give it a value there ` +
+        '(a ${VAR} set in .env.averi keeps the secret out of averi.yaml), and retry',
+    );
+  };
+
   const expand = (template: string, credential?: string): string =>
     template.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, variable: string) => {
       const value = env[variable];
-      // Unset and EMPTY are both refused (empty since 2026-10-07): a
-      // `PASSWORD=` line in .env.averi parses to "", and since the adapters
-      // type an empty string as a no-op on both platforms, a step that typed
-      // it would pass and the bank would reject the login one screen later —
-      // the 2026-08-06 misdiagnosis shape this module exists to prevent. A
-      // literal `value: ""` in the YAML never comes through here (resolve
-      // passes plain strings through), so "clear this field" stays writable.
-      if (value === undefined || value === '') {
-        const forWhom =
-          credential ?
-            ` (needed for credential "${credential}"` +
-            `${environment === undefined ? '' : ` in environment "${environment}"`})`
-          : '';
-        // An exported variable wins over .env.averi (flow/load.ts#envBeside),
-        // so an empty one in the shell or CI shadows a real value in the file:
-        // "set it in .env.averi" would then change nothing — say so.
-        throw new SetupError(
-          value === undefined ?
-            `Environment variable ${variable} is not set${forWhom} — set it in .env.averi beside averi.yaml, or export it, and retry`
-          : `Environment variable ${variable} is set but empty${forWhom} — give it a value in .env.averi beside averi.yaml, or export it with one; ` +
-              'an empty variable exported in the shell or CI shadows the value in .env.averi, so unset it there, and retry',
-        );
-      }
+      if (value === undefined || value === '') throw emptyVariable(variable, value === undefined, credential);
       return value;
     });
 
@@ -144,7 +185,14 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
             : `declare it under credentials: or environments.${environment}.credentials`;
           throw new SetupError(`Unknown credential "$${key}" — ${where}`);
         }
-        return { value: expand(template, key), secret: true };
+        // Two facts, two checks: a template that is "" is the author's
+        // declaration (refused with the layer to edit); a non-empty template
+        // whose expansion is "" cannot happen — expand refuses every empty
+        // variable — so it is a plain Error, a bug here, not a config remedy.
+        if (template === '') throw emptyCredential(key);
+        const value = expand(template, key);
+        if (value === '') throw new Error(`Credential "$${key}" expanded to an empty value — a bug in flow/credentials.ts`);
+        return { value, secret: true };
       }
       if (raw.includes('${')) return { value: expand(raw), secret: true };
       return { value: raw, secret: false };

@@ -202,6 +202,52 @@ flows:
     expect(trace).toContainEqual({ action: 'type_pin', detail: '9 digits' });
   });
 
+  // 2026-10-08 (after-ios-idb review #4): the digits were stripped and
+  // whatever was left typed — so a value with none typed nothing, traced
+  // "0 digits" and passed, and the PIN was rejected a screen later. Refused
+  // on either path (keypad taps or keystrokes) as a config error — the
+  // step's ✗ line, no "0 digits" success line — quoting what the author
+  // wrote, never the value. (Nothing typed is not asserted: zero digits
+  // typed nothing before the fix too.)
+  describe('type_pin refuses a value with no digits before the first key', () => {
+    const pinCfg = (value: string, keypad = false) =>
+      parseConfig(`
+app:
+  android: { package: md.bank.app }
+credentials:
+  pin: \${TEST_PIN}
+flows:
+  f:
+    steps:
+      - type_pin: { value: ${value}${keypad ? ', keypad: { id_pattern: "pin_key_{digit}" }' : ''} }
+`);
+
+    it.each([
+      ['a literal ""', '""', {}, 'type_pin "" has no digits'],
+      ['a literal with no digit in it', '"abc"', {}, 'type_pin "abc" has no digits'],
+      ['a credential holding only formatting', '$pin', { TEST_PIN: '---' }, 'type_pin "$pin" has no digits'],
+    ])('%s', async (_name, value, env, headline) => {
+      for (const keypad of [false, true]) {
+        resetLayout();
+        const fake = new FakeAdapter(buildScreens(), 'pin_login');
+        const error = await FlowEngine.run(pinCfg(value, keypad), fake, { ...FAST, env: { ...TEST_ENV, ...env } }, { flow: 'f' }).catch(
+          (e: unknown) => e,
+        );
+        expect((error as Error).message).toContain(headline);
+        const trace = (error as FlowError).trace;
+        expect(trace.find((t) => t.action === '✗ type_pin')?.detail).toContain(`failed — ${headline}`);
+        expect(trace.some((t) => t.action === 'type_pin')).toBe(false);
+      }
+    });
+
+    it('an EMPTY credential is the credential rule\'s refusal, not this one', async () => {
+      const fake = new FakeAdapter(buildScreens(), 'pin_login');
+      await expect(FlowEngine.run(pinCfg('$pin'), fake, { ...FAST, env: { TEST_PIN: '' } }, { flow: 'f' })).rejects.toThrow(
+        'Environment variable TEST_PIN is set but empty (needed for credential "pin")',
+      );
+    });
+  });
+
   it('rejects a keypad with both id_pattern and text_pattern', () => {
     expect(() =>
       parseConfig(`
@@ -1910,6 +1956,41 @@ flows:
       ]);
     });
 
+    // 2026-10-08 (review of after-ios-idb #4): a CONFIG refusal is not an
+    // absent interstitial. Skipped, an empty secret inside `optional:` let the
+    // flow run on with the login half-typed; now it fails the flow with its
+    // own refusal, the ✗ on the step that raised it, and no skip line.
+    describe('a config refusal inside optional: fails the flow, never skipped', () => {
+      const credentialFlow = (inner: string) =>
+        parseConfig(`
+app: { android: { package: md.bank.app } }
+credentials:
+  pin: ""
+flows:
+  f:
+    steps:
+      - optional:
+          - ${inner}
+`);
+      it.each([
+        ['an empty $credential in a fill', 'fill: { id: amount_input, value: $pin }', '✗ fill id:"amount_input"', 'Credential "$pin" is empty (declared as "" under credentials:)'],
+        ['a type_pin value with no digits', 'type_pin: { value: "abc" }', '✗ type_pin', 'type_pin "abc" has no digits'],
+        ['an undeclared credential', 'type: { value: $nope }', '✗ type', 'Unknown credential "$nope"'],
+        ['an unset variable', 'type: { value: "\${AVERI_TEST_UNSET}" }', '✗ type', 'Environment variable AVERI_TEST_UNSET is not set'],
+      ])('%s', async (_name, inner, failedLine, refusal) => {
+        const fake = formFake();
+        const error = await FlowEngine.run(credentialFlow(inner), fake, FAST, { flow: 'f' }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(FlowError);
+        expect((error as Error).message).toContain(refusal);
+        const trace = (error as FlowError).trace;
+        expect(trace.filter((t) => t.action.startsWith('✗'))).toEqual([
+          { action: failedLine, detail: expect.stringContaining(refusal) as string },
+        ]);
+        expect(trace.some((t) => t.action === 'optional')).toBe(false);
+        expect(fake.typed).toEqual([]);
+      });
+    });
+
     // Code review 2026-10-08, against the spec card: a failure after the
     // element was found stays another error. The tap's own resolution never
     // saw it, but the presence check did — so the skip quotes the tap.
@@ -2002,6 +2083,27 @@ flows:
     const fake = formFake();
     await expect(FlowEngine.run(cfgSecret, fake, { ...FAST, env: { TEST_PIN: '' } }, { flow: 'f' })).rejects.toThrow(
       /TEST_PIN is set but empty \(needed for credential "pin"\)/,
+    );
+    expect(fake.taps).toEqual([]);
+    expect(fake.typed).toEqual([]);
+  });
+
+  // 2026-10-08 (after-ios-idb review #4): a credential DECLARED as "" never
+  // met the variable check and was typed as nothing — the fill passed as
+  // `***`. Refused before the field is tapped, like the empty variable above.
+  it('a credential declared as "" fails the fill before the field is tapped', async () => {
+    const cfgSecret = parseConfig(`
+app: { android: { package: md.bank.app } }
+credentials:
+  pin: ""
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: $pin }
+`);
+    const fake = formFake();
+    await expect(FlowEngine.run(cfgSecret, fake, FAST, { flow: 'f' })).rejects.toThrow(
+      'Credential "$pin" is empty (declared as "" under credentials:)',
     );
     expect(fake.taps).toEqual([]);
     expect(fake.typed).toEqual([]);

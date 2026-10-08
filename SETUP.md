@@ -382,5 +382,10 @@ one happens by itself.
 - **A `${VAR}` is missing or empty** — the error names the credential (and environment) that needed it;
   add the variable to `.env.averi`. If it IS in `.env.averi` and the error says "set but empty", an empty variable
   exported in the shell or CI shadows it (exported variables win): unset it there. Never ask the user for the value
-  itself.
+  itself. A credential declared as `""` in averi.yaml is refused the same way (`Credential "$password" is empty`,
+  naming the `credentials:` or `environments.<name>.credentials` layer it was declared in): a secret is never empty,
+  because typing "" is a no-op and the step would pass with nothing typed. A plain step value `""` (`fill` with
+  `clear: true` to clear a field, MCP `type_text ""`) is not a secret and still works.
+- **`type_pin "…" has no digits`** — `type_pin` types only the digits of its value (`111-111-111` is formatting);
+  a value with none would type nothing, so it is refused before the first key. Fix the value or the credential.
 - **Flow times out after a UI change** — fix the descriptor as part of the change; it's code.

@@ -156,9 +156,12 @@ export class UnreadTreeRefusal extends Error {
  * flows cannot fix it, and the next rung may be the destructive one. A
  * SetupError is a broken descriptor; an UnreadTreeRefusal is a nested ladder
  * (a rung's `requires:`) that already refused — escalating the OUTER ladder
- * past it would run the wipe the inner one declined. Only the ladder's catch
- * asks: the final wait never enters a ladder, so it can see a SetupError
- * (an unknown state in a condition) but never a refusal.
+ * past it would run the wipe the inner one declined. The ladder's catch asks
+ * (the final wait never enters a ladder, so it can see a SetupError — an
+ * unknown state in a condition — but never a refusal), and since 2026-10-08
+ * so does `optional:` (runOptionalSteps), which rethrows instead of
+ * skipping, and runStep, which then gives such an error its ✗ line even
+ * inside an `optional:`.
  */
 const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanceof UnreadTreeRefusal;
 
@@ -832,8 +835,11 @@ export class FlowEngine {
       // One ✗ per failure: the innermost step logs it; the enclosing `branch` /
       // platform-override / nested-flow steps that rethrow the SAME error add
       // only a vaguer label (review 2026-09-18).
+      // A terminal error (a config refusal) is never swallowed, even inside
+      // an `optional:` (runOptionalSteps rethrows it), so it gets its ✗ on
+      // the step that raised it, not on the enclosing `optional`.
       const seen = typeof e === 'object' && e !== null && this.loggedFailures.has(e);
-      if (this.swallowDepth === 0 && !seen) {
+      if ((this.swallowDepth === 0 || isTerminal(e)) && !seen) {
         this.log(`✗ ${stepSummary(step, this.adapter.platform)}`, `failed — ${headline(e)}`);
         if (typeof e === 'object' && e !== null) this.loggedFailures.add(e);
       }
@@ -932,6 +938,21 @@ export class FlowEngine {
     // PIN/OTP inputs are numeric; formatting in the credential ("111-111-111")
     // is display convention, not keystrokes.
     const pin = raw.replace(/\D/g, '');
+    // Zero digits is refused before the first key (2026-10-08, after-ios-idb
+    // review #4): it typed nothing, logged "0 digits" and passed, and the
+    // PIN screen — or the bank, one screen later — rejected it. An empty
+    // SECRET never gets here (flow/credentials.ts owns "a secret is never
+    // empty"); what this catches is the PIN-specific half: a value with no
+    // digit in it (`value: "abc"`, a literal "", a credential holding a
+    // label instead of a code). The value itself is not quoted — it may be
+    // a secret — only what the author wrote (`$pin`, `${OTP}`, or the
+    // literal).
+    if (pin === '') {
+      throw new SetupError(
+        `type_pin ${JSON.stringify(spec.value)} has no digits — a PIN is typed digit by digit and everything ` +
+          'else is dropped as formatting, so nothing would be typed; give it a value with digits, and retry',
+      );
+    }
     const rounds = spec.twice ? 2 : 1;
     for (let round = 0; round < rounds; round++) {
       if (spec.keypad) {
@@ -1134,6 +1155,18 @@ export class FlowEngine {
           await this.runStep(s); // swallowDepth > 0: no ✗ line, the failure is logged as skipped below
         }
       } catch (e) {
+        // A config refusal is not an absent interstitial (2026-10-08, review
+        // of after-ios-idb #4): an empty secret, a `type_pin` value with no
+        // digits, an undeclared credential — the same rule as the
+        // malformed `timeout:` above, which is split outside the try for
+        // exactly this reason. Skipping it would let the flow run on with
+        // the login half-typed and fail a screen later, the shape
+        // flow/credentials.ts exists to prevent. `isTerminal` is the ladder's
+        // own "re-running cannot fix this" set: a SetupError, and an
+        // UnreadTreeRefusal, which no step inside an `optional:` can raise
+        // today (only the ladder does, and no step runs one) — were one ever
+        // to, a declined destructive rung is not an absence either.
+        if (isTerminal(e)) throw e;
         // Why it was skipped: "(not present)" only when the interaction
         // module says the element was never found (ElementNotFoundError,
         // interact/resolve.ts) — the presence poll's own miss (never the
