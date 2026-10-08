@@ -1,5 +1,6 @@
 import type { KeyboardOracle, KeyboardWitness, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { oracleKeyboard } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import {
   failedLookMessage,
@@ -324,9 +325,13 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
      * the class).
      *
      * Cost: the witness query (AndroidAdapter's keyboardWitness has its
-     * cost), the second resolve and the second `state()` query happen only
-     * here, in the overlap case; a clear first look pays one query, in
-     * keyboard.ts.
+     * cost), the second resolve and the second look happen only here, in
+     * the overlap case; a clear first look pays one query, two with the
+     * keyboard up, in keyboard.ts. A re-check round reads the oracle whole
+     * (`oracleKeyboard`: `state()`, and `touchable()` while the band is up)
+     * and asks the witness while the point stays covered — three calls a
+     * round then, at most six rounds (ui-tree/soft-keyboard.ts#readSoftKeyboard
+     * has the whole table).
      */
     async guard({ target, opts, point: at, frame, what, covered }: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }> {
       const backPressed = `${covered}; back pressed`;
@@ -357,7 +362,11 @@ export function windowModel(adapter: KeyboardAdapter, oracle: KeyboardOracle): K
         let stillCovering = frame;
         for (let waited = KEYBOARD_DISAGREEMENT_POLL_MS; ; waited += KEYBOARD_DISAGREEMENT_POLL_MS) {
           await sleep(KEYBOARD_DISAGREEMENT_POLL_MS);
-          const now = await oracle.state();
+          // The oracle read WHOLE — band and panels (`oracleKeyboard`): the
+          // first look may have found the point under a floating panel, and
+          // the band alone would read it clear here and tap a key (review
+          // 2026-10-08).
+          const now = await oracleKeyboard(oracle);
           let window = keyboardOver(now, judged);
           if (window.over !== 'covering') {
             const settled = await resolveSettled(adapter, target, opts);

@@ -79,6 +79,14 @@ describe('scrollUntilVisible — a floating keyboard\'s panel covers as the band
     expect(hidden.fake.attachedKeyboard.touchableAnswers.queries).toBe(0);
   });
 
+  it('a panel dragged to the top (y 0): no stroke, and the message says it leaves nothing above its top edge — not that it covers the whole screen', async () => {
+    const top = { ...GBOARD_PANEL, y: 0 };
+    const { fake } = form({ startY: 1515, window: { state: 'shown', frame: GBOARD_STRIP }, touchable: { witness: 'shown', region: [top, GBOARD_STRIP] }, covered: [top, GBOARD_STRIP] });
+    const error = await scrollUntilVisible(fake, 'id:message_for_payee_input', FAST).catch((e: unknown) => e);
+    expect((error as Error).message).toContain('the soft keyboard over [359,0][1040,643] leaves nothing of the screen above its top edge, so nothing under it can be judged');
+    expect(fake.swipes).toEqual([]);
+  });
+
   it('DOCKED: the region is the band — the stroke and the stop exactly as before this date', async () => {
     const { fake } = form({ startY: 2900, window: { state: 'shown', frame: DOCKED }, touchable: touchableOf(GBOARD.docked.touchable), covered: [DOCKED] });
     const result = await scrollUntilVisible(fake, 'id:message_for_payee_input', FAST);

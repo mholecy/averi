@@ -85,7 +85,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       return out('');
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
-    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
+    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, query, touchable, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
     expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
   });
 

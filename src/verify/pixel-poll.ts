@@ -109,8 +109,11 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * costs a round, not the verdict, and once a later query finds the element
  * clear the covered sentence stops being the timeout's wording. `hidden`, `unknown`, a frame elsewhere, or
  * no oracle at all (iOS, whose keyboard is in the tree) → the round proceeds
- * exactly as before. Only `state()` is asked, never `witness()`: the witness
- * exists to veto a `back` key press, and nothing is pressed here — a stale
+ * exactly as before. `witness()` is never asked: the witness exists to veto
+ * a `back` key press, and nothing is pressed here (since 2026-10-08 the
+ * `touchable()` read that follows a shown `state()` carries `mInputShown`
+ * too, but only as the admission rule for a floating panel —
+ * ui-tree/soft-keyboard.ts#panelsBeyond — never as a veto over the band) — a stale
  * `shown` costs covered rounds until the window state catches up (seconds,
  * measured on `KeyboardOracle.witness`), within the 12 s pixel default; under
  * a short explicit timeout it fails closed with the covered wording; never a
@@ -127,7 +130,10 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * captured on a device; a multi-display device reads unknown. The check sits after the deadline check so a round that
  * would capture nothing queries nothing either. Cost: one `dumpsys window
  * displays` per round, tens of ms (the measured figures are on
- * AndroidAdapter's `keyboardState`), on Android only, against a round of
+ * AndroidAdapter's `keyboardState`), and since 2026-10-08 one more adb call
+ * on a round that reads the keyboard up (`touchable()`, AndroidAdapter's
+ * `keyboardTouchable`: `dumpsys input_method` and `dumpsys window
+ * InputMethod`, filtered on the device), on Android only, against a round of
  * ~2.6–4.3 s there. The verify legs are untouched: their text table already
  * reports this case as OCCLUDED.
  *
