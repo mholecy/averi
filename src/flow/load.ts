@@ -1,9 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { Platform } from '../adapters/types.js';
-import type { IosTreeSourceKind } from '../adapters/ios-node.js';
-import type { KeyboardDismissal } from '../interact/keyboard.js';
-import { inertKeyboardDismissNote, keyboardDismissals, parseConfig, type AveriConfig } from './config.js';
+import { inertKeyboardDismissNote, parseConfig, type AveriConfig } from './config.js';
 import type { EnvValues } from './credentials.js';
 
 /**
@@ -15,13 +13,15 @@ import type { EnvValues } from './credentials.js';
  * pure walks over them, so parsing a payload loads no I/O, and the
  * `.env.averi` reading that used to keep module-level state and write
  * `process.env` is one function here that returns a value instead
- * (`envBeside`, below). The MCP path policies (`appBuildPath`,
- * `iosToolSettingsFor`) stay beside the loaders they wrap: which file is read
- * and when its absence is tolerated is config policy, not the MCP layer's.
+ * (`envBeside`, below). Which of these loaders a TOOL CALL runs, and when a
+ * missing or invalid file is tolerated, is flow/tool-config.ts's (since
+ * 2026-10-08; until then `iosToolSettingsFor` sat here and each MCP handler
+ * chose a loader by hand); only the mapping of each tool name to its policy
+ * is the MCP layer's (mcp/config-policy.ts).
  */
 
 /** What a config-requiring tool starts from: the parsed descriptor and the environment its values resolve in. */
-interface ProjectConfig {
+export interface ProjectConfig {
   cfg: AveriConfig;
   /** See flow/credentials.ts — real environment over `.env.averi`, assembled once per load. */
   env: EnvValues;
@@ -92,9 +92,12 @@ const noted = new Set<string>();
 export const projectConfigPath = (configPath?: string): string => resolve(configPath ?? 'averi.yaml');
 
 /**
- * The strict load every config-REQUIRING tool starts with: the environment is
- * assembled from the real one and a sibling .env.averi (said on stderr, since
- * stdout is the MCP transport), then averi.yaml must exist and parse.
+ * The strict load every tool that resolves credentials starts with (the
+ * `required` + `env` policy of flow/tool-config.ts: ensure_state, run_flow,
+ * verify): the environment is assembled from the real one and a sibling
+ * .env.averi (said on stderr, since stdout is the MCP transport), then
+ * averi.yaml must exist and parse. A tool that needs the config but no
+ * credentials (install_app) runs `loadConfig` alone and reads no .env.averi.
  *
  * The ONE place under src/flow/ that reads `process.env`. Everything below it
  * takes the environment as a value (ProjectConfig.env), so nothing else in
@@ -142,65 +145,13 @@ export function appBuildPath(cfg: AveriConfig, platform: Platform): string {
 }
 
 /**
- * What averi.yaml gives the iOS side of a config-optional tool, read once:
- * the tree-source kind (every tree-reading tool) and the keyboard guard's
- * dismissals (`tap` and `type_text`, whose taps go through the guard).
- * Both `undefined` for android, which reads no config.
- */
-export interface IosToolSettings {
-  /** `app.ios.treeSource` — the registry's default (idb) when undefined. */
-  treeSource: IosTreeSourceKind | undefined;
-  /** `app.ios.keyboardDismiss` in the guard's vocabulary (flow/config.ts#keyboardDismissals) — stage A, a covered target refused, when undefined. */
-  dismissals: readonly KeyboardDismissal[] | undefined;
-}
-
-/**
- * The iOS settings for tools that predate averi.yaml and must keep working
- * without one (ui_snapshot, tap, type_text, scroll_until, assert). A policy
- * in three parts, written here ONCE for both fields, each part pinned
- * (tests/flow/load.test.ts, and through the protocol in
- * tests/mcp/tools.test.ts):
- *
- * - android never reads the config. It has no tree source, its keyboard
- *   guard is the oracle's and never looks at a dismissal, and an invalid
- *   averi.yaml must not break android calls on these config-blind tools.
- * - ios with NO averi.yaml → both `undefined`: the registry's default (idb)
- *   and stage A for the guard.
- * - ios with a present-but-invalid averi.yaml throws — see loadConfigIfPresent.
- *
- * Returns the settings, not registry options: until 2026-10-03 this was
- * `loadIosOpts` in the MCP layer, but which file is read and when its absence
- * is tolerated is config policy; only the wrapping into the registry's
- * options is the MCP layer's. The conversion of the dismissals is
- * flow/config.ts#keyboardDismissals, the one owner. A caller that needs only
- * the tree source ignores the other field.
- *
- * One lookup, not two (2026-10-07, K3; until then `iosTreeSourceFor` and
- * `keyboardDismissalsFor`, each with its own copy of the policy and its own
- * loadConfigIfPresent): the stage B doc had ACCEPTED a second read of the
- * same file on one `tap`/`type_text` call because "one loader returning
- * both would make every caller of either carry the other". That held in
- * ONE direction only. Every caller that needs the dismissals (tap,
- * type_text) also needs the tree source, so nothing carries the dismissals
- * for nothing; the tree-only tools (ui_snapshot, scroll_until, assert) DO
- * now get dismissals they throw away — a pure map
- * (`keyboardDismissals`) over a config already loaded and validated, hidden
- * behind the MCP layer's tree-only wrapper. Against that, the cost of two
- * lookups was real: the file was read and parsed twice per call, and
- * `loaded` ran twice, its inert-note memo hiding the second stderr line.
- * Reversed; the once-per-call read is pinned in tests/mcp/tools.test.ts.
- */
-export async function iosToolSettingsFor(platform: Platform, configPath?: string): Promise<IosToolSettings> {
-  if (platform === 'android') return { treeSource: undefined, dismissals: undefined };
-  const cfg = await loadConfigIfPresent(projectConfigPath(configPath));
-  return { treeSource: cfg?.app.ios?.treeSource, dismissals: keyboardDismissals(cfg) };
-}
-
-/**
  * loadConfig for tools that predate averi.yaml and must keep working without
- * one (ui_snapshot, tap, ...): a MISSING file is `undefined`, but a
+ * one (ui_snapshot, tap, assert, launch_app, ... — the `optional` policy of
+ * flow/tool-config.ts): a MISSING file is `undefined`, but a
  * present-and-invalid file still throws — silently ignoring a broken config
- * would mask the very setting (e.g. app.ios.treeSource) the caller came for.
+ * would mask the very setting (app.ios.treeSource, app.android.activity, the
+ * app the health line asks about) the caller came for. Any other read error
+ * (a directory, no permission) throws as it came.
  */
 export async function loadConfigIfPresent(path: string): Promise<AveriConfig | undefined> {
   let raw: string;

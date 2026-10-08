@@ -85,6 +85,35 @@ flows:
       .toThrow(/Invalid averi\.yaml/);
   });
 
+  // Device check, 2026-10-08: a YAML syntax error escaped as the bare
+  // library message, naming no file — the config-policy table promises every
+  // broken averi.yaml fails a call naming it.
+  it('a YAML syntax error is `Invalid <source>: …`, naming the file, with the line and column kept and the parser error as cause', () => {
+    const broken = 'app: {}\nflows: { f:\n  steps:\n    - tap: x\n}\n';
+    let thrown: unknown;
+    try {
+      parseConfig(broken, '/proj/averi.yaml');
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const err = thrown as Error;
+    expect(err.message).toMatch(/^Invalid \/proj\/averi\.yaml: .*at line \d+, column \d+/);
+    expect((err.cause as Error).name).toBe('YAMLParseError');
+  });
+
+  // Review of the device check: a step with an unknown key used to carry a
+  // second, misleading line from the platform-override member of the union.
+  it('an unknown step key is reported alone — no "platform override" noise beside it', () => {
+    expect(() => parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - tapp: { id: x }\n')).toThrow(
+      /^Invalid averi\.yaml:\n {2}flows\.f\.steps\.0: Unrecognized key\(s\) in object: 'tapp'$/,
+    );
+  });
+
+  it('a real override naming neither platform still says so', () => {
+    expect(() => parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - {}\n')).toThrow('platform override needs android and/or ios');
+  });
+
   it('rejects reach references to unknown flows', () => {
     expect(() =>
       parseConfig('app: {}\nstates:\n  s:\n    detect: { element: { id: x } }\n    reach: [nope]\n'),

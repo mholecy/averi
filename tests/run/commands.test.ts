@@ -4,9 +4,10 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AveriConfig } from '../../src/flow/config.js';
 import { EngineSession } from '../../src/flow/engine.js';
+import { Verifier } from '../../src/verify/assert.js';
+import { loadForCall, REQUIRED_CONFIG_AND_ENV } from '../../src/flow/tool-config.js';
 import {
   baselineDirFor,
-  launchActivityFor,
   runAsserts,
   runEnsureState,
   runNamedFlow,
@@ -18,8 +19,12 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
  * The single-platform tool compositions at their own level: a FakeAdapter, a
  * real averi.yaml in a temp dir, no MCP server. tests/mcp/tools.test.ts pins
  * the same behaviour through the protocol; what is pinned here is what the
- * protocol cannot show cleanly — the ORDER (config before the adapter is
- * resolved), and what each function returns as a value.
+ * protocol cannot show cleanly — the ORDER (the environment pre-flight before
+ * the adapter is resolved), and what each function returns as a value. Since
+ * 2026-10-08 these functions take the config the handler read (once, under
+ * the tool's policy — flow/tool-config.ts), not a path: what a missing or
+ * broken averi.yaml does to each tool is pinned through the protocol, in
+ * tests/mcp/tools.test.ts, where the read now happens.
  */
 
 // The one sleep owner is recorded, not waited on (as in tests/verify/capture.test.ts).
@@ -61,8 +66,9 @@ async function file(name: string, content: string): Promise<string> {
   return path;
 }
 const validConfig = () => file('averi.yaml', VALID_CONFIG);
-const invalidConfig = () => file('broken.yaml', INVALID_CONFIG);
 const missing = () => join(dir, 'no-such-averi.yaml');
+/** The project an ensure_state / run_flow handler hands down: the valid config and its environment, read as the tool's policy reads them. */
+const validProject = async () => loadForCall(REQUIRED_CONFIG_AND_ENV, await validConfig());
 
 const home = () =>
   new FakeAdapter(
@@ -95,7 +101,7 @@ describe('runEnsureState', () => {
       return shot;
     };
     const { resolve, resolvedWith } = resolver(fake);
-    const out = await runEnsureState({ session: new EngineSession(), state: 'home', configPath: await validConfig() }, resolve);
+    const out = await runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolve);
     expect(out.text).toMatch(/home[\s\S]*\nappAlive: true$/);
     expect(out.shot).toEqual(frame('c'));
     expect(fake.screenshots).toEqual(frames);
@@ -111,7 +117,7 @@ describe('runEnsureState', () => {
       fake.screenshots.push(shot);
       return shot;
     };
-    const out = await runEnsureState({ session: new EngineSession(), state: 'home', configPath: await validConfig() }, resolver(fake).resolve);
+    const out = await runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolver(fake).resolve);
     expect(out.text).toMatch(/\nappAlive: true\n⚠ frame: /);
     expect(out.text.split('\n').at(-1)).toBe('⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available');
     expect(out.shot).toEqual(frame('moving 5'));
@@ -119,25 +125,18 @@ describe('runEnsureState', () => {
 
   it('runs in the environment the call names: the trace opens with it', async () => {
     const out = await runEnsureState(
-      { session: new EngineSession(), state: 'home', environment: 'staging', configPath: await validConfig() },
+      { session: new EngineSession(), state: 'home', environment: 'staging', project: await validProject() },
       resolver(home()).resolve,
     );
     expect(out.text).toContain('environment staging');
     expect(out.text).toContain('overrides: username');
   });
 
-  it('a missing or invalid averi.yaml fails before the adapter is resolved', async () => {
-    for (const configPath of [missing(), await invalidConfig()]) {
-      const { resolve, resolvedWith } = resolver(home());
-      await expect(runEnsureState({ session: new EngineSession(), state: 'home', configPath }, resolve)).rejects.toThrow();
-      expect(resolvedWith).toEqual([]);
-    }
-  });
 
   it('an unknown state is the engine\'s error, and no frame is captured for it', async () => {
     const fake = home();
     await expect(
-      runEnsureState({ session: new EngineSession(), state: 'nowhere', configPath: await validConfig() }, resolver(fake).resolve),
+      runEnsureState({ session: new EngineSession(), state: 'nowhere', project: await validProject() }, resolver(fake).resolve),
     ).rejects.toThrow(/nowhere/);
     expect(fake.screenshots).toEqual([]);
   });
@@ -147,7 +146,7 @@ describe('runNamedFlow', () => {
   it('runs the flow on the resolved adapter and returns the trace with the health line', async () => {
     const fake = home();
     const { resolve, resolvedWith } = resolver(fake);
-    const text = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath: await validConfig() }, resolve);
+    const text = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', project: await validProject() }, resolve);
     expect(fake.taps).toEqual(['menu_button']);
     expect(text).toMatch(/menu_button[\s\S]*\nappAlive: true$/);
     expect(resolvedWith).toHaveLength(1);
@@ -155,11 +154,11 @@ describe('runNamedFlow', () => {
   });
 
   it('runs in the environment the call names; without one the trace names none', async () => {
-    const configPath = await validConfig();
-    const named = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', environment: 'staging', configPath }, resolver(home()).resolve);
+    const project = await validProject();
+    const named = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', environment: 'staging', project }, resolver(home()).resolve);
     expect(named).toContain('environment staging');
     expect(named).toContain('overrides: username');
-    const plain = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath }, resolver(home()).resolve);
+    const plain = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', project }, resolver(home()).resolve);
     expect(plain).not.toContain('environment');
   });
 
@@ -168,7 +167,7 @@ describe('runNamedFlow', () => {
   it('an environment averi.yaml does not declare is refused, naming the known ones — before the adapter is resolved', async () => {
     const r = resolver(home());
     await expect(
-      runNamedFlow({ session: new EngineSession(), flow: 'open_menu', environment: 'nope', configPath: await validConfig() }, r.resolve),
+      runNamedFlow({ session: new EngineSession(), flow: 'open_menu', environment: 'nope', project: await validProject() }, r.resolve),
     ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
     expect(r.resolvedWith).toEqual([]);
   });
@@ -176,7 +175,7 @@ describe('runNamedFlow', () => {
   it('ensure_state takes the same pre-flight: no adapter is resolved for an undeclared environment', async () => {
     const r = resolver(home());
     await expect(
-      runEnsureState({ session: new EngineSession(), state: 'home', environment: 'nope', configPath: await validConfig() }, r.resolve),
+      runEnsureState({ session: new EngineSession(), state: 'home', environment: 'nope', project: await validProject() }, r.resolve),
     ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
     expect(r.resolvedWith).toEqual([]);
   });
@@ -184,55 +183,59 @@ describe('runNamedFlow', () => {
   it('the health line is the app\'s: a dead app is reported, not thrown', async () => {
     const fake = home();
     fake.appRunning = false;
-    const text = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath: await validConfig() }, resolver(fake).resolve);
+    const text = await runNamedFlow({ session: new EngineSession(), flow: 'open_menu', project: await validProject() }, resolver(fake).resolve);
     expect(text).toContain('appAlive: false — md.bank.app is not running!');
   });
 
-  it('a missing averi.yaml fails before the adapter is resolved', async () => {
-    const { resolve, resolvedWith } = resolver(home());
-    await expect(runNamedFlow({ session: new EngineSession(), flow: 'open_menu', configPath: missing() }, resolve)).rejects.toThrow();
-    expect(resolvedWith).toEqual([]);
-  });
 });
 
 describe('runAsserts', () => {
-  const run = (configPath: string, adapter = home()) =>
+  const run = (cfg: AveriConfig | undefined, adapter = home()) =>
     runAsserts({
       adapter,
       specs: [{ element: { id: 'home_root' } }, { element: { id: 'nope' }, timeout: '0ms' }],
-      baselineDir: baselineDirFor(configPath),
-      configPath,
+      baselineDir: baselineDirFor(missing()),
+      cfg,
     });
 
-  it('no averi.yaml → the verdict and one line per assert, and no health line', async () => {
-    const text = await run(missing());
+  it('no config → the verdict and one line per assert, and no health line', async () => {
+    const text = await run(undefined);
     expect(text).toMatch(/^1\/2 asserts FAILED\n/);
     expect(text).toContain('home_root');
     expect(text).toContain('FAIL  element id:"nope" exists');
     expect(text).not.toContain('appAlive');
   });
 
-  it('with averi.yaml → the same text with the health line appended', async () => {
-    const bare = await run(missing());
-    expect(await run(await validConfig())).toBe(`${bare}\nappAlive: true`);
+  it('with a config → the same text with the health line appended', async () => {
+    const bare = await run(undefined);
+    expect(await run((await validProject()).cfg)).toBe(`${bare}\nappAlive: true`);
   });
 
-  it('an INVALID averi.yaml → the results, silently no health (current behaviour; see the dated note in runAsserts)', async () => {
-    const bare = await run(missing());
-    expect(await run(await invalidConfig())).toBe(bare);
-  });
-
-  it('a throw from the health check itself is swallowed too (the catch is that broad; pinned, not endorsed)', async () => {
-    const bare = await run(missing());
+  // A throw outside appHealth's own guard costs the health line and nothing
+  // else — the narrow guard kept from the old catch-all (2026-10-08 code
+  // review: the verdict change the wide removal made was not taken).
+  it('a throw from the health check itself omits the health line; the verdict and the results stand', async () => {
+    const bare = await run(undefined);
+    const fake = home();
     // appHealth contains its own device errors, so the throw has to come from
     // somewhere it does not guard: the first thing it reads off the adapter.
-    const fake = home();
     Object.defineProperty(fake, 'platform', {
       get() {
         throw new Error('adapter gone');
       },
     });
-    expect(await run(await validConfig(), fake)).toBe(bare);
+    expect(await run((await validProject()).cfg, fake)).toBe(bare);
+  });
+
+  // The guard is the health check's ALONE: a throw from the asserts
+  // themselves is the call's failure, not a verdict to pass over.
+  it('a throw from the asserts themselves fails the call — the guard does not reach them', async () => {
+    const assertAll = vi.spyOn(Verifier.prototype, 'assertAll').mockRejectedValue(new Error('verifier broke'));
+    try {
+      await expect(run((await validProject()).cfg)).rejects.toThrow('verifier broke');
+    } finally {
+      assertAll.mockRestore();
+    }
   });
 });
 
@@ -243,79 +246,5 @@ describe('baselineDirFor', () => {
 
   it('with no configPath, off the cwd — where the default averi.yaml is looked up', () => {
     expect(baselineDirFor()).toBe(join(process.cwd(), '.averi', 'baselines'));
-  });
-});
-
-describe('launchActivityFor — which activity a launch_app call starts', () => {
-  const call = { platform: 'android' as const, appId: 'md.bank.app' };
-
-  it('android, nothing named, averi.yaml describes this package → its activity', async () => {
-    expect(await launchActivityFor({ ...call, configPath: await validConfig() })).toBe('.MainActivity');
-  });
-
-  it('another package → none', async () => {
-    expect(await launchActivityFor({ ...call, appId: 'com.other.app', configPath: await validConfig() })).toBeUndefined();
-  });
-
-  it('a named activity is returned as given, on either platform', async () => {
-    const configPath = await validConfig();
-    expect(await launchActivityFor({ ...call, activity: '.ShareActivity', configPath })).toBe('.ShareActivity');
-    expect(await launchActivityFor({ ...call, platform: 'ios', activity: '.X', configPath })).toBe('.X');
-  });
-
-  it('an intent alone suppresses the fallback — the one rule, shared with a flow launch step (resolveLaunchActivity)', async () => {
-    expect(
-      await launchActivityFor({ ...call, intent: { action: 'android.intent.action.SEND' }, configPath: await validConfig() }),
-    ).toBeUndefined();
-  });
-
-  it('ios never gets one from the config', async () => {
-    expect(await launchActivityFor({ ...call, platform: 'ios', configPath: await validConfig() })).toBeUndefined();
-  });
-
-  // The android half of the guard changes no answer (the rule says undefined
-  // off android); what it does is keep an ios launch from loading averi.yaml
-  // and .env.averi at all. Since 2026-10-04 the env file is read into a value,
-  // not into process.env, so the observable is the stderr line the load
-  // prints — each test gets its own temp dir, so the line is fresh each time.
-  describe('beside a .env.averi', () => {
-    const VAR = 'AVERI_COMMANDS_TEST_LAUNCH_ENV';
-    const LOADED = `averi: loaded ${VAR} from .env.averi`;
-    let stderr: ReturnType<typeof vi.spyOn>;
-    beforeEach(async () => {
-      stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await file('.env.averi', `${VAR}=loaded\n`);
-    });
-    afterEach(() => {
-      stderr.mockRestore();
-      expect(process.env[VAR]).toBeUndefined(); // never written, loaded or not
-    });
-
-    it('an ios call does not load the project config: nothing is said about the env file', async () => {
-      expect(await launchActivityFor({ ...call, platform: 'ios', configPath: await validConfig() })).toBeUndefined();
-      expect(stderr).not.toHaveBeenCalledWith(LOADED);
-    });
-
-    // The load is skipped by the RULE's own "when", not by platform alone:
-    // an android call that names its entry point has no use for the config.
-    it.each([
-      ['an activity', { activity: '.ShareActivity' }, '.ShareActivity'],
-      ['an intent', { intent: { action: 'android.intent.action.SEND' } }, undefined],
-    ])('an android call naming %s does not load it either', async (_what, entry, activity) => {
-      expect(await launchActivityFor({ ...call, ...entry, configPath: await validConfig() })).toBe(activity);
-      expect(stderr).not.toHaveBeenCalledWith(LOADED);
-    });
-
-    it('control: the same call on android does load it', async () => {
-      expect(await launchActivityFor({ ...call, configPath: await validConfig() })).toBe('.MainActivity');
-      expect(stderr).toHaveBeenCalledWith(LOADED);
-    });
-  });
-
-  it.each([
-    ['missing', async () => missing()],
-    ['present but invalid', invalidConfig],
-  ])('a %s averi.yaml → none, not an error (the catch-all; pinned, see the dated follow-up)', async (_name, path) => {
-    expect(await launchActivityFor({ ...call, configPath: await path() })).toBeUndefined();
   });
 });

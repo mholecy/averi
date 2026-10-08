@@ -6,7 +6,6 @@ import { parseConfig } from '../../src/flow/config.js';
 import {
   appBuildPath,
   envBeside,
-  iosToolSettingsFor,
   loadConfig,
   loadConfigIfPresent,
   loadProjectConfig,
@@ -269,113 +268,5 @@ app:
     const none = parseConfig('app:\n  android: { package: md.bank.app }\n');
     expect(() => appBuildPath(none, 'android')).toThrow('No path given and averi.yaml has no app.android build path');
     expect(() => appBuildPath(none, 'ios')).toThrow('No path given and averi.yaml has no app.ios build path');
-  });
-});
-
-/**
- * One lookup for both fields since K3 (2026-10-07): the pins below were
- * `iosTreeSourceFor`'s and `keyboardDismissalsFor`'s, moved here and each
- * at least as strong — every row that read one field now pins the WHOLE
- * two-field result, so a value leaking from one field into the other
- * fails. The policy (android never reads, missing → undefined, invalid →
- * throws) is written once and so pinned once per field.
- */
-describe('iosToolSettingsFor — the config-optional tools\' policy', () => {
-  let dir: string;
-  const write = async (content: string) => {
-    dir = await mkdtemp(join(tmpdir(), 'averi-tree-source-'));
-    const path = join(dir, 'averi.yaml');
-    await writeFile(path, content);
-    return path;
-  };
-  afterEach(async () => {
-    if (dir) await rm(dir, { recursive: true, force: true });
-  });
-
-  const INVALID = 'flows: 12\n';
-  const NONE = { treeSource: undefined, dismissals: undefined };
-
-  it('android never reads the config: a present-but-invalid averi.yaml is not an error', async () => {
-    expect(await iosToolSettingsFor('android', await write(INVALID))).toEqual(NONE);
-  });
-
-  it('android gets no kind even from a valid config that names one', async () => {
-    const path = await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
-    expect(await iosToolSettingsFor('android', path)).toEqual(NONE);
-  });
-
-  it('ios: the same invalid averi.yaml throws, naming the file', async () => {
-    const path = await write(INVALID);
-    await expect(iosToolSettingsFor('ios', path)).rejects.toThrow(path);
-  });
-
-  it('ios: a missing averi.yaml is undefined — the registry\'s default applies', async () => {
-    await write(INVALID); // a real directory, with the file under another name
-    expect(await iosToolSettingsFor('ios', join(dir, 'no-such.yaml'))).toEqual(NONE);
-  });
-
-  it('ios: the configured kind (and no dismissals, none being configured), or undefined when the config names none', async () => {
-    expect(await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n'))).toEqual({ treeSource: 'wda', dismissals: undefined });
-    expect(await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toEqual(NONE);
-  });
-
-  /** Stage B (2026-10-07): the same policy for `app.ios.keyboardDismiss`, read by the tap and type_text tools. */
-  describe('the dismissals half — the same policy for the keyboard guard\'s dismissals', () => {
-    const CONFIGURED = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ tap: { id: login_title } }, { accessory: true }] }\n';
-
-    it('android never reads the config: an invalid one is no error, a valid one with dismissals gives none', async () => {
-      expect(await iosToolSettingsFor('android', await write(INVALID))).toEqual(NONE);
-      expect(await iosToolSettingsFor('android', await write(CONFIGURED))).toEqual(NONE);
-    });
-
-    it('ios: the invalid averi.yaml throws naming the file; a missing one is undefined', async () => {
-      const path = await write(INVALID);
-      await expect(iosToolSettingsFor('ios', path)).rejects.toThrow(path);
-      expect(await iosToolSettingsFor('ios', join(dir, 'no-such.yaml'))).toEqual(NONE);
-    });
-
-    it('ios: the configured list in the guard\'s vocabulary, in order (and no kind, none being configured), or undefined when the config names none', async () => {
-      expect(await iosToolSettingsFor('ios', await write(CONFIGURED))).toEqual({ treeSource: undefined, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }, { kind: 'accessory' }] });
-      expect(await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app }\n'))).toEqual(NONE);
-    });
-
-    it('ios: both fields come from the one load — a config naming both gives both', async () => {
-      const both = await iosToolSettingsFor('ios', await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda, keyboardDismiss: [{ accessory: true }] }\n'));
-      expect(both).toEqual({ treeSource: 'wda', dismissals: [{ kind: 'accessory' }] });
-    });
-
-    /** Review round 1: the key under the default tree source is inert — said on stderr once per file, by every loader. */
-    describe('the inert-key note', () => {
-      const INERT = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ accessory: true }] }\n';
-      let stderr: ReturnType<typeof vi.spyOn>;
-      beforeEach(() => {
-        stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      });
-      afterEach(() => {
-        stderr.mockRestore();
-      });
-      const notes = () => stderr.mock.calls.map((c: unknown[]) => String(c[0])).filter((line: string) => line.includes('keyboardDismiss'));
-
-      it('the strict loader says it once per file, naming the file, and not again on a re-load', async () => {
-        const path = await write(INERT);
-        await loadConfig(path);
-        await loadConfig(path);
-        expect(notes()).toEqual([`averi: ${path}: app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`]);
-      });
-
-      it('the lenient loader (the config-optional tools) says it too; a config with treeSource: wda, or without the key, says nothing', async () => {
-        const path = await write(INERT);
-        await loadConfigIfPresent(path);
-        expect(notes()).toHaveLength(1);
-        await loadConfig(await write('app:\n  ios: { bundleId: md.bank.app, treeSource: wda, keyboardDismiss: [{ accessory: true }] }\n'));
-        await loadConfig(await write('app:\n  ios: { bundleId: md.bank.app, treeSource: idb }\n'));
-        expect(notes()).toHaveLength(1);
-      });
-
-      it('android calls through the lenient loader never load the file, so never say it', async () => {
-        await iosToolSettingsFor('android', await write(INERT));
-        expect(notes()).toEqual([]);
-      });
-    });
   });
 });

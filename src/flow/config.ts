@@ -184,6 +184,9 @@ const launchIntent: z.ZodType<LaunchIntent> = z
   })
   .strict();
 
+/** The platform-override step's refinement message — named, because parseConfig drops it where it is noise (withoutMootOverrideIssues). */
+const OVERRIDE_NEEDS_PLATFORM = 'platform override needs android and/or ios';
+
 const step: z.ZodType<Step> = z.lazy(() =>
   z.union([
     z
@@ -282,7 +285,7 @@ const step: z.ZodType<Step> = z.lazy(() =>
       .object({ android: step.optional(), ios: step.optional() })
       .strict()
       .refine((s) => s.android !== undefined || s.ios !== undefined, {
-        message: 'platform override needs android and/or ios',
+        message: OVERRIDE_NEEDS_PLATFORM,
       }),
   ]),
 );
@@ -391,7 +394,7 @@ export type AveriConfig = z.infer<typeof configSchema>;
  * `app.ios.keyboardDismiss` in the interaction module's vocabulary
  * (interact/keyboard.ts#KeyboardDismissal) — the one conversion, done once
  * per engine (FlowEngine's constructor) and once per config-optional tool
- * call (flow/load.ts#iosToolSettingsFor), so no config type crosses into
+ * call (flow/tool-config.ts#iosToolSettings), so no config type crosses into
  * interact/ and no interact type is spelled in YAML. `undefined` when the
  * config, its iOS section or the key is absent: the guard then has nothing
  * to tap, exactly stage A. Not platform-gated here: the engine passes it to
@@ -405,17 +408,53 @@ export function keyboardDismissals(cfg: AveriConfig | undefined): readonly Keybo
   return configured.map((s): KeyboardDismissal => ('tap' in s ? { kind: 'tap', target: s.tap } : { kind: 'accessory' }));
 }
 
+/**
+ * The one parse of an averi.yaml text — every loader (flow/load.ts's
+ * loadConfig and loadConfigIfPresent, and through them loadProjectConfig and
+ * flow/tool-config.ts#loadForCall) comes through here, so every way a file
+ * can be broken is said in one shape, `Invalid <source>: …`, naming the file.
+ *
+ * Until 2026-10-08 only a SCHEMA failure was: a YAML syntax error escaped as
+ * the bare library message ("Block collections are not allowed within flow
+ * collections at line 99, column 5: …") with no file in it. That mattered
+ * more once the config-policy table made a broken file fail every call that
+ * reads it — an Android assert or launch_app, an iOS tree tool — and promised
+ * the failure names the file (found by the device check). The library's
+ * message is kept whole (line, column, the excerpt), and the error itself is
+ * the `cause`.
+ */
 export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfig {
-  const raw = parseYaml(yamlText);
+  let raw: unknown;
+  try {
+    raw = parseYaml(yamlText);
+  } catch (err) {
+    throw new Error(`Invalid ${source}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+  }
   const result = configSchema.safeParse(raw);
   if (!result.success) {
-    const issues = result.error.issues
+    const issues = withoutMootOverrideIssues(result.error.issues)
       .map((i) => `  ${i.path.join('.') || '(root)'}: ${i.message}`)
       .join('\n');
     throw new Error(`Invalid ${source}:\n${issues}`);
   }
   validateReferences(result.data, source);
   return result.data;
+}
+
+/**
+ * A step with an unknown key (`tapp:`) fails every member of the step union,
+ * and zod reports the member that failed only "softly": the platform-override
+ * object, `.strict()` and then refined. Strict-mode's unrecognized key does
+ * not stop the refinement, so beside the useful `Unrecognized key(s) in
+ * object: 'tapp'` came `platform override needs android and/or ios` at the
+ * same path — noise, since the step was never meant as an override. The
+ * refinement's issue is dropped wherever an unrecognized-key issue sits at
+ * the same path; a real override naming neither platform (`{}` alone) still
+ * gets it.
+ */
+function withoutMootOverrideIssues(issues: z.ZodIssue[]): z.ZodIssue[] {
+  const unknownAt = new Set(issues.filter((i) => i.code === 'unrecognized_keys').map((i) => i.path.join('.')));
+  return issues.filter((i) => !(i.message === OVERRIDE_NEEDS_PLATFORM && unknownAt.has(i.path.join('.'))));
 }
 
 /** What a launch call says about its entry point — a flow `launch:` step or a `launch_app` call. */
@@ -431,9 +470,10 @@ export interface LaunchEntry {
  * android, and only when the caller named NEITHER an activity NOR an intent.
  *
  * Exported beside the rule below for the one caller that has to know the
- * answer before it has a config: `launch_app` (run/commands.ts) loads
- * averi.yaml only when the fallback can apply. Everyone else calls
- * `resolveLaunchActivity`, which asks this itself.
+ * answer before it has a config: `launch_app`, whose entry in the policy
+ * table (mcp/config-policy.ts#TOOL_CONFIG) reads averi.yaml only when the
+ * fallback can apply. Everyone else calls `resolveLaunchActivity`, which
+ * asks this itself.
  */
 export function launchConsultsConfigActivity({ platform, activity, intent }: Omit<LaunchEntry, 'appId'>): boolean {
   return platform === 'android' && activity === undefined && intent === undefined;

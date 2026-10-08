@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -8,6 +8,7 @@ import { IdbEmptyTreeError } from '../../src/adapters/ios-tree-source.js';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
+import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
 import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
@@ -48,6 +49,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 /** How many times THIS config file was read since the last reset — the exact path the tool was given, not any averi.yaml. */
 const configReads = (configPath: string) => reads.paths.filter((p) => p === configPath).length;
+/** How many times the .env.averi beside the test's config was read since the last reset. */
+const envReads = () => reads.paths.filter((p) => p === join(dir, '.env.averi')).length;
 
 let dir: string;
 const closers: (() => Promise<void>)[] = [];
@@ -190,6 +193,17 @@ describe('the server itself', () => {
     expect(tools.map((t) => t.name)).toEqual([...TOOL_NAMES]);
     expect(TOOL_NAMES).toHaveLength(18);
   });
+
+  // 2026-10-08: the policy table (mcp/config-policy.ts#TOOL_CONFIG) declares
+  // what every config-reading tool reads. A tool given a `configPath` but
+  // missing from the table would choose its own loader again; one in the
+  // table without the argument could not be pointed at a config.
+  it('the tools that take a configPath are exactly the ones the config policy table declares', async () => {
+    const { client } = await connect();
+    const { tools } = await client.listTools();
+    const taking = tools.filter((t) => 'configPath' in (t.inputSchema.properties ?? {})).map((t) => t.name);
+    expect(taking.sort()).toEqual(Object.keys(TOOL_CONFIG).sort());
+  });
 });
 
 describe('tap and type_text refuse an ambiguous selector', () => {
@@ -326,6 +340,34 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(bound()).toEqual([]); // refused before any device
   });
 
+  // `required` + env (flow/tool-config.ts): moved here from
+  // tests/run/commands.test.ts on 2026-10-08, when the read moved up into
+  // the handler.
+  it.each([
+    ['run_flow', 'missing', async () => missing()],
+    ['run_flow', 'invalid', invalidConfig],
+    ['ensure_state', 'missing', async () => missing()],
+    ['ensure_state', 'invalid', invalidConfig],
+  ])('%s: a %s averi.yaml is an error naming the file, before any device is bound', async (tool, _name, path) => {
+    const { call, bound } = await connect();
+    const configPath = await path();
+    const result = await call(tool, { platform: 'android', flow: 'touch_home', state: 'home', configPath });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(bound()).toEqual([]);
+  });
+
+  it.each(['run_flow', 'ensure_state', 'verify'])('%s: averi.yaml and .env.averi are each read ONCE per call', async (tool) => {
+    const { call } = await connect();
+    const configPath = await validConfig();
+    await file('.env.averi', 'AVERI_TOOLS_TEST=1\n');
+    reads.paths.length = 0;
+    const result = await call(tool, { platform: 'android', platforms: ['android'], flow: 'touch_home', state: 'home', configPath });
+    expect(result.isError).toBe(false);
+    expect(configReads(configPath)).toBe(1);
+    expect(envReads()).toBe(1);
+  });
+
   it('the clearState count belongs to the server: its three engine tools share it, both verify legs too, a second server starts at 1', async () => {
     const configPath = await file(
       'averi.yaml',
@@ -406,6 +448,29 @@ describe('install_app — which build', () => {
     expect(result.text).toContain('No path given and averi.yaml has no app.android build path');
     expect(installed).toEqual([]);
   });
+
+  // `required` (flow/tool-config.ts): without a path the config is the only
+  // source of the build, so neither a missing nor a broken one can be passed over.
+  it.each([
+    ['missing', async () => missing()],
+    ['invalid', invalidConfig],
+  ])('no path and a %s averi.yaml → an error naming the file, nothing installed', async (_name, path) => {
+    const configPath = await path();
+    const { result, installed } = await installing({ configPath });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(installed).toEqual([]);
+  });
+
+  it('no path: averi.yaml is read once, and .env.averi beside it not at all — a build path needs no credentials', async () => {
+    const configPath = await file('averi.yaml', 'app:\n  android: { package: md.bank.app, apk: build/app.apk }\n');
+    await file('.env.averi', 'AVERI_TOOLS_TEST=1\n');
+    reads.paths.length = 0;
+    const { result } = await installing({ configPath });
+    expect(result.isError).toBe(false);
+    expect(configReads(configPath)).toBe(1);
+    expect(envReads()).toBe(0);
+  });
 });
 
 describe('launch_app — the entry activity', () => {
@@ -472,13 +537,45 @@ describe('launch_app — the entry activity', () => {
     expect(launches[0].activity).toBeUndefined();
   });
 
-  it.each([
-    ['no averi.yaml', async () => missing()],
-    ['an invalid averi.yaml', invalidConfig],
-  ])('%s → launches without an activity instead of failing', async (_name, configPath) => {
-    const { launches } = await launch({ appId: 'md.bank.app' }, { configPath: await configPath() });
+  it('no averi.yaml → launches without an activity instead of failing (`optional`)', async () => {
+    const { launches } = await launch({ appId: 'md.bank.app' }, { configPath: missing() });
     expect(launches).toHaveLength(1);
     expect(launches[0].activity).toBeUndefined();
+  });
+
+  // 2026-10-08: until then a catch-all launched here without the activity —
+  // on a debug build bundling LeakCanary, the wrong app, silently.
+  it('android, nothing named, an INVALID averi.yaml → an error naming the file, nothing launched, no device bound', async () => {
+    const { call, fakes, bound } = await connect();
+    const configPath = await invalidConfig();
+    const result = await call('launch_app', { platform: 'android', appId: 'md.bank.app', configPath });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(fakes.android!.launches).toEqual([]);
+    expect(bound()).toEqual([]);
+  });
+
+  // The same broken file beside a call that would use nothing from it: not read.
+  it.each([
+    ['android, an activity named', 'android', { activity: '.ShareActivity' }],
+    ['android, an intent given', 'android', { intent: { action: 'android.intent.action.SEND' } }],
+    ['ios', 'ios', {}],
+  ] as const)('%s → the invalid averi.yaml is not read, and the launch goes ahead', async (_name, platform, entry) => {
+    const configPath = await invalidConfig();
+    reads.paths.length = 0;
+    const { launches } = await launch({ appId: 'md.bank.app', ...entry }, { platform, configPath });
+    expect(launches).toHaveLength(1);
+    expect(configReads(configPath)).toBe(0);
+  });
+
+  it('the fallback reads averi.yaml once, and .env.averi not at all — an activity needs no credentials', async () => {
+    const configPath = await validConfig();
+    await file('.env.averi', 'AVERI_TOOLS_TEST=1\n');
+    reads.paths.length = 0;
+    const { launches } = await launch({ appId: 'md.bank.app' }, { configPath });
+    expect(launches[0].activity).toBe('.MainActivity');
+    expect(configReads(configPath)).toBe(1);
+    expect(envReads()).toBe(0);
   });
 });
 
@@ -547,7 +644,7 @@ describe('type_text refuses a control character before anything is sent', () => 
   }
 });
 
-describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_until, assert)', () => {
+describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_until — and assert on ios)', () => {
   const snapshot = async (platform: Platform, configPath: string) => {
     const harness = await connect();
     const result = await harness.call('ui_snapshot', { platform, filter: 'id:home_root', configPath });
@@ -645,19 +742,44 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(JSON.parse(result.texts[0])).toMatchObject({ role: 'container', children: [{ label: 'Forgot PIN?' }, { label: 'Enter your PIN' }] });
   });
 
-  // The rule is one helper at five call sites; ui_snapshot above and assert
-  // below carry the detail, these pin that the other three go through it.
-  it.each([
-    ['tap', { selector: 'id:home_root' }],
-    ['type_text', { selector: 'id:home_root', text: 'x' }],
-    ['scroll_until', { selector: 'id:home_root' }],
-  ])('ios: %s fails on the same invalid averi.yaml before a device is bound', async (tool, args) => {
-    const configPath = await invalidConfig();
+  /**
+   * The same policy for every tool in the group, not only ui_snapshot: each
+   * declares it in mcp/config-policy.ts#TOOL_CONFIG and reads through the one
+   * loader (2026-10-08; until then a shared helper, which an `it.each` over
+   * tap, type_text and scroll_until pinned for the ios-invalid row only). `assert` is in the iOS half only — on
+   * android it reads averi.yaml for its health line (its own describe).
+   */
+  const TREE_CALLS: Record<string, Record<string, unknown>> = {
+    ui_snapshot: { filter: 'id:home_root' },
+    tap: { selector: 'id:home_root' },
+    type_text: { text: 'x' },
+    scroll_until: { selector: 'id:home_root' },
+    assert: { asserts: [{ element: { id: 'home_root' } }] },
+  };
+
+  it.each(Object.keys(TREE_CALLS))('ios %s: an INVALID averi.yaml fails the call naming the file, before a device is bound', async (tool) => {
     const harness = await connect();
-    const result = await harness.call(tool, { platform: 'ios', configPath, ...args });
+    const configPath = await invalidConfig();
+    const result = await harness.call(tool, { platform: 'ios', configPath, ...TREE_CALLS[tool] });
     expect(result.isError).toBe(true);
     expect(result.text).toContain(configPath);
     expect(harness.bound()).toEqual([]);
+  });
+
+  it.each(Object.keys(TREE_CALLS))('ios %s: a MISSING averi.yaml is the default tree source, and the call works', async (tool) => {
+    const harness = await connect();
+    const result = await harness.call(tool, { platform: 'ios', configPath: missing(), ...TREE_CALLS[tool] });
+    expect(result.isError).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
+  });
+
+  it.each(['ui_snapshot', 'tap', 'type_text', 'scroll_until'])('android %s: an INVALID averi.yaml is not read at all, and the call works', async (tool) => {
+    const harness = await connect();
+    const configPath = await invalidConfig();
+    reads.paths.length = 0;
+    const result = await harness.call(tool, { platform: 'android', configPath, ...TREE_CALLS[tool] });
+    expect(result.isError).toBe(false);
+    expect(configReads(configPath)).toBe(0);
   });
 
   it('ios: a missing averi.yaml means the default tree source (idb)', async () => {
@@ -679,9 +801,9 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
 
 /**
  * Stage B (2026-10-07): the tap and type_text tools hand averi.yaml's
- * `app.ios.keyboardDismiss` to the keyboard guard (flow/load.ts#
- * iosToolSettingsFor, the one config-optional lookup, which also gives the
- * tree source). The measured iOS login in points: `login_submit` under the band
+ * `app.ios.keyboardDismiss` to the keyboard guard (flow/tool-config.ts#
+ * iosToolSettings over the call's one read, which also gives the tree
+ * source; flow/load.ts#iosToolSettingsFor until 2026-10-08). The measured iOS login in points: `login_submit` under the band
  * the WDA source marks, the title above it; the fake plays the app (K5b: a
  * tap on the title hides the keyboard).
  */
@@ -761,30 +883,74 @@ describe('tap / type_text pass app.ios.keyboardDismiss to the guard', () => {
 });
 
 describe('assert — results always, health only with a loadable averi.yaml', () => {
-  const run = async (configPath: string) => {
-    const { call } = await connect();
-    return call('assert', { platform: 'android', asserts: [{ element: { id: 'home_root' } }], configPath });
+  const run = async (configPath: string, platform: Platform = 'android') => {
+    const harness = await connect();
+    const result = await harness.call('assert', { platform, asserts: [{ element: { id: 'home_root' } }], configPath });
+    return { ...result, bound: harness.bound() };
   };
 
-  it('no averi.yaml → the assert results and no health line', async () => {
-    const result = await run(missing());
+  it.each(['android', 'ios'] as const)('%s: no averi.yaml → the assert results and no health line', async (platform) => {
+    const result = await run(missing(), platform);
     expect(result.isError).toBe(false);
     expect(result.text).toContain('home_root');
     expect(result.text).not.toContain('appAlive');
   });
 
-  it('with averi.yaml → the same results with the health line appended', async () => {
-    const bare = await run(missing());
-    const result = await run(await validConfig());
+  it.each(['android', 'ios'] as const)('%s: with averi.yaml → the same results with the health line appended', async (platform) => {
+    const bare = await run(missing(), platform);
+    const result = await run(await validConfig(), platform);
     expect(result.isError).toBe(false);
     expect(result.text).toBe(`${bare.text}\nappAlive: true`);
   });
 
-  it('android + an INVALID averi.yaml → results, silently no health (current behaviour; see the dated note in run/commands.ts#runAsserts)', async () => {
-    const bare = await run(missing());
-    const result = await run(await invalidConfig());
+  // 2026-10-08: until then the android call passed and silently dropped the
+  // health line (a catch-all in run/commands.ts#runAsserts) while the ios
+  // call failed — one broken file, two verdicts by platform. Now one.
+  it.each(['android', 'ios'] as const)('%s: an INVALID averi.yaml fails the call naming the file, before a device is bound', async (platform) => {
+    const configPath = await invalidConfig();
+    const result = await run(configPath, platform);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(result.bound).toEqual([]);
+  });
+
+  // Device check (2026-10-08): a YAML SYNTAX error used to surface as the
+  // parser's bare message, naming no file.
+  it('android: an averi.yaml that is not even YAML → an error naming the file, before a device is bound', async () => {
+    const configPath = await file('averi.yaml', 'app: {}\nflows: { f:\n  steps:\n    - tap: x\n}\n');
+    const result = await run(configPath);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(`Invalid ${configPath}: `);
+    expect(result.text).toMatch(/at line \d+, column \d+/);
+    expect(result.bound).toEqual([]);
+  });
+
+  // Review round 1: only a MISSING file means "no averi.yaml". A path the
+  // file cannot be read from for another reason (here a directory) fails the
+  // call as it came — until 2026-10-08 the android call's catch-all passed it.
+  it('android: a configPath that is a directory → an error (EISDIR), before a device is bound', async () => {
+    const configPath = join(dir, 'averi.yaml');
+    await mkdir(configPath);
+    const result = await run(configPath);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('EISDIR');
+    expect(result.bound).toEqual([]);
+  });
+
+  // The ios call needs averi.yaml twice — the tree source and the health
+  // line — and until 2026-10-08 read it twice, the second time strictly and
+  // with .env.averi, which the health line has no use for.
+  it.each(['android', 'ios'] as const)('%s: averi.yaml is read ONCE per call, and .env.averi not at all', async (platform) => {
+    const configPath = await file('averi.yaml', `${VALID_CONFIG.replace('ios:     { bundleId: md.bank.app }', 'ios:     { bundleId: md.bank.app, treeSource: wda }')}`);
+    await file('.env.averi', 'AVERI_TOOLS_TEST=1\n');
+    reads.paths.length = 0;
+    const result = await run(configPath, platform);
     expect(result.isError).toBe(false);
-    expect(result.text).toBe(bare.text);
+    expect(result.text).toContain('appAlive: true');
+    expect(configReads(configPath)).toBe(1);
+    expect(envReads()).toBe(0);
+    // ...and that one read served the tree source too.
+    expect(result.bound).toEqual([{ platform, deviceId: `${platform}-1`, treeSource: platform === 'ios' ? 'wda' : undefined }]);
   });
 });
 
