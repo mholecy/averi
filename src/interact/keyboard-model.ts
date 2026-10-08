@@ -4,7 +4,7 @@ import { tapPoint } from '../ui-tree/selectors.js';
 import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type Target } from './resolve.js';
+import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type TapScreen, type Target } from './resolve.js';
 
 /**
  * The seam between the two keyboard models (2026-10-07, the keyboard-model
@@ -58,8 +58,8 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  */
 export const KEYBOARD_HIDE_DELAY_MS = 300;
 
-/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice (the in-tree model's refusal). */
-export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey'>;
+/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice (the in-tree model's refusal), the screen size (the on-screen rule, resolve.ts#onScreen — the tap's and a dismissal's, since 2026-10-08). */
+export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>;
 
 /** A resolved node whose tap point no soft keyboard covers. */
 export interface ResolvedClear extends Resolved {
@@ -254,6 +254,8 @@ export interface CoveredLook {
   opts: GuardOptions;
   /** Where the target was on that look. */
   point: Point;
+  /** The screen the first look was judged on (resolve.ts#tapScreen), for a model that judges a point of its own — the in-tree model's dismissal (`onScreen`). */
+  screen: TapScreen | undefined;
   /** The frame (or band) that covered it. */
   frame: Rect;
   /** The target as the messages name it: `id:login_submit`, `id:"login_submit"` for an ElementSpec. */
@@ -272,6 +274,8 @@ export interface CoveredLook {
 export interface Hiding {
   /** The side effect: the window model's `back`, the in-tree model's tap on the picked element. */
   perform(): Promise<void>;
+  /** What `perform` sent, as a clause — `back was pressed to hide the soft keyboard`, `id:"login_title" was tapped at (201,303) to hide the soft keyboard` — for a refusal after it that must say something was (the off-screen rule, resolve.ts#refuseOffScreen). */
+  sent: string;
   /** How many looks after it before the last still-covering one refuses: one for `back` (the frame decides), KEYBOARD_HIDE_CONFIRM_LOOKS for a dismissal tap (a hide animation caught mid-way is not a refusal). */
   looks: number;
   /** The look could not resolve the target: the model's error over `failedLookMessage`, saying what it did to the screen first, with `e` as the cause. */

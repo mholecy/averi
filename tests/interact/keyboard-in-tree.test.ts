@@ -364,10 +364,21 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(result.keyboardHidden).toBe(HIDDEN);
       });
 
-      it('a root without a rect (no screen to judge by) skips the on-screen check, not the strategy', async () => {
-        const fake = hiding(iosFake());
+      it('a root without a rect: the DEVICE screen judges — the tap\'s own on-screen rule (resolve.ts#onScreen, one owner since 2026-10-08)', async () => {
+        const fake = iosFake();
         fake.live().rect = { x: 0, y: 0, width: 0, height: 0 };
         fake.viewportSize = { width: 402, height: 874 };
+        title(fake).rect = { x: 36, y: -60, width: 330, height: 24 };
+        await expect(tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] })).rejects.toThrow('(tap id:"login_title": off screen at (201,-48))');
+        expect(fake.taps).toEqual([]);
+      });
+
+      it('no screen at all — no root rect and no device size: the on-screen check is skipped, not the strategy (fail open)', async () => {
+        const fake = hiding(iosFake());
+        fake.live().rect = { x: 0, y: 0, width: 0, height: 0 };
+        fake.viewport = async () => {
+          throw new Error('idb describe: no screen_dimensions');
+        };
         title(fake).rect = { x: 36, y: -60, width: 330, height: 24 };
         await tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] });
         expect(fake.taps).toEqual(['login_title', 'login_submit']);

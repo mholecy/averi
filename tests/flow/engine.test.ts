@@ -2762,6 +2762,25 @@ flows:
     expect(fake.taps).toEqual([]);
   });
 
+  it('an optional tap: whose target the keyboard\'s re-layout moved off screen AFTER back: the skip\'s one line says back was pressed (2026-10-08, review m2)', async () => {
+    const fake = loginFake();
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    const relayout = fake.onKey;
+    fake.onKey = (key, self) => {
+      relayout?.(key, self);
+      self.live().children[1].rect = { x: 99, y: 2300, width: 300, height: 132 };
+    };
+    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' });
+    expect(trace).toContainEqual({
+      action: 'optional',
+      detail:
+        'skipped id:"login_submit" (id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is off screen at ' +
+        '(249,2366) on a 1080x2220 screen (rect 99,2300 300x132) — scroll_until it first)',
+    });
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.taps).toEqual([]);
+  });
+
   it('a fill: that fails after the dismissal traces ⚠ fill … back pressed before its ✗ line', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };

@@ -86,4 +86,23 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     expect(calls).toEqual([dump, dump, wmSize, query, witness, query, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
     expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
   });
+
+  it('a target below the screen: refused BEFORE the keyboard is asked — the screen read, re-read once, no dumpsys, no key, no tap (2026-10-08)', async () => {
+    const tree = hierarchy(
+      '<node index="0" text="Sign in" resource-id="com.example.app:id/login_submit" class="android.widget.Button" package="com.example.app" content-desc="" bounds="[99,2300][399,2432]"/>',
+    );
+    const calls: string[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
+      if (full.includes('uiautomator dump')) return out(tree);
+      if (full === wmSize) return out(PHYSICAL);
+      return out('');
+    };
+    await expect(tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 })).rejects.toThrow(
+      'id:login_submit is off screen at (249,2366) on a 1080x2220 screen (rect 99,2300 300x132)',
+    );
+    expect(calls).toEqual([dump, dump, wmSize, wmSize]);
+  });
 });

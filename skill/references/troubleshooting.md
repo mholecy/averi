@@ -42,8 +42,11 @@ Alternatively, detect on a button or row id.
 
 ## A tap target off screen
 
-- **`… is off screen at (x,y) on a WxH screen … — scroll_until it first; nothing was tapped`**: the element is in the tree but its centre is outside the screen. iOS keeps a scroll view's content below the fold in the tree with real rects. Nothing was tapped, so focus did not move. Run `scroll_until` for the same selector, then tap again. `only N% of it … is on screen` means the element is clipped at an edge; scroll it further in.
-- **`… to appear` with `(found, but 0×0 (scrolled off screen, or collapsed) …)`**: the selector matched only zero-area nodes. iOS (idb) reports a node scrolled above the top that way. Run `scroll_until` with `direction: up`, then retry. If it is not in a scroll view, the view is collapsed or not laid out yet.
+- **`… is off screen at (x,y) on a WxH screen … — scroll_until it first; nothing was tapped`**: the element is in the tree but its centre is outside the screen. iOS keeps a scroll view's content below the fold in the tree with real rects. Nothing was tapped, so focus did not move. Run `scroll_until` for the same selector, then tap again.
+- **`… only N% of it … is on screen … — scroll_until it with fully: true first`**: the element is clipped at an edge with its centre outside. A plain `scroll_until` stops as soon as any part shows and hands back the same clipped element, so pass `fully: true`.
+- **`… was not tapped: after back was pressed …` / `after id:"…" was tapped …`**: the keyboard guard hid the keyboard first, and the layout then moved the element off screen. The screen has changed; take a `screenshot`, then `scroll_until` it.
+- **`either way up`** in the refusal: averi could not tell how the screen is held, so it refused only a point outside the screen in both orientations.
+- **`… to appear` with `(it matched only 0×0 nodes (scrolled off screen, or collapsed) …)`**: the selector matched only zero-area nodes. iOS (idb) reports a node scrolled above the top that way. Run `scroll_until` with `direction: up`, then retry. If it is not in a scroll view, the view is collapsed or not laid out yet.
 
 ## Typing and fields
 

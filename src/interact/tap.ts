@@ -1,6 +1,6 @@
-import type { DeviceAdapter } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
+import type { KeyboardAdapter } from './keyboard-model.js';
 import type { Target } from './resolve.js';
 
 /**
@@ -34,7 +34,7 @@ import type { Target } from './resolve.js';
  * to import the selector layer above it (ARCHITECTURE.md §3).
  */
 export async function tapElement(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>,
+  adapter: KeyboardAdapter,
   target: Target,
   opts: GuardOptions,
 ): Promise<{ note?: string; keyboardHidden?: string }> {

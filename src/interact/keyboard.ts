@@ -1,4 +1,4 @@
-import type { DeviceAdapter, Point, Rect, SoftKeyboard } from '../adapters/types.js';
+import type { Point, Rect, SoftKeyboard } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { inTreeModel } from './keyboard-in-tree.js';
@@ -121,22 +121,22 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  * a day in the tree (2026-10-04 → 2026-10-05): one decision table over all
  * four window-model phases — the dated banner in keyboard-window.ts.
  */
-export async function resolveClearOfKeyboard(
-  adapter: KeyboardAdapter & Pick<DeviceAdapter, 'viewport'>,
-  target: Target,
-  opts: GuardOptions,
-): Promise<ResolvedClear> {
+export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: Target, opts: GuardOptions): Promise<ResolvedClear> {
   const first = await resolveSettled(adapter, target, opts);
   // The other rule every tap on a resolved node shares (2026-10-08): its
   // point must lie ON the screen (resolve.ts#refuseOffScreen, the reasons
   // there). Asked before the keyboard is, so a target below the fold costs
   // no `back` and no dismissal tap; asked again of the node a guard that
   // acted hands back, since the layout moves when the keyboard goes (an iOS
-  // keyboard-avoiding scroll view scrolls back down). The box comes from the
-  // first read's tree — the orientation does not turn inside one tap.
-  const screen = await tapScreen(adapter, first.tree);
-  refuseOffScreen(target, first.node, screen);
-  const onScreen = (r: ResolvedClear): ResolvedClear => (refuseOffScreen(target, r.node, screen, r.keyboardHidden), r);
+  // keyboard-avoiding scroll view scrolls back down). The screen comes from
+  // the first read's tree — the orientation does not turn inside one tap —
+  // or from the re-read a refusal makes first.
+  const screen = await refuseOffScreen(adapter, target, first.node, first.tree, await tapScreen(adapter, first.tree));
+  // After the guard: `sent` only when something WAS sent (the hiding path);
+  // a model that handed the node back clear sent nothing.
+  const onScreen = async (r: ResolvedClear, sent?: string): Promise<ResolvedClear> => (
+    await refuseOffScreen(adapter, target, r.node, first.tree, screen, sent), r
+  );
   const at = tapPoint(first.node);
   const opening = keyboardOver((await readSoftKeyboard(adapter, first.tree, first.node)).keyboard, at);
   // THE guard's one fail-open rule, applied here and wherever a model reads
@@ -152,7 +152,7 @@ export async function resolveClearOfKeyboard(
   // reads of `adapter.keyboard` — readSoftKeyboard's and this — sit together.
   const model = keyboardModel(adapter);
   const what = describeTarget(target);
-  const ready = await model.guard({ target, opts, point: at, frame: opening.frame, what, covered: `the soft keyboard covered ${what}` });
+  const ready = await model.guard({ target, opts, point: at, screen, frame: opening.frame, what, covered: `the soft keyboard covered ${what}` });
   if ('cleared' in ready) return onScreen(ready.cleared);
   const { hiding } = ready;
   await hiding.perform();
@@ -164,7 +164,7 @@ export async function resolveClearOfKeyboard(
     },
     (seen, looks) => hiding.stillCovering(seen, looks),
   );
-  return onScreen(cleared);
+  return onScreen(cleared, hiding.sent);
 }
 
 /**

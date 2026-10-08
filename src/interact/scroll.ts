@@ -1,5 +1,5 @@
 import type { DeviceAdapter, Rect, SoftKeyboard, UiNode } from '../adapters/types.js';
-import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import { clippedEdges, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { cannotHide, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
@@ -240,10 +240,12 @@ const frameWords = (viewport: Box, cover: Cover | undefined): string =>
  * reads them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
  * as before — the guard's fail-open rule; an unread tree strokes in the box
  * the last read round's band left (review 2026-10-08), the stop already
- * quoting the read error. Landscape is not handled: the band and the
- * judgement use `viewport()` as built while the stroke box is turned
- * (swipe.ts#screenBox) — the pre-existing gap ARCHITECTURE.md records for
- * the visibility judgements.
+ * quoting the read error. Landscape: since 2026-10-08 the judgement, the
+ * band's `above` box and the stroke all use the round's `screenBox` box —
+ * turned when the tree's window says so — the screen the tap's on-screen
+ * rule judges too (resolve.ts#tapScreen); the band's frame is the oracle's
+ * or the tree's, in the tree's coordinates already. Unmeasured on a device
+ * held sideways.
  *
  * The band is APPLIED only when it changes the round — the two judgements
  * differ, or the round ends in a stroke or a failure rather than a clean
@@ -303,9 +305,26 @@ export async function scrollUntilVisible(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS;
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
-  // The visibility reference frame: read before the loop, so a device whose
-  // screen cannot be read fails here rather than as "never intersected".
-  const viewport = await adapter.viewport();
+  // The device's screen, read before the loop, so a device whose screen
+  // cannot be read fails here rather than as "never intersected".
+  const asBuilt = await adapter.viewport();
+  // The visibility reference frame (2026-10-08, review of the off-screen tap
+  // refusal, M2): the box `screenBox` gives this round's tree — the tap's
+  // screen owner (resolve.ts#tapScreen), so a stop the scroll calls visible
+  // is judged on the screen the next tap is judged on, turned in landscape
+  // as the stroke already was. Until then it was `viewport()` as built: in
+  // landscape a button at y 500 of a 874x402 window was "fully visible" on
+  // a 402x874 panel and the tap after it refused. A round whose tree did
+  // not read keeps the last frame; a box screenBox cannot give (a 0×0
+  // device and no window) is the device as built, as before.
+  let viewport: Box = asBuilt;
+  const frameOf = async (read: TreeRead): Promise<Box> => {
+    try {
+      return (await screenBox(adapter, read)).box;
+    } catch {
+      return asBuilt;
+    }
+  };
 
   const deadline = Date.now() + timeoutMs;
   let lastFound: UiNode[] = [];
@@ -330,7 +349,10 @@ export async function scrollUntilVisible(
     const read = await readTreeOrError(adapter);
     const { tree, error } = read;
     lastReadError = error;
-    if (tree !== undefined) treesRead++;
+    if (tree !== undefined) {
+      treesRead++;
+      viewport = await frameOf(read);
+    }
     lastFound = tree === undefined ? [] : findTarget(tree, target);
     if (lastFound.length > 0) everFound = true;
     // The keyboard this round, off this round's tree (no subject: every match

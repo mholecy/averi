@@ -1,4 +1,4 @@
-import type { DeviceAdapter, Rect, Selector, UiNode } from '../adapters/types.js';
+import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { containsPoint, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
@@ -284,7 +284,7 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
 }
 
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
-export const ZERO_AREA_HINT = 'found, but 0×0 (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
+export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
 
 /** Did the target match in this tree, but only with zero-area nodes — resolveNow's filter, the reason it answered `undefined`? */
 const matchedOnlyZeroArea = (tree: UiNode, target: Target): boolean => findTarget(tree, target).length > 0;
@@ -332,44 +332,86 @@ export async function resolvePresent(
  * iOS 27 (idb, 402×874 pt): the tree lists a scroll view's content below the
  * fold with its real rects (y 885, y 1157), the tap went to (94,895), landed
  * nowhere, and the reply said "Tapped" — the next `type_text` typed into the
- * field that still had focus. Thrown with NOTHING sent.
+ * field that still had focus. The target itself is never tapped.
  *
  * A class of its own, like AmbiguityRefusal, because it is neither of the
  * wait's failures: the element WAS found (never ElementNotFoundError — an
  * `optional:` tap of it is skipped with this headline, not "(not present)"),
  * and nothing is moving. The remedy is in the message: scroll it in first.
+ * When the keyboard guard had already sent something (a `back`, a dismissal
+ * tap), the HEADLINE says what — the one line an `optional:` skip quotes.
  */
 export class OffScreenRefusal extends Error {}
 
+/** The screen a tap point is judged against: `swipe.ts#ScreenBox`'s box, and whether a window witnessed which way up it is. */
+export interface TapScreen {
+  box: Rect;
+  witnessed: boolean;
+}
+
 /**
- * The screen a tap point is judged against: `swipe.ts#screenBox`, the one
- * owner of "the device's screen as the tree's coordinates see it" — the
- * device's `viewport()` (memoized by the adapter; in the tree's units, px on
- * Android, pt on iOS), turned when `tree`'s window says the screen is held
- * sideways, the tree's window when the device size cannot be read. Reusing
- * it, rather than `viewport()` alone, is what keeps a landscape tap at
- * x 600 of 874 from being refused against the 402-wide panel as built.
+ * The screen for the on-screen rule: `swipe.ts#screenBox`, the one owner of
+ * "the device's screen as the tree's coordinates see it" — the device's
+ * `viewport()` (memoized by the adapter; in the tree's units, px on Android,
+ * pt on iOS), turned when `tree`'s window says the screen is held sideways,
+ * the tree's window when the device size cannot be read — with its
+ * `witnessed` flag (onScreen says what it changes).
  *
- * `undefined` — no box at all — means the check is skipped and the tap goes
- * ahead as it did before the check existed: the keyboard guard's fail-open
- * rule (keyboard.ts). The check exists to stop a false "Tapped", and must
- * never be why a tap on a device that could not report its size did not
- * happen.
+ * `undefined` — no box at all — leaves the judgement to the tree's root rect
+ * (`onScreen`), and with no root rect either the tap goes ahead as it did
+ * before the rule existed: the keyboard guard's fail-open rule
+ * (keyboard.ts). The rule exists to stop a false "Tapped", and must never
+ * be why a tap on a device that could not report its size did not happen.
  */
-export async function tapScreen(adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<Rect | undefined> {
+export async function tapScreen(adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<TapScreen | undefined> {
   try {
-    return (await screenBox(adapter, { tree })).box;
+    const { box, witnessed } = await screenBox(adapter, { tree });
+    return { box, witnessed };
   } catch {
     return undefined;
   }
 }
 
+const turned = (b: Rect): Rect => ({ x: b.x, y: b.y, width: b.height, height: b.width });
+
+/** The boxes a point may lie in to count as on screen: the box, and — when no window witnessed which way up it is — the box turned. */
+const screenBoxes = (screen: TapScreen): Rect[] => (screen.witnessed ? [screen.box] : [screen.box, turned(screen.box)]);
+
 /**
- * Refuse a tap whose point lies off `screen` (OffScreenRefusal), or return.
- * The rule every tap on a resolved node shares, applied by
- * keyboard.ts#resolveClearOfKeyboard — behind `tapElement` (the flow `tap:`
- * step, the MCP `tap` tool) and `fillField`'s focus tap — to the node it
- * hands back.
+ * THE on-screen rule for a point about to be tapped (2026-10-08) — the
+ * target's centre (`refuseOffScreen`) and a configured keyboard dismissal's
+ * (keyboard-in-tree.ts#pickDismissal: WDA keeps off-screen nodes, a title
+ * scrolled above the top is still in the tree). One owner since the review
+ * of the off-screen refusal: the picker had judged by the root's rect alone.
+ *
+ * - A screen whose orientation a window witnessed (`TapScreen.witnessed`):
+ *   inside its box.
+ * - One no window witnessed: inside the box EITHER way up. Review
+ *   2026-10-08 (B1): the turn is a swipe's question first, where a wrong
+ *   box costs an off-centre stroke; refusing on it would refuse every tap
+ *   past x 402 in an idb landscape tree whose window a straddling carousel
+ *   card made unreliable, an iPad strip, a walked-width turn, a split pane.
+ *   What this gives up: a point off a portrait screen's right edge but
+ *   within its height turned (a carousel page at x 450, y 300 on 402×874)
+ *   is not refused on an unwitnessed screen. The measured case — below the
+ *   fold, (94,895) on 402×874 — lies outside both and is refused either way.
+ * - No screen at all: inside the tree's root rect when it has one; with
+ *   none, on screen (fail open).
+ *
+ * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
+ * a 402-wide screen is judged at 402, off it: that is where the tap would go.
+ */
+export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefined): boolean {
+  if (screen === undefined) return rectArea(tree.rect) === 0 || containsPoint(tree.rect, point);
+  return screenBoxes(screen).some((box) => containsPoint(box, point));
+}
+
+/**
+ * Refuse a tap whose point lies off the screen (OffScreenRefusal), or return
+ * the screen it was judged against. The rule every tap on a resolved node
+ * shares, applied by keyboard.ts#resolveClearOfKeyboard — behind
+ * `tapElement` (the flow `tap:` step, the MCP `tap` tool) and `fillField`'s
+ * focus tap — to the node it hands back.
  *
  * Judged on the tap POINT, not the rect: a node whose centre is on screen
  * is tapped as before, however much of it is clipped. A node partly on
@@ -378,21 +420,55 @@ export async function tapScreen(adapter: Pick<DeviceAdapter, 'viewport'>, tree: 
  * point would change what the keyboard guard judged (it tests the centre),
  * and the visible part of such a node is a sliver at a screen edge — on iOS
  * the bottom one is the home indicator's gesture zone, the top the status
- * bar — where a tap is least likely to reach the element. `scroll_until`
- * brings it in, and its reply says how much is visible.
+ * bar — where a tap is least likely to reach the element. Its remedy is
+ * `scroll_until … fully: true`: a plain `scroll_until` stops on any
+ * intersection and would hand back the same clipped node (review
+ * 2026-10-08, M1).
  *
- * `after`, when the keyboard guard acted before this look (pressed `back`,
- * tapped a dismissal), is quoted beneath the headline: something WAS sent.
+ * Before refusing, the device's screen is read AGAIN (`viewport({ fresh:
+ * true })`, once, on this path only — the clear path costs nothing new):
+ * the adapter memoizes the size for the session, and a fold, an unfold or a
+ * `wm size` change would otherwise refuse taps for the server's life (review
+ * 2026-10-08, M3; the same re-read verify/capture.ts makes before refusing a
+ * window as wider than the screen). The refusal names the size read again
+ * when it differs from the first.
+ *
+ * `sent`, when the keyboard guard acted before this look — `back was
+ * pressed …`, `id:"login_title" was tapped …` (`Hiding.sent`) — fronts the
+ * headline: the target was not tapped, but something was.
  */
-export function refuseOffScreen(target: Target, node: UiNode, screen: Rect | undefined, after?: string): void {
-  if (screen === undefined) return;
+export async function refuseOffScreen(
+  adapter: Pick<DeviceAdapter, 'viewport'>,
+  target: Target,
+  node: UiNode,
+  tree: UiNode,
+  screen: TapScreen | undefined,
+  sent?: string,
+): Promise<TapScreen | undefined> {
   const at = tapPoint(node);
-  if (containsPoint(screen, at)) return;
-  const visible = visibleFractionInViewport(node.rect, screen);
-  const where = `at (${at.x},${at.y}) on a ${screen.width}x${screen.height} screen`;
-  const part = visible > 0 ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre` : ` (rect ${rectText(node.rect)})`;
+  if (onScreen(at, tree, screen)) return screen;
+  try {
+    await adapter.viewport({ fresh: true });
+  } catch {
+    // An unreadable size is screenBox's to handle (the tree's window stands in).
+  }
+  const again = await tapScreen(adapter, tree);
+  if (onScreen(at, tree, again)) return again;
+  const judged: TapScreen = again ?? screen ?? { box: tree.rect, witnessed: true };
+  const boxes = screenBoxes(judged);
+  const visible = Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
+  const size = `${judged.box.width}x${judged.box.height}`;
+  const reread =
+    again !== undefined && screen !== undefined && (again.box.width !== screen.box.width || again.box.height !== screen.box.height)
+      ? ` (read again before refusing; it was ${screen.box.width}x${screen.box.height})`
+      : '';
+  const where = `at (${at.x},${at.y}) on a ${size} screen${judged.witnessed ? '' : ' either way up'}${reread}`;
+  const part =
+    visible > 0
+      ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — scroll_until it with fully: true first`
+      : ` (rect ${rectText(node.rect)}) — scroll_until it first`;
+  const what = describeTarget(target);
   throw new OffScreenRefusal(
-    `${describeTarget(target)} is off screen ${where}${part} — scroll_until it first; nothing was tapped` +
-      (after === undefined ? '' : `\n  (before that: ${after})`),
+    sent === undefined ? `${what} is off screen ${where}${part}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is off screen ${where}${part}`,
   );
 }
