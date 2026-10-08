@@ -1,6 +1,6 @@
 # BUG: through WebDriverAgent a full-screen SwiftUI `Toolbar` "shadows" every point, so a configured `keyboardDismiss` tap on the screen title is refused as "covered"
 
-> **Status (2026-10-08):** open — triaged P3 (`treeSource: wda` only; mp-native runs idb today, but it blocks the documented path to WDA); the cited code is unchanged on `c35388a`.
+> **Status (2026-10-08):** fixed on branch `fix/p3-wda-toolbar-shadow`; unmeasured on a device: `shadowing` (`src/ui-tree/geometry.ts`) no longer counts a later screen-sized HOST as cover by itself — a non-interactive node with children whose area reaches `SCREEN_SIZED_FRACTION` of the root's rect (the largest rect when the root has none); its content at the point still covers, and a screen-sized interactive or childless node still covers as itself. Pinned by a test built from the tree below; re-run the repro with `treeSource: wda` to confirm the title is tapped and the keyboard hides. **At merge:** move `SCREEN_SIZED_FRACTION` from `ui-tree/bare-tree.ts` to `adapters/types.ts` beside `STRUCTURAL_ROLES` (geometry.ts ↔ bare-tree.ts is an import cycle on this branch, which may not edit bare-tree.ts), and drop the cycle clause from ARCHITECTURE.md's ui-tree paragraph.
 
 **Measured 2026-10-08 16:42–16:43 UTC** in `/Users/mholecy/Finshape/mp-native` (SWIFT payment form, branch
 `feature/swift-payment`) with a scratch config — mp-native's `averi.yaml` uses idb and was not edited — iPhone 17
@@ -74,7 +74,7 @@ path to `treeSource: wda`, which mp-native's own `averi.yaml` header considers f
 ## Possible fix directions (owner's choice)
 
 - Apply the wrapper-by-size rule in `shadowing`: a non-structural node whose area reaches `SCREEN_SIZED_FRACTION` of
-  the root does not shadow (a real modal sheet/alert is smaller than the screen, or carries content children that do).
+  the root (taken: only a non-interactive one with children, see Status) does not shadow (a real modal sheet/alert is smaller than the screen, or carries content children that do).
 - Or judge cover by the shadowing node's content children (leaf with label/text) rather than the container itself.
 - A test with this tree (title, then a 402×874 `Toolbar`) pinning the title as usable.
 

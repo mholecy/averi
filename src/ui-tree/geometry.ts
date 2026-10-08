@@ -1,4 +1,6 @@
-import { rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { SCREEN_SIZED_FRACTION } from './bare-tree.js';
+import { isInteractive } from './selectors.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -548,16 +550,47 @@ export function rectText(r: Rect): string {
  * that the band missed is a real cover (review 2026-10-07). `undefined` when
  * nothing shadows the point. Ancestors and earlier siblings never count:
  * they are beneath. A heuristic, not a compositor — a transparent overlay
- * reads as cover, a label inside a sheet that does not contain the point
- * does not — but it refuses the measured kind of false target: an alert's
- * or a sheet's content over the title, a navigation bar's own label.
+ * smaller than the screen reads as cover, a label inside a sheet that does
+ * not contain the point does not — but it refuses the measured kind of
+ * false target: an alert's or a sheet's content over the title, a
+ * navigation bar's own label.
  *
  * Asked by the tap guard's dismissal picker (interact/keyboard-in-tree.ts
  * #pickDismissal). Here, not in soft-keyboard.ts, since 2026-10-07: it is
  * a draw-order question over rects asked of any tree — the keyboard is one
  * more thing that can be drawn over a point, not what the question is about.
+ *
+ * A screen-sized HOST is not a cover by itself either (2026-10-08,
+ * docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md):
+ * a non-structural, non-interactive node WITH children whose area reaches
+ * `SCREEN_SIZED_FRACTION` of the screen — the root's rect, the screen the
+ * dismissal picker's on-screen check uses, or the tree's largest rect when
+ * the root has none (bare-tree.ts's `wrapperBySize` notion). WDA gives a
+ * SwiftUI pushed screen's toolbar host as `toolbar 'Toolbar'` with the
+ * screen's full frame AFTER the title in pre-order; it draws nothing over
+ * the title, yet every `keyboardDismiss` tap on that screen was refused as
+ * "covered by toolbar". Its descendants are still walked, so a full-screen
+ * host over the point covers through the CONTENT it carries there (a text,
+ * a button, a card smaller than the screen). Not exempt, whatever their
+ * size: an interactive node (a full-screen `button` backdrop — an RN
+ * transparent Modal's Pressable — takes the tap) and a childless one (a
+ * full-screen image or text draws itself). The measured refusals above are
+ * kept. Accepted trade-off: a full-screen non-interactive host with nothing
+ * of its own at the point (a host whose content sits elsewhere — a
+ * full-screen `scrollable` or `webview`, such as an RN ScrollView in a
+ * transparent modal whose rows are below the title) reads as not covering,
+ * and the dismissal tap lands on it. "Has children" is a weak signal: the
+ * measured toolbar's only child is an empty container. On the guard's path a
+ * keyboard that stays ends in `AfterDismissalTap`; on the post-fill
+ * `dismiss()` path (interact/keyboard-in-tree.ts) a tap that changed the
+ * screen and took the keyboard with it is reported as `hiddenBy: tapping
+ * <title>` — the same as any dismissal tap whose side effect the band cannot
+ * see. iOS dimming views come through as `other` (structural), never a
+ * cover before this change, so they are not a new cost.
  */
 export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
+  const screen = rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
+  const host = (n: UiNode) => n.children.length > 0 && !isInteractive(n) && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION;
   let after = false;
   let over: UiNode | undefined;
   const walk = (n: UiNode): void => {
@@ -565,7 +598,7 @@ export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | un
       after = true; // the node's own subtree is the node
       return;
     }
-    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && containsPoint(n.rect, point)) over = n;
+    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && !host(n) && containsPoint(n.rect, point)) over = n;
     for (const child of n.children) walk(child);
   };
   walk(tree);
