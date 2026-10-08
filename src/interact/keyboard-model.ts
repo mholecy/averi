@@ -127,7 +127,7 @@ export interface GuardOptions extends SettleOptions {
 /** What `dismissKeyboard` takes of the guard's options: the dismissals it may tap and the ambiguity policy they are judged under — no default policy is written here. The settle options are not among them: it resolves nothing. */
 export type DismissOptions = Pick<GuardOptions, 'dismissals' | 'ambiguous'>;
 
-/** What `dismissKeyboard` did, for the caller's trace: at most one of the two — on the window model never `hiddenBy`, and `warning` only on its floating-keyboard row (since 2026-10-08). */
+/** What `dismissKeyboard` did, for the caller's trace: at most one of the two — on the window model never `hiddenBy`, and `warning` only on its `unlocated` row (since 2026-10-08). */
 export interface DismissResult {
   /** The in-tree keyboard was up and this hid it: `tapping id:"login_title"`, the fragment the flow's fill line appends after `; keyboard hidden by ` — not a `keyboardHidden` sentence, so the engine's `⚠` tracing cannot take this result by mistake. */
   hiddenBy?: string;

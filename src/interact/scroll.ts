@@ -54,9 +54,12 @@ export interface ScrollUntilResult {
    *   several nodes match — a different match judged (one under the band
    *   loses to one above it), which can be a clean "fully visible" (round 3
    *   of the review, 2026-10-08); a band that changes nothing is not applied;
-   * - `unlocated`: the window model's floating-keyboard row — the input
-   *   method says one is shown, the window state gives it no area — so
-   *   nothing could be judged against it and the report says so
+   * - `unlocated`: the window model's `unlocated` row — the input method
+   *   says a keyboard is shown, the window state gives it no area (one still
+   *   coming up? not measured — keyboard-window.ts#UNLOCATED_KEYBOARD; a
+   *   floating Gboard does not read this way, its panel is read from the
+   *   window's touchable region and covers as the band does) — so nothing
+   *   could be judged against it and the report says so
    *   (keyboard.ts#keyboardUnlocated). Only on a clean `fully: true` stop.
    */
   keyboard?: { state: 'shown'; frame: Rect } | { state: 'unlocated' };
@@ -655,11 +658,15 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  *   not move is the defect it reports). For both, only strokes count: a
  *   confirming read sent none.
  *
- * The floating keyboard (docs/bugs/2026-10-05-android-floating-gboard-
- * keyboard.md, inferred): on a failed stop, and on a `fully: true` stop —
- * where the answer changes what the reader does next — a window reading
- * `hidden` is checked once against the input method (`keyboardUnlocated`);
- * when it says shown, the report says the keyboard could not be placed.
+ * The unlocated keyboard (keyboard-window.ts#UNLOCATED_KEYBOARD — the input
+ * method says shown, the window state gives it no area: one still coming
+ * up? not measured. Not the floating keyboard any more: measured on API 33,
+ * a floating Gboard keeps a band and its panel is read from the window's
+ * touchable region, `coverOf` above): on a failed stop, and on a
+ * `fully: true` stop — where the answer changes what the reader does next —
+ * a window reading `hidden` is checked once against the input method
+ * (`keyboardUnlocated`); when it says shown, the report says the keyboard
+ * could not be placed.
  * Nothing is judged against it — there is no frame — and nothing is
  * pressed. Not on a default clean stop (review 2026-10-08: a witness query
  * on every one buys a sentence nobody acts on).
@@ -713,7 +720,7 @@ export async function scrollUntilVisible(
   let coveredRounds = 0;
   /** The cover the last round whose tree READ applied — undefined when that round applied none — for the stroke of a round whose tree did not read. */
   let lastReadCover: Cover | undefined;
-  /** On a failed or `fully: true` stop only: the floating row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
+  /** On a failed or `fully: true` stop only: the `unlocated` row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
   const unlocatedAt = async (round: SoftKeyboard | undefined): Promise<boolean> => round !== undefined && (await keyboardUnlocated(adapter, round));
   /** Spend a confirming read: settle again, send nothing, read again. */
   const settleAgain = async (): Promise<void> => {
@@ -886,7 +893,7 @@ export async function scrollUntilVisible(
       // The keyboard, when any round applied one: the reader must not take a
       // scroll that worked around it — or one it hid the element under — for
       // a wrong selector (the bug note's 15 s "never appeared"). And the
-      // floating row, asked of the last round's reading whatever came before.
+      // `unlocated` row, asked of the last round's reading whatever came before.
       const shown =
         lastCover !== undefined
           ? `. The soft keyboard was up over ${frameText(lastCover.band)} in ${coveredRounds} of the ${treesRead} rounds read: ` +

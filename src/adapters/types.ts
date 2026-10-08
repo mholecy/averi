@@ -329,7 +329,7 @@ export interface KeyboardOracle {
    * also in two places that press nothing: where `state()` read HIDDEN and
    * the caller has no tap point — the post-fill dismissal, and
    * `scroll_until` on a failed or `fully: true` stop
-   * (interact/keyboard.ts#keyboardUnlocated, the floating-keyboard row:
+   * (interact/keyboard.ts#keyboardUnlocated, the `unlocated` row:
    * window hidden, input method shown, only reported) — and in
    * `scroll_until` before a `shown` band may change its judgement or its
    * stroke (keyboard.ts#keyboardCorroborated, the same veto; at most once a

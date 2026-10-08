@@ -1754,7 +1754,7 @@ flows:
     });
   });
 
-  it('the floating-keyboard row (window hidden, input method shown) marks a fully: true line ⚠: "fully visible" is not established', async () => {
+  it('the `unlocated` row (window hidden, input method shown) marks a fully: true line ⚠: "fully visible" is not established', async () => {
     const fake = scrollingFake(500);
     fake.attachKeyboard({ state: 'hidden' }, 'shown');
     const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });
@@ -2741,7 +2741,7 @@ flows:
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
   });
 
-  it('fill … dismissKeyboard: true with the floating-keyboard row (window hidden, input method shown): no back, and a ⚠ fill line instead of silent success (2026-10-08)', async () => {
+  it('fill … dismissKeyboard: true with the `unlocated` row (window hidden, input method shown): no back, and a ⚠ fill line instead of silent success (2026-10-08)', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'hidden' };
     fake.attachedKeyboard.witnessAnswers.current = 'shown';

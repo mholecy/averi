@@ -354,7 +354,7 @@ export interface SoftKeyboardReading extends KeyboardRemedy {
  * - a pixel-poll round: 1, or 2 with the keyboard up (no witness);
  * - a `scroll_until` round: 1, or 2 with the keyboard up, or 3 when the band
  *   changes the round (its `keyboardCorroborated` witness), plus the
- *   floating row's witness on a failed or `fully: true` stop. The
+ *   `unlocated` row's witness on a failed or `fully: true` stop. The
  *   touchable call's own `mInputShown`, read a moment before, could serve
  *   that veto and save the third call; it is not reused (judged 2026-10-08,
  *   review round 1): the reading would carry a witness only on the shown

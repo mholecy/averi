@@ -623,7 +623,7 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
   it.each([
     ['window clear (hidden) · witness hidden: nothing to dismiss — back would navigate', ['clear', 'hidden'], 'nothing'],
     ['window clear (hidden) · witness unknown: nothing, as before 2026-10-08', ['clear', 'unknown'], 'nothing'],
-    ['window clear (hidden) · witness shown: the floating-keyboard row — nothing pressed, said (2026-10-08)', ['clear', 'shown'], 'unlocated'],
+    ['window clear (hidden) · witness shown: the `unlocated` row — nothing pressed, said (2026-10-08)', ['clear', 'shown'], 'unlocated'],
     ['window unknown: back, as before 2026-10-03 — the witness is not asked', ['unknown'], 'back'],
     ['covering · witness shown', ['covering', 'shown'], 'back'],
     ['covering · witness unknown', ['covering', 'unknown'], 'back'],
