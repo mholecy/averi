@@ -2,13 +2,13 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
-import { detectXcodeEnv } from './xcode-env.js';
+import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import type { Device, DeviceAdapter, DeviceScreen, Key, LaunchOptions, UiNode } from './types.js';
+import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, UiNode } from './types.js';
 import { ViewportMemo } from './viewport-memo.js';
 
 /**
@@ -23,69 +23,45 @@ import { ViewportMemo } from './viewport-memo.js';
 export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   private readonly exec: ExecFn;
-  private readonly udid: string | undefined;
-  private readonly treeSource: IosTreeSource | undefined;
+  private readonly udid: string;
+  private readonly treeSource: IosTreeSource;
 
-  constructor(
-    opts: {
-      udid?: string;
-      exec?: ExecFn;
-      /**
-       * Where uiTree() reads from. Absent on an UNBOUND adapter: the registry
-       * constructs one per platform to probe listDevices(), and a probe never
-       * reads a tree. A bound adapter always gets one — both sources need the
-       * concrete UDID (idb rejects simctl's `booted` alias, WDA builds
-       * `-destination id=`), and the registry is the one caller that has it,
-       * which is why the source is injected here and not defaulted.
-       */
-      treeSource?: IosTreeSource;
-    } = {},
-  ) {
+  constructor(opts: {
+    /**
+     * The simulator this adapter drives — required (2026-10-08): listing
+     * simulators is discovery.ts's, not an adapter's, so there is no unbound
+     * adapter any more, and with it went simctl's `booted` alias and the
+     * lazy `simctl list` that resolved a UDID for idb (which rejects the
+     * alias).
+     */
+    udid: string;
+    exec?: ExecFn;
+    /**
+     * Where uiTree() reads from. Injected, not defaulted: both sources need
+     * the concrete UDID (idb rejects simctl's `booted` alias, WDA builds
+     * `-destination id=`), and the registry is the one caller that has it.
+     */
+    treeSource: IosTreeSource;
+  }) {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
   }
 
-  /** The injected source's kind; undefined on an unbound adapter, which never reads a tree (DeviceAdapter.treeSourceKind). */
-  get treeSourceKind(): IosTreeSourceKind | undefined {
-    return this.treeSource?.kind;
+  /** The injected source's kind (DeviceAdapter.treeSourceKind). */
+  get treeSourceKind(): IosTreeSourceKind {
+    return this.treeSource.kind;
   }
 
-  private target(): string {
-    return this.udid ?? 'booted';
-  }
-
-  /** DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */
-  private detectEnv(): Promise<Record<string, string> | undefined> {
-    return detectXcodeEnv(this.exec);
-  }
-
-  private async simctl(args: string[], timeoutMs?: number) {
-    const env = await this.detectEnv();
-    return this.exec('xcrun', ['simctl', ...args], { env, ...(timeoutMs ? { timeoutMs } : {}) });
+  /** `xcrun simctl` under the DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */
+  private simctl(args: string[], timeoutMs?: number) {
+    return simctl(this.exec, args, timeoutMs);
   }
 
   // --- idb boundary (input only — the tree read is the source's) ---
 
-  /**
-   * idb rejects simctl's `booted` alias — it wants a concrete UDID. Resolve
-   * it once via `simctl list` when no explicit udid was given.
-   */
-  private bootedUdidPromise: Promise<string> | undefined;
-
-  private resolveTarget(): Promise<string> {
-    if (this.udid) return Promise.resolve(this.udid);
-    this.bootedUdidPromise ??= (async () => {
-      const devices = await this.listDevices();
-      const booted = devices.find((d) => d.state === 'booted');
-      if (!booted) throw new Error('No booted simulator — boot one with `xcrun simctl boot <name>`');
-      return booted.id;
-    })();
-    return this.bootedUdidPromise;
-  }
-
-  private async idb(args: string[], timeoutMs?: number) {
-    return runIdb(this.exec, await this.resolveTarget(), args, { timeoutMs });
+  private idb(args: string[], timeoutMs?: number) {
+    return runIdb(this.exec, this.udid, args, { timeoutMs });
   }
 
   private idbUi(args: string[]) {
@@ -96,14 +72,6 @@ export class IosAdapter implements DeviceAdapter {
   // neither idb nor WDA has uiautomator's "no window yet" transient — a
   // launching app simply appears in the next read.
   uiTree(): Promise<UiNode> {
-    if (!this.treeSource) {
-      return Promise.reject(
-        new Error(
-          'This IosAdapter has no tree source — it was created unbound, for device probing only; ' +
-            'read trees through an adapter the registry bound to a simulator',
-        ),
-      );
-    }
     return this.treeSource.read();
   }
 
@@ -117,36 +85,13 @@ export class IosAdapter implements DeviceAdapter {
    * source's WdaServer.shutdown() is terminal and a second call is a no-op).
    */
   dispose(): Promise<void> {
-    return this.treeSource?.dispose() ?? Promise.resolve();
+    return this.treeSource.dispose();
   }
 
   // --- simctl-backed lifecycle ---
 
-  async listDevices(): Promise<Device[]> {
-    const { stdout } = await this.simctl(['list', 'devices', '--json']);
-    const parsed = JSON.parse(stdout.toString('utf8')) as {
-      devices: Record<string, { udid: string; name: string; state: string; isAvailable: boolean }[]>;
-    };
-    const devices: Device[] = [];
-    for (const [runtime, list] of Object.entries(parsed.devices)) {
-      // "com.apple.CoreSimulator.SimRuntime.iOS-17-5" → "17.5"
-      const osVersion = runtime.match(/iOS-([\d-]+)/)?.[1]?.replace(/-/g, '.') ?? 'unknown';
-      for (const d of list) {
-        if (!d.isAvailable) continue;
-        devices.push({
-          id: d.udid,
-          platform: 'ios',
-          name: d.name,
-          osVersion,
-          state: d.state === 'Booted' ? 'booted' : 'offline',
-        });
-      }
-    }
-    return devices;
-  }
-
   async install(appPath: string): Promise<void> {
-    await this.simctl(['install', this.target(), appPath], 120_000);
+    await this.simctl(['install', this.udid, appPath], 120_000);
   }
 
   async launch(bundleId: string, opts: LaunchOptions = {}): Promise<void> {
@@ -158,7 +103,7 @@ export class IosAdapter implements DeviceAdapter {
     }
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.enableAccessibilityAutomation(`launching ${bundleId}`);
-    await this.simctl(['launch', this.target(), bundleId]);
+    await this.simctl(['launch', this.udid, bundleId]);
   }
 
   /** The simulator-wide write below is announced once per adapter, not per launch. */
@@ -198,13 +143,13 @@ export class IosAdapter implements DeviceAdapter {
   private async enableAccessibilityAutomation(what: string): Promise<void> {
     for (const key of ['AutomationEnabled', 'ApplicationAccessibilityEnabled']) {
       try {
-        await this.simctl(['spawn', this.target(), 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000);
+        await this.simctl(['spawn', this.udid, 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000);
       } catch (e) {
         const reason = errorMessage(e).split('\n')[0];
         console.error(
-          `averi: could not set com.apple.Accessibility ${key} on ${this.target()} before ${what} (${reason}) — ` +
+          `averi: could not set com.apple.Accessibility ${key} on ${this.udid} before ${what} (${reason}) — ` +
             'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
-            `if it does, reboot the simulator (xcrun simctl shutdown ${this.udid ?? '<udid>'} && xcrun simctl boot ${this.udid ?? '<udid>'})`,
+            `if it does, reboot the simulator (xcrun simctl shutdown ${this.udid} && xcrun simctl boot ${this.udid})`,
         );
         return;
       }
@@ -212,7 +157,7 @@ export class IosAdapter implements DeviceAdapter {
     if (!this.accessibilityAutomationAnnounced) {
       this.accessibilityAutomationAnnounced = true;
       console.error(
-        `averi: set com.apple.Accessibility AutomationEnabled and ApplicationAccessibilityEnabled to true on ${this.target()} ` +
+        `averi: set com.apple.Accessibility AutomationEnabled and ApplicationAccessibilityEnabled to true on ${this.udid} ` +
           '(simulator-wide, not restored; before every launch, so an earlier WebDriverAgent session cannot leave idb reading an empty tree)',
       );
     }
@@ -220,27 +165,27 @@ export class IosAdapter implements DeviceAdapter {
 
   async terminate(bundleId: string): Promise<void> {
     // simctl terminate fails if the app is not running — that's fine.
-    await this.simctl(['terminate', this.target(), bundleId]).catch(() => undefined);
+    await this.simctl(['terminate', this.udid, bundleId]).catch(() => undefined);
   }
 
   async openDeepLink(url: string): Promise<void> {
     // A link can cold-start the app: that is a launch (enableAccessibilityAutomation).
     await this.enableAccessibilityAutomation(`opening ${url}`);
-    await this.simctl(['openurl', this.target(), url]);
+    await this.simctl(['openurl', this.udid, url]);
   }
 
   async screenshot(): Promise<Buffer> {
     const dir = await mkdtemp(join(tmpdir(), 'averi-'));
     const file = join(dir, 'screen.png');
     try {
-      await this.simctl(['io', this.target(), 'screenshot', file]);
+      await this.simctl(['io', this.udid, 'screenshot', file]);
       // simctl exits 0 and the file is read after it — an empty or foreign
       // file is judged here, as on Android (screenshot-bytes.ts).
       return screenshotPng(await readFile(file), {
-        device: `simulator ${this.target()}`,
-        command: `xcrun simctl io ${this.target()} screenshot <file>`,
+        device: `simulator ${this.udid}`,
+        command: `xcrun simctl io ${this.udid} screenshot <file>`,
         remedy: `Re-check \`xcrun simctl list devices booted\` and retry; if it repeats, reboot the simulator ` +
-          `(xcrun simctl shutdown ${this.udid ?? '<udid>'} && xcrun simctl boot ${this.udid ?? '<udid>'}).`,
+          `(xcrun simctl shutdown ${this.udid} && xcrun simctl boot ${this.udid}).`,
       });
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -346,20 +291,15 @@ export class IosAdapter implements DeviceAdapter {
     '(tap: { id: <title> }, accessory: true) and the guard taps the first one on screen before a covered target; ' +
     'typing with a hardware keyboard keeps the software keyboard from showing';
 
-  async setClipboard(text: string): Promise<void> {
-    const env = await this.detectEnv();
-    await this.exec('xcrun', ['simctl', 'pbcopy', this.target()], { stdin: text, env });
-  }
-
   async isAppRunning(bundleId: string): Promise<boolean> {
-    const { stdout } = await this.simctl(['spawn', this.target(), 'launchctl', 'list']);
+    const { stdout } = await this.simctl(['spawn', this.udid, 'launchctl', 'list']);
     return stdout.toString('utf8').includes(`UIKitApplication:${bundleId}`);
   }
 
   async logs(sinceMs: number): Promise<string[]> {
     const start = formatLogDate(new Date(sinceMs));
     const { stdout } = await this.simctl(
-      ['spawn', this.target(), 'log', 'show', '--style', 'compact', '--start', start],
+      ['spawn', this.udid, 'log', 'show', '--style', 'compact', '--start', start],
       60_000,
     );
     return stdout.toString('utf8').split('\n').filter((l) => l.trim() !== '');
@@ -368,7 +308,7 @@ export class IosAdapter implements DeviceAdapter {
   /** Wipe the app's data container in place (simctl has no `pm clear` equivalent). */
   private async clearAppData(bundleId: string): Promise<void> {
     await this.terminate(bundleId);
-    const { stdout } = await this.simctl(['get_app_container', this.target(), bundleId, 'data']);
+    const { stdout } = await this.simctl(['get_app_container', this.udid, bundleId, 'data']);
     const container = stdout.toString('utf8').trim();
     if (!container.startsWith('/')) throw new Error(`Unexpected app container path: ${container}`);
     for (const entry of await readdir(container)) {

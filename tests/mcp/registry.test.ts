@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry, defaultFactory, type AdapterOpts } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultFactory, discoveryWith, type AdapterOpts, type DeviceDiscovery } from '../../src/mcp/registry.js';
+import type { ExecFn } from '../../src/adapters/exec.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { resetWdaPortAllocatorForTests, wdaPortFor } from '../../src/adapters/wda.js';
@@ -7,26 +8,30 @@ import type { Device, DeviceAdapter, Platform } from '../../src/adapters/types.j
 import { FakeAdapter } from '../helpers/fake.js';
 
 /**
- * Factory whose device list is mutable mid-test (devices boot and vanish).
- * `onProbe` gates listDevices — lets a test freeze a probe mid-flight.
+ * A registry over a device list that is mutable mid-test (devices boot and
+ * vanish) — the discovery seam is the list itself, no adapter is built to
+ * ask it. `onProbe` gates the listing — lets a test freeze a probe
+ * mid-flight. `probes` counts listings per platform.
  */
 function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
   const bound: string[] = [];
   const created: FakeAdapter[] = [];
+  const probes: Platform[] = [];
   // Records what the registry asked for: `id+kind` on ios (the registry
   // resolves the kind before calling, so the default is spelled out), a bare
   // id on android (no tree source there).
-  const factory = (platform: Platform, deviceId?: string, opts?: AdapterOpts): DeviceAdapter => {
-    if (deviceId !== undefined) bound.push(opts?.treeSource === undefined ? deviceId : `${deviceId}+${opts.treeSource}`);
+  const factory = (platform: Platform, deviceId: string, opts?: AdapterOpts): DeviceAdapter => {
+    bound.push(opts?.treeSource === undefined ? deviceId : `${deviceId}+${opts.treeSource}`);
     const adapter = new FakeAdapter({}, 'none');
-    adapter.listDevices = async () => {
-      await onProbe?.();
-      return devices.filter((d) => d.platform === platform);
-    };
-    if (deviceId !== undefined) created.push(adapter);
+    created.push(adapter);
     return adapter;
   };
-  return { registry: new AdapterRegistry(factory), bound, created, devices };
+  const discovery: DeviceDiscovery = async (platform) => {
+    probes.push(platform);
+    await onProbe?.();
+    return devices.filter((d) => d.platform === platform);
+  };
+  return { registry: new AdapterRegistry({ factory, discovery }), bound, created, devices, probes };
 }
 
 const device = (id: string, state: Device['state'] = 'booted', platform: Platform = 'android'): Device => ({
@@ -38,6 +43,46 @@ const device = (id: string, state: Device['state'] = 'booted', platform: Platfor
 });
 
 describe('AdapterRegistry', () => {
+  it('lists through discovery alone — no adapter is built to ask which devices exist', async () => {
+    const { registry, created, probes } = makeRegistry([device('phone'), device('sim', 'booted', 'ios')]);
+    expect((await registry.listAll()).map((d) => d.id)).toEqual(['phone', 'sim']);
+    expect(probes.sort()).toEqual(['android', 'ios']);
+    expect(created).toEqual([]);
+  });
+
+  it('a platform whose discovery throws (adb or xcrun missing) lists nothing; the other still lists', async () => {
+    const discovery: DeviceDiscovery = async (platform) => {
+      if (platform === 'android') throw new Error('spawn adb ENOENT');
+      return [device('sim', 'booted', 'ios')];
+    };
+    const registry = new AdapterRegistry({ factory: () => new FakeAdapter({}, 'none'), discovery });
+    expect((await registry.listAll()).map((d) => d.id)).toEqual(['sim']);
+    // A discovery that throws SYNCHRONOUSLY is the same event, not an escape from listAll.
+    const throwsSync: DeviceDiscovery = (platform) => {
+      if (platform === 'ios') throw new Error('xcrun not found');
+      return Promise.resolve([device('phone')]);
+    };
+    const sync = new AdapterRegistry({ factory: () => new FakeAdapter({}, 'none'), discovery: throwsSync });
+    expect((await sync.listAll()).map((d) => d.id)).toEqual(['phone']);
+  });
+
+  it('no booted device in the listing: each platform says where it looked, and nothing is built', async () => {
+    const { registry, created } = makeRegistry([device('phone', 'offline'), device('sim', 'offline', 'ios')]);
+    await expect(registry.get('android')).rejects.toThrow('No booted Android emulator/device found (adb devices)');
+    await expect(registry.get('ios')).rejects.toThrow('No booted iOS simulator found (xcrun simctl list)');
+    expect(created).toEqual([]);
+  });
+
+  it('get() resolves the device through discovery and builds ONE adapter, bound to it — every call asks discovery again', async () => {
+    const { registry, bound, created, probes } = makeRegistry([device('offline-one', 'offline'), device('phone')]);
+    const adapter = await registry.get('android');
+    expect(created).toEqual([adapter]);
+    expect(bound).toEqual(['phone']);
+    expect(probes).toEqual(['android']);
+    expect(await registry.get('android')).toBe(adapter); // cached, but the binding is re-checked
+    expect(probes).toEqual(['android', 'android']);
+  });
+
   it('binds to the first booted device when nothing is selected', async () => {
     const { registry, bound } = makeRegistry([device('watch-emulator'), device('phone')]);
     await registry.get('android');
@@ -224,8 +269,9 @@ describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
 describe('defaultFactory — the wiring the injected factories above never see', () => {
   // No device is touched. Which backend a kind gets is adapters/ knowledge and
   // is pinned there (ios-tree-source.test.ts, createIosTreeSource); this file
-  // pins only what the registry adds: the bound device id goes through, an
-  // unbound adapter gets nothing, android gets its own adapter.
+  // pins only what the registry adds: the bound device id goes through and
+  // android gets its own adapter. (There is no unbound call since 2026-10-08:
+  // the id is required by the type, and listing is DeviceDiscovery's.)
 
   it('a bound wda adapter is bound to the GIVEN device id — its WebDriverAgent holds that udid\'s port, not `booted`\'s', () => {
     // The one consequence of the udid a wda source is constructed with that
@@ -263,18 +309,28 @@ describe('defaultFactory — the wiring the injected factories above never see',
     expect(defaultFactory('ios', 'AAAA-1111').treeSourceKind).toBe('idb');
     expect(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }).treeSourceKind).toBe('idb');
     expect(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }).treeSourceKind).toBe('wda');
-    expect(defaultFactory('ios').treeSourceKind).toBeUndefined();
     expect(defaultFactory('android', 'emulator-5554').treeSourceKind).toBeUndefined();
   });
 
-  it('an unbound ios adapter (probe) has no source: uiTree is the recovery error, listDevices is the only thing it is for', async () => {
-    const probe = defaultFactory('ios');
-    expect(probe).toBeInstanceOf(IosAdapter);
-    await expect(probe.uiTree()).rejects.toThrow(/no tree source/);
+  it('the default discovery lists android with adb and ios with simctl — the platform reaches the right listing', async () => {
+    const calls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      calls.push([cmd, ...args].join(' '));
+      return { stdout: Buffer.from(cmd === 'xcrun' && args[0] === 'simctl' ? '{"devices":{}}' : ''), stderr: '' };
+    };
+    const discover = discoveryWith(exec);
+    expect(await discover('android')).toEqual([]);
+    expect(calls).toEqual(['adb devices -l']);
+    calls.length = 0;
+    expect(await discover('ios')).toEqual([]);
+    expect(calls).toContain('xcrun simctl list devices --json');
+    expect(calls.some((c) => c.startsWith('adb'))).toBe(false);
   });
 
-  it('android gets an AndroidAdapter, bound or not, whatever the kind says', () => {
-    expect(defaultFactory('android')).toBeInstanceOf(AndroidAdapter);
+  it('android gets an AndroidAdapter, whatever the kind says; ios an IosAdapter', () => {
+    expect(defaultFactory('android', 'emulator-5554')).toBeInstanceOf(AndroidAdapter);
     expect(defaultFactory('android', 'emulator-5554', { treeSource: 'wda' })).toBeInstanceOf(AndroidAdapter);
+    resetWdaPortAllocatorForTests();
+    expect(defaultFactory('ios', 'AAAA-1111')).toBeInstanceOf(IosAdapter);
   });
 });

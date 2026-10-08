@@ -2,6 +2,8 @@ import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import { createIosTreeSource } from '../adapters/ios-tree-source.js';
+import { listAndroidDevices, listIosDevices } from '../adapters/discovery.js';
+import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 
 /** Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). */
@@ -10,15 +12,33 @@ export interface AdapterOpts {
 }
 
 /**
- * Unbound (deviceId omitted) adapters probe; bound ones drive one device.
- * The registry resolves `opts` to a kind before calling (kindFor): a bound
- * ios call always carries one, an android call never does.
+ * Builds the adapter that drives ONE device — the id is required: listing
+ * devices is DeviceDiscovery's (below), so there is no unbound adapter
+ * (2026-10-08; until then a factory call without an id built a probe
+ * adapter whose only use was `listDevices()`). The registry resolves `opts`
+ * to a kind before calling (kindFor): an ios call always carries one, an
+ * android call never does.
  */
 export type AdapterFactory = (
   platform: Platform,
-  deviceId?: string,
+  deviceId: string,
   opts?: AdapterOpts,
 ) => DeviceAdapter;
+
+/**
+ * Which devices a platform has, booted or not — the registry's second
+ * dependency beside the factory (2026-10-08, the iOS adapter stack review's
+ * candidate 1). A platform question, so it is not a member of the bound
+ * adapter; adapters/discovery.ts holds the adb and simctl listings, and the
+ * registry's tests hand in a list.
+ */
+export type DeviceDiscovery = (platform: Platform) => Promise<Device[]>;
+
+/** The platform → listing wiring over one exec — exported so its tests can hand in a fake exec. */
+export const discoveryWith = (exec: ExecFn = defaultExec): DeviceDiscovery => (platform) =>
+  platform === 'android' ? listAndroidDevices(exec) : listIosDevices(exec);
+
+export const defaultDiscovery: DeviceDiscovery = discoveryWith();
 
 /**
  * Exported for its tests: the registry's own tests inject a factory, so this
@@ -28,8 +48,6 @@ export type AdapterFactory = (
  */
 export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
   if (platform === 'android') return new AndroidAdapter({ serial: deviceId });
-  // An unbound ios adapter only probes listDevices() — it gets no tree source.
-  if (deviceId === undefined) return new IosAdapter();
   // The registry hands over the resolved kind (kindFor); the fallback only
   // serves a direct caller of the factory, and names the same default.
   return new IosAdapter({
@@ -81,7 +99,18 @@ export class AdapterRegistry {
   /** Key: JSON [platform, deviceId, kind|null] — device ids may contain ':' (adb over TCP). */
   private adapters = new Map<string, { platform: Platform; deviceId: string; adapter: DeviceAdapter }>();
 
-  constructor(private readonly factory: AdapterFactory = defaultFactory) {}
+  private readonly factory: AdapterFactory;
+  private readonly discovery: DeviceDiscovery;
+
+  /**
+   * Both seams or neither: a caller that injected a fake factory but left
+   * discovery at its default would have its tests run `adb devices` and
+   * `simctl list` on the host — the type does not let it.
+   */
+  constructor(deps: { factory: AdapterFactory; discovery: DeviceDiscovery } = { factory: defaultFactory, discovery: defaultDiscovery }) {
+    this.factory = deps.factory;
+    this.discovery = deps.discovery;
+  }
 
   async listAll(): Promise<Device[]> {
     const [android, ios] = await Promise.all([
@@ -204,7 +233,16 @@ export class AdapterRegistry {
     if (this.closed) throw new Error('averi is shutting down — no device work is accepted any more');
   }
 
-  private probe(platform: Platform): Promise<Device[]> {
-    return this.factory(platform).listDevices();
+  /**
+   * One listing per call, as before discovery left the adapter: get() asks on
+   * EVERY tool call (that is how a vanished device is noticed), which on
+   * Android is `adb devices -l` plus one `getprop` per attached device.
+   * Not cached here — a stale "still booted" would hand out an adapter for a
+   * device that is gone. Async, so a discovery that throws synchronously is
+   * the same event as one that rejects (the rule disposeQuietly states) —
+   * listAll's per-platform catch must see both.
+   */
+  private async probe(platform: Platform): Promise<Device[]> {
+    return this.discovery(platform);
   }
 }

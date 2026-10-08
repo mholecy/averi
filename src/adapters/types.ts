@@ -8,6 +8,7 @@ import type { IosTreeSourceKind } from './ios-node.js';
 
 export type Platform = 'android' | 'ios';
 
+/** One entry of a platform's device list (discovery.ts, behind the registry's DeviceDiscovery). */
 export interface Device {
   id: string; // adb serial / simctl UDID
   platform: Platform;
@@ -301,20 +302,19 @@ export interface DeviceAdapter {
   readonly platform: Platform;
   /**
    * Which backend `uiTree()` actually reads with, when the adapter has one
-   * and the distinction exists — the bound iOS adapter reports its tree
-   * source's kind (idb or wda); Android has one tree and says nothing, as
-   * does an unbound probe. The adapter is the source of truth here, not
-   * averi.yaml: a layer above that re-derived the kind from the config
-   * (2026-10-06, the flow engine's wait hint) agreed with the registry only
-   * as long as nobody paired a FlowEngine with an adapter built elsewhere.
+   * and the distinction exists — the iOS adapter reports its tree source's
+   * kind (idb or wda; always one since 2026-10-08, when the unbound probe
+   * adapter went — discovery.ts); Android has one tree and says nothing.
+   * The adapter is the source of truth here, not averi.yaml: a layer
+   * above that re-derived the kind from the config (2026-10-06, the flow
+   * engine's wait hint) agreed with the registry only as long as nobody
+   * paired a FlowEngine with an adapter built elsewhere.
    * Diagnostic only — nothing above dispatches on it. Required, not
    * optional, so an implementation or a wrapper that forgets it fails to
    * compile instead of silently losing the hint; `undefined` is the
    * declared answer for "none".
    */
   readonly treeSourceKind: IosTreeSourceKind | undefined;
-
-  listDevices(): Promise<Device[]>;
 
   /** Reinstall triggers the app's login requirement — intentional. */
   install(appPath: string): Promise<void>;
@@ -427,7 +427,6 @@ export interface DeviceAdapter {
    * that the adapter cannot hide it on its own.
    */
   readonly keyboardAdvice?: string;
-  setClipboard(text: string): Promise<void>;
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;

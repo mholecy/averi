@@ -99,3 +99,13 @@ export function shellQuote(word: string): string {
 export function shellCommandLine(argv: readonly string[]): string {
   return argv.map(shellQuote).join(' ');
 }
+
+/**
+ * `adb -s <serial> shell <argv>` as the argv handed to the `adb` binary, each
+ * device word quoted by shellQuote — the one builder of a device shell
+ * command (2026-10-08): AndroidAdapter's `shell` and discovery.ts's getprop
+ * on a listed device both call it, so neither spells the quoting itself.
+ */
+export function adbShellArgv(serial: string, argv: readonly string[]): string[] {
+  return ['-s', serial, 'shell', ...argv.map(shellQuote)];
+}

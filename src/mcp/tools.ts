@@ -52,12 +52,13 @@ import type { Platform, UiNode } from '../adapters/types.js';
  * response content, `isError`.
  *
  * What is injected, and what is not: the registry (whose AdapterFactory seam
- * already existed) and the version string. Config and contract files stay
- * real files read from disk — a test writes an averi.yaml into a temp dir and
- * passes `configPath`, as a user would. Rejected: a config-loader or
- * file-system parameter. It would be a second adapter at a seam that already
- * has a cheap real one, and the path-resolution rules (projectConfigPath,
- * baselineDirFor) are exactly what such a fake would skip.
+ * already existed; its DeviceDiscovery joined it 2026-10-08) and the version
+ * string. Config and contract files stay real files read from disk — a test
+ * writes an averi.yaml into a temp dir and passes `configPath`, as a user
+ * would. Rejected: a config-loader or file-system parameter. It would be a
+ * second adapter at a seam that already has a cheap real one, and the
+ * path-resolution rules (projectConfigPath, baselineDirFor) are exactly what
+ * such a fake would skip.
  *
  * What a handler holds, since 2026-10-03 (later the same day; the same list
  * as ARCHITECTURE.md §2): its description and input schema, which includes

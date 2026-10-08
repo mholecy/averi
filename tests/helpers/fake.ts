@@ -1,5 +1,5 @@
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { KEYBOARD_ROLE, type Device, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -269,7 +269,6 @@ export class FakeAdapter implements DeviceAdapter {
   }
 
   // Unused by tests:
-  async listDevices(): Promise<Device[]> { return []; }
   async install(_path: string): Promise<void> {}
   async terminate(): Promise<void> {}
   async openDeepLink(): Promise<void> {}
@@ -277,7 +276,6 @@ export class FakeAdapter implements DeviceAdapter {
   async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
     this.swipes.push({ from, to });
   }
-  async setClipboard(): Promise<void> {}
 }
 
 /**

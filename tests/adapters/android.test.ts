@@ -22,12 +22,6 @@ function fakeExec(responses: Record<string, string | Buffer>) {
   return { fn, calls };
 }
 
-const DEVICES_OUTPUT = `List of devices attached
-emulator-5554          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1
-emulator-5556          offline transport_id:2
-
-`;
-
 // Trimmed real-world shape: hierarchy root, nested nodes, PIN field, button.
 const UIAUTOMATOR_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy rotation="0">
@@ -41,26 +35,6 @@ const UIAUTOMATOR_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?
   </node>
 </hierarchy>
 UI hierchary dumped to: /dev/tty`;
-
-describe('AndroidAdapter.listDevices', () => {
-  it('parses adb devices -l and fetches OS version for booted devices', async () => {
-    const { fn } = fakeExec({
-      'adb devices -l': DEVICES_OUTPUT,
-      'adb -s emulator-5554 shell getprop': '14\n',
-    });
-    const devices = await new AndroidAdapter({ exec: fn }).listDevices();
-    expect(devices).toEqual([
-      {
-        id: 'emulator-5554', platform: 'android', name: 'sdk_gphone64_arm64',
-        osVersion: '14', state: 'booted',
-      },
-      {
-        id: 'emulator-5556', platform: 'android', name: 'emulator-5556',
-        osVersion: 'unknown', state: 'offline',
-      },
-    ]);
-  });
-});
 
 describe('parseUiautomatorXml', () => {
   const tree = parseUiautomatorXml(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
@@ -204,15 +178,6 @@ describe('AndroidAdapter interactions', () => {
       expect(err?.message).toMatch(/device emulator-5554 is not reachable: adb get-state says "device 'emulator-5554' not found"/);
       expect(err?.message).toContain('adb could not run uiautomator dump');
       expect(err?.cause).toBeInstanceOf(ExecError);
-    });
-
-    it('several devices and no serial: prescribes select_device, not adb kill-server', async () => {
-      const fn: ExecFn = async (cmd, args) => {
-        const full = [cmd, ...args].join(' ');
-        if (full.includes('uiautomator dump')) return { stdout: Buffer.from('Killed'), stderr: '' };
-        throw new ExecError(full, 1, 'adb: more than one device/emulator');
-      };
-      await expect(new AndroidAdapter({ exec: fn }).uiTree()).rejects.toThrow(/select_device/);
     });
 
     it('Killed on a reachable device: the dump died on the guest, device still named', async () => {
@@ -531,10 +496,6 @@ describe('AndroidAdapter interactions', () => {
       const offline = execErrorLikeExec('adb -s e shell monkey', 255, "adb: device 'e' not found\n");
       await expect(answering(offline).launch('md.bank.app')).rejects.toBe(offline);
     });
-  });
-
-  it('setClipboard reports unsupported', async () => {
-    await expect(new AndroidAdapter().setClipboard('x')).rejects.toThrow(/not supported/);
   });
 
   it('viewport parses wm size (Override beats Physical), says Android windows may sit beside system bars, and caches', async () => {
@@ -922,9 +883,9 @@ describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', 
   });
 
   it('text on stdout (`Killed`, the measured dying-guest shape) is refused too, quoting what came back', async () => {
-    const { fn } = fakeExec({ 'adb exec-out screencap -p': 'Killed\n' });
-    await expect(new AndroidAdapter({ exec: fn }).screenshot()).rejects.toThrow(
-      /^`adb exec-out screencap -p` on the default adb device returned 7 bytes starting "Killed" — not a PNG/,
+    const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': 'Killed\n' });
+    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
+      /^`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 7 bytes starting "Killed" — not a PNG/,
     );
   });
 });

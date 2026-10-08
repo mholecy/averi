@@ -6,7 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IdbEmptyTreeError } from '../../src/adapters/ios-tree-source.js';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
-import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
+import { AdapterRegistry, type AdapterFactory, type DeviceDiscovery } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
 import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
@@ -75,8 +75,9 @@ const booted = (platform: Platform): Device => ({
 /**
  * A server built by the module under test, over a registry whose factory
  * hands out the test's fakes, connected to a real SDK client in memory.
- * `factoryCalls` records every adapter the registry asked for — probes
- * (no deviceId) included — which is how "no device was touched" is asserted.
+ * `factoryCalls` records every adapter the registry asked for and every
+ * device listing it made (an entry without a deviceId — the discovery seam,
+ * since 2026-10-08) — which is how "no device was touched" is asserted.
  *
  * Without arguments both platforms get a `home()` device, returned as
  * `fakes`; a test that needs a particular screen passes its own.
@@ -86,19 +87,18 @@ async function connect(
   version = '0.0.0-test',
 ) {
   const factoryCalls: { platform: Platform; deviceId?: string; treeSource?: string }[] = [];
+  const discovery: DeviceDiscovery = async (platform) => {
+    factoryCalls.push({ platform });
+    return [booted(platform)];
+  };
   const factory: AdapterFactory = (platform, deviceId, opts) => {
     factoryCalls.push({ platform, deviceId, treeSource: opts?.treeSource });
-    if (deviceId === undefined) {
-      const probe = new FakeAdapter({}, 'none');
-      probe.listDevices = async () => [booted(platform)];
-      return probe;
-    }
     const fake = fakes[platform];
     if (fake === undefined) throw new Error(`test harness: no ${platform} fake`);
     fake.platform = platform;
     return fake;
   };
-  const server = createAveriServer({ registry: new AdapterRegistry(factory), version });
+  const server = createAveriServer({ registry: new AdapterRegistry({ factory, discovery }), version });
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: 'tools-test', version: '0' });

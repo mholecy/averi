@@ -1,11 +1,11 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
-import { shellCommandLine, shellQuote } from './adb-shell.js';
+import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
-import { zeroRect, type Device, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -18,10 +18,9 @@ const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
  */
 const CONTROL_KEY_CHAR_RE = /[\u0000-\u001f\u007f]/;
 
-/** One adb call's options: its own budget, and a device other than the adapter's (listDevices). */
+/** One adb call's options: its own budget. */
 interface AdbCallOptions {
   timeoutMs?: number;
-  serial?: string;
 }
 
 /** uiautomator's "the app has no window yet" status — a transient, not a failure. */
@@ -164,9 +163,16 @@ export class AndroidAdapter implements DeviceAdapter {
     witness: () => this.keyboardWitness(),
   };
   private readonly exec: ExecFn;
-  private readonly serial: string | undefined;
+  /**
+   * The device every call targets, as `adb -s <serial>` — required
+   * (2026-10-08): listing devices is discovery.ts's, not an adapter's, so
+   * there is no unbound adapter any more, and with it went adb without `-s`
+   * (whichever single device adb picked), the "the default adb device"
+   * wording and the "more than one device" diagnosis.
+   */
+  private readonly serial: string;
 
-  constructor(opts: { serial?: string; exec?: ExecFn } = {}) {
+  constructor(opts: { serial: string; exec?: ExecFn }) {
     this.serial = opts.serial;
     this.exec = opts.exec ?? defaultExec;
   }
@@ -177,14 +183,14 @@ export class AndroidAdapter implements DeviceAdapter {
    * `rawShell` below — for `shell` adb joins the arguments with a space for
    * the device's `sh -c` unescaped, so `shell` quotes them (adb-shell.ts);
    * for `exec-out` adb escapes them itself (see execOut).
-   *
-   * `serial` overrides the adapter's own device for one call — listDevices
-   * asks each LISTED device by its id.
    */
   private adb(args: string[], opts: AdbCallOptions = {}) {
-    const serial = opts.serial ?? this.serial;
-    const target = serial ? ['-s', serial] : [];
-    return this.exec('adb', [...target, ...args], opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : undefined);
+    return this.runAdb(['-s', this.serial, ...args], opts);
+  }
+
+  /** The `adb` binary with a complete argv — `adb` and `shell` both end here. */
+  private runAdb(argv: string[], opts: AdbCallOptions) {
+    return this.exec('adb', argv, opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : undefined);
   }
 
   /**
@@ -196,7 +202,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * builds a `shell` argv of its own.
    */
   private shell(argv: readonly string[], opts: AdbCallOptions = {}) {
-    return this.adb(['shell', ...argv.map(shellQuote)], opts);
+    return this.runAdb(adbShellArgv(this.serial, argv), opts);
   }
 
   /**
@@ -222,30 +228,6 @@ export class AndroidAdapter implements DeviceAdapter {
    */
   private rawShell(line: string, opts: AdbCallOptions = {}) {
     return this.adb(['shell', line], opts);
-  }
-
-  async listDevices(): Promise<Device[]> {
-    const { stdout } = await this.exec('adb', ['devices', '-l']);
-    const devices: Device[] = [];
-    for (const line of stdout.toString('utf8').split('\n').slice(1)) {
-      const match = line.trim().match(/^(\S+)\s+(device|offline)\b/);
-      if (!match) continue;
-      const [, id, state] = match;
-      const model = line.match(/model:(\S+)/)?.[1] ?? id;
-      let osVersion = 'unknown';
-      if (state === 'device') {
-        const prop = await this.shell(['getprop', 'ro.build.version.release'], { serial: id });
-        osVersion = prop.stdout.toString('utf8').trim() || 'unknown';
-      }
-      devices.push({
-        id,
-        platform: 'android',
-        name: model,
-        osVersion,
-        state: state === 'device' ? 'booted' : 'offline',
-      });
-    }
-    return devices;
   }
 
   async install(appPath: string): Promise<void> {
@@ -346,8 +328,8 @@ export class AndroidAdapter implements DeviceAdapter {
     // exec-out exits 0 with whatever the guest wrote — nothing, or `Killed`,
     // on a dying emulator — so the bytes are judged here (screenshot-bytes.ts).
     return screenshotPng(stdout, {
-      device: this.serial ? `device ${this.serial}` : 'the default adb device',
-      command: `adb${this.serial ? ` -s ${this.serial}` : ''} exec-out screencap -p`,
+      device: `device ${this.serial}`,
+      command: `adb -s ${this.serial} exec-out screencap -p`,
       remedy: 'Re-check `adb devices` and retry; if it repeats, the emulator, not the app, needs attention.',
     });
   }
@@ -409,7 +391,6 @@ export class AndroidAdapter implements DeviceAdapter {
       : kind === 'exec-error'
         ? `adb could not run uiautomator dump: ${status}`
         : `uiautomator dump returned no XML: ${status}`;
-    const id = this.serial ?? 'the default adb device';
     let state: string;
     try {
       state = (await this.adb(['get-state'], { timeoutMs: 5_000 })).stdout.toString('utf8').trim();
@@ -420,12 +401,8 @@ export class AndroidAdapter implements DeviceAdapter {
         ? (e.stderr.trim().replace(/^(Command failed:.*\n)?\s*(error|adb):\s*/s, '') || `exit ${e.exitCode}`)
         : String(e);
     }
-    if (/more than one device/i.test(state)) {
-      return `several Android devices are attached and none is selected — \`list_devices\` then ` +
-        `\`select_device\` before reading a tree (adb: "${state}"). (${dump})`;
-    }
     if (state !== 'device') {
-      return `device ${id} is not reachable: adb get-state says "${state || 'unknown'}" — ` +
+      return `device ${this.serial} is not reachable: adb get-state says "${state || 'unknown'}" — ` +
         `recover the device (wait for \`adb devices\` to read \`device\`; \`adb kill-server && adb start-server\` ` +
         `if it does not) before reading its tree. Not an averi or uiautomator fault. (${dump})`;
     }
@@ -433,12 +410,12 @@ export class AndroidAdapter implements DeviceAdapter {
       return `${dump} — yet adb get-state says "device"; adb itself failed, not the app. Re-check \`adb devices\` and retry once.`;
     }
     if (kind === 'timeout') {
-      return `device ${id} is reachable but SLOW: ${dump} while adb get-state says "device" — the host or ` +
+      return `device ${this.serial} is reachable but SLOW: ${dump} while adb get-state says "device" — the host or ` +
         `emulator is under load (measured 2026-09-17: an 11.4 s dump at load avg 28). Not a dead app and not a ` +
         `code defect; ease the load (builds, other emulators) and retry.`;
     }
     if (NULL_ROOT_RE.test(status)) {
-      return `device ${id} is still settling: uiautomator has no window to dump yet ` +
+      return `device ${this.serial} is still settling: uiautomator has no window to dump yet ` +
         `(cold launch or animation; ${retried ? `retried once after ${NULL_ROOT_RETRY_MS} ms` : 'read once'}). ` +
         `Wait for the screen (\`screenshot\` waits for stability) and retry. (${dump})`;
     }
@@ -642,11 +619,6 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.shell(['input', 'keyevent', '123']); // KEYCODE_MOVE_END
     for (let i = 0; i < count; i++) await this.shell(['input', 'keyevent', '67']); // DEL
     for (let i = 0; i < count; i++) await this.shell(['input', 'keyevent', '112']); // FORWARD_DEL
-  }
-
-  async setClipboard(_text: string): Promise<void> {
-    // No reliable pure-adb clipboard write across API levels; revisit with a helper app if needed.
-    throw new Error('setClipboard is not supported on Android yet');
   }
 
   async isAppRunning(packageName: string): Promise<boolean> {

@@ -23,18 +23,15 @@ function fakeExec(responses: Record<string, string | Buffer>) {
   return { fn, calls };
 }
 
-const SIMCTL_LIST = JSON.stringify({
-  devices: {
-    'com.apple.CoreSimulator.SimRuntime.iOS-17-5': [
-      { udid: 'AAAA-1111', name: 'iPhone 15', state: 'Booted', isAvailable: true },
-      { udid: 'BBBB-2222', name: 'iPhone 15 Pro', state: 'Shutdown', isAvailable: true },
-      { udid: 'CCCC-3333', name: 'Broken runtime', state: 'Shutdown', isAvailable: false },
-    ],
-    'com.apple.CoreSimulator.SimRuntime.iOS-16-4': [
-      { udid: 'DDDD-4444', name: 'iPhone 14', state: 'Shutdown', isAvailable: true },
-    ],
-  },
-});
+/**
+ * The tree source of an adapter whose test reads no tree: required since
+ * 2026-10-08 (there is no unbound adapter), and loud if a read reaches it.
+ */
+const NO_TREE: IosTreeSource = {
+  kind: 'idb',
+  read: () => Promise.reject(new Error('this test reads no tree')),
+  dispose: () => Promise.resolve(),
+};
 
 const IDB_DESCRIBE_ALL = JSON.stringify([
   {
@@ -48,18 +45,6 @@ const IDB_DESCRIBE_ALL = JSON.stringify([
   { type: 'StaticText', AXLabel: 'Welcome back', AXUniqueId: null, AXValue: null },
 ]);
 
-describe('IosAdapter.listDevices', () => {
-  it('parses simctl JSON, derives OS version, filters unavailable devices', async () => {
-    const { fn } = fakeExec({ 'xcrun simctl list devices --json': SIMCTL_LIST });
-    const devices = await new IosAdapter({ exec: fn }).listDevices();
-    expect(devices).toEqual([
-      { id: 'AAAA-1111', platform: 'ios', name: 'iPhone 15', osVersion: '17.5', state: 'booted' },
-      { id: 'BBBB-2222', platform: 'ios', name: 'iPhone 15 Pro', osVersion: '17.5', state: 'offline' },
-      { id: 'DDDD-4444', platform: 'ios', name: 'iPhone 14', osVersion: '16.4', state: 'offline' },
-    ]);
-  });
-});
-
 describe('IosAdapter interactions', () => {
   it('end to end on the idb source: tapElement resolves against describe-all and taps the center through idb', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
@@ -70,29 +55,17 @@ describe('IosAdapter interactions', () => {
 
   it('rejects activity/intent launches with Android-only guidance', async () => {
     const { fn } = fakeExec({});
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await expect(adapter.launch('com.app', { activity: '.Main' })).rejects.toThrow(/Android-only/);
     await expect(adapter.launch('com.app', { intent: { action: 'SEND' } })).rejects.toThrow(/Android-only/);
   });
 
-  it('targets "booted" when no udid is given', async () => {
-    const { fn, calls } = fakeExec({});
-    await new IosAdapter({ exec: fn }).openDeepLink('myapp://home');
-    expect(calls.at(-1)?.full).toBe('xcrun simctl openurl booted myapp://home');
-  });
-
   it('probes for simctl once, not per call', async () => {
     const { fn, calls } = fakeExec({});
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await adapter.openDeepLink('a://b');
     await adapter.openDeepLink('c://d');
     expect(calls.filter((c) => c.full === 'xcrun --find simctl')).toHaveLength(1);
-  });
-
-  it('setClipboard pipes text to simctl pbcopy via stdin', async () => {
-    const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).setClipboard('secret');
-    expect(calls.at(-1)).toMatchObject({ full: 'xcrun simctl pbcopy AAAA-1111', stdin: 'secret' });
   });
 
   it('viewport reads point dimensions from idb describe and caches', async () => {
@@ -101,7 +74,7 @@ describe('IosAdapter interactions', () => {
         screen_dimensions: { width: 1206, height: 2622, density: 3, width_points: 402, height_points: 874 },
       }),
     });
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
     expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
@@ -113,7 +86,7 @@ describe('IosAdapter interactions', () => {
   it('viewport does not memoize a FAILED read: the next call asks idb again, and its success is kept', async () => {
     const responses: Record<string, string> = { 'idb describe --json': JSON.stringify({}) };
     const { fn, calls } = fakeExec(responses);
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await expect(adapter.viewport()).rejects.toThrow(/no screen_dimensions/);
     responses['idb describe --json'] = JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } });
     expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
@@ -126,7 +99,7 @@ describe('IosAdapter interactions', () => {
       'idb describe --json': JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } }),
     };
     const { fn, calls } = fakeExec(responses);
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
     responses['idb describe --json'] = JSON.stringify({ screen_dimensions: { width_points: 820, height_points: 1180 } });
     expect(await adapter.viewport({ fresh: true })).toEqual({ width: 820, height: 1180 });
@@ -136,14 +109,14 @@ describe('IosAdapter interactions', () => {
 
   it('clearText sends backspaces then forward-deletes (position-independent)', async () => {
     const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).clearText(3);
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).clearText(3);
     expect(calls.at(-2)?.full).toBe('idb ui key-sequence 42 42 42 --udid AAAA-1111');
     expect(calls.at(-1)?.full).toBe('idb ui key-sequence 76 76 76 --udid AAAA-1111');
   });
 
   it('typeText hands the text to idb ui text', async () => {
     const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).typeText('alice');
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).typeText('alice');
     expect(calls.at(-1)?.full).toBe('idb ui text alice --udid AAAA-1111');
   });
 
@@ -153,13 +126,13 @@ describe('IosAdapter interactions', () => {
   // clear. The contract (DeviceAdapter.typeText) is that "" types nothing.
   it('typeText with an empty string calls idb not at all — the contract Android meets with a zero-iteration loop', async () => {
     const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).typeText('');
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).typeText('');
     expect(calls).toEqual([]);
   });
 
   it('pressKey back is rejected with guidance, home uses the HOME button', async () => {
     const { fn, calls } = fakeExec({});
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await expect(adapter.pressKey('back')).rejects.toThrow(/no iOS equivalent/);
     await adapter.pressKey('home');
     expect(calls.at(-1)?.full).toBe('idb ui button HOME --udid AAAA-1111');
@@ -167,7 +140,7 @@ describe('IosAdapter interactions', () => {
 
   it('has no keyboard oracle: on iOS the keyboard is part of the tree, so a tap pays nothing for the question and interact/ presses no key here', () => {
     const { fn } = fakeExec({});
-    const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     expect(adapter.keyboard).toBeUndefined();
     expect('keyboard' in adapter).toBe(false); // not even a stub: the class declares nothing
   });
@@ -239,7 +212,6 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     expect(bound.treeSourceKind).toBe('idb');
     const wda = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: { ...fakeSource().source, kind: 'wda' } });
     expect(wda.treeSourceKind).toBe('wda');
-    expect(new IosAdapter({ exec: fakeExec({}).fn }).treeSourceKind).toBeUndefined(); // unbound: no source, nothing to report
   });
 
   it("dispose returns the source's release — the process shutdown awaits it", async () => {
@@ -250,13 +222,6 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     expect(state.disposes).toBe(1);
   });
 
-  it('an unbound adapter (no udid, no source) probes only: listDevices works, uiTree is a loud error, dispose is a no-op', async () => {
-    const { fn } = fakeExec({ 'xcrun simctl list devices --json': SIMCTL_LIST });
-    const adapter = new IosAdapter({ exec: fn });
-    expect(await adapter.listDevices()).toHaveLength(3);
-    await expect(adapter.uiTree()).rejects.toThrow(/no tree source/);
-    await expect(adapter.dispose()).resolves.toBeUndefined();
-  });
 });
 
 // docs/bugs/2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md: one
@@ -280,7 +245,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
 
   it('a plain launch: both defaults writes on the target simulator, then the launch, in that order', async () => {
     const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).launch('com.app');
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).launch('com.app');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
 
@@ -296,7 +261,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     try {
       await writeFile(join(container, 'Library'), '');
       const { fn, calls } = fakeExec({ 'xcrun simctl get_app_container AAAA-1111 com.app data': `${container}\n` });
-      await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).launch('com.app', { clearState: true });
+      await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).launch('com.app', { clearState: true });
       expect(simctlCalls(calls)).toEqual([
         'xcrun simctl terminate AAAA-1111 com.app',
         'xcrun simctl get_app_container AAAA-1111 com.app data',
@@ -311,13 +276,13 @@ describe('IosAdapter re-enables accessibility automation before every launch and
 
   it('a deep link writes first too — `simctl openurl` can cold-start the app, which is a launch', async () => {
     const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn }).openDeepLink('myapp://home');
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).openDeepLink('myapp://home');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl openurl AAAA-1111 myapp://home']);
   });
 
   it('the simulator-wide write is announced on stderr once per adapter, not per launch', async () => {
     const { fn } = fakeExec({});
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await adapter.launch('com.app');
     await adapter.launch('com.app');
     await adapter.openDeepLink('myapp://home');
@@ -336,7 +301,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
       writes.push(args.join(' '));
       return Promise.reject(new Error('Command failed (exit 1): xcrun simctl spawn …\nUnable to boot'));
     };
-    await new IosAdapter({ udid: 'AAAA-1111', exec: failing }).launch('com.app');
+    await new IosAdapter({ udid: 'AAAA-1111', exec: failing, treeSource: NO_TREE }).launch('com.app');
     expect(writes).toHaveLength(1); // the first failure ends the pair
     expect(simctlCalls(calls)).toEqual(['xcrun simctl launch AAAA-1111 com.app']);
     expect(stderr).toHaveBeenCalledTimes(1); // the failure line, and no success announcement
@@ -364,12 +329,12 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => 
 
   it('passes a file that starts with the PNG signature through unchanged', async () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
-    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(png) }).screenshot();
+    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(png), treeSource: NO_TREE }).screenshot();
     expect(shot.equals(png)).toBe(true);
   });
 
   it('an empty file is a transport error naming the simulator, the command and the reboot', async () => {
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(Buffer.alloc(0)) }).screenshot()).rejects.toThrow(
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(Buffer.alloc(0)), treeSource: NO_TREE }).screenshot()).rejects.toThrow(
       '`xcrun simctl io AAAA-1111 screenshot <file>` on simulator AAAA-1111 returned 0 bytes — not a PNG, though the ' +
         'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
         'screen. Re-check `xcrun simctl list devices booted` and retry; if it repeats, reboot the simulator ' +
@@ -379,6 +344,6 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => 
 
   it('a file that is not a PNG is refused too, quoting its start', async () => {
     const exec = writesScreenshot(Buffer.from('JFIF not a png'));
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec }).screenshot()).rejects.toThrow(/returned 14 bytes starting "JFIF not a png" — not a PNG/);
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(/returned 14 bytes starting "JFIF not a png" — not a PNG/);
   });
 });

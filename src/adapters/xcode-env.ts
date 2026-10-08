@@ -20,6 +20,17 @@ export function detectXcodeEnv(exec: ExecFn = defaultExec): Promise<Record<strin
   return promise;
 }
 
+/**
+ * `xcrun simctl <args>` under the probe's DEVELOPER_DIR — the one spelling of
+ * a simctl call (2026-10-08): IosAdapter's `simctl` and discovery.ts's
+ * `simctl list devices --json` both call it. `timeoutMs` is passed on only
+ * when given, so a call without one carries `{ env }` alone, as before.
+ */
+export async function simctl(exec: ExecFn, args: readonly string[], timeoutMs?: number) {
+  const env = await detectXcodeEnv(exec);
+  return exec('xcrun', ['simctl', ...args], { env, ...(timeoutMs ? { timeoutMs } : {}) });
+}
+
 async function probe(exec: ExecFn): Promise<Record<string, string> | undefined> {
   if (process.env.DEVELOPER_DIR) return undefined;
   try {
