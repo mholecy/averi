@@ -43,6 +43,9 @@ Alternatively, detect on a button or row id.
 ## Typing and fields
 
 - **`⚠ fill … typing APPENDS`**: the field already held text and `clear` was off. The length check passed, but the content may be wrong. Add `clear: true`, unless a pre-filled value must survive.
+- **`Typed N characters into … — NOT verified: the matched node exposes no value`** (a `⚠ fill … NOT verified` line in a flow): the selector matched a node that shows no text, so averi could not check the typing. If `clear` was set, nothing was deleted either. Check the field with `ui_snapshot`.
+- **`⚠ … the matched node is role text, not a textfield`**: the selector found a label, not the input. Typical on iOS with `treeSource: idb`, where a floating label is its own `text` node. `clear` deletes nothing there. The line names the nearest input. Select it with `role:textfield` plus its `id:`, or its current `value:` when inputs share an id.
+- **A fill fails with `typed N characters but the field shows M`** on a field that reformats what is typed (`0.00` becomes `1000.00`): the read-back compares the field with the value exactly when `clear` is set, and looks for it inside the field without. A reformatting field cannot pass that, whatever the selector (since 2026-10-08 a `value:` or `text:` selector is read back too). Type the value as the field will show it, or focus the field with `tap`, type with `type_text` without a selector (not read back), and check the result with an `assert`.
 - **A later step fails after any `⚠ tap` / `⚠ fill` line** (an unexpected value, a submit that never happened): suspect that tap first. Check the field values with `ui_snapshot`.
 - **Placeholders** exist only while the field is EMPTY on iOS. Assert them before typing.
 

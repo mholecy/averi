@@ -571,7 +571,7 @@ describe('fillField — the focus tap goes through the same guard', () => {
     expect(fake.tapPoints).toEqual([{ x: 540, y: 1066 }]);
     expect(fake.typed).toEqual(['abc']);
     const sentence = 'the soft keyboard covered id:login_password; hidden before tapping';
-    expect(result).toEqual({ note: sentence, keyboardHidden: sentence, warning: undefined });
+    expect(result).toEqual({ note: sentence, keyboardHidden: sentence, warning: undefined, role: 'textfield', readBack: 'landed' });
   });
 
   it('a field clear of the keyboard: exactly one query, no key, nothing reported', async () => {
@@ -580,7 +580,7 @@ describe('fillField — the focus tap goes through the same guard', () => {
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
     expect(fake.keys).toEqual([]);
     expect(fake.tapPoints).toEqual([{ x: 540, y: 1166 }]);
-    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined });
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined, role: 'textfield', readBack: 'landed' });
   });
 
   it('a keyboard that stays over the field: the fill throws the recovery error and neither taps nor types', async () => {

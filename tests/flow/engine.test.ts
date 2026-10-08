@@ -13,7 +13,7 @@ import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
 import { FlowEngine, EngineSession, FlowError, idbContainerIdHint, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { el, FakeAdapter, hidesKeyboardOn, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -1796,13 +1796,13 @@ flows:
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 2.50' });
   });
 
-  it('clear: true through YAML wipes the pre-filled value before typing, and the trace says (cleared)', async () => {
+  it('clear: true through YAML wipes the pre-filled value before typing, and the trace says how many characters it cleared', async () => {
     const fake = formFake('2.50');
     const trace = await FlowEngine.run(cfg('{ id: amount_input, value: "7", clear: true }'), fake, FAST, { flow: 'f' });
     expect(fake.deletes).toEqual([4]); // "2.50".length — the step's `clear` reached the fill
     expect(fake.typed).toEqual(['7']);
     expect(fake.focused?.value).toBe('7');
-    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 7 (cleared)' });
+    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = 7 (cleared 4 characters first)' });
   });
 
   it('a fill on a field that never appears fails within the TAP budget, with the settle wording', async () => {
@@ -2195,7 +2195,58 @@ flows:
     const trace = await FlowEngine.run(cfgLiteral, fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([4]); // "9.99".length
-    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" =  (cleared)' });
+    expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" =  (cleared 4 characters first)' });
+  });
+
+  // docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
+  // `fill: text:"Value*" = 7.25 (cleared)` was printed from the step's
+  // `clear`, on a label node no read-back could see.
+  describe('the measured iOS idb floating label (2026-10-08)', () => {
+    const iosCfg = (fill: string) =>
+      parseConfig(`
+app: { ios: { bundleId: sk.finportal.myport } }
+flows:
+  f:
+    steps:
+      - fill: ${fill}
+`);
+
+    it('a floated label: the fill line is ⚠, says NOT verified and that no delete was sent, and a ⚠ line names the input', async () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      const trace = await FlowEngine.run(iosCfg('{ text: "IBAN*", value: "DE89370400440532013000", clear: true }'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({
+        action: '⚠ fill',
+        detail:
+          'text:"IBAN*": the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
+          'the nearest input is textfield id:"TextFieldWithComponentStyle" at 26,366 350x30 — ' +
+          'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
+      });
+      expect(trace).toContainEqual({
+        action: '⚠ fill',
+        detail:
+          'text:"IBAN*" = DE89370400440532013000 — NOT verified: the matched node exposes no value (role text); ' +
+          "clear sent no delete — a role text node's length is not the field's",
+      });
+      expect(trace.some((t) => t.action === 'fill')).toBe(false);
+      expect(trace.some((t) => (t.detail ?? '').includes('(cleared'))).toBe(false);
+    });
+
+    it('M-1: a clear-only fill on the label is a ⚠ fill line, NOT verified', async () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      const trace = await FlowEngine.run(iosCfg('{ text: "IBAN*", value: "", clear: true }'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({
+        action: '⚠ fill',
+        detail: "text:\"IBAN*\" =  — NOT verified: clear sent no delete — a role text node's length is not the field's",
+      });
+      expect(fake.deletes).toEqual([]);
+    });
+
+    it('the input itself, by role and its old value: a plain fill line with the characters it cleared', async () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      const trace = await FlowEngine.run(iosCfg('{ role: textfield, text: "XX12345", value: "DE89", clear: true }'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({ action: 'fill', detail: 'text:"XX12345" role:"textfield" = DE89 (cleared 7 characters first)' });
+      expect(trace.some((t) => t.action === '⚠ fill')).toBe(false);
+    });
   });
 });
 

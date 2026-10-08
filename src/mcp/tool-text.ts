@@ -11,13 +11,13 @@
  * 2026-10-03, later the same day: the reason above no longer holds — the
  * handlers moved to mcp/tools.ts, which is importable and tested through an
  * in-memory transport. The functions stay here anyway: they are pure, and
- * tool-text.test.ts pins every wording variant (note, warning, cleared)
+ * tool-text.test.ts pins every wording variant (note, warning, cleared, unverified, not an input)
  * without building a server, a registry or a fake device to provoke each one.
  */
 
 import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
-import type { FillResult } from '../interact/fill.js';
+import { fillCaveats, fillClearedText, fillUnverifiedText, type FillResult } from '../interact/fill.js';
 import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
@@ -27,18 +27,30 @@ export const tapText = (selector: string, note: string | undefined): string =>
   `Tapped ${selector}${note ? ` (${note})` : ''}`;
 
 /**
- * `Filled <selector> (N characters[, cleared first])[ (note)]`, and on its own
- * line below, `⚠ <warning>` when the fill was legal but suspicious. The
- * warning gets a line of its own so it is not lost inside the parentheses.
- * Takes the fill's own result spread in, so the tool never passes two
- * `undefined`s positionally (review 2026-10-03, C2 shape).
+ * What a fill did, from its result (interact/fill.ts#FillResult) — the
+ * wording of each fact is fill.ts's, shared with the flow line:
+ * - read back and landed (or nothing to type):
+ *   `Filled <selector> (N characters[, cleared M characters first])[ (note)]`
+ * - nothing to read back (`readBack: 'no-value'`):
+ *   `Typed N characters into <selector> — NOT verified: the matched node
+ *   exposes no value (role R)[; clear sent no delete …][ (note)]` — a
+ *   different verb, so "Filled" never stands for a fill nobody saw.
+ * Then each caveat (fill.ts#fillCaveats: a matched node that is not an
+ * input, the masked-append warning) on its own `⚠` line, so it is not lost
+ * inside the parentheses. "cleared" is what was SENT, never the requested
+ * option: until 2026-10-08 the reply printed `clear` as asked, and an idb
+ * label node read "cleared first" with nothing deleted (docs/bugs/
+ * 2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
  */
-export const fillText = (
-  selector: string,
-  fill: { length: number; cleared: boolean } & FillResult,
-): string =>
-  `Filled ${selector} (${fill.length} characters${fill.cleared ? ', cleared first' : ''})${fill.note ? ` (${fill.note})` : ''}` +
-  (fill.warning ? `\n⚠ ${fill.warning}` : '');
+export const fillText = (selector: string, fill: { length: number } & FillResult): string => {
+  const unverified = fillUnverifiedText(fill);
+  const cleared = fillClearedText(fill);
+  const head =
+    unverified === undefined
+      ? `Filled ${selector} (${fill.length} characters${cleared === undefined ? '' : `, ${cleared}`})`
+      : `Typed ${fill.length} characters into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
+  return head + (fill.note ? ` (${fill.note})` : '') + fillCaveats(fill).map((c) => `\n⚠ ${c}`).join('');
+};
 
 /**
  * `Swiped[ <direction>] (x,y) → (x,y)` — the stroke actually sent, for a
