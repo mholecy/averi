@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillText, launchText, snapshotNote, swipeText, tapText } from '../../src/mcp/tool-text.js';
+import { fillText, launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
 import { el, node, screen } from '../helpers/fake.js';
 
 describe('tap and type_text response lines', () => {
@@ -49,7 +49,32 @@ describe('tap and type_text response lines', () => {
     // A clear whose read-back LANDED needs no caveat: the field shows exactly the value.
     expect(fillText('id:search', { length: 4, role: 'other', readBack: 'landed', cleared: 'unmeasured' })).toBe('Filled id:search (4 characters)');
     expect(fillText('id:title', { length: 1, role: 'text', readBack: 'not-taken' })).toBe(
-      "Typed 1 characters into id:title — NOT verified: the matched node's value does not show the typed text (role text) — it is not the field",
+      "Typed 1 character into id:title — NOT verified: the matched node's value does not show the typed text (role text) — it is not the field",
+    );
+  });
+
+  // Device checks of docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md (re-run at e9e6509).
+  it('one character is `1 character`, typed or cleared, verified or not', () => {
+    expect(fillText('role:textfield value:"1.5"', { length: 1, ...landed, cleared: 3 })).toBe('Filled role:textfield value:"1.5" (1 character, cleared 3 characters first)');
+    expect(fillText('id:bic', { length: 1, role: 'scrollable', readBack: 'no-value' })).toBe(
+      'Typed 1 character into id:bic — NOT verified: the matched node exposes no value (role scrollable)',
+    );
+    expect(typedText(1)).toBe('Typed 1 character');
+    expect(typedText(22)).toBe('Typed 22 characters');
+  });
+
+  it('a field the read-back could not find again is said as not found, not as a node with no value — and a textfield gets no ⚠', () => {
+    expect(fillText('role:textfield value:"XX12345"', { length: 22, role: 'textfield', readBack: 'lost', lost: 'screen-changed', cleared: 7 })).toBe(
+      'Typed 22 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
+        'NOT verified: the field could not be found again (the screen changed while typing)',
+    );
+    expect(fillText('role:textfield value:"XX"', { length: 3, role: 'textfield', readBack: 'lost', lost: 'unmatched' })).toBe(
+      'Typed 3 characters into role:textfield value:"XX" — NOT verified: the field could not be found again (the selector no longer matches it)',
+    );
+    // m-1 (review 2026-10-08, bundle C round 1): a clear alone whose read after the delete lost the field.
+    expect(fillText('role:textfield value:"XX12345"', { length: 0, role: 'textfield', readBack: 'lost', lost: 'unmatched', cleared: 7 })).toBe(
+      'Typed 0 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
+        'NOT verified: the field could not be found again (the selector no longer matches it)',
     );
   });
 

@@ -2256,6 +2256,23 @@ flows:
       expect(trace).toContainEqual({ action: 'fill', detail: 'text:"XX12345" role:"textfield" = DE89 (cleared 7 characters first)' });
       expect(trace.some((t) => t.action === '⚠ fill')).toBe(false);
     });
+
+    // iOS device check (2026-10-08, re-run at e9e6509): an id appearing while typing made the identity fallback refuse.
+    it('the screen changes while typing: a ⚠ fill line that the field could not be found again, and no not-a-textfield line', async () => {
+      const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+      const origType = fake.typeText.bind(fake);
+      fake.typeText = async (text: string) => {
+        await origType(text);
+        fake.live().children.push(node({ role: 'text', identifier: 'iban_notice', rect: { x: 26, y: 400, width: 350, height: 15 } }));
+      };
+      const trace = await FlowEngine.run(iosCfg('{ role: textfield, text: "XX12345", value: "DE89", clear: true }'), fake, FAST, { flow: 'f' });
+      expect(trace.filter((t) => t.action === '⚠ fill')).toEqual([
+        {
+          action: '⚠ fill',
+          detail: 'text:"XX12345" role:"textfield" = DE89 (cleared 7 characters first) — NOT verified: the field could not be found again (the screen changed while typing)',
+        },
+      ]);
+    });
   });
 });
 

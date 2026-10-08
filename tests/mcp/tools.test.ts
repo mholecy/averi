@@ -599,6 +599,11 @@ describe('type_text with an empty text', () => {
     expect(fake.taps).toEqual([]);
   });
 
+  it('without a selector, one character is `Typed 1 character`', async () => {
+    const { call } = await connect({ ios: form() });
+    expect((await call('type_text', { platform: 'ios', text: 'x', configPath: missing() })).text).toBe('Typed 1 character');
+  });
+
   it('with a selector and clear: the field is focused and cleared, the "" handed over, and the response says so', async () => {
     const fake = form();
     const { call } = await connect({ ios: fake });
@@ -653,6 +658,33 @@ describe('type_text on the measured iOS idb floating label (2026-10-08)', () => 
       configPath: missing(),
     });
     expect(result.text).toBe('Filled role:textfield value:"XX12345" (22 characters, cleared 7 characters first)');
+  });
+
+  // iOS device check (2026-10-08, re-run at e9e6509): the screen's id set
+  // changed during typing (`iban_input_error` went, `iban_notice` came), the
+  // identity fallback rightly refused, and the reply blamed the textfield
+  // for exposing no value although it held the typed text.
+  it('the screen changes while typing: "the field could not be found again", not "exposes no value", and no ⚠', async () => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    const children = () => fake.live().children;
+    children().push(node({ role: 'text', identifier: 'iban_input_error', rect: { x: 26, y: 400, width: 350, height: 15 } }));
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      await origType(text);
+      children().splice(-1, 1, node({ role: 'text', identifier: 'iban_notice', rect: { x: 26, y: 400, width: 350, height: 15 } }));
+    };
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', {
+      platform: 'ios',
+      selector: 'role:textfield value:"XX12345"',
+      text: 'DE89370400440532013000',
+      clear: true,
+      configPath: missing(),
+    });
+    expect(result.text).toBe(
+      'Typed 22 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
+        'NOT verified: the field could not be found again (the screen changed while typing)',
+    );
   });
 });
 
