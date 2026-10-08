@@ -641,7 +641,7 @@ describe('type_text on the measured iOS idb floating label (2026-10-08)', () => 
     const { call } = await connect({ ios: fake });
     const result = await call('type_text', { platform: 'ios', selector: 'text:"IBAN*"', text: '', clear: true, configPath: missing() });
     expect(result.text.split('\n')[0]).toBe(
-      "Typed 0 characters into text:\"IBAN*\" — NOT verified: clear sent no delete — a role text node's length is not the field's",
+      "Focused text:\"IBAN*\" — NOT verified: clear sent no delete — a role text node's length is not the field's",
     );
     expect(result.text).toContain('⚠ the matched node is role text, not a textfield — nothing was deleted');
     expect(fake.deletes).toEqual([]);

@@ -36,7 +36,9 @@ export const tapText = (selector: string, note: string | undefined): string =>
  *   sent no delete …][ (note)]`, the reason e.g. `the matched node exposes
  *   no value (role R)` or `the field could not be found again (the screen
  *   changed while typing)` — a different verb, so "Filled" never stands for
- *   a fill nobody saw.
+ *   a fill nobody saw. A clear alone (no text) has its own head there,
+ *   `Cleared <selector> (N characters sent as deletes)` or `Focused
+ *   <selector>` (`clearAloneHead`).
  * Every count is fill.ts#charactersText: `1 character`, never `1
  * characters` (2026-10-08 device checks).
  * Then each caveat (fill.ts#fillCaveats: a matched node that is not an
@@ -52,9 +54,27 @@ export const fillText = (selector: string, fill: { length: number } & FillResult
   const head =
     unverified === undefined
       ? `Filled ${selector} (${charactersText(fill.length)}${cleared === undefined ? '' : `, ${cleared}`})`
-      : `Typed ${charactersText(fill.length)} into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
+      : fill.length === 0 && fill.cleared !== undefined
+        ? `${clearAloneHead(selector, fill.cleared)} — ${unverified}`
+        : `Typed ${charactersText(fill.length)} into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
   return head + (fill.note ? ` (${fill.note})` : '') + fillCaveats(fill).map((c) => `\n⚠ ${c}`).join('');
 };
+
+/**
+ * The head of a clear ALONE (empty text, `clear: true`) that could not be
+ * verified (code review of round 2, 2026-10-08): it typed nothing, so
+ * "Typed 0 characters into … (cleared 7 characters first)" said neither
+ * what was done nor what is unknown. Its two unverified paths:
+ * - deletes went out and the read after them lost the field (readBack
+ *   `lost`): `Cleared <selector> (N characters sent as deletes)` — sent,
+ *   not seen to land;
+ * - no delete went out (`cleared: 'unmeasured'`, a node that is not the
+ *   input): `Focused <selector>` — the focus tap is all that was done.
+ * A verified clear alone keeps `Filled <selector> (0 characters, cleared N
+ * characters first)`.
+ */
+const clearAloneHead = (selector: string, cleared: NonNullable<FillResult['cleared']>): string =>
+  typeof cleared === 'number' && cleared > 0 ? `Cleared ${selector} (${charactersText(cleared)} sent as deletes)` : `Focused ${selector}`;
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field
