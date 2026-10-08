@@ -6,7 +6,7 @@ import { sleep } from '../util/sleep.js';
 import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
 import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
-import { judgingScreen, screenBox, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
+import { judgingScreen, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -268,7 +268,7 @@ const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: '
  * bottom (the keyboard's top edge, when the frame is the screen above
  * one); likewise sideways. Content comes in through the near edge, so a
  * target that was ever read short of this and is now beyond it was carried
- * across the frame by a fling (`Motion.strokeDirection`; measured under
+ * across the frame by a fling (`Motion.nextStroke`; measured under
  * WDA: 613 → -357 in one swipe; 681 → -48 for a 52-pt row whose last 4 pt
  * stay on screen behind the top bar) — and swiping the same way again only
  * pushes it further out. A target clipped at BOTH edges (taller than the
@@ -291,14 +291,20 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
   }
 }
 
-/** What the read being judged followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
+/** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). Motion's own fact, set by `stroked` and `confirming`. */
 type Since = 'start' | 'stroke' | 'settle';
 
 /** What one read says about motion (`Motion.observe`). */
 interface Observed {
   /** The judged match is where the previous read's judged match was. */
   bestUnmoved: boolean;
-  /** A stroke was sent since the previous read and the judged match did not move — the `fully: true` clipped stop's "content exhausted". */
+  /**
+   * UNMOVED_STROKES_EXHAUST identical strokes in a row left the JUDGED match
+   * where it was — the `fully: true` clipped stop's "content exhausted".
+   * The judged match alone (review round 2): a visible clipped match that
+   * does not move is the defect this reports; two strokes, not one, for
+   * the transients the exhausted rule waits out.
+   */
   stuck: boolean;
   /** UNMOVED_STROKES_EXHAUST identical strokes in a row left EVERY match where it was, and the target is off the frame. */
   exhausted: boolean;
@@ -307,27 +313,52 @@ interface Observed {
 /** What a stop is, by the confirming rule (SETTLE_CONFIRM_READS): settled; worth one more read; or reported unsettled. */
 type StopVerdict = 'settled' | 'confirm' | 'unsettled';
 
+/** The next stroke: where the content lies for it, and the factor its reach is scaled by (`shortenStroke`). */
+interface NextStroke {
+  toward: Direction;
+  reach: number;
+}
+
 /**
  * The scroll's memory of how the target moved, read for read — the one
  * owner of every rule that compares a read with an earlier one
  * (2026-10-08, review round 1: they were loose variables of the loop):
- * the stuck and exhausted tests, the confirming reads, the turn after a
- * fling, and the swipe after which the target was last in the frame.
+ * what each read followed, the stuck and exhausted tests, the confirming
+ * reads, the turn after a fling and its shortened stroke, and the swipe
+ * after which the target was last in the frame.
+ *
+ * Per round the loop calls `beginRead` once, then — when the tree read —
+ * `observe`; at a stop `stopVerdict` (and `confirming` to spend a read);
+ * before a stroke `nextStroke`, after it `stroked`.
  */
 class Motion {
+  private since: Since = 'start';
+  /** What the read being judged followed — `since` as `beginRead` found it. */
+  private current: Since = 'start';
   /** Every match's rect at the last read that read, and the judged match's at the last read that had one. */
   private prevRects: Rect[] | undefined;
   private prevBest: Rect | undefined;
-  /** Identical strokes in a row after which every match stayed put, and the stroke they were. */
-  private unmovedStrokes = 0;
+  /** Identical strokes in a row after which every match, and the judged match, stayed put — and the stroke they were. */
+  private allUnmovedStrokes = 0;
+  private bestUnmovedStrokes = 0;
   private streakStroke: string | undefined;
   private lastStrokeKey: string | undefined;
   /** Some read saw the target SHORT of the far edge (`beyondFarEdge`) — so a later read beyond it means a fling carried it across. */
   private seenShort = false;
+  /**
+   * The last read that READ found the target beyond the far edge, after an
+   * earlier read saw it short of it: the next stroke turns. Kept across a
+   * read that failed — that round strokes as the last read round decided,
+   * as it keeps that round's stroke box (`lastReadCover`); cleared by a read
+   * that does not find the target (a lazy list dropped it: nothing to turn
+   * for).
+   */
+  private carriedPast = false;
   private confirmReads = 0;
+  private strokesSent = 0;
   /** Where the content lay for the last stroke sent: the caller's direction, or its opposite after a fling past the target. For "swiping … no longer moves it". */
   lastStroke: Direction;
-  /** Strokes drawn the other way after a fling past the target, for the failure text. */
+  /** Direction changes — a stroke drawn the other way from the one before — for the shortening and the failure text. */
   turns = 0;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   inFrameAfter: number | undefined;
@@ -336,33 +367,60 @@ class Motion {
     this.lastStroke = direction;
   }
 
-  /** One read that read: every match found, the one judged, and what the read followed. */
-  observe(found: readonly UiNode[], best: Judged | undefined, since: Since, swipes: number): Observed {
+  /** A read is starting: what it follows is fixed for this round. */
+  beginRead(): void {
+    this.current = this.since;
+  }
+
+  /** The read being judged is a confirming read (nothing was sent since the last). */
+  get confirmingRead(): boolean {
+    return this.current === 'settle';
+  }
+
+  /**
+   * One read that read: every match found, the one judged, the frames it
+   * was judged in (the screen above an applied keyboard, or each box that
+   * counts), and the swipe count. Where the target stands against the far
+   * edge is recorded HERE, on every read — a stop round strokes nothing,
+   * and a target seen short only at a stop the confirming read then lost
+   * must still turn the next stroke (review round 2).
+   */
+  observe(found: readonly UiNode[], best: Judged | undefined, frames: readonly Rect[], swipes: number): Observed {
     const rects = found.map((n) => ({ ...n.rect }));
     const bestUnmoved = best !== undefined && this.prevBest !== undefined && rectsEqual(this.prevBest, best.node.rect);
-    if (since === 'stroke') {
-      // Every match, not only the judged one (review round 1): with several
-      // matches off the frame the judged one is the first in tree order,
-      // which can be a static duplicate (another page, a hidden copy) while
-      // the real one moved.
+    if (this.current === 'stroke') {
+      // Every match, not only the judged one, for "exhausted" (review round
+      // 1): with several matches off the frame the judged one is the first
+      // in tree order, which can be a static duplicate (another page, a
+      // hidden copy) while the real one moved.
       const allUnmoved = this.prevRects !== undefined && sameRects(this.prevRects, rects);
-      this.unmovedStrokes = !allUnmoved ? 0 : this.unmovedStrokes > 0 && this.streakStroke === this.lastStrokeKey ? this.unmovedStrokes + 1 : 1;
+      const same = this.streakStroke === this.lastStrokeKey;
+      this.allUnmovedStrokes = !allUnmoved ? 0 : this.allUnmovedStrokes > 0 && same ? this.allUnmovedStrokes + 1 : 1;
+      this.bestUnmovedStrokes = !bestUnmoved ? 0 : this.bestUnmovedStrokes > 0 && same ? this.bestUnmovedStrokes + 1 : 1;
       this.streakStroke = this.lastStrokeKey;
     }
     this.prevRects = rects;
-    if (best !== undefined) this.prevBest = { ...best.node.rect };
-    if (best !== undefined && best.visible > 0) this.inFrameAfter = swipes;
+    this.carriedPast = false;
+    if (best !== undefined) {
+      this.prevBest = { ...best.node.rect };
+      // In EVERY frame the round judged in: a target beyond the far edge one
+      // way up but across both edges the other is not turned for.
+      const beyond = frames.every((f) => beyondFarEdge(best.node.rect, this.direction, f));
+      this.carriedPast = beyond && this.seenShort;
+      if (!beyond) this.seenShort = true;
+      if (best.visible > 0) this.inFrameAfter = swipes;
+    }
     const offFrame = best !== undefined && best.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
     return {
       bestUnmoved,
-      stuck: since === 'stroke' && bestUnmoved,
-      exhausted: this.unmovedStrokes >= UNMOVED_STROKES_EXHAUST && offFrame,
+      stuck: this.current === 'stroke' && this.bestUnmovedStrokes >= UNMOVED_STROKES_EXHAUST,
+      exhausted: this.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST && offFrame,
     };
   }
 
   /** A stop on this read: settled (0 swipes, or a confirming read found it unmoved), worth another read, or reported unsettled. */
-  stopVerdict(o: Observed, since: Since, swipes: number, deadline: number): StopVerdict {
-    if (swipes === 0 || (since === 'settle' && o.bestUnmoved)) return 'settled';
+  stopVerdict(o: Observed, swipes: number, deadline: number): StopVerdict {
+    if (swipes === 0 || (this.current === 'settle' && o.bestUnmoved)) return 'settled';
     return this.mayConfirm(deadline) ? 'confirm' : 'unsettled';
   }
 
@@ -371,44 +429,51 @@ class Motion {
     return this.confirmReads < SETTLE_CONFIRM_READS && Date.now() < deadline;
   }
 
-  /** A confirming read is being spent. */
+  /** A confirming read is being spent: the next read follows a settle, not a stroke. */
   confirming(): void {
     this.confirmReads++;
+    this.since = 'settle';
   }
 
   /**
-   * Which way the next stroke goes (2026-10-08, the WDA device check):
-   * toward the caller's direction — unless a fling carried the target
-   * across the frame since a read saw it short of the far edge
-   * (`beyondFarEdge`, in EVERY box the round judged in: the screen above
-   * an applied keyboard, or each of `ScreenBox.boxes`; measured 613 → -357
-   * in one swipe, then five more swipes DOWN into exhausted content). Then
-   * the other way, to bring it back; a stroke that throws it back past the
-   * near edge leaves it short again, and the next stroke goes the caller's
-   * way. A turn that overshoots too is turned again, not given up: giving
-   * up would swipe on into content the target has already passed, a sure
-   * failure, while each turn may land it (near the end of the content the
-   * fling is cut short) — the strokes stay bounded by `maxSwipes`, and the
-   * failure counts the turns. A target read beyond the far edge before any
-   * read saw it short of it — above the screen on round 0 of a scroll
+   * The next stroke (2026-10-08, the WDA device check): toward the caller's
+   * direction — unless this read found a fling carried the target across
+   * the frame since a read saw it short of the far edge (`observe`;
+   * measured 613 → -357 in one swipe, then five more swipes DOWN into
+   * exhausted content). Then the other way, to bring it back; a stroke that
+   * throws it back past the near edge leaves it short again, and the next
+   * stroke goes the caller's way. A target read beyond the far edge before
+   * any read saw it short of it — above the screen on round 0 of a scroll
    * down, and every round after while it stays there — is the caller's
    * direction to honour, as it always was. Needs the target to STAY in the
    * tree once off the frame: a lazy list (Android RecyclerView/LazyColumn,
    * iOS List/UITableView under WDA) drops it, and then nothing turns.
+   *
+   * Converging is deliberate (review round 2): every direction change
+   * halves the reach of every stroke after it (`reach`, applied with
+   * swipe.ts#shortenStroke — the touch-down kept, never under twice
+   * TOUCH_SLOP). A fling is the app's: with the measured content-down fling
+   * (−729 to −970 pt for the 344-pt stroke) and a content-up fling of the
+   * same size, full strokes both ways ping-pong round the target to
+   * `maxSwipes`; with the reach halved per turn the distance left shrinks
+   * geometrically whatever the app flings. A turn that overshoots too is
+   * turned again, not given up — giving up would swipe on into content the
+   * target has passed — and the failure counts the turns.
    */
-  strokeDirection(best: Judged | undefined, frames: readonly Rect[]): Direction {
-    const beyond = best !== undefined && frames.every((f) => beyondFarEdge(best.node.rect, this.direction, f));
-    const turn = beyond && this.seenShort;
-    if (best !== undefined && !beyond) this.seenShort = true;
-    return turn ? OPPOSITE[this.direction] : this.direction;
+  nextStroke(): NextStroke {
+    const toward = this.carriedPast ? OPPOSITE[this.direction] : this.direction;
+    const turns = this.strokesSent > 0 && toward !== this.lastStroke ? this.turns + 1 : this.turns;
+    return { toward, reach: 0.5 ** turns };
   }
 
   /** A stroke was sent: toward `toward`, drawn as `stroke`. */
   stroked(toward: Direction, stroke: Stroke): void {
+    if (this.strokesSent > 0 && toward !== this.lastStroke) this.turns++;
+    this.strokesSent++;
     this.lastStroke = toward;
     this.lastStrokeKey = JSON.stringify(stroke);
     this.confirmReads = 0;
-    if (toward !== this.direction) this.turns++;
+    this.since = 'stroke';
   }
 }
 
@@ -543,19 +608,23 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  *   one that never holds still, or a stop at the deadline, is reported with
  *   `settled: false`. A fling that carried the target across the frame —
  *   beyond its far edge, after a read saw it short of that — turns the next
- *   stroke round (`Motion.strokeDirection`), instead of swiping on into
+ *   stroke round (`Motion.nextStroke`), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
- *   moved nothing); it needs the target to stay in the tree, so a lazy list
- *   gets no turn. A failure counts the turns, and one after the target was
- *   in the frame says so rather than "never".
+ *   moved nothing), and every turn halves the reach of the strokes after it
+ *   (review round 2: equal flings both ways ping-ponged to `maxSwipes`); it
+ *   needs the target to stay in the tree, so a lazy list gets no turn. A
+ *   failure counts the turns, and one after the target was in the frame
+ *   says so rather than "never".
  * - Exhausted off the frame (`UNMOVED_STROKES_EXHAUST`, `Motion.observe`): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,
  *   fails then, with the stop bound's words (they name the keyboard and the
  *   remedy), cause "the last 2 … did not move it: content exhausted, or the
  *   swipes were not taken" — measured on Android, the form's last field
- *   under the IME swiped for the whole 15 s. Like the `fully: true` clipped
- *   stop's stuck test (one stroke, unchanged), only strokes count: a
+ *   under the IME swiped for the whole 15 s. The `fully: true` clipped
+ *   stop's stuck test takes the same two identical strokes (review round 2;
+ *   it watches the judged match alone — a visible clipped match that does
+ *   not move is the defect it reports). For both, only strokes count: a
  *   confirming read sent none.
  *
  * The floating keyboard (docs/bugs/2026-10-05-android-floating-gboard-
@@ -611,7 +680,6 @@ export async function scrollUntilVisible(
   // frame for good" — and a stop after a stroke holds only once a read
   // finds it still.
   const motion = new Motion(direction);
-  let since: Since = 'start';
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   let lastCover: Cover | undefined;
   let coveredRounds = 0;
@@ -619,7 +687,7 @@ export async function scrollUntilVisible(
   let lastReadCover: Cover | undefined;
   /** On a failed or `fully: true` stop only: the floating row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
   const unlocatedAt = async (round: SoftKeyboard | undefined): Promise<boolean> => round !== undefined && (await keyboardUnlocated(adapter, round));
-  /** Spend a confirming read: settle again, send nothing, read again (the caller sets `since`). */
+  /** Spend a confirming read: settle again, send nothing, read again. */
   const settleAgain = async (): Promise<void> => {
     motion.confirming();
     await sleep(settleMs);
@@ -630,7 +698,7 @@ export async function scrollUntilVisible(
     const read = await readTreeOrError(adapter);
     const { tree, error } = read;
     lastReadError = error;
-    const after = since;
+    motion.beginRead();
     if (tree !== undefined) {
       treesRead++;
       frame = await frameOf(read);
@@ -663,18 +731,21 @@ export async function scrollUntilVisible(
       coveredRounds++;
     }
     if (tree !== undefined) lastReadCover = cover;
-    // A read that did not read says nothing about motion: the comparisons
-    // wait for the next one that does.
-    const observed: Observed | undefined = tree === undefined ? undefined : motion.observe(lastFound, best, after, swipes);
+    // The frames this round judged in — the screen above an applied
+    // keyboard, else every box that counts — for where the target stands
+    // against the far edge (`Motion.observe`, `beyondFarEdge`). A read that
+    // did not read says nothing about motion: the comparisons wait for the
+    // next one that does.
+    const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : frame.boxes;
+    const observed: Observed | undefined = tree === undefined ? undefined : motion.observe(lastFound, best, judgedFrames, swipes);
     if (best !== undefined && best.visible > 0 && observed !== undefined) {
       if (!fully || best.clipped.length === 0) {
         // A stop after a stroke is reported only once a read finds the
         // target where the last one did (SETTLE_CONFIRM_READS): a fling can
         // carry it on, or out of the frame, after the settle read caught it
         // inside. A stop at 0 swipes was not stroked: reported at once.
-        const verdict = motion.stopVerdict(observed, after, swipes, deadline);
+        const verdict = motion.stopVerdict(observed, swipes, deadline);
         if (verdict === 'confirm') {
-          since = 'settle';
           await settleAgain();
           continue;
         }
@@ -723,8 +794,7 @@ export async function scrollUntilVisible(
     }
     // A confirming read that did not read: read again, within the same
     // budget, rather than stroke away from a stop the last read saw.
-    if (after === 'settle' && tree === undefined && motion.mayConfirm(deadline)) {
-      since = 'settle';
+    if (motion.confirmingRead && tree === undefined && motion.mayConfirm(deadline)) {
       await settleAgain();
       continue;
     }
@@ -800,11 +870,9 @@ export async function scrollUntilVisible(
       const message = `scroll_until ${describe} failed ${cause} — ${why}${turned}${shown}${unlocated}`;
       throw absenceError(message, { sighted: everFound, treesRead, readError: lastReadError });
     }
-    // Toward the caller's direction, or back after a fling past the target
-    // (`Motion.strokeDirection`), judged in the frame this round judged in:
-    // the screen above an applied keyboard, else every box that counts.
-    const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : frame.boxes;
-    const toward = motion.strokeDirection(best, judgedFrames);
+    // Toward the caller's direction, or back after a fling past the target,
+    // the reach halved per turn so the scroll converges (`Motion.nextStroke`).
+    const { toward, reach } = motion.nextStroke();
     // The gesture's box is swipe.ts#screenBox's — the same owner as a
     // `swipe:` step's, oriented by this round's tree (after a failed read:
     // the device box as built; its note is not reported here, the stop
@@ -824,11 +892,11 @@ export async function scrollUntilVisible(
     // last saw.
     const { box } = await screenBox(adapter, read);
     const strokeCover = tree === undefined ? lastReadCover : cover;
-    const stroke = strokeCover === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, strokeCover.band.y, toward, 'content');
+    const drawn = strokeCover === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, strokeCover.band.y, toward, 'content');
+    const stroke = shortenStroke(drawn, reach);
     await adapter.swipe(stroke.from, stroke.to);
     swipes++;
     motion.stroked(toward, stroke);
-    since = 'stroke';
     await sleep(settleMs);
   }
 }

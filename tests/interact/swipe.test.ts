@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { screenBox, swipeScreen, swipeVector, swipeVectorAbove } from '../../src/interact/swipe.js';
+import { screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -280,5 +280,29 @@ describe('swipeVectorAbove — the touch-down placed clear of a keyboard, never 
     expect(swipeVectorAbove(box, 400, 'up', 'content')).toEqual({ from: { x: 200, y: 200 }, to: { x: 200, y: 320 } });
     // Just below it falls back: band at 398 → box stroke 80 → 318 (238), placed 200 → 318 (118 < 119).
     expect(swipeVectorAbove(box, 398, 'up', 'content')).toEqual({ from: { x: 200, y: 80 }, to: { x: 200, y: 318 } });
+  });
+});
+
+/** Review round 2 (2026-10-08): the stroke `scroll_until` shortens after each turn round a target a fling carried past. */
+describe('shortenStroke — the touch-down kept, the reach scaled, never a tap', () => {
+  const down = { from: { x: 201, y: 458 }, to: { x: 201, y: 114 } }; // the WDA content-down stroke, 344 pt
+
+  it('scales the reach toward the touch-down, which stays where it was placed', () => {
+    expect(shortenStroke(down, 0.5)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 286 } });
+    expect(shortenStroke(down, 1)).toEqual(down);
+  });
+
+  it('never below twice TOUCH_SLOP (assumed 24): 344 × 1/16 = 21.5 becomes 48', () => {
+    expect(TOUCH_SLOP).toBe(24);
+    expect(shortenStroke(down, 1 / 16)).toEqual({ from: { x: 201, y: 458 }, to: { x: 201, y: 410 } });
+  });
+
+  it('never longer than the stroke given: a stroke already under the floor is left as it is', () => {
+    const short = { from: { x: 10, y: 50 }, to: { x: 10, y: 30 } };
+    expect(shortenStroke(short, 0.5)).toEqual(short);
+  });
+
+  it('sideways too: along the stroke, x scaled, y kept', () => {
+    expect(shortenStroke({ from: { x: 80, y: 437 }, to: { x: 322, y: 437 } }, 0.5)).toEqual({ from: { x: 80, y: 437 }, to: { x: 201, y: 437 } });
   });
 });

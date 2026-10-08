@@ -72,9 +72,10 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  *     The first fix's content-down stroke over that box (458 → 114 under
  *     WDA, 344 pt) flung the SwiftUI form ~730–800 pt, past its target; that
  *     is answered where it is seen — scroll.ts confirms a stop on a settled
- *     read and turns the stroke round after a fling past the target — not by
- *     a shorter stroke here, which would be one app's fling tuned into every
- *     app's gesture (Android's 838-px stroke moved the Compose form 637 px a
+ *     read, turns the stroke round after a fling past the target and halves
+ *     its reach on every turn (`shortenStroke`) — not by a shorter first
+ *     stroke here, which would be one app's fling tuned into every app's
+ *     gesture (Android's 838-px stroke moved the Compose form 637 px a
  *     swipe and needed no cut).
  *
  * The strokes this gives (re-measured 2026-10-08 against the tests):
@@ -112,6 +113,36 @@ export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Dire
   const placed = { from: { x: inUncovered.from.x, y: downY }, to: inUncovered.to };
   const reach = (s: Stroke): number => Math.abs(s.to.y - s.from.y);
   return reach(placed) < reach(inUncovered) / 2 ? inUncovered : placed;
+}
+
+/**
+ * The distance a finger must travel before a scroll view takes the touch as
+ * a drag rather than a tap, in tree units — ASSUMED, not measured on either
+ * platform: Android's ViewConfiguration touch slop is 8 dp (22 px at the
+ * Pixel_3a's 2.75 density), a UIScrollView's pan starts after ~10 pt. 24
+ * covers both units with room. `shortenStroke` never draws a stroke shorter
+ * than twice this, so a shortened stroke is still a drag, never a tap.
+ */
+export const TOUCH_SLOP = 24;
+
+/**
+ * `stroke` with its reach scaled by `factor` (0 < factor ≤ 1), its
+ * touch-down kept: the end moves along the stroke toward the touch-down,
+ * so whatever placed the touch-down (`swipeVectorAbove`'s rules: never in
+ * the keyboard clearance, never higher than without a keyboard) still
+ * holds, and the stroke still runs the same way. Never shorter than twice
+ * TOUCH_SLOP (nor longer than the stroke given). Used by `scroll_until`
+ * to shorten the stroke after each turn round a target a fling carried past
+ * (interact/scroll.ts, Motion.nextStroke), so the distance left shrinks
+ * however far the app flings. Pure.
+ */
+export function shortenStroke(stroke: Stroke, factor: number): Stroke {
+  const dx = stroke.to.x - stroke.from.x;
+  const dy = stroke.to.y - stroke.from.y;
+  const reach = Math.hypot(dx, dy);
+  if (factor >= 1 || reach === 0) return stroke;
+  const k = Math.min(reach, Math.max(reach * factor, 2 * TOUCH_SLOP)) / reach;
+  return { from: stroke.from, to: { x: Math.round(stroke.from.x + dx * k), y: Math.round(stroke.from.y + dy * k) } };
 }
 
 /** The lowest y a touch-down over a keyboard may take (`swipeVectorAbove` (a)): the lower point of `swipeVector`'s vertical stroke over the box the keyboard leaves — read off it, so a change to SWIPE_REACH_FRACTION moves both together. */
