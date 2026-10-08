@@ -55,7 +55,7 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
 
 /**
  * `xcrun simctl list devices --json` through xcode-env.ts#simctl, the one
- * simctl call the iOS adapter makes too (under the DEVELOPER_DIR probe
+ * spelling of a simctl call the iOS adapter uses too (under the DEVELOPER_DIR probe
  * WdaServer shares). Unavailable simulators (a
  * runtime that is not installed) are left out; the OS version is read from
  * the runtime key.

@@ -296,11 +296,12 @@ export interface EngineOptions {
   /** Grace window for the detect re-check between two reach flows (see `detects`). */
   reachRecheckMs?: number;
   /**
-   * Default timeout for inline `assert:` steps (each spec can override). Set,
-   * it applies to EVERY assert kind, color/ocr included — a value under ~8 s
-   * starves a screen that needs two rounds on an Android emulator; leave it
-   * unset for the Verifier's per-kind defaults, 3 s for tree asserts and 12 s
-   * for color/ocr (2026-10-06, verify/assert.ts `PIXEL_ASSERT_TIMEOUT_MS`).
+   * Default timeout for inline `assert:` steps (each spec can override).
+   * Those steps take element asserts only — flow/config.ts validates them
+   * with verify/element-assert.ts#elementAssertSchema, so no color, ocr or
+   * rect assert reaches this — and set, it replaces their tree-assert
+   * default; unset, the Verifier's `ASSERT_TIMEOUT_MS` (3 s, verify/assert.ts)
+   * applies. Only the engine's tests set it; the server's runs leave it unset.
    */
   assertTimeoutMs?: number;
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */

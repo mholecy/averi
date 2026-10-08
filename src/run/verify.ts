@@ -139,8 +139,9 @@ type VerificationLeg = {
 
 /**
  * appAlive check (ARCHITECTURE.md §8): is the app-under-test still running?
- * When it died, include a crash excerpt from recent logs so flows fail fast
- * with the reason, not just a blank screen.
+ * When it died, include a crash excerpt from recent logs so a run that ended
+ * on a blank screen says why. Which results carry it is the callers' call
+ * (run/commands.ts, the verify legs below).
  */
 export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promise<string> {
   const app = cfg.app[adapter.platform];

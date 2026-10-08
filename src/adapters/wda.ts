@@ -13,7 +13,7 @@ import { errorMessage } from '../util/error-message.js';
 
 /**
  * WebDriverAgent lifecycle for one simulator (docs/plans/ios-wda-tree-source.md,
- * Phase 1). WDA ships as the `appium-webdriveragent` devDependency (16.1.7);
+ * Phase 1). WDA ships as the `appium-webdriveragent` optional dependency (pinned in package.json);
  * measured 2026-08-12 on Xcode 26.6 / iOS 26.5:
  * - build once per Xcode version (`xcodebuild build-for-testing`, cached in
  *   DerivedData — the first build takes MINUTES, then it's a no-op),
@@ -104,8 +104,12 @@ export function resetWdaPortAllocatorForTests(): void {
 /**
  * require.resolve is unavailable in ESM — createRequire bridges it. The
  * resolve is preflighted with its own message because appium-webdriveragent
- * is a devDependency: absent in production installs, and a bare resolve error
- * wrapped as a "build failure" would send the user debugging xcodebuild.
+ * is an OPTIONAL dependency of averi: absent when the install skipped optional
+ * dependencies (`--omit=optional`) or its install failed, and a bare resolve
+ * error wrapped as a "build failure" would send the user debugging xcodebuild.
+ * The advice reinstalls averi itself: the resolve walks up from averi's own
+ * files, so `npm i -D appium-webdriveragent` in the user's app repo reaches
+ * only an averi installed in that repo, never an npx or global one.
  */
 export function wdaProjectPath(
   resolvePkg: (id: string) => string = createRequire(import.meta.url).resolve,
@@ -115,8 +119,10 @@ export function wdaProjectPath(
     pkgJson = resolvePkg('appium-webdriveragent/package.json');
   } catch (err) {
     throw new Error(
-      'treeSource: wda requires the appium-webdriveragent package (a devDependency, ' +
-        'not present in production installs) — `npm i -D appium-webdriveragent@16.1.7`',
+      'treeSource: wda requires the appium-webdriveragent package, an optional dependency of averi ' +
+        'that is not installed (optional dependencies were skipped, e.g. --omit=optional, or its install failed) — ' +
+        'reinstall averi without --omit=optional (and with npm_config_omit unset); under npx, clear its cache ' +
+        '(`rm -rf ~/.npm/_npx`) and run it again',
       { cause: err },
     );
   }
@@ -403,7 +409,7 @@ export class WdaServer {
           `WDA from a previous session: a server that was still busy when the host closed it took a SIGTERM, and ` +
           `before 0.8.1 nothing then stopped its WebDriverAgent (0.8.1 stops it and waits for the port to go quiet; ` +
           `a SIGKILL, or a second signal during that wait, still leaves it). ` +
-          `Recover: \`pkill -f WebDriverAgentRunner\`, or ${rebootSimulatorAdvice(this.udid)}, or pass an explicit \`port\`.`,
+          `Recover: \`pkill -f WebDriverAgentRunner\` or ${rebootSimulatorAdvice(this.udid)}.`,
       );
     }
     assertNotStopped();
@@ -463,7 +469,7 @@ export class WdaServer {
       `Port ${this.port} answers /status but is not WebDriverAgent ` +
         `(${res.ok ? `productBundleIdentifier=${JSON.stringify(bundle ?? null)}` : `HTTP ${res.status}`}). ` +
         `WDA ports are allocated per UDID starting at 8100 (${this.port} for ${this.udid}); ` +
-        'free the port or pass an explicit `port`.',
+        'free the port.',
     );
   }
 

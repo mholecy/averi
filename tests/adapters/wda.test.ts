@@ -43,12 +43,18 @@ describe('wdaProjectPath', () => {
     expect(wdaProjectPath()).toContain('WebDriverAgent.xcodeproj');
   });
 
-  it('a missing package is its own error with the install command, not a build failure', () => {
+  it('a missing package is its own error naming it as averi\'s optional dependency, not a build failure', () => {
     const failingResolve = () => {
       throw new Error("Cannot find module 'appium-webdriveragent/package.json'");
     };
-    expect(() => wdaProjectPath(failingResolve)).toThrow(/npm i -D appium-webdriveragent@16\.1\.7/);
-    expect(() => wdaProjectPath(failingResolve)).toThrow(/treeSource: wda/);
+    // The advice reinstalls averi with optional dependencies — never `npm i -D`
+    // in the app repo, which an npx or global averi does not resolve from.
+    expect(() => wdaProjectPath(failingResolve)).toThrow(
+      /^treeSource: wda requires the appium-webdriveragent package, an optional dependency of averi /,
+    );
+    expect(() => wdaProjectPath(failingResolve)).toThrow(/reinstall averi without --omit=optional/);
+    expect(() => wdaProjectPath(failingResolve)).toThrow('clear its cache (`rm -rf ~/.npm/_npx`)');
+    expect(() => wdaProjectPath(failingResolve)).not.toThrow(/npm i -D|devDependency/);
   });
 });
 
@@ -68,8 +74,8 @@ describe('WdaServer.ensureRunning', () => {
     expect(err?.message).toContain('AAAA-1111');
     // The way out names THIS simulator's reboot, from the one owner (simulator-reboot.ts, 2026-10-08).
     expect(err?.message).toContain(
-      'Recover: `pkill -f WebDriverAgentRunner`, or reboot the simulator ' +
-        '(`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`), or pass an explicit `port`.',
+      'Recover: `pkill -f WebDriverAgentRunner` or reboot the simulator ' +
+        '(`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`).',
     );
     expect(spawner.spawns).toHaveLength(0);
   });
@@ -184,6 +190,8 @@ describe('WdaServer.ensureRunning', () => {
     expect(err?.message).toContain('not WebDriverAgent');
     expect(err?.message).toContain(String(server.port));
     expect(err?.message).toContain('allocated per UDID');
+    // No user-reachable path sets WDA's port (the registry passes no deps), so the advice names none.
+    expect(err?.message).toMatch(/free the port\.$/);
   });
 
   it('skips the build when an xctestrun exists, and starts with TEST_RUNNER_USE_PORT', async () => {
