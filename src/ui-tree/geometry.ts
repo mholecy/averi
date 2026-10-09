@@ -479,14 +479,19 @@ export function absentFromViewport(
  * h 143 against a pinned 60 and pointing the investigation at the app's
  * row-height logic, which was correct. A caller who is told the fraction can
  * see the clipping; a caller told "visible" cannot.
+ *
+ * The viewport is anchored at the origin unless it says otherwise (`x`,
+ * `y`: a box that starts lower — iOS's screen below its status band,
+ * interact/swipe.ts#belowStatusBand).
  */
 export function visibleFractionInViewport(
   rect: Rect,
-  viewport: { width: number; height: number },
+  viewport: { x?: number; y?: number; width: number; height: number },
 ): number {
   if (rectArea(rect) === 0) return 0;
-  const w = Math.min(rect.x + rect.width, viewport.width) - Math.max(rect.x, 0);
-  const h = Math.min(rect.y + rect.height, viewport.height) - Math.max(rect.y, 0);
+  const { x = 0, y = 0 } = viewport;
+  const w = Math.min(rect.x + rect.width, x + viewport.width) - Math.max(rect.x, x);
+  const h = Math.min(rect.y + rect.height, y + viewport.height) - Math.max(rect.y, y);
   if (w <= 0 || h <= 0) return 0;
   return (w * h) / rectArea(rect);
 }
@@ -569,17 +574,19 @@ export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
  * the content exhausted is a missing-clearance bug, 'top' is a sticky header
- * overlapping, and the two want different fixes.
+ * overlapping, and the two want different fixes. The viewport is anchored
+ * as `visibleFractionInViewport`'s.
  */
 export function clippedEdges(
   rect: Rect,
-  viewport: { width: number; height: number },
+  viewport: { x?: number; y?: number; width: number; height: number },
 ): ('top' | 'bottom' | 'left' | 'right')[] {
+  const { x = 0, y = 0 } = viewport;
   const out: ('top' | 'bottom' | 'left' | 'right')[] = [];
-  if (rect.y < 0) out.push('top');
-  if (rect.y + rect.height > viewport.height) out.push('bottom');
-  if (rect.x < 0) out.push('left');
-  if (rect.x + rect.width > viewport.width) out.push('right');
+  if (rect.y < y) out.push('top');
+  if (rect.y + rect.height > y + viewport.height) out.push('bottom');
+  if (rect.x < x) out.push('left');
+  if (rect.x + rect.width > x + viewport.width) out.push('right');
   return out;
 }
 

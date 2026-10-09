@@ -491,15 +491,39 @@ export interface ScreenBox {
    * `judgingScreen`'s `box` is the first of these — what a reply quotes.
    */
   boxes: Rect[];
+  /**
+   * The device's `DeviceScreen.statusBand` (iOS only — adapters/ios-status-
+   * band.ts): the band at the top of a PORTRAIT box whose points a
+   * judgement counts as OFF the screen — the point a tap presses, and
+   * `scroll_until`'s stop on it (`belowStatusBand` cuts it). Absent on
+   * Android, and when the device size could not be read (the tree's window
+   * stands in, and the judgement fails open as the rest of that path does).
+   */
+  statusBand?: number;
 }
 
 /** The box, its side lengths swapped — the same screen held the other way. */
 export const turnedBox = (b: Rect): Rect => ({ x: b.x, y: b.y, width: b.height, height: b.width });
 
-/** The screen a judgement of "on screen" uses: `ScreenBox.box` (what a reply quotes) and `ScreenBox.boxes` (what counts). */
+/** The screen a judgement of "on screen" uses: `ScreenBox.box` (what a reply quotes), `ScreenBox.boxes` (what counts) and `ScreenBox.statusBand` (what of them does not). */
 export interface JudgingScreen {
   box: Rect;
   boxes: Rect[];
+  statusBand?: number;
+}
+
+/**
+ * `box` less the screen's status band (`JudgingScreen.statusBand`) at its
+ * top when `box` is portrait — the part of it a point or a rect is judged
+ * on screen in; `box` itself on Android, in landscape, or with no screen.
+ * `shape` is the screen box the band belongs to when `box` was cut from it
+ * (the screen above a keyboard): its shape, not the cut's, says portrait.
+ */
+export function belowStatusBand(box: Rect, screen: Pick<JudgingScreen, 'statusBand'> | undefined, shape: { width: number; height: number } = box): Rect {
+  const band = screen?.statusBand ?? 0;
+  if (band <= 0 || shape.height <= shape.width) return box;
+  const top = Math.max(box.y, band);
+  return { ...box, y: top, height: Math.max(0, box.y + box.height - top) };
 }
 
 /**
@@ -523,7 +547,7 @@ export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport'>, re
 }
 
 /** The judging screen of a `screenBox` already read — `judgingScreen` without the read, for a caller that also strokes in the box (interact/scroll.ts reads one a round). */
-export const judgingOf = ({ boxes }: ScreenBox): JudgingScreen => ({ box: boxes[0], boxes });
+export const judgingOf = ({ boxes, statusBand }: ScreenBox): JudgingScreen => ({ box: boxes[0], boxes, ...(statusBand !== undefined && { statusBand }) });
 
 /**
  * The screen box a gesture swipes in — the ONE owner, read by `swipeScreen`
@@ -592,6 +616,7 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
       box,
       ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
       boxes: judgedBoxes(size, device, box, sideways),
+      ...(device.statusBand !== undefined && { statusBand: device.statusBand }),
     };
   }
   if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
@@ -611,6 +636,7 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
       'Check the device answers (`adb shell wm size` / `idb describe`) and retry.',
   );
 }
+
 
 /**
  * How far a window's width may fall short of (or pass) the panel's long

@@ -13,6 +13,7 @@ import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Po
 import { awaitForeground } from './ios-foreground.js';
 import { appInfoNames } from './simctl-appinfo.js';
 import { ViewportMemo } from './viewport-memo.js';
+import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
 
 /**
@@ -308,10 +309,11 @@ export class IosAdapter implements DeviceAdapter {
     if (!dims?.width_points || !dims.height_points) {
       throw new Error('idb describe returned no screen_dimensions.{width,height}_points');
     }
-    return { width: dims.width_points, height: dims.height_points };
+    const size = { width: dims.width_points, height: dims.height_points };
+    return { ...size, statusBand: iosStatusBand(size) };
   });
 
-  /** Screen size in POINTS — the units idb AX frames use. Memoized: types.ts#viewport. */
+  /** Screen size in POINTS — the units idb AX frames use — and its status band (ios-status-band.ts). Memoized: types.ts#viewport. */
   viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
     return this.viewportMemo.get(opts);
   }

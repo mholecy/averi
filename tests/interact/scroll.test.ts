@@ -630,3 +630,105 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
     expect(await scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 });
+
+/**
+ * iOS's status band is off the screen for `scroll_until`'s stop too (2026-10-09, device check C3-1.3 of
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): one 0.3-s stroke (`idb ui swipe 201 699 201
+ * 175`) flung `priority_select` from 771 to `24,-20`, its centre (201,6) — on the screen and under no tree node — and
+ * the plain stop stopped there; the tap that followed went to the status bar. interact/swipe.ts#iosStatusBand.
+ */
+describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
+  /** The SWIFT form as idb lists it, `priority_select` moved by each stroke to the next of `ys` (the last one standing). */
+  async function flungForm(platform: 'ios' | 'android', ys: number[]) {
+    const { readFile } = await import('node:fs/promises');
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    const row = tree.children.find((n) => n.identifier === 'swift_payment.form.priority_select')!;
+    class Flung extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        row.rect = { ...row.rect, y: ys.length > 1 ? ys.shift()! : ys[0] };
+      }
+    }
+    const fake = new Flung({ form: tree }, 'form');
+    fake.platform = platform;
+    fake.keyboard = undefined;
+    // What each adapter's viewport reports: the iOS adapter adds the band (adapters/ios-status-band.ts), Android none.
+    fake.viewportSize = platform === 'ios' ? { width: 402, height: 874, statusBand: 62 } : { width: 402, height: 874 };
+    return fake;
+  }
+
+  it('the measured fling to y -20 is no stop: the scroll turns back and stops where the tap will open the row', async () => {
+    const fake = await flungForm('ios', [-20, 550]);
+    const result = await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST);
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([
+      { from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }, // the measured stroke
+      { from: { x: 201, y: 175 }, to: { x: 201, y: 437 } }, // turned back, half its reach
+    ]);
+  });
+
+  /** The turned stroke the measured run drew second: content up, from y 175, half the reach. */
+  const TURNED = { from: { x: 201, y: 175 }, to: { x: 201, y: 437 } };
+
+  it('a row lying wholly in the band (y 10–62): no plain stop and no fully: true one — and the next stroke is turned back at once, the band being past the far edge', async () => {
+    for (const fully of [false, true]) {
+      const fake = await flungForm('ios', [10, 550]);
+      expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, fully })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+      expect(fake.swipes[1]).toEqual(TURNED);
+    }
+  });
+
+  it('a row whose centre lies in the band with part of it below (34–86, centre (201,60)): no stop, turned back', async () => {
+    const fake = await flungForm('ios', [34, 550]);
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.swipes[1]).toEqual(TURNED);
+  });
+
+  it('only the centre: a row reaching into the band with its centre below it (36–88, centre (201,62)) stops plain AND fully — what lies in the band is judged against the screen', async () => {
+    for (const fully of [false, true]) {
+      const fake = await flungForm('ios', [36, 550]);
+      expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, fully })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    }
+  });
+
+  /** A screen that does not scroll, holding one image at `rect`. */
+  const still = (rect: Rect) => {
+    resetLayout();
+    const root = screen(el({ identifier: 'root' }), node({ role: 'image', identifier: 'hero', rect }));
+    root.rect = { x: 0, y: 0, width: 402, height: 874 };
+    const fake = new FakeAdapter({ s: root }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    return fake;
+  };
+
+  it('full-bleed content at the top (a hero 0,0 402x300, review of fix/r6-ios-top MAJOR 2): fully visible after 0 swipes', async () => {
+    const fake = still({ x: 0, y: 0, width: 402, height: 300 });
+    expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('a header whose centre stays in the band (0,0 402x106 on a screen that does not scroll): the failure names iOS\'s status bar — no clip, no layout defect', async () => {
+    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("its centre (201,53) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar");
+    expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
+  });
+
+  it('a list already at its bottom end, the target pushed up under the bar (24,10 354x52) by the default direction down: the failure says to try direction "up"', async () => {
+    const error = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain(
+      "its centre (201,36) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar, and the content is exhausted: " +
+        'swiping down no longer moves it out from under the status bar — try direction: "up".',
+    );
+    const up = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', { ...FAST, direction: 'up' }).catch((e: unknown) => e)) as Error;
+    expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down".');
+  });
+
+  it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {
+    const fake = await flungForm('android', [-20, 550]);
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 1, visible: expect.closeTo(0.615, 3), clipped: ['top'] });
+  });
+});

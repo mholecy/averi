@@ -86,8 +86,8 @@ describe('IosAdapter interactions', () => {
       }),
     });
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
-    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
-    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874, statusBand: 62 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874, statusBand: 62 });
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
   });
 
@@ -100,8 +100,8 @@ describe('IosAdapter interactions', () => {
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await expect(adapter.viewport()).rejects.toThrow(/no screen_dimensions/);
     responses['idb describe --json'] = JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } });
-    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
-    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874, statusBand: 62 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874, statusBand: 62 });
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(2);
   });
 
@@ -111,10 +111,10 @@ describe('IosAdapter interactions', () => {
     };
     const { fn, calls } = fakeExec(responses);
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
-    expect(await adapter.viewport()).toEqual({ width: 402, height: 874 });
+    expect(await adapter.viewport()).toEqual({ width: 402, height: 874, statusBand: 62 });
     responses['idb describe --json'] = JSON.stringify({ screen_dimensions: { width_points: 820, height_points: 1180 } });
-    expect(await adapter.viewport({ fresh: true })).toEqual({ width: 820, height: 1180 });
-    expect(await adapter.viewport()).toEqual({ width: 820, height: 1180 });
+    expect(await adapter.viewport({ fresh: true })).toEqual({ width: 820, height: 1180, statusBand: 20 });
+    expect(await adapter.viewport()).toEqual({ width: 820, height: 1180, statusBand: 20 });
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(2);
   });
 

@@ -4,7 +4,7 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { containsPoint, drawnOverText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { judgingScreen, type JudgingScreen } from './swipe.js';
+import { belowStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -468,13 +468,22 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * - No screen at all: inside the tree's root rect when it has one; with
  *   none, on screen (fail open).
  *
+ * - On iOS, never in the status band at the top of a portrait box
+ *   (adapters/ios-status-band.ts, reported with the device's screen, 2026-10-09: a tap at (201,6) went to the
+ *   status bar, which scrolled the form to its top): that band is off the
+ *   screen for a tap (`inStatusBand` words the refusal).
+ *
  * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
  * a 402-wide screen is judged at 402, off it: that is where the tap would go.
  */
 export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefined): boolean {
   if (screen === undefined) return rectArea(tree.rect) === 0 || containsPoint(tree.rect, point);
-  return screen.boxes.some((box) => containsPoint(box, point));
+  return screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 }
+
+/** The point lies on the screen but in its status band (`onScreen`'s iOS clause) — in a box, and in no box less the band. */
+const inStatusBand = (point: Point, screen: TapScreen): boolean =>
+  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
  * Refuse a tap whose point lies off the screen (OffScreenRefusal), or return
@@ -507,6 +516,11 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
  * memo (adapters/viewport-memo.ts), so `tapScreen` then asks the device once
  * more — one extra read on a refusal path, accepted.
  *
+ * A point on the screen but inside iOS's status band (`onScreen`'s iOS
+ * clause, 2026-10-09) is refused in its own words — `under iOS's status
+ * bar at (201,6) — the top 62 pt …` — since "off screen" would contradict
+ * a rect the reader sees on it.
+ *
  * `sent`, when the keyboard guard acted before this look — `back was
  * pressed …`, `id:"login_title" was tapped …` (`Hiding.sent`) — fronts the
  * headline: the target was not tapped, but something was.
@@ -529,6 +543,11 @@ export async function refuseOffScreen(
   const again = await tapScreen(adapter, tree);
   if (onScreen(at, tree, again)) return again;
   const judged: TapScreen = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
+  const what = describeTarget(target);
+  if (inStatusBand(at, judged)) {
+    const band = `under iOS's status bar at (${at.x},${at.y}) — the top ${judged.statusBand} pt of a ${judged.box.width}x${judged.box.height} screen, where a tap goes to the status bar (rect ${rectText(node.rect)}) — scroll_until it first`;
+    throw new OffScreenRefusal(sent === undefined ? `${what} is ${band}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${band}`);
+  }
   const visible = Math.max(...judged.boxes.map((b) => visibleFractionInViewport(node.rect, b)));
   const size = `${judged.box.width}x${judged.box.height}`;
   const reread =
@@ -540,7 +559,6 @@ export async function refuseOffScreen(
     visible > 0
       ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — scroll_until it with fully: true first`
       : ` (rect ${rectText(node.rect)}) — scroll_until it first`;
-  const what = describeTarget(target);
   throw new OffScreenRefusal(
     sent === undefined ? `${what} is off screen ${where}${part}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is off screen ${where}${part}`,
   );
@@ -607,14 +625,20 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * keyboard shown; nothing more with it hidden — the guard's first reading
  * is reused).
  *
- * Only nodes of the tree cover (decision 4): iOS's status bar and a top bar
- * the tree lists before the form — WDA's, idb's (only its button and title)
- * — are not inferred, so a row scrolled up under them is tapped at its
- * centre as before the check existed. The other way round — a row
- * scrolled under the bar read as drawn over BackButton and the title, under
- * idb, whose list is flat — is judged by an INTERIM rule, unmeasured
- * (ui-tree/draw-order.ts's `flatListAbove` row: in idb's list a later node
- * covers only when its top lies at or below the target's).
+ * The box is cut below iOS's status band (swipe.ts#belowStatusBand,
+ * 2026-10-09) before a piece is chosen, as above a keyboard: a moved tap
+ * never lands on the status bar. Its centre is never there — the on-screen
+ * rule refused that first.
+ *
+ * Only nodes of the tree cover (decision 4): a top bar the tree lists
+ * before the form — WDA's, idb's (only its button and title) — is not
+ * inferred, so a row scrolled up under it is tapped at its centre as
+ * before the check existed (iOS's status bar is off the screen, above).
+ * The other way round — a row scrolled under the bar read as drawn over
+ * BackButton and the title, under idb, whose list is flat — is judged by
+ * chrome before content (ui-tree/draw-order.ts's `flatListChrome` row,
+ * device check C3-3: in idb's list the bar's items come before the form's
+ * rows, and a row listed after them is no cover of them).
  */
 export async function aimClearOfChrome(
   target: Target,
@@ -625,7 +649,8 @@ export async function aimClearOfChrome(
   sent?: string,
 ): Promise<Aim> {
   const centre = tapPoint(node);
-  const box = screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect);
+  // Below iOS's status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
+  const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
   const order = drawOrder(tree);
   const cover = order.exposure(node, box).centreCover;
   if (cover === undefined) return { point: centre };

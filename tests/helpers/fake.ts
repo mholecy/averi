@@ -235,9 +235,9 @@ export class FakeAdapter implements DeviceAdapter {
    * make every test exercise the mismatch note instead of the table under
    * test. A test that wants a mismatch must ask for one.
    */
-  viewportSize: { width: number; height: number } | undefined;
+  viewportSize: { width: number; height: number; statusBand?: number } | undefined;
 
-  async viewport(): Promise<{ width: number; height: number }> {
+  async viewport(): Promise<{ width: number; height: number; statusBand?: number }> {
     if (this.viewportSize !== undefined) return this.viewportSize;
     const { width, height } = this.screens[this.current].rect;
     return { width, height };

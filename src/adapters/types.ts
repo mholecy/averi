@@ -43,6 +43,15 @@ export interface DeviceScreen {
    * a CONTENT width (2026-10-07, the parity code review's A1/A2).
    */
   windowsBesideSystemBars?: boolean;
+  /**
+   * The height of the band at the top of the screen held upright that is
+   * NOT the app's to tap — iOS's status bar, down to the safe area
+   * (ios-status-band.ts, the measurement there). Set by the iOS adapter
+   * only; Android's status bar lies outside the app's window. Read by
+   * interact/swipe.ts#screenBox, which carries it to the judgements of a
+   * tap point (2026-10-09).
+   */
+  statusBand?: number;
 }
 
 /**
@@ -307,8 +316,9 @@ export interface UiNode {
    * a child of a synthetic 0×0 root (adapters/ios-tree-source.ts#idbTree)
    * in the list's order — no node has a parent of its own, so nothing in
    * the tree says what a node belongs to. Read by ui-tree/draw-order.ts,
-   * whose `target` question judges such a list by an interim rule of its
-   * own (`flatListAbove`) and asks an on-target text to repeat the target
+   * whose `target` question judges such a list by a rule of its own —
+   * the top bar listed before the content is no cover's target
+   * (`flatListChrome`) — and asks an on-target text to repeat the target
    * (`onTarget`), the sibling guard being void there. A mark of the source, like `ofKeyboard` and
    * `clipsDescendants`: ui-tree knows no platform, and the shape alone (a
    * rectless root over leaves) would also match a test's or a future

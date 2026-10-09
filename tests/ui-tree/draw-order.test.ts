@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
 import { COMPOSE } from '../helpers/android-dumps.js';
@@ -16,6 +16,9 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
  * The draw-order module's interface (ui-tree/draw-order.ts): its three
  * questions, each pinned on the device shapes its rows were measured on.
  */
+
+/** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
+const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
 
 describe('shadowing — the later node drawn over a point (the dismissal picker\'s cover test)', () => {
   const P = { x: 100, y: 100 };
@@ -682,7 +685,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(exposure.coverAt({ x: 201, y: 495 })).toBeUndefined();
     });
 
-    it('idb\'s flat list, the INTERIM rule (owner decision, code review P1 — unmeasured): a later node covers the target only when its top lies at or below the target\'s — a row scrolled up under the top bar is no cover of BackButton or the title; CONTINUE over priority_select still is', async () => {
+    it('idb\'s flat list, chrome before content (owner decision on device check C3-3): a row scrolled up under the top bar, listed after it, is no cover of BackButton or the title; CONTINUE over priority_select still is', async () => {
       const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
       const nodes = [...everyNode(tree)];
       const find = (p: (n: UiNode) => boolean) => nodes.find(p)!;
@@ -695,8 +698,77 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       debit.rect = { ...debit.rect, y: 40, height: 72 }; // scrolled up under the bar: 24,40 354x72 over BackButton (y 70) and the title (y 74)
       iban.rect = { ...iban.rect, y: 27 };
       for (const target of [back, title]) expect(drawOrder(tree).exposure(target, IPHONE)).toMatchObject({ covers: [], tapAt: { moved: false } });
-      // CONTINUE (y 780) over priority_select (y 771): its top at or below the target's — a cover, as measured.
+      // The measured false refusals of the interim rule: a row whose top lies INSIDE Back's 70–98 (C3-3 positions 2, 4, 6).
+      debit.rect = { ...debit.rect, y: 82, height: 20 };
+      for (const target of [back, title]) expect(drawOrder(tree).exposure(target, IPHONE)).toMatchObject({ covers: [], tapAt: { moved: false } });
+      // CONTINUE (y 780) over priority_select (y 771): content over content — a cover, as measured.
       expect(drawOrder(tree).exposure(priority, IPHONE).covers.map((n) => n.identifier)).toEqual(['swift_payment.form.continue_button']);
+    });
+
+    it('…where the content starts: the first node past the bar\'s band (the top 20 %), or lying on a node of the bar before it; the screen-sized Application is skipped', () => {
+      const host = uiNode({ role: 'other', label: 'app', rect: IPHONE });
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const save = uiNode({ role: 'button', label: 'Save', rect: rect(330, 70, 50, 28) });
+      const flat = (...children: UiNode[]) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [host, ...children] });
+      // A row lying on BackButton starts the content, even inside the band: no cover of the bar before it.
+      const under = uiNode({ role: 'textfield', rect: rect(42, 82, 318, 20) });
+      expect(drawOrder(flat(back, save, under)).exposure(back, IPHONE).covers).toEqual([]);
+      // A row past the band starts it too; what follows is content, and content covers content.
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
+      const bar = uiNode({ role: 'button', label: 'Pinned', rect: rect(0, 320, 402, 60) });
+      expect(drawOrder(flat(back, row, bar)).exposure(row, IPHONE).covers).toEqual([bar]);
+      // A sheet starting ABOVE a content target is a cover again (the interim rule\'s stated miss).
+      const sheet = uiNode({ role: 'button', label: 'Sheet', rect: rect(0, 200, 402, 400) });
+      expect(drawOrder(flat(back, row, sheet)).exposure(row, IPHONE).covers).toEqual([sheet]);
+      // A node of the bar lying on another (a badge on BackButton) starts the content — the stated miss: no cover of it.
+      const badge = uiNode({ role: 'image', label: 'Badge', rect: rect(40, 70, 30, 20) });
+      expect(drawOrder(flat(back, badge, row)).exposure(back, IPHONE).covers).toEqual([]);
+    });
+
+    it('…only content ENDING inside the bar\'s band is excused (review MAJOR 1): a sheet reaching past it covers the bar\'s items; a popover ending inside it does not — the residual, stated', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
+      const flat = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, later] });
+      const sheet = uiNode({ role: 'button', label: 'Cancel', rect: rect(16, 72, 370, 400) });
+      expect(drawOrder(flat(sheet)).exposure(back, IPHONE).covers).toEqual([sheet]);
+      const popover = uiNode({ role: 'button', label: 'Tip', rect: rect(16, 72, 70, 34) });
+      expect(drawOrder(flat(popover)).exposure(back, IPHONE).covers).toEqual([]);
+    });
+
+    it('a screen with no bar (the reviewer\'s repro, MAJOR 1): rows at the top read as the bar\'s, and a menu listed last that reaches past the band still covers Row1 — the tap moves off it', () => {
+      const rows = [62, 106, 150, 194].map((y, i) => uiNode({ role: 'button', label: `Row${i + 1}`, rect: rect(0, y, 402, 44) }));
+      const menu = uiNode({ role: 'button', label: 'Menu', rect: rect(150, 70, 240, 130) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', label: 'App', rect: IPHONE }), ...rows, menu] });
+      const seen = drawOrder(tree).exposure(rows[0], IPHONE);
+      expect(seen.covers).toEqual([menu]);
+      expect(seen.tapAt).toEqual({ point: { x: 75, y: 88 }, moved: true, piece: rect(0, 70, 150, 36) });
+    });
+
+    it('the band\'s line sits at 20 % of the screen (174.8 on 874): content ending at 170 is excused over a bar item, content ending at 180 is not', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
+      const flat = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, later] });
+      const short = uiNode({ role: 'textfield', rect: rect(20, 80, 318, 90) }); // 80–170
+      expect(drawOrder(flat(short)).exposure(back, IPHONE).covers).toEqual([]);
+      const long = uiNode({ role: 'textfield', rect: rect(20, 80, 318, 100) }); // 80–180
+      expect(drawOrder(flat(long)).exposure(back, IPHONE).covers).toEqual([long]);
+    });
+
+    it('a row reaching past the band\'s line starts the content: a text ending inside the band over its top covers it', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 150, 402, 50) }); // 150–200, past the line at 174.8
+      const tip = uiNode({ role: 'text', label: 'Tip', rect: rect(0, 160, 200, 14) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, tip] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([tip]);
+    });
+
+    it('a row scrolled ABOVE the screen starts the content, whatever band it ends in: the rows after it are content, and a text ending inside the band over one of them covers it', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const above = uiNode({ role: 'button', label: 'Above', rect: rect(0, -100, 402, 50) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 100, 402, 40) });
+      const tip = uiNode({ role: 'text', label: 'Tip', rect: rect(0, 110, 200, 30) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, above, row, tip] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([tip]);
     });
 
     it('…the same shapes with no flat-list mark (a WDA or Android tree, or any tree its source did not mark) are judged as before: the row under the bar covers BackButton', () => {
@@ -705,9 +777,37 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const shape = (flatList?: true) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), ...(flatList && { flatList }), children: [uiNode({ role: 'other', rect: IPHONE }), back, debit] });
       expect(drawOrder(shape()).exposure(back, IPHONE).covers).toEqual([debit]);
       expect(drawOrder(shape(true)).exposure(back, IPHONE).covers).toEqual([]);
-      // At or below: a later node whose top is the target's covers it in the flat list too.
-      const badge = uiNode({ role: 'image', label: 'Badge', rect: rect(40, 70, 30, 20) });
-      expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [back, badge] })).exposure(back, IPHONE).covers).toEqual([badge]);
+    });
+
+    describe('the six measured positions of device check C3-3 (tests/fixtures/idb-swift-form-scrolled-under-top-bar.json)', () => {
+      const positions = Object.entries(C33.positions).map(([pos, elements]) => [pos, parseIdbDescribeAll(JSON.stringify(elements))] as const);
+
+      it.each(positions)('%s: Back and the title are uncovered — all of them shows, the tap goes to the centre', (_pos, tree) => {
+        const order = drawOrder(tree);
+        for (const [id, centre] of [['BackButton', { x: 44, y: 84 }], ['swift_payment.form.title', { x: 201, y: 84 }]] as const) {
+          const target = tree.children.find((n) => n.identifier === id)!;
+          expect(order.exposure(target, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: centre, moved: false } });
+        }
+      });
+
+      it('the rows that lay on Back and the title at positions 2, 4 and 6 (the interim rule\'s three false refusals) are in the dumps, after them', () => {
+        const at = (pos: string) => positions.find(([p]) => p === pos)![1].children;
+        const back = rect(30, 70, 28, 28);
+        const onBack = (pos: string) => at(pos).filter((n, i) => i > 1 && rectsOverlap(n.rect, back)).map((n) => `${n.role} ${n.rect.x},${n.rect.y}`);
+        expect([onBack('pos2'), onBack('pos4'), onBack('pos6')]).toEqual([
+          ['textfield 42,75', 'text 42,75'],
+          ['textfield 42,82', 'text 42,82'],
+          ['text 42,80'],
+        ]);
+      });
+
+      it('position 6: the pinned CONTINUE, listed last, still covers the row under it (payee_country_select 24,776 354x52) — content over content', () => {
+        const tree = positions.find(([p]) => p === 'pos6')![1];
+        const row = tree.children.find((n) => n.identifier === 'swift_payment.form.payee_country_select')!;
+        const seen = drawOrder(tree).exposure(row, IPHONE);
+        expect(seen.centreCover?.identifier).toBe('swift_payment.form.continue_button');
+        expect(seen.tapAt).toBeUndefined(); // 4 pt show above the bar
+      });
     });
 
     it('a bar button with the form scrolled under the translucent bar (WDA lists the bar first): the scroll view\'s rows are no cover of it', () => {
