@@ -492,11 +492,12 @@ export interface ScreenBox {
    */
   boxes: Rect[];
   /**
-   * iOS only: the height of the band at the top of a PORTRAIT box that a
-   * judgement counts as OFF the screen — iOS's status bar, down to the safe
-   * area (`iosStatusBand`, the measurement there; `belowStatusBand` cuts
-   * it). Absent on Android, whose status bar lies outside the app's window
-   * and so outside every rect its tree gives.
+   * The device's `DeviceScreen.statusBand` (iOS only — adapters/ios-status-
+   * band.ts): the band at the top of a PORTRAIT box whose points a
+   * judgement counts as OFF the screen — the point a tap presses, and
+   * `scroll_until`'s stop on it (`belowStatusBand` cuts it). Absent on
+   * Android, and when the device size could not be read (the tree's window
+   * stands in, and the judgement fails open as the rest of that path does).
    */
   statusBand?: number;
 }
@@ -509,66 +510,6 @@ export interface JudgingScreen {
   box: Rect;
   boxes: Rect[];
   statusBand?: number;
-}
-
-/**
- * iOS's top safe-area inset in a PORTRAIT screen, in points, by the
- * screen's size — the band `iosStatusBand` cuts. MEASURED on the iPhone 17
- * simulator (402x874, iOS 27): WDA lists the navigation bar at `0,62
- * 402x54` (tests/fixtures/wda-source-rn-myport.json, and SwiftUI's at
- * `0,62 402x44` in wda-source-skeleton-login.json), the status bar's own
- * items end at y 39–44 (SpringBoard's tree, ui-tree/bare-tree.ts), and a
- * tap at (201,6) was taken by the status bar (docs/bugs/2026-10-08-tap-and-
- * scroll-until-ignore-pinned-app-chrome.md, device check C3-1.3: the form
- * scrolled to its top, no sheet opened). The other sizes are Apple's
- * published insets for the iPhones of those sizes, NOT measured here
- * (where two models share a size and differ — the 375x812 X and 12 mini,
- * 44 and 50; the 414x896 XS Max and XR, 44 and 48 — the smaller).
- */
-const IOS_SAFE_AREA_TOPS: Readonly<Record<string, number>> = {
-  '402x874': 62,
-  '440x956': 62,
-  '393x852': 59,
-  '430x932': 59,
-  '390x844': 47,
-  '428x926': 47,
-  '375x812': 44,
-  '414x896': 44,
-  '375x667': 20,
-  '414x736': 20,
-  '320x568': 20,
-};
-
-/**
- * The band for a portrait screen of a size the table does not hold (an
- * iPad, a model newer than it): 20 pt, the classic status bar's height and
- * the smallest any iOS device has in portrait — so the band never reaches
- * into a navigation bar on a screen it was not measured on, and a point in
- * the top 20 pt, which every status bar takes, is still caught.
- */
-export const IOS_MIN_STATUS_BAND = 20;
-
-/**
- * THE iOS status band (2026-10-09, the owner's decision on device check
- * C3-1.3 of docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
- * chrome.md): the top of a portrait screen down to the safe area counts as
- * OFF the screen for every judgement of a point or a rect on it — the tap's
- * on-screen rule and where a moved tap may go (interact/resolve.ts#onScreen,
- * #aimClearOfChrome), and `scroll_until`'s stop (interact/scroll-rounds.ts#
- * judge). Measured: one 0.3-s stroke flung `priority_select` to `24,-20`,
- * its centre (201,6) on the screen and under no node of the idb tree, the
- * plain stop stopped there, and the tap went to the status bar, which
- * scrolled the form back to its top. Neither tree lists the status bar, and
- * the app's own top bar below it is left unjudged (out of scope). By the
- * screen's size (`IOS_SAFE_AREA_TOPS`, else `IOS_MIN_STATUS_BAND`); 0 for a
- * landscape screen — an iPhone hides its status bar there (an iPad's
- * landscape bar is not seen, stated). Residual: an app that hides the
- * status bar (a full-screen player or game) has targets in the band
- * refused, the safe direction.
- */
-export function iosStatusBand(screen: { width: number; height: number }): number {
-  if (screen.height <= screen.width) return 0;
-  return IOS_SAFE_AREA_TOPS[`${screen.width}x${screen.height}`] ?? IOS_MIN_STATUS_BAND;
 }
 
 /**
@@ -597,7 +538,7 @@ export function belowStatusBand(box: Rect, screen: Pick<JudgingScreen, 'statusBa
  * is the panel as built, not the gesture's turned box, when the turn is no
  * evidence (`judgedBoxes`).
  */
-export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport' | 'platform'>, read: TreeRead): Promise<JudgingScreen | undefined> {
+export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<JudgingScreen | undefined> {
   try {
     return judgingOf(await screenBox(adapter, read));
   } catch {
@@ -654,7 +595,7 @@ export const judgingOf = ({ boxes, statusBand }: ScreenBox): JudgingScreen => ({
  * the read the caller already made: `swipeScreen` makes one, the scroll loop
  * hands in its round's.
  */
-export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport' | 'platform'>, read: TreeRead): Promise<ScreenBox> {
+export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<ScreenBox> {
   let device: DeviceScreen | undefined;
   let deviceProblem: string;
   try {
@@ -675,12 +616,12 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport' | 'platf
       box,
       ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
       boxes: judgedBoxes(size, device, box, sideways),
-      ...statusBandOf(adapter, device),
+      ...(device.statusBand !== undefined && { statusBand: device.statusBand }),
     };
   }
   if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
     const box = { x: 0, y: 0, width: size.width, height: size.height };
-    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`, boxes: [box], ...statusBandOf(adapter, size) };
+    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`, boxes: [box] };
   }
   const treeProblem =
     size === undefined
@@ -696,9 +637,6 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport' | 'platf
   );
 }
 
-/** `ScreenBox.statusBand` on iOS: the band of the screen held upright (`iosStatusBand`) — applied to the portrait boxes only (`belowStatusBand`). */
-const statusBandOf = (adapter: Pick<DeviceAdapter, 'platform'>, screen: { width: number; height: number }): { statusBand?: number } =>
-  adapter.platform === 'ios' ? { statusBand: iosStatusBand({ width: Math.min(screen.width, screen.height), height: Math.max(screen.width, screen.height) }) } : {};
 
 /**
  * How far a window's width may fall short of (or pass) the panel's long
@@ -777,7 +715,7 @@ export interface ScreenSwipe extends Stroke {
  * is no usable box.
  */
 export async function swipeScreen(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'platform'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe'>,
   opts: SwipeOptions,
 ): Promise<ScreenSwipe> {
   const { box, note } = await screenBox(adapter, await readTreeOrError(adapter));

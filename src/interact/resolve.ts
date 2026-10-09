@@ -397,7 +397,7 @@ export type TapScreen = JudgingScreen;
  * (keyboard.ts). The rule exists to stop a false "Tapped", and must never
  * be why a tap on a device that could not report its size did not happen.
  */
-export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport' | 'platform'>, tree: UiNode): Promise<TapScreen | undefined> => judgingScreen(adapter, { tree });
+export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<TapScreen | undefined> => judgingScreen(adapter, { tree });
 
 /**
  * THE on-screen rule for a point about to be tapped (2026-10-08) — the
@@ -422,7 +422,7 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport' | 'platform'>,
  *   none, on screen (fail open).
  *
  * - On iOS, never in the status band at the top of a portrait box
- *   (swipe.ts#iosStatusBand, 2026-10-09: a tap at (201,6) went to the
+ *   (adapters/ios-status-band.ts, reported with the device's screen, 2026-10-09: a tap at (201,6) went to the
  *   status bar, which scrolled the form to its top): that band is off the
  *   screen for a tap (`inStatusBand` words the refusal).
  *
@@ -479,7 +479,7 @@ const inStatusBand = (point: Point, screen: TapScreen): boolean =>
  * headline: the target was not tapped, but something was.
  */
 export async function refuseOffScreen(
-  adapter: Pick<DeviceAdapter, 'viewport' | 'platform'>,
+  adapter: Pick<DeviceAdapter, 'viewport'>,
   target: Target,
   node: UiNode,
   tree: UiNode,
@@ -602,7 +602,7 @@ export async function aimClearOfChrome(
   sent?: string,
 ): Promise<Aim> {
   const centre = tapPoint(node);
-  // Below iOS's status band (swipe.ts#iosStatusBand): a moved tap is never aimed into it.
+  // Below iOS's status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
   const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
   const order = drawOrder(tree);
   const cover = order.exposure(node, box).centreCover;

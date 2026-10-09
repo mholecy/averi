@@ -706,12 +706,40 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(flat(back, badge, row)).exposure(back, IPHONE).covers).toEqual([]);
     });
 
-    it('…the residual, stated: content listed after the bar that IS drawn over it (a sheet reaching over the bar, its presenter still listed) is no cover of the bar\'s items', () => {
+    it('…only content ENDING inside the bar\'s band is excused (review MAJOR 1): a sheet reaching past it covers the bar\'s items; a popover ending inside it does not — the residual, stated', () => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
-      const cancel = uiNode({ role: 'button', label: 'Cancel', rect: rect(16, 72, 70, 34) });
-      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, cancel] });
-      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([]);
+      const flat = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, later] });
+      const sheet = uiNode({ role: 'button', label: 'Cancel', rect: rect(16, 72, 370, 400) });
+      expect(drawOrder(flat(sheet)).exposure(back, IPHONE).covers).toEqual([sheet]);
+      const popover = uiNode({ role: 'button', label: 'Tip', rect: rect(16, 72, 70, 34) });
+      expect(drawOrder(flat(popover)).exposure(back, IPHONE).covers).toEqual([]);
+    });
+
+    it('a screen with no bar (the reviewer\'s repro, MAJOR 1): rows at the top read as the bar\'s, and a menu listed last that reaches past the band still covers Row1 — the tap moves off it', () => {
+      const rows = [62, 106, 150, 194].map((y, i) => uiNode({ role: 'button', label: `Row${i + 1}`, rect: rect(0, y, 402, 44) }));
+      const menu = uiNode({ role: 'button', label: 'Menu', rect: rect(150, 70, 240, 130) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', label: 'App', rect: IPHONE }), ...rows, menu] });
+      const seen = drawOrder(tree).exposure(rows[0], IPHONE);
+      expect(seen.covers).toEqual([menu]);
+      expect(seen.tapAt).toEqual({ point: { x: 75, y: 88 }, moved: true, piece: rect(0, 70, 150, 36) });
+    });
+
+    it('a row reaching past the band\'s line starts the content: a text ending inside the band over its top covers it', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 150, 402, 50) }); // 150–200, past the line at 174.8
+      const tip = uiNode({ role: 'text', label: 'Tip', rect: rect(0, 160, 200, 14) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, tip] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([tip]);
+    });
+
+    it('a row scrolled ABOVE the screen starts the content, whatever band it ends in: the rows after it are content, and a text ending inside the band over one of them covers it', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const above = uiNode({ role: 'button', label: 'Above', rect: rect(0, -100, 402, 50) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 100, 402, 40) });
+      const tip = uiNode({ role: 'text', label: 'Tip', rect: rect(0, 110, 200, 30) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, above, row, tip] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([tip]);
     });
 
     it('…the same shapes with no flat-list mark (a WDA or Android tree, or any tree its source did not mark) are judged as before: the row under the bar covers BackButton', () => {

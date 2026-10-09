@@ -43,6 +43,15 @@ export interface DeviceScreen {
    * a CONTENT width (2026-10-07, the parity code review's A1/A2).
    */
   windowsBesideSystemBars?: boolean;
+  /**
+   * The height of the band at the top of the screen held upright that is
+   * NOT the app's to tap — iOS's status bar, down to the safe area
+   * (ios-status-band.ts, the measurement there). Set by the iOS adapter
+   * only; Android's status bar lies outside the app's window. Read by
+   * interact/swipe.ts#screenBox, which carries it to the judgements of a
+   * tap point (2026-10-09).
+   */
+  statusBand?: number;
 }
 
 /**

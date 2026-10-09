@@ -179,6 +179,8 @@ interface SeenFor extends Seen {
   readonly flatList: boolean;
   /** The walk index of a flat list's first content node (`firstContent`): the nodes before it are its top bar. The walk's length when there is none, or the tree is not a flat list. */
   readonly contentFrom: number;
+  /** The bottom of the top bar's band (`FLAT_LIST_TOP_BAR_FRACTION` of the screen): content ending above it may lie under the bar. */
+  readonly barLine: number;
 }
 
 /**
@@ -422,8 +424,9 @@ const NOT_DRAWN = {
 
   /**
    * CONTENT OVER THE TOP BAR, IN A FLAT LIST: under idb (`UiNode.flatList`
-   * on the root), a node at or after the list's first CONTENT node, over a
-   * target listed before it — the top bar's (`firstContent`, `contentFrom`).
+   * on the root), a node at or after the list's first CONTENT node that
+   * ends inside the top bar's band (`barLine`), over a target listed before
+   * that node — the top bar's (`firstContent`, `contentFrom`).
    * `target` only: chrome before content, the owner's decision of 2026-10-09
    * on device check C3-3 (docs/bugs/2026-10-08-tap-and-scroll-until-
    * ignore-pinned-app-chrome.md), replacing the interim `flatListAbove`.
@@ -443,20 +446,28 @@ const NOT_DRAWN = {
    * before the content, and content listed after them is no cover of them,
    * wherever its top lies; between content nodes nothing changes — the
    * pinned CONTINUE, listed after the rows, still covers `priority_select`.
+   * Only content that ENDS inside the bar's band (`barLine`,
+   * `FLAT_LIST_TOP_BAR_FRACTION`) is excused — a row scrolled under the bar
+   * lies in it (the measured IBAN at 75–95, `will_remain` at 80–95), while a
+   * menu, a sheet or a dialog listed after the content reaches past it and
+   * covers what it lies on, the bar's items too (review of fix/r6-ios-top,
+   * MAJOR 1: on a screen with no bar the first rows inside the band are read
+   * as the bar's, and a menu `150,70 240x130` listed last over Row1 `0,62
+   * 402x44` read "clear" until the menu had to reach past the band).
    *
    * Residuals, stated: content listed after the bar that really is drawn
-   * over it — a sheet or a dialog reaching over the top bar while idb still
-   * lists the screen under it (not measured: whether idb lists a presenter's
-   * nodes under a sheet) — is not seen over the bar's items (a false
-   * "clear": the tap may press the sheet). A node of the bar listed after
+   * over it and ends inside the band — a small popover or tooltip over a
+   * bar item, or over a first row read as the bar's — is not seen (a false
+   * "clear": the tap may press it). A node of the bar listed after
    * the first content node (`firstContent`'s misses) still meets content as
    * content: a row scrolled under it reads as cover — a false refusal, the
    * safe direction. Improved on the interim rule: a sheet laid over a
-   * CONTENT target it starts above is a cover again. WDA's nested tree and
+   * target it starts above is a cover again — a content target always, a
+   * bar item whenever the sheet reaches past the band. WDA's nested tree and
    * Android's never meet this row: neither is marked.
    */
   flatListChrome: {
-    target: ({ at }, { target, contentFrom }) => target.at < contentFrom && at >= contentFrom,
+    target: ({ node, at }, { target, contentFrom, barLine }) => target.at < contentFrom && at >= contentFrom && node.rect.y + node.rect.height <= barLine,
   },
 
   /**
@@ -662,8 +673,7 @@ export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
  * that overlaps another (a badge on a bar button) starts the content, so
  * the bar's items after it meet the rows as content do.
  */
-function firstContent(order: readonly Placed[], screen: Rect, area: number): number {
-  const line = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
+function firstContent(order: readonly Placed[], screen: Rect, area: number, line: number): number {
   const bar: Rect[] = [];
   for (const { node, at } of order.slice(1)) {
     const r = node.rect;
@@ -698,7 +708,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
     placed.end = order.length;
   };
   walk(tree, undefined, undefined);
-  const contentFrom = flatList ? firstContent(order, screen, seen.screen) : order.length;
+  const barLine = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
+  const contentFrom = flatList ? firstContent(order, screen, seen.screen, barLine) : order.length;
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
@@ -731,7 +742,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine };
       const covers =
         shown === undefined || about === undefined
           ? []

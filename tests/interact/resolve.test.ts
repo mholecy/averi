@@ -22,7 +22,8 @@ import {
 } from '../../src/interact/resolve.js';
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { IOS_MIN_STATUS_BAND, iosStatusBand, screenBox } from '../../src/interact/swipe.js';
+import { IOS_MIN_STATUS_BAND, iosStatusBand } from '../../src/adapters/ios-status-band.js';
+import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
@@ -1053,7 +1054,8 @@ describe('iOS\'s status band (2026-10-09)', () => {
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.platform = platform;
     fake.keyboard = undefined;
-    fake.viewportSize = { width: 402, height: 874 };
+    // What each adapter's viewport reports: the iOS adapter adds the band (adapters/ios-status-band.ts), Android none.
+    fake.viewportSize = platform === 'ios' ? { width: 402, height: 874, statusBand: 62 } : { width: 402, height: 874 };
     return fake;
   };
   const PRIORITY = 'id:swift_payment.form.priority_select';
@@ -1104,11 +1106,34 @@ describe('iOS\'s status band (2026-10-09)', () => {
     expect(fake.tapPoints).toEqual([{ x: 201, y: 6 }]);
   });
 
-  it('the band by the screen\'s size: measured 62 on 402x874, published insets elsewhere, 20 on an unknown portrait, none in landscape; on iOS only', async () => {
-    expect([iosStatusBand({ width: 402, height: 874 }), iosStatusBand({ width: 393, height: 852 }), iosStatusBand({ width: 375, height: 667 })]).toEqual([62, 59, 20]);
-    expect([iosStatusBand({ width: 1024, height: 1366 }), iosStatusBand({ width: 874, height: 402 })]).toEqual([IOS_MIN_STATUS_BAND, 0]);
-    expect((await screenBox(await swiftForm(771), { tree: undefined })).statusBand).toBe(62);
-    expect((await screenBox(await swiftForm(771, 'android'), { tree: undefined })).statusBand).toBeUndefined();
+  it('the band by the screen\'s size, held upright: measured 62 on 402x874, published insets elsewhere, 20 on a size not in the table (the iPhone Air, an iPad)', () => {
+    expect([iosStatusBand({ width: 402, height: 874 }), iosStatusBand({ width: 874, height: 402 }), iosStatusBand({ width: 393, height: 852 }), iosStatusBand({ width: 375, height: 667 })]).toEqual([62, 62, 59, 20]);
+    expect([iosStatusBand({ width: 420, height: 912 }), iosStatusBand({ width: 1024, height: 1366 })]).toEqual([IOS_MIN_STATUS_BAND, IOS_MIN_STATUS_BAND]);
+  });
+
+  it('screenBox carries the device\'s band, and only the device\'s: none when the size could not be read and the tree\'s window stands in', async () => {
+    const fake = await swiftForm(771);
+    expect((await screenBox(fake, { tree: undefined })).statusBand).toBe(62);
+    const unread = await swiftForm(771);
+    unread.viewport = async () => {
+      throw new Error('idb describe returned no screen_dimensions');
+    };
+    const window = node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } })] });
+    const judged = await screenBox(unread, { tree: window });
+    expect(judged.box).toEqual({ x: 0, y: 0, width: 402, height: 874 });
+    expect(judged.statusBand).toBeUndefined();
+  });
+
+  it('a landscape box is not cut: on a screen held sideways a centre at y 30 is tapped (an iPhone hides its status bar there)', async () => {
+    resetLayout();
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 300, y: 10, width: 200, height: 40 } });
+    const fake = new FakeAdapter({ s: node({ role: 'other', rect: { x: 0, y: 0, width: 874, height: 402 }, children: [row] }) }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toEqual([{ x: 0, y: 0, width: 874, height: 402 }]);
+    await tapElement(fake, 'id:row', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 400, y: 30 }]);
   });
 });
 

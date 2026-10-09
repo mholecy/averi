@@ -313,6 +313,12 @@ export interface Judged {
    * the tap's keyboard guard deals with that one.
    */
   centreOnScreen: boolean;
+  /**
+   * Set when its centre lies on the screen but inside iOS's status band
+   * (swipe.ts#belowStatusBand, 2026-10-09) — so not `centreOnScreen`: the
+   * band's height, which the failure quotes (`shortOf`'s `statusBar`).
+   */
+  centreInBand?: number;
   /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
   shows: number;
 }
@@ -421,7 +427,7 @@ export type Shortfall =
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean };
 
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
-export type InFrameShort = { of: 'clipped'; judged: Judged } | { of: 'covered'; judged: Judged };
+export type InFrameShort = { of: 'clipped'; judged: Judged } | { of: 'covered'; judged: Judged } | { of: 'statusBar'; judged: Judged; band: number };
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
@@ -850,29 +856,35 @@ function judge(
   band: Pick<JudgingScreen, 'statusBand'>,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  // Every box below iOS's status band (swipe.ts#iosStatusBand, 2026-10-09): what lies in it is off the screen, as for the tap.
-  const screen: Rect = belowStatusBand({ x: 0, y: 0, ...viewport }, band);
+  const whole: Rect = { x: 0, y: 0, ...viewport };
+  // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
+  const screen: Rect = belowStatusBand(whole, band);
+  const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'centreInBand'> => {
+    const centre = tapPoint(node);
+    const centreOnScreen = containsPoint(screen, centre);
+    return { centreOnScreen, ...(!centreOnScreen && containsPoint(whole, centre) && { centreInBand: screen.y - whole.y }) };
+  };
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
-    const box: Rect = belowStatusBand({ x: 0, y: 0, ...frame }, band, viewport);
+    const box: Rect = { x: 0, y: 0, ...frame };
     const seen = order?.exposure(node, box);
     // The draw order's answer, as the tap's chrome check reads it (resolve.ts#aimClearOfChrome): the cover at the centre inside the frame.
     const centreCover = seen?.centreCover;
-    const visible = visibleFractionInViewport(node.rect, box);
+    const visible = visibleFractionInViewport(node.rect, frame);
     return {
       node,
       visible,
-      clipped: clippedEdges(node.rect, box),
+      clipped: clippedEdges(node.rect, frame),
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
       ...(centreCover !== undefined && { centreCover }),
-      centreOnScreen: containsPoint(screen, tapPoint(node)),
+      ...centreFacts(node),
       shows: seen?.shows ?? visible,
     };
   };
   const scored = found.map((node): Judged => {
     if (cover === undefined || cover.keyboardSide(node)) return inFrame(node, viewport);
     const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], centreOnScreen: containsPoint(screen, tapPoint(node)), shows: 0 };
+    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], ...centreFacts(node), shows: 0 };
     return inFrame(node, above, cover.cover);
   });
   return scored.sort((a, b) => better(a, b, fully))[0];
@@ -908,15 +920,18 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * stop, "visible … CLIPPED 40%", and the next tap was refused off screen
  * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
  * keyboard — a centre under the band stops as before, and the tap's
- * keyboard guard hides the keyboard. On iOS every box is judged below the
- * status band (`judge`, swipe.ts#iosStatusBand, 2026-10-09): a centre
- * there is off the screen — measured, one stroke flung `priority_select`
- * to `24,-20` and the plain stop stopped with its centre at (201,6), where
- * the tap pressed the status bar — and with `fully: true` a rect reaching
- * into it is clipped at the top.
+ * keyboard guard hides the keyboard. On iOS a centre inside the status
+ * band is off the screen (`Judged.centreInBand`, adapters/ios-status-
+ * band.ts, 2026-10-09) — measured, one stroke flung `priority_select` to
+ * `24,-20` and the plain stop stopped with its centre at (201,6), where the
+ * tap pressed the status bar — for both stops: `fully: true` asks the
+ * centre to be on the screen too (an unclipped rect's centre always is,
+ * but in the band). Only the centre: what of the rect lies in the band is
+ * judged against the screen as before, so full-bleed content at the top (a
+ * hero image at y 0) is "fully visible".
  */
 function stops(j: Judged, fully: boolean): boolean {
-  return j.visible > 0 && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreOnScreen && j.centreCover === undefined);
+  return j.visible > 0 && j.centreOnScreen && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);
 }
 
 /**
@@ -924,11 +939,14 @@ function stops(j: Judged, fully: boolean): boolean {
  * rule the stuck and the bound sentences read: `clipped` — an edge cut
  * with `fully: true`, or without it the centre off the screen; else
  * `covered` — something of the app drawn over it (over its centre, without
- * `fully`). With `fully: true` a cut edge leads, as it always has.
+ * `fully`). With `fully: true` a cut edge leads, as it always has. A centre
+ * on the screen but in iOS's status band is `statusBar` (2026-10-09): the
+ * sentence names the status bar, never a clip or a layout defect.
  */
 function shortOf(j: Judged, fully: boolean): InFrameShort {
-  const clipped = fully ? j.clipped.length > 0 : !j.centreOnScreen;
-  return { of: clipped ? 'clipped' : 'covered', judged: j };
+  if (fully && j.clipped.length > 0) return { of: 'clipped', judged: j };
+  if (j.centreInBand !== undefined) return { of: 'statusBar', judged: j, band: j.centreInBand };
+  return { of: !j.centreOnScreen ? 'clipped' : 'covered', judged: j };
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
@@ -1216,6 +1234,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
+  // Below iOS's status band: a target whose centre a fling carried into it
+  // is past the far edge, and the next stroke turns back.
   const judgedFrames: Rect[] =
     cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
   const gesture = seen.screen?.box;

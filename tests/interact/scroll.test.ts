@@ -653,7 +653,8 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     const fake = new Flung({ form: tree }, 'form');
     fake.platform = platform;
     fake.keyboard = undefined;
-    fake.viewportSize = { width: 402, height: 874 };
+    // What each adapter's viewport reports: the iOS adapter adds the band (adapters/ios-status-band.ts), Android none.
+    fake.viewportSize = platform === 'ios' ? { width: 402, height: 874, statusBand: 62 } : { width: 402, height: 874 };
     return fake;
   }
 
@@ -667,18 +668,53 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     ]);
   });
 
-  it('a row lying wholly in the band (y 10–52) is not in the viewport: neither a plain stop nor a fully: true one', async () => {
-    const plain = await flungForm('ios', [10, 550]);
-    expect(await scrollUntilVisible(plain, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 2, visible: 1, clipped: [] });
-    const fully = await flungForm('ios', [10, 550]);
-    expect(await scrollUntilVisible(fully, 'id:swift_payment.form.priority_select', { ...FAST, fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  /** The turned stroke the measured run drew second: content up, from y 175, half the reach. */
+  const TURNED = { from: { x: 201, y: 175 }, to: { x: 201, y: 437 } };
+
+  it('a row lying wholly in the band (y 10–62): no plain stop and no fully: true one — and the next stroke is turned back at once, the band being past the far edge', async () => {
+    for (const fully of [false, true]) {
+      const fake = await flungForm('ios', [10, 550]);
+      expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, fully })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+      expect(fake.swipes[1]).toEqual(TURNED);
+    }
   });
 
-  it('a row reaching into the band with its centre below it is a plain stop, clipped at the top by the band — and no fully: true one', async () => {
-    const fake = await flungForm('ios', [36, 550]); // 36–88, centre 62: 26 of 52 pt below the band
-    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 1, visible: 0.5, clipped: ['top'] });
-    const fully = await flungForm('ios', [36, 550]);
-    expect(await scrollUntilVisible(fully, 'id:swift_payment.form.priority_select', { ...FAST, fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  it('a row whose centre lies in the band with part of it below (34–86, centre (201,60)): no stop, turned back', async () => {
+    const fake = await flungForm('ios', [34, 550]);
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.swipes[1]).toEqual(TURNED);
+  });
+
+  it('only the centre: a row reaching into the band with its centre below it (36–88, centre (201,62)) stops plain AND fully — what lies in the band is judged against the screen', async () => {
+    for (const fully of [false, true]) {
+      const fake = await flungForm('ios', [36, 550]);
+      expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, fully })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    }
+  });
+
+  /** A screen that does not scroll, holding one image at `rect`. */
+  const still = (rect: Rect) => {
+    resetLayout();
+    const root = screen(el({ identifier: 'root' }), node({ role: 'image', identifier: 'hero', rect }));
+    root.rect = { x: 0, y: 0, width: 402, height: 874 };
+    const fake = new FakeAdapter({ s: root }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    return fake;
+  };
+
+  it('full-bleed content at the top (a hero 0,0 402x300, review of fix/r6-ios-top MAJOR 2): fully visible after 0 swipes', async () => {
+    const fake = still({ x: 0, y: 0, width: 402, height: 300 });
+    expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('a header whose centre stays in the band (0,0 402x106 on a screen that does not scroll): the failure names iOS\'s status bar — no clip, no layout defect', async () => {
+    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("its centre (201,53) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar");
+    expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
   it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {
