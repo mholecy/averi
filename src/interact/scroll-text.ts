@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { absenceError, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
-import { OPPOSITE } from './swipe.js';
+import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
  * Every sentence `scroll_until` says (2026-10-09, the scroll-rounds
@@ -238,6 +238,18 @@ const statusBarText = (judged: Judged, band: number): string => `its centre stay
 const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);
 
 /**
+ * The way back as every stuck sentence words it (`otherWay`, scroll-rounds.ts
+ * #round's stuck turn): one stroke `back` moved it neither, none was left to
+ * try it with, or it was swiped earlier in the scroll.
+ */
+const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['otherWay'], back: Direction): string =>
+  otherWay === 'unmoved'
+    ? `, nor does swiping ${back}`
+    : otherWay === 'untried'
+      ? `, and swiping ${back} was never tried (no swipe or time was left)`
+      : `, and swiping ${back} was tried earlier in the scroll`;
+
+/**
  * The failure for every outcome but `visible`, and its class: `stuck` a
  * plain Error (the element was there and seen); `covered` and `bound`
  * through resolve.ts#absenceError — ElementNotFoundError only when no read
@@ -254,9 +266,8 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const n = swipesText(o.swipes);
       const last = `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`;
       const back = OPPOSITE[o.lastStroke];
-      // One stroke the other way moved it neither (scroll-rounds.ts#round's stuck turn) — or none was left to try it with.
-      const neither =
-        o.otherWay === 'unmoved' ? `, nor does a swipe ${back}` : o.otherWay === 'untried' ? `, and swiping ${back} was never tried (no swipe or time was left)` : '';
+      // The way back (`otherWayText`); one swiped earlier is said only in the status bar's sentence, which would else advise it.
+      const neither = o.otherWay === 'stroked' ? '' : otherWayText(o.otherWay, back);
       // Under something of the app (2026-10-09, scroll-rounds.ts#shortOf) that
       // stays over it at the end of the content: no clearance for a pinned
       // bar. Led by the cover whenever that is what it is short of — a plain
@@ -270,7 +281,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
         const other =
           o.otherWay === 'untried'
             ? ` — try direction: "${back}"; if no direction moves it, ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `
-            : `${o.otherWay === 'unmoved' ? `, nor does swiping ${back}` : `, and swiping ${back} was tried earlier in the scroll`} — ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `;
+            : `${otherWayText(o.otherWay, back)} — ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `;
         return new Error(
           `scroll_until ${describe} failed after ${n} — ${statusBarText(judged, short.band)}, and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,

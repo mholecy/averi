@@ -148,7 +148,7 @@ describe('round — the soft keyboard', () => {
     expect(failureOf(played, 'id:priority_select').message).toBe(
       'scroll_until id:priority_select failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
         'the viewport above the soft keyboard over [0,1398][1080,2220], and the content is exhausted: swiping down no longer moves ' +
-        'it, nor does a swipe up. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
+        'it, nor does swiping up. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
         'tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again; only if it stays clipped with ' +
         'the keyboard down is it a layout defect. Last rect {"x":66,"y":1360,"width":948,"height":73} in a 1080x2220 viewport',
     );
@@ -1257,7 +1257,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
       expect(strokesToward(played)).toEqual(['down', 'down', 'up']); // one stroke back before the defect is declared
       expect(failureOf(played, 'id:priority').message).toBe(
         `scroll_until id:priority failed after 3 swipes — element is in the viewport but under ${COVER} at its centre (201,797), drawn over it — 17% of it shows — ` +
-          'and the content is exhausted: swiping down no longer moves it, nor does a swipe up. The app draws that over it at the end of the content — a layout defect ' +
+          'and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect ' +
           '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":24,"y":771,"width":354,"height":52} in a 402x874 viewport',
       );
     }
@@ -1325,7 +1325,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(played.outcome?.kind).toBe('stuck');
     expect(failureOf(played, 'id:r').message).toBe(
       'scroll_until id:r failed after 3 swipes — element is in the viewport but under button "Bar" (0,800 402x74) at its centre (201,870), drawn over it — 0% of it shows — ' +
-        'and the content is exhausted: swiping down no longer moves it, nor does a swipe up. The app draws that over it at the end of the content — a layout defect ' +
+        'and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect ' +
         '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":0,"y":840,"width":402,"height":60} in a 402x874 viewport',
     );
   });
@@ -1465,7 +1465,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(reaches(played)).toEqual([1]);
   });
 
-  it('a stroke back that MOVES the row but leaves it short (776 → 760, still under CONTINUE) is no "nor does a swipe": the scroll goes on, and stops', () => {
+  it('a stroke back that MOVES the row but leaves it short (776 → 760, still under CONTINUE) is no "nor does swiping": the scroll goes on, and stops', () => {
     const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), form(760), form(514), form(514)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'down']);
     expect(resultOf(played)).toEqual({ swipes: 5, visible: 1, clipped: [] });
