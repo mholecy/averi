@@ -193,6 +193,9 @@ type Row = { readonly [Q in Question]?: (placed: Placed, seen: Seen) => boolean 
   readonly target?: (placed: Placed, seen: SeenFor) => boolean;
 };
 
+/** A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none, the caller asks. */
+const fillsScreen = (r: Rect, screen: number): boolean => rectArea(r) >= screen * SCREEN_SIZED_FRACTION;
+
 /**
  * The `structural` row's wrapper excuse for a target: `node` holds the
  * target's whole rect, and is the screen's size or holds the target's
@@ -200,7 +203,7 @@ type Row = { readonly [Q in Question]?: (placed: Placed, seen: Seen) => boolean 
  */
 const holdsWhole = (node: UiNode, target: Placed, screen: number): boolean =>
   rectWithin(target.node.rect, node.rect) &&
-  (rectArea(node.rect) >= screen * SCREEN_SIZED_FRACTION || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
+  (fillsScreen(node.rect, screen) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
 /** `inner` lies in `outer`'s subtree (or is it). */
 const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
@@ -219,8 +222,8 @@ const scrolls = (n: UiNode): boolean => CONTENT_FRAMED_ROLES.has(n.role) || n.cl
  */
 const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 
-/** A node with children whose area reaches SCREEN_SIZED_FRACTION of the screen (`screenOf`): it draws through its content, which is walked. */
-const screenSized = (n: UiNode, screen: number): boolean => n.children.length > 0 && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION;
+/** A node with children that `fillsScreen`: it draws through its content, which is walked. */
+const screenSized = (n: UiNode, screen: number): boolean => n.children.length > 0 && fillsScreen(n.rect, screen);
 
 /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
@@ -646,7 +649,7 @@ const NOT_DRAWN = {
       placed.node.rect.x === placed.parent.node.rect.x &&
       placed.node.rect.width === placed.parent.node.rect.width &&
       !screenSized(placed.parent.node, screen) &&
-      rectArea(placed.node.rect) < screen * SCREEN_SIZED_FRACTION,
+      !fillsScreen(placed.node.rect, screen),
   },
 
   /**
@@ -795,7 +798,7 @@ function firstContent(order: readonly Placed[], screen: Rect, area: number, line
   const bar: Rect[] = [];
   for (const { node, at } of order.slice(1)) {
     const r = node.rect;
-    if (!(rectArea(r) > 0) || (STRUCTURAL_ROLES.has(node.role) && rectArea(r) >= area * SCREEN_SIZED_FRACTION)) continue;
+    if (!(rectArea(r) > 0) || (STRUCTURAL_ROLES.has(node.role) && fillsScreen(r, area))) continue;
     if (r.y < screen.y || r.y + r.height > line || bar.some((b) => rectIntersection(b, r) !== undefined)) return at;
     bar.push(r);
   }
