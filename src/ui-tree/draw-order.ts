@@ -267,6 +267,25 @@ const ownContent = ({ node, parent }: Placed, about: SeenFor): boolean =>
   rectWithin(node.rect, about.target.node.rect) &&
   drawnOn(parent, about);
 
+/** The `ownControl` row's text button or row: `control` has `parent`'s x and width exactly, at any height. */
+const spansWidth = (control: Rect, parent: Rect): boolean => control.x === parent.x && control.width === parent.width;
+
+/**
+ * The `ownControl` row's icon button: `control` lies in `parent` PADDED
+ * evenly on all four sides — every inset at least a pixel, the four within
+ * a pixel of each other (a centred placement's rounding), none more than
+ * half the control's shorter side, to a pixel (Compose pads a control of at
+ * least 24 dp to its 48-dp touch target: 63 px in 126 at 2.625 px/dp,
+ * insets 32 and 31) — and centred on the target, to a pixel.
+ */
+const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
+  const insets = [control.x - parent.x, parent.x + parent.width - control.x - control.width, control.y - parent.y, parent.y + parent.height - control.y - control.height];
+  const least = Math.min(...insets);
+  const most = Math.max(...insets);
+  const [c, t] = [rectCentre(control), rectCentre(target)];
+  return least >= 1 && most - least <= 1 && 2 * most <= Math.min(control.width, control.height) + 1 && Math.abs(c.x - t.x) <= 1 && Math.abs(c.y - t.y) <= 1;
+};
+
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
 const itemless = (n: UiNode): boolean => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
 
@@ -584,9 +603,10 @@ const NOT_DRAWN = {
   /**
    * THE TARGET'S OWN CONTROL: an INTERACTIVE node with no label and no
    * value, a sibling of a NON-INTERACTIVE target, that holds the target's
-   * rect whole and SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
-   * exactly — the parent not the screen's size (`screenSized`), nor the
-   * control. `target` only (2026-10-09, docs/bugs/2026-10-09-android-
+   * rect whole and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and
+   * width exactly (`spansWidth`) — or is PADDED in it on all four sides,
+   * evenly and centred on the target (`paddedOn`); the parent not the
+   * screen's size (`screenSized`), nor the control. `target` only (2026-10-09, docs/bugs/2026-10-09-android-
    * compose-button-text-refused-as-under-its-own-button.md — a regression of
    * this column's first round): a Compose `Button` reaches uiautomator as a
    * wrapper holding its label text and, AFTER it, an unlabelled clickable
@@ -596,25 +616,44 @@ const NOT_DRAWN = {
    * the screen a layout defect, and an `optional:` tap skipped. A tap at
    * the label's centre lands on the button — what the caller means.
    *
-   * Why the full width (the round-5 ui_snapshots, tests/fixtures/android-
-   * ui-snapshot-compose.json): in every measured case the control has its
-   * wrapper's x and width, and is inset only vertically — Compose's
-   * minimum-touch-target padding, by a share that varies: LOGIN and PAY
-   * 121 of 132 px, PAY ME and SCAN QR 113, Google Contacts' "No thanks",
-   * "Sync device and SIM contacts", "Save", "Add phone" 110, "Add phone"
-   * cut by the screen's bottom 96, "Add fields" 76 (an area share from 0.58
-   * to 0.92, so no area threshold fits). A list row's `button` IS the row,
-   * and stays whole where uiautomator cuts the row's container at the
-   * list's edge or the floating tab bar's (`66,1784 948x56` holding a
-   * `button 66,1784 948x143`), so the control is not held to lie within its
-   * parent. Only the width was measured; a control spanning its wrapper's
-   * height instead (a tall narrow one) is not excused.
+   * The two shapes are the round-5 ui_snapshots' (tests/fixtures/android-
+   * ui-snapshot-compose.json; every node there under a later unlabelled
+   * interactive sibling is one of them). A TEXT button or a list row: the
+   * control has its wrapper's x and width, and is inset only vertically —
+   * Compose's minimum-touch-target padding, by a share that varies: LOGIN
+   * and PAY 121 of 132 px, PAY ME and SCAN QR 113, Google Contacts' "No
+   * thanks", "Sync device and SIM contacts", "Save", "Add phone" 110, "Add
+   * phone" cut by the screen's bottom 96, "Add fields" 76 (an area share
+   * from 0.58 to 0.92, so no area threshold fits; the vertical insets 5/6,
+   * 9/10, 11/11, 11/25, 11/45 — uneven where the control is cut). A list
+   * row's `button` IS the row, and stays whole where uiautomator cuts the
+   * row's container at the list's edge or the floating tab bar's (`66,1784
+   * 948x56` holding a `button 66,1784 948x143`), so this shape's control is
+   * not held to lie within its parent, nor to any height. An ICON button
+   * (2026-10-09, round 6b): Contacts' Cancel, More options and Delete —
+   * `container 11,88 132x132` → the label node `other 'Cancel' 44,121
+   * 66x66`, `button 22,99 110x110` — the control is inset 11 px on ALL
+   * four sides (a 40-dp IconButton padded to its 48-dp touch target at
+   * 2.75 px/dp) and its centre is the label's, so 0 % of the label showed
+   * and `tap label:"Cancel"` was refused. `paddedOn` asks that shape and no
+   * more: every inset at least a pixel, the four within a pixel of each
+   * other — a centred placement rounds an odd margin (105 px in 126 at
+   * 2.625 px/dp: 11 and 10) — none over half the control's shorter side,
+   * to a pixel (Compose pads a control of at least 24 dp: 63 px in 126,
+   * insets 32 and 31), and the label's centre within a pixel of the
+   * control's. Not excused: a control padded differently per axis (a
+   * 40×24-dp one: 4 dp and 12 dp; not measured); an icon button CUT by a
+   * list's or scroll view's edge, whose insets are then uneven (`button
+   * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, as
+   * at round 6, the safe direction; nor one spanning its wrapper's height
+   * only (a tall narrow one).
    *
    * What still covers: a pinned CTA in the SAME parent as a text (review of
    * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over
    * "Forgot password?" in its 1080-wide ConstraintLayout with the keyboard
    * up, `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"`
-   * over its fee) — inset from its layout's sides, and labelled; a
+   * over its fee) — labelled, inset from its layout's sides and not evenly
+   * on all four (LOG IN: 40, 40, 940, 20); a
    * non-interactive node holding the label (an opaque card, a loading
    * view); an interactive TARGET under a later control (a button over a
    * button); a control in a screen-sized parent, or screen-sized itself
@@ -623,10 +662,11 @@ const NOT_DRAWN = {
    * when it or its parent is that large (see the residual); one that
    * does not hold the label whole (a field's clear button); one in another
    * parent. idb's flat list never meets this row: every node's parent is
-   * its 0×0 root, which no control spans. Residual, stated: an unlabelled
-   * interactive node spanning the width of a wrapper it shares with a
-   * label is read as the label's control, and the tap is sent to it —
-   * geometry cannot tell it from a Compose Button. So: a Compose
+   * its 0×0 root, which no control spans or lies in. Residual, stated: an
+   * unlabelled interactive node spanning the width of a wrapper it shares
+   * with a label, or padded evenly in it and centred on the label, is read
+   * as the label's control, and the tap is sent to it — geometry cannot
+   * tell it from a Compose Button. So: a Compose
    * `clickable(role = Role.Button)` overlay laid over a text in a Box of
    * its width (a card's tap target, a disabled-state scrim cut to the
    * card), an unlabelled `ImageButton` filling a thumbnail's FrameLayout
@@ -636,7 +676,9 @@ const NOT_DRAWN = {
    * `accessibilityRole="button"`, no label) inside a safe-area container
    * `0,59 402x781`, 0.894 of the screen and so not screen-sized: the
    * backdrop spans the container's width and holds the sheet's texts — all
-   * excused.
+   * excused; and an unlabelled clickable overlay laid with an even margin
+   * over a centred text in its card (the margin at most half the overlay's
+   * side).
    */
   ownControl: {
     target: (placed, { target, screenArea }) =>
@@ -646,8 +688,7 @@ const NOT_DRAWN = {
       !placed.node.value &&
       !isInteractive(target.node) &&
       rectWithin(target.node.rect, placed.node.rect) &&
-      placed.node.rect.x === placed.parent.node.rect.x &&
-      placed.node.rect.width === placed.parent.node.rect.width &&
+      (spansWidth(placed.node.rect, placed.parent.node.rect) || paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect)) &&
       !screenSized(placed.parent.node, screenArea) &&
       !fillsScreen(placed.node.rect, screenArea),
   },

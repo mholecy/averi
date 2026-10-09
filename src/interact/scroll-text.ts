@@ -4,7 +4,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, underStatusBar } from './resolve.js';
+import { absenceError, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE } from './swipe.js';
 
@@ -266,9 +266,8 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
         const other =
           o.turns > 0
             ? `, and the scroll turned to ${o.lastStroke} because swiping ${OPPOSITE[o.lastStroke]} carries it further under or past the edge — ` +
-              `it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it. `
-            : ` — try direction: "${OPPOSITE[o.lastStroke]}"; ` +
-              `if no direction moves it, it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it. `;
+              `${PINNED_UNDER_STATUS_BAR}, and no step taps it. `
+            : ` — try direction: "${OPPOSITE[o.lastStroke]}"; if no direction moves it, ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `;
         return new Error(
           `scroll_until ${describe} failed after ${n} — ${statusBarText(judged, short.band)}, and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
