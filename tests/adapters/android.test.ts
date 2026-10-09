@@ -98,6 +98,18 @@ describe('parseUiautomatorXml', () => {
 });
 
 describe('AndroidAdapter interactions', () => {
+  it('drags at 0.45 screens a second (types.ts#dragSpeed, 2026-10-09): the duration a caller passes reaches `input swipe`; none passed is still 300 ms', async () => {
+    const { fn, calls } = fakeExec({});
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect(adapter.dragSpeed).toBe(0.45);
+    await adapter.swipe({ x: 540, y: 1871 }, { x: 540, y: 1021 }, 851);
+    await adapter.swipe({ x: 540, y: 1776 }, { x: 540, y: 444 });
+    expect(calls.filter((c) => c.includes('input swipe'))).toEqual([
+      'adb -s emulator-5554 shell input swipe 540 1871 540 1021 851',
+      'adb -s emulator-5554 shell input swipe 540 1776 540 444 300',
+    ]);
+  });
+
   it('uiTree strips the trailing uiautomator status line', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
     const tree = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree();

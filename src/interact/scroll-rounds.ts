@@ -114,6 +114,20 @@ interface RoundRead {
    * tree). For the `fully: true` stop's flush check (PROBE_REACH).
    */
   scrollerOf: (node: UiNode) => Rect | undefined;
+  /**
+   * The largest clipping container in this round's tree
+   * (ui-tree/geometry.ts#largestScroller) — the screen's own scroll view,
+   * for a stroke while the target's own container is not known (it has not
+   * been read yet). Undefined when the tree has none (iOS).
+   */
+  mainScroller?: Rect;
+  /**
+   * A cheap fingerprint of the WHOLE tree (ui-tree/read-tree.ts
+   * #treeFingerprint) — every node's role, text, id and rect — for "the
+   * strokes changed nothing at all" when the target is not in the tree
+   * (UNMOVED_STROKES_EXHAUST). Undefined: that rule never fires.
+   */
+  fingerprint?: string;
 }
 
 /** What to do next. */
@@ -227,8 +241,13 @@ export interface Flush {
   checked: boolean;
 }
 
-/** Which bound ended the scroll: the same stroke twice moved nothing (with the direction last swiped), `maxSwipes`, or the deadline. */
-export type BoundBy = { of: 'exhausted'; lastStroke: Direction } | { of: 'maxSwipes' } | { of: 'timeout'; timeoutMs: number };
+/**
+ * Which bound ended the scroll: the same stroke twice moved nothing (with
+ * the direction last swiped, and what stayed put — every match of a target
+ * off the frame, or the whole tree of one not in it), `maxSwipes`, or the
+ * deadline.
+ */
+export type BoundBy = { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree' } | { of: 'maxSwipes' } | { of: 'timeout'; timeoutMs: number };
 
 /**
  * What the target was short of at a bound, by the last round:
@@ -236,6 +255,10 @@ export type BoundBy = { of: 'exhausted'; lastStroke: Direction } | { of: 'maxSwi
  * - `clipped`: in the frame but clipped (the `fully: true` bar not met);
  * - `absent`: not in the last tree, and never in the frame before it;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
+ * - `left`: not in the last tree, never in the frame, but in the tree after
+ *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
+ *   carried it out and a lazy list dropped it (2026-10-09: "never appeared"
+ *   was said of it, with a plain Error, which contradicted itself);
  * - `offFrame`: in the tree, off the frame judged — `inFrameAfter` when an
  *   earlier read had it in the frame; `cover` the one this round applied,
  *   `eitherWayUp` when the whole-screen judgement ran over both boxes.
@@ -245,6 +268,7 @@ export type Shortfall =
   | { of: 'clipped'; judged: Judged }
   | { of: 'absent' }
   | { of: 'gone'; inFrameAfter: number }
+  | { of: 'left'; inTreeAfter: number }
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean };
 
 /**
@@ -286,6 +310,17 @@ export const SETTLE_CONFIRM_READS = 3;
  * test takes the same two (review round 2), watching the judged match
  * alone — a visible clipped match that does not move is the defect it
  * reports. For both, only strokes count: a confirming read sent none.
+ *
+ * And a target NOT in the tree (2026-10-09, docs/bugs/2026-10-09-scroll-
+ * until-fling-skips-target-in-lazy-list.md): the same stroke twice after
+ * which the WHOLE tree is unchanged (`RoundRead.fingerprint`) — content at
+ * its end, the target not in it, or no longer: measured, `scroll_until
+ * row_40` on a list ending at row_36 swiped 5 times to the 15 s timeout,
+ * "never appeared". Now it fails after the two, in the same words, the
+ * cause saying the screen did not change. The whole tree, not "no match
+ * moved" — there is no match to watch; a screen that changes on its own (a
+ * clock, an animation) never reads unchanged and runs to the bound as
+ * before, the safe way.
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
 
@@ -427,8 +462,9 @@ interface State {
    * earlier read saw it short of it: the next stroke turns. Kept across a
    * read that failed — that round strokes as the last read round decided,
    * as it keeps that round's stroke box (`lastReadCover`); cleared by a read
-   * that does not find the target (a lazy list dropped it: nothing to turn
-   * for).
+   * that does not find the target — whether to turn then is `dropped`'s
+   * question (2026-10-09; until then such a read meant "a lazy list dropped
+   * it: nothing to turn for", and the strokes went on the caller's way).
    */
   readonly carriedPast: boolean;
   /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke). */
@@ -442,6 +478,27 @@ interface State {
   readonly inFrameAfter: number | undefined;
   /** The probe in flight (PROBE_REACH): the judged match's rect and edge when it was sent. Cleared by the next read that reads. */
   readonly probe: { rect: Rect; edge: Edge } | undefined;
+  /** The swipe count at the last read that had the target in the tree at all — for "was in the tree … then left it". */
+  readonly inTreeAfter: number | undefined;
+  /** The direction of the last stroke SENT, a probe included — the way the content last moved, for `dropped`. */
+  readonly lastSent: Direction | undefined;
+  /** The last read that read: the judged match's rect and the frames it was judged in — undefined when it found no match. */
+  readonly lastFound: { rect: Rect; frames: readonly Rect[] } | undefined;
+  /**
+   * The target was dropped from the tree by the content's motion — the
+   * last read had it short of the far edge of that motion, this one has no
+   * match — so the strokes go this way, back, until a read finds it again
+   * (`nextStroke`). Not cleared by a read without the target: it is still
+   * beyond the edge it left through.
+   */
+  readonly dropped: Direction | undefined;
+  /** The stroke box: the target's clipping container at the last read that found it in one (`RoundRead.scrollerOf`). */
+  readonly targetScroller: Rect | undefined;
+  /** The stroke box the last read that read chose (`within`), for the stroke of a round whose tree did not read. */
+  readonly lastWithin: Rect | undefined;
+  /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
+  readonly prevFingerprint: string | undefined;
+  readonly treeUnmovedStrokes: number;
 }
 
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
@@ -473,6 +530,14 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     turns: 0,
     inFrameAfter: undefined,
     probe: undefined,
+    inTreeAfter: undefined,
+    lastSent: undefined,
+    lastFound: undefined,
+    dropped: undefined,
+    targetScroller: undefined,
+    lastWithin: undefined,
+    prevFingerprint: undefined,
+    treeUnmovedStrokes: 0,
   };
   return state as unknown as Rounds;
 }
@@ -585,8 +650,12 @@ interface Observed {
    * where it was — the `fully: true` clipped stop's "content exhausted".
    */
   stuck: boolean;
-  /** UNMOVED_STROKES_EXHAUST identical strokes in a row left EVERY match where it was, and the target is off the frame. */
-  exhausted: boolean;
+  /**
+   * UNMOVED_STROKES_EXHAUST identical strokes in a row left EVERY match
+   * where it was, and the target is off the frame (`matches`); or left the
+   * whole tree as it was, and the target is not in it (`tree`).
+   */
+  exhausted: 'matches' | 'tree' | undefined;
 }
 
 /**
@@ -598,10 +667,16 @@ interface Observed {
  * short only at a stop the confirming read then lost must still turn the
  * next stroke (review round 2).
  */
-function observe(s: Mutable<State>, current: Since, found: readonly UiNode[], best: Judged | undefined, frames: readonly Rect[]): Observed {
+function observe(s: Mutable<State>, current: Since, read: RoundRead, best: Judged | undefined, frames: readonly Rect[]): Observed {
+  const { found, fingerprint } = read;
   const rects = found.map((n) => ({ ...n.rect }));
   const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
   if (current === 'stroke') {
+    // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST,
+    // 2026-10-09): the same streak rule, over the fingerprint.
+    const treeUnmoved = fingerprint !== undefined && s.prevFingerprint === fingerprint;
+    const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
+    s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
     // Every match, not only the judged one, for "exhausted" (review round
     // 1): with several matches off the frame the judged one is the first
     // in tree order, which can be a static duplicate (another page, a
@@ -613,8 +688,32 @@ function observe(s: Mutable<State>, current: Since, found: readonly UiNode[], be
     s.streakDrawn = s.lastDrawn;
   }
   s.prevRects = rects;
+  s.prevFingerprint = fingerprint;
   s.carriedPast = false;
+  // Dropped (2026-10-09, docs/bugs/2026-10-09-scroll-until-fling-skips-
+  // target-in-lazy-list.md): the last read had the target SHORT of the far
+  // edge of the content's last motion — inside the frame, under the
+  // keyboard, or not yet in — and this read, after a stroke or a settle
+  // since one, has no match. A lazy list (RecyclerView, LazyColumn) keeps a
+  // row in the tree only while it intersects the list, and on Android a
+  // row's bounds never pass the list's edge (they are cut to it), so
+  // `carriedPast` — which needs a read to FIND the target beyond the far
+  // edge — can never fire there: the row is in one read and absent from
+  // the next. It can only have left through the edge the content moved
+  // toward: measured, Contacts' `Last name` clipped by the IME, one stroke
+  // down, gone, and four more strokes down into the end of the editor.
+  // The strokes now go back (`dropped`, `nextStroke`) — a turn, halving
+  // the reach like any — until a read finds it.
+  if (best === undefined && current !== 'start' && s.lastFound !== undefined && s.lastSent !== undefined) {
+    const { rect, frames: lastFrames } = s.lastFound;
+    if (!lastFrames.every((f) => beyondFarEdge(rect, s.lastSent as Direction, f))) s.dropped = OPPOSITE[s.lastSent];
+  }
+  s.lastFound = best === undefined ? undefined : { rect: { ...best.node.rect }, frames };
   if (best !== undefined) {
+    s.dropped = undefined;
+    s.inTreeAfter = s.swipes;
+    const scroller = read.scrollerOf(best.node);
+    if (scroller !== undefined) s.targetScroller = { ...scroller };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for.
@@ -627,7 +726,12 @@ function observe(s: Mutable<State>, current: Since, found: readonly UiNode[], be
   return {
     bestUnmoved,
     stuck: current === 'stroke' && s.bestUnmovedStrokes >= UNMOVED_STROKES_EXHAUST,
-    exhausted: s.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST && offFrame,
+    exhausted:
+      s.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST && offFrame
+        ? 'matches'
+        : current === 'stroke' && s.treeUnmovedStrokes >= UNMOVED_STROKES_EXHAUST && found.length === 0
+          ? 'tree'
+          : undefined,
   };
 }
 
@@ -644,10 +748,17 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * next stroke goes the caller's way. A target read beyond the far edge
  * before any read saw it short of it — above the screen on round 0 of a
  * scroll down, and every round after while it stays there — is the
- * caller's direction to honour, as it always was. Needs the target to STAY
- * in the tree once off the frame: a lazy list (Android
+ * caller's direction to honour, as it always was. That needs the target to
+ * STAY in the tree once off the frame; a lazy list (Android
  * RecyclerView/LazyColumn, iOS List/UITableView under WDA) drops it, and
- * then nothing turns.
+ * on Android its bounds never pass the list's edge anyway. Since
+ * 2026-10-09 a read that LOSES the target it last read short of the far
+ * edge of the content's last motion turns the strokes too (`dropped`,
+ * recorded in `observe`): back the way the content came, until a read
+ * finds it — a turn like this one, the reach halved. What is left: a
+ * target no read ever had (the stroke must not carry it across the list
+ * between two reads — the drag speed, adapters/android.ts#dragSpeed, is
+ * what keeps that from happening on Android; iOS strokes at its default).
  *
  * Converging is deliberate (review round 2): every direction change
  * halves the reach of every stroke after it (`reach`, applied with
@@ -670,7 +781,7 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * turns out to be further away than one move.
  */
 function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean } {
-  const toward = s.carriedPast ? OPPOSITE[s.rules.direction] : s.rules.direction;
+  const toward = s.dropped ?? (s.carriedPast ? OPPOSITE[s.rules.direction] : s.rules.direction);
   // A turn: drawn the other way from the last stroke sent — the one test the reach and the turn count share.
   const turn = s.strokesSent > 0 && toward !== s.lastStroke;
   return { toward, reach: 0.5 ** (turn ? s.turns + 1 : s.turns), turn };
@@ -735,7 +846,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
   const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : s.frame.boxes;
-  const observed = read === undefined ? undefined : observe(s, current, found, best, judgedFrames);
+  const observed = read === undefined ? undefined : observe(s, current, read, best, judgedFrames);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
   const probed = s.probe;
@@ -802,8 +913,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // container does not resize for, swiped for the whole 15 s): fail now
   // with the stop bound's own words — they already name the keyboard and
   // the way to hide it. See `observe` for what counts.
-  const exhausted = observed?.exhausted === true;
-  if (exhausted || s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) {
+  const exhausted = observed?.exhausted;
+  if (exhausted !== undefined || s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) {
     // The `unlocated` row, asked of the last round's reading whatever came
     // before — a round whose tree did not read has none.
     let unlocated = false;
@@ -811,8 +922,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (seen.unlocated === undefined) return ask('unlocated');
       unlocated = seen.unlocated;
     }
-    const by: BoundBy = exhausted
-      ? { of: 'exhausted', lastStroke: s.lastStroke }
+    const by: BoundBy =
+      exhausted !== undefined
+      ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
         : { of: 'timeout', timeoutMs: s.rules.timeoutMs };
@@ -834,14 +946,25 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // none — rather than stroke through the keyboard it last saw.
   const { toward, reach, turn } = nextStroke(s);
   const strokeCover = read === undefined ? s.lastReadCover : cover;
+  // Over the target's scroll container once a read has placed it in one,
+  // else the screen's largest (2026-10-09; swipe.ts#scrollStroke): the
+  // stroke touches down on what scrolls, and its length is that
+  // container's 60 %, never the screen's — a 1417-px list is not stroked
+  // 1332 px. A round whose tree did not read keeps the last read round's.
+  const within = read === undefined ? s.lastWithin : (s.targetScroller ?? read.mainScroller);
+  s.lastWithin = within;
   if (turn) s.turns++;
   s.strokesSent++;
   s.lastStroke = toward;
+  s.lastSent = toward;
   s.confirmReads = 0;
   s.since = 'stroke';
   s.swipes++;
   s.owesDrawn = true;
-  return { state: s as unknown as Rounds, step: { do: 'stroke', toward, reach, ...(strokeCover !== undefined && { coverTop: strokeCover.topCover.y }) } };
+  return {
+    state: s as unknown as Rounds,
+    step: { do: 'stroke', toward, reach, ...(strokeCover !== undefined && { coverTop: strokeCover.topCover.y }), ...(within !== undefined && { within: { ...within } }) },
+  };
 }
 
 /**
@@ -853,6 +976,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
  */
 function probe(s: Mutable<State>, edge: Edge, rect: Rect, container: Rect, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
   s.probe = { rect: { ...rect }, edge };
+  s.lastSent = REVEALS[edge];
   s.confirmReads = 0;
   s.since = 'stroke';
   s.swipes++;
@@ -884,7 +1008,10 @@ function shortfall(s: State, readError: Error | undefined, found: readonly UiNod
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.visible > 0) return { of: 'clipped', judged: best };
   const left = s.inFrameAfter;
-  if (found.length === 0) return left !== undefined ? { of: 'gone', inFrameAfter: left } : { of: 'absent' };
+  if (found.length === 0) {
+    if (left !== undefined) return { of: 'gone', inFrameAfter: left };
+    return s.inTreeAfter !== undefined ? { of: 'left', inTreeAfter: s.inTreeAfter } : { of: 'absent' };
+  }
   return {
     of: 'offFrame',
     rect: (best?.node ?? found[0]).rect,

@@ -255,7 +255,11 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
 function boundText(by: BoundBy, swipes: number): string {
   switch (by.of) {
     case 'exhausted':
-      return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`;
+      // `tree` (2026-10-09): there is no match to watch, so the sentence
+      // says what was watched — the whole screen.
+      return by.unchanged === 'tree'
+        ? `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not change the screen: content exhausted, or the swipes were not taken)`
+        : `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`;
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
     case 'timeout':
@@ -276,6 +280,11 @@ function shortText(short: Shortfall): string {
       return 'element never appeared in the tree';
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
+    case 'left':
+      // 2026-10-09: it WAS in the tree — "never appeared" (the bug note's
+      // third observation) was false, and its class (a plain Error, the
+      // element was sighted) already said so.
+      return `element was in the tree ${whenInFrame(short.inTreeAfter)} (off the viewport, or under the soft keyboard), never in the viewport, and is no longer in the tree — a swipe carried it out (a fling?) and a lazy list drops what scrolls away`;
     case 'offFrame': {
       const offFrame = `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
       const rect = `(last rect ${JSON.stringify(short.rect)})`;

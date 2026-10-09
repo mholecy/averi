@@ -563,6 +563,22 @@ export function scrollerOf(tree: UiNode): (node: UiNode) => Rect | undefined {
   return (node) => nearest.get(node);
 }
 
+/**
+ * The largest node of the tree that clips its descendants
+ * (`clipsDescendants`, by area), as its rect — the screen's own scroll
+ * view, which `scroll_until` strokes over while the target's own container
+ * is not known yet (2026-10-09; interact/scroll-rounds.ts#RoundRead
+ * .mainScroller). Largest, not first: a carousel above a page's list is
+ * the smaller of the two. Undefined when none (every iOS tree). One walk.
+ */
+export function largestScroller(tree: UiNode): Rect | undefined {
+  let best: Rect | undefined;
+  for (const n of everyNode(tree)) {
+    if (n.clipsDescendants === true && rectArea(n.rect) > (best === undefined ? 0 : rectArea(best))) best = n.rect;
+  }
+  return best === undefined ? undefined : { ...best };
+}
+
 // ─── Rect identity and wording ───────────────────────────────────────────────
 
 /**

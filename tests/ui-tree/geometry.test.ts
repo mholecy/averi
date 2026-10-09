@@ -11,6 +11,7 @@ import {
   sameRect,
   sameRectWithinPixel,
   scrollerOf,
+  largestScroller,
   shadowing,
 } from '../../src/ui-tree/geometry.js';
 import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
@@ -484,5 +485,17 @@ describe('scrollerOf — each node\'s nearest clipping ancestor (2026-10-09)', (
     expect(of(outer)).toBeUndefined();
     expect(of(bare)).toBeUndefined();
     expect(of(leaf(600))).toBeUndefined(); // a node of another read
+  });
+});
+
+describe('largestScroller — the screen\'s own scroll view (2026-10-09)', () => {
+  const box = (y: number, height: number, clips: boolean, children: UiNode[] = []): UiNode => ({
+    role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y, width: 1080, height }, children, ...(clips && { clipsDescendants: true as const }),
+  });
+  it('the largest clipping node by area — a carousel above the list is the smaller; none without one', () => {
+    const carousel = box(300, 300, true);
+    const list = box(737, 1417, true);
+    expect(largestScroller(box(0, 2220, false, [carousel, list]))).toEqual(list.rect);
+    expect(largestScroller(box(0, 2220, false, [box(300, 300, false)]))).toBeUndefined();
   });
 });

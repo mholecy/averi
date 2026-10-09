@@ -28,14 +28,24 @@ export class LazyList extends FakeAdapter {
     readonly labels: readonly string[],
     readonly rowHeight: number,
     readonly container: Rect,
-    opts: { offset?: number; screen?: { width: number; height: number }; carry?: (travel: number, durationMs: number | undefined) => number } = {},
+    opts: {
+      offset?: number;
+      screen?: { width: number; height: number };
+      carry?: (travel: number, durationMs: number | undefined) => number;
+      /** The adapter's `dragSpeed` (types.ts): set for the Android adapter's, absent for one that has none (iOS). */
+      dragSpeed?: number;
+    } = {},
   ) {
     super({ s: node({ role: 'container' }) }, 's');
     this.offset = opts.offset ?? 0;
+    this.dragSpeed = opts.dragSpeed;
     this.screenSize = opts.screen ?? { width: 1080, height: 2220 };
     this.carry = opts.carry ?? (() => 1);
   }
 
+  readonly dragSpeed: number | undefined;
+  /** How far each stroke moved the content, in order. */
+  moves: number[] = [];
   private readonly screenSize: { width: number; height: number };
   private readonly carry: (travel: number, durationMs: number | undefined) => number;
 
@@ -83,6 +93,23 @@ export class LazyList extends FakeAdapter {
     if (!inside) return;
     const travel = from.y - to.y; // finger up → content scrolls toward its end
     const moved = travel * this.carry(Math.abs(travel), durationMs);
+    const before = this.offset;
     this.offset = Math.min(this.maxOffset, Math.max(0, Math.round(this.offset + moved)));
+    this.moves.push(this.offset - before);
   }
 }
+
+/**
+ * A RecyclerView's fling at the Pixel_3a's density, for `LazyList`'s
+ * `carry`: the finger's travel plus AOSP OverScroller's spline fling for
+ * the lift speed — 2140·(0.35·v/2140)^1.736 px at v px/s
+ * (adapters/android.ts#dragSpeed has the constants and the two measured
+ * points) — `input swipe`'s finger moving at one speed, its default 300 ms
+ * when no duration is given. 1332 px in 300 ms: ≈ 2560 px (measured ≈ 2190;
+ * the model overestimates); 850 px at 999 px/s: ≈ 940.
+ */
+export const flingCarry = (travel: number, durationMs: number | undefined): number => {
+  if (travel === 0) return 1;
+  const v = travel / ((durationMs ?? 300) / 1000);
+  return (travel + 2140 * ((0.35 * v) / 2140) ** 1.736) / travel;
+};

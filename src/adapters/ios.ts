@@ -270,6 +270,20 @@ export class IosAdapter implements DeviceAdapter {
     await this.idbUi(['tap', String(x), String(y), '--duration', String(durationMs / 1000)]);
   }
 
+  /**
+   * The stroke's duration defaults to 300 ms, and `scroll_until` passes
+   * none: this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
+   * .dragSpeed; decided 2026-10-09 with the Android one). `idb ui swipe
+   * --duration` would take one, but nothing measured says which: a
+   * UIScrollView decelerates by a rate per ms, its fling roughly linear in
+   * the lift speed (measured under WDA: a 344-pt stroke in 300 ms, 1147
+   * pt/s, carried the SwiftUI form 729–970 pt), so a speed tuned on
+   * Android's spline would still fling here, and idb's own step timing
+   * over a long duration is unmeasured. The scroll's turn — every turn
+   * halving the reach — was device-checked on that form, and a lazy list's
+   * dropped row now turns the stroke too (interact/scroll-rounds.ts).
+   * Unmeasured: an iOS List under WDA that drops its rows.
+   */
   async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
     await this.idbUi(['swipe',
       String(from.x), String(from.y), String(to.x), String(to.y),

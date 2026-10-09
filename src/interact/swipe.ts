@@ -184,6 +184,28 @@ export function scrollStroke(box: Rect, step: { toward: Direction; reach: number
   return shortenStroke(vector, reach, toward === 'up' || toward === 'down' ? over.height : over.width);
 }
 
+/**
+ * The floor on a `dragMs` duration: Android's own `input swipe` default
+ * (adapters/android.ts#swipe), so a short stroke — a probe, a halved one —
+ * is never sent faster than the stroke was before 2026-10-09.
+ */
+export const MIN_DRAG_MS = 300;
+
+/**
+ * How long `stroke` must take for the finger to move at `speed` screens a
+ * second (the adapter's `dragSpeed`, adapters/types.ts) over `screen`'s
+ * long side — never under MIN_DRAG_MS; whole ms, rounded up. `scroll_until`
+ * hands it to every stroke on an adapter that has a `dragSpeed` (2026-10-09,
+ * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md:
+ * 1332 px in 300 ms flung a RecyclerView past the row between two reads).
+ * Pure.
+ */
+export function dragMs(stroke: Stroke, speed: number, screen: { width: number; height: number }): number {
+  const pxPerSecond = speed * Math.max(screen.width, screen.height);
+  const length = Math.hypot(stroke.to.x - stroke.from.x, stroke.to.y - stroke.from.y);
+  return Math.max(MIN_DRAG_MS, Math.ceil((length / pxPerSecond) * 1000));
+}
+
 /** The rect two rects share, or undefined when they share no area. */
 function meet(a: Rect, b: Rect): Rect | undefined {
   const x = Math.max(a.x, b.x);

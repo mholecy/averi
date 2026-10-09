@@ -369,9 +369,15 @@ describe('round — after the device check', () => {
     expect(strokeCovers(played)).toEqual([572, 572, 572]);
   });
 
-  it('a read that no longer finds the target after a turn clears it: nothing to turn for, the caller\'s direction again', () => {
+  it('a read that no longer finds the target after a turn: the turned stroke carried it out the other way (it was short of that edge), so the next goes back — the caller\'s direction — as a turn of its own', () => {
+    // Until 2026-10-09 this read cleared the turn ("a lazy list dropped it:
+    // nothing to turn for") and the stroke went the caller's way for that
+    // reason; now it goes the caller's way because the drop is read as the
+    // target leaving through the edge the up-stroke moved it toward — and
+    // it is counted as a turn, halving the reach again.
     const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaRow(-48), wdaGone]); // the turned stroke drops it from the tree
     expect(strokesToward(played)).toEqual(['down', 'up', 'down']);
+    expect(played.steps.filter((st) => st.do === 'stroke').map((st) => st.reach)).toEqual([1, 0.5, 0.25]);
   });
 
   it('a target first seen short only at a stop the confirming read then lost (not on the round-0 read) still turns the next stroke — where it stands is recorded on every read', () => {
@@ -699,5 +705,96 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     // Denied: the probe is drawn over the container whole.
     const denied = play(FULLY_ANDROID, [{ ...row, corroborated: false }, row]);
     expect(denied.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, within: RESIZED, probe: true });
+  });
+});
+
+describe('round — a lazy list that drops the target, and a screen strokes no longer change (docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md)', () => {
+  const FULLY_ANDROID: Rules = { ...ANDROID, fully: true, maxSwipes: 6, timeoutMs: 15_000 };
+  /** Contacts' `Last name` row, x 132, 816x160, the docked IME up. */
+  const lastName = (y: number): Row => ({ found: [match({ x: 132, y, width: 816, height: 160 }, 'last_name')], cover: UP_IME });
+  const imeGone: Row = { found: [], cover: UP_IME };
+  const reachOf = (played: ReturnType<typeof play>) => played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []));
+
+  it('measured: clipped by the IME at round 0, dropped by the first stroke — turned BACK (up), halved, and found, instead of four more strokes down into the end of the editor', () => {
+    const played = play(FULLY_ANDROID, [lastName(1317), imeGone, lastName(900), lastName(900)]);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+    expect(reachOf(played)).toEqual([1, 0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('measured: WHOLLY under the IME at round 0 (in the tree, visible 0), dropped by the first stroke — turned back too: it was short of the far edge', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 3 }, [lastName(1409), imeGone, imeGone, imeGone]);
+    expect(strokesToward(played)).toEqual(['down', 'up', 'up']); // back, and on back while it stays out — not ping-pong
+    // The wording: it WAS in the tree — not "never appeared", and the class agrees (a plain Error, it was sighted).
+    const error = failureOf(played, 'text:"Last name"');
+    expect(error.message).toMatch(
+      /^scroll_until text:"Last name" failed after 3 swipes \(maxSwipes\) — element was in the tree before the first swipe \(off the viewport, or under the soft keyboard\), never in the viewport, and is no longer in the tree — a swipe carried it out \(a fling\?\) and a lazy list drops what scrolls away\. It was turned round 1 time/,
+    );
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('a failed read is not a drop: the round strokes the caller\'s way, as before; the read after it, without the target, is', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 2 }, [lastName(1317), { error: 'uiautomator dump returned no XML' }, imeGone]);
+    expect(strokesToward(played)).toEqual(['down', 'down']);
+    const after = play({ ...FULLY_ANDROID, maxSwipes: 3 }, [lastName(1317), { error: 'uiautomator dump returned no XML' }, imeGone, imeGone]);
+    expect(strokesToward(after)).toEqual(['down', 'down', 'up']);
+  });
+
+  it('a target last read BEYOND the far edge, then dropped, is not turned for: it already lay where the caller\'s strokes push it (iOS, read above the frame from the start)', () => {
+    const played = play({ ...IPHONE, fully: true, maxSwipes: 3 }, [wdaRow(-357), wdaGone, wdaGone, wdaGone]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
+  });
+
+  it('dropped on the confirming read after a stop (the fling went on after the settle read): turned back too', () => {
+    const played = play(FULLY_ANDROID, [lastName(2400), lastName(700), imeGone, lastName(800), lastName(800)]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stroke', 'confirm', 'stop']);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+  });
+
+  /** Settings' list, for the stroke box. */
+  const LIST: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
+  const OTHER: Rect = { x: 0, y: 300, width: 1080, height: 300 };
+
+  it('the stroke is drawn over the screen\'s largest clipping container until a read places the target in one, then over the target\'s; a round whose tree did not read keeps the last; none on iOS', () => {
+    const played = play({ ...ANDROID, maxSwipes: 4 }, [
+      { found: [], mainScroller: LIST },
+      { found: [match({ x: 0, y: 2400, width: 1080, height: 198 })], scroller: OTHER, mainScroller: LIST },
+      { error: 'uiautomator dump returned no XML' },
+      { found: [], mainScroller: LIST },
+      { found: [] },
+    ]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [st.within] : []))).toEqual([LIST, OTHER, OTHER, OTHER]);
+    expect(play({ ...IPHONE, maxSwipes: 1 }, [{ found: [] }, { found: [] }]).steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1 });
+  });
+
+  const tree = (fingerprint: string, extra: Row = {}): Row => ({ found: [], fingerprint, ...extra });
+
+  it('measured: row_40 of a list that ends at row_36 — not in the tree, and two identical strokes after which the WHOLE tree is unchanged: content exhausted, at once — ElementNotFoundError, it was never seen', () => {
+    const played = play(FULLY_ANDROID, [tree('a'), tree('b'), tree('b'), tree('b')]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
+    const error = failureOf(played, 'id:transactions.list.row_40');
+    expect(error.message).toBe(
+      'scroll_until id:transactions.list.row_40 failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, or the swipes were not taken) — element never appeared in the tree',
+    );
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('a tree that changes (a clock, an animation), or ONE unchanged stroke, or two DIFFERENT strokes, is not exhausted', () => {
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, ['a', 'b', 'c', 'd', 'e'].map((f) => tree(f))).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, ['a', 'a', 'b', 'b', 'c'].map((f) => tree(f))).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
+    // A dropped target turns the stroke: the unchanged reads after it are counted from the new stroke.
+    const turned = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), fingerprint: 'a' }, { ...imeGone, fingerprint: 'b' }, { ...imeGone, fingerprint: 'b' }, { ...imeGone, fingerprint: 'b' }]);
+    expect(strokesToward(turned)).toEqual(['down', 'up', 'up']);
+    expect(turned.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree', lastStroke: 'up' } });
+    // Unchanged after the first stroke down AND after the turned one up: two strokes, but not the same stroke — the streak starts again.
+    const twoKinds = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), fingerprint: 'a' }, { ...imeGone, fingerprint: 'a' }, { ...imeGone, fingerprint: 'a' }, { ...imeGone, fingerprint: 'a' }]);
+    expect(twoKinds.outcome).toMatchObject({ swipes: 3, by: { of: 'exhausted', unchanged: 'tree' } });
+    // No fingerprint: never.
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 3 }, [{ found: [] }, { found: [] }, { found: [] }, { found: [] }]).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
+  });
+
+  it('a target IN the tree off the frame keeps the match rule\'s words ("did not move it"), whatever the tree', () => {
+    const row = (fingerprint: string): Row => ({ found: [formRow(2900)], fingerprint });
+    expect(failureOf(play(ANDROID, [row('a'), row('a'), row('a')]), 'id:t').message).toMatch(/the last 2, swiping down, did not move it/);
   });
 });

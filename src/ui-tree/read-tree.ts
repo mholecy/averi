@@ -1,4 +1,4 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { everyNode, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
 import type { Verdict } from './verdict.js';
 
@@ -286,4 +286,31 @@ export async function pollTree<T>(
     if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree };
     await sleep(opts.pollMs);
   }
+}
+
+/**
+ * A fingerprint of the whole tree: every node, pre-order, by role, label,
+ * identifier, value and rect, hashed (FNV-1a, 32-bit, as 8 hex digits) —
+ * two reads of an unchanged screen give the same string, and any node that
+ * moved, appeared, vanished or changed its text a different one (bar a
+ * hash collision, one in 4·10⁹). For `scroll_until`'s "the same stroke
+ * twice changed nothing at all" when the target is not in the tree
+ * (2026-10-09, interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST). Cheap:
+ * one walk, no copy — a round's tree is a few hundred nodes; kept as 8
+ * characters, not the tree. Here because it is a question about a READ,
+ * asked of two of them.
+ */
+export function treeFingerprint(tree: UiNode): string {
+  let h = 0x811c9dc5;
+  const feed = (text: string): void => {
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+  };
+  for (const n of everyNode(tree)) {
+    const { x, y, width, height } = n.rect;
+    feed(`${n.role}\u0000${n.label ?? ''}\u0000${n.identifier ?? ''}\u0000${n.value ?? ''}\u0000${x},${y},${width},${height}\u0001`);
+  }
+  return h.toString(16).padStart(8, '0');
 }

@@ -3,7 +3,7 @@ import { type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type Ui
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
-import { LazyList } from '../helpers/lazy-list.js';
+import { flingCarry, LazyList } from '../helpers/lazy-list.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -488,5 +488,43 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
     const result = await scrollUntilVisible(fake, 'id:swift_payment.form.fees_select', { ...FAST, fully: true });
     expect(fake.swipes).toHaveLength(1);
     expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: true });
+  });
+});
+
+describe('scrollUntilVisible — strokes that drag, not fling, over the scroll container (Android, docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md)', () => {
+  const SETTINGS: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
+  const settingsLabels = ['Network', 'Devices', 'Apps', 'Notifications', 'Battery', 'Storage', 'Sound', 'Modes', 'Display', 'Wallpaper', 'Accessibility', 'Security', 'Privacy', 'Location', 'Safety', 'Passwords', 'Digital', 'System', 'About'];
+
+  it('measured: Settings\' Display, two rows below the fold — reached; every stroke drawn over the list at the drag speed (850 px in 851 ms) moves it about its own length, not 1.6×', async () => {
+    const fake = new LazyList(settingsLabels, 198, SETTINGS, { carry: flingCarry, dragSpeed: 0.45 });
+    const result = await scrollUntilVisible(fake, 'text:"Display"', { fully: true, maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
+    expect(result.clipped).toEqual([]);
+    expect(fake.rowRect('Display').height).toBe(198);
+    for (const stroke of fake.swipes) {
+      expect(stroke.from.y).toBeGreaterThanOrEqual(737); // on the list, not the header
+      expect(stroke.durationMs).toBe(Math.max(300, Math.ceil((Math.abs(stroke.to.y - stroke.from.y) / 999) * 1000)));
+    }
+    expect(fake.swipes[0]).toEqual({ from: { x: 540, y: 1871 }, to: { x: 540, y: 1021 }, durationMs: 851 });
+    for (const [i, moved] of fake.moves.entries()) {
+      const travel = Math.abs(fake.swipes[i].to.y - fake.swipes[i].from.y);
+      expect(Math.abs(moved)).toBeLessThanOrEqual(travel * 1.15); // the 300-ms stroke moved this list 1413 for 850
+    }
+  });
+
+  it('measured: row_40 of a list that ends at row_36 — fails after the two strokes that no longer change the screen, not at the timeout; ElementNotFoundError, it never appeared', async () => {
+    const rows = Array.from({ length: 37 }, (_, i) => `row_${i}`);
+    const fake = new LazyList(rows, 198, SETTINGS, { carry: flingCarry, dragSpeed: 0.45, offset: 5_500 });
+    const error = await scrollUntilVisible(fake, 'text:"row_40"', { fully: true, maxSwipes: 6, timeoutMs: 15_000, settleMs: 1 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(
+      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, or the swipes were not taken) — element never appeared in the tree',
+    );
+  });
+
+  it('an adapter with no drag speed (iOS) strokes at its own default duration, as before — none is passed', async () => {
+    const fake = new LazyList(settingsLabels, 198, SETTINGS);
+    await scrollUntilVisible(fake, 'text:"Display"', { maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
+    expect(fake.swipes.length).toBeGreaterThan(0);
+    expect(fake.swipes.every((st) => st.durationMs === undefined)).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -345,5 +345,17 @@ describe('scrollStroke — the scroll step\'s stroke, over the target\'s scroll 
     expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398, within: SETTINGS })).toEqual(swipeVectorAbove(SETTINGS, 1398, 'down', 'content'));
     expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: { x: 0, y: 3000, width: 1080, height: 100 } })).toEqual(swipeVector(BOX, 'down', 'content'));
     expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 700, within: SETTINGS })).toEqual(swipeVectorAbove(BOX, 700, 'down', 'content'));
+  });
+});
+
+describe('dragMs — a stroke\'s duration at the adapter\'s drag speed (2026-10-09)', () => {
+  const PIXEL_3A = { width: 1080, height: 2220 };
+  it('length ÷ (speed × the long side), in whole ms rounded up: 0.45 of 2220 is 999 px/s', () => {
+    expect(dragMs({ from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } }, 0.45, PIXEL_3A)).toBe(1334); // the screen stroke, 1332 px
+    expect(dragMs({ from: { x: 540, y: 1871 }, to: { x: 540, y: 1021 } }, 0.45, PIXEL_3A)).toBe(851); // Settings' list stroke
+    expect(dragMs({ from: { x: 0, y: 0 }, to: { x: 1332, y: 0 } }, 0.45, { width: 2220, height: 1080 })).toBe(1334); // landscape: the long side still
+  });
+  it(`never under MIN_DRAG_MS (${MIN_DRAG_MS}, Android's own default): a probe or a halved stroke is not sent faster than before`, () => {
+    expect(dragMs({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } }, 0.45, PIXEL_3A)).toBe(300);
   });
 });

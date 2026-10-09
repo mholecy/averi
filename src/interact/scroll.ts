@@ -1,12 +1,12 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { readTreeOrError } from '../ui-tree/read-tree.js';
-import { scrollerOf } from '../ui-tree/geometry.js';
+import { readTreeOrError, treeFingerprint } from '../ui-tree/read-tree.js';
+import { largestScroller, scrollerOf } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
-import { judgingScreen, screenBox, scrollStroke, type Direction } from './swipe.js';
+import { dragMs, judgingScreen, screenBox, scrollStroke, type Direction } from './swipe.js';
 
 export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
 
@@ -31,13 +31,13 @@ export interface ScrollOptions {
 
 /**
  * What a scroll needs of a device (2026-10-09): the tree, the screen's size,
- * the stroke, and the keyboard's oracle and advice for the round's reading
+ * the stroke and how fast it may be drawn (`dragSpeed`), and the keyboard's oracle and advice for the round's reading
  * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
  * adapter can scroll, and a reader sees what a scroll can touch. Every
  * reader the driver hands it to takes a `Pick` of its own
  * (`readTreeOrError`, `judgingScreen`, `screenBox`, `readKeyboard`).
  */
-export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice'>;
+export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed'>;
 
 /**
  * Swipe until the element is present AND visibly inside the viewport
@@ -170,11 +170,23 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   stroke round (scroll-rounds.ts#nextStroke), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
  *   moved nothing), and every turn halves the reach of the strokes after it
- *   (review round 2: equal flings both ways ping-ponged to `maxSwipes`); it
- *   needs the target to stay in the tree, so a lazy list gets no turn. A
- *   failure counts the turns, and one after the target was in the frame
- *   says so rather than "never".
- * - Exhausted off the frame (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
+ *   (review round 2: equal flings both ways ping-ponged to `maxSwipes`).
+ *   Since 2026-10-09 a target a lazy list dropped right after a read had it
+ *   short of the far edge turns the strokes back too
+ *   (scroll-rounds.ts#observe, `dropped`). A failure counts the turns, and
+ *   one after the target was in the frame — or only in the tree — says so
+ *   rather than "never".
+ * - The fling itself (2026-10-09, docs/bugs/2026-10-09-scroll-until-fling-
+ *   skips-target-in-lazy-list.md): a 1332-px Android stroke in 300 ms moved
+ *   Settings' 1417-px list ≈ 2190 px, so a row could pass from below it to
+ *   above it between two reads, in none — `Display` two rows below the fold
+ *   was never reached. Each stroke is now drawn over the target's scroll
+ *   container (the screen's largest before the target is read in one;
+ *   swipe.ts#scrollStroke), its length the container's, and on an adapter
+ *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
+ *   time it costs against the 15 s default is on adapters/android.ts
+ *   #dragSpeed; the default is unchanged.
+ * - Exhausted (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,
  *   fails then, with the stop bound's words (they name the keyboard and the
@@ -254,8 +266,17 @@ export async function scrollUntilVisible(
       const found = findTarget(tree, target);
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
+      const mainScroller = largestScroller(tree);
       seen = {
-        read: { found, ofKeyboard: reading.ofKeyboard, scrollerOf: scrollerOf(tree), ...(screen !== undefined && { screen }), ...(cover !== undefined && { cover }) },
+        read: {
+          found,
+          ofKeyboard: reading.ofKeyboard,
+          scrollerOf: scrollerOf(tree),
+          fingerprint: treeFingerprint(tree),
+          ...(mainScroller !== undefined && { mainScroller }),
+          ...(screen !== undefined && { screen }),
+          ...(cover !== undefined && { cover }),
+        },
         elapsedMs: 0,
       };
     }
@@ -296,9 +317,15 @@ export async function scrollUntilVisible(
       // round's. `within` (the flush check's probe, 2026-10-09): over the
       // target's scroll container, so it touches down on what scrolls
       // (swipe.ts#scrollStroke has the measured why).
+      // Drawn at the adapter's drag speed when it has one (Android, since
+      // 2026-10-09: adapters/android.ts#dragSpeed has the measured fling and
+      // the time it costs), so one stroke moves the content about its own
+      // length and a row cannot cross the list between two reads; else at
+      // the adapter's default duration, as before (iOS).
       const { box } = await screenBox(adapter, read);
       drawn = scrollStroke(box, step);
-      await adapter.swipe(drawn.from, drawn.to);
+      if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
+      else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, box));
     }
     await sleep(settleMs);
   }

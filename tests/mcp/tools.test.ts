@@ -1113,6 +1113,14 @@ describe('scroll_until', () => {
   it('timeoutMs is plain milliseconds, passed through: the timeout error quotes it', async () => {
     const { call, fakes } = await connect();
     const fake = fakes.android!;
+    // A screen that changes on every swipe (a ticking label): a static one
+    // now fails after 2 swipes that change nothing (2026-10-09, the whole-
+    // tree exhaustion), before any timeout — this test is about the timeout.
+    const read = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      const tree = await read();
+      return { ...tree, children: [...tree.children, { role: 'text', label: `tick ${fake.swipes.length}`, identifier: null, value: null, rect: { x: 0, y: 0, width: 10, height: 10 }, children: [] }] };
+    };
     const result = await call('scroll_until', {
       platform: 'android',
       selector: 'id:never_there',

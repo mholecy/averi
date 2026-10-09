@@ -32,6 +32,10 @@ export interface Row {
   ofKeyboard?: (node: UiNode) => boolean;
   /** Every match's clipping scroll container (geometry.ts#scrollerOf); default none — an iOS tree, or a match with no clipping ancestor. */
   scroller?: Rect;
+  /** The tree's largest clipping container (geometry.ts#largestScroller); default none. */
+  mainScroller?: Rect;
+  /** The whole tree's fingerprint (read-tree.ts#treeFingerprint); default none — the whole-tree exhaustion never fires. */
+  fingerprint?: string;
   /** The answer to `ask witness` (the reading's `corroborated()`); default true. */
   corroborated?: boolean;
   /** The answer to `ask unlocated` (the reading's `unlocated()`); default false. */
@@ -82,7 +86,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       read:
         row.error !== undefined
           ? { error: new Error(row.error) }
-          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollerOf: () => row.scroller, ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
+          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollerOf: () => row.scroller, ...(row.mainScroller && { mainScroller: row.mainScroller }), ...(row.fingerprint !== undefined && { fingerprint: row.fingerprint }), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };

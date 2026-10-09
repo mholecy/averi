@@ -453,6 +453,41 @@ export class AndroidAdapter implements DeviceAdapter {
       String(x), String(y), String(x), String(y), String(durationMs)]);
   }
 
+  /**
+   * 0.45 screens a second — 999 px/s on the Pixel_3a's 2220-px side, 364
+   * dp/s at its 2.75 density (types.ts#DeviceAdapter.dragSpeed; 2026-10-09,
+   * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md).
+   *
+   * Measured: `input swipe 540 1776 540 444 300` — 1332 px in 300 ms, 4440
+   * px/s — moved Settings' RecyclerView ≈ 2190 px, more than its 1417-px
+   * height plus a 198-px row, so a row could pass from below the list to
+   * above it between two reads (a quarter of Settings' rows were in no
+   * read); a 500-px swipe over 1500 ms (333 px/s) moved it 485 px. `input
+   * swipe` moves the finger at one speed and lifts, so the lift speed is the
+   * average. AOSP's OverScroller spline (DECELERATION_RATE ln 0.78 / ln 0.9,
+   * INFLEXION 0.35, friction 0.015, gravity × 39.37 in/m × 160·density ppi
+   * × 0.84) gives a fling of 2140·(0.35·v/2140)^1.736 px at the Pixel_3a's
+   * density: ≈ 1230 px at 4440 px/s (measured ≈ 860 past the finger's
+   * travel), ≈ 14 at 333 (measured ≈ 7 past the travel less the 22-px
+   * slop) — the model overestimates, the safe way — and ≈ 90 px at 999
+   * px/s, under half a 143–198 px row. In SCREENS per second, not px, so a
+   * lower-density screen (fewer px for the same inches) gets a slower px
+   * speed, roughly the same dp speed: the fling is computed in px from a
+   * px/s velocity scaled by ppi, so the same dp speed flings about the same
+   * dp. Not measured beyond the two points above; one emulator, one density.
+   *
+   * Cost, stated (the `scroll_until` default budget stays 15 s): a stroke
+   * takes length ÷ 999 px/s instead of 300 ms — the screen stroke 1332 px
+   * 1.33 s (+1.03 s), Settings' list stroke 850 px 0.85 s (+0.55 s), the
+   * SWIFT form's 1042 px 1.04 s (+0.74 s), a probe or a halved stroke
+   * floored at 300 ms (+0) — so the 6 default swipes cost up to ≈ 6 s more
+   * of the 15 s, where the measured fling runs spent ≈ 3 s a round; and a
+   * stroke now moves the content ≈ its own length, not ≈ 1.6×, so content
+   * far below the fold takes more strokes. What it buys: no row is carried
+   * across the list between two reads.
+   */
+  readonly dragSpeed = 0.45;
+
   async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
     await this.shell(['input', 'swipe',
       String(from.x), String(from.y), String(to.x), String(to.y), String(durationMs)]);

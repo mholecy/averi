@@ -583,6 +583,18 @@ export interface DeviceAdapter {
    * that the adapter cannot hide it on its own.
    */
   readonly keyboardAdvice?: string;
+  /**
+   * How fast a finger may move — in screens per second, the screen's LONG
+   * side — for a stroke to DRAG this platform's scroll views about its own
+   * length rather than fling them on (2026-10-09, docs/bugs/2026-10-09-
+   * scroll-until-fling-skips-target-in-lazy-list.md). `scroll_until` sizes
+   * each stroke's duration from it (interact/swipe.ts#dragMs); absent, the
+   * adapter's own default duration is used, as before. A platform fact, so
+   * the adapter's: the fling is the platform's scroll physics, and the
+   * scroll is platform-agnostic. Set by Android only — the reasons for iOS
+   * are on `IosAdapter`'s absence of it (adapters/ios.ts#swipe).
+   */
+  readonly dragSpeed?: number;
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;
