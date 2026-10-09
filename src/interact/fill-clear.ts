@@ -1,5 +1,5 @@
 import { isMaskedValue } from '../ui-tree/masked-value.js';
-import { heldText, type FillFailure, type LostWhy } from './fill-facts.js';
+import { heldText, type ClearPlaceholder, type FillFailure, type LostWhy } from './fill-facts.js';
 
 /**
  * `fill`'s CLEAR as one pure function (2026-10-09, the fill-clear
@@ -83,7 +83,7 @@ export type ClearStep =
 export interface ClearFacts {
   cleared: number;
   end:
-    | { kind: 'empty'; placeholder?: 'shown' | 'prefix' | 'other' }
+    | { kind: 'empty'; placeholder?: ClearPlaceholder }
     | { kind: 'unchanged'; shows: number; deletes: number }
     | { kind: 'lost'; why: LostWhy };
 }
