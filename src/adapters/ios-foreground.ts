@@ -245,7 +245,7 @@ function notInFront(bundleId: string, label: string, names: readonly string[], o
   }
   return (
     head +
-    `Treat the tree as the previous app's until a read is labelled ${quoted(names)}: after an app switch idb was measured ` +
+    `Treat the tree as the previous app's until a read is labelled ${names.length > 0 ? quoted(names) : `with one of ${bundleId}'s names`}: after an app switch idb was measured ` +
     `serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is still labelled "${label}" ` +
     `while the screenshot shows ${bundleId} is that label its on-screen name (a localized display name its Info.plist does ` +
     "not carry), and this note can be ignored. The screenshot alone cannot tell them apart: it shows the launched app " +

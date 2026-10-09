@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
+import { awaitForeground, FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
 import { Verifier } from '../../src/verify/assert.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
@@ -210,6 +210,18 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(outcome.note).toMatch(/the UI tree was still SpringBoard's \(the home screen or the launch animation\) — /);
     // never "a localized display name": SpringBoard is not the app under another name
     expect(outcome.note).toMatch(/Compare with screenshot\. Read again before trusting what the tree says$/);
+  });
+
+  it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :" (code review of fix/r4, S11)', async () => {
+    const note = await awaitForeground({
+      bundleId: 'com.apple.MobileAddressBook',
+      label: async () => ({ kind: 'label', label: 'Skeleton Internal' }),
+      names: async () => [],
+      ownerOf: () => undefined,
+    });
+    expect(note).toMatch(/^3 s after launching com\.apple\.MobileAddressBook, the UI tree/);
+    expect(note).toMatch(/Treat the tree as the previous app's until a read is labelled with one of com\.apple\.MobileAddressBook's names: after/);
+    expect(note).not.toMatch(/labelled :/);
   });
 
   it('empty for the whole bound: a note that nothing was checked', async () => {
