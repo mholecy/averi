@@ -142,9 +142,26 @@ export function sameRectWithinPixel(a: Rect, b: Rect): boolean {
  * the WDA parser's keyboard band test needs it and may not import that layer.
  */
 export function rectsOverlap(a: Rect, b: Rect): boolean {
-  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-  return w > 0 && h > 0;
+  return rectIntersection(a, b) !== undefined;
+}
+
+/**
+ * The rect two rects share, or undefined when they share no area (an edge
+ * or a corner in common is none) — `rectsOverlap`'s question answered with
+ * the shared rect itself, and its one arithmetic. Callers: the box a scroll
+ * stroke is drawn in, the gesture box met with a clipping container
+ * (interact/swipe.ts#strokeBox — a private `meet` there until the code
+ * review of round 3, 2026-10-09), and the fill's nearest-input pick
+ * (interact/fill.ts, its overlap area — a private `overlapArea` until the
+ * verification round). Here beside `rectsOverlap`, below ui-tree/
+ * geometry.ts, which re-exports it.
+ */
+export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const width = Math.min(a.x + a.width, b.x + b.width) - x;
+  const height = Math.min(a.y + a.height, b.y + b.height) - y;
+  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
 }
 
 /**

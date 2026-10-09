@@ -1,4 +1,4 @@
-import { everyNode, rectArea, rectsOverlap, sameRect, sameRectWithinPixel, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { isInteractive } from './selectors.js';
 
 /**
@@ -502,9 +502,11 @@ export function visibleFractionInViewport(
  * `sameRect` joined them on 2026-10-08 (round 4): the WDA parser's text-echo
  * rule (wda-source.ts#isTextEcho) asks the same question. Its tolerant
  * sibling `sameRectWithinPixel` (scroll_until's motion test) joined it the
- * same day, so rect equality has one owner.
+ * same day, so rect equality has one owner. `rectIntersection` joined
+ * `rectsOverlap` on 2026-10-09 (verification round of fix/r3-cr): the
+ * overlap test is its `!== undefined`, one arithmetic for both.
  */
-export { rectArea, rectsOverlap, sameRect, sameRectWithinPixel };
+export { rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel };
 
 /**
  * Is the point inside the rect — left and top inclusive, right and bottom
@@ -517,22 +519,6 @@ export { rectArea, rectsOverlap, sameRect, sameRectWithinPixel };
  */
 export function containsPoint(rect: Rect, point: Point): boolean {
   return point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
-}
-
-/**
- * The rect two rects share, or undefined when they share no area (an edge
- * or a corner in common is none) — `rectsOverlap`'s question answered with
- * the shared rect itself. The box a scroll stroke is drawn in is the
- * gesture box met with a clipping container (interact/swipe.ts#strokeBox);
- * it was a private `meet` there until the code review of round 3
- * (2026-10-09) — rect arithmetic lives here.
- */
-export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
-  const x = Math.max(a.x, b.x);
-  const y = Math.max(a.y, b.y);
-  const width = Math.min(a.x + a.width, b.x + b.width) - x;
-  const height = Math.min(a.y + a.height, b.y + b.height) - y;
-  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
 }
 
 /**

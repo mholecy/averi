@@ -1,4 +1,4 @@
-import { everyNode, rectArea, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
@@ -37,17 +37,12 @@ function nearestInput(tree: UiNode, near: UiNode): NearbyInput | 'none' {
   let best: { node: UiNode; overlap: number; gap: number } | undefined;
   for (const n of everyNode(tree)) {
     if (n.role !== INPUT_ROLE || rectArea(n.rect) === 0) continue;
-    const overlap = overlapArea(n.rect, near.rect);
+    const met = rectIntersection(n.rect, near.rect);
+    const overlap = met === undefined ? 0 : rectArea(met);
     const gap = rectGap(n.rect, near.rect);
     if (best === undefined || overlap > best.overlap || (overlap === best.overlap && gap < best.gap)) best = { node: n, overlap, gap };
   }
   return best === undefined ? 'none' : { identifier: best.node.identifier, rect: { ...best.node.rect }, overlaps: best.overlap > 0 };
-}
-
-function overlapArea(a: Rect, b: Rect): number {
-  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-  return Math.max(0, w) * Math.max(0, h);
 }
 
 function rectGap(a: Rect, b: Rect): number {
