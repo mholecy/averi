@@ -1,6 +1,6 @@
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
-import type { IosTreeSource } from './ios-tree-source.js';
+import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { UiNode } from './types.js';
 
 /**
@@ -67,7 +67,7 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Not asked: always `undefined`, without a read (2026-10-09). The launch's
+   * Not asked: always `declined`, without a read (2026-10-09). The launch's
    * foreground wait (ios-foreground.ts) was measured on idb only — idb hands
    * out the previous app's tree for ~1–2 s after an app switch — and WDA's
    * sessionless `/source` has not been measured doing the same. Asking here
@@ -79,8 +79,8 @@ export class WdaTreeSource implements IosTreeSource {
    * would make this a read of `/source` returning the root's label when its
    * type is `Application`.
    */
-  async applicationLabel(): Promise<undefined> {
-    return undefined;
+  async applicationLabel(): Promise<ApplicationLabel> {
+    return { kind: 'declined' };
   }
 
   private released(cause?: unknown): Error {

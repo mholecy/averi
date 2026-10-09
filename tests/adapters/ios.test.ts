@@ -339,7 +339,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
 
   it('the same on a WDA-source adapter — a wda project\'s teardown poisons idb for every other reader of the simulator', async () => {
     const { fn, calls } = fakeExec({});
-    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), applicationLabel: async () => undefined, dispose: () => Promise.resolve() };
+    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), applicationLabel: async () => ({ kind: 'declined' }), dispose: () => Promise.resolve() };
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });

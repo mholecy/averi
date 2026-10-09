@@ -48,16 +48,28 @@ export interface IosTreeSource {
    * (ios-foreground.ts), never by a reader of the tree: the normalized tree
    * keeps no element types (idb's Application is a plain `other`), so the
    * question is answered from the raw payload, by the source that has it.
-   *
-   * `null`: the read cannot say — it lists no Application element, or one
-   * with no label (both unmeasured; the launch's wait says it could not
-   * check). `undefined`: the source does not ask (WdaTreeSource, which says
-   * why), and reads nothing. Throws as `read()` throws; one device read per
-   * call, like `read()`.
+   * The three answers are ApplicationLabel's. Throws as `read()` throws; one
+   * device read per call, like `read()` — except a `declined` source, which
+   * reads nothing.
    */
-  applicationLabel(): Promise<string | null | undefined>;
+  applicationLabel(): Promise<ApplicationLabel>;
   dispose(): Promise<void>;
 }
+
+/**
+ * IosTreeSource.applicationLabel's answer — a tagged union, not
+ * `string | null | undefined` (review 2026-10-09: the two absences meant
+ * different things and only a comment told them apart).
+ *
+ * - `label`: the Application element's label as read — SpringBoard's `' '`
+ *   included, never trimmed (the caller names it).
+ * - `unlabelled`: the read cannot say — it lists no Application element, or
+ *   one whose label is missing or empty (both unmeasured; the launch's wait
+ *   reads on, and says it could not check if nothing better follows).
+ * - `declined`: the source does not ask (WdaTreeSource, which says why) and
+ *   read nothing; the launch's wait then waits for nothing and says nothing.
+ */
+export type ApplicationLabel = { kind: 'label'; label: string } | { kind: 'unlabelled' } | { kind: 'declined' };
 
 /**
  * The seams the two sources already take, for a caller that has fakes: idb
@@ -262,11 +274,12 @@ export class IdbTreeSource implements IosTreeSource {
    * SpringBoard's `' '`), but the element is found by type, not by place.
    * The same read as `read()` — an empty payload throws IdbEmptyTreeError
    * here too, so the caller can tell idb's launch transient (no tree yet)
-   * from a tree of the wrong app.
+   * from a tree of the wrong app. An empty AXLabel is `unlabelled`, as a
+   * missing one is: no app is named by nothing.
    */
-  async applicationLabel(): Promise<string | null> {
-    const app = (await this.readOnce()).elements.find((el) => el.type === 'Application');
-    return app?.AXLabel ?? null;
+  async applicationLabel(): Promise<ApplicationLabel> {
+    const label = (await this.readOnce()).elements.find((el) => el.type === 'Application')?.AXLabel;
+    return label === undefined || label === null || label === '' ? { kind: 'unlabelled' } : { kind: 'label', label };
   }
 
   private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {

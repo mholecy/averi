@@ -229,21 +229,23 @@ describe('IdbTreeSource.applicationLabel — which app a read is of', () => {
 
   it("the Application element's AXLabel, in one describe-all — the same read as read()", async () => {
     const { answer, calls } = label([{ type: 'Application', AXLabel: 'Contacts', frame: F }, BUTTON]);
-    expect(await answer).toBe('Contacts');
+    expect(await answer).toEqual({ kind: 'label', label: 'Contacts' });
     expect(calls.filter((c) => c.full.startsWith('idb'))).toEqual([{ full: 'idb ui describe-all --json --udid AAAA-1111', timeoutMs: 15_000 }]);
   });
 
   it("SpringBoard's label is a single space, returned as read — not trimmed to nothing", async () => {
-    expect(await label([{ type: 'Application', AXLabel: ' ', frame: F }, BUTTON]).answer).toBe(' ');
+    expect(await label([{ type: 'Application', AXLabel: ' ', frame: F }, BUTTON]).answer).toEqual({ kind: 'label', label: ' ' });
   });
 
   it('found by type, not by place', async () => {
-    expect(await label([BUTTON, { type: 'Application', AXLabel: 'Contacts', frame: F }]).answer).toBe('Contacts');
+    expect(await label([BUTTON, { type: 'Application', AXLabel: 'Contacts', frame: F }]).answer).toEqual({ kind: 'label', label: 'Contacts' });
   });
 
-  it("an Application with no label is null, and so is a list with no Application — the read cannot say", async () => {
-    expect(await label([{ type: 'Application', frame: F }, BUTTON]).answer).toBeNull();
-    expect(await label([BUTTON]).answer).toBeNull();
+  it("an Application with no label, or an empty one, is unlabelled, and so is a list with no Application — the read cannot say", async () => {
+    expect(await label([{ type: 'Application', frame: F }, BUTTON]).answer).toEqual({ kind: 'unlabelled' });
+    expect(await label([{ type: 'Application', AXLabel: null, frame: F }, BUTTON]).answer).toEqual({ kind: 'unlabelled' });
+    expect(await label([{ type: 'Application', AXLabel: '', frame: F }, BUTTON]).answer).toEqual({ kind: 'unlabelled' });
+    expect(await label([BUTTON]).answer).toEqual({ kind: 'unlabelled' });
   });
 
   it("an empty payload throws IdbEmptyTreeError, as read() does — idb's launch transient is no tree, not a tree of the wrong app", async () => {
@@ -401,9 +403,9 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
   });
 
-  it("'wda': applicationLabel is not asked — undefined, with no WebDriverAgent started and no idb call", async () => {
+  it("'wda': applicationLabel is not asked — declined, with no WebDriverAgent started and no idb call", async () => {
     const { spawner, fetcher, exec, deps } = await fakes(IDB_DESCRIBE_ALL);
-    expect(await createIosTreeSource('wda', 'BBBB-2222', deps).applicationLabel()).toBeUndefined();
+    expect(await createIosTreeSource('wda', 'BBBB-2222', deps).applicationLabel()).toEqual({ kind: 'declined' });
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls).toEqual([]);
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);

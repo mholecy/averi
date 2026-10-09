@@ -1,4 +1,4 @@
-import { IdbEmptyTreeError } from './ios-tree-source.js';
+import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
@@ -39,11 +39,11 @@ import { sleep } from '../util/sleep.js';
  * failed, or listed neither name), or a read error other than
  * idb's empty tree (the device was not read; the readers after the launch
  * meet the same error in their own words). A read with no Application or
- * an unlabelled one (`null` — unmeasured shapes, and possibly idb's
+ * an unlabelled one (`unlabelled` — unmeasured shapes, and possibly idb's
  * full-frame launch transient) is a poll miss instead, remembered: if no
  * labelled read follows by the deadline, the note says it could not check.
  * Only a source that does not ask
- * (`undefined` — WDA, wda-tree-source.ts, by decision) stays silent. idb's
+ * (`declined` — WDA, wda-tree-source.ts, by decision) stays silent. idb's
  * empty tree (IdbEmptyTreeError — no tree yet, measured 0.4 s after a
  * launch) is a poll miss: the window this exists for is right behind it.
  *
@@ -174,7 +174,7 @@ function unquote(value: string): string {
 export interface ForegroundCheck {
   bundleId: string;
   /** IosTreeSource.applicationLabel — one device read per call. */
-  label(): Promise<string | null | undefined>;
+  label(): Promise<ApplicationLabel>;
   /**
    * The bundle's names (appInfoNames), never empty; THROWS when they could
    * not be read — the error's first line is what the note quotes. Called at
@@ -197,20 +197,19 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
   /** Whether a read came back with no Application label (see below). */
   let unlabelled = false;
   for (;;) {
-    let label: string | null | undefined;
-    let empty = false;
+    let read: ApplicationLabel | undefined;
     try {
-      label = await check.label();
+      read = await check.label();
     } catch (e) {
       // A device that was not read: idb's empty tree is the launch's own
-      // transient (read on); anything else is not this check's to diagnose.
+      // transient (read on, `read` left undefined); anything else is not this
+      // check's to diagnose.
       if (!(e instanceof IdbEmptyTreeError)) return unchecked(check.bundleId, errorMessage(e).split('\n')[0]);
-      empty = true;
     }
-    if (!empty) {
+    if (read !== undefined) {
       // The source does not ask (WDA): by decision, nothing to wait for and nothing to say.
-      if (label === undefined) return undefined;
-      if (label === null || label === '') {
+      if (read.kind === 'declined') return undefined;
+      if (read.kind === 'unlabelled') {
         // A poll miss, like the empty tree — not a stop (review round 2):
         // idb's other launch transient, a lone full-frame Application that
         // IdbEmptyTreeError deliberately leaves a tree, may come unlabelled
@@ -230,8 +229,8 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
           // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
           deadline += Date.now() - asked;
         }
-        if (names.includes(label)) return undefined;
-        stale = label;
+        if (names.includes(read.label)) return undefined;
+        stale = read.label;
       }
     }
     // Pause only if the read after it would START before the deadline.

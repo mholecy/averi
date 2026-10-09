@@ -326,7 +326,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
       read: () => Promise.reject(new Error('unused')),
       applicationLabel: async () => {
         reads.push('label');
-        return undefined;
+        return { kind: 'declined' };
       },
       dispose: () => Promise.resolve(),
     };
