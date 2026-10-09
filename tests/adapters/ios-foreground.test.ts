@@ -140,8 +140,8 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
   /**
    * docs/bugs/2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md (11:25:29, at 347e70d) — THE MEASURED
    * CASE: the session's first launch, the bank app in front since before the server started (never launched by it, so its
-   * names are unknown here); the screenshot showed Contacts while idb served "Skeleton Internal" ~5 s after the launch and
-   * Contacts' only by 16 s. The old note said "If the screenshot shows com.apple.MobileAddressBook … this can be ignored":
+   * names are unknown here); the screenshot showed Contacts while idb served "Skeleton Internal" >= 4.5 s after the launch and
+   * Contacts' only by ~15 s. The old note said "If the screenshot shows com.apple.MobileAddressBook … this can be ignored":
    * the screenshot did, and ignoring it was the wrong-app read. Now: the previous app's until proven otherwise, and the
    * localized reading only past a 20 s re-read — never on the screenshot alone.
    */
@@ -158,7 +158,7 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
       '3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — ' +
         "iOS can hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app " +
         '(an absent check passes on it). Treat the tree as the previous app\'s until a read is labelled "Contacts": after an app ' +
-        "switch idb was measured serving the previous app's tree more than 5 s. Only if a read 20 s or more after the launch is " +
+        "switch idb was measured serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is " +
         'still labelled "Skeleton Internal" while the screenshot shows com.apple.MobileAddressBook is that label its on-screen ' +
         'name (a localized display name its Info.plist does not carry), and this note can be ignored. The screenshot alone ' +
         "cannot tell them apart: it shows the launched app before idb's tree does",

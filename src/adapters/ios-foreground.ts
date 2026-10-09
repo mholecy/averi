@@ -56,8 +56,8 @@ import { sleep } from '../util/sleep.js';
  * so in both cases it shows the launched app — measured at 347e70d, the
  * session's first launch, after the bank app (in front since before
  * that server process started, never launched by it) had been in front for minutes: the screenshot
- * showed Contacts while idb still served "Skeleton Internal" ~5 s after the
- * launch (a raw read ~1 s after the 4.2 s reply), Contacts' first at 16 s
+ * showed Contacts while idb still served "Skeleton Internal" ≥ 4.5 s after
+ * the launch (a raw read just after the 4.2 s reply), Contacts' first ~15 s
  * (the window ended somewhere between), and the note's "if the screenshot
  * shows <bundle> … this can be ignored" licensed exactly the wrong-app
  * read this wait exists to prevent. What does tell them apart is the label
@@ -77,11 +77,12 @@ import { sleep } from '../util/sleep.js';
  *    treat the tree as the previous app's until a read carries one of the
  *    bundle's names; only a read still under that label 20 s or more after
  *    the launch, with the screenshot showing the launched app, makes it a
- *    localized name. 20 s, not "a few": the measured window outlasted 5 s
- *    and was over by 16 s, and a localized name (unmeasured, rare) paying a
+ *    localized name. 20 s, not "a few": the measured window outlasted 4.5 s
+ *    and was over by ~15 s — ONE switch measured, so a one-sample bound
+ *    with margin, for a later device check to revise — and a localized name (unmeasured, rare) paying a
  *    long re-read once is cheaper than a stale tree trusted.
  * Considered and not done: one more read after the bound before writing the
- * note (one read ~3.3 s in would not have outlasted the measured ≥ 5 s,
+ * note (one read ~3.3 s in would not have outlasted the measured ≥ 4.5 s,
  * and a longer bound is paid by every localized-name launch); asking every
  * installed app's name on the give-up path (`simctl listapps`) — the one
  * lookup that would have named the measured case's app, but its output
@@ -245,7 +246,7 @@ function notInFront(bundleId: string, label: string, names: readonly string[], o
   return (
     head +
     `Treat the tree as the previous app's until a read is labelled ${quoted(names)}: after an app switch idb was measured ` +
-    `serving the previous app's tree more than 5 s. Only if a read 20 s or more after the launch is still labelled "${label}" ` +
+    `serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is still labelled "${label}" ` +
     `while the screenshot shows ${bundleId} is that label its on-screen name (a localized display name its Info.plist does ` +
     "not carry), and this note can be ignored. The screenshot alone cannot tell them apart: it shows the launched app " +
     "before idb's tree does"
