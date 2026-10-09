@@ -24,6 +24,8 @@ import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
+import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import { COMPOSE } from '../helpers/android-dumps.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
@@ -659,6 +661,48 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     stale.attachedKeyboard.witnessAnswers.current = 'hidden';
     await tapElement(stale, 'id:row', OPTS);
     expect(stale.tapPoints).toEqual([{ x: 540, y: 1350 }]);
+  });
+});
+
+/**
+ * A Compose `Button`'s label under its own unlabelled clickable `button`, and a list row's label node under its avatar's
+ * text (docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md, a regression of round 5's
+ * C3): at 86eb42d these calls returned `Tapped text:"LOGIN"` and stopped `fully: true` on the row; at dd50327 the tap was
+ * refused, `scroll_until` called the screen a layout defect, and `fully` never stopped.
+ */
+describe('a Compose label under its own control (2026-10-09)', () => {
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const compose = (xml: string) => {
+    const fake = new FakeAdapter({ s: parseUiautomatorXml(xml) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    return fake;
+  };
+
+  it.each([
+    ['LOGIN', COMPOSE.login, { x: 540, y: 1463 }],
+    ['SIGN IN', COMPOSE.signIn, { x: 541, y: 1869 }],
+    ['DISCARD', COMPOSE.discard, { x: 776, y: 1253 }],
+    ['No thanks', COMPOSE.noThanks, { x: 541, y: 2023 }],
+  ])('tap text:"%s" presses the button at the text\'s centre, nothing said — as at 86eb42d', async (label, xml, centre) => {
+    const fake = compose(xml);
+    expect(await tapElement(fake, `text:"${label}"`, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect(fake.tapPoints).toEqual([centre]);
+  });
+
+  it('scroll_until text:"SIGN IN" on a screen that does not scroll: visible after 0 swipes — no layout defect, no stroke', async () => {
+    const fake = compose(COMPOSE.signIn);
+    expect(await scrollUntilVisible(fake, 'text:"SIGN IN"', { maxSwipes: 2, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('Account Detail: `fully: true` stops on a row\'s label node with its avatar on it, no stroke spent; a row under the tab bar\'s host is still not tapped there', async () => {
+    const fake = compose(COMPOSE.accountDetail);
+    const label = 'label:"Loan repayment, 17.12.2025, +493.00 EUR"';
+    expect(await scrollUntilVisible(fake, label, { maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([]);
+    const under = await tapElement(fake, 'label:"Card payment, 15.12.2025, -12.00 EUR"', OPTS).catch((e: unknown) => e);
+    expect(under).toBeInstanceOf(CoveredRefusal);
+    expect(fake.tapPoints).toEqual([]);
   });
 });
 

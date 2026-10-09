@@ -226,6 +226,32 @@ const repeats = (node: UiNode, target: UiNode): boolean => {
   return [node.label, node.value].some((t) => t !== null && own.includes(t));
 };
 
+/** The `onTarget` row's sibling: see the row. */
+const drawnOn = ({ node, parent }: Placed, { target, flatList }: SeenFor): boolean =>
+  parent !== undefined &&
+  parent === target.parent &&
+  !isInteractive(node) &&
+  (!flatList || repeats(node, target.node)) &&
+  node.rect.width < target.node.rect.width &&
+  node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
+  containsPoint(target.node.rect, tapPoint(node));
+
+/**
+ * The `onTarget` row's nested content: a non-interactive node lying wholly
+ * inside a CHILDLESS target, below a sibling drawn on it (`drawnOn`) — each
+ * node between them its own content in turn.
+ */
+const ownContent = (placed: Placed, about: SeenFor): boolean => {
+  const { node, parent } = placed;
+  return (
+    parent !== undefined &&
+    about.target.node.children.length === 0 &&
+    !isInteractive(node) &&
+    rectWithin(node.rect, about.target.node.rect) &&
+    (drawnOn(parent, about) || ownContent(parent, about))
+  );
+};
+
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
 const itemless = (n: UiNode): boolean => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
 
@@ -493,16 +519,71 @@ const NOT_DRAWN = {
    * bare footer text beside a CONTAINER target (a FrameLayout holding a
    * RecyclerView and a TextView, a Scaffold whose bottom bar is a bare
    * Text, `fully` asked of the list): same shape, same answer as before.
+   *
+   * And what such a sibling holds (2026-10-09, `ownControl`'s note): a
+   * NON-INTERACTIVE node lying WHOLLY inside a CHILDLESS target, whose
+   * parent is a sibling drawn on it or such content in turn (`ownContent`).
+   * Childless: a leaf whose content is listed beside it (Compose's merged
+   * label node, an RN view under WDA) has no other; a target with children
+   * has its content as them, and a sibling's subtree beside it is the
+   * stated residual above at one remove — the Compose tab-bar host drawn on
+   * its list (a sweep at dd50327 found the host already excused there) is
+   * not extended to its tabs. Measured on
+   * mp-native's Account Detail (Compose): `container row_N` → the label
+   * node `other 'Loan repayment, 17.12.2025, +493.00 EUR' 66,951 948x143`,
+   * the avatar `container 116,980 88x88` → `text 'LR' 136,999 48x49`, the
+   * amount texts, the row's `button` (`sameFrame`). The avatar was drawn on
+   * the label node, its text — one wrapper down — read as a cover, and
+   * `scroll_until … fully: true` never stopped on a row wholly on screen.
+   * Under WDA the same reach: `login_support` (a childless RN view) and
+   * its sibling `other login_support_email` drawn on it, whose text
+   * `podpora@finportal.sk` no longer covers it (wda-source-myport-login-
+   * keyboard.json). Still covers: an interactive descendant, one reaching
+   * outside the target, anything under a sibling that is not drawn on it
+   * (a full-width header's text). A flat list has no nesting, so idb never
+   * meets it.
    */
   onTarget: {
-    target: ({ node, parent }, { target, flatList }) =>
+    target: (placed, about) => drawnOn(placed, about) || ownContent(placed, about),
+  },
+
+  /**
+   * THE TARGET'S OWN CONTROL: an INTERACTIVE node in a NON-INTERACTIVE
+   * target's parent that holds the target's rect whole and lies within that
+   * parent, the parent not the screen's size (`screenSized`). `target` only
+   * (2026-10-09, docs/bugs/2026-10-09-android-compose-button-text-refused-
+   * as-under-its-own-button.md — a regression of this column's first
+   * round): a Compose `Button` reaches uiautomator as a wrapper holding its
+   * label text and, AFTER it, an unlabelled clickable `button` of about the
+   * wrapper's rect — mp-native's `container 44,1397 992x132` → `text
+   * 'LOGIN' 481,1438 118x49`, `button 44,1402 992x121`; SIGN IN, DISCARD
+   * (in `swift_payment.form.discard_button`), Google Contacts' "No thanks"
+   * the same (tests/helpers/android-dumps.ts#COMPOSE). That button read as
+   * drawn over the text: `tap text:"LOGIN"` was refused, `scroll_until`
+   * called the screen a layout defect, and an `optional:` tap skipped. A
+   * tap at the label's centre lands on the button — what the caller means.
+   *
+   * What still covers: an interactive TARGET under a later control (a
+   * button over a button is a real cover); a control in a screen-sized
+   * parent, or reaching outside its parent — a scrim, an RN transparent
+   * Modal's backdrop, a dismiss region, which hold every label of the
+   * screen; one that does not hold the label whole (a field's clear
+   * button); one in another parent (a pinned CTA bar, the tab-bar host).
+   * idb's flat list never meets this row: every node's parent is its 0×0
+   * root, which holds nothing. Residual, stated: a clickable overlay laid
+   * over a label inside a small wrapper of their own — a disabled-state
+   * scrim cut to a card — is read as the label's control, and the tap is
+   * sent to it.
+   */
+  ownControl: {
+    target: ({ node, parent }, { target, screen }) =>
       parent !== undefined &&
       parent === target.parent &&
-      !isInteractive(node) &&
-      (!flatList || repeats(node, target.node)) &&
-      node.rect.width < target.node.rect.width &&
-      node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
-      containsPoint(target.node.rect, tapPoint(node)),
+      isInteractive(node) &&
+      !isInteractive(target.node) &&
+      rectWithin(target.node.rect, node.rect) &&
+      rectWithin(node.rect, parent.node.rect) &&
+      !screenSized(parent.node, screen),
   },
 
   /**
