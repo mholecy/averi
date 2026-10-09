@@ -40,8 +40,9 @@ import { sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type 
  *   Android, and which rounds pay them is the rule this module owns.
  * - `confirm`: settle, read again, send nothing. `stroke`: draw the stroke
  *   the step describes and hand it back, as sent, in the next round's
- *   `drawn` — the "same stroke twice" identity is the drawn points, which
- *   only the driver can compute (the box is the device's). `drawn` is
+ *   `drawn` — the "same stroke twice" identity is the points as sent
+ *   (swipe.ts#scrollStroke of the step, whose `box` this module decides
+ *   over the driver's gesture box — RoundSeen.gesture). `drawn` is
  *   required on the round after a `stroke` and refused on any other; `round`
  *   throws on either breach, and on any call after `stop`.
  * - `stop`: the scroll is over; `outcome` says how (interact/scroll-text.ts
@@ -1119,7 +1120,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const { toward, reach, turn } = nextStroke(s);
   const strokeCover = read === undefined ? s.lastReadCover : cover;
   // Over the target's scroll container once a read has placed it in one,
-  // else the screen's largest (2026-10-09; swipe.ts#scrollStroke): the
+  // else the screen's largest (2026-10-09; swipe.ts#strokeRoom): the
   // stroke touches down on what scrolls, and its length is that
   // container's 60 %, never the screen's — a 1417-px list is not stroked
   // 1332 px. A round whose tree did not read keeps the last read round's.

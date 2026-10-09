@@ -11,7 +11,10 @@ import { node } from './fake.js';
  * interact/scroll.ts#scrollUntilVisible): `play` feeds a table of what each
  * read saw and returns what the rounds did — no fake device, no clock, no
  * timers. One row per read, in order; a row's keyboard answers are given up
- * front and handed to `round` only when it asks.
+ * front and handed to `round` only when it asks. A row says what was ON
+ * the screen — the matches, their containers, a spinner — and `treeOf`
+ * builds the tree the round derives its facts from, as from a device's;
+ * the stroke a row hands back is the driver's own (`drawnFor`).
  *
  * What an `ask` is NOT: a device query. `asks` lists the questions the
  * round put to its keyboard reading; what each costs is the reading's

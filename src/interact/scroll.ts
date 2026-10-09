@@ -181,7 +181,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   above it between two reads, in none — `Display` two rows below the fold
  *   was never reached. Each stroke is now drawn over the target's scroll
  *   container (the screen's largest before the target is read in one;
- *   swipe.ts#scrollStroke), its length the container's, and on an adapter
+ *   the round decides the box, swipe.ts#strokeRoom, above the keyboard),
+ *   its length the container's, and on an adapter
  *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
  *   time it costs against the 15 s default is on adapters/android.ts
  *   #dragSpeed; the default is unchanged.
