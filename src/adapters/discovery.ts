@@ -22,6 +22,40 @@ import type { Device } from './types.js';
  * fake exec, and the registry's tests fake the listing itself.
  */
 
+/** An adb state averi lists: what the Device's state becomes, and — for one that cannot be driven — why, and what to do (`androidUnusable`). */
+interface AdbStateRow {
+  state: Device['state'];
+  unusable?: string;
+}
+
+/**
+ * THE adb states averi lists, one row each (code review S8: until then the
+ * listing and `androidUnusable` each switched on the state) — the line
+ * pattern is built from its keys.
+ */
+const ADB_STATES: Readonly<Record<'device' | 'offline' | 'unauthorized', AdbStateRow>> = {
+  device: { state: 'booted' },
+  offline: {
+    state: 'offline',
+    unusable:
+      'is offline: adb sees it but cannot talk to it. An emulator still booting reads offline for a while — ' +
+      'wait until `adb devices` reads `device`; if it stays offline, `adb kill-server && adb start-server`, then ' +
+      'restart the emulator or reconnect the USB cable.',
+  },
+  unauthorized: {
+    state: 'unauthorized',
+    unusable:
+      'is unauthorized: adb sees it, but the device has not accepted this computer\'s debugging key. On a ' +
+      'phone, unlock it and accept the "Allow USB debugging?" prompt; on an emulator, `adb kill-server`, then ' +
+      '`adb devices` to reconnect (restart the emulator if it stays unauthorized).',
+  },
+};
+
+type AdbState = keyof typeof ADB_STATES;
+
+/** `<serial>  <state> …` for a state of `ADB_STATES`. */
+const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\b`);
+
 /**
  * `adb devices -l`, then `getprop ro.build.version.release` on each device
  * adb calls `device` (an offline or unauthorized one cannot answer; its
@@ -41,9 +75,10 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
   const { stdout } = await exec('adb', ['devices', '-l']);
   const devices: Device[] = [];
   for (const line of stdout.toString('utf8').split('\n').slice(1)) {
-    const match = line.trim().match(/^(\S+)\s+(device|offline|unauthorized)\b/);
+    const match = line.trim().match(ADB_LINE);
     if (!match) continue;
-    const [, id, state] = match;
+    const [, id, adbState] = match;
+    const state = adbState as AdbState;
     const model = line.match(/model:(\S+)/)?.[1] ?? id;
     let osVersion = 'unknown';
     if (state === 'device') {
@@ -55,7 +90,7 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
       platform: 'android',
       name: model,
       osVersion,
-      state: state === 'device' ? 'booted' : state === 'offline' ? 'offline' : 'unauthorized',
+      state: ADB_STATES[state].state,
     });
   }
   return devices;
@@ -66,23 +101,13 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
  * reason sentence starting `is …` and ending with a full stop, which the
  * registry puts after the device's name in each of its three
  * refusals (auto-pick, select_device, a pinned device), so the remedy is
- * worded once, beside the listing that read the state. undefined for a
- * booted device, and on iOS (offline there is a shut-down simulator; the
- * registry words that).
+ * worded once, beside the listing that read the state (`ADB_STATES`).
+ * undefined for a booted device, and on iOS (offline there is a shut-down
+ * simulator; the registry words that).
  */
 export function androidUnusable(device: Device): string | undefined {
   if (device.platform !== 'android') return undefined;
-  if (device.state === 'unauthorized') {
-    return 'is unauthorized: adb sees it, but the device has not accepted this computer\'s debugging key. On a ' +
-      'phone, unlock it and accept the "Allow USB debugging?" prompt; on an emulator, `adb kill-server`, then ' +
-      '`adb devices` to reconnect (restart the emulator if it stays unauthorized).';
-  }
-  if (device.state === 'offline') {
-    return 'is offline: adb sees it but cannot talk to it. An emulator still booting reads offline for a while — ' +
-      'wait until `adb devices` reads `device`; if it stays offline, `adb kill-server && adb start-server`, then ' +
-      'restart the emulator or reconnect the USB cable.';
-  }
-  return undefined;
+  return Object.values(ADB_STATES).find((s) => s.state === device.state)?.unusable;
 }
 
 /**

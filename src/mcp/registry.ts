@@ -6,6 +6,19 @@ import { androidUnusable, listAndroidDevices, listIosDevices } from '../adapters
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 
+/**
+ * An Android device adb lists but averi cannot drive, named for a refusal:
+ * `"<serial>" is unauthorized: …` — the quoted serial, then the reason and
+ * remedy (adapters/discovery.ts#androidUnusable). One spelling for the
+ * registry's three refusals — select_device, a pinned device, the auto-pick
+ * (code review S8). undefined for a device that can be driven, one not on
+ * Android, or none.
+ */
+function unusableNamed(device: Device | undefined): string | undefined {
+  const why = device === undefined ? undefined : androidUnusable(device);
+  return why === undefined || device === undefined ? undefined : `"${device.id}" ${why}`;
+}
+
 /** Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). */
 export interface AdapterOpts {
   treeSource?: IosTreeSourceKind;
@@ -135,12 +148,8 @@ export class AdapterRegistry {
       throw new Error(`Unknown ${platform} device "${deviceId}" — known: ${known}`);
     }
     if (device.state !== 'booted') {
-      const unusable = androidUnusable(device);
-      throw new Error(
-        unusable === undefined
-          ? `Device "${deviceId}" is ${device.state} — boot it first`
-          : `Android device "${deviceId}" ${unusable}`,
-      );
+      const unusable = unusableNamed(device);
+      throw new Error(unusable === undefined ? `Device "${deviceId}" is ${device.state} — boot it first` : `Android device ${unusable}`);
     }
     this.assertOpen(); // before the write, as in get(): a shutdown during the probe must not leave a binding behind
     const previous = this.bindings.get(platform);
@@ -166,12 +175,12 @@ export class AdapterRegistry {
       if (stillBooted) return this.adapterFor(platform, binding.deviceId, opts);
       if (binding.pinned) {
         // Still listed, but unauthorized (a revoked key) or offline: say which.
-        const unusable = listed === undefined ? undefined : androidUnusable(listed);
+        const unusable = unusableNamed(listed);
         throw new Error(
           unusable === undefined
             ? `Selected ${platform} device "${binding.deviceId}" is no longer booted — ` +
               'reboot it or select_device another one'
-            : `Selected ${platform} device "${binding.deviceId}" ${unusable} Or select_device another one.`,
+            : `Selected ${platform} device ${unusable} Or select_device another one.`,
         );
       }
       this.bindings.delete(platform);
@@ -186,10 +195,7 @@ export class AdapterRegistry {
     if (booted.length === 0) {
       // adb lists devices it cannot drive (unauthorized, offline): name them
       // and the remedy rather than "no booted device" (C5, 2026-10-09).
-      const unusable = devices.flatMap((d) => {
-        const why = androidUnusable(d);
-        return why === undefined ? [] : [`"${d.id}" ${why}`];
-      });
+      const unusable = devices.flatMap((d) => unusableNamed(d) ?? []);
       if (unusable.length > 0) {
         throw new Error(`No usable Android emulator/device found (adb devices): ${unusable.join(' ')}`);
       }
