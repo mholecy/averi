@@ -16,7 +16,7 @@
  * interact`), so the two layouts cannot sit together there. flow/ would
  * satisfy the layering too (mcp/ may import it); interact/ was CHOSEN, beside
  * the verdict it renders and the facts it comes from — the precedent is
- * interact/scroll.ts#describeScrollResult, which the MCP tool and the flow
+ * interact/scroll-text.ts#describeScrollResult, which the MCP tool and the flow
  * line both print.
  *
  * THE RULE for every renderer here (and any added later, e.g. a JSON

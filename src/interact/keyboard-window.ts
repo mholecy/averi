@@ -234,7 +234,7 @@ export async function dismissal(reading: KeyboardReading): Promise<DismissalDeci
 
 /**
  * The `unlocated` row's sentence — the one wording, for the post-fill
- * dismissal's warning and for `scroll_until`'s report (interact/scroll.ts),
+ * dismissal's warning and for `scroll_until`'s report (interact/scroll-text.ts),
  * which asks the same question at its stop (the reading's `unlocated`,
  * ui-tree/keyboard-cover.ts).
  * The cause is said as a question. Until the device check of 2026-10-08 it

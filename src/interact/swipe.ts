@@ -71,7 +71,7 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  *     over the uncovered box (`swipeVector`), its touch-down moved by (a).
  *     The first fix's content-down stroke over that box (458 → 114 under
  *     WDA, 344 pt) flung the SwiftUI form ~730–800 pt, past its target; that
- *     is answered where it is seen — scroll.ts confirms a stop on a settled
+ *     is answered where it is seen — scroll-rounds.ts confirms a stop on a settled
  *     read, turns the stroke round after a fling past the target and halves
  *     its reach on every turn (`shortenStroke`) — not by a shorter first
  *     stroke here, which would be one app's fling tuned into every app's
@@ -100,7 +100,7 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  * box's own, as short as the box: a short drag on the content rather than
  * a stroke on the panel. `keyboardTop` must lie inside the box (the caller
  * fails before stroking when a keyboard leaves nothing above it;
- * scroll.ts#coverOf). Pure.
+ * scroll-rounds.ts#coverOf). Pure.
  */
 export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Direction, meaning: SwipeMeaning): Stroke {
   const uncovered = { ...box, height: Math.min(box.height, keyboardTop - box.y) };
@@ -145,7 +145,7 @@ export const MIN_STROKE_FRACTION = 0.03;
  * side along the stroke (its height for up/down, its width for
  * left/right) — and never longer than the stroke given. Used by `scroll_until`
  * to shorten the stroke after each turn round a target a fling carried past
- * (interact/scroll.ts, Motion.nextStroke), so the distance left shrinks
+ * (interact/scroll-rounds.ts#nextStroke), so the distance left shrinks
  * however far the app flings. Pure.
  */
 export function shortenStroke(stroke: Stroke, factor: number, side: number): Stroke {
@@ -160,8 +160,8 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
 
 /**
  * The same stroke: the same touch-down and the same lift-off, point for
- * point. For `scroll_until`'s "the same stroke twice" (interact/scroll.ts,
- * Motion: UNMOVED_STROKES_EXHAUST) — until the code review of round 2
+ * point. For `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#
+ * UNMOVED_STROKES_EXHAUST) — until the code review of round 2
  * (2026-10-08) a comparison of `JSON.stringify`ed strokes, which compared
  * their spelling (key order included) rather than their points.
  */

@@ -3,7 +3,7 @@
  * only for exactly one. Regular plurals only (`noun + s`): every noun averi
  * counts in a message is one. A util leaf, so every layer can reach it
  * (code review of round 2, 2026-10-08: the fill's character count,
- * scroll.ts's swipesText and its turn count each wrote the ternary, as did
+ * scroll.ts's swipesText and its turn count (scroll-text.ts's since 2026-10-09) each wrote the ternary, as did
  * the node, element and invalid-field counts — `1 characters` was a
  * device-check finding of the same day).
  */
