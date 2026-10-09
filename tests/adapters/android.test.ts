@@ -5,6 +5,10 @@ import { AndroidAdapter, parseImeInsets, parseInputShown, parseTouchableRegion, 
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
+import { everyNode, type UiNode } from '../../src/adapters/types.js';
+import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { scrollUntilVisible } from '../../src/interact/scroll.js';
+import { FakeAdapter } from '../helpers/fake.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -94,6 +98,107 @@ describe('parseUiautomatorXml', () => {
     expect(t.children[0].children[0].clipsDescendants).toBeUndefined();
     expect(t.children[1].clipsDescendants).toBeUndefined();
     expect('clipsDescendants' in t).toBe(false); // absent, not false: ui_snapshot prints the tree as JSON
+  });
+});
+
+describe('parseUiautomatorXml — a node cut short of its own descendants is widened to them (docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md)', () => {
+  // The measured Account Detail shape (run9-android, 5e5a3d1, after the second drag): row_0's testTag node cut at its sticky
+  // date header's bottom (480) to 66,480 948x66, its own label and button the true rect 66,403 948x143, the header listed after
+  // the rows inside the scrolling list.
+  const ACCOUNT_DETAIL = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="transactions.list.container" scrollable="true" bounds="[0,401][1080,2154]">
+    <node class="android.view.View" resource-id="transactions.list.row_0" bounds="[66,480][1014,546]">
+      <node class="android.view.View" content-desc="Loan repayment, 17.07.2026, +602.00 EUR" bounds="[66,403][1014,546]" />
+      <node class="android.view.View" bounds="[116,480][204,552]"><node class="android.widget.TextView" text="LR" bounds="[136,484][184,533]" /></node>
+      <node class="android.widget.Button" bounds="[66,403][1014,546]" />
+    </node>
+    <node class="android.view.View" resource-id="transactions.list.row_1" bounds="[66,592][1014,735]">
+      <node class="android.view.View" content-desc="Loan repayment, 16.07.2026, +250.00 EUR" bounds="[66,592][1014,735]" />
+      <node class="android.widget.Button" bounds="[66,592][1014,735]" />
+    </node>
+    <node class="android.view.View" resource-id="transactions.list.date_header_0" bounds="[0,401][1080,480]">
+      <node class="android.widget.TextView" text="17.07.2026" bounds="[66,415][286,465]" />
+    </node>
+  </node>
+</node>
+</hierarchy>`;
+  const tree = parseUiautomatorXml(ACCOUNT_DETAIL);
+  const byId = (id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
+  const PIXEL = { x: 0, y: 0, width: 1080, height: 2220 };
+
+  it('row_0 reads its descendants\' union, the dumped bounds kept as cutBounds; a whole row and the header are left as dumped', () => {
+    expect(byId('transactions.list.row_0')).toMatchObject({ rect: { x: 66, y: 403, width: 948, height: 143 }, cutBounds: { x: 66, y: 480, width: 948, height: 66 } });
+    expect(byId('transactions.list.row_1').rect).toEqual({ x: 66, y: 592, width: 948, height: 143 });
+    expect(byId('transactions.list.row_1')).not.toHaveProperty('cutBounds');
+    expect(byId('transactions.list.date_header_0')).not.toHaveProperty('cutBounds');
+    expect([...everyNode(tree)].filter((n) => 'cutBounds' in n)).toHaveLength(1); // absent, not undefined: ui_snapshot prints the tree as JSON
+  });
+
+  it('…so the row reads under the header drawn after it: 66 of its 143 px show', () => {
+    const seen = drawOrder(tree).exposure(byId('transactions.list.row_0'), PIXEL);
+    expect(seen.covers.map((c) => c.identifier)).toContain('transactions.list.date_header_0');
+    expect(seen.shows).toBeCloseTo(66 / 143, 9);
+  });
+
+  it('…and `scroll_until id:row_0 fully` turns at once (the label selector\'s measured stroke, content down) instead of "fully visible after 0 swipes"', async () => {
+    const fake = new FakeAdapter({ list: tree }, 'list');
+    const outcome = await scrollUntilVisible(fake, 'id:transactions.list.row_0', { fully: true, maxSwipes: 1, timeoutMs: 2_000, settleMs: 1 }).catch((e: unknown) => e);
+    expect(outcome).toBeInstanceOf(Error);
+    expect(fake.swipes).toHaveLength(1);
+    expect(fake.swipes[0].to.y).toBeGreaterThan(fake.swipes[0].from.y);
+  });
+
+  it('only descendants spanning it across count, the union is cut to the clipping list, a node outside any list or with no area is left as dumped', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+    <node class="android.view.View" resource-id="badge_row" bounds="[66,500][1014,600]"><node class="android.widget.TextView" text="badge" bounds="[900,470][1000,530]" /></node>
+    <node class="android.view.View" resource-id="wider_row" bounds="[66,700][1014,760]"><node class="android.widget.Button" bounds="[0,680][1080,800]" /></node>
+    <node class="android.view.View" resource-id="edge_row" bounds="[66,1950][1014,2000]"><node class="android.widget.Button" bounds="[66,1950][1014,2093]" /></node>
+    <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>
+  </node>
+  <node class="android.view.View" resource-id="unscrolled" bounds="[66,2100][1014,2150]"><node class="android.widget.Button" bounds="[66,2050][1014,2150]" /></node>
+</node>
+</hierarchy>`);
+    const of = (id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
+    expect(of('badge_row')).not.toHaveProperty('cutBounds');
+    expect(of('wider_row')).toMatchObject({ rect: { x: 0, y: 680, width: 1080, height: 120 }, cutBounds: { x: 66, y: 700, width: 948, height: 60 } });
+    expect(of('edge_row')).not.toHaveProperty('cutBounds');
+    expect(of('collapsed')).not.toHaveProperty('cutBounds');
+    expect(of('unscrolled')).not.toHaveProperty('cutBounds');
+  });
+
+  it('the round-5 ui_snapshots, re-dumped through the parser: only the two rows cut at the floating tab bar widen — every other rect, Contacts\' padded icons (wrapper 132, control 110, label 66) and the IME-cut "Add fields"/"Add phone" among them, stays as dumped', async () => {
+    const fixture = JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+    const CLASS: Record<string, string> = { button: 'android.widget.Button', text: 'android.widget.TextView', textfield: 'android.widget.EditText', image: 'android.widget.ImageView' };
+    const attr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const toXml = (n: UiNode): string => {
+      const { x, y, width, height } = n.rect;
+      const attrs = [
+        `class="${CLASS[n.role] ?? 'android.view.View'}"`,
+        `bounds="[${x},${y}][${x + width},${y + height}]"`,
+        n.identifier !== null ? `resource-id="${attr(n.identifier)}"` : '',
+        n.label !== null ? `content-desc="${attr(n.label)}"` : '',
+        n.clipsDescendants === true ? 'scrollable="true"' : '',
+      ].join(' ');
+      return `<node ${attrs}>${n.children.map(toXml).join('')}</node>`;
+    };
+    const widened: string[] = [];
+    for (const [screen, dumped] of Object.entries(fixture.screens)) {
+      const parsed = parseUiautomatorXml(`<hierarchy rotation="0">${toXml(dumped)}</hierarchy>`);
+      const before = [...everyNode(dumped)];
+      const after = [...everyNode(parsed)];
+      expect(after).toHaveLength(before.length);
+      after.forEach((n, i) => {
+        if (n.cutBounds === undefined) expect(n.rect).toEqual(before[i].rect);
+        else {
+          expect(n.cutBounds).toEqual(before[i].rect);
+          widened.push(`${screen} ${n.identifier} ${n.rect.y} ${n.rect.height}`);
+        }
+      });
+    }
+    expect(widened).toEqual(['accountDetail transactions.list.row_29 1784 143', 'accountDetail transactions.list.row_30 2044 143']);
   });
 });
 
