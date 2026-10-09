@@ -586,11 +586,12 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * Only nodes of the tree cover (decision 4): a top bar the tree lists
  * before the form — WDA's, idb's (only its button and title) — is not
  * inferred, so a row scrolled up under it is tapped at its centre as
- * before the check existed (iOS's status bar is off the screen, above). The other way round — a row
- * scrolled under the bar read as drawn over BackButton and the title, under
- * idb, whose list is flat — is judged by an INTERIM rule, unmeasured
- * (ui-tree/draw-order.ts's `flatListAbove` row: in idb's list a later node
- * covers only when its top lies at or below the target's).
+ * before the check existed (iOS's status bar is off the screen, above).
+ * The other way round — a row scrolled under the bar read as drawn over
+ * BackButton and the title, under idb, whose list is flat — is judged by
+ * chrome before content (ui-tree/draw-order.ts's `flatListChrome` row,
+ * device check C3-3: in idb's list the bar's items come before the form's
+ * rows, and a row listed after them is no cover of them).
  */
 export async function aimClearOfChrome(
   target: Target,

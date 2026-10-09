@@ -307,8 +307,9 @@ export interface UiNode {
    * a child of a synthetic 0×0 root (adapters/ios-tree-source.ts#idbTree)
    * in the list's order — no node has a parent of its own, so nothing in
    * the tree says what a node belongs to. Read by ui-tree/draw-order.ts,
-   * whose `target` question judges such a list by an interim rule of its
-   * own (`flatListAbove`) and asks an on-target text to repeat the target
+   * whose `target` question judges such a list by a rule of its own —
+   * the top bar listed before the content is no cover's target
+   * (`flatListChrome`) — and asks an on-target text to repeat the target
    * (`onTarget`), the sibling guard being void there. A mark of the source, like `ofKeyboard` and
    * `clipsDescendants`: ui-tree knows no platform, and the shape alone (a
    * rectless root over leaves) would also match a test's or a future

@@ -169,10 +169,16 @@ interface Seen {
   readonly screen: number;
 }
 
-/** What the `target` column is judged against besides: the target, at its first place in the walk, and whether the tree is a flat list (`UiNode.flatList` on its root). */
+/**
+ * What the `target` column is judged against besides: the target, at its
+ * first place in the walk, whether the tree is a flat list (`UiNode.flatList`
+ * on its root), and — in one — where its content starts (`contentFrom`).
+ */
 interface SeenFor extends Seen {
   readonly target: Placed;
   readonly flatList: boolean;
+  /** The walk index of a flat list's first content node (`firstContent`): the nodes before it are its top bar. The walk's length when there is none, or the tree is not a flat list. */
+  readonly contentFrom: number;
 }
 
 /**
@@ -407,43 +413,50 @@ const NOT_DRAWN = {
    * it is not: it refuses BackButton).
    *
    * Under idb this row never fires: its list is FLAT, so no node has a
-   * scroll-view ancestor — `flatListAbove` stands in for it there.
+   * scroll-view ancestor — `flatListChrome` stands in for it over the top
+   * bar.
    */
   scrolledContent: {
     target: ({ scroller }, { target }) => scroller !== undefined && !within(target, scroller),
   },
 
   /**
-   * ABOVE THE TARGET IN A FLAT LIST: under idb (`UiNode.flatList` on the
-   * root), a node whose TOP lies above the target's top. `target` only —
-   * an INTERIM rule, the owner's decision of 2026-10-09 (code review of
-   * deep/r5-covers, P1), to be measured on device; NOT measured: whether
-   * idb's list order is paint order at all is unknown.
+   * CONTENT OVER THE TOP BAR, IN A FLAT LIST: under idb (`UiNode.flatList`
+   * on the root), a node at or after the list's first CONTENT node, over a
+   * target listed before it — the top bar's (`firstContent`, `contentFrom`).
+   * `target` only: chrome before content, the owner's decision of 2026-10-09
+   * on device check C3-3 (docs/bugs/2026-10-08-tap-and-scroll-until-
+   * ignore-pinned-app-chrome.md), replacing the interim `flatListAbove`.
    *
-   * Why: idb's list is flat, so `scrolledContent` cannot tell a row of the
-   * form from the bar over it, and a row scrolled up under the translucent
-   * top bar — idb keeps its real rect, the bug note measured the IBAN input
-   * at y 27 — comes AFTER BackButton and the title in the list and read as
-   * drawn over them: `tap BackButton` and `scroll_until` to it were refused
-   * (`… under button "Debit account" … nothing of it shows`), the one tap
-   * that leaves the screen. The cases the rule is held to: the row at y
-   * 27–40 is no cover of BackButton (y 70) or the title (y 74) — its top
-   * is above theirs; the pinned CONTINUE bar (y 780) over `priority_select`
-   * (y 771) still is — its top at or below the target's, the bug's own
-   * shape (tests/fixtures/idb-swift-form-continue.json). A pinned bar
-   * covers what scrolls up to it from above, and content scrolled under a
-   * top bar lies above what the bar holds.
+   * Measured (tests/fixtures/idb-swift-form-scrolled-under-top-bar.json,
+   * six scroll positions of mp-native's SWIFT form): idb lists the
+   * Application `0,0 402x874`, then the top bar — `button 'Back'` `30,70
+   * 28x28`, the title `136,74 130x20` — then every form row in reading
+   * order, then the pinned CONTINUE; a screenshot shows the bar opaque, Back
+   * and the title drawn in full and the rows scrolled under it hidden. idb's
+   * list is flat, so `scrolledContent` cannot tell a row of the form from
+   * the bar over it, and every row follows the bar's items in the list. The
+   * interim rule (a later node covers only when its top lies at or below
+   * the target's) refused Back and the title at 3 of 6 positions — a
+   * floating label, a textfield, a helper line with its top at 75, 80 or 82,
+   * inside Back's 70–98 — all three false. Here the bar's items are listed
+   * before the content, and content listed after them is no cover of them,
+   * wherever its top lies; between content nodes nothing changes — the
+   * pinned CONTINUE, listed after the rows, still covers `priority_select`.
    *
-   * Residuals, stated: a cover whose top lies above the target's — a
-   * bottom sheet or a dialog laid over a row it starts above, a bar taller
-   * than a row it reaches over — is not seen under idb (a false "clear":
-   * the tap may press the cover); a row scrolled under a top bar whose top
-   * lies at or below a bar item's — a short row under a tall bar — still
-   * reads as cover (a false refusal, the safe direction). WDA's nested tree
-   * and Android's never meet this row: neither is marked.
+   * Residuals, stated: content listed after the bar that really is drawn
+   * over it — a sheet or a dialog reaching over the top bar while idb still
+   * lists the screen under it (not measured: whether idb lists a presenter's
+   * nodes under a sheet) — is not seen over the bar's items (a false
+   * "clear": the tap may press the sheet). A node of the bar listed after
+   * the first content node (`firstContent`'s misses) still meets content as
+   * content: a row scrolled under it reads as cover — a false refusal, the
+   * safe direction. Improved on the interim rule: a sheet laid over a
+   * CONTENT target it starts above is a cover again. WDA's nested tree and
+   * Android's never meet this row: neither is marked.
    */
-  flatListAbove: {
-    target: ({ node }, { target, flatList }) => flatList && node.rect.y < target.node.rect.y,
+  flatListChrome: {
+    target: ({ at }, { target, contentFrom }) => target.at < contentFrom && at >= contentFrom,
   },
 
   /**
@@ -617,6 +630,50 @@ const NOT_DRAWN = {
 
 const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
 
+/**
+ * The top of the screen a flat list's top bar lies in (`firstContent`), as
+ * a fraction of the screen's height: 20 %, 175 pt of the 874-pt iPhone 17.
+ * Measured: idb lists the SWIFT form's Back at y 70–98 and its title at
+ * 74–94, under a bar that ends at y 116 (13 %); a large-title bar ends
+ * near 158 pt of 874 (18 %, inferred). A content row lying wholly inside
+ * this band at the head of the content is read as the bar's
+ * (`firstContent`'s misses, stated there).
+ */
+export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
+
+/**
+ * Where a flat list's CONTENT starts (`flatListChrome`): the walk index of
+ * the first node, after the root and the screen-sized structural hosts
+ * (idb's Application, `other`), that lies
+ * outside the top bar's band (`FLAT_LIST_TOP_BAR_FRACTION`: not wholly
+ * between the screen's top and that line — a row scrolled above the screen
+ * is outside it) or that overlaps a node of the bar before it (a row
+ * scrolled up under the bar is listed after the bar's items and lies on
+ * them; the bar's own items lie side by side). The nodes before it are the
+ * top bar's. Nodes with no area are skipped. `order.length` when the list
+ * has no such node.
+ *
+ * Measured on the SWIFT form's six positions: the first content node is
+ * always the form's first row, `debit_select`, at y -180…-117 — above the
+ * screen. Misses, stated: a form whose first row lies wholly inside the
+ * band and clear of the bar's items (at rest just below a short bar, or
+ * scrolled to sit between it and the band's line) is read as the bar's —
+ * harmless while nothing listed after it lies on it; and a node of the bar
+ * that overlaps another (a badge on a bar button) starts the content, so
+ * the bar's items after it meet the rows as content do.
+ */
+function firstContent(order: readonly Placed[], screen: Rect, area: number): number {
+  const line = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
+  const bar: Rect[] = [];
+  for (const { node, at } of order.slice(1)) {
+    const r = node.rect;
+    if (!(rectArea(r) > 0) || (STRUCTURAL_ROLES.has(node.role) && rectArea(r) >= area * SCREEN_SIZED_FRACTION)) continue;
+    if (r.y < screen.y || r.y + r.height > line || bar.some((b) => rectIntersection(b, r) !== undefined)) return at;
+    bar.push(r);
+  }
+  return order.length;
+}
+
 /** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). */
 function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
@@ -641,6 +698,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     placed.end = order.length;
   };
   walk(tree, undefined, undefined);
+  const contentFrom = flatList ? firstContent(order, screen, seen.screen) : order.length;
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
@@ -673,7 +731,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom };
       const covers =
         shown === undefined || about === undefined
           ? []

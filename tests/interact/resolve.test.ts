@@ -571,7 +571,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
   });
 
-  it('idb, a row scrolled up under the top bar (code review P1, repro C — the interim flat-list rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
+  it('idb, a row scrolled up under the top bar (code review P1, repro C — since device check C3-3 the chrome-before-content rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
     const debit = tree.children.find((n) => n.identifier === 'swift_payment.form.debit_select')!;
     debit.rect = { x: 24, y: 40, width: 354, height: 72 };
@@ -1109,5 +1109,30 @@ describe('iOS\'s status band (2026-10-09)', () => {
     expect([iosStatusBand({ width: 1024, height: 1366 }), iosStatusBand({ width: 874, height: 402 })]).toEqual([IOS_MIN_STATUS_BAND, 0]);
     expect((await screenBox(await swiftForm(771), { tree: undefined })).statusBand).toBe(62);
     expect((await screenBox(await swiftForm(771, 'android'), { tree: undefined })).statusBand).toBeUndefined();
+  });
+});
+
+/**
+ * idb's flat list, chrome before content (2026-10-09, device check C3-3 of
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): at six scroll positions of the SWIFT form the
+ * interim rule refused `tap id:BackButton` at positions 2, 4 and 6 and the title at 4 — a row scrolled under the opaque
+ * bar, listed after it, read as drawn over it. The dumps: tests/fixtures/idb-swift-form-scrolled-under-top-bar.json.
+ */
+describe('idb, rows scrolled under the top bar — the six measured positions (2026-10-09)', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as {
+    positions: Record<string, unknown[]>;
+  };
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+
+  it.each(Object.keys(fixture.positions))('%s: tap Back and the title — both tapped at their centres, nothing said; scroll_until stops on them at once', async (pos) => {
+    const fake = new FakeAdapter({ form: parseIdbDescribeAll(JSON.stringify(fixture.positions[pos])) }, 'form');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    for (const selector of ['id:BackButton', 'id:swift_payment.form.title']) {
+      expect(await tapElement(fake, selector, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+      expect(await scrollUntilVisible(fake, selector, { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    }
+    expect(fake.tapPoints).toEqual([{ x: 44, y: 84 }, { x: 201, y: 84 }]);
   });
 });
