@@ -627,6 +627,16 @@ export function rectText(r: Rect): string {
 }
 
 /**
+ * How a sentence names a NODE drawn over another — `button "Continue to
+ * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
+ * rect (`rectText`). The tap's chrome refusal and move
+ * (interact/resolve.ts#aimClearOfChrome) and `scroll_until`'s covered
+ * sentences (interact/scroll-text.ts) share it (2026-10-09).
+ */
+export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
+  `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
+
+/**
  * How a sentence quotes the KEYBOARD's frame: `[x,y][x2,y2]`, as dumpsys
  * prints it. Not `rectText` for the keyboard in interact/ (2026-10-08: the
  * two docs each claimed to be the one way) — see the pair's note above.

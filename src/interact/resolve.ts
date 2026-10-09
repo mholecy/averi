@@ -1,6 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
+import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, nodeText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { judgingScreen, type JudgingScreen } from './swipe.js';
@@ -460,4 +461,99 @@ export async function refuseOffScreen(
   throw new OffScreenRefusal(
     sent === undefined ? `${what} is off screen ${where}${part}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is off screen ${where}${part}`,
   );
+}
+
+// ─── Clear of the app's chrome ───────────────────────────────────────────────
+
+/**
+ * The target resolved, settled, lies on screen and clear of the soft
+ * keyboard, but the point a tap on it would press — its centre — lies under
+ * a node drawn over it, and no piece of it large enough to aim at shows
+ * (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
+ * chrome.md). Measured on mp-native's SWIFT form, both iOS tree sources:
+ * `priority_select` at `24,771 354x52`, its centre (201,797) on the pinned
+ * CONTINUE bar `24,780 354x44`; "Tapped" pressed the (disabled) bar, and an
+ * enabled one would have submitted the payment form. Nothing is tapped.
+ *
+ * A class of its own, like OffScreenRefusal and for its reasons: the element
+ * WAS found (an `optional:` tap of it is skipped with this headline, not
+ * "(not present)"), nothing is moving, and the remedy is in the message —
+ * `scroll_until` it, which since the same date keeps scrolling until the
+ * centre is clear (interact/scroll-rounds.ts#stops). When the keyboard guard
+ * had already sent something, the HEADLINE says what.
+ */
+export class CoveredRefusal extends Error {}
+
+/** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
+export interface Aim {
+  point: Point;
+  /** `at (201,767) — its centre (201,780) is under button "Continue to summary" (24,780 354x44), drawn over it; tapped the uncovered part 354x26`. */
+  moved?: string;
+}
+
+
+/**
+ * THE chrome check for a point about to be tapped on a resolved node
+ * (2026-10-09; the bug note's owner decision 1): the target's centre, unless
+ * a node of the tree is drawn over it there — then the centre of the
+ * largest piece of it nothing is drawn over, when both its sides reach the
+ * minimum (ui-tree/draw-order.ts#exposure, its rows and MIN_TAP_PIECE_FRACTION),
+ * said in `moved`; else a CoveredRefusal naming the cover. Applied by
+ * keyboard.ts#resolveClearOfKeyboard LAST, to the node and tree it hands
+ * back — after the on-screen rule and the keyboard guard, so neither of
+ * their judgements changes: both are of the centre, and the centre is what
+ * is tapped unless something is drawn over it.
+ *
+ * Judged in the screen box that holds the centre (`screen`, the on-screen
+ * rule's; the tree's root rect, or the node's own, when there is none — fail
+ * open, as there). The soft keyboard is no cover node — Android lists none,
+ * and a band is believed only with its input method's word
+ * (ui-tree/keyboard-cover.ts) — so it is asked for ONLY when the centre is
+ * covered (`keyboardTop`: the top of a band the input method stands by, or
+ * undefined), and the box cut above it before a piece is chosen: a piece
+ * under the keyboard is never aimed at. Its cost is the reading's, on that
+ * path only (on Android the touchable region and the witness, with the
+ * keyboard shown; nothing more with it hidden — the guard's first reading
+ * is reused).
+ *
+ * Only nodes of the tree cover (decision 4): iOS's status bar and a top bar
+ * the tree lists before the form — WDA's, idb's (only its button and title)
+ * — are not inferred, so a row scrolled up under them is tapped at its
+ * centre as before the check existed. The other way round is a residual
+ * under idb: a row scrolled under the bar reads as drawn over BackButton
+ * and the title (idb's flat list, ui-tree/draw-order.ts's `scrolledContent`
+ * row), so a tap on them is moved or refused, nothing pressed — open for
+ * the owner.
+ */
+export async function aimClearOfChrome(
+  target: Target,
+  node: UiNode,
+  tree: UiNode,
+  screen: TapScreen | undefined,
+  keyboardTop: () => Promise<number | undefined>,
+  sent?: string,
+): Promise<Aim> {
+  const centre = tapPoint(node);
+  const box = screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect);
+  const order = drawOrder(tree);
+  const cover = order.exposure(node, box).coverAt(centre);
+  if (cover === undefined) return { point: centre };
+  const top = await keyboardTop();
+  const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
+  const above = within === box ? '' : ' above the soft keyboard';
+  const seen = order.exposure(node, within);
+  const under = `under ${nodeText(cover)}`;
+  if (seen.tapAt !== undefined) {
+    const { point } = seen.tapAt;
+    if (!seen.tapAt.moved) return { point };
+    const { width, height } = seen.tapAt.piece;
+    return { point, moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${under}, drawn over it; tapped the uncovered part ${width}x${height}${above}` };
+  }
+  const shows =
+    seen.largest === undefined
+      ? `nothing of it shows${above}`
+      : `only a ${seen.largest.width}x${seen.largest.height} part of it shows${above}, under the ${seen.minPiece}x${seen.minPiece} a tap may be moved to`;
+  const finding = `${under} at its centre (${centre.x},${centre.y}), drawn over it; ${shows} — scroll_until it first`;
+  const what = describeTarget(target);
+  throw new CoveredRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }

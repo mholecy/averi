@@ -4,10 +4,14 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 afterEach(() => {
   vi.useRealTimers();
 });
+import { readFile } from 'node:fs/promises';
 import type { UiNode } from '../../src/adapters/types.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { tapText } from '../../src/mcp/tool-text.js';
 import {
   absenceError,
   AmbiguityRefusal,
+  CoveredRefusal,
   DEFAULT_SETTLE_TIMEOUT_MS,
   ElementNotFoundError,
   OffScreenRefusal,
@@ -19,7 +23,7 @@ import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
-import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
@@ -455,6 +459,150 @@ describe('a tap target off the screen (2026-10-08)', () => {
       'id:login_submit was not tapped: after id:"login_title" was tapped at (201,303) to hide the soft keyboard, it is off screen at (107,924) on a 402x874 screen (rect 36,900 141x48) — scroll_until it first',
     );
     expect(fake.taps).toEqual(['login_title']);
+  });
+});
+
+/**
+ * A tap on a resolved node whose centre lies under a node drawn over it — the app's own pinned chrome — goes to an
+ * uncovered piece of it when one is large enough, and is refused otherwise (2026-10-09,
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md). Measured on mp-native's SWIFT form under idb
+ * (402×874 pt): `priority_select` at `24,771 354x52`, its centre (201,797) on the CONTINUE bar `24,780 354x44`, listed
+ * LAST in idb's flat list; "Tapped" went to the disabled CONTINUE and nothing opened.
+ */
+describe('a tap target under the app\'s chrome (2026-10-09)', () => {
+  const CONTINUE = 'button "Continue to summary" (24,780 354x44)';
+  /** The SWIFT form as idb lists it: flat under a 0×0 root, the Application first, the CONTINUE bar last; `priority_select` at `y`. */
+  const swiftForm = (y = 771) => {
+    const fake = new FakeAdapter(
+      {
+        form: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 0, height: 0 },
+          children: [
+            node({ role: 'other', label: 'mp-native', rect: { x: 0, y: 0, width: 402, height: 874 } }),
+            node({ role: 'button', label: 'BackButton', identifier: 'back', rect: { x: 30, y: 70, width: 28, height: 28 } }),
+            node({ role: 'textfield', identifier: 'swift_payment.form.amount_input', rect: { x: 24, y: 300, width: 354, height: 44 } }),
+            node({ role: 'button', label: 'Priority*', identifier: 'swift_payment.form.priority_select', rect: { x: 24, y, width: 354, height: 52 } }),
+            node({ role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+          ],
+        }),
+      },
+      'form',
+    );
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  };
+  const PRIORITY = 'id:swift_payment.form.priority_select';
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+
+  it('the measured rest position (y 771): only the top 9 pt show — refused, naming the bar, nothing tapped', async () => {
+    const fake = swiftForm();
+    const error = await tapElement(fake, PRIORITY, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CoveredRefusal);
+    expect((error as Error).message).toBe(
+      `${PRIORITY} is under ${CONTINUE} at its centre (201,797), drawn over it; only a 354x9 part of it shows, ` +
+        'under the 24x24 a tap may be moved to — scroll_until it first; nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('at y 754 the centre (201,780) is on the bar but a 26-pt strip shows above it: tapped there, and the result says so', async () => {
+    const fake = swiftForm(754);
+    const result = await tapElement(fake, PRIORITY, OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 767 }]);
+    expect(result.moved).toBe(`at (201,767) — its centre (201,780) is under ${CONTINUE}, drawn over it; tapped the uncovered part 354x26`);
+    expect(tapText(PRIORITY, result.note, result.moved)).toBe(
+      `Tapped ${PRIORITY} at (201,767) — its centre (201,780) is under ${CONTINUE}, drawn over it; tapped the uncovered part 354x26`,
+    );
+  });
+
+  it('clear of the bar (the manual swipe put it at y 452), and the bar itself: tapped at the centre as always, nothing said', async () => {
+    const fake = swiftForm(452);
+    const result = await tapElement(fake, PRIORITY, OPTS);
+    const bar = await tapElement(fake, 'id:swift_payment.form.continue_button', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 478 }, { x: 201, y: 802 }]);
+    expect([result.moved, bar.moved, result.note]).toEqual([undefined, undefined, undefined]);
+  });
+
+  it('the fill\'s focus tap goes through the same check: refused before anything is tapped or typed; moved, the note says where it focused', async () => {
+    const refused = swiftForm();
+    refused.live().children[3].role = 'textfield';
+    await expect(fillField(refused, PRIORITY, 'x', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
+    expect([refused.tapPoints, refused.typed]).toEqual([[], []]);
+    const moved = swiftForm(754);
+    moved.live().children[3].role = 'textfield';
+    const result = await fillField(moved, PRIORITY, 'x', OPTS);
+    expect(moved.tapPoints).toEqual([{ x: 201, y: 767 }]);
+    expect(result.note).toBe(`focus tap at (201,767) — its centre (201,780) is under ${CONTINUE}, drawn over it; tapped the uncovered part 354x26`);
+  });
+
+  it('the shape through the idb parser (tests/fixtures/idb-swift-form-continue.json): refused the same', async () => {
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
+  });
+
+  it('after the keyboard guard tapped a dismissal: the refusal says what was sent first', async () => {
+    const fake = iosLoginFake({
+      onTap: (id, self) => {
+        if (id !== 'login_title') return;
+        dropBand(self.live());
+        self.live().children.push(node({ role: 'button', label: 'Pay', identifier: 'pay_bar', rect: { x: 0, y: 540, width: 402, height: 80 } }));
+      },
+    });
+    fake.viewportSize = { width: 402, height: 874 };
+    const error = await tapElement(fake, 'id:login_submit', { ...OPTS, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CoveredRefusal);
+    expect((error as Error).message).toBe(
+      'id:login_submit was not tapped: after id:"login_title" was tapped at (201,303) to hide the soft keyboard, it is under button "Pay" (0,540 402x80) ' +
+        'at its centre (107,571), drawn over it; nothing of it shows — scroll_until it first',
+    );
+    expect(fake.taps).toEqual(['login_title']);
+  });
+
+  /** Android (1080x2220, the oracle): a 300-px row whose top 200 px lie under a bar laid after its list — its centre (540,1250) on the bar, a 100-px strip below. */
+  const androidSheet = (band?: number) => {
+    const fake = new FakeAdapter(
+      {
+        s: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 1080, height: 2220 },
+          children: [
+            node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, clipsDescendants: true, children: [node({ role: 'button', identifier: 'row', rect: { x: 0, y: 1100, width: 1080, height: 300 } })] }),
+            node({ role: 'button', label: 'Next', identifier: 'next', rect: { x: 0, y: 1100, width: 1080, height: 200 } }),
+          ],
+        }),
+      },
+      's',
+    );
+    fake.attachKeyboard(band === undefined ? { state: 'hidden' } : { state: 'shown', frame: { x: 0, y: band, width: 1080, height: 2220 - band } }, 'shown');
+    return fake;
+  };
+
+  it('the keyboard is no cover node, but a piece under its band is not tapped: the band is read again only when the centre is covered, and cut away', async () => {
+    const hidden = androidSheet();
+    const events = recorded(hidden);
+    const result = await tapElement(hidden, 'id:row', OPTS);
+    expect(hidden.tapPoints).toEqual([{ x: 540, y: 1350 }]); // the strip's centre
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'tap:540,1350']); // the opening reading, asked again: nothing more on a hidden keyboard
+    expect(result.moved).toBe('at (540,1350) — its centre (540,1250) is under button "Next" (0,1100 1080x200), drawn over it; tapped the uncovered part 1080x100');
+    // The keyboard up from y 1350 — clear of the centre, so the guard lets it be — leaves 50 px of the strip: under the
+    // 65-px minimum, refused; the band and the input method's word read once each.
+    const up = androidSheet(1350);
+    const upEvents = recorded(up);
+    await expect(tapElement(up, 'id:row', OPTS)).rejects.toThrow(
+      'id:row is under button "Next" (0,1100 1080x200) at its centre (540,1250), drawn over it; only a 1080x50 part of it shows above the soft keyboard, under the 65x65 a tap may be moved to',
+    );
+    expect(upEvents).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?']);
+    // A witness that denies the band: not cut — the strip is tapped whole, as with no keyboard.
+    const stale = androidSheet(1350);
+    stale.attachedKeyboard.witnessAnswers.current = 'hidden';
+    await tapElement(stale, 'id:row', OPTS);
+    expect(stale.tapPoints).toEqual([{ x: 540, y: 1350 }]);
   });
 });
 

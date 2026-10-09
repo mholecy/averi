@@ -11,7 +11,7 @@ import {
   type Hiding,
   type KeyboardAdapter,
   type KeyboardModel,
-  type ResolvedClear,
+  type ClearedLook,
 } from './keyboard-model.js';
 import { resolveSettled } from './resolve.js';
 
@@ -287,7 +287,7 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
      * re-check round is `over` on a fresh reading (ui-tree/keyboard-cover.ts
      * counts it, and the whole wait).
      */
-    async guard({ target, opts, point: at, verdict, what, covered }: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }> {
+    async guard({ target, opts, point: at, verdict, what, covered }: CoveredLook): Promise<{ cleared: ClearedLook } | { hiding: Hiding }> {
       const backPressed = `${covered}; back pressed`;
       /** The last verdict over the point, with the input method's word — the wording of a later failure depends on whether it could be asked. */
       let last = verdict;

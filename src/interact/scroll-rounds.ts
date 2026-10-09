@@ -1,8 +1,9 @@
 import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { clippedEdges, containsPoint, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
+import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgingOf, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
@@ -196,11 +197,11 @@ interface TreeFacts {
  * holds no state between calls (code review of deep/r3-scroll, S6: until
  * then a WeakMap by tree object saved those walks).
  */
-function factsOf(tree: UiNode): TreeFacts {
+function factsOf(tree: UiNode, order: DrawOrder = drawOrder(tree)): TreeFacts {
   return {
     scrollersOf: scrollersOf(tree),
     mainScroller: largestScroller(tree),
-    drawOrder: drawOrder(tree),
+    drawOrder: order,
     fingerprint: treeFingerprint(tree),
     loading: showsProgress(tree),
   };
@@ -286,12 +287,27 @@ export interface Cover {
   remedy: KeyboardRemedy;
 }
 
-/** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the cover it was judged under (none for a whole-screen judgement or a keyboard-side node). */
-interface Judged {
+/**
+ * One match as judged: how much of it is in the frame, the frame's edges it
+ * extends past, the keyboard cover it was judged under (none for a
+ * whole-screen judgement or a keyboard-side node), and — since 2026-10-09
+ * (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md) —
+ * what of the app is drawn over it inside that frame
+ * (ui-tree/draw-order.ts#exposure): the covers, the one over its centre,
+ * and how much of it shows.
+ */
+export interface Judged {
   node: UiNode;
+  /** The fraction of it inside the frame — covers or not (`visibleFractionInViewport`). */
   visible: number;
   clipped: Edge[];
   under?: Cover;
+  /** The nodes drawn over it inside the frame, pre-order; empty when none. */
+  covers: readonly UiNode[];
+  /** The cover drawn over its centre (`tapPoint`, the point a tap presses), when the centre lies in the frame under one. */
+  centreCover?: UiNode;
+  /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
+  shows: number;
 }
 
 /**
@@ -303,8 +319,9 @@ interface Judged {
  *   target still (the reply says so); `unlocated` only on a `fully: true`
  *   stop judged with no cover under it; `flush` only on a `fully: true`
  *   stop whose edge lies on its clipping container's (PROBE_REACH).
- * - `stuck`: `fully: true`, the judged match in the frame but clipped, and
- *   UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
+ * - `stuck`: the judged match in the frame but short of the stop — clipped
+ *   (`fully: true`), or since 2026-10-09 under a node of the app (`stops`) —
+ *   and UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
  *   layout defect, or the keyboard's edge when it is the bottom clip.
  * - `covered`: a corroborated cover leaves nothing above its top edge;
  *   nothing judged, no stroke sent.
@@ -374,6 +391,9 @@ export interface TouchedOn {
  * What the target was short of at a bound, by the last round:
  * - `readFailed`: the last tree read failed — quoted, whatever came before;
  * - `clipped`: in the frame but clipped (the `fully: true` bar not met);
+ * - `covered` (2026-10-09): in the frame, not clipped, but a node of the app
+ *   drawn over it — over any of it with `fully: true`, over its centre
+ *   without (`stops`);
  * - `absent`: not in the last tree, and never in the frame before it;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
@@ -387,6 +407,7 @@ export interface TouchedOn {
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
   | { of: 'clipped'; judged: Judged }
+  | { of: 'covered'; judged: Judged }
   | { of: 'absent' }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number }
@@ -799,32 +820,81 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
 /**
  * The MOST revealed match, not the first: an id can sit on a container and
  * its child, and reporting the clipped one of the two would invent a defect.
- * Under a cover, a keyboard-side node (the round's reading's `ofKeyboard`,
- * one walk per round) is judged against
- * the whole screen; every other node against the part above the band, or
- * scores 0 when the band leaves none.
+ * Most revealed by what SHOWS — in the frame and under nothing of the app
+ * (`order.exposure`, 2026-10-09) — which is what is in the frame when
+ * nothing is drawn over it; a match that stops the round first (`better`). Under a cover, a keyboard-side node (the round's
+ * reading's `ofKeyboard`, one walk per round) is judged against the whole
+ * screen; every other node against the part above the band, or scores 0
+ * when the band leaves none — and what is drawn over a node is counted only
+ * inside the box it is judged in: a bar under the keyboard covers nothing
+ * the round can see.
  */
-function judge(found: readonly UiNode[], viewport: DeviceScreen, cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean }): Judged | undefined {
+function judge(
+  found: readonly UiNode[],
+  viewport: DeviceScreen,
+  order: DrawOrder | undefined,
+  fully: boolean,
+  cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
+): Judged | undefined {
+  const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
+    const box: Rect = { x: 0, y: 0, ...frame };
+    const seen = order?.exposure(node, box);
+    const centre = tapPoint(node);
+    const centreCover = containsPoint(box, centre) ? seen?.coverAt(centre) : undefined;
+    const visible = visibleFractionInViewport(node.rect, frame);
+    return {
+      node,
+      visible,
+      clipped: clippedEdges(node.rect, frame),
+      ...(under !== undefined && { under }),
+      covers: seen?.covers ?? [],
+      ...(centreCover !== undefined && { centreCover }),
+      shows: seen?.shows ?? visible,
+    };
+  };
   const scored = found.map((node): Judged => {
-    if (cover === undefined || cover.keyboardSide(node)) {
-      return { node, visible: visibleFractionInViewport(node.rect, viewport), clipped: clippedEdges(node.rect, viewport) };
-    }
+    if (cover === undefined || cover.keyboardSide(node)) return inFrame(node, viewport);
     const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover };
-    return { node, visible: visibleFractionInViewport(node.rect, above), clipped: clippedEdges(node.rect, above), under: cover.cover };
+    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], shows: 0 };
+    return inFrame(node, above, cover.cover);
   });
-  return scored.sort((a, b) => b.visible - a.visible)[0];
+  return scored.sort((a, b) => better(a, b, fully))[0];
 }
 
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], boxes: readonly DeviceScreen[]): Judged | undefined {
+function judgeOver(found: readonly UiNode[], boxes: readonly DeviceScreen[], order: DrawOrder | undefined, fully: boolean): Judged | undefined {
   return boxes
-    .map((box) => judge(found, box))
-    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || j.visible > best.visible) ? j : best), undefined);
+    .map((box) => judge(found, box, order, fully))
+    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
+}
+
+/**
+ * The order of two judgements, best first (a comparator): a match that
+ * STOPS the round (`stops`) before one that does not — a match showing
+ * more but with its centre covered must not hide one the next tap would hit
+ * (review round 1) — then the one more of which shows.
+ */
+function better(a: Judged, b: Judged, fully: boolean): number {
+  return Number(stops(b, fully)) - Number(stops(a, fully)) || b.shows - a.shows;
+}
+
+/**
+ * THE stop condition: the judged match is in the frame, and — `fully: true`
+ * — clipped at no edge with nothing of the app drawn over any of it; or —
+ * without — nothing drawn over its centre, the point the next tap presses
+ * (2026-10-09, the bug note's decisions 2 and 3). Until that date a plain
+ * stop was any intersection and a `fully: true` one any unclipped rect, and
+ * a row under a pinned CONTINUE bar was "fully visible after 0 swipes".
+ * The centre is not required to lie in the frame: a plain stop with the
+ * centre off the screen stays a stop, and the tap's own on-screen rule says
+ * so (resolve.ts#refuseOffScreen) — unchanged.
+ */
+function stops(j: Judged, fully: boolean): boolean {
+  return j.visible > 0 && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
-const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== undefined && j.visible > 0 && (!fully || j.clipped.length === 0);
+const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== undefined && stops(j, fully);
 
 /**
  * The two judgements say the same thing about the same node. `clipped` is
@@ -1070,11 +1140,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // and over the screen ABOVE the cover (`coverOf`) — the covered judgement
   // stands only when the band changes the round and the witness stood by it.
   const offered = read === undefined ? undefined : coverOf(read.cover, viewport);
-  const whole = judgeOver(found, s.frame.boxes);
+  // What is drawn over what, once a round (ui-tree/draw-order.ts): the
+  // judgement's covers, and the stroke's (`TreeFacts.drawOrder`).
+  const order = read === undefined ? undefined : drawOrder(read.tree);
+  const whole = judgeOver(found, s.frame.boxes, order, fully);
   let cover: Cover | undefined;
   let best = whole;
   if (offered !== undefined && read !== undefined) {
-    const covered = judge(found, viewport, { cover: offered, keyboardSide: read.ofKeyboard });
+    const covered = judge(found, viewport, order, fully, { cover: offered, keyboardSide: read.ofKeyboard });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a
@@ -1100,7 +1173,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // nothing about motion: the comparisons wait for the next one that does.
   const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : s.frame.boxes;
   const gesture = seen.screen?.box;
-  const now: ThisRead | undefined = read === undefined ? undefined : { read, facts: factsOf(read.tree), frames: judgedFrames, gesture, cover };
+  const now: ThisRead | undefined = read === undefined ? undefined : { read, facts: factsOf(read.tree, order), frames: judgedFrames, gesture, cover };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
@@ -1108,7 +1181,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (read !== undefined) s.probe = undefined;
 
   if (best !== undefined && best.visible > 0 && observed !== undefined && now !== undefined) {
-    if (!fully || best.clipped.length === 0) {
+    if (stops(best, fully)) {
       // The probe moved nothing: the match is where it was sent from — the
       // stop holds (it held still through a stroke), and nothing lies
       // beyond its flush edge.
@@ -1176,7 +1249,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       }
       return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }) });
     }
-    // fully: true and still clipped — only a swipe that MOVES it can help.
+    // Still clipped (`fully: true`) or under something of the app — only a
+    // swipe that MOVES it can help.
     if (observed.stuck) return stop(s, { kind: 'stuck', swipes: s.swipes, judged: best, lastStroke: s.lastStroke, viewport });
   }
   // A confirming read that did not read, or the read after a probe: read
@@ -1358,7 +1432,7 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
  */
 function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
-  if (best !== undefined && best.visible > 0) return { of: 'clipped', judged: best };
+  if (best !== undefined && best.visible > 0) return s.rules.fully && best.clipped.length > 0 ? { of: 'clipped', judged: best } : { of: 'covered', judged: best };
   const left = s.inFrameAfter;
   if (found.length === 0) {
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };

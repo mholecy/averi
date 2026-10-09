@@ -58,8 +58,24 @@ export const KEYBOARD_HIDE_DELAY_MS = 300;
 /** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice (the in-tree model's refusal), the screen size (the on-screen rule, resolve.ts#onScreen — the tap's and a dismissal's, since 2026-10-08). */
 export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>;
 
-/** A resolved node whose tap point no soft keyboard covers. */
+/**
+ * A resolved node whose tap point no soft keyboard covers, and the point a
+ * tap on it goes to — its centre, or since 2026-10-09 an uncovered piece of
+ * it when a node of the app is drawn over the centre
+ * (resolve.ts#aimClearOfChrome).
+ */
 export interface ResolvedClear extends Resolved {
+  /** Where to tap: the centre (`tapPoint`), or the moved point `moved` describes. */
+  point: Point;
+  /**
+   * Set when the tap goes elsewhere than the centre — the clause, `at
+   * (201,767) — its centre (201,780) is under button "Continue to summary"
+   * (24,780 354x44), drawn over it; tapped the uncovered part 354x26`.
+   * NOT folded into `note`: the tap's reply puts it after the selector
+   * (mcp/tool-text.ts#tapText), the fill's note says it of its focus tap,
+   * and the flow traces it as a `⚠` line (flow/engine.ts#tracingDismissal).
+   */
+  moved?: string;
   /**
    * Set when the guard had to do something before the tap — the sentence
    * itself: `back` pressed and the keyboard hidden; pressed and unconfirmed;
@@ -132,9 +148,20 @@ export interface DismissResult {
   warning?: string;
 }
 
-/** The guard's answer: the node, with the keyboard sentence folded into the resolution note and kept alone beside it. */
-export const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => ({
+/**
+ * A model's answer when the keyboard left the point: the node as resolved
+ * again, the tree it was resolved in (the chrome check, the last rule of a
+ * tap, judges it there — resolve.ts#aimClearOfChrome), and the keyboard
+ * sentence.
+ */
+export interface ClearedLook extends ResolvedSettled {
+  keyboardHidden?: string;
+}
+
+/** The guard's answer: the node and its tree, with the keyboard sentence folded into the resolution note and kept alone beside it. */
+export const withNote = (resolved: ResolvedSettled, keyboardHidden: string): ClearedLook => ({
   node: resolved.node,
+  tree: resolved.tree,
   note: resolved.note === undefined ? keyboardHidden : `${resolved.note}; ${keyboardHidden}`,
   keyboardHidden,
 });
@@ -289,7 +316,7 @@ export interface KeyboardModel {
    * refusal is thrown, nothing sent; or the hiding to perform, with its
    * words.
    */
-  guard(covered: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }>;
+  guard(covered: CoveredLook): Promise<{ cleared: ClearedLook } | { hiding: Hiding }>;
   /**
    * The dismissal after a fill, whole: no point to judge, so the model reads
    * the keyboard anywhere, decides, acts at most once and — where it

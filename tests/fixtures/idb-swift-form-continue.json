@@ -1,0 +1,11 @@
+[
+  {"type": "Application", "AXLabel": "mp-native", "AXUniqueId": null, "AXValue": null, "frame": {"x": 0, "y": 0, "width": 402, "height": 874}},
+  {"type": "Button", "AXLabel": "BackButton", "AXUniqueId": null, "AXValue": null, "frame": {"x": 30, "y": 70, "width": 28, "height": 28}},
+  {"type": "StaticText", "AXLabel": "SWIFT PAYMENT", "AXUniqueId": "swift_payment.form.title", "AXValue": null, "frame": {"x": 136, "y": 74, "width": 130, "height": 20}},
+  {"type": "Button", "AXLabel": "Debit account", "AXUniqueId": "swift_payment.form.debit_select", "AXValue": null, "frame": {"x": 24, "y": 150, "width": 354, "height": 52}},
+  {"type": "TextField", "AXLabel": null, "AXUniqueId": "TextFieldWithComponentStyle", "AXValue": "DE89370400440532013000", "frame": {"x": 42, "y": 380, "width": 280, "height": 20}},
+  {"type": "StaticText", "AXLabel": "IBAN", "AXUniqueId": "TextFieldWithComponentStyle", "AXValue": null, "frame": {"x": 42, "y": 359, "width": 35, "height": 15}},
+  {"type": "StaticText", "AXLabel": "The IBAN belongs to a country outside the SEPA area", "AXUniqueId": "swift_payment.form.iban_notice", "AXValue": null, "frame": {"x": 24, "y": 640, "width": 354, "height": 40}},
+  {"type": "Button", "AXLabel": "Priority*", "AXUniqueId": "swift_payment.form.priority_select", "AXValue": null, "frame": {"x": 24, "y": 771, "width": 354, "height": 52}},
+  {"type": "Button", "AXLabel": "Continue to summary", "AXUniqueId": "swift_payment.form.continue_button", "AXValue": null, "frame": {"x": 24, "y": 780, "width": 354, "height": 44}}
+]

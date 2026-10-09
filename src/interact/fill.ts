@@ -1,6 +1,5 @@
 import { everyNode, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
-import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
@@ -157,7 +156,10 @@ export async function fillField(
   assertTypeable(value);
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
-  const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);
+  const { node, note: resolutionNote, keyboardHidden, point, moved } = await resolveClearOfKeyboard(adapter, target, opts);
+  // A focus tap moved off a covered centre (resolve.ts#aimClearOfChrome) is said in the note, after what the guard said.
+  const focusMoved = moved === undefined ? undefined : `focus tap ${moved}`;
+  const note = focusMoved === undefined ? resolutionNote : resolutionNote === undefined ? focusMoved : `${resolutionNote}; ${focusMoved}`;
   let lastTree: UiNode | undefined; // the newest tree refetch read — the not-input finding looks for the input in it
   // sameField's guard (see there): before typing, the identity fallback is
   // asked freely (a clear's deletes do not navigate); after it, only on the
@@ -194,7 +196,6 @@ export async function fillField(
     screenBeforeTyping ??= lastTree === undefined ? null : screenSignature(lastTree);
     await adapter.typeText(text);
   };
-  const point = tapPoint(node);
   await adapter.tap(point.x, point.y);
   await sleep(DEFAULT_FOCUS_DELAY_MS); // focus + keyboard — a constant, not an option: tests mock util/sleep
 
@@ -397,6 +398,7 @@ export async function fillField(
   return {
     note,
     keyboardHidden,
+    moved,
     maskedAppend,
     role: node.role,
     typed: value.length,

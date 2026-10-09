@@ -770,13 +770,13 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
   });
 
-  it('the guard\'s answer carries the node and its note only — never the tree the resolution rode in on (in-tree clear, and oracle hidden)', async () => {
+  it('the guard\'s answer carries the node, its note and the point to tap only — never the tree the resolution rode in on (in-tree clear, and oracle hidden)', async () => {
     const clear = await resolveClearOfKeyboard(iosFake(), 'id:login_title', FAST);
-    expect(Object.keys(clear)).toEqual(['node', 'note']);
+    expect(Object.keys(clear)).toEqual(['node', 'note', 'point']);
     const android = iosFake();
     android.attachKeyboard({ state: 'hidden' });
     const hidden = await resolveClearOfKeyboard(android, 'id:login_submit', FAST);
-    expect(Object.keys(hidden)).toEqual(['node', 'note']);
+    expect(Object.keys(hidden)).toEqual(['node', 'note', 'point']);
   });
 
   it('the resolution note of the node tapped is kept, unchanged, when the band does not cover it', async () => {

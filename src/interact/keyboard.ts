@@ -1,11 +1,12 @@
 import type { Point, Rect } from '../adapters/types.js';
-import { readKeyboard } from '../ui-tree/keyboard-cover.js';
+import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { inTreeModel } from './keyboard-in-tree.js';
 import {
   confirmHidden,
   lookAgain,
   withNote,
+  type ClearedLook,
   type DismissOptions,
   type DismissResult,
   type GuardOptions,
@@ -14,7 +15,7 @@ import {
   type ResolvedClear,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
-import { describeTarget, refuseOffScreen, resolveSettled, tapScreen, type Resolved, type Target } from './resolve.js';
+import { aimClearOfChrome, describeTarget, refuseOffScreen, resolveSettled, tapScreen, type Target } from './resolve.js';
 
 /**
  * The soft-keyboard guard and the post-fill dismissal, written ONCE over
@@ -48,14 +49,15 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
   return adapter.keyboard === undefined ? inTreeModel(adapter) : windowModel(adapter);
 }
 
-/** The guard's answer when it had nothing to do: the node and its note, without the tree the resolution rode in on. */
-const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
-
 /**
- * resolveSettled, plus the two rules every tap on a resolved node shares:
- * the point about to be tapped must lie on the screen (2026-10-08 —
- * resolve.ts#refuseOffScreen; an OffScreenRefusal, nothing sent, when it
- * does not), and not under the soft keyboard (2026-10-03). Used by
+ * resolveSettled, plus the three rules every tap on a resolved node shares,
+ * in this order: the point about to be tapped must lie on the screen
+ * (2026-10-08 — resolve.ts#refuseOffScreen; an OffScreenRefusal, nothing
+ * sent, when it does not), not under the soft keyboard (2026-10-03), and —
+ * last, on the node and tree the guard hands back — not under a node of the
+ * app drawn over it (2026-10-09 — resolve.ts#aimClearOfChrome: the tap moves
+ * to an uncovered piece large enough, said in `moved`, or a CoveredRefusal).
+ * The answer carries the point to tap (`ResolvedClear.point`). Used by
  * tapElement (the flow `tap:` step and the MCP `tap` tool) and by
  * fillField's focus tap; there is no third tap on a resolved node.
  *
@@ -129,13 +131,29 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // the first read's tree — the orientation does not turn inside one tap —
   // or from the re-read a refusal makes first.
   const screen = await refuseOffScreen(adapter, target, first.node, first.tree, await tapScreen(adapter, first.tree));
+  // The LAST rule (2026-10-09): nothing of the app drawn over the point —
+  // else an uncovered piece of the target, or a CoveredRefusal
+  // (resolve.ts#aimClearOfChrome, the reasons there). On the node and tree
+  // the guard hands back, after the on-screen rule; the keyboard is read for
+  // it only when the centre is covered, off `reading` — the look's own, so
+  // what it already asked is not asked again.
+  const aimed = async (r: ClearedLook, reading: KeyboardReading, sent?: string): Promise<ResolvedClear> => {
+    const keyboardTop = async () => {
+      const cover = await reading.cover();
+      return cover !== undefined && (await reading.corroborated()) ? cover.top.y : undefined;
+    };
+    const { point, moved } = await aimClearOfChrome(target, r.node, r.tree, screen, keyboardTop, sent);
+    return { node: r.node, note: r.note, ...(r.keyboardHidden !== undefined && { keyboardHidden: r.keyboardHidden }), point, ...(moved !== undefined && { moved }) };
+  };
   // After the guard: `sent` only when something WAS sent (the hiding path);
   // a model that handed the node back clear sent nothing.
-  const onScreen = async (r: ResolvedClear, sent?: string): Promise<ResolvedClear> => (
-    await refuseOffScreen(adapter, target, r.node, first.tree, screen, sent), r
-  );
+  const onScreen = async (r: ClearedLook, sent?: string, reading = readKeyboard(adapter, r.tree)): Promise<ResolvedClear> => {
+    await refuseOffScreen(adapter, target, r.node, first.tree, screen, sent);
+    return aimed(r, reading, sent);
+  };
   const at = tapPoint(first.node);
-  const opening = await readKeyboard(adapter, first.tree).over(at, first.node);
+  const reading = readKeyboard(adapter, first.tree);
+  const opening = await reading.over(at, first.node);
   // THE guard's one fail-open rule, applied here and wherever a model reads
   // the keyboard again: nothing over the point — hidden, a frame elsewhere —
   // or a state that could not be read means the tap goes ahead as before
@@ -143,7 +161,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // never be the reason a tap did not happen; a device that is really gone
   // fails the tap itself, in the tap's own words. Only a COVERING reading —
   // the input method standing by it or denying it — reaches a model.
-  if (opening.kind === 'clear' || opening.kind === 'unknown') return bare(first);
+  if (opening.kind === 'clear' || opening.kind === 'unknown') return aimed(first, reading);
 
   // Chosen here, not above: the clear path allocates nothing, and the two
   // reads of `adapter.keyboard` — readKeyboard's and this — sit together.
@@ -153,15 +171,17 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   if ('cleared' in ready) return onScreen(ready.cleared);
   const { hiding } = ready;
   await hiding.perform();
-  const cleared = await confirmHidden<ResolvedClear, { frame: Rect; point: Point }>(
+  const cleared = await confirmHidden<{ look: ClearedLook; reading: KeyboardReading }, { frame: Rect; point: Point }>(
     hiding.looks,
     async () => {
       const look = await lookAgain(adapter, target, opts, hiding.failed);
-      return look.verdict.kind === 'covered' ? { stillUp: { frame: look.verdict.frame, point: look.point } } : { gone: withNote(look.resolved, hiding.hidden(look.verdict)) };
+      return look.verdict.kind === 'covered'
+        ? { stillUp: { frame: look.verdict.frame, point: look.point } }
+        : { gone: { look: withNote(look.resolved, hiding.hidden(look.verdict)), reading: look.reading } };
     },
     (seen, looks) => hiding.stillCovering(seen, looks),
   );
-  return onScreen(cleared, hiding.sent);
+  return onScreen(cleared.look, hiding.sent, cleared.reading);
 }
 
 /**

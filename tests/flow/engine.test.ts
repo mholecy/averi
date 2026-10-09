@@ -1726,6 +1726,18 @@ flows:
     expect(row?.action).toBe('⚠ scroll_until');
   });
 
+  it('a stop with part of the element under a bar the app draws over it is marked ⚠ and says so (2026-10-09)', async () => {
+    // 60 px tall at y 1900, its centre (50,1930) clear of a bar at 1940–2000 laid after it: a plain stop, its bottom covered.
+    const fake = scrollingFake(1900, 600, 60);
+    fake.live().children.push(node({ role: 'button', label: 'Continue', identifier: 'continue', rect: { x: 0, y: 1940, width: 1000, height: 60 } }));
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
+    const row = trace.find((t) => t.action.endsWith('scroll_until'));
+    expect(row).toEqual({
+      action: '⚠ scroll_until',
+      detail: 'id:"submit_button" visible after 0 swipes — PARTLY UNDER button "Continue" (0,1940 1000x60), drawn over it — 67% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too',
+    });
+  });
+
   it('fully: true keeps swiping past a clipped stop until the element is entirely inside', async () => {
     const fake = scrollingFake(2580);
     const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });
@@ -2603,6 +2615,54 @@ flows:
     const fake = new FakeAdapter({ fresh: screen(el({ role: 'textfield', identifier: 'username_field' })) }, 'fresh');
     await FlowEngine.run(cfg, fake, FAST, { flow: 'f' });
     expect(fake.taps).toEqual(['username_field']);
+  });
+});
+
+describe('tap: / fill: on a target under the app\'s chrome — the trace says where the tap went, or the step fails naming the cover (2026-10-09)', () => {
+  // docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md; the rule is pinned in tests/interact/resolve.test.ts.
+  const form = (y: number) =>
+    new FakeAdapter(
+      {
+        form: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 402, height: 874 },
+          children: [
+            node({ role: 'textfield', identifier: 'priority', rect: { x: 24, y, width: 354, height: 52 } }),
+            node({ role: 'button', label: 'Continue to summary', identifier: 'continue', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+          ],
+        }),
+      },
+      'form',
+    );
+  const flow = (step: string) =>
+    parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - ${step}
+`);
+  const MOVED = 'at (201,767) — its centre (201,780) is under button "Continue to summary" (24,780 354x44), drawn over it; tapped the uncovered part 354x26';
+
+  it('a tap: moved off a covered centre logs ONE ⚠ tap line before the tap line; a fill: the same as ⚠ fill', async () => {
+    const tapped = form(754);
+    expect(await FlowEngine.run(flow('tap: { id: priority }'), tapped, FAST, { flow: 'f' })).toEqual([
+      { action: 'flow f', detail: 'start' },
+      { action: '⚠ tap', detail: `id:"priority" tapped ${MOVED}` },
+      { action: 'tap', detail: 'id:"priority"' },
+      { action: 'flow f', detail: 'done' },
+    ]);
+    expect(tapped.tapPoints).toEqual([{ x: 201, y: 767 }]);
+    const filled = form(754);
+    const trace = await FlowEngine.run(flow('fill: { id: priority, value: "x" }'), filled, FAST, { flow: 'f' });
+    expect(trace[1]).toEqual({ action: '⚠ fill', detail: `id:"priority" tapped ${MOVED}` });
+  });
+
+  it('a tap: whose centre is covered with too little showing fails the step, nothing tapped', async () => {
+    const fake = form(771);
+    const error = (await FlowEngine.run(flow('tap: { id: priority }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain('id:"priority" is under button "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over it; only a 354x9 part of it shows');
+    expect(fake.tapPoints).toEqual([]);
   });
 });
 
