@@ -52,7 +52,7 @@ export const usableScreen = ({ width, height }: { width: number; height: number 
  * A point in the platform's tree units (Android pixels, iOS points) — a tap
  * point, a swipe's end. Named here, beside the screen it lies on, because
  * `DeviceAdapter.swipe` takes it: until 2026-10-08 the adapters and
- * ui-tree's point helpers (`tapPoint`, `containsPoint`, `shadowing`) spelled
+ * ui-tree's point helpers (`tapPoint`, `containsPoint`, draw order's `shadowing`) spelled
  * `{ x, y }` inline and interact/ named it twice (keyboard-model.ts's tap
  * point, swipe.ts's stroke end).
  */
@@ -186,8 +186,9 @@ export const KEYBOARD_ROLE = 'keyboard';
 /**
  * The roles every source gives its wrappers (Application, Window, Other,
  * Cell; FrameLayout, View). Beside KEYBOARD_ROLE since 2026-10-07: it was
- * `ui-tree/bare-tree.ts`'s, and `ui-tree/geometry.ts#shadowing` (a later
- * structural wrapper contains every point and draws nothing) needed it too
+ * `ui-tree/bare-tree.ts`'s, and the draw order (`ui-tree/draw-order.ts`'s
+ * `structural` row: a later wrapper contains every point and draws
+ * nothing) needed it too
  * — a low-level module importing a higher sibling for one constant, so the
  * constant moved to the one place both may read.
  */
@@ -198,7 +199,7 @@ export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'othe
  * room for a status-bar inset or a rounding difference between the wrapper and
  * the screen, while a content row (a Cell, a Pressable) sits far below it.
  * `ui-tree/bare-tree.ts` reads it for a wrapper by size and, since 2026-10-08,
- * `ui-tree/geometry.ts#shadowing` for a screen-sized host — moved here from
+ * `ui-tree/draw-order.ts` for a screen-sized host — moved here from
  * bare-tree.ts the same day, for STRUCTURAL_ROLES' reason above: neither
  * ui-tree module imports the other for a constant.
  */
@@ -275,7 +276,7 @@ export interface UiNode {
    * Compose screen whose only node is an empty scroller would stop reading
    * bare (the unsafe direction for `absent:`, verdict.ts); `role:container`
    * and `role:scrollable` selectors written against today's trees would
-   * change what they match; and geometry.ts#shadowing's
+   * change what they match; and ui-tree/draw-order.ts's
    * CONTENT_FRAMED_ROLES would start excusing those frames. Absent on iOS:
    * WDA and idb report a node's frame unclipped — a row under the top bar
    * reads at y -48, past the frame (interact/scroll-rounds.ts#beyondFarEdge

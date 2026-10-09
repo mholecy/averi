@@ -216,8 +216,8 @@ const statusBarBottom = (nodes: readonly UiNode[], screen: Rect): number | undef
 const CLOCK = /^(?:[\p{L}\p{M}]{1,3}\s?)?\p{Nd}{1,2}[:.]\p{Nd}{2}(?:\s?[\p{L}\p{M}]{1,8}\.?){0,2}$/u;
 
 // STRUCTURAL_ROLES, the wrapper roles this rule reads, is defined beside
-// KEYBOARD_ROLE in adapters/types.ts since 2026-10-07 (geometry.ts's
-// `shadowing` reads it too).
+// KEYBOARD_ROLE in adapters/types.ts since 2026-10-07 (the draw order,
+// ui-tree/draw-order.ts, reads it too).
 /** Roles that are decoration unless LABELLED: a splash image (identified or not), a spinner. */
 export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress']);
 /**

@@ -257,7 +257,7 @@ export interface StrokeRoom {
  * above the keyboard, falling back to the screen; one judgement now, the
  * keyboard in it. No gesture `box` at all (screenBox threw): no room.
  *
- * `over` gives the rects drawn over a candidate (ui-tree/geometry.ts
+ * `over` gives the rects drawn over a candidate (ui-tree/draw-order.ts
  * #drawnOver, through scroll-rounds.ts#TreeFacts, or as a remembered
  * container carries them, scroll-rounds.ts#StrokeContainer) — the floating tab bar
  * of 2026-10-09 (docs/bugs/2026-10-09-android-scroll-stroke-touches-down-
