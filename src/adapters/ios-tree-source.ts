@@ -108,9 +108,11 @@ interface IdbElement {
 
 /**
  * `idb ui describe-all --json` returns a FLAT array of elements, not a tree —
- * normalize under a synthetic root with all elements as direct children.
- * (ui-tree/geometry.ts relies on that root being 0x0: it infers the screen
- * size from the children, never from a wrapper.)
+ * normalize under a synthetic root with all elements as direct children,
+ * marked `flatList` (UiNode.flatList: ui-tree/draw-order.ts reads the list's
+ * order by a rule of its own). (ui-tree/geometry.ts relies on that root
+ * being 0x0: it infers the screen size from the children, never from a
+ * wrapper.)
  */
 export function parseIdbDescribeAll(json: string): UiNode {
   return idbTree(idbElements(json));
@@ -139,6 +141,7 @@ function idbTree(elements: IdbElement[]): UiNode {
     value: null,
     rect: zeroRect(),
     children,
+    flatList: true,
   };
 }
 

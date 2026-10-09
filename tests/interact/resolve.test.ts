@@ -569,6 +569,22 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
   });
 
+  it('idb, a row scrolled up under the top bar (code review P1, repro C — the interim flat-list rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    const debit = tree.children.find((n) => n.identifier === 'swift_payment.form.debit_select')!;
+    debit.rect = { x: 24, y: 40, width: 354, height: 72 };
+    tree.children.find((n) => n.role === 'textfield')!.rect.y = 27;
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const scrolled = await scrollUntilVisible(fake, 'text:"SWIFT PAYMENT"', { maxSwipes: 0, settleMs: 0 });
+    expect(scrolled).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    for (const selector of ['text:"BackButton"', 'text:"SWIFT PAYMENT"']) expect(await tapElement(fake, selector, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect(fake.tapPoints).toEqual([{ x: 44, y: 84 }, { x: 201, y: 84 }]);
+    // …and the pinned CONTINUE bar over priority_select is still refused, as measured.
+    await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
+  });
+
   it('after the keyboard guard tapped a dismissal: the refusal says what was sent first', async () => {
     const fake = iosLoginFake({
       onTap: (id, self) => {

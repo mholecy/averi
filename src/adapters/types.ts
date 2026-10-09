@@ -301,6 +301,19 @@ export interface UiNode {
    * runs on to the view's edge: not flush, not caught either.
    */
   clipsDescendants?: true;
+  /**
+   * Set on the ROOT of a tree its source gives as a FLAT LIST (code review
+   * of deep/r5-covers, P1, 2026-10-09): idb's `describe-all`, every element
+   * a child of a synthetic 0×0 root (adapters/ios-tree-source.ts#idbTree)
+   * in the list's order — no node has a parent of its own, so nothing in
+   * the tree says what a node belongs to. Read by ui-tree/draw-order.ts,
+   * whose `target` question judges such a list by an interim rule of its
+   * own (`flatListAbove`). A mark of the source, like `ofKeyboard` and
+   * `clipsDescendants`: ui-tree knows no platform, and the shape alone (a
+   * rectless root over leaves) would also match a test's or a future
+   * source's tree that is not idb's. Absent on WDA and Android trees.
+   */
+  flatList?: true;
 }
 
 /**

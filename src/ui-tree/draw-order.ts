@@ -148,9 +148,10 @@ interface Placed {
   readonly parent: Placed | undefined;
 }
 
-/** What a row is judged against beside the node: the screen's area (`screenOf`). */
+/** What a row is judged against beside the node: the screen's area (`screenOf`), and whether the tree is a flat list (`UiNode.flatList` on its root). */
 interface Seen {
   readonly screen: number;
+  readonly flatList: boolean;
 }
 
 /** What the `target` column is judged against besides: the target, at its first place in the walk. */
@@ -391,18 +392,44 @@ const NOT_DRAWN = {
    * refusal, the safe direction for a keyboard dismissal; for a tap target
    * it is not: it refuses BackButton).
    *
-   * RESIDUAL under idb, open for the owner (review round 2): idb's list is
-   * FLAT, so no node has a scroll-view ancestor and this row never fires.
-   * A row scrolled up under the top bar — idb keeps its real rect, the bug
-   * note measured the IBAN input at y 27 — follows BackButton and the title
-   * in the list and reads as drawn over them: `tap BackButton` is refused
-   * (`… under button "Debit account" … nothing of it shows`), or moved,
-   * nothing pressed. CONTINUE over a row is the same order and geometry,
-   * so no rule is written for it without a device read of idb's order
-   * (pinned in tests/ui-tree/draw-order.test.ts, "idb residual").
+   * Under idb this row never fires: its list is FLAT, so no node has a
+   * scroll-view ancestor — `flatListAbove` stands in for it there.
    */
   scrolledContent: {
     target: ({ scroller }, { target }) => scroller !== undefined && !within(target, scroller),
+  },
+
+  /**
+   * ABOVE THE TARGET IN A FLAT LIST: under idb (`UiNode.flatList` on the
+   * root), a node whose TOP lies above the target's top. `target` only —
+   * an INTERIM rule, the owner's decision of 2026-10-09 (code review of
+   * deep/r5-covers, P1), to be measured on device; NOT measured: whether
+   * idb's list order is paint order at all is unknown.
+   *
+   * Why: idb's list is flat, so `scrolledContent` cannot tell a row of the
+   * form from the bar over it, and a row scrolled up under the translucent
+   * top bar — idb keeps its real rect, the bug note measured the IBAN input
+   * at y 27 — comes AFTER BackButton and the title in the list and read as
+   * drawn over them: `tap BackButton` and `scroll_until` to it were refused
+   * (`… under button "Debit account" … nothing of it shows`), the one tap
+   * that leaves the screen. The cases the rule is held to: the row at y
+   * 27–40 is no cover of BackButton (y 70) or the title (y 74) — its top
+   * is above theirs; the pinned CONTINUE bar (y 780) over `priority_select`
+   * (y 771) still is — its top at or below the target's, the bug's own
+   * shape (tests/fixtures/idb-swift-form-continue.json). A pinned bar
+   * covers what scrolls up to it from above, and content scrolled under a
+   * top bar lies above what the bar holds.
+   *
+   * Residuals, stated: a cover whose top lies above the target's — a
+   * bottom sheet or a dialog laid over a row it starts above, a bar taller
+   * than a row it reaches over — is not seen under idb (a false "clear":
+   * the tap may press the cover); a row scrolled under a top bar whose top
+   * lies at or below a bar item's — a short row under a tall bar — still
+   * reads as cover (a false refusal, the safe direction). WDA's nested tree
+   * and Android's never meet this row: neither is marked.
+   */
+  flatListAbove: {
+    target: ({ node }, { target, flatList }) => flatList && node.rect.y < target.node.rect.y,
   },
 
   /**
@@ -598,7 +625,7 @@ function subtract(from: Rect, cut: Rect): Rect[] {
  */
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
-  const seen: Seen = { screen: rectArea(screen) };
+  const seen: Seen = { screen: rectArea(screen), flatList: tree.flatList === true };
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
   const walk = (node: UiNode, parent: Placed | undefined, scroller: Placed | undefined): void => {

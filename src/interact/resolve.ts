@@ -519,11 +519,11 @@ export interface Aim {
  * Only nodes of the tree cover (decision 4): iOS's status bar and a top bar
  * the tree lists before the form — WDA's, idb's (only its button and title)
  * — are not inferred, so a row scrolled up under them is tapped at its
- * centre as before the check existed. The other way round is a residual
- * under idb: a row scrolled under the bar reads as drawn over BackButton
- * and the title (idb's flat list, ui-tree/draw-order.ts's `scrolledContent`
- * row), so a tap on them is moved or refused, nothing pressed — open for
- * the owner.
+ * centre as before the check existed. The other way round — a row
+ * scrolled under the bar read as drawn over BackButton and the title, under
+ * idb, whose list is flat — is judged by an INTERIM rule, unmeasured
+ * (ui-tree/draw-order.ts's `flatListAbove` row: in idb's list a later node
+ * covers only when its top lies at or below the target's).
  */
 export async function aimClearOfChrome(
   target: Target,
