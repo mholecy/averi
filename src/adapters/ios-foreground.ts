@@ -75,14 +75,13 @@ import { sleep } from '../util/sleep.js';
  *  - any other label — an app averi never launched (the MEASURED case:
  *    opened by hand, or before the server started) or a localized name:
  *    treat the tree as the previous app's until a read carries one of the
- *    bundle's names; only a read still under that label 20 s or more after
- *    the launch, with the screenshot showing the launched app, makes it a
- *    localized name. 20 s, not "a few": the measured window outlasted 4.5 s
- *    and was over by ~15 s — ONE switch measured, so a one-sample bound
- *    with margin, for a later device check to revise — and a localized name (unmeasured, rare) paying a
- *    long re-read once is cheaper than a stale tree trusted.
+ *    bundle's names; only a read still under that label LOCALIZED_REREAD_MS
+ *    or more after the launch, with the screenshot showing the launched app,
+ *    makes it a localized name (the bound and its reason are the
+ *    constant's; the measured window the note quotes is
+ *    STALE_TREE_MEASURED_MS).
  * Considered and not done: one more read after the bound before writing the
- * note (one read ~3.3 s in would not have outlasted the measured ≥ 4.5 s,
+ * note (one read ~3.3 s in would not have outlasted STALE_TREE_MEASURED_MS,
  * and a longer bound is paid by every localized-name launch); asking every
  * installed app's name on the give-up path (`simctl listapps`) — the one
  * lookup that would have named the measured case's app, but its output
@@ -133,6 +132,25 @@ export const FOREGROUND_WAIT_MS = 3_000;
  * becoming a hot loop.
  */
 export const FOREGROUND_POLL_MS = 200;
+
+/**
+ * The longest the previous app's tree was measured outlasting a launch — at
+ * least this long (2026-10-09, at 347e70d: a raw read just after the 4.2 s
+ * reply was still the bank app's). Quoted by the give-up note
+ * (`notInFront`), never waited for.
+ */
+const STALE_TREE_MEASURED_MS = 4_500;
+
+/**
+ * How long after the launch a read must still carry the stale label before
+ * the give-up note lets it be the app's localized name (`notInFront`). 20 s,
+ * not "a few": the measured window outlasted STALE_TREE_MEASURED_MS and was
+ * over by ~15 s — ONE switch measured, so a one-sample bound with margin,
+ * for a later device check to revise — and a localized name (unmeasured,
+ * rare) paying a long re-read once is cheaper than a stale tree trusted.
+ * Advice in the note only: the wait itself never runs this long.
+ */
+const LOCALIZED_REREAD_MS = 20_000;
 
 /** What the wait needs: the launched bundle, one read of the tree's Application label, and the bundle's names (cached by the caller). */
 export interface ForegroundCheck {
@@ -228,7 +246,7 @@ const whose = (label: string) =>
  * The note for a label that never matched, chosen by the label (see the
  * module comment): SpringBoard's — read again; another known app's name
  * (`owner`) — that app's tree, read again; else both readings, told apart
- * by a read 20 s after the launch. The head is the same for all three.
+ * by a read LOCALIZED_REREAD_MS after the launch. The head is the same for all three.
  */
 function notInFront(bundleId: string, label: string, names: readonly string[], owner: string | undefined): string {
   const head =
@@ -246,7 +264,8 @@ function notInFront(bundleId: string, label: string, names: readonly string[], o
   return (
     head +
     `Treat the tree as the previous app's until a read is labelled ${names.length > 0 ? quoted(names) : `with one of ${bundleId}'s names`}: after an app switch idb was measured ` +
-    `serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is still labelled "${label}" ` +
+    `serving the previous app's tree for ${formatSeconds(STALE_TREE_MEASURED_MS)} and more. ` +
+    `Only if a read ${formatSeconds(LOCALIZED_REREAD_MS)} or more after the launch is still labelled "${label}" ` +
     `while the screenshot shows ${bundleId} is that label its on-screen name (a localized display name its Info.plist does ` +
     "not carry), and this note can be ignored. The screenshot alone cannot tell them apart: it shows the launched app " +
     "before idb's tree does"
