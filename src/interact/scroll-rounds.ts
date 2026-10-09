@@ -304,6 +304,8 @@ export interface Judged {
   under?: Cover;
   /** The nodes drawn over it inside the frame, pre-order; empty when none. */
   covers: readonly UiNode[];
+  /** Where each of `covers` presses, in the same order (draw-order.ts#Exposure.reaches): a pinned bar's reach, not its frame — what `observe`'s far-side test reads. */
+  reaches: readonly Rect[];
   /** The cover drawn over its centre (`tapPoint`, the point a tap presses), when the centre lies in the frame under one. */
   centreCover?: UiNode;
   /**
@@ -900,6 +902,7 @@ function judge(
       clipped: clippedEdges(node.rect, frame),
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
+      reaches: seen?.reaches ?? [],
       ...(centreCover !== undefined && { centreCover }),
       ...centreFacts(node),
       shows: seen?.shows ?? visible,
@@ -908,7 +911,7 @@ function judge(
   const scored = found.map((node): Judged => {
     if (cover === undefined || cover.keyboardSide(node)) return inFrame(node, viewport);
     const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], ...centreFacts(node), shows: 0 };
+    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], reaches: [], ...centreFacts(node), shows: 0 };
     return inFrame(node, above, cover.cover);
   });
   return scored.sort((a, b) => better(a, b, fully))[0];
@@ -1178,8 +1181,12 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // "content exhausted … a layout defect" after two, and from -20
     // `direction: "up"` flung it to 771 under CONTINUE and swiped up six
     // times more. The target is right there: the strokes turn at once.
+    // Where a cover presses, as exposure judged it (`Judged.reaches`, code
+    // review of round 6b P1): CONTINUE pinned at idb's flat list reaches the
+    // screen's bottom, so the row flung to 776–828 has it over its far
+    // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
-    const atFarEdge = best.visible > 0 && (beyond || best.covers.some((c) => overFar(c.rect)));
+    const atFarEdge = best.visible > 0 && (beyond || best.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyond) s.seenShort = true;
     if (best.visible > 0) s.inFrameAfter = s.swipes;

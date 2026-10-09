@@ -126,6 +126,14 @@ export interface Exposure {
   readonly shows: number;
   /** The nodes drawn over it inside `within`, in pre-order; empty when none. */
   readonly covers: readonly UiNode[];
+  /**
+   * Where each of `covers` presses, in the same order: its rect, or — for a
+   * node pinned at a flat list's bottom (`bottomPinned`) — its reach
+   * (`pinnedReach`). The rects `shows`, `largest` and `coverAt` are judged
+   * against, so a caller asking where a cover lies over the target (scroll-
+   * rounds.ts#overFarSide) asks of the same rect.
+   */
+  readonly reaches: readonly Rect[];
   /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
   /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — `coverAt` of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
@@ -1135,6 +1143,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       return {
         shows: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
         covers,
+        reaches: over.map((c) => ({ ...c.reach })),
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         ...(tapAt !== undefined && { tapAt }),

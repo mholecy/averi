@@ -1517,11 +1517,30 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(strokesToward(play({ ...IPHONE, fully: true }, [one(320), one(100), one(100)]))).toEqual(['up']);
   });
 
+  // A nested tree (WDA's): no pinned reach, so CONTINUE is its frame, over neither edge. idb's flat list: below (P1).
   it('measured shape, direction up, fully: true: flung to 776 — its top under CONTINUE, its bottom (828) below the bar\'s, so no side of it is the bar\'s — stuck up, then ONE stroke back before the defect: it reveals the row', () => {
     const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), form(514), form(514)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down']);
     expect(reaches(played)).toEqual([1, 1, 1, 0.5]);
     expect(resultOf(played)).toEqual({ swipes: 4, visible: 1, clipped: [] });
+  });
+
+  describe('under idb\'s flat list, the far side is where a cover PRESSES — CONTINUE pinned at the bottom reaches the screen\'s bottom (draw-order.ts#bottomPinned; code review of round 6b P1)', () => {
+    /** The same read as idb gives it: a flat list, CONTINUE listed last and pinned. */
+    const idb = (y: number): Row => ({ ...form(y), flatList: true });
+
+    it('measured, direction up from -20: flung to 776–828 — CONTINUE\'s reach (780 down to 874) is over its far (bottom) side — turned at once, half the reach; not two unmoved strokes and the stuck turn', () => {
+      const played = play({ ...MEASURED, direction: 'up', fully: true }, [idb(-20), idb(776), idb(514), idb(514)]);
+      expect(strokesToward(played)).toEqual(['up', 'down']);
+      expect(reaches(played)).toEqual([1, 0.5]);
+      expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    });
+
+    it.each([776, 800, 850])('no false turn the other way: direction down, the row at %i under CONTINUE — the reach is over its near (bottom) edge too, or lies in the near half — stroked down, the caller\'s way', (y) => {
+      const played = play({ ...MEASURED, fully: true, maxSwipes: 1 }, [idb(y), idb(y + 1)]);
+      expect(strokesToward(played)).toEqual(['down']);
+      expect(reaches(played)).toEqual([1]);
+    });
   });
 
   it('the stuck turn is ONE stroke, once: a stroke back that moves it, and a second stuck, fail as before — no third direction change for the stuck test', () => {

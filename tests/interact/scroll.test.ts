@@ -808,10 +808,13 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
   });
 
-  it('direction up, fully: true, from -20 flung to 776 — its top under CONTINUE, its bottom (828) below the bar\'s: stuck up twice, then ONE stroke back reveals it — not "a layout defect"', async () => {
+  // Code review of round 6b, P1: until then the far side was read off CONTINUE's FRAME (780–824), over neither edge of the
+  // row at 776–828, so the scroll swiped up twice more, unmoved, before the stuck turn; idb's list pins CONTINUE, whose
+  // reach runs to the screen's bottom (draw-order.ts#bottomPinned) — over the row's far (bottom) side.
+  it('direction up, fully: true, from -20 flung to 776 — its top under CONTINUE, and CONTINUE\'s reach (down to 874) over its bottom: turned at once, the stroke back reveals it — not "a layout defect"', async () => {
     const fake = await following(-20, (travel, y) => (travel > 0 ? 776 : y + travel));
-    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6, direction: 'up', fully: true })).toEqual({ swipes: 4, visible: 1, clipped: [] });
-    expect(fake.swipes.map(fingerWay)).toEqual([1, 1, 1, -1]);
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6, direction: 'up', fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.swipes.map(fingerWay)).toEqual([1, -1]);
   });
 
   it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {
