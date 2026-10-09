@@ -71,7 +71,7 @@ The recovery pass never re-runs a destructive flow, one whose `requires:` chain 
 | `assert` | a LIST of element asserts: `assert: [ { element: { id: x }, text: "…" } ]` | A failure fails the flow, with the diff in the trace. |
 | `wait` | `{ element: … }` or `{ state: … }`, `timeout:` | |
 | `branch` | list of `{ when: <condition>, do: [steps] }` | The first matching arm runs. With no matching arm the step times out and fails, so cover every outcome. |
-| `optional` | `[steps]` | A step whose element is absent is skipped, and so are the failures listed below. A config refusal, and a tap refused on a present element, fail the flow (see below). |
+| `optional` | `[steps]` | A step whose element is absent is skipped, and so are the failures listed below. A config refusal, a tap refused on a present element, and a `fill` whose value did not land or was refused fail the flow (see below). |
 
 For platforms that need different steps, a step can be `{ android: <step>, ios: <step> }`. Either side may be left out, and the step is then skipped on that platform.
 
@@ -85,13 +85,11 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
   - **An optional `scroll_until` that found its element but could not stop on it:** still clipped, covered, or under the status bar when the content ran out; under a soft keyboard that leaves nothing to judge; or out of swipes or time with the element seen.
   - **A tap (or a `type_pin` key) whose element never held still:** `Timed out … to hold still (found, but never at the same position in two consecutive reads)`.
   - **A tap whose element the presence check saw, then left:** `Timed out … to appear` from the tap itself, after the ~1.5 s presence check had found it. It WAS there.
-  - **A `fill` whose field was found and tapped, but the text did not land:** `fill: typed N characters but the field shows M …`, `fill: field still shows … after clearing twice`, or the field could not be read back.
-  - **A `fill` refused for a control character** before anything was tapped: `cannot type U+000A …`.
-  - **A tap or typing command the device refused** (an `adb` or WDA error) on a found element.
+  - **A tap or typing command the device refused** (an `adb` or WDA error) on a found element. This includes a `fill`'s typing or clearing command: a device error while typing is still skipped. A `fill` whose field could not be read back after the focus tap is not; it fails the flow (below).
   - **A failed `assert`:** `N/M flow asserts failed`.
   - **A step with no element of its own:** a `wait:` or `branch:` that timed out (the text names what it waited for); a `swipe` or a `type` that failed; a `launch` the device refused (not one with no `app.<platform>` section: that is a config refusal).
   - **A malformed `timeout:` on a nested step** (a `wait:`, `scroll_until`, or a tap inside a `branch:` or platform override): `Invalid duration "…"`. The optional `tap`'s own malformed `timeout:` is a config refusal.
-  - **A dead device:** `(last UI tree read failed: …)`. The device could not be read, which is not the same as the element being missing.
+  - **A dead device:** `(last UI tree read failed: …)`. The device could not be read, which is not the same as the element being missing. The exception is a `fill` whose field could not be read again after its focus tap: it fails the flow (below).
 
   The first three are skipped deliberately. Each of the others means the step got further than "the interstitial is absent": the element was found, or the step failed on something other than an element. Read such a skip as a descriptor or app bug, not a missing interstitial.
 - Everything else fails the flow even inside `optional:`:
@@ -101,7 +99,11 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
     - on iOS, the element's centre is under the status bar (the top safe-area inset, 62 pt on a 402x874 iPhone). This counts as off screen even though the centre lies inside the rect you see on screen, because a tap there goes to the status bar. A target PINNED there, in no scroll view (a layout that ignores the safe area, such as a close button drawn at the very top), is refused every time, and no scroll moves it: the refusal says `it is pinned under the status bar`. Under `optional:` it fails the flow like any other refusal;
     - a soft keyboard covers it and averi sent nothing: on iOS no usable `keyboardDismiss` entry, on Android the window state and the input method disagree about the keyboard.
 
-    The `✗` line reads `optional step not skipped: its element is present, but the tap was refused — …`. Inside a `reach:` ladder averi then checks `detect` once more: if the rung already reached the state, the call passes. Otherwise the ladder stops there and does NOT escalate to the next rung, even when a later rung might have cleared the screen, because that rung may be the destructive one. Fix the step (`scroll_until` the element first, configure a dismissal, or hide the keyboard in an earlier step) or the screen. For a target pinned under the status bar only the screen's layout can be fixed.
+    The `✗` line reads `optional step not skipped: its element is present, but the tap was refused — …`.
+  - A `fill` whose text did not land: the read-back shows something else (`fill: typed N characters but the field shows M …`), the clear left text twice (`fill: field still shows … after clearing twice`), or the field could not be read again after the focus tap (`fill: could not re-read …`). The field was tapped and may hold partial text, and a half-typed form must not run on. The `✗` line reads `optional step not skipped: its field is present, but its value did not land — …`.
+  - A `fill` whose value holds a control character (`cannot type U+000A …`). The `✗` line reads `optional step not skipped: averi refused its value before anything was typed — …`.
+
+    For each of these three, inside a `reach:` ladder averi then checks `detect` once more: if the rung already reached the state, the call passes. Otherwise the ladder stops there and does NOT escalate to the next rung, even when a later rung might have cleared the screen, because that rung may be the destructive one. Fix the step (`scroll_until` the element first, configure a dismissal, or hide the keyboard in an earlier step) or the screen. For a target pinned under the status bar only the screen's layout can be fixed.
 - Since 2026-10-08 a `tap:` or `fill:` on an element whose centre is off screen FAILS the flow, and since 2026-10-09 inside `optional:` too. Before, the tap went to a point off the screen and the step passed; the failure surfaced steps later. Add a `scroll_until` before such a step (`fully: true` if the element sits at a screen edge).
 
 ## `dismissKeyboard` on `fill`
