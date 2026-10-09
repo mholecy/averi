@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
 import type { ReadBack } from '../../src/interact/fill-facts.js';
-import { judgeFill, wordingOf } from '../../src/interact/fill-verdict.js';
+import { judgeFill } from '../../src/interact/fill-verdict.js';
+import { wordingOf } from '../../src/interact/fill-text.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
@@ -272,7 +273,7 @@ describe('fillField — masked fields verify by length', () => {
     appendBullets(fake);
     const { maskedAppend } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
     expect(fake.focused?.value).toHaveLength(36);
-    expect(maskedAppend).toEqual({ held: 20 }); // its sentence is fill-verdict.ts's (fill-verdict.test.ts)
+    expect(maskedAppend).toEqual({ held: 20 }); // its sentence is fill-text.ts's (fill-text.test.ts)
   });
 
   // Review 2026-09-18: the pre-tap read is stale for both shapes below, and a

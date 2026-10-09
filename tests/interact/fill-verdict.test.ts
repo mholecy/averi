@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { FillResult } from '../../src/interact/fill-facts.js';
-import { charactersText } from '../../src/util/count.js';
-import { caveatText, judgeFill, wordingOf, type Caveat, type FillVerdict, type Reason } from '../../src/interact/fill-verdict.js';
+import { judgeFill } from '../../src/interact/fill-verdict.js';
 
 /**
  * The judgement is asserted as CODES — `did`, `sent`, `reasons`, `caveats`
  * — never as wording: a wording change touches the sentence tables' block
- * below and nothing else. Every fact shape the old reply tests built by
- * hand (tool-text.test.ts until 2026-10-09) is judged here, including the
- * two fillField never produces (marked), because the invariants must hold
- * over the whole FillResult type, not only the shapes measured today.
+ * in fill-text.test.ts and nothing else. Every fact shape the old reply
+ * tests built by hand (tool-text.test.ts until 2026-10-09) is judged here,
+ * including the two fillField never produces (marked), because the
+ * invariants must hold over the whole FillResult type, not only the shapes
+ * measured today.
  */
 const fact = (f: Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>): FillResult => ({ role: 'textfield', ...f });
 const landed = { kind: 'landed' } as const;
@@ -118,67 +118,5 @@ describe('judgeFill — what the facts mean', () => {
           if (v.sent !== undefined) expect(v.sent.what === 'deletes').toBe(v.did === 'cleared');
           if (readBack.kind === 'landed') expect(v.reasons).toEqual([]);
         }
-  });
-});
-
-/**
- * Every row of the three sentence tables, byte for byte — the wording of
- * the MCP reply and the flow line alike (their layout is pinned in
- * fill-text.test.ts). Built from literal verdicts: the tables are total over
- * the codes, so each code is one case.
- */
-describe('wordingOf — every sentence', () => {
-  const verdict = (v: Partial<FillVerdict>): FillVerdict => ({ did: 'typed', typed: 3, reasons: [], caveats: [], ...v });
-  const unverified = (...reasons: Reason[]) => wordingOf(verdict({ reasons })).unverified;
-
-  it('the reasons, joined in order under one `NOT verified:`; none is undefined', () => {
-    expect(unverified()).toBeUndefined();
-    expect(unverified({ code: 'no-value', role: 'textfield' })).toBe('NOT verified: the matched node exposes no value (role textfield)');
-    expect(unverified({ code: 'not-taken', role: 'text' })).toBe(
-      "NOT verified: the matched node's value does not show the typed text (role text) — it is not the field",
-    );
-    expect(unverified({ code: 'lost', why: 'unmatched' })).toBe('NOT verified: the field could not be found again (the selector no longer matches it)');
-    expect(unverified({ code: 'lost', why: 'screen-changed' })).toBe('NOT verified: the field could not be found again (the screen changed while typing)');
-    expect(unverified({ code: 'no-value', role: 'text' }, { code: 'clear-unmeasured', role: 'text' })).toBe(
-      "NOT verified: the matched node exposes no value (role text); clear sent no delete — a role text node's length is not the field's",
-    );
-    expect(unverified({ code: 'no-value', role: 'textfield' }, { code: 'clear-no-length' })).toBe(
-      'NOT verified: the matched node exposes no value (role textfield); clear sent no delete — the node gave no length to delete',
-    );
-  });
-
-  it('what was sent, and the typed length — singular for one', () => {
-    expect(wordingOf(verdict({ sent: { what: 'characters', n: 7 } })).sent).toBe('cleared 7 characters first');
-    expect(wordingOf(verdict({ sent: { what: 'characters', n: 1 } })).sent).toBe('cleared 1 character first');
-    expect(wordingOf(verdict({ sent: { what: 'deletes', n: 7 } })).sent).toBe('7 deletes sent');
-    expect(wordingOf(verdict({ sent: { what: 'deletes', n: 1 } })).sent).toBe('1 delete sent');
-    expect(wordingOf(verdict({})).sent).toBeUndefined();
-    expect([0, 1, 2].map((typed) => wordingOf(verdict({ typed })).typed)).toEqual(['0 characters', '1 character', '2 characters']);
-    expect([0, 1, 2].map(charactersText)).toEqual(['0 characters', '1 character', '2 characters']);
-  });
-
-  it('the caveats: the three not-an-input inputs, typed or not, and the masked append', () => {
-    const notInput = (input: Extract<Caveat, { code: 'not-input' }>['input'], typed = true) => caveatText({ code: 'not-input', role: 'text', typed, input });
-    expect(notInput({ identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 343, width: 350, height: 56 }, overlaps: true })).toBe(
-      'the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
-        'the input overlapping it is textfield id:"TextFieldWithComponentStyle" at 26,343 350x56 — ' +
-        'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
-    );
-    expect(notInput({ identifier: null, rect: { x: 0, y: 20, width: 100, height: 10 }, overlaps: false })).toBe(
-      'the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
-        'the nearest input is textfield at 0,20 100x10 — select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
-    );
-    expect(notInput('none')).toBe('the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; no textfield is on the screen');
-    expect(notInput('unread', false)).toBe(
-      'the matched node is role text, not a textfield — nothing was deleted, and the focus is wherever the tap left it; the screen could not be read again to name the input',
-    );
-    expect(caveatText({ code: 'masked-append', held: 20 })).toBe(
-      'masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
-    );
-    expect(caveatText({ code: 'masked-append', held: 1 })).toBe('masked field already held 1 character and clear is not set — typing APPENDS; pass clear: true to replace');
-    expect(wordingOf(verdict({ caveats: [{ code: 'not-input', role: 'text', typed: true, input: 'none' }, { code: 'masked-append', held: 2 }] })).caveats).toEqual([
-      notInput('none'),
-      'masked field already held 2 characters and clear is not set — typing APPENDS; pass clear: true to replace',
-    ]);
   });
 });

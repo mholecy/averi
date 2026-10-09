@@ -6,7 +6,7 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
-import { caveatText } from './fill-verdict.js';
+import { caveatText } from './fill-text.js';
 import type { FillResult, LostWhy, NearbyInput, ReadBack } from './fill-facts.js';
 import { INPUT_ROLE } from './input-role.js';
 import { charactersText } from '../util/count.js';

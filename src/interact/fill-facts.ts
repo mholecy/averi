@@ -2,8 +2,8 @@
  * What a fill MEASURED — the facts interact/fill.ts#fillField returns, and
  * nothing else: no I/O, no judgement, no sentence. A leaf, so that the
  * three modules that read them each import it and none imports another for
- * its types — fill.ts measures (and imports fill-verdict.ts for one
- * sentence, its mismatch error's), fill-verdict.ts judges, fill-text.ts says. Until
+ * its types — fill.ts measures (and imports fill-text.ts for one sentence,
+ * its mismatch error's), fill-verdict.ts judges, fill-text.ts says. Until
  * 2026-10-09 these types lived in fill.ts, which imported fill-verdict.ts
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the
@@ -29,8 +29,8 @@ export interface NearbyInput {
  * What the fill DID, as facts — measured, never worded. What they mean
  * (verified or not, and why; the head verb; what the clear sent) is decided
  * once by interact/fill-verdict.ts#judgeFill, and every sentence about them
- * is that module's; the MCP reply and the flow line render the verdict, and
- * neither restates the request. Until 2026-10-08 both printed the REQUESTED
+ * is interact/fill-text.ts's, the one renderer of the MCP reply and the flow
+ * line, and neither restates the request. Until 2026-10-08 both printed the REQUESTED
  * `clear` ("cleared first", "(cleared)") and an unreadable read-back passed
  * as landed: on iOS idb a floating-label `text` node was "Filled … (22
  * characters, cleared first)" with nothing cleared and nothing typed

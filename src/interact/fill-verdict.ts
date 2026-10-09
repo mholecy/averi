@@ -1,5 +1,5 @@
 /**
- * What a fill's facts MEAN, decided once — and every sentence that says it.
+ * What a fill's facts MEAN, decided once, as codes — never as sentences.
  *
  * interact/fill.ts measures (`FillResult`: what the clear deleted, how the
  * read-back went, what the node is, what the masked field held). Two media
@@ -14,20 +14,22 @@
  * (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
  *
  * Now the split is three-way, each part with one owner:
- * - facts — interact/fill-facts.ts#FillResult, measured by fill.ts, never worded (the
- *   masked-append warning was a sentence on the result until 2026-10-09; it
- *   is `maskedAppend: { held }` now, and its sentence is a row below);
+ * - facts — interact/fill-facts.ts#FillResult, measured by fill.ts, never
+ *   worded (the masked-append warning was a sentence on the result until
+ *   2026-10-09; it is `maskedAppend: { held }` now, and its sentence a row
+ *   in fill-text.ts);
  * - judgement — `judgeFill` here: the head verb (`did`), what the clear
  *   sent and how to count it (`sent`), WHY the fill is not verified
  *   (`reasons`, codes) and what else the caller must hear (`caveats`,
  *   codes). Pure, total, no I/O; the tests of the judgement assert codes,
  *   never wording;
- * - words — `wordingOf` / `caveatText` here, over two exhaustive tables
- *   (`REASON_SENTENCE`, `CAVEAT_SENTENCE`, plus `SENT_SENTENCE`): a new code
- *   without its sentence does not compile. Layout — where those words sit in
- *   a reply or a trace line — is interact/fill-text.ts's, the one renderer
- *   of both media, which branches on `did` and on whether `sent` and
- *   `unverified` are there, never on a reason code.
+ * - words — interact/fill-text.ts's, all of them: the sentence tables
+ *   (one row per code, exhaustive, so a new code without its sentence does
+ *   not compile) and the layout of both media beside them. The same rule as
+ *   scroll_until's (interact/scroll-rounds.ts judges into typed outcomes,
+ *   interact/scroll-text.ts says every sentence): the judge emits codes, the
+ *   renderer owns the words. Until 2026-10-09 (code review S1) the tables
+ *   sat here and only the layout was fill-text.ts's.
  *
  * The verdict's invariants (pinned in tests/interact/fill-verdict.test.ts):
  * - `did === 'filled'` ⇔ `reasons.length === 0` — "Filled" is the only
@@ -48,17 +50,13 @@
  *   warning (fill.ts never produces both: a masked-append needs an input
  *   that took the text, a not-input finding a read-back that did not land).
  *
- * The facts' types come from interact/fill-facts.ts, a leaf; fill.ts
- * imports this module by value for one thing, `caveatText` (its mismatch
- * error), and nothing here imports fill.ts. The two values both modules need are leaves of
- * their own: `INPUT_ROLE` (interact/input-role.ts) and `charactersText`
- * (util/count.ts) — neither is a judgement.
+ * Its only import is the facts' types, from interact/fill-facts.ts (a
+ * leaf): it imports neither fill.ts, which measures, nor fill-text.ts, which
+ * reads the verdict — the graph is fill.ts → fill-facts.ts ← fill-verdict.ts
+ * ← fill-text.ts, and fill.ts → fill-text.ts for its mismatch error's words.
  */
 
-import { rectText } from '../ui-tree/geometry.js';
-import { charactersText, countOf } from '../util/count.js';
 import type { FillResult, LostWhy, NearbyInput } from './fill-facts.js';
-import { INPUT_ROLE } from './input-role.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
@@ -148,78 +146,3 @@ export function judgeFill(r: FillResult): FillVerdict {
     note: r.note,
   };
 }
-
-/**
- * The words of a verdict, layout-free — what interact/fill-text.ts places:
- * - `typed`: `N character(s)`;
- * - `sent`: `cleared N character(s) first` | `N delete(s) sent`, present
- *   with the verdict's `sent`;
- * - `unverified`: `NOT verified: ` and every reason's sentence joined by
- *   `; `, present ⇔ the verdict has reasons;
- * - `caveats`: one sentence per caveat, in the verdict's order.
- */
-export interface FillWording {
-  typed: string;
-  sent?: string;
-  unverified?: string;
-  caveats: string[];
-}
-
-/** The verdict in words. Pure; with `caveatText`, the only producer of fill sentences. */
-export function wordingOf(v: FillVerdict): FillWording {
-  return {
-    typed: charactersText(v.typed),
-    sent: v.sent === undefined ? undefined : SENT_SENTENCE[v.sent.what](v.sent.n),
-    unverified: v.reasons.length === 0 ? undefined : `NOT verified: ${v.reasons.map(reasonText).join('; ')}`,
-    caveats: v.caveats.map(caveatText),
-  };
-}
-
-/** One caveat's sentence. Exported for fill.ts's mismatch error, which names the input the caller probably meant in the same words. */
-export function caveatText(c: Caveat): string {
-  return (CAVEAT_SENTENCE[c.code] as (c: Caveat) => string)(c);
-}
-
-function reasonText(r: Reason): string {
-  return (REASON_SENTENCE[r.code] as (r: Reason) => string)(r);
-}
-
-/** One row per code; the mapped type makes a missing row a compile error. */
-type SentenceTable<U extends { code: string }> = { [C in U['code']]: (u: Extract<U, { code: C }>) => string };
-
-const SENT_SENTENCE: Record<Sent['what'], (n: number) => string> = {
-  characters: (n) => `cleared ${charactersText(n)} first`,
-  deletes: (n) => `${countOf(n, 'delete')} sent`,
-};
-
-const REASON_SENTENCE: SentenceTable<Reason> = {
-  'no-value': (r) => `the matched node exposes no value (role ${r.role})`,
-  'not-taken': (r) => `the matched node's value does not show the typed text (role ${r.role}) — it is not the field`,
-  lost: (r) => `the field could not be found again${LOST_WHY_TEXT[r.why]}`,
-  'clear-unmeasured': (r) => `clear sent no delete — a role ${r.role} node's length is not the field's`,
-  'clear-no-length': () => 'clear sent no delete — the node gave no length to delete',
-};
-
-/** ` (why)` for a `lost` read-back, chosen per reason (review 2026-10-08, n-3: it read as "the selector no longer matches it" whatever the reason). */
-const LOST_WHY_TEXT: Record<LostWhy, string> = {
-  'screen-changed': ' (the screen changed while typing)',
-  unmatched: ' (the selector no longer matches it)',
-};
-
-const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
-  'not-input': ({ role, typed, input }) => {
-    const head =
-      `the matched node is role ${role}, not a ${INPUT_ROLE} — ` +
-      (typed ? 'typing goes wherever the focus tap left the focus' : 'nothing was deleted, and the focus is wherever the tap left it');
-    if (input === 'none') return `${head}; no ${INPUT_ROLE} is on the screen`;
-    if (input === 'unread') return `${head}; the screen could not be read again to name the input`;
-    // Identifier and rect only: never the label or the value (on Android an
-    // EditText's label falls back to its text, and a field may hold a credential).
-    const id = input.identifier === null ? '' : ` id:"${input.identifier}"`;
-    return (
-      `${head}; the ${input.overlaps ? 'input overlapping it' : 'nearest input'} is ${INPUT_ROLE}${id} at ${rectText(input.rect)} — ` +
-      `select the input itself (role:${INPUT_ROLE} with its id:, or its current value: when inputs share an id)`
-    );
-  },
-  'masked-append': ({ held }) => `masked field already held ${charactersText(held)} and clear is not set — typing APPENDS; pass clear: true to replace`,
-};
