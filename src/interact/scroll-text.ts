@@ -260,11 +260,18 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // Its centre under iOS's status bar at the end of the content (2026-10-09): no defect of the app's — the
       // point a tap presses is the status bar's, and no swipe that way moves it out. The other way may; a target
       // pinned there moves neither way (code review of round 6, P1), which is said rather than promised away.
+      // Turned (2026-10-09, scroll-rounds.ts#nextStroke): the scroll already went the other way, or skipped it as
+      // carrying the row further under — "try direction" would send the reader to a way that cannot help.
       if (short.of === 'statusBar') {
+        const other =
+          o.turns > 0
+            ? `, and the scroll turned to ${o.lastStroke} because swiping ${OPPOSITE[o.lastStroke]} carries it further under or past the edge — ` +
+              `it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it. `
+            : ` — try direction: "${OPPOSITE[o.lastStroke]}"; ` +
+              `if no direction moves it, it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it. `;
         return new Error(
           `scroll_until ${describe} failed after ${n} — ${statusBarText(judged, short.band)}, and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it out from under the status bar — try direction: "${OPPOSITE[o.lastStroke]}"; ` +
-            `if no direction moves it, it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it. ${last}`,
+            `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
         );
       }
       if (short.of === 'covered') {
@@ -311,7 +318,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
     }
     case 'bound': {
       const turned =
-        o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), so the next was drawn the other way` : '';
+        o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), or it lay at the edge the swipes push it out through, so the next was drawn the other way` : '';
       // The keyboard, when any round applied one: the reader must not take a
       // scroll that worked around it — or one it hid the element under — for
       // a wrong selector (the bug note's 15 s "never appeared").

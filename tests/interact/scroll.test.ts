@@ -638,12 +638,13 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
  * the plain stop stopped there; the tap that followed went to the status bar. interact/swipe.ts#iosStatusBand.
  */
 describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
-  /** The SWIFT form as idb lists it, `priority_select` moved by each stroke to the next of `ys` (the last one standing). */
-  async function flungForm(platform: 'ios' | 'android', ys: number[]) {
+  /** The SWIFT form as idb lists it, `priority_select` (at `start`, else where the fixture has it) moved by each stroke to the next of `ys` (the last one standing). */
+  async function flungForm(platform: 'ios' | 'android', ys: number[], start?: number) {
     const { readFile } = await import('node:fs/promises');
     const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
     const row = tree.children.find((n) => n.identifier === 'swift_payment.form.priority_select')!;
+    if (start !== undefined) row.rect = { ...row.rect, y: start };
     class Flung extends FakeAdapter {
       override async swipe(from: Point, to: Point): Promise<void> {
         await super.swipe(from, to);
@@ -692,6 +693,16 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     }
   });
 
+  // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md: measured, six
+  // `201 699 201 175` strokes to maxSwipes from a row resting at y 20, and "content exhausted … a layout defect" from -20.
+  it.each([20, -20])('a row RESTING at y %d (its centre in the band, or across the top edge): the first stroke is the turned one — the measured 262-pt stroke back', async (start) => {
+    for (const fully of [false, true]) {
+      const fake = await flungForm('ios', [563], start);
+      expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, fully })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+      expect(fake.swipes).toEqual([TURNED]);
+    }
+  });
+
   /** A screen that does not scroll, holding one image at `rect`. */
   const still = (rect: Rect) => {
     resetLayout();
@@ -736,13 +747,19 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(error.message).toContain("its centre stays under iOS's status bar at (201,61), in the top 62 pt of the screen");
   });
 
-  it('a list already at its bottom end, the target pushed up under the bar (24,10 354x52) by the default direction down: the failure says to try direction "up"', async () => {
-    const error = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
+  // Until docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md the
+  // default direction swiped DOWN twice and advised `direction: "up"`; the row lies at the edge a down stroke pushes it out
+  // through, so the scroll now turns up itself, at once — and with that tried too, the failure says it is pinned.
+  it('a screen that does not scroll, the target under the bar (24,10 354x52): the default direction down turns up at once; up moves it neither — pinned, no "try direction"', async () => {
+    const fake = still({ x: 24, y: 10, width: 354, height: 52 });
+    const error = (await scrollUntilVisible(fake, 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain(
       "its centre stays under iOS's status bar at (201,36), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted: " +
-        'swiping down no longer moves it out from under the status bar — try direction: "up"; ' +
-        'if no direction moves it, it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.',
+        'swiping up no longer moves it out from under the status bar, and the scroll turned to up because swiping down carries it further under or past the edge — ' +
+        'it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.',
     );
+    expect(fake.swipes.map((sw) => Math.sign(sw.to.y - sw.from.y))).toEqual([1, 1]); // the finger moves down: content up, both strokes
+    // direction: "up" from the start — the band is its NEAR edge, nothing turns it: the advice stands as it was.
     const up = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', { ...FAST, direction: 'up' }).catch((e: unknown) => e)) as Error;
     expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down"; if no direction moves it');
   });

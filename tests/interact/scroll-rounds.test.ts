@@ -5,7 +5,8 @@ import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../..
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
-import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Row } from '../helpers/rounds.js';
+import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Played, type Row } from '../helpers/rounds.js';
+import type { ScreenBox } from '../../src/interact/swipe.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
@@ -464,7 +465,7 @@ describe('round — after the device check', () => {
   it('a target flung past and turned round, which the turned strokes no longer move: the failure names the turns and the direction last swiped', () => {
     const played = play(FULLY, [613, -357, -357, -357].map((y) => wdaRow(y))); // carried past, then nothing moves it
     expect(failureOf(played, 'id:row').message).toMatch(
-      /^scroll_until id:row failed after 3 swipes \(the last 2, swiping up, did not move it: content exhausted, or the swipes were not taken\) — element in tree but never intersected the 402x572 screen above the soft keyboard over \[0,572\]\[402,874\] \(last rect \{"x":24,"y":-357,"width":354,"height":52\}\)\. It was turned round 1 time: a swipe carried it past the viewport \(a fling\), so the next was drawn the other way\. The soft keyboard was up/,
+      /^scroll_until id:row failed after 3 swipes \(the last 2, swiping up, did not move it: content exhausted, or the swipes were not taken\) — element in tree but never intersected the 402x572 screen above the soft keyboard over \[0,572\]\[402,874\] \(last rect \{"x":24,"y":-357,"width":354,"height":52\}\)\. It was turned round 1 time: a swipe carried it past the viewport \(a fling\), or it lay at the edge the swipes push it out through, so the next was drawn the other way\. The soft keyboard was up/,
     );
   });
 
@@ -998,6 +999,8 @@ describe('round — the flush check across nested clipping containers, and a pro
       ['up', true],
       ['down', false],
     ]);
+    // No stroke of the scroll's course went up: the stroke back is no turn, and keeps the full reach.
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' && st.probe !== true ? [st.reach] : []))).toEqual([1]);
   });
 
   it('a list still loading its next page — a spinner, the tree otherwise unchanged — is not called exhausted; the sentence names loading among the causes when no spinner shows', () => {
@@ -1337,5 +1340,85 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     const BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
     const played = play({ ...IPHONE, fully: true }, [{ ...form(400), cover: coverOver(BAND, NO_BACK) }]);
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+});
+
+describe('round — a target resting in the frame at the edge the strokes push it out through (docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md)', () => {
+  /** The iPhone 17 as the iOS adapter reports it: the 62-pt status band (adapters/ios-status-band.ts). */
+  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], statusBand: 62 };
+  const CONTINUE = node({ role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: { x: 24, y: 780, width: 354, height: 44 } });
+  /** A read of the SWIFT form with `priority_select` (354x52) at y, on the banded screen, CONTINUE drawn over the rest. */
+  const form = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [CONTINUE], screen: BANDED });
+  const MEASURED = { ...IPHONE, maxSwipes: 6 };
+  const reaches = (played: Played): number[] => played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []));
+
+  it('measured (a): plain, the row resting at y 20 — its centre in the band — with the default direction down: the first stroke turns back (content up) at half the reach, and stops — not six strokes down to maxSwipes', () => {
+    const played = play(MEASURED, [form(20), form(563), form(563)]);
+    expect(strokesToward(played)).toEqual(['up']);
+    expect(reaches(played)).toEqual([0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    // fully: true likewise.
+    expect(strokesToward(play({ ...MEASURED, fully: true }, [form(20), form(563), form(563)]))).toEqual(['up']);
+  });
+
+  it('measured (b): fully: true, the row at y -20 straddling the top edge: turned back at once, half the reach — not "content exhausted … a layout defect" after two strokes down', () => {
+    const played = play({ ...MEASURED, fully: true }, [form(-20), form(300), form(300)]);
+    expect(strokesToward(played)).toEqual(['up']);
+    expect(reaches(played)).toEqual([0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('measured (c): direction up from -20 — the stroke flings the row to 771 under CONTINUE, the edge content-up strokes push it out through: the next turns (content down), half the reach', () => {
+    const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(771), form(400), form(400)]);
+    expect(strokesToward(played)).toEqual(['up', 'down']);
+    expect(reaches(played)).toEqual([1, 0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('(c) when no stroke moves it from under CONTINUE either way: both directions tried, then stuck naming the bar — a layout defect', () => {
+    const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(771), form(771), form(771)]);
+    expect(strokesToward(played)).toEqual(['up', 'down', 'down']);
+    expect(played.outcome?.kind).toBe('stuck');
+    expect(failureOf(played, 'id:priority').message).toContain('swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect');
+  });
+
+  it('a cover over the far side at the TOP (a bar over the row\'s top, the default direction down): turned at once — not stroked on under it (code review P7\'s accepted cost)', () => {
+    const bar = node({ role: 'other', label: 'Header', rect: { x: 0, y: 62, width: 402, height: 60 } });
+    const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [bar] });
+    const played = play({ ...IPHONE, fully: true }, [row(100), row(300), row(300)]);
+    expect(strokesToward(played)).toEqual(['up']);
+    expect(reaches(played)).toEqual([0.5]);
+  });
+
+  it('a row pinned in the band (a screen that does not scroll): turned up at once, and when that does not move it either, stuck naming the status bar as pinned — no "try direction" the scroll already tried', () => {
+    const played = play(MEASURED, [form(10), form(10), form(10)]);
+    expect(strokesToward(played)).toEqual(['up', 'up']);
+    expect(played.outcome?.kind).toBe('stuck');
+    const message = failureOf(played, 'id:priority').message;
+    expect(message).toContain('swiping up no longer moves it out from under the status bar, and the scroll turned to up because swiping down carries it further under');
+    expect(message).toContain('it is pinned under the status bar');
+    expect(message).not.toContain('try direction');
+  });
+
+  it('Android, no band: fully: true, a row clipped at its scroll container\'s top edge (the screen\'s): turned back at once, half the reach', () => {
+    const scroller: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+    const played = play({ ...ANDROID, maxSwipes: 6, fully: true }, reads([-20, 400, 400], formRow, { scroller }));
+    expect(strokesToward(played)).toEqual(['up']);
+    expect(reaches(played)).toEqual([0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('a cover is judged over what of the row lies in the frame: scrolling up, a row running off the top under a top bar is covered whole there — the near side, no turn', () => {
+    const bar = node({ role: 'other', label: 'Header', rect: { x: 0, y: 0, width: 402, height: 100 } });
+    const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 80 }, 'priority')], over: [bar] });
+    const played = play({ ...IPHONE, direction: 'up', fully: true }, [row(-30), row(300), row(300)]);
+    expect(strokesToward(played)).toEqual(['up']);
+    expect(reaches(played)).toEqual([1]);
+  });
+
+  it('a row clipped at the NEAR edge (the bottom, scrolling down) is stroked on the caller\'s way, as before', () => {
+    const played = play({ ...MEASURED, fully: true }, [form(850), form(400), form(400)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(reaches(played)).toEqual([1]);
   });
 });
