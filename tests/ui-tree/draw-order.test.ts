@@ -6,7 +6,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { CLASSIC_VIEWS, COMPOSE } from '../helpers/android-dumps.js';
 import { node as uiNode } from '../helpers/fake.js';
 
 /**
@@ -411,9 +411,15 @@ describe('the three questions disagree on purpose, per row', () => {
     expect(ask(elsewhere)).toEqual({ shadowing: elsewhere, drawnOver: [elsewhere], target: [elsewhere] });
   });
 
-  it('own control: an interactive SIBLING holding a non-interactive target whole, inside their parent (a Compose Button\'s clickable over its label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
-    const control = uiNode({ role: 'button', rect: rect(140, 270, 120, 60) });
-    expect(ask(control, true)).toEqual({ shadowing: control, drawnOver: [], target: [] });
+  it('own control: an unlabelled interactive SIBLING holding a non-interactive target whole and filling their wrapper (a Compose Button\'s clickable over its label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
+    const target = uiNode({ role: 'text', label: 'title', rect: rect(150, 280, 100, 40) });
+    const control = uiNode({ role: 'button', rect: rect(140, 272, 120, 56) });
+    const wrapper = uiNode({ role: 'container', rect: rect(140, 270, 120, 60), children: [target, control] });
+    const order = drawOrder(uiNode({ role: 'application', rect: SCREEN, children: [uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: [wrapper] })] }));
+    expect({ shadowing: order.shadowing(target, P), drawnOver: order.drawnOver(LIST), target: order.exposure(target, SCREEN).covers }).toEqual({ shadowing: control, drawnOver: [], target: [] });
+    // The same control laid in the list beside the target: the list is no wrapper of it (it fills 3 % of it) — a cover.
+    const pinned = uiNode({ role: 'button', rect: rect(140, 270, 120, 60) });
+    expect(ask(pinned, true)).toEqual({ shadowing: pinned, drawnOver: [], target: [pinned] });
     // After the list, holding the target: no sibling — a bar's button, a cover.
     const bar = uiNode({ role: 'button', rect: rect(140, 270, 120, 60) });
     expect(ask(bar)).toEqual({ shadowing: bar, drawnOver: [bar], target: [bar] });
@@ -826,6 +832,49 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       expect(drawOrder(uiNode({ role: 'container', rect: PIXEL, children: [sheet] })).exposure(target, PIXEL).covers).toEqual([bar]);
     });
 
+    it('a classic View\'s pinned CTA in the SAME layout as a text (review of fix/r6): LOG IN over "Forgot password?" with the keyboard up, CONTINUE over the terms, a sheet\'s PAY over its fee — each fills a sliver of the layout and carries its own label: a cover', () => {
+      const cases: [string, string, string][] = [
+        ['Forgot password?', 'LOG IN', CLASSIC_VIEWS.loginImeUp],
+        ['By continuing you accept the terms', 'CONTINUE', CLASSIC_VIEWS.terms],
+        ['Fee: 2.00 EUR', 'PAY', CLASSIC_VIEWS.sheet],
+      ];
+      for (const [label, cta, xml] of cases) {
+        const { find, order } = parse(xml);
+        const seen = order.exposure(find((n) => n.label === label), PIXEL);
+        expect(seen.covers.map((n) => n.label)).toEqual([cta]);
+        expect(seen.tapAt).toBeUndefined();
+      }
+    });
+
+    it('the wrapper is the control\'s own only when the control fills it (OWN_CONTROL_FILL, 0.85) and says nothing itself: a labelled or valued control, or one filling 0.84 of the wrapper, covers; 0.86 does not — unless it misses part of the label, or fills a wrapper of its own beside the label\'s', () => {
+      // A 992x100 wrapper; the label 481,1400 118x49 inside it; the control 992 wide, h tall, from the wrapper's top.
+      const label = uiNode({ role: 'text', label: 'LOGIN', rect: rect(481, 1400, 118, 49) });
+      const filling = (h: number, partial: Partial<UiNode> = {}) => uiNode({ role: 'button', rect: rect(44, 1397, 992, h), ...partial });
+      const covers = (later: UiNode) => drawOrder(inParent(label, later, rect(44, 1397, 992, 100))).exposure(label, PIXEL).covers;
+      expect(covers(filling(86))).toEqual([]);
+      const thin = filling(84);
+      expect(covers(thin)).toEqual([thin]);
+      for (const said of [filling(100, { label: 'LOG IN' }), filling(100, { value: 'on' })]) expect(covers(said)).toEqual([said]);
+      // Filling the wrapper but not holding the label whole (the label below its bottom edge): a cover.
+      const low = uiNode({ role: 'text', label: 'LOGIN', rect: rect(481, 1470, 118, 25) });
+      const upper = filling(86);
+      expect(drawOrder(inParent(low, upper, rect(44, 1397, 992, 100))).exposure(low, PIXEL).covers).toEqual([upper]);
+      // Filling ITS OWN wrapper, a sibling of the label's (an unlabelled clickable Surface pinned as a bar over the label): a cover.
+      const surface = uiNode({ role: 'button', rect: rect(44, 1392, 992, 136) });
+      const bar = uiNode({ role: 'container', rect: rect(44, 1390, 992, 140), children: [surface] });
+      const tree = uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(0, 1200, 1080, 600), children: [uiNode({ role: 'container', rect: WRAPPER, children: [text()] }), bar] })] });
+      const target = [...everyNode(tree)].find((n) => n.label === 'LOGIN')!;
+      expect(drawOrder(tree).exposure(target, PIXEL).covers).toEqual([bar, surface]);
+    });
+
+    it('a non-interactive node of the wrapper\'s size holding the label — an opaque card, a loading view — covers it', () => {
+      const target = text();
+      for (const role of ['image', 'progress', 'other']) {
+        const card = uiNode({ role, rect: rect(44, 1402, 992, 121), ...(role === 'other' && { label: 'Loading' }) });
+        expect(drawOrder(inParent(target, card)).exposure(target, PIXEL).covers).toEqual([card]);
+      }
+    });
+
     it('in idb\'s flat list every node is a sibling, of the 0×0 root that holds nothing: a later button holding the text, its top at the text\'s, covers it', () => {
       const target = text();
       const later = button(rect(44, 1438, 992, 121));
@@ -844,6 +893,9 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       expect(drawOrder(rowOf(avatar(out))).exposure(label, PIXEL).covers).toEqual([out]);
       const header = uiNode({ role: 'container', label: 'December', rect: rect(66, 940, 948, 60), children: [uiNode({ role: 'text', label: 'December', rect: rect(100, 951, 300, 40) })] });
       expect(drawOrder(rowOf(header)).exposure(label, PIXEL).covers).toEqual([header, header.children[0]]);
+      // One wrapper down, as measured — two is not the target's: the avatar's text inside a frame of the avatar covers.
+      const deep = uiNode({ role: 'text', label: 'LR', rect: rect(136, 999, 48, 49) });
+      expect(drawOrder(rowOf(avatar(uiNode({ role: 'container', rect: rect(126, 990, 68, 68), children: [deep] })))).exposure(label, PIXEL).covers).toEqual([deep]);
     });
 
     it('…and only of a CHILDLESS target: the list holding the rows, with the tab bar\'s host drawn on it as its sibling, still has the tab and its text over it', () => {

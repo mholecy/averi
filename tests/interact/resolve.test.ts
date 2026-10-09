@@ -25,7 +25,7 @@ import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { parseUiautomatorXml } from '../../src/adapters/android.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { CLASSIC_VIEWS, COMPOSE } from '../helpers/android-dumps.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
@@ -703,6 +703,16 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     const under = await tapElement(fake, 'label:"Card payment, 15.12.2025, -12.00 EUR"', OPTS).catch((e: unknown) => e);
     expect(under).toBeInstanceOf(CoveredRefusal);
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE keeps the layout-defect diagnosis', async () => {
+    const login = compose(CLASSIC_VIEWS.loginImeUp);
+    await expect(tapElement(login, 'text:"Forgot password?"', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
+    expect(login.tapPoints).toEqual([]);
+    const terms = compose(CLASSIC_VIEWS.terms);
+    await expect(scrollUntilVisible(terms, 'text:"By continuing you accept the terms"', { maxSwipes: 2, settleMs: 0 })).rejects.toThrow(
+      /under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows — and the content is exhausted.* a layout defect/,
+    );
   });
 });
 
