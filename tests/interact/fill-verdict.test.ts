@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { FillResult } from '../../src/interact/fill-facts.js';
-import { judgeFill, type FillVerdict } from '../../src/interact/fill-verdict.js';
+import type { Difference, FillResult } from '../../src/interact/fill-facts.js';
+import { differenceOf, judgeFill, type FillVerdict, type Mismatch } from '../../src/interact/fill-verdict.js';
 
 /**
  * The judgement is asserted as CODES — `did`, `sent`, `reasons`, `caveats`
@@ -154,14 +154,33 @@ describe('judgeFill — what the facts mean', () => {
     for (const [f, sent] of rows) expect([f, judgeFill(fact(f)).sent]).toEqual([f, sent]);
   });
 
+  // Review of the hint-aware clear, probes C and K: a clear alone that ended
+  // on its named placeholder without seeing the field empty. fill.ts reports
+  // the fact (clearPlaceholder); the judgement is here since 2026-10-09.
+  it('clearPlaceholder: `shown` and `prefix` make a clear alone NOT verified (placeholder); `other`, or anything typed, does not', () => {
+    const rows: [Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>, Pick<FillVerdict, 'did' | 'sent' | 'reasons'>][] = [
+      // C: the field read its placeholder before any delete — nothing sent.
+      [{ typed: 0, readBack: nothingTyped, cleared: 0, clearPlaceholder: 'shown' }, { did: 'focused', sent: undefined, reasons: [{ code: 'placeholder' }] }],
+      // K: the deletes went into `Companyabc` and left `Company`.
+      [{ typed: 0, readBack: nothingTyped, cleared: 10, clearPlaceholder: 'prefix' }, { did: 'cleared', sent: { what: 'deletes', n: 10 }, reasons: [{ code: 'placeholder' }] }],
+      // Deleted INTO the placeholder from `Zed`: seen empty.
+      [{ typed: 0, readBack: nothingTyped, cleared: 3, clearPlaceholder: 'other' }, { did: 'filled', sent: { what: 'characters', n: 3 }, reasons: [] }],
+      // With a value the exact read-back decides, whatever the clear ended on.
+      [{ typed: 4, readBack: landed, cleared: 10, clearPlaceholder: 'prefix' }, { did: 'filled', sent: { what: 'characters', n: 10 }, reasons: [] }],
+      [{ typed: 0, readBack: { kind: 'lost', why: 'unmatched' }, cleared: 0, clearPlaceholder: 'shown' }, { did: 'focused', sent: undefined, reasons: [{ code: 'lost', why: 'unmatched' }] }],
+    ];
+    for (const [f, v] of rows) expect([f, judgeFill(fact(f))]).toMatchObject([f, v]);
+  });
+
   it('the invariants hold over every read-back, clear and length combination', () => {
     const readBacks: FillResult['readBack'][] = [landed, { kind: 'no-value' }, { kind: 'not-taken' }, { kind: 'lost', why: 'unmatched' }, nothingTyped, { kind: 'placeholder' }];
     const clears: FillResult['cleared'][] = [undefined, 0, 3, 'unmeasured'];
     for (const readBack of readBacks)
       for (const cleared of clears)
         for (const typed of [0, 1, 5])
-          for (const clearUnchanged of typeof cleared === 'number' ? [undefined, { shows: 9, deletes: 12 }] : [undefined]) {
-            const v = judgeFill(fact({ typed, readBack, cleared, clearUnchanged }));
+          for (const clearUnchanged of typeof cleared === 'number' ? [undefined, { shows: 9, deletes: 12 }] : [undefined])
+          for (const clearPlaceholder of [undefined, 'shown', 'prefix', 'other'] as const) {
+            const v = judgeFill(fact({ typed, readBack, cleared, clearUnchanged, clearPlaceholder }));
             expect(v.did === 'filled').toBe(v.reasons.length === 0);
             if (v.did !== 'filled') expect(v.did === 'typed').toBe(typed > 0);
             if (v.did !== 'filled' && typed === 0) expect(v.did === 'cleared').toBe(v.sent !== undefined);
@@ -171,4 +190,42 @@ describe('judgeFill — what the facts mean', () => {
             if (clearUnchanged !== undefined && readBack.kind !== 'landed') expect(v.reasons.at(-1)).toEqual({ code: 'clear-unchanged', shows: 9 });
           }
   });
+});
+
+/**
+ * The mismatch's classification, as `Difference` codes — the wording is
+ * fill-text.test.ts's, and fill.test.ts pins a few end to end. One row per
+ * rule of differenceOf, in its order, each row naming the shape it stands
+ * for; `before` defaults to null (nothing shown when typing began), `clear`
+ * to false.
+ */
+describe('differenceOf — what a missed read-back differs by, without content', () => {
+  const m = (f: Partial<Mismatch> & Pick<Mismatch, 'observed' | 'value'>): Mismatch => ({ before: null, clear: false, maskedHeld: 0, placeholder: undefined, ...f });
+  const rows: [string, Partial<Mismatch> & Pick<Mismatch, 'observed' | 'value'>, Difference][] = [
+    // 1. unchanged — first, whatever the reading is
+    ['typing dropped on held text (D2: it matches but for case)', { observed: 'Hello', before: 'Hello', value: 'hello' }, { kind: 'unchanged' }],
+    ['typing dropped on a field showing only its placeholder (D)', { observed: 'Search', before: 'Search', value: 'search', placeholder: 'Search' }, { kind: 'unchanged' }],
+    ['typing dropped on held bullets: unchanged, not masked', { observed: '••••', before: '••••', value: 'abcdef' }, { kind: 'unchanged' }],
+    // 2. masked
+    ['bullets, no clear: the held count rides along', { observed: '•••••', value: '123456', maskedHeld: 0 }, { kind: 'masked', held: 0 }],
+    ['bullets onto held bullets, no clear', { observed: '•'.repeat(32), before: '•'.repeat(20), value: 'x'.repeat(16), maskedHeld: 20 }, { kind: 'masked', held: 20 }],
+    ['bullets with clear: no held count (the clear emptied it)', { observed: '•••••', value: 'secret', clear: true, maskedHeld: 4 }, { kind: 'masked', held: undefined }],
+    // 3. partly masked
+    ['show-the-last-character (`•••••t`): lengths only', { observed: '•••••t', value: 'secret' }, { kind: 'length' }],
+    // 4. held text compared
+    ['auto-capitalised, no clear', { observed: 'Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
+    ['auto-capitalised, with clear', { observed: 'Hello world', value: 'hello world', clear: true }, { kind: 'case', positions: 1 }],
+    ['no clear onto held text: only the run after it is compared', { observed: 'NOTE: HI THERE', before: 'Note: ', value: 'hi there' }, { kind: 'case', positions: 7 }],
+    ['no clear: of several runs that match but for case, the closest counts — not the first', { observed: 'HELLO Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
+    ['no clear, the held text changed too: compared whole, closest run', { observed: 'NOTE: HI THERE', before: 'xyz', value: 'hi there' }, { kind: 'case', positions: 7 }],
+    ['with clear the field must EQUAL the value: longer but for case is a length', { observed: 'Re: Hello', value: 'hello', clear: true }, { kind: 'length' }],
+    ['autocorrect `teh` → `the`: same length, how many differ', { observed: 'the', value: 'teh' }, { kind: 'same-length', positions: 2 }],
+    ['held `HELLo` is not the typing: only `hxllo` after it is compared', { observed: 'HELLohxllo', before: 'HELLo', value: 'hello' }, { kind: 'same-length', positions: 1 }],
+    ['a mask that inserts a space', { observed: '1234 5', value: '12345' }, { kind: 'length' }],
+    ['typing onto a field showing only its placeholder: the placeholder is no held text, so nothing is sliced off', { observed: 'Searchx', before: 'Search', value: 'searchx', placeholder: 'Search' }, { kind: 'case', positions: 1 }],
+    ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
+    ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
+    ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],
+  ];
+  for (const [shape, f, kind] of rows) it(shape, () => expect(differenceOf(m(f))).toEqual(kind));
 });

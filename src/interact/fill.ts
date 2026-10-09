@@ -1,5 +1,5 @@
 import { everyNode, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
-import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
+import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -7,7 +7,9 @@ import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
 import { fillFailureText } from './fill-text.js';
-import type { Difference, FillFailure, FillResult, LostWhy, NearbyInput, ReadBack } from './fill-facts.js';
+import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
+import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
+import { differenceOf } from './fill-verdict.js';
 import { INPUT_ROLE } from './input-role.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
@@ -104,8 +106,10 @@ function screenSignature(tree: UiNode): string {
  *   the field still reports. A reading equal to the field's named
  *   placeholder is empty, and a delete round that leaves the reading
  *   UNCHANGED stops the clear (an empty field showing its hint, or one
- *   ignoring deletes — 2026-10-09, see the loop): the read-back decides
- *   when a value follows, and a clear alone is reported not verified.
+ *   ignoring deletes — 2026-10-09): the read-back decides when a value
+ *   follows, and a clear alone is reported not verified. Every rule of the
+ *   clear is interact/fill-clear.ts's (`clearStep`, pure); here it is only
+ *   driven.
  * - type with clear: the field must show exactly the value; the retry may
  *   safely wipe and retype (the content is ours).
  * - type without clear: the typed value must appear IN the field (contiguous
@@ -190,30 +194,11 @@ export async function fillField(
   await adapter.tap(point.x, point.y);
   await sleep(DEFAULT_FOCUS_DELAY_MS); // focus + keyboard — a constant, not an option: tests mock util/sleep
 
-  // What the field HOLDS, as opposed to what it SHOWS: a reading exactly
-  // equal to the placeholder the tree source names (UiNode.placeholder — WDA's
-  // placeholderValue, a dump's hint) is an empty field. Every source reports
-  // an empty field's placeholder as its value (measured 2026-10-09, both
-  // platforms: docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-
-  // content.md), and the clear below counted it as content to delete. The
-  // node's own placeholder is the field's: refetch finds the same field.
-  // Exact equality, and a known cost: a field that really holds the text of
-  // its own placeholder reads as empty here — the tree cannot tell the two
-  // apart. Where the source names no placeholder (idb, the API 33 dump), the
-  // clear's unchanged-reading rule below is what catches a hint.
+  // What the field HOLDS, as opposed to what it SHOWS (fill-facts.ts#heldText:
+  // a reading equal to the named placeholder is an empty field). The node's
+  // own placeholder is the field's: refetch finds the same field.
   const placeholder = node.placeholder;
-  const held = (shown: string | null | undefined): string => (shown === undefined || shown === null || shown === placeholder ? '' : shown);
-  // A delete round left the reading exactly as it was, and it is text a hint
-  // could be — named for what it tests, not for the hint it may be (review
-  // 2026-10-09: it was `isHint`; a field that ignores deletes reads the
-  // same, see the loop). BULLETS never are: an unchanged masked reading is a field the
-  // deletes did not reach (a focus tap that missed), and stopping there let
-  // the typing go nowhere too and a masked read-back — compared by length —
-  // pass with the old password still in place (review of this branch,
-  // probe A: the finportal `invalid_grant` class). Such a field fails as
-  // clear-twice, as it always did.
-  const deletesChangedNothing = (before: string | null | undefined, after: string | null): boolean =>
-    held(after) !== '' && after === before && !isMaskedValue(after ?? '');
+  const held = (shown: string | null | undefined): string => heldText(shown, placeholder);
 
   let current: UiNode | undefined = node;
   let preText = held(node.value); // what the field holds when typing starts (see `landed`)
@@ -256,12 +241,8 @@ export async function fillField(
   const maskedHeld = isMaskedValue(preText) ? preText.length : 0;
   let cleared: FillResult['cleared'];
   let clearUnchanged: FillResult['clearUnchanged'];
-  // The clear ended on the placeholder, which may be held text (see the loop).
-  let placeholderLeft = false;
-  // Why the clear's read after a delete found no field (review 2026-10-08,
-  // m-1): the loop then stops without calling the field empty, and a clear
-  // alone (nothing typed, so no read-back) reports it as `lost`.
-  let clearLost: LostWhy | undefined;
+  // How the clear ended (fill-clear.ts#ClearFacts) — undefined without one.
+  let clearEnd: ClearFacts['end'] | undefined;
   if (clear && !isInput) {
     // Not an input: what it shows is not the field's length — a label's own
     // text (deletes counted off it went into whatever had focus) or nothing
@@ -283,133 +264,32 @@ export async function fillField(
       const focused = await refetch();
       if (focused !== undefined) current = focused;
     }
-    let deletes = 0; // every delete the loop sent, all rounds — clearUnchanged.deletes
-    for (let attempt = 0; ; attempt++) {
-      const before = current?.value;
-      const existing = held(before).length;
-      cleared ??= existing; // the first pass's count: what the field held when the clear began
-      if (existing === 0) break;
-      await adapter.clearText(existing);
-      deletes += existing;
+    // Every rule of the clear is fill-clear.ts's (clearStep): this loop only
+    // performs the step it is given — the deletes, or the poll cadence's
+    // wait — and hands back what the next read saw, in that order.
+    let next = clearStep(startClear(placeholder), { value: current?.value ?? null });
+    while (next.step.do === 'delete' || next.step.do === 'reread') {
+      if (next.step.do === 'delete') await adapter.clearText(next.step.count);
+      else await sleep(pollMs);
       current = await refetch();
-      if (current === undefined) {
-        // Not found is not empty: until 2026-10-08 this read as `left = 0`,
-        // and a clear alone was "Filled … (cleared 7 characters first)" on a
-        // field that the keyboard had moved and that still held `XX`. With a
-        // value, the read-back below (exact, with clear) is what decides.
-        clearLost = lostOnLastRead;
-        break;
-      }
-      // An unchanged reading may be a LATE one: synthetic input is droppable
-      // and slow end to end (Compose async state, an IME queue — 3 of 11
-      // characters landed at first, measured 2026-08-05), and one read right
-      // after the deletes turned a clear that worked into "the deletes did
-      // not change it" (review of this branch, probe I). One more read after
-      // the poll cadence before believing it. The cost: one pollMs and one
-      // tree read on every clear that ends on an unchanged reading — every
-      // clear of a hinted field whose source names no placeholder.
-      // Asked again only of that second reading; otherwise the first answer
-      // stands for the rule below.
-      let unchanged = deletesChangedNothing(before, current.value);
-      if (unchanged) {
-        await sleep(pollMs);
-        current = await refetch();
-        if (current === undefined) {
-          clearLost = lostOnLastRead;
-          break;
-        }
-        unchanged = deletesChangedNothing(before, current.value);
-      }
-      const left = held(current.value).length;
-      if (left === 0) {
-        // Deleted INTO the placeholder: proof of an empty field only when
-        // the reading before the deletes did not START with the placeholder's
-        // text. Deletes go from the end, so what they leave is a prefix of
-        // what was there; a placeholder that is not a prefix of it can only
-        // be the field showing empty. One that is (`Companyabc` with 3 of 10
-        // deletes landing leaves `Company`) may be text the deletes did not
-        // reach (review round 2, probe K: "Filled … cleared 10 characters
-        // first" of a field still holding `Company`). Then a clear alone is
-        // the `placeholder` read-back, not verified; with a value, the exact
-        // read-back decides (typing onto held text shows more than the value).
-        placeholderLeft = placeholder !== undefined && current.value === placeholder && (before ?? '').startsWith(placeholder);
-        break;
-      }
-      if (unchanged) {
-        // The deletes changed NOTHING: the field shows what it showed before
-        // them. An empty field showing its hint or placeholder reads exactly
-        // so — the stock Android EditText (API 33 dumps the hint as `text`)
-        // and iOS fields (idb AXValue, WDA value) whose source names no
-        // placeholder, measured 2026-10-09 (bug note above): the loop sent
-        // up to twice the hint's length in deletes into an EMPTY field and
-        // threw `field still shows 9 characters after clearing twice`, so
-        // `clear: true` never typed its value and a clear alone failed after
-        // it had succeeded. A field that IGNORES deletes (read-only, an IME
-        // that drops them) reads exactly the same; the tree cannot tell the
-        // two apart, so the loop stops here and leaves the verdict to what
-        // follows:
-        // - with a value, the typing and its EXACT read-back: on an empty
-        //   field it lands; a field that ignores deletes shows its old text
-        //   plus the value, the retry's wipe is ignored too, and the fill
-        //   fails — after the value was typed (twice) into it, where it used
-        //   to fail before typing. That is the price of this rule.
-        // - alone, `clearUnchanged`: the clear is reported NOT verified (it
-        //   was a failure until now, and a verified "Filled" would claim an
-        //   empty field nobody saw), the reason naming both causes.
-        // A FIRST round that changed nothing deleted nothing that anyone saw:
-        // `cleared` is then 0, so no reply claims "cleared 9 characters
-        // first" of an empty hinted field (review of this branch, probe J;
-        // the say-what-was-done rule of 2026-10-08). The deletes that went
-        // out are still counted, in `clearUnchanged.deletes`.
-        // The usual cost on a field that held text: one round deletes it,
-        // the hint appears (a CHANGED reading), a second round sends the
-        // hint's length in deletes into the empty field and finds it
-        // unchanged — measured as 1 + 9 deletes on the Contacts editor.
-        // Where the source names the placeholder, `held` stops after the
-        // first round.
-        if (attempt === 0) cleared = 0;
-        clearUnchanged = { shows: left, deletes };
-        break;
-      }
-      // Two rounds that each SHORTENED the field and did not empty it: the
-      // deletes are landing short — the clear-twice failure, as always. A
-      // reading that is not a prefix of the one before the deletes was not
-      // produced by deleting from the end (where clearText deletes from): a
-      // field that held `Probe`, kept `Pro` after a short round, and showed
-      // its hint after the next (probe E). It gets ONE more round, and the
-      // unchanged rule above decides; a third round that still changes the
-      // field fails.
-      const shortened = (before ?? '').startsWith(current.value ?? '');
-      if (attempt >= 2 || (attempt >= 1 && shortened)) {
-        throw failure({ code: 'clear-twice', left, rounds: attempt + 1 });
-      }
+      // refetch sets lostOnLastRead whenever it finds no field.
+      next = clearStep(next.state, current === undefined ? { lost: lostOnLastRead ?? 'unmatched' } : { value: current.value });
     }
+    if (next.step.do === 'fail') throw failure(next.step.failure);
+    const { facts } = next.step;
+    cleared = facts.cleared;
+    clearEnd = facts.end;
+    if (clearEnd.kind === 'unchanged') clearUnchanged = { shows: clearEnd.shows, deletes: clearEnd.deletes };
   }
 
   // What the field showed when typing began — the read-back's mismatch error
   // says "did not change" when it still shows exactly this.
   const shownBeforeTyping = current?.value ?? null;
   await startTyping(value);
-  // A clear alone that found the field showing exactly its named
-  // placeholder and so deleted nothing, or whose deletes ended on it from a
-  // reading that started with it (`placeholderLeft`): empty, or holding
-  // that very text — the tree cannot tell (review of this branch, probes C
-  // and K). Not verified. A field cleared INTO its placeholder from a
-  // reading that did not start with it was seen to empty, and is.
-  const showsOnlyPlaceholder =
-    value === '' &&
-    clear === true &&
-    isInput &&
-    (cleared === 0 || placeholderLeft) &&
-    clearUnchanged === undefined &&
-    placeholder !== undefined &&
-    current?.value === placeholder;
-  let readBack: ReadBack =
-    value === '' && clearLost !== undefined
-      ? { kind: 'lost', why: clearLost }
-      : showsOnlyPlaceholder
-        ? { kind: 'placeholder' }
-        : { kind: 'nothing-typed' };
+  // Nothing typed: the clear's lost field is the read-back's (nothing saw it
+  // empty); a clear that ended on its placeholder is reported as a fact
+  // (`clearPlaceholder`) and judged by judgeFill.
+  let readBack: ReadBack = value === '' && clearEnd?.kind === 'lost' ? { kind: 'lost', why: clearEnd.why } : { kind: 'nothing-typed' };
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -491,18 +371,7 @@ export async function fillField(
           code: 'mismatch',
           typed: value.length,
           shows: observed.length,
-          differs:
-            observed === shownBeforeTyping
-              ? { kind: 'unchanged' }
-              : isMaskedValue(observed)
-                ? { kind: 'masked', held: clear ? undefined : maskedHeld }
-                : // Partly masked (Android's show-the-last-character password
-                  // field, `•••••t`): its content is not comparable either;
-                  // the lengths are all that may be said (hasBullet: • and ●
-                  // only — `*` and `·` are ordinary text too).
-                  hasBullet(observed)
-                  ? { kind: 'length' }
-                  : differenceOf(held(observed), value, clear === true, clear ? '' : held(shownBeforeTyping)),
+          differs: differenceOf({ observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
           notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
         });
       }
@@ -529,6 +398,7 @@ export async function fillField(
     typed: value.length,
     cleared,
     clearUnchanged,
+    clearPlaceholder: clearEnd?.kind === 'empty' ? clearEnd.placeholder : undefined,
     readBack,
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };
@@ -537,46 +407,6 @@ export async function fillField(
 /** A fill's error: its words are fill-text.ts's, like every fill sentence. */
 function failure(f: FillFailure): Error {
   return new Error(fillFailureText(f));
-}
-
-/**
- * What can be said of a non-masked read-back that missed the value, without
- * carrying either string (fill-facts.ts#Difference): with `clear` the field
- * must EQUAL the value, so the two are compared whole; without, it must
- * CONTAIN it, so every run of the new text (`prior`: what the field held
- * before typing) as long as the value is compared and the closest one
- * counts. `shown` is what the field HOLDS (a named placeholder is no text). Only position-for-position: an inserted or
- * dropped character is a length difference (`length`), as before.
- * Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for
- * the measured auto-capitalisation; a case pair whose forms differ in length
- * (`ß`/`SS`) reads as a plain difference, never as a pass.
- */
-function differenceOf(shown: string, value: string, clear: boolean, prior: string): Difference {
-  // Without clear the field may hold text from before the typing; only what
-  // came AFTER it is compared, when the field still starts with it (typing
-  // appends at the cursor, which the focus tap leaves at the end). A field
-  // whose earlier text changed too is compared whole — the limit: a run of
-  // the old text can then be named as the "transformed" typing.
-  const observed = prior !== '' && shown.startsWith(prior) ? shown.slice(prior.length) : shown;
-  let caseOnly: number | undefined; // fewest case-only differing characters over the runs compared
-  const starts = clear ? (observed.length === value.length ? [0] : []) : Array.from({ length: Math.max(0, observed.length - value.length + 1) }, (_, i) => i);
-  for (const at of starts) {
-    let differ = 0;
-    let caseAlone = true;
-    for (let i = 0; i < value.length && caseAlone; i++) {
-      const a = observed[at + i];
-      const b = value[i];
-      if (a === b) continue;
-      differ++;
-      caseAlone = a.toLowerCase() === b.toLowerCase() || a.toUpperCase() === b.toUpperCase();
-    }
-    if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
-  }
-  if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
-  if (observed.length !== value.length) return { kind: 'length' };
-  let differ = 0;
-  for (let i = 0; i < value.length; i++) if (observed[i] !== value[i]) differ++;
-  return { kind: 'same-length', positions: differ };
 }
 
 /**

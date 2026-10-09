@@ -9,9 +9,32 @@
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the
  * deepening series, S8).
+ *
+ * One function lives here beside the types, `heldText`: not a judgement but
+ * the DEFINITION every measurement of a field is taken in — what it holds as
+ * opposed to what it shows — so the driver (fill.ts), the clear's rules
+ * (fill-clear.ts) and the mismatch's classifier
+ * (fill-verdict.ts#differenceOf) count the same characters (2026-10-09,
+ * the fill-clear deepening; it was a closure inside fillField until then,
+ * and only fillField could ask it).
  */
 
 import type { Rect } from '../adapters/types.js';
+
+/**
+ * What a field HOLDS, as opposed to what it SHOWS: a reading exactly equal
+ * to the placeholder the tree source names (UiNode.placeholder — WDA's
+ * placeholderValue, a dump's hint) is an empty field, and so is no reading.
+ * Every source reports an empty field's placeholder as its value (measured
+ * 2026-10-09, both platforms: docs/bugs/2026-10-09-android-clear-reads-
+ * edittext-hint-as-content.md), and the clear counted it as content to
+ * delete. Exact equality, and a known cost: a field that really holds the
+ * text of its own placeholder reads as empty — the tree cannot tell the two
+ * apart. Where the source names no placeholder (idb, the API 33 dump), the
+ * clear's unchanged-reading rule (fill-clear.ts) is what catches a hint.
+ */
+export const heldText = (shown: string | null | undefined, placeholder: string | undefined): string =>
+  shown === undefined || shown === null || shown === placeholder ? '' : shown;
 
 /**
  * An input on the screen near a matched node that is not one — what the
@@ -61,7 +84,8 @@ export interface FillResult {
    * the field: nothing then says the field is empty — review 2026-10-08,
    * m-1, a field the keyboard moved still held `XX` behind "cleared 7
    * characters first"); 0 when it held none (an input's null value is an empty one: the
-   * adapters turn "" into null). `unmeasured` when the matched node is not
+   * adapters turn "" into null), or when the first round of deletes changed
+   * nothing (fill-clear.ts#ClearFacts, `clearUnchanged`). `unmeasured` when the matched node is not
    * an input: its length is not the field's — a label's text, or no value
    * at all — so no delete was sent (review 2026-10-08: deletes counted off a
    * WDA label's text went into whatever had focus, and a label with no value
@@ -85,10 +109,26 @@ export interface FillResult {
    * nothing anyone saw (so when it was the FIRST round, `cleared` is 0:
    * review of this branch, probe J — "cleared 9 characters first" of an
    * empty hinted field). Never set on a MASKED reading: bullets are no
-   * hint, and an unchanged masked field fails as clear-twice (fill.ts,
-   * `deletesChangedNothing`).
+   * hint, and an unchanged masked field fails as clear-twice
+   * (fill-clear.ts, `deletesChangedNothing`).
    */
   clearUnchanged?: { shows: number; deletes: number };
+  /**
+   * With `clear` on an input only: the clear ended with the field reading
+   * EXACTLY its named placeholder (UiNode.placeholder) — empty by
+   * `heldText`, or text the deletes did not reach; the tree cannot tell.
+   * Which reading led there (fill-clear.ts#ClearFacts):
+   * - `shown`: the field read the placeholder before any delete — none was
+   *   sent (review of the hint-aware clear, probe C);
+   * - `prefix`: the last deletes went into a reading that STARTED with the
+   *   placeholder's text, so what they left may be held (probe K);
+   * - `other`: they went into one that did not — only an empty field
+   *   shows the placeholder then.
+   * A fact, not a verdict: judgeFill makes `shown` and `prefix` the
+   * `placeholder` reason of a clear alone (2026-10-09; until then fill.ts
+   * decided it and reported a `placeholder` read-back).
+   */
+  clearPlaceholder?: 'shown' | 'prefix' | 'other';
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
@@ -144,13 +184,14 @@ export type LostWhy = 'screen-changed' | 'unmatched';
  *   7 characters deleted and then held the typed text was said to "expose
  *   no value": the refusal was right, the reason blamed the node.
  * - `nothing-typed`: the value was empty — a focus (and clear) alone.
- * - `placeholder` (2026-10-09): the field's last reading is EXACTLY its
- *   named placeholder (UiNode.placeholder) and nothing shows more — the
- *   value typed was that very text, or a clear alone found the field
- *   showing it and deleted nothing. Empty, or holding the text: the tree
- *   cannot tell (review of this branch, probes B and C), so it is not
- *   verified. A clear that deleted INTO the placeholder saw the field
- *   empty, and is `nothing-typed`.
+ * - `placeholder` (2026-10-09): the read-back's reading is EXACTLY the
+ *   field's named placeholder (UiNode.placeholder) and nothing shows more
+ *   — the value typed was that very text. Empty, or holding the text: the
+ *   tree cannot tell (review of the hint-aware clear, probe B), so it is not
+ *   verified. Typed fills only since 2026-10-09 (the fill-clear deepening):
+ *   a clear alone that ends on the placeholder is `nothing-typed` with the
+ *   fact `clearPlaceholder`, and judgeFill decides whether that is the
+ *   `placeholder` reason (probes C and K).
  */
 export type ReadBack =
   | { kind: 'landed' }
@@ -188,7 +229,10 @@ export type FillFailure =
 
 /**
  * What differs between the typed value and a read-back that did not match
- * it, measured by fill.ts without carrying either string:
+ * it, without carrying either string — classified by ONE function,
+ * interact/fill-verdict.ts#differenceOf, all five kinds (until 2026-10-09
+ * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
+ * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
  *   bullets it held after focus, without `clear` (undefined with it).
  * - `case`: the typed text IS there but for letter case — at `positions`
