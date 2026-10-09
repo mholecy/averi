@@ -509,6 +509,9 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const tall = uiNode({ role: 'button', label: 'Bar', rect: rect(0, 540, 400, 100) });
     const cut = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, tall] })).exposure(target, above);
     expect(cut).toMatchObject({ covers: [tall], largest: rect(0, 500, 400, 40), tapAt: { point: { x: 200, y: 520 }, moved: true } });
+    // A centre outside `within` (under the cut) with nothing over it is still no tap point: the tap moves into what shows.
+    const lower = rect(0, 0, 400, 540);
+    expect(drawOrder(tree).exposure(target, lower).tapAt).toEqual({ point: { x: 200, y: 520 }, moved: true, piece: rect(0, 500, 400, 40) });
     const outside = drawOrder(tree).exposure(target, rect(0, 0, 400, 400));
     expect(outside).toMatchObject({ visible: 0, covers: [] });
     expect(outside.tapAt).toBeUndefined();

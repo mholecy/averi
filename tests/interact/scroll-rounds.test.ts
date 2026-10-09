@@ -1218,6 +1218,13 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 
+  it('without fully, a centre under the keyboard band is not "covered" by a bar there: the frame is the screen above the band — a stop, as before', () => {
+    const BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
+    const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 560, width: 402, height: 80 } });
+    const played = play(IPHONE, [{ found: [match({ x: 24, y: 550, width: 354, height: 60 }, 'priority')], over: [bar], cover: coverOver(BAND, NO_BACK) }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+  });
+
   it('a plain stop both clipped and partly under a bar says both, the clip first', () => {
     const by = { role: 'button', label: 'Continue to summary', identifier: null, rect: CONTINUE_RECT };
     expect(describeScrollResult({ swipes: 1, visible: 0.5, clipped: ['bottom'], covered: { by, shows: 0.3 } })).toBe(
