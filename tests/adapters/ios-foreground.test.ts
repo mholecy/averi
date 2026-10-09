@@ -41,13 +41,17 @@ const SPRINGBOARD = JSON.stringify([
 const EMPTY = JSON.stringify([{ type: 'Application', AXLabel: 'Contacts', frame: f(0, 0, 0, 0) }]);
 
 const CONTACTS_INFO = appinfo('Contacts', 'Contacts');
+/** The bank app's names, as `simctl appinfo com.finshape.dbosbanking` would list them (the measured label). */
+const BANK_INFO = appinfo('"Skeleton Internal"', 'Runner');
+/** appinfo per bundle: the bank app's for its id, Contacts' for every other. */
+const perBundle = (bundle: string) => (bundle === 'com.finshape.dbosbanking' ? BANK_INFO : CONTACTS_INFO);
 
 /**
  * An exec whose describe-all answers in turn from `reads` (the last repeats),
- * and whose `simctl appinfo` answers `info` (an Error rejects). Every command
- * line is recorded.
+ * and whose `simctl appinfo` answers `info` (an Error rejects; a function
+ * answers per bundle id). Every command line is recorded.
  */
-function device(reads: string[], info: string | Error = CONTACTS_INFO, took: { readMs?: number; appinfoMs?: number } = {}) {
+function device(reads: string[], info: string | Error | ((bundle: string) => string) = CONTACTS_INFO, took: { readMs?: number; appinfoMs?: number } = {}) {
   const calls: string[] = [];
   /** The virtual time each describe-all STARTED at. */
   const readStarts: number[] = [];
@@ -65,7 +69,7 @@ function device(reads: string[], info: string | Error = CONTACTS_INFO, took: { r
     if (full.startsWith('idb describe --json')) return out(JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } }));
     if (full.startsWith('xcrun simctl appinfo')) {
       if (info instanceof Error) throw info;
-      return out(info);
+      return out(typeof info === 'function' ? info(args.at(-1)!) : info);
     }
     return out('');
   };
@@ -133,7 +137,15 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(d.describeAlls()).toBe(2);
   });
 
-  it('never in front: reads until the bound and no longer, then goes on with a note naming the label read and both readings of it', async () => {
+  /**
+   * docs/bugs/2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md (11:25:29, at 347e70d) — THE MEASURED
+   * CASE: the session's first launch, the bank app in front since before the server started (never launched by it, so its
+   * names are unknown here); the screenshot showed Contacts while idb served "Skeleton Internal" >= 4.5 s after the launch and
+   * Contacts' only by ~15 s. The old note said "If the screenshot shows com.apple.MobileAddressBook … this can be ignored":
+   * the screenshot did, and ignoring it was the wrong-app read. Now: the previous app's until proven otherwise, and the
+   * localized reading only past a 20 s re-read — never on the screenshot alone.
+   */
+  it('never in front, the label no app averi launched (the measured case): reads until the bound and no longer, then a note: the previous app\'s tree until a read says otherwise, a localized name only past 20 s', async () => {
     const d = device([BANK]);
     const started = Date.now();
     const outcome = await d.adapter.launch('com.apple.MobileAddressBook');
@@ -145,10 +157,36 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(outcome.note).toBe(
       '3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — ' +
         "iOS can hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app " +
-        '(an absent check passes on it). Compare with screenshot. If the screenshot shows com.apple.MobileAddressBook, its ' +
-        "on-screen name differs from its Info.plist name (a localized display name) and this can be ignored; otherwise read " +
-        'again before trusting what the tree says',
+        '(an absent check passes on it). Treat the tree as the previous app\'s until a read is labelled "Contacts": after an app ' +
+        "switch idb was measured serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is " +
+        'still labelled "Skeleton Internal" while the screenshot shows com.apple.MobileAddressBook is that label its on-screen ' +
+        'name (a localized display name its Info.plist does not carry), and this note can be ignored. The screenshot alone ' +
+        "cannot tell them apart: it shows the launched app before idb's tree does",
     );
+  });
+
+  /**
+   * The same switch when averi itself launched the app being left (a flow or session that opened the bank app first):
+   * its names are cached, so the label is known to be ANOTHER app's — the note says whose tree it is and nothing else.
+   */
+  it('never in front, the label the name of an app averi launched earlier: the note says the tree is still that app\'s — no localized-name reading, no screenshot test', async () => {
+    const d = device([BANK], perBundle);
+    expect(await d.adapter.launch('com.finshape.dbosbanking')).toEqual({}); // its names now known to the adapter
+    const outcome = await d.adapter.launch('com.apple.MobileAddressBook');
+    expect(outcome.note).toBe(
+      '3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — ' +
+        "iOS can hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app " +
+        '(an absent check passes on it). "Skeleton Internal" is the name of com.finshape.dbosbanking, which averi launched ' +
+        "earlier, not of com.apple.MobileAddressBook: the tree is still that app's, even if the screenshot already shows " +
+        "com.apple.MobileAddressBook (it switches before idb's tree does) — read again before trusting what the tree says",
+    );
+    expect(outcome.note).not.toMatch(/localized|can be ignored/);
+  });
+
+  it('a known name is matched by any of that app\'s names — its CFBundleName too', async () => {
+    const d = device([BANK.replace('Skeleton Internal', 'Runner')], perBundle);
+    await d.adapter.launch('com.finshape.dbosbanking'); // "Runner" is its CFBundleName: a match, names cached
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/"Runner" is the name of com\.finshape\.dbosbanking, which averi launched earlier/);
   });
 
   it('reads that take time: no read STARTS at or after the deadline', async () => {

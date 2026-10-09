@@ -168,11 +168,15 @@ export class IosAdapter implements DeviceAdapter {
       bundleId,
       label: () => this.treeSource.applicationLabel(),
       names: () => this.appNames(bundleId),
+      ownerOf: (label) => [...this.appNamesCache].find(([, names]) => names.includes(label))?.[0],
     });
     return note === undefined ? {} : { note };
   }
 
-  /** appInfoNames per bundle, read once per adapter — a name does not change under a session (a reinstall that renames the app is the exception, and costs one stale note at most). */
+  /**
+   * appInfoNames per bundle, read once per adapter — a name does not change under a session (a reinstall that renames the app is the exception, and costs one stale note at most).
+   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter's launches looked up (the idb source — WDA declines the check before asking; this process), so an app opened by hand or before the server started is not in it.
+   */
   private readonly appNamesCache = new Map<string, readonly string[]>();
 
   /**
