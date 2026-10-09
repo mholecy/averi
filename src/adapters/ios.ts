@@ -175,7 +175,7 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * appInfoNames per bundle, read once per adapter — a name does not change under a session (a reinstall that renames the app is the exception, and costs one stale note at most).
-   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another launched app's name is that app's tree, not a localized name.
+   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter's launches looked up (the idb source — WDA declines the check before asking; this process), so an app opened by hand or before the server started is not in it.
    */
   private readonly appNamesCache = new Map<string, readonly string[]>();
 

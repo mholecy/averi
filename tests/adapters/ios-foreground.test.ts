@@ -137,7 +137,15 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(d.describeAlls()).toBe(2);
   });
 
-  it('never in front, the label no app averi launched: reads until the bound and no longer, then goes on with a note naming the label read and how to tell its two readings apart', async () => {
+  /**
+   * docs/bugs/2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md (11:25:29, at 347e70d) — THE MEASURED
+   * CASE: the session's first launch, the bank app in front since before the server started (never launched by it, so its
+   * names are unknown here); the screenshot showed Contacts while idb served "Skeleton Internal" ~5 s after the launch and
+   * Contacts' only by 16 s. The old note said "If the screenshot shows com.apple.MobileAddressBook … this can be ignored":
+   * the screenshot did, and ignoring it was the wrong-app read. Now: the previous app's until proven otherwise, and the
+   * localized reading only past a 20 s re-read — never on the screenshot alone.
+   */
+  it('never in front, the label no app averi launched (the measured case): reads until the bound and no longer, then a note: the previous app\'s tree until a read says otherwise, a localized name only past 20 s', async () => {
     const d = device([BANK]);
     const started = Date.now();
     const outcome = await d.adapter.launch('com.apple.MobileAddressBook');
@@ -149,19 +157,17 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(outcome.note).toBe(
       '3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — ' +
         "iOS can hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app " +
-        '(an absent check passes on it). Read again in a few seconds: if the tree is still labelled "Skeleton Internal" ' +
-        'and the screenshot shows com.apple.MobileAddressBook, that label is its on-screen name (a localized display name ' +
-        "its Info.plist does not carry) and this can be ignored; if the label changed, this read was the previous app's. " +
-        'The screenshot alone cannot tell them apart: it shows the launched app before idb\'s tree does',
+        '(an absent check passes on it). Treat the tree as the previous app\'s until a read is labelled "Contacts": after an app ' +
+        "switch idb was measured serving the previous app's tree more than 5 s. Only if a read 20 s or more after the launch is " +
+        'still labelled "Skeleton Internal" while the screenshot shows com.apple.MobileAddressBook is that label its on-screen ' +
+        'name (a localized display name its Info.plist does not carry), and this note can be ignored. The screenshot alone ' +
+        "cannot tell them apart: it shows the launched app before idb's tree does",
     );
   });
 
   /**
-   * docs/bugs/2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md (11:25:29, at 347e70d): the bank
-   * app in front for minutes, then `launch_app com.apple.MobileAddressBook` — the screenshot showed Contacts while idb
-   * served the bank app's tree ("Skeleton Internal") for >= 4.5 s, past the bound. The old note said "If the screenshot
-   * shows com.apple.MobileAddressBook … this can be ignored": the screenshot did, and ignoring it was the wrong-app read.
-   * When the label is the name of another app averi launched, the note says whose tree it is and nothing else.
+   * The same switch when averi itself launched the app being left (a flow or session that opened the bank app first):
+   * its names are cached, so the label is known to be ANOTHER app's — the note says whose tree it is and nothing else.
    */
   it('never in front, the label the name of an app averi launched earlier: the note says the tree is still that app\'s — no localized-name reading, no screenshot test', async () => {
     const d = device([BANK], perBundle);
