@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { FillResult } from '../../src/interact/fill-facts.js';
-import { judgeFill, type Caveat, type FillVerdict, type Reason } from '../../src/interact/fill-verdict.js';
-import { caveatText, fillText, wordingOf } from '../../src/interact/fill-text.js';
+import type { Caveat, FillVerdict, Reason } from '../../src/interact/fill-verdict.js';
+import { caveatText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
 import { charactersText } from '../../src/util/count.js';
 
 /**
  * Both media of one fill, side by side — the MCP reply and the flow trace
- * lines — from the same facts through judgeFill, so a layout change that
+ * lines — from the same facts, each judged by its renderer, so a layout change that
  * makes the two say different things fails here in one place (df8a91a: a
  * clear alone read `(N deletes sent)` in the reply and `cleared N characters
  * first` on the flow line). Every shape the reply tests pinned until
@@ -20,12 +20,11 @@ const landed = { kind: 'landed' } as const;
 
 /** The reply for `sel`, and the flow lines for the step `sel` showing `shown`, as `[action, text]` in log order (caveats, then the line). */
 const both = (sel: string, f: FillResult, shown = 'x'.repeat(f.typed)) => {
-  const v = judgeFill(f);
-  const step = fillText(v, { step: sel, shown });
-  return { reply: fillText(v, { reply: sel }), flow: [...step.caveats, step.line].map((l) => [l.action, l.text]) };
+  const step = fillStepText(f, { step: sel, shown });
+  return { reply: fillReply(f, sel), flow: [...step.caveats, step.line].map((l) => [l.action, l.text]) };
 };
 
-describe('fillText — the MCP reply and the flow line of the same fill', () => {
+describe('fillReply and fillStepText — the MCP reply and the flow line of the same fill', () => {
   it('filled: the length and what the clear deleted in the reply, the shown value and the same clause on the line', () => {
     expect(both('id:amount', fact({ typed: 4, readBack: landed }), '2.50')).toEqual({
       reply: 'Filled id:amount (4 characters)',

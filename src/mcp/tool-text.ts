@@ -15,7 +15,7 @@
  * registry or a fake device to provoke each one.
  *
  * The type_text reply WITH a selector (a fill) is not here since 2026-10-09:
- * it is interact/fill-text.ts#fillText, beside the flow's fill line it must
+ * it is interact/fill-text.ts#fillReply, beside the flow's fill line it must
  * agree with — the flow engine may not import this layer.
  */
 

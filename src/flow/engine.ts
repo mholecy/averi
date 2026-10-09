@@ -1,8 +1,7 @@
 import type { IosTreeSourceKind } from '../adapters/ios-node.js';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
-import { judgeFill } from '../interact/fill-verdict.js';
-import { fillText } from '../interact/fill-text.js';
+import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
@@ -1181,7 +1180,7 @@ export class FlowEngine {
     // NOT verified: …` (docs/bugs/2026-10-08-ios-fill-unverified-reports-
     // filled-and-cleared.md: an idb label node printed `(cleared)` on a
     // field nothing reached). Masking the value is this engine's call.
-    const said = fillText(judgeFill(filled), { step: describeElementSpec(spec), shown: secret ? '***' : value });
+    const said = fillStepText(filled, { step: describeElementSpec(spec), shown: secret ? '***' : value });
     // The caveats (a match that is not an input, the masked-append warning)
     // are logged BEFORE the keyboard is dismissed: a dismissal that throws
     // (a `back` the device refuses, a dismissal tap that does not hide the
