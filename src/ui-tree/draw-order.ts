@@ -216,9 +216,9 @@ const screenSized = (n: UiNode, screen: number): boolean => n.children.length > 
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
 
 /**
- * `node` repeats `target` (the `onTarget` row): it carries the target's
- * identifier, or its label or value is the target's label, placeholder or
- * value — none of them empty.
+ * `node` repeats `target` (the `onTarget` row, in a flat list): it carries
+ * the target's identifier, or its label or value is the target's label,
+ * placeholder or value — none of them empty.
  */
 const repeats = (node: UiNode, target: UiNode): boolean => {
   if (node.identifier !== null && node.identifier !== '' && node.identifier === target.identifier) return true;
@@ -446,9 +446,10 @@ const NOT_DRAWN = {
 
   /**
    * ON THE TARGET: a NON-INTERACTIVE SIBLING of the target, narrower than
-   * it, whose centre lies on it and which REPEATS the target — its
-   * identifier, or its text (label or value) equal to the target's label,
-   * placeholder or value. `target` only (2026-10-09): idb's list is FLAT
+   * it, whose centre lies on it — and, in idb's flat list (`UiNode.flatList`),
+   * which REPEATS the target: its identifier, or its text (label or value)
+   * equal to the target's label, placeholder or value. `target` only
+   * (2026-10-09): idb's list is FLAT
    * (adapters/ios-tree-source.ts#parseIdbDescribeAll), so a field's own
    * floating label comes after the field as its sibling, never as its
    * descendant — measured on mp-native's SWIFT form
@@ -460,34 +461,42 @@ const NOT_DRAWN = {
    * a tap there focuses the field. Without this row `scroll_until … fully:
    * true` would never stop on such a field.
    *
-   * Repeating the target is the evidence (code review of deep/r5-covers,
-   * P4): until then any narrower non-interactive sibling on the target was
-   * excused, and under idb — whose list makes every node a sibling of every
-   * other — a pinned footer's text `16,785 200x30` inside a row `0,760
-   * 402x60` read "fully visible", and the tap pressed the footer. An
-   * outlined field's floating label repeats the field's label or hint (its
-   * placeholder); idb's repeats its identifier. Text that names something
-   * else — a total, a section title — is a cover, so a bare-text sticky
-   * header narrower than its row covers it (the residual stated before).
-   *
-   * The rest narrows it further. A sibling, not any node: the label of a
-   * bar drawn over a large row (the Compose tab's `Home` text inside the
-   * row's rect) is part of a cover, not of the target. Its centre on the
-   * target, not its whole rect (review round 1): an outlined field's
+   * A sibling, not any node: the label of a bar drawn over a large row (the
+   * Compose tab's `Home` text inside the row's rect) is part of a cover,
+   * not of the target — a bar's text has the bar for its parent. Its centre
+   * on the target, not its whole rect (review round 1): an outlined field's
    * floating label straddles the field's top border — and only that
    * border: its bottom may not pass the target's (review round 2: a pinned
    * footer's text straddling a row's BOTTOM edge is the bug's own shape).
    * Narrower: a full-width sibling over a row is a sticky section header.
    * An interactive one (a clear button) still covers, at its own rect.
-   * Under idb the sibling guard is void, its list being flat; the
-   * repetition is what is left to tell a label from a cover there.
+   * WDA also lists an unaccessible React Native view's texts as SIBLINGS of
+   * the view, not its children (wda-source-rn-myport.json: the screen's
+   * four texts after `placeholder_screen` 0,116 402x758, "Scaffold is
+   * running." `138,479 126x18` on its centre) — the target's own content,
+   * excused here whatever it says.
+   *
+   * Under idb the sibling guard is void — its list makes every node a
+   * sibling of every other — so there the repetition is the evidence
+   * (code review of deep/r5-covers, P4): without it a pinned footer's text
+   * `16,785 200x30` inside a row `0,760 402x60` read "fully visible", and
+   * the tap pressed the footer. idb's floating label repeats the field's
+   * identifier; text that names something else — a total, a section title
+   * — covers. Only there (verification of P4): asked of every tree, it made
+   * the RN screen's own text a cover of `placeholder_screen`, and
+   * `scroll_until` to it never stopped. In a nested tree a pinned footer's
+   * text has the footer, or the screen outside the row's scroll view, for
+   * its parent, so the sibling guard already rejects it. Residual, stated:
+   * a text laid on a target in the target's own parent with no wrapper of
+   * its own — absolutely positioned, or a layout-only view flattened away —
+   * is excused there, as an outlined field's floating label is.
    */
   onTarget: {
-    target: ({ node, parent }, { target }) =>
+    target: ({ node, parent }, { target, flatList }) =>
       parent !== undefined &&
       parent === target.parent &&
       !isInteractive(node) &&
-      repeats(node, target.node) &&
+      (!flatList || repeats(node, target.node)) &&
       node.rect.width < target.node.rect.width &&
       node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
       containsPoint(target.node.rect, tapPoint(node)),

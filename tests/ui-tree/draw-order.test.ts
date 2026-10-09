@@ -398,8 +398,8 @@ describe('the three questions disagree on purpose, per row', () => {
     expect(ask(later)).toEqual({ shadowing: later, drawnOver: [later], target: [] });
   });
 
-  it('on the target: a non-interactive SIBLING lying wholly inside the target and repeating its text is drawn on it (idb\'s floating label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
-    const label = () => uiNode({ role: 'text', label: 'title', rect: rect(160, 285, 50, 20) });
+  it('on the target: a non-interactive SIBLING lying wholly inside the target is drawn on it (a floating label; in idb\'s flat list it must also repeat the target) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
+    const label = () => uiNode({ role: 'text', label: 'IBAN', rect: rect(160, 285, 50, 20) });
     const sibling = label();
     expect(ask(sibling, true)).toEqual({ shadowing: sibling, drawnOver: [], target: [] });
     const button = uiNode({ role: 'button', label: 'clear', rect: rect(160, 285, 50, 20) });
@@ -608,8 +608,8 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       for (const cover of [shaped({ role: 'other' }), shaped({ identifier: 'pager' })]) expect(drawOrder(tree(cover)).exposure(row, IPHONE).covers).toEqual([cover]);
     });
 
-    it('an outlined field\'s floating label straddling its top border (a narrower sibling repeating the field\'s label, its centre on the field): drawn on it; a full-width sibling is a header, a cover', () => {
-      const field = uiNode({ role: 'textfield', identifier: 'iban', label: 'IBAN', rect: rect(24, 300, 354, 56) });
+    it('an outlined field\'s floating label straddling its top border (a narrower sibling, its centre on the field — in a nested tree it need not repeat the field): drawn on it; a full-width sibling is a header, a cover', () => {
+      const field = uiNode({ role: 'textfield', identifier: 'iban', rect: rect(24, 300, 354, 56) });
       const label = uiNode({ role: 'text', label: 'IBAN', rect: rect(36, 292, 40, 16) });
       const header = uiNode({ role: 'text', label: 'Section', rect: rect(24, 290, 354, 20) });
       const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), field, later] });
@@ -620,21 +620,47 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree(footer)).exposure(field, IPHONE).covers).toEqual([footer]);
     });
 
-    it('a narrower text on the target that repeats nothing of it is a cover (code review of deep/r5-covers, P4): a pinned footer\'s text inside a row, a bare-text sticky header', () => {
+    it('in idb\'s flat list a narrower text on the target that repeats nothing of it is a cover (code review of deep/r5-covers, P4): a pinned footer\'s text inside a row, a bare-text sticky header', () => {
       const row = uiNode({ role: 'button', identifier: 'row', label: 'Row', rect: rect(0, 760, 402, 60) });
       const footer = uiNode({ role: 'text', label: 'Total 100 EUR', rect: rect(16, 785, 200, 30) });
       const header = uiNode({ role: 'text', label: 'SECTION', rect: rect(16, 770, 200, 40) });
-      const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), row, later] });
+      const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), row, later] });
       for (const cover of [footer, header]) expect(drawOrder(tree(cover)).exposure(row, IPHONE).covers).toEqual([cover]);
       // What a field's own label repeats — its label, placeholder, value, or (idb) its identifier — is drawn on it.
       const field = uiNode({ role: 'textfield', identifier: 'iban_field', label: 'IBAN', placeholder: 'Enter IBAN', value: 'DE89', rect: rect(24, 300, 354, 56) });
       const on = (partial: Partial<UiNode>) => uiNode({ role: 'text', rect: rect(36, 310, 120, 18), ...partial });
-      const withField = (text: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [field, text] });
+      const withField = (text: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [field, text] });
       for (const text of [on({ label: 'IBAN' }), on({ label: 'Enter IBAN' }), on({ label: 'DE89' }), on({ identifier: 'iban_field', label: 'International account' })]) {
         expect(drawOrder(withField(text)).exposure(field, IPHONE).covers).toEqual([]);
       }
       const other = on({ label: 'Required' });
       expect(drawOrder(withField(other)).exposure(field, IPHONE).covers).toEqual([other]);
+    });
+
+    it('…in a nested tree the sibling is the evidence, whatever it says (verification of P4): the same footer text in the footer, a sibling of the row\'s scroll view, covers; a text listed beside its own view is drawn on it', () => {
+      const row = uiNode({ role: 'button', identifier: 'row', label: 'Row', rect: rect(0, 760, 402, 60) });
+      const footer = uiNode({ role: 'text', label: 'Total 100 EUR', rect: rect(16, 785, 200, 30) });
+      const nested = uiNode({
+        role: 'container',
+        rect: IPHONE,
+        children: [uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 874), children: [row] }), uiNode({ role: 'container', rect: rect(0, 770, 402, 104), children: [footer] })],
+      });
+      expect(drawOrder(nested).exposure(row, IPHONE).covers).toContain(footer);
+      const view = uiNode({ role: 'container', identifier: 'screen', rect: rect(0, 116, 402, 758) });
+      const text = uiNode({ role: 'text', label: 'Scaffold is running.', rect: rect(138, 479, 126, 18) });
+      const beside = (flatList?: true) => uiNode({ role: 'container', rect: IPHONE, ...(flatList && { flatList }), children: [view, text] });
+      expect(drawOrder(beside()).exposure(view, IPHONE).covers).toEqual([]);
+      expect(drawOrder(beside(true)).exposure(view, IPHONE).covers).toEqual([text]);
+    });
+
+    it('the real RN fixture (tests/fixtures/wda-source-rn-myport.json): the screen\'s texts, which WDA lists as siblings of `placeholder_screen`, are no cover of it — its centre is tapped', async () => {
+      const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-myport.json', import.meta.url), 'utf8'));
+      const screen = [...everyNode(tree)].find((n) => n.identifier === 'placeholder_screen')!;
+      const exposure = drawOrder(tree).exposure(screen, tree.rect);
+      expect(exposure.covers.filter((n) => n.role === 'text')).toEqual([]); // only the RN debugger's warning banner, 10,787 382x49, at the bottom
+      expect(exposure.centreCover).toBeUndefined();
+      expect(exposure.tapAt).toEqual({ point: { x: 201, y: 495 }, moved: false });
+      expect(exposure.coverAt({ x: 201, y: 495 })).toBeUndefined();
     });
 
     it('idb\'s flat list, the INTERIM rule (owner decision, code review P1 — unmeasured): a later node covers the target only when its top lies at or below the target\'s — a row scrolled up under the top bar is no cover of BackButton or the title; CONTINUE over priority_select still is', async () => {
