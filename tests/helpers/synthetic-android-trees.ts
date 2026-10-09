@@ -2,9 +2,9 @@
  * SYNTHETIC uiautomator dumps — built by the review of fix/r6, not captured
  * on a device: classic Android Views whose bottom-pinned CTA is laid AFTER a
  * text in the SAME layout and over it, real covers. The CTA is inset from
- * its layout's sides and carries its own label, so it is no wrapper's own
- * control (ui-tree/draw-order.ts#ownControl). Each a `<hierarchy>` for
- * `parseUiautomatorXml`.
+ * its layout's sides, not evenly on all four, and carries its own label, so
+ * it is no wrapper's own control (ui-tree/draw-order.ts#ownControl). Each a
+ * `<hierarchy>` for `parseUiautomatorXml`.
  */
 export const CLASSIC_VIEWS = {
   /** A login fragment's ConstraintLayout `0,210 1080x1090` with the keyboard up (adjustResize): the bottom-pinned `Button "LOG IN" 40,1150 1000x130` rides up over `TextView "Forgot password?" 380,1180 320x60`. */

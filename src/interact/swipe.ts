@@ -1,4 +1,4 @@
-import { usableScreen, type DeviceAdapter, type DeviceScreen, type Rect, type Stroke } from '../adapters/types.js';
+import { usableScreen, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
 import { containsPoint, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
@@ -527,6 +527,15 @@ export function belowStatusBand(box: Rect, screen: Pick<JudgingScreen, 'statusBa
   const top = Math.max(box.y, band);
   return { ...box, y: top, height: Math.max(0, box.y + box.height - top) };
 }
+
+/**
+ * `point` lies on the screen but in its status band: inside one of `boxes`,
+ * and inside none of them less the band (`belowStatusBand`). The tap's
+ * refusal (resolve.ts#refuseOffScreen) and `scroll_until`'s judgement
+ * (scroll-rounds.ts#judge) ask it alike.
+ */
+export const inStatusBand = (point: Point, screen: Pick<JudgingScreen, 'boxes' | 'statusBand'>): boolean =>
+  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
  * `screenBox` for a JUDGEMENT rather than a gesture — the one try/catch the

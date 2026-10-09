@@ -5,6 +5,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
 import { COMPOSE } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
@@ -921,6 +922,27 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     for (const row of rows) expect(order.exposure(row, PIXEL).covers).toEqual([]);
   });
 
+  it('the round-5 ui_snapshots\' ICON buttons — Contacts\' Cancel, More options, Delete: the label node under a control padded by 11 px on all four sides of its 132×132 wrapper shows whole, its centre tapped (a refusal at 2f98900)', async () => {
+    const { contactsCreateStaged, contactsCreate } = await snapshots();
+    const icons = (tree: UiNode) =>
+      [...everyNode(tree)].flatMap((parent) =>
+        parent.children.flatMap((n, i) => {
+          const control = parent.children.slice(i + 1).find((b) => b.role === 'button' && !b.label && rectWithin(n.rect, b.rect) && b.rect.x !== parent.rect.x);
+          return n.label && control ? [{ label: n.label, n, wrapper: parent.rect, control: control.rect }] : [];
+        }),
+      );
+    const seen: string[] = [];
+    for (const [screen, tree] of Object.entries({ contactsCreateStaged, contactsCreate })) {
+      const order = drawOrder(tree);
+      for (const { label, n, wrapper, control } of icons(tree)) {
+        seen.push(`${screen} ${label}`);
+        expect([wrapper.width, wrapper.height, control.x - wrapper.x, control.y - wrapper.y, control.width, control.height, n.rect.width, n.rect.height]).toEqual([132, 132, 11, 11, 110, 110, 66, 66]);
+        expect(order.exposure(n, PIXEL)).toMatchObject({ covers: [], shows: 1, tapAt: { point: rectCentre(control), moved: false } });
+      }
+    }
+    expect(seen.sort()).toEqual(['contactsCreate Cancel', 'contactsCreate Delete', 'contactsCreate More options', 'contactsCreate More options', 'contactsCreateStaged Cancel', 'contactsCreateStaged Delete', 'contactsCreateStaged More options']);
+  });
+
   it.each([
     ['LOGIN', COMPOSE.login, rect(44, 1402, 992, 121), { x: 540, y: 1463 }],
     ['SIGN IN', COMPOSE.signIn, rect(44, 1808, 992, 121), { x: 541, y: 1869 }],
@@ -1026,11 +1048,53 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
         expect(seen.covers.map((n) => n.label)).toEqual([cta]);
         expect(seen.tapAt).toBeUndefined();
       }
-      // Unlabelled, LOG IN still covers: it does not span its layout's width.
+      // Unlabelled, LOG IN still covers: it does not span its layout's width, nor is it padded evenly on all four sides (40, 40, 940, 20).
       const { find, order } = parse(CLASSIC_VIEWS.loginImeUp);
       const login = find((n) => n.label === 'LOG IN');
       login.label = null;
       expect(order.exposure(find((n) => n.label === 'Forgot password?'), PIXEL).covers).toEqual([login]);
+    });
+
+    describe('the icon button\'s control, padded on all four sides (Contacts\' Cancel: wrapper 11,88 132x132, control 22,99 110x110, label node 44,121 66x66)', () => {
+      const ICON_WRAPPER = rect(11, 88, 132, 132);
+      const icon = (r = rect(44, 121, 66, 66)) => uiNode({ role: 'other', label: 'Cancel', rect: r });
+
+      it('padded evenly, or within a pixel (a centred placement rounded — 126 px around 105 at 2.625 dp/px, insets 11 and 10): no cover', () => {
+        expect(coversOf(icon(), button(rect(22, 99, 110, 110)), ICON_WRAPPER)).toEqual([]);
+        expect(coversOf(icon(rect(43, 120, 63, 63)), button(rect(22, 99, 105, 105)), rect(11, 88, 126, 126))).toEqual([]);
+        // A 24-dp control padded to 48 dp at 2.625 px/dp: 63 px in 126, insets 32 and 31 — 2×32 is the side plus the rounding's pixel.
+        expect(coversOf(icon(rect(51, 128, 47, 47)), button(rect(43, 120, 63, 63)), rect(11, 88, 126, 126))).toEqual([]);
+      });
+
+      it('a cover: a control flush with a side (insets 0 and 1), insets differing by two, an inset over half the control\'s side, a label off the control\'s centre on either axis, a control that says something', () => {
+        for (const r of [rect(11, 88, 131, 131), rect(22, 99, 108, 110)]) {
+          const later = button(r);
+          expect(coversOf(icon(), later, ICON_WRAPPER)).toEqual([later]);
+        }
+        const wide = button(rect(55, 132, 44, 44));
+        expect(coversOf(icon(rect(66, 143, 22, 22)), wide, ICON_WRAPPER)).toEqual([wide]);
+        // The SHORTER side bounds it: insets of 30 around a 110×40 control (2×30 over 40, under 110).
+        const flat = button(rect(41, 118, 110, 40));
+        expect(coversOf(icon(rect(86, 128, 20, 20)), flat, rect(11, 88, 170, 100))).toEqual([flat]);
+        // Off by 2 px on either axis is off centre too (centre (77,154) → (79,154), (77,156)).
+        for (const r of [rect(24, 101, 40, 40), rect(57, 101, 40, 40), rect(24, 134, 40, 40), rect(59, 134, 40, 40), rect(57, 136, 40, 40)]) {
+          const later = button(rect(22, 99, 110, 110));
+          expect(coversOf(icon(r), later, ICON_WRAPPER)).toEqual([later]);
+        }
+        const said = button(rect(22, 99, 110, 110), { label: 'Close' });
+        expect(coversOf(icon(), said, ICON_WRAPPER)).toEqual([said]);
+      });
+
+      it('residual, stated: an icon button CUT by a list\'s or scroll view\'s edge — insets 11, 11, 11, 41 — is still refused', () => {
+        const cut = button(rect(22, 99, 110, 80));
+        expect(coversOf(icon(rect(44, 121, 66, 56)), cut, ICON_WRAPPER)).toEqual([cut]);
+      });
+
+      it('a centred dialog-like overlay in a screen-sized parent, padded evenly, still covers', () => {
+        const target = uiNode({ role: 'text', label: 'Are you sure?', rect: rect(440, 1060, 200, 100) });
+        const overlay = button(rect(40, 40, 1000, 2140));
+        expect(coversOf(target, overlay, PIXEL)).toEqual([overlay]);
+      });
     });
 
     it('a non-interactive node of the wrapper\'s width holding the label — an opaque card, a loading view — covers it', () => {
@@ -1045,6 +1109,10 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       const target = text();
       const later = button(rect(44, 1438, 992, 121));
       expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: PIXEL }), target, later] })).exposure(target, PIXEL).covers).toEqual([later]);
+      // Nor an icon's padded control: no node lies inside the 0×0 root (both below the top bar's band, so content).
+      const icon = uiNode({ role: 'other', label: 'Cancel', rect: rect(44, 1121, 66, 66) });
+      const padded = button(rect(22, 1099, 110, 110));
+      expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: PIXEL }), icon, padded] })).exposure(icon, PIXEL).covers).toEqual([padded]);
     });
 
     it('a row\'s own content is narrow: in the avatar\'s wrapper, an interactive node, a text reaching outside the label node, and any text under a full-width sibling (a header) cover it; so does content two wrappers down', () => {
