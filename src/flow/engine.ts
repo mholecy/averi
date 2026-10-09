@@ -1,9 +1,9 @@
 import type { IosTreeSourceKind } from '../adapters/ios-node.js';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
-import { fillField } from '../interact/fill.js';
+import { fillField, FillValueFailure } from '../interact/fill.js';
 import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
-import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, movedTapText, resolvePresent, type Ambiguity } from '../interact/resolve.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, movedTapText, resolvePresent, type Ambiguity, type RefusedOnPresentElement } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -184,7 +184,9 @@ class ReentryError extends Error {
  * item 3): an error carrying interact's RefusedOnPresentElement marker (the
  * target's centre off the screen or under a node drawn over it; the soft
  * keyboard over it with nothing sent), raised by an optional tap or by a
- * nested step's tap (a fill's focus tap). `optional:` skips an ABSENT
+ * nested step's tap (a fill's focus tap) — and, by the same decision, a
+ * fill whose value did not land or was refused (interact/fill.ts#
+ * FillValueFailure; see notSkippedWhy). `optional:` skips an ABSENT
  * element; this one is on screen, so the interstitial the step exists for IS
  * there, and skipping it ran the flow on — measured: mp-native's
  * `login_registered` rung skipped a refused `optional: tap { text: "LOGIN" }`,
@@ -201,11 +203,28 @@ class ReentryError extends Error {
  * decision is about what `optional:` may swallow.
  */
 class OptionalNotSkipped extends Error {
-  constructor(refusal: Error) {
-    super(`optional step not skipped: its element is present, but the tap was refused — ${refusal.message}`, { cause: refusal });
+  constructor(refusal: Error & (RefusedOnPresentElement | FillValueFailure)) {
+    super(`optional step not skipped: ${notSkippedWhy(refusal)} — ${refusal.message}`, { cause: refusal });
     this.name = 'OptionalNotSkipped';
   }
 }
+
+/**
+ * Why OptionalNotSkipped's step was not skipped, said before the refusal it
+ * quotes. A fill that failed on its value (interact/fill.ts#FillValueFailure;
+ * 2026-10-09, owner's decision) is the same finding as a refused tap: its
+ * text did not land after the focus tap (a half-typed login must not run on),
+ * or its value was refused before anything was typed (a broken value, not an
+ * absent field — the field was never even looked for).
+ */
+const notSkippedWhy = (e: RefusedOnPresentElement | FillValueFailure): string =>
+  !(e instanceof FillValueFailure) ? 'its element is present, but the tap was refused'
+  : e.fillValue === 'did-not-land' ? 'its field is present, but its value did not land'
+  : 'its value was refused before anything was typed';
+
+/** Does an enclosing `optional:` turn `e` into OptionalNotSkipped instead of skipping it? */
+const notSkippable = (e: unknown): e is Error & (RefusedOnPresentElement | FillValueFailure) =>
+  isRefusedOnPresentElement(e) || e instanceof FillValueFailure;
 
 /**
  * An error the ladder must NOT escalate past, nor hand to salvage: re-running
@@ -1011,8 +1030,9 @@ export class FlowEngine {
       // the step that raised it, not on the enclosing `optional`. Nor is a
       // tap refused on a PRESENT element inside one (2026-10-09): it becomes
       // the terminal OptionalNotSkipped here, on the innermost step — a
-      // platform override's tap, a fill's focus tap, a tap in a `branch:`.
-      throw this.failed(step, this.swallowDepth > 0 && isRefusedOnPresentElement(e) ? new OptionalNotSkipped(e) : e);
+      // platform override's tap, a fill's focus tap, a tap in a `branch:` —
+      // nor a fill whose value did not land or was refused (FillValueFailure).
+      throw this.failed(step, this.swallowDepth > 0 && notSkippable(e) ? new OptionalNotSkipped(e) : e);
     }
   }
 
@@ -1345,7 +1365,9 @@ export class FlowEngine {
         // there and was refused a tap (interact's RefusedOnPresentElement —
         // off screen, under something drawn over it, or under a keyboard
         // with nothing sent) is the interstitial
-        // itself, so the step fails the flow instead of being skipped.
+        // itself, so the step fails the flow instead of being skipped; so
+        // is a fill whose value did not land or was refused (FillValueFailure,
+        // wrapped by runStep).
         if (isTerminal(e)) throw e;
         // Why it was skipped: "(not present)" only when the interaction
         // module says the element was never found (ElementNotFoundError,
@@ -1354,10 +1376,9 @@ export class FlowEngine {
         // step's resolution or scroll_until that never saw its target. Every
         // other failure is skipped with its own headline (and the read error
         // beneath it, when the last read failed — skipReason): the element
-        // WAS there (and was not refused a tap — that threw above), or
-        // nobody could see the screen at the end, or the step never got as
-        // far as looking (a fill's value refused before anything is tapped),
-        // or what failed was no element at all (a `wait:` or `branch:`
+        // WAS there (and was not refused a tap, nor a fill's value — those
+        // threw above), or nobody could see the screen at the end, or what
+        // failed was no element at all (a `wait:` or `branch:`
         // timeout says what it waited for).
         //
         // Until 2026-10-08 the engine deduced this from missing evidence: a

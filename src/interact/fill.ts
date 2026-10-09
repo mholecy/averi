@@ -152,8 +152,13 @@ export async function fillField(
   opts: FillOptions,
 ): Promise<FillResult> {
   // Before the field is resolved: a refused value must cost no keyboard
-  // dismissal, no focus tap and no clear (type-text.ts).
-  assertTypeable(value);
+  // dismissal, no focus tap and no clear (type-text.ts). Marked 'refused'
+  // (FillValueFailure) — the message is type-text.ts's, unchanged.
+  try {
+    assertTypeable(value);
+  } catch (e) {
+    throw new FillValueFailure(errorMessage(e), 'refused');
+  }
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
   const { node, note: resolutionNote, keyboardHidden, point, moved } = await resolveClearOfKeyboard(adapter, target, opts);
@@ -409,9 +414,34 @@ export async function fillField(
   };
 }
 
+/**
+ * A fill that failed on its VALUE — the marker the flow engine's `optional:`
+ * reads (flow/engine.ts, OptionalNotSkipped; 2026-10-09, owner's decision):
+ * - `did-not-land`: every error fillField throws after its focus tap
+ *   (FillFailure — a read-back mismatch, a clear that left text twice, a
+ *   re-read that failed mid-fill). The field was tapped and may hold partial
+ *   text, so the step after it would run on a half-typed form.
+ * - `refused`: a value holding a control character (type-text.ts), refused
+ *   before anything is sent. A broken value, not an absent field.
+ * Neither is skipped by `optional:` — it fails the flow, as a tap refused on
+ * a present element does (resolve.ts#RefusedOnPresentElement). The `type:`
+ * step's own control-character refusal (typeIntoFocused) is not marked.
+ * Errors from the resolution and the keyboard guard before the focus tap
+ * (absent field, refusals on a present one) keep their own classes.
+ */
+export class FillValueFailure extends Error {
+  readonly fillValue: 'did-not-land' | 'refused';
+
+  constructor(message: string, fillValue: 'did-not-land' | 'refused') {
+    super(message);
+    this.name = 'FillValueFailure';
+    this.fillValue = fillValue;
+  }
+}
+
 /** A fill's error: its words are fill-text.ts's, like every fill sentence. */
 function failure(f: FillFailure): Error {
-  return new Error(fillFailureText(f));
+  return new FillValueFailure(fillFailureText(f), 'did-not-land');
 }
 
 /**
