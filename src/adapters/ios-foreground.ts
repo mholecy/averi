@@ -36,10 +36,13 @@ import { sleep } from '../util/sleep.js';
  * format, a tree shape not yet seen — would leave this P0 open on every
  * launch with nothing to say so. So the wait stops at once WITH a note
  * when it cannot tell: the bundle's names could not be read (appinfo
- * failed, or listed neither name), the read lists no Application or one
- * with no label (`null` — unmeasured shapes), or a read error other than
+ * failed, or listed neither name), or a read error other than
  * idb's empty tree (the device was not read; the readers after the launch
- * meet the same error in their own words). Only a source that does not ask
+ * meet the same error in their own words). A read with no Application or
+ * an unlabelled one (`null` — unmeasured shapes, and possibly idb's
+ * full-frame launch transient) is a poll miss instead, remembered: if no
+ * labelled read follows by the deadline, the note says it could not check.
+ * Only a source that does not ask
  * (`undefined` — WDA, wda-tree-source.ts, by decision) stays silent. idb's
  * empty tree (IdbEmptyTreeError — no tree yet, measured 0.4 s after a
  * launch) is a poll miss: the window this exists for is right behind it.
@@ -191,6 +194,8 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
   let names: readonly string[] | undefined;
   /** The last label that was not a match — what the note names. */
   let stale: string | undefined;
+  /** Whether a read came back with no Application label (see below). */
+  let unlabelled = false;
   for (;;) {
     let label: string | null | undefined;
     let empty = false;
@@ -205,23 +210,36 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
     if (!empty) {
       // The source does not ask (WDA): by decision, nothing to wait for and nothing to say.
       if (label === undefined) return undefined;
-      if (label === null || label === '') return unchecked(check.bundleId, "the tree's Application element has no label, or there is none");
-      if (names === undefined) {
-        const asked = Date.now();
-        try {
-          names = await check.names();
-        } catch (e) {
-          return unchecked(check.bundleId, errorMessage(e).split('\n')[0]);
+      if (label === null || label === '') {
+        // A poll miss, like the empty tree — not a stop (review round 2):
+        // idb's other launch transient, a lone full-frame Application that
+        // IdbEmptyTreeError deliberately leaves a tree, may come unlabelled
+        // (unmeasured; the 2026-10-06 note allows either), and stopping on
+        // it would cost a cold launch its wait. Remembered, so the deadline
+        // says it could not check rather than nothing; free when a labelled
+        // read follows.
+        unlabelled = true;
+      } else {
+        if (names === undefined) {
+          const asked = Date.now();
+          try {
+            names = await check.names();
+          } catch (e) {
+            return unchecked(check.bundleId, errorMessage(e).split('\n')[0]);
+          }
+          // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
+          deadline += Date.now() - asked;
         }
-        // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
-        deadline += Date.now() - asked;
+        if (names.includes(label)) return undefined;
+        stale = label;
       }
-      if (names.includes(label)) return undefined;
-      stale = label;
     }
     // Pause only if the read after it would START before the deadline.
     if (Date.now() + FOREGROUND_POLL_MS >= deadline) {
-      return stale !== undefined ? notInFront(check.bundleId, stale, names ?? []) : emptyThroughout(check.bundleId);
+      // The most telling thing read wins: a real label, then an unlabelled tree, then nothing at all.
+      if (stale !== undefined) return notInFront(check.bundleId, stale, names ?? []);
+      if (unlabelled) return unchecked(check.bundleId, `the tree's Application element had no label, or there was none, for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`);
+      return emptyThroughout(check.bundleId);
     }
     await sleep(FOREGROUND_POLL_MS);
   }

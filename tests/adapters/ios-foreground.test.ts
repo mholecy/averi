@@ -276,16 +276,47 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(d.appinfos()).toHaveLength(1);
   });
 
-  it('a read with no Application, or an unlabelled one (unmeasured shapes): one read, no appinfo, a note saying it could not check', async () => {
-    const button = { type: 'Button', AXLabel: 'Cancel', frame: f(16, 90, 60, 30) };
-    for (const payload of [[button], [{ type: 'Application', frame: f(0, 0, 402, 874) }, button], [{ type: 'Application', AXLabel: '', frame: f(0, 0, 402, 874) }, button]]) {
-      const d = device([JSON.stringify(payload)]);
-      expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(
-        /^could not check that com\.apple\.MobileAddressBook is in front \(the tree's Application element has no label, or there is none\) — /,
+  // Review round 2: a read that cannot say whose tree it is (no Application,
+  // or an unlabelled one — unmeasured, and possibly idb's full-frame launch
+  // transient) is a poll miss, not a stop, so a cold launch keeps its wait.
+  const BUTTON = { type: 'Button', AXLabel: 'Cancel', frame: f(16, 90, 60, 30) };
+  const UNSAYABLE = [
+    JSON.stringify([BUTTON]),
+    JSON.stringify([{ type: 'Application', frame: f(0, 0, 402, 874) }, BUTTON]),
+    JSON.stringify([{ type: 'Application', AXLabel: '', frame: f(0, 0, 402, 874) }, BUTTON]),
+  ];
+
+  it('an unlabelled read, then the app\'s: read on, match, no note — the unlabelled read cost one pause', async () => {
+    for (const payload of UNSAYABLE) {
+      resetSleeps();
+      const d = device([payload, CONTACTS]);
+      expect(await d.adapter.launch('com.apple.MobileAddressBook')).toEqual({});
+      expect(d.describeAlls()).toBe(2);
+      expect(d.appinfos()).toHaveLength(1); // asked only once a label could be compared
+    }
+  });
+
+  it('unlabelled to the deadline: never silent — a note saying it could not check; no appinfo asked', async () => {
+    for (const payload of UNSAYABLE) {
+      const d = device([payload]);
+      expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toBe(
+        "could not check that com.apple.MobileAddressBook is in front (the tree's Application element had no label, or there " +
+          "was none, for the 3 s averi waited) — for a moment after a launch iOS can hand idb the previous app's tree; " +
+          'compare with screenshot before trusting a read',
       );
-      expect(d.describeAlls()).toBe(1);
+      expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
       expect(d.appinfos()).toEqual([]);
     }
+  });
+
+  it('a stale label outranks a later unlabelled read in the note: the last real label read is named', async () => {
+    const outcome = await device([BANK, UNSAYABLE[1]]).adapter.launch('com.apple.MobileAddressBook');
+    expect(outcome.note).toMatch(/the UI tree was still the app labelled "Skeleton Internal"/);
+  });
+
+  it('an unlabelled read, then only empty trees: the note is the unlabelled one — the most telling thing read', async () => {
+    const outcome = await device([UNSAYABLE[1], EMPTY]).adapter.launch('com.apple.MobileAddressBook');
+    expect(outcome.note).toMatch(/^could not check that .* \(the tree's Application element had no label/);
   });
 
   it('a WDA-source adapter: no read, no appinfo, no note — the source does not ask, by decision', async () => {
