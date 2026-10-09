@@ -166,7 +166,7 @@ interface Placed {
 
 /** What a row is judged against beside the node: the screen's area (`screenOf`). */
 interface Seen {
-  readonly screen: number;
+  readonly screenArea: number;
 }
 
 /**
@@ -193,14 +193,17 @@ type Row = { readonly [Q in Question]?: (placed: Placed, seen: Seen) => boolean 
   readonly target?: (placed: Placed, seen: SeenFor) => boolean;
 };
 
+/** A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none, the caller asks. */
+const fillsScreen = (r: Rect, screenArea: number): boolean => rectArea(r) >= screenArea * SCREEN_SIZED_FRACTION;
+
 /**
  * The `structural` row's wrapper excuse for a target: `node` holds the
  * target's whole rect, and is the screen's size or holds the target's
  * nearest scroll view whole.
  */
-const holdsWhole = (node: UiNode, target: Placed, screen: number): boolean =>
+const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =>
   rectWithin(target.node.rect, node.rect) &&
-  (rectArea(node.rect) >= screen * SCREEN_SIZED_FRACTION || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
+  (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
 /** `inner` lies in `outer`'s subtree (or is it). */
 const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
@@ -219,8 +222,8 @@ const scrolls = (n: UiNode): boolean => CONTENT_FRAMED_ROLES.has(n.role) || n.cl
  */
 const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 
-/** A node with children whose area reaches SCREEN_SIZED_FRACTION of the screen (`screenOf`): it draws through its content, which is walked. */
-const screenSized = (n: UiNode, screen: number): boolean => n.children.length > 0 && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION;
+/** A node with children that `fillsScreen`: it draws through its content, which is walked. */
+const screenSized = (n: UiNode, screenArea: number): boolean => n.children.length > 0 && fillsScreen(n.rect, screenArea);
 
 /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
@@ -330,8 +333,8 @@ const NOT_DRAWN = {
   structural: {
     shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: ({ node }, { target, screen }) =>
-      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screen)),
+    target: ({ node }, { target, screenArea }) =>
+      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea)),
   },
 
   /**
@@ -366,9 +369,9 @@ const NOT_DRAWN = {
    * row of its screen, and a full-screen backdrop button takes the tap.
    */
   screenSizedHost: {
-    shadowing: ({ node }, { screen }) => !isInteractive(node) && screenSized(node, screen),
-    drawnOver: ({ node }, { screen }) => screenSized(node, screen),
-    target: ({ node }, { screen }) => !isInteractive(node) && screenSized(node, screen),
+    shadowing: ({ node }, { screenArea }) => !isInteractive(node) && screenSized(node, screenArea),
+    drawnOver: ({ node }, { screenArea }) => screenSized(node, screenArea),
+    target: ({ node }, { screenArea }) => !isInteractive(node) && screenSized(node, screenArea),
   },
 
   /**
@@ -636,7 +639,7 @@ const NOT_DRAWN = {
    * excused.
    */
   ownControl: {
-    target: (placed, { target, screen }) =>
+    target: (placed, { target, screenArea }) =>
       siblingOf(placed, target) &&
       isInteractive(placed.node) &&
       !placed.node.label &&
@@ -645,8 +648,8 @@ const NOT_DRAWN = {
       rectWithin(target.node.rect, placed.node.rect) &&
       placed.node.rect.x === placed.parent.node.rect.x &&
       placed.node.rect.width === placed.parent.node.rect.width &&
-      !screenSized(placed.parent.node, screen) &&
-      rectArea(placed.node.rect) < screen * SCREEN_SIZED_FRACTION,
+      !screenSized(placed.parent.node, screenArea) &&
+      !fillsScreen(placed.node.rect, screenArea),
   },
 
   /**
@@ -791,11 +794,11 @@ export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
  * that overlaps another (a badge on a bar button) starts the content, so
  * the bar's items after it meet the rows as content do.
  */
-function firstContent(order: readonly Placed[], screen: Rect, area: number, line: number): number {
+function firstContent(order: readonly Placed[], screen: Rect, screenArea: number, line: number): number {
   const bar: Rect[] = [];
   for (const { node, at } of order.slice(1)) {
     const r = node.rect;
-    if (!(rectArea(r) > 0) || (STRUCTURAL_ROLES.has(node.role) && rectArea(r) >= area * SCREEN_SIZED_FRACTION)) continue;
+    if (!(rectArea(r) > 0) || (STRUCTURAL_ROLES.has(node.role) && fillsScreen(r, screenArea))) continue;
     if (r.y < screen.y || r.y + r.height > line || bar.some((b) => rectIntersection(b, r) !== undefined)) return at;
     bar.push(r);
   }
@@ -814,7 +817,7 @@ function screenOf(tree: UiNode): Rect {
  */
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
-  const seen: Seen = { screen: rectArea(screen) };
+  const seen: Seen = { screenArea: rectArea(screen) };
   const flatList = tree.flatList === true;
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
@@ -827,7 +830,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   };
   walk(tree, undefined, undefined);
   const barLine = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
-  const contentFrom = flatList ? firstContent(order, screen, seen.screen, barLine) : order.length;
+  const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);

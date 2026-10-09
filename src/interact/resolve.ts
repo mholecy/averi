@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, drawnOverText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
@@ -134,7 +134,8 @@ export class AmbiguityRefusal extends Error {}
  * logged "skipped step (not present)", and every new failure-after-finding
  * needed one more `instanceof` there. Now an optional step is "(not
  * present)" exactly when this is what it threw, and anything else is
- * skipped with its own headline — save a PresentElementRefusal (since
+ * skipped with its own headline — save an error carrying the
+ * RefusedOnPresentElement marker (`isRefusedOnPresentElement`, since
  * 2026-10-09), which fails the flow.
  *
  * Deliberately narrow:
@@ -486,6 +487,34 @@ const inStatusBand = (point: Point, screen: TapScreen): boolean =>
   screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
+ * iOS's status band as one clause — `under iOS's status bar at (201,6), in
+ * the top 62 pt of the screen, where a tap goes to the status bar` — the
+ * words for a point there, read by the tap's refusal (`refuseOffScreen`) and
+ * by `scroll_until`'s failures (scroll-text.ts), so the two say the one fact
+ * alike (code review of round 6, S5).
+ */
+export const underStatusBar = (at: Point, band: number): string =>
+  `under iOS's status bar at (${at.x},${at.y}), in the top ${band} pt of the screen, where a tap goes to the status bar`;
+
+/**
+ * What to do about a target whose centre lies under iOS's status bar, said
+ * as far as the tree knows it (code review of round 6, P1: the refusal had
+ * said `scroll_until it first` of a button pinned at the top, which no
+ * scroll moves). In a scroll view (`scrolls`, ui-tree/geometry.ts
+ * #insideScroller), `scroll_until` moves it out from under the bar; in none,
+ * it is pinned there — a layout that ignores the safe area — and no step
+ * reaches it; where the tree cannot say (idb's flat list), both. The
+ * refusal stays a refusal either way — the safe direction, and terminal in
+ * an `optional:` step (flow/engine.ts).
+ */
+export function statusBarRemedy(scrolls: boolean | undefined): string {
+  const pinned = 'no scroll moves it out: it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else';
+  if (scrolls === true) return 'it lies in a scroll view — scroll_until it first, to move it out from under the bar';
+  if (scrolls === false) return `it lies in no scroll view, so ${pinned}`;
+  return `if it lies in a scroll view, scroll_until it first, to move it out from under the bar; if not, ${pinned}`;
+}
+
+/**
  * Refuse a tap whose point lies off the screen (OffScreenRefusal), or return
  * the screen it was judged against. The rule every tap on a resolved node
  * shares, applied by keyboard.ts#resolveClearOfKeyboard — behind
@@ -517,8 +546,9 @@ const inStatusBand = (point: Point, screen: TapScreen): boolean =>
  * more — one extra read on a refusal path, accepted.
  *
  * A point on the screen but inside iOS's status band (`onScreen`'s iOS
- * clause, 2026-10-09) is refused in its own words — `under iOS's status
- * bar at (201,6) — the top 62 pt …` — since "off screen" would contradict
+ * clause, 2026-10-09) is refused in its own words (`underStatusBar`, and
+ * `statusBarRemedy`: scroll it out only where it can be) — since "off
+ * screen" would contradict
  * a rect the reader sees on it.
  *
  * `sent`, when the keyboard guard acted before this look — `back was
@@ -545,7 +575,7 @@ export async function refuseOffScreen(
   const judged: TapScreen = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
   const what = describeTarget(target);
   if (inStatusBand(at, judged)) {
-    const band = `under iOS's status bar at (${at.x},${at.y}) — the top ${judged.statusBand} pt of a ${judged.box.width}x${judged.box.height} screen, where a tap goes to the status bar (rect ${rectText(node.rect)}) — scroll_until it first`;
+    const band = `${underStatusBar(at, judged.statusBand ?? 0)} (rect ${rectText(node.rect)}) — ${statusBarRemedy(insideScroller(tree, node))}`;
     throw new OffScreenRefusal(sent === undefined ? `${what} is ${band}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${band}`);
   }
   const visible = Math.max(...judged.boxes.map((b) => visibleFractionInViewport(node.rect, b)));

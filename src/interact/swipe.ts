@@ -4,6 +4,9 @@ import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
+/** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
+export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
 /**
  * Which thing `direction` names. A `swipe:` step names the FINGER's movement
  * (swipe up = finger travels up, revealing content below), and so does the
@@ -40,8 +43,7 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
     left: { from: { x: cx + dx, y: cy }, to: { x: cx - dx, y: cy } },
     right: { from: { x: cx - dx, y: cy }, to: { x: cx + dx, y: cy } },
   } as const;
-  const awayFrom = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
-  return meaning === 'finger' ? finger[direction] : finger[awayFrom[direction]];
+  return meaning === 'finger' ? finger[direction] : finger[OPPOSITE[direction]];
 }
 
 /**
@@ -636,7 +638,6 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
       'Check the device answers (`adb shell wm size` / `idb describe`) and retry.',
   );
 }
-
 
 /**
  * How far a window's width may fall short of (or pass) the panel's long

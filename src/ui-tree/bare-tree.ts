@@ -115,7 +115,7 @@ import { countOf } from '../util/count.js';
  *
  * - the STATUS BAR is not content. A status bar is a CLOCK — a `text` whose
  *   WHOLE label is a time (`18:29`, see CLOCK), wholly inside the top
- *   STATUS_BAND_FRACTION of the screen — with at least one STATUS ITEM
+ *   CLOCK_BAND_FRACTION of the screen — with at least one STATUS ITEM
  *   beside it: a labelled or valued `container`/`other` lying wholly above
  *   the clock's bottom plus CLOCK_SLACK_FRACTION of the screen (the measured
  *   Cellular, Wi-Fi and battery items). When there is one, every node lying
@@ -146,7 +146,7 @@ import { countOf } from '../util/count.js';
  * INFERRED, not measured: that the clock reads as a time in every locale
  * (CLOCK; a status bar with no readable time — a call pill, "18 h 29" — is
  * missed, i.e. read as before); that a status item always stands beside it;
- * the band's cap on other devices (STATUS_BAND_FRACTION); and that an APP's
+ * the band's cap on other devices (CLOCK_BAND_FRACTION); and that an APP's
  * tree carries no status bar — the one whole app read the note recorded on
  * iOS 27 (bare, 2 nodes, at +3.0 s) had none, no WDA fixture holds a
  * StatusBar, and uiautomator dumps only the app's window (its decor's
@@ -174,7 +174,7 @@ export function isBareTree(tree: UiNode): boolean {
 
 /**
  * The tree's largest rect — the screen every source wraps its tree in — or
- * undefined when no rect has area. The status band is measured against the
+ * undefined when no rect has area. The clock band is measured against the
  * same rect wrapperBySize is, so the two agree on what the screen is: a
  * labelled Application taller than the screen stops being a wrapper by size
  * and counts, whatever the band does.
@@ -190,12 +190,12 @@ const within = (r: Rect, screen: Rect, bottom: number): boolean => rectArea(r) >
 
 /**
  * The status bar's bottom line, or undefined when the tree shows none: the
- * first CLOCK `text` wholly inside the top STATUS_BAND_FRACTION whose line —
+ * first CLOCK `text` wholly inside the top CLOCK_BAND_FRACTION whose line —
  * its bottom plus CLOCK_SLACK_FRACTION of the screen, capped at the band —
  * holds a labelled or valued `container`/`other` other than a wrapper.
  */
 const statusBarBottom = (nodes: readonly UiNode[], screen: Rect): number | undefined => {
-  const cap = screen.y + screen.height * STATUS_BAND_FRACTION;
+  const cap = screen.y + screen.height * CLOCK_BAND_FRACTION;
   for (const clock of nodes) {
     if (clock.role !== 'text' || !CLOCK.test(clock.label ?? '') || !within(clock.rect, screen, cap)) continue;
     const line = Math.min(cap, clock.rect.y + clock.rect.height + screen.height * CLOCK_SLACK_FRACTION);
@@ -221,7 +221,7 @@ const CLOCK = /^(?:[\p{L}\p{M}]{1,3}\s?)?\p{Nd}{1,2}[:.]\p{Nd}{2}(?:\s?[\p{L}\p{
 /** Roles that are decoration unless LABELLED: a splash image (identified or not), a spinner. */
 export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress']);
 /**
- * The cap on the status bar (2026-10-08): its clock must lie wholly inside
+ * The CLOCK BAND, the cap on the status bar (2026-10-08): its clock must lie wholly inside
  * the top fraction of the screen (the tree's largest rect), and nothing below
  * the cap is ever skipped. A fraction, not points, because iOS rects are
  * points and Android's are pixels. Measured on iOS 27 (iPhone 17, 874 pt):
@@ -229,8 +229,10 @@ export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress
  * Dynamic Island iPhone's 62 pt of 874 is 7.1 %, an iPhone SE's 20 of 667 is
  * 3.0 %, an iPad's 24 of 1024 is 2.3 %. 8 % holds them all with room for
  * rounding; the band itself ends at the clock (CLOCK_SLACK_FRACTION).
+ * Not iOS's STATUS BAND (adapters/ios-status-band.ts, the safe-area inset a
+ * tap is refused in): this one only finds SpringBoard's clock in a tree.
  */
-export const STATUS_BAND_FRACTION = 0.08;
+export const CLOCK_BAND_FRACTION = 0.08;
 /**
  * How far below the clock's bottom a status item may end, as a fraction of
  * the screen's height: 1 %, 8.7 pt on the measured 874 pt screen, where the

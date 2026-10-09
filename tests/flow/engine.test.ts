@@ -2103,6 +2103,28 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
+    // Code review of round 6, P1: a button pinned under iOS's status bar (centre in the band) is an OffScreenRefusal on
+    // a present element — terminal in an optional:, the owner's safe direction — and its remedy offers no scroll_until.
+    it('a tap on an element pinned under iOS\'s status bar: refused, the flow fails — not skipped, nothing tapped — and the line says it is pinned', async () => {
+      const fake = formFake();
+      fake.platform = 'ios';
+      fake.keyboard = undefined;
+      fake.viewportSize = { width: 1000, height: 2000, statusBand: 62 };
+      fake.live().children.push(node({ role: 'button', identifier: 'promo_close', rect: { x: 900, y: 10, width: 80, height: 40 } })); // centre (940,30)
+      const error = (await FlowEngine.run(optionalFlow('tap: { id: promo_close }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.trace.slice(1)).toEqual([
+        {
+          action: '✗ tap id:"promo_close"',
+          detail:
+            'failed — optional step not skipped: its element is present, but the tap was refused — ' +
+            'id:"promo_close" is under iOS\'s status bar at (940,30), in the top 62 pt of the screen, where a tap goes to the status bar (rect 900,10 80x40) — ' +
+            'it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else; nothing was tapped',
+        },
+      ]);
+      expect(fake.taps).toEqual([]);
+    });
+
     it('a tap on a DEAD device is not (not present): the skip carries the read error, so it never reads as a slow screen', async () => {
       const fake = formFake();
       fake.uiTree = async () => {
@@ -3130,6 +3152,31 @@ flows:
       },
     ]);
     expect(fake.keys).toEqual(['back']);
+    expect(fake.taps).toEqual([]);
+  });
+
+  // Verification of code review of round 6, P1: the remedy after back is judged in the tree that holds the node handed
+  // back (the guard's second look) — in the first read's tree it is not found, and the wording fell back to "both".
+  it('an optional tap: whose target the re-layout after back pinned under a status band: the remedy reads the second look\'s tree — pinned, no scroll_until', async () => {
+    const fake = loginFake();
+    fake.viewportSize = { width: 1080, height: 2220, statusBand: 62 };
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    const relayout = fake.onKey;
+    fake.onKey = (key, self) => {
+      relayout?.(key, self);
+      self.live().children[1].rect = { x: 99, y: 0, width: 300, height: 100 };
+    };
+    const error = (await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1)).toEqual([
+      {
+        action: '✗ tap id:"login_submit"',
+        detail:
+          'failed — optional step not skipped: its element is present, but the tap was refused — ' +
+          'id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is under iOS\'s status bar at (249,50), ' +
+          'in the top 62 pt of the screen, where a tap goes to the status bar (rect 99,0 300x100) — it lies in no scroll view, so no scroll moves it out: ' +
+          'it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else',
+      },
+    ]);
     expect(fake.taps).toEqual([]);
   });
 

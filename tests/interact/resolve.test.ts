@@ -1157,10 +1157,54 @@ describe('iOS\'s status band (2026-10-09)', () => {
     const error = await tapElement(fake, PRIORITY, OPTS).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OffScreenRefusal);
     expect((error as Error).message).toBe(
-      `${PRIORITY} is under iOS's status bar at (201,6) — the top 62 pt of a 402x874 screen, where a tap goes to the status bar ` +
-        '(rect 24,-20 354x52) — scroll_until it first; nothing was tapped',
+      `${PRIORITY} is under iOS's status bar at (201,6), in the top 62 pt of the screen, where a tap goes to the status bar ` +
+        '(rect 24,-20 354x52) — if it lies in a scroll view, scroll_until it first, to move it out from under the bar; ' +
+        'if not, no scroll moves it out: it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else; nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  /**
+   * The remedy as far as the tree knows it (code review of round 6, P1: a button pinned at the top was told to
+   * `scroll_until it first`, which no scroll does). A WDA-shaped tree has ancestry: a button in no scroll view is
+   * pinned there; one in a `scrollable` is scrolled out. idb's flat list has none, so it says both (above).
+   */
+  describe('the remedy says what can move it', () => {
+    const pinnedAt = (inScrollView: boolean | 'webview') => {
+      resetLayout();
+      const close = node({ role: 'button', label: 'Close', identifier: 'close', rect: { x: 340, y: 14, width: 44, height: 40 } });
+      const content = inScrollView ? node({ role: inScrollView === 'webview' ? 'webview' : 'scrollable', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [close] }) : close;
+      const fake = new FakeAdapter({ s: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [content] }) }, 's');
+      fake.platform = 'ios';
+      fake.keyboard = undefined;
+      fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+      return fake;
+    };
+
+    it('in no scroll view (a layout that ignores the safe area): pinned, no scroll_until offered — still refused, nothing tapped', async () => {
+      const fake = pinnedAt(false);
+      const error = await tapElement(fake, 'id:close', OPTS).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(OffScreenRefusal);
+      expect((error as Error).message).toBe(
+        "id:close is under iOS's status bar at (362,34), in the top 62 pt of the screen, where a tap goes to the status bar (rect 340,14 44x40) — " +
+          'it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else; nothing was tapped',
+      );
+      expect((error as Error).message).not.toContain('scroll_until');
+      expect(fake.tapPoints).toEqual([]);
+    });
+
+    it('in a scroll view: scroll_until it out', async () => {
+      const error = await tapElement(pinnedAt(true), 'id:close', OPTS).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(OffScreenRefusal);
+      expect((error as Error).message).toContain('(rect 340,14 44x40) — it lies in a scroll view — scroll_until it first, to move it out from under the bar; nothing was tapped');
+    });
+
+    it('in a web view (a WKWebView\'s page scrolls): scroll_until it out, never "pinned"', async () => {
+      const error = await tapElement(pinnedAt('webview'), 'id:close', OPTS).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(OffScreenRefusal);
+      expect((error as Error).message).toContain('— it lies in a scroll view — scroll_until it first');
+      expect((error as Error).message).not.toContain('pinned');
+    });
   });
 
   it('the band\'s edge: a centre at y 61 is refused, at y 62 tapped', async () => {

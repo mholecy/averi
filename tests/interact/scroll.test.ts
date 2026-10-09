@@ -713,18 +713,38 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   it('a header whose centre stays in the band (0,0 402x106 on a screen that does not scroll): the failure names iOS\'s status bar — no clip, no layout defect', async () => {
     const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
-    expect(error.message).toContain("its centre (201,53) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar");
+    expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
+  });
+
+  // Code review of round 6, P2: `fully` judges clipping against the whole screen, but the stop also needs the centre
+  // below the band — full-bleed content whose ROUNDED centre lies in the band (at y 0: 122 pt or less under 62) never
+  // stops, and says why. The verification round: 123 pt rounds its centre 61.5 to 62, and stops.
+  it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
+    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
+    expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
+  });
+
+  it('…the boundary is the rounded centre: 0,0 402x123 (centre 61.5, sent as 62) is fully visible after 0 swipes; 0,0 402x122 (centre 61) fails naming the status bar', async () => {
+    for (const height of [123, 124]) {
+      const fake = still({ x: 0, y: 0, width: 402, height });
+      expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    }
+    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 122 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain("its centre stays under iOS's status bar at (201,61), in the top 62 pt of the screen");
   });
 
   it('a list already at its bottom end, the target pushed up under the bar (24,10 354x52) by the default direction down: the failure says to try direction "up"', async () => {
     const error = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain(
-      "its centre (201,36) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar, and the content is exhausted: " +
-        'swiping down no longer moves it out from under the status bar — try direction: "up".',
+      "its centre stays under iOS's status bar at (201,36), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted: " +
+        'swiping down no longer moves it out from under the status bar — try direction: "up"; ' +
+        'if no direction moves it, it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.',
     );
     const up = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', { ...FAST, direction: 'up' }).catch((e: unknown) => e)) as Error;
-    expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down".');
+    expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down"; if no direction moves it');
   });
 
   it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {

@@ -6,7 +6,7 @@ import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { belowStatusBand, judgingOf, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { belowStatusBand, judgingOf, OPPOSITE, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -314,11 +314,11 @@ export interface Judged {
    */
   centreOnScreen: boolean;
   /**
-   * Set when its centre lies on the screen but inside iOS's status band
-   * (swipe.ts#belowStatusBand, 2026-10-09) — so not `centreOnScreen`: the
-   * band's height, which the failure quotes (`shortOf`'s `statusBar`).
+   * The height of iOS's status band (swipe.ts#belowStatusBand, 2026-10-09),
+   * set only when its centre lies on the screen but inside that band — so
+   * not `centreOnScreen`; the failure quotes it (`shortOf`'s `statusBar`).
    */
-  centreInBand?: number;
+  bandOverCentre?: number;
   /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
   shows: number;
 }
@@ -626,9 +626,6 @@ function flushWith(
   return nearest.length === 2 ? { fills: [nearest[0], nearest[1]] } : undefined;
 }
 
-/** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
-const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: 'right', right: 'left' };
-
 /** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
 type Since = 'start' | 'stroke' | 'settle';
 
@@ -853,16 +850,16 @@ function judge(
   viewport: DeviceScreen,
   order: DrawOrder | undefined,
   fully: boolean,
-  band: Pick<JudgingScreen, 'statusBand'>,
+  statusBand: number | undefined,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
   const whole: Rect = { x: 0, y: 0, ...viewport };
   // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
-  const screen: Rect = belowStatusBand(whole, band);
-  const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'centreInBand'> => {
+  const screen: Rect = belowStatusBand(whole, { statusBand });
+  const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
     const centre = tapPoint(node);
     const centreOnScreen = containsPoint(screen, centre);
-    return { centreOnScreen, ...(!centreOnScreen && containsPoint(whole, centre) && { centreInBand: screen.y - whole.y }) };
+    return { centreOnScreen, ...(!centreOnScreen && containsPoint(whole, centre) && { bandOverCentre: screen.y - whole.y }) };
   };
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
     const box: Rect = { x: 0, y: 0, ...frame };
@@ -893,7 +890,7 @@ function judge(
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
 function judgeOver(found: readonly UiNode[], { boxes, statusBand }: JudgingScreen, order: DrawOrder | undefined, fully: boolean): Judged | undefined {
   return boxes
-    .map((box) => judge(found, box, order, fully, { statusBand }))
+    .map((box) => judge(found, box, order, fully, statusBand))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
 }
 
@@ -921,14 +918,19 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
  * keyboard — a centre under the band stops as before, and the tap's
  * keyboard guard hides the keyboard. On iOS a centre inside the status
- * band is off the screen (`Judged.centreInBand`, adapters/ios-status-
+ * band is off the screen (`Judged.bandOverCentre`, adapters/ios-status-
  * band.ts, 2026-10-09) — measured, one stroke flung `priority_select` to
  * `24,-20` and the plain stop stopped with its centre at (201,6), where the
  * tap pressed the status bar — for both stops: `fully: true` asks the
  * centre to be on the screen too (an unclipped rect's centre always is,
  * but in the band). Only the centre: what of the rect lies in the band is
- * judged against the screen as before, so full-bleed content at the top (a
- * hero image at y 0) is "fully visible".
+ * judged against the screen as before — `fully` judges clipping against the
+ * whole screen — so full-bleed content at the top (a hero image at y 0)
+ * stops once its centre — ROUNDED, the point a tap sends (`tapPoint`) —
+ * lies below the band; one whose rounded centre lies in it (at y 0, shorter
+ * than twice the band less a point: 122 pt or less under 62, while 123 pt
+ * rounds its centre 61.5 to 62 and stops) stops neither way, and fails
+ * naming the status bar (`shortOf`'s `statusBar`; code review of round 6, P2).
  */
 function stops(j: Judged, fully: boolean): boolean {
   return j.visible > 0 && j.centreOnScreen && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);
@@ -945,7 +947,7 @@ function stops(j: Judged, fully: boolean): boolean {
  */
 function shortOf(j: Judged, fully: boolean): InFrameShort {
   if (fully && j.clipped.length > 0) return { of: 'clipped', judged: j };
-  if (j.centreInBand !== undefined) return { of: 'statusBar', judged: j, band: j.centreInBand };
+  if (j.bandOverCentre !== undefined) return { of: 'statusBar', judged: j, band: j.bandOverCentre };
   return { of: !j.centreOnScreen ? 'clipped' : 'covered', judged: j };
 }
 
@@ -1210,7 +1212,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   let cover: Cover | undefined;
   let best = whole;
   if (offered !== undefined && read !== undefined) {
-    const covered = judge(found, viewport, order, fully, s.frame, { cover: offered, keyboardSide: read.ofKeyboard });
+    const covered = judge(found, viewport, order, fully, s.frame.statusBand, { cover: offered, keyboardSide: read.ofKeyboard });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a
