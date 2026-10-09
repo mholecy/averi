@@ -209,13 +209,15 @@ export async function fillField(
   const placeholder = node.placeholder;
   const held = (shown: string | null | undefined): string => (shown === undefined || shown === null || shown === placeholder ? '' : shown);
   // A delete round left the reading exactly as it was, and it is text a hint
-  // could be. BULLETS never are: an unchanged masked reading is a field the
+  // could be — named for what it tests, not for the hint it may be (review
+  // 2026-10-09: it was `isHint`; a field that ignores deletes reads the
+  // same, see the loop). BULLETS never are: an unchanged masked reading is a field the
   // deletes did not reach (a focus tap that missed), and stopping there let
   // the typing go nowhere too and a masked read-back — compared by length —
   // pass with the old password still in place (review of this branch,
   // probe A: the finportal `invalid_grant` class). Such a field fails as
   // clear-twice, as it always did.
-  const isHint = (before: string | null | undefined, after: string | null): boolean =>
+  const deletesChangedNothing = (before: string | null | undefined, after: string | null): boolean =>
     held(after) !== '' && after === before && !isMaskedValue(after ?? '');
 
   let current: UiNode | undefined = node;
@@ -311,13 +313,17 @@ export async function fillField(
       // the poll cadence before believing it. The cost: one pollMs and one
       // tree read on every clear that ends on an unchanged reading — every
       // clear of a hinted field whose source names no placeholder.
-      if (isHint(before, current.value)) {
+      // Asked again only of that second reading; otherwise the first answer
+      // stands for the rule below.
+      let unchanged = deletesChangedNothing(before, current.value);
+      if (unchanged) {
         await sleep(pollMs);
         current = await refetch();
         if (current === undefined) {
           clearLost = lostOnLastRead;
           break;
         }
+        unchanged = deletesChangedNothing(before, current.value);
       }
       const left = held(current.value).length;
       if (left === 0) {
@@ -334,7 +340,7 @@ export async function fillField(
         placeholderLeft = placeholder !== undefined && current.value === placeholder && (before ?? '').startsWith(placeholder);
         break;
       }
-      if (isHint(before, current.value)) {
+      if (unchanged) {
         // The deletes changed NOTHING: the field shows what it showed before
         // them. An empty field showing its hint or placeholder reads exactly
         // so — the stock Android EditText (API 33 dumps the hint as `text`)

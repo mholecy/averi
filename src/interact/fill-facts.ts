@@ -86,7 +86,7 @@ export interface FillResult {
    * review of this branch, probe J — "cleared 9 characters first" of an
    * empty hinted field). Never set on a MASKED reading: bullets are no
    * hint, and an unchanged masked field fails as clear-twice (fill.ts,
-   * `isHint`).
+   * `deletesChangedNothing`).
    */
   clearUnchanged?: { shows: number; deletes: number };
   /** How the typed text was checked (`ReadBack`). */
