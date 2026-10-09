@@ -591,6 +591,17 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, 'text:"Payee\u2019s name"', OPTS)).rejects.toThrow(`text:"Payee\u2019s name" is under ${CONTINUE} at its centre (94,827)`);
   });
 
+  it('idb, the number pad up with CONTINUE lifted onto it (run2-ios #250, review of fix/r6b-idb HIGH 1): a row under the keys is never tapped on key "2" — refused, nothing tapped', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 570, width: 354, height: 60 } }));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:fees', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
+    await expect(tapElement(fake, 'id:swift_payment.form.value_date_select', OPTS)).rejects.toThrow(`is under button "Continue to summary" (24,512 354x44) at its centre (201,571)`);
+    expect(fake.tapPoints).toEqual([]);
+  });
+
   it('idb, a label 3 pt below the pinned CONTINUE (round-6 device check H-1, which pressed CONTINUE): refused, nothing tapped — the bar reaches the screen\'s bottom', async () => {
     const elements = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')).positions.pos1;
     const tree = parseIdbDescribeAll(JSON.stringify(elements));

@@ -19,6 +19,7 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
  */
 
 /** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
+const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
 const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
 
@@ -721,8 +722,11 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(flat(back, row, bar)).exposure(row, IPHONE).covers).toEqual([bar]);
       // A sheet listed last that starts ABOVE a content target: the reading-order break — no cover of it, the stated
       // residual the owner accepted (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-…); over the bar it still is.
-      const sheet = uiNode({ role: 'button', label: 'Sheet', rect: rect(0, 200, 402, 400) });
+      const sheet = uiNode({ role: 'button', label: 'Sheet', rect: rect(16, 200, 370, 400) });
       expect(drawOrder(flat(back, row, sheet)).exposure(row, IPHONE).covers).toEqual([]);
+      // One that holds the row whole never breaks (review of fix/r6b-idb, HIGH 2): a cover in its own right.
+      const whole = uiNode({ role: 'button', label: 'Sheet', rect: rect(0, 200, 402, 400) });
+      expect(drawOrder(flat(back, row, whole)).exposure(row, IPHONE).covers).toEqual([whole]);
       // A node of the bar lying on another (a badge on BackButton) starts the content — the stated miss: no cover of it.
       const badge = uiNode({ role: 'image', label: 'Badge', rect: rect(40, 70, 30, 20) });
       expect(drawOrder(flat(back, badge, row)).exposure(back, IPHONE).covers).toEqual([]);
@@ -861,7 +865,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const above = uiNode({ role: 'text', label: 'Above', rect: rect(24, 300, 354, 20) });
         expect(drawOrder(flat(row, footer)).exposure(row, IPHONE).covers).toEqual([footer]);
         expect(drawOrder(flat(row, above, footer)).exposure(row, IPHONE).covers).toEqual([]);
-        expect(drawOrder(flat(row, uiNode({ role: 'textfield', rect: rect(0, 0, 0, 0) }), footer)).exposure(row, IPHONE).covers).toEqual([footer]);
+        expect(drawOrder(flat(row, uiNode({ role: 'textfield', rect: rect(24, 300, 354, 0) }), footer)).exposure(row, IPHONE).covers).toEqual([footer]);
         // Its top AT the target\'s is no break.
         expect(drawOrder(flat(row, uiNode({ role: 'text', label: 'Level', rect: rect(380, 400, 20, 10) }), footer)).exposure(row, IPHONE).covers).toEqual([footer]);
       });
@@ -875,7 +879,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const badge = uiNode({ role: 'text', label: '2', rect: rect(100, 810, 20, 12) });
         expect(drawOrder(flat(label, bar, badge)).exposure(label, IPHONE).covers).toEqual([bar, badge]);
         // A row cut by the screen\'s bottom (ending at 880, past 874) is not pinned: it starts above the label, so it breaks.
-        const cut = uiNode({ role: 'button', label: 'Cut', rect: rect(24, 800, 354, 80) });
+        const cut = uiNode({ role: 'button', label: 'Cut', rect: rect(200, 800, 202, 80) }); // not holding the label whole
         expect(drawOrder(flat(label, cut)).exposure(label, IPHONE).covers).toEqual([]);
       });
 
@@ -883,6 +887,75 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
         const menu = uiNode({ role: 'button', label: 'Menu', rect: rect(16, 72, 370, 400) });
         expect(drawOrder(flat(back, row, uiNode({ role: 'text', label: 'Above', rect: rect(24, 50, 100, 10) }), menu)).exposure(back, IPHONE).covers).toEqual([menu]);
+      });
+
+      describe('idb\'s keyboard (review of fix/r6b-idb, HIGH 1): idb marks no keyboard node, so its keys, listed last, are the only covers of the rows under it — the break never excuses them', () => {
+        const pad = () => parseIdbDescribeAll(JSON.stringify(PAD.elements));
+        const labels = (nodes: readonly UiNode[]) => nodes.map((n) => n.identifier ?? n.label);
+
+        it('run2-ios #250: value_date_select under CONTINUE, lifted onto the number pad, and the keys 1–3 — every cover it had at 2f98900, and CONTINUE\'s reach down to the keyboard\'s top (589) on its centre', () => {
+          const tree = pad();
+          const row = tree.children.find((n) => n.identifier === 'swift_payment.form.value_date_select')!;
+          const seen = drawOrder(tree).exposure(row, IPHONE);
+          expect(labels(seen.covers)).toEqual(['swift_payment.form.continue_button', '1', '2', '3']);
+          expect(seen.centreCover?.identifier).toBe('swift_payment.form.continue_button');
+          expect(seen.tapAt).toBeUndefined();
+        });
+
+        it('…the reviewer\'s probe on it: a row at 24,570 354x60 between the form and CONTINUE is never tapped on key "2" (201,600) — it is refused, under CONTINUE\'s reach and the keys', () => {
+          const tree = pad();
+          const row = uiNode({ role: 'button', label: 'Fees', rect: rect(24, 570, 354, 60) });
+          tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, row);
+          const seen = drawOrder(tree).exposure(row, IPHONE);
+          expect(labels(seen.covers)).toEqual(['swift_payment.form.continue_button', '1', '2', '3']);
+          expect(seen.tapAt).toBeUndefined();
+        });
+
+        const keyboard = () => [
+          ...[5, 137, 270].map((x, i) => uiNode({ role: 'button', label: String(i + 1), rect: rect(x, 596, 132, 54) })),
+          uiNode({ role: 'other', rect: rect(0, 589, 402, 285) }),
+        ];
+
+        it('a node starting above the target that is not chrome (an error\'s TRY AGAIN, run3-ios #45) breaks for content — never for the keys before the background, nor those after it (Dictate)', () => {
+          const field = uiNode({ role: 'textfield', label: 'Name', rect: rect(24, 580, 354, 40) });
+          const retry = uiNode({ role: 'button', label: 'TRY AGAIN', rect: rect(16, 427, 370, 44) });
+          const over = uiNode({ role: 'text', label: 'Over', rect: rect(30, 585, 100, 20) });
+          const dictate = uiNode({ role: 'button', label: 'Dictate', rect: rect(325, 600, 68, 69) });
+          expect(labels(drawOrder(flat(field, retry, over, ...keyboard(), dictate)).exposure(field, IPHONE).covers)).toEqual(['1', '2', '3', 'Dictate']);
+        });
+
+        it('a lifted bar reaches down to the keyboard\'s top, not the screen\'s bottom: a row lying under the keyboard below the keys listed is no target of its reach', () => {
+          const low = uiNode({ role: 'textfield', label: 'Low', rect: rect(24, 700, 354, 20) });
+          const bar = uiNode({ role: 'button', label: 'Continue', rect: rect(24, 512, 354, 44) });
+          expect(drawOrder(flat(low, bar, ...keyboard())).exposure(low, IPHONE).covers).toEqual([]); // the background is no cover in idb's list (the structural row)
+          const row = uiNode({ role: 'textfield', label: 'Row', rect: rect(24, 545, 354, 52) });
+          expect(labels(drawOrder(flat(row, bar, ...keyboard())).exposure(row, IPHONE).covers)).toEqual(['Continue', '1', '2', '3']);
+        });
+
+        it('narrow: the background must span the screen\'s width down to its bottom, be unlabelled and structural — else the keys are content, and the break excuses them', () => {
+          const field = uiNode({ role: 'textfield', label: 'Name', rect: rect(24, 580, 354, 40) });
+          const retry = uiNode({ role: 'button', label: 'TRY AGAIN', rect: rect(16, 427, 370, 44) });
+          const keys = keyboard().slice(0, 3);
+          for (const back of [uiNode({ role: 'other', rect: rect(2, 589, 402, 285) }), uiNode({ role: 'other', rect: rect(0, 589, 410, 285) }), uiNode({ role: 'other', rect: rect(0, 589, 402, 280) }), uiNode({ role: 'other', rect: rect(0, 100, 402, 774) }), uiNode({ role: 'other', label: 'Card', rect: rect(0, 589, 402, 285) }), uiNode({ role: 'image', rect: rect(0, 589, 402, 285) })]) {
+            expect(drawOrder(flat(field, retry, ...keys, back)).exposure(field, IPHONE).covers.filter((n) => n.role === 'button')).toEqual([]);
+          }
+          // Without the background (a shape idb's keyboard never had in the 69 device dumps) the keys after a lifted bar are content: the residual.
+          const bar = uiNode({ role: 'button', label: 'Continue', rect: rect(24, 500, 354, 44) });
+          expect(drawOrder(flat(field, bar, ...keys)).exposure(field, IPHONE).covers).toEqual([]);
+        });
+      });
+
+      it('a bar listed last that ends inside the top bar\'s band never breaks (review of fix/r6b-idb, MEDIUM — Contacts\' New Contact, run3-ios #102): Toolbar 0,83 402x48 covers a row scrolled under it', () => {
+        const bar = uiNode({ role: 'other', identifier: 'New Contact', rect: rect(0, 78, 402, 54) });
+        const row = uiNode({ role: 'button', label: 'add birthday', rect: rect(20, 95, 362, 51) });
+        const toolbar = uiNode({ role: 'other', label: 'Toolbar', identifier: 'Toolbar', rect: rect(0, 83, 402, 48) });
+        const tree = flat(uiNode({ role: 'button', label: 'add address', rect: rect(20, 30, 362, 51) }), bar, row, uiNode({ role: 'button', label: 'add date', rect: rect(20, 160, 362, 51) }), toolbar);
+        const seen = drawOrder(tree).exposure(row, IPHONE);
+        expect(seen.covers).toEqual([toolbar]);
+        expect(seen.tapAt).toBeUndefined();
+        // One ending below the band's line (174.8) is content, and breaks.
+        const low = uiNode({ role: 'other', label: 'Toolbar', rect: rect(0, 83, 300, 100) }); // not holding the row whole
+        expect(drawOrder(flat(bar, row, low)).exposure(row, IPHONE).covers).toEqual([]);
       });
 
       it('a tree that is not a flat list has no break: the same shapes judged as before', () => {
@@ -935,6 +1008,8 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const row = uiNode({ role: 'button', label: 'Row', rect: rect(24, 780, 354, 44) });
         const next = uiNode({ role: 'button', label: 'Next', rect: rect(24, 876, 354, 52) }); // the list runs on past the screen
         expect(drawOrder(flat(under, row, next)).exposure(under, IPHONE).covers).toEqual([]);
+        const flush = uiNode({ role: 'button', label: 'Flush', rect: rect(380, 824, 20, 52) }); // starts AT the row's bottom: the list runs on
+        expect(drawOrder(flat(under, row, flush)).exposure(under, IPHONE).covers).toEqual([]);
         const text = uiNode({ role: 'text', label: 'Total', rect: rect(24, 780, 354, 44) });
         expect(drawOrder(flat(under, text)).exposure(under, IPHONE).covers).toEqual([]);
         const high = uiNode({ role: 'button', label: 'High', rect: rect(24, 776, 354, 44) }); // ends at 820
