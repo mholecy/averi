@@ -926,9 +926,11 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * but in the band). Only the centre: what of the rect lies in the band is
  * judged against the screen as before — `fully` judges clipping against the
  * whole screen — so full-bleed content at the top (a hero image at y 0)
- * stops once its centre lies below the band; one shorter than twice the
- * band has its centre in it, stops neither way, and fails naming the status
- * bar (`shortOf`'s `statusBar`; code review of round 6, P2).
+ * stops once its centre — ROUNDED, the point a tap sends (`tapPoint`) —
+ * lies below the band; one whose rounded centre lies in it (at y 0, shorter
+ * than twice the band less a point: 122 pt or less under 62, while 123 pt
+ * rounds its centre 61.5 to 62 and stops) stops neither way, and fails
+ * naming the status bar (`shortOf`'s `statusBar`; code review of round 6, P2).
  */
 function stops(j: Judged, fully: boolean): boolean {
   return j.visible > 0 && j.centreOnScreen && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);

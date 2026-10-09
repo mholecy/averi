@@ -718,7 +718,8 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   });
 
   // Code review of round 6, P2: `fully` judges clipping against the whole screen, but the stop also needs the centre
-  // below the band — full-bleed content shorter than twice the band (124 pt here) never stops, and says why.
+  // below the band — full-bleed content whose ROUNDED centre lies in the band (at y 0: 122 pt or less under 62) never
+  // stops, and says why. The verification round: 123 pt rounds its centre 61.5 to 62, and stops.
   it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
     const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
@@ -726,9 +727,13 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
-  it('…and at twice the band (0,0 402x124, centre y 62) it is fully visible after 0 swipes', async () => {
-    const fake = still({ x: 0, y: 0, width: 402, height: 124 });
-    expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  it('…the boundary is the rounded centre: 0,0 402x123 (centre 61.5, sent as 62) is fully visible after 0 swipes; 0,0 402x122 (centre 61) fails naming the status bar', async () => {
+    for (const height of [123, 124]) {
+      const fake = still({ x: 0, y: 0, width: 402, height });
+      expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    }
+    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 122 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain("its centre stays under iOS's status bar at (201,61), in the top 62 pt of the screen");
   });
 
   it('a list already at its bottom end, the target pushed up under the bar (24,10 354x52) by the default direction down: the failure says to try direction "up"', async () => {
