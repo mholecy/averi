@@ -1001,7 +1001,11 @@ function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { 
  * the screen's bottom and its keys left out of "listed after it"; it
  * reaches the keyboard's top. Measured: run2-ios #250, CONTINUE `24,512
  * 354x44` (bottom 556, 33 pt above the keyboard at 589), listed after the
- * form and before the keys. Residual, stated (as before this rule): the
+ * form and before the keys — the SHAPE; its reach down to the keyboard's
+ * top is INFERRED, not measured by a tap (kept by the owner, code review of
+ * round 6b P4): checked on the screenshot `run2-ios/img-253-0.png`, the
+ * lifted bar's background between it and the keys; no tap below a lifted
+ * bar's frame has been sent. Residual, stated (as before this rule): the
  * last row of a list that ends inside the band, with nothing listed after
  * it, reads as pinned — it reaches down over what lies below it in its
  * column (on screen, only content listed before it: a false refusal, the
@@ -1080,21 +1084,22 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`). */
   const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
   /**
-   * Where a cover of a target presses (`exposure`): its rect — or, for a
-   * node pinned at a flat list's bottom (`bottomPinned`), its rect run down
-   * to the screen's bottom edge — or a bar lifted onto idb's keyboard down
-   * to the keyboard's top (inferred from H-1, not measured: the lifted
-   * bar's background between it and the keys) — across its own x-range. Measured (round-6
-   * device check, H-1, `run8-ios/img-147-0.png`): with the SWIFT form's
-   * `Payee’s bank street & no.` label at `42,817 186x20`, 3 pt below
-   * CONTINUE's frame `24,780 354x44`, a tap at (135,827) opened SUMMARY —
-   * CONTINUE's hit area reaches below its accessibility frame, and the bar's
-   * opaque background, which idb lists as no node, hides the form from
-   * CONTINUE's top down to the screen's bottom. Its x-range, not the screen's
-   * width: the tap that pressed it lay inside it, and the screenshot cannot
-   * say more (the form's rows span CONTINUE's 24–378 exactly); a narrow
-   * button at the bottom (a floating action button) run across the screen
-   * would hide its neighbours.
+   * Where a cover of a target presses (`exposure`): its rect — or, for a node
+   * pinned at a flat list's bottom (`bottomPinned`), its rect run down to the
+   * screen's bottom edge — or a bar lifted onto idb's keyboard down to the
+   * keyboard's top (inferred from H-1 and checked on the screenshot
+   * `run2-ios/img-253-0.png` — the lifted bar's background between it and the
+   * keys — not measured by a tap; code review of round 6b P4) — across its
+   * own x-range. Measured (round-6 device check, H-1,
+   * `run8-ios/img-147-0.png`): with the SWIFT form's `Payee’s bank street &
+   * no.` label at `42,817 186x20`, 3 pt below CONTINUE's frame `24,780
+   * 354x44`, a tap at (135,827) opened SUMMARY — CONTINUE's hit area reaches
+   * below its accessibility frame, and the bar's opaque background, which idb
+   * lists as no node, hides the form from CONTINUE's top down to the screen's
+   * bottom. Its x-range, not the screen's width: the tap that pressed it lay
+   * inside it, and the screenshot cannot say more (the form's rows span
+   * CONTINUE's 24–378 exactly); a narrow button at the bottom (a floating
+   * action button) run across the screen would hide its neighbours.
    */
   const pinnedReach = (placed: Placed): Rect => {
     const r = placed.node.rect;
