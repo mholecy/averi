@@ -1,4 +1,4 @@
-import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
+import { rectArea, type ClippedSide, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
@@ -248,12 +248,12 @@ export async function resolveSettled(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
   let sighted = false;
-  let zeroOnly = false;
+  let zeroHint: string | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
+      zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
       if (resolved === undefined) {
         lastRect = undefined;
         return undefined;
@@ -276,7 +276,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome, zeroOnly);
+  throw notFound(target, timeoutMs, outcome, zeroHint);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -303,28 +303,54 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
 
 /**
  * A wait that never resolved its target, worded for what it waited for —
- * nothing about settling. `zeroOnly`: the last tree read matched the target,
- * but only with zero-area nodes (2026-10-08,
+ * nothing about settling. `zeroHint`: the last tree read matched the
+ * target, but only with zero-area nodes (2026-10-08,
  * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md: idb reports a
  * node scrolled above the top of a scroll view as 0×0, and the wait read
  * "to appear" for a node the snapshot showed). The hint says so beneath the
  * headline (pollTimeoutMessage drops it when the last read failed). Still
  * absence for ElementNotFoundError's purpose — nothing was ever ACTIONABLE,
  * and a collapsed view, the case the zero-area rule was written for, carries
- * its id at 0×0 too, which is why the hint names both.
+ * its id at 0×0 too, which is why the hint names both (`zeroAreaHint`
+ * words it, and names the side when Android dumped them clipped out).
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroOnly = false): Error {
-  return absenceError(
-    pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroOnly ? ZERO_AREA_HINT : undefined),
-    { sighted: false, ...outcome },
-  );
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string): Error {
+  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint), {
+    sighted: false,
+    ...outcome,
+  });
 }
 
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
 export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
 
-/** Did the target match in this tree, but only with zero-area nodes — resolveNow's filter, the reason it answered `undefined`? */
-const matchedOnlyZeroArea = (tree: UiNode, target: Target): boolean => findTarget(tree, target).length > 0;
+/** Where a node clipped out past each side of its container lies, and the scroll_until direction that brings it back. */
+const CLIPPED_OUT: Readonly<Record<ClippedSide, { where: string; direction: string }>> = {
+  top: { where: 'above', direction: 'up' },
+  bottom: { where: 'below', direction: 'down' },
+  left: { where: 'left of', direction: 'left' },
+  right: { where: 'right of', direction: 'right' },
+};
+
+/**
+ * The hint for a target this tree matched, but only with zero-area nodes —
+ * resolveNow's filter, the reason it answered `undefined` — or undefined
+ * when it matched nothing (or something resolveNow took). When every such
+ * match was dumped clipped out of its scroll container (Android's inverted
+ * bounds, adapters/types.ts#UiNode.clippedOut, 2026-10-09: Settings' `Apps`
+ * under the collapsing app bar read "0×0" for a `126x-239` node), it says
+ * where, and the direction that scrolls it back when they agree; else
+ * ZERO_AREA_HINT.
+ */
+function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
+  const matched = findTarget(tree, target);
+  if (matched.length === 0) return undefined;
+  const sides = new Set(matched.map((n) => n.clippedOut));
+  if (sides.has(undefined)) return ZERO_AREA_HINT;
+  const [only, ...more] = [...sides] as ClippedSide[];
+  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => CLIPPED_OUT[side].where).join(' or ')} its scroll container — scroll_until it first`;
+  return `it matched only nodes clipped out ${CLIPPED_OUT[only].where} its scroll container (scrolled past it) — scroll_until it with direction: "${CLIPPED_OUT[only].direction}" first`;
+}
 
 /**
  * Wait only for the target to APPEAR — one round that resolves it under the
@@ -346,18 +372,18 @@ export async function resolvePresent(
   opts: SettleOptions,
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
-  let zeroOnly = false;
+  let zeroHint: string | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
+      zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
       return resolved;
     },
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome, zeroOnly);
+  throw notFound(target, timeoutMs, outcome, zeroHint);
 }
 
 // ─── On screen ───────────────────────────────────────────────────────────────

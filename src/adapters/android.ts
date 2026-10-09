@@ -6,7 +6,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -988,8 +988,9 @@ export function parseUiautomatorXml(xml: string): UiNode {
   };
 }
 
-/** Where a node lies in the dump: its nearest clipping ancestor's rect (`UiNode.clipsDescendants`), when it has one. */
+/** Where a node lies in the dump: its parent's rect as normalized, and its nearest clipping ancestor's (`UiNode.clipsDescendants`), when it has them. */
 interface Around {
+  parent?: Rect;
   clip?: Rect;
 }
 
@@ -1008,9 +1009,9 @@ function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
     raw.focusable === 'true' &&
     raw['long-clickable'] === 'true';
   const isTextInput = className.endsWith('EditText') || composeTextInput;
-  const rect = parseBounds(raw.bounds);
+  const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
-  const children = rawChildren.map((child) => normalizeNode(child, { clip: clips ? rect : around.clip }));
+  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {
     role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),
@@ -1027,6 +1028,8 @@ function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
     // The bounds as dumped, when they were cut short of the node's own
     // descendants (types.ts#UiNode.cutBounds): `rect` is their union.
     ...(whole !== undefined && { cutBounds: rect }),
+    // Dumped inverted: wholly outside its container, on this side (types.ts#UiNode.clippedOut).
+    ...(clippedOut !== undefined && { clippedOut }),
   };
   // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
   // .getText() returns the hint while isShowingHintText() — and the API 33
@@ -1085,6 +1088,41 @@ function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | unde
   // Never narrower than dumped on a side the clip would cut: only grown.
   [l, t, r, b] = [Math.min(l, rect.x), Math.min(t, rect.y), Math.max(r, right), Math.max(b, bottom)];
   return { x: l, y: t, width: r - l, height: b - t };
+}
+
+/**
+ * A node's bounds as dumped — unless uiautomator dumped them INVERTED, bottom
+ * above top or right left of left (2026-10-09, docs/bugs/2026-10-09-android-
+ * inverted-uiautomator-bounds-pass-through-as-negative-heights.md: Settings'
+ * rows scrolled under the collapsing app bar, `text="Apps"
+ * bounds="[198,297][324,58]"`, `homepage_title` `[66,66][428,44]`). The
+ * node is clipped OUT of its container: one edge is the container's (the
+ * clip, 297: the list's top), the other the node's own, already past it
+ * (58). Which edge is the clip's is read off the parent, whose rect is cut
+ * to the same clip: the edge of the two nearer the parent's same edge —
+ * the top to its top, the bottom to its bottom (a tie, and a root, read
+ * top or left). Such a node is clamped to zero size AT the clip edge — a
+ * node with no area is never a target (interact/resolve.ts), and none
+ * other reads a negative side — and the side it lies past is kept as
+ * `clippedOut` (types.ts#UiNode.clippedOut), for the scroll and the wait's
+ * hint. Both axes are clamped; the vertical side is the one named when
+ * both are inverted.
+ */
+function nodeBounds(bounds: string | undefined, parent: Rect | undefined): { rect: Rect; clippedOut?: ClippedSide } {
+  const m = bounds?.match(BOUNDS_RE);
+  if (!m) return { rect: zeroRect() };
+  const [, l, t, r, b] = m.map(Number);
+  const nearer = (a: number, edgeA: number, z: number, edgeZ: number) => Math.abs(z - edgeZ) < Math.abs(a - edgeA);
+  const vertical: ClippedSide | undefined = b >= t ? undefined : parent !== undefined && nearer(t, parent.y, b, parent.y + parent.height) ? 'bottom' : 'top';
+  const sideways: ClippedSide | undefined = r >= l ? undefined : parent !== undefined && nearer(l, parent.x, r, parent.x + parent.width) ? 'right' : 'left';
+  const rect: Rect = {
+    x: sideways === 'right' ? r : l,
+    y: vertical === 'bottom' ? b : t,
+    width: sideways === undefined ? r - l : 0,
+    height: vertical === undefined ? b - t : 0,
+  };
+  const clippedOut = vertical ?? sideways;
+  return clippedOut === undefined ? { rect } : { rect, clippedOut };
 }
 
 function parseBounds(bounds: string | undefined): Rect {

@@ -98,6 +98,9 @@ export interface Rect {
  */
 export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
 
+/** The side of its container a node lies wholly past (`UiNode.clippedOut`). */
+export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
+
 /**
  * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
  * a negative or NaN side. The one spelling of "has this rect an area": the
@@ -336,6 +339,27 @@ export interface UiNode {
    * node the parser left as dumped.
    */
   cutBounds?: Rect;
+  /**
+   * The side of its container this node lies wholly PAST, when the tree
+   * source dumped its bounds inverted (2026-10-09, docs/bugs/2026-10-09-
+   * android-inverted-uiautomator-bounds-pass-through-as-negative-
+   * heights.md): Android only, set by the uiautomator parser (adapters/
+   * android.ts#nodeBounds). uiautomator cuts a node's bounds to its
+   * container, and a node scrolled wholly past it keeps one edge of each —
+   * Settings' `Apps` row under the collapsing app bar dumped
+   * `[198,297][324,58]`, the list's top and the row's own bottom — which
+   * reached every reader as `126x-239`: `ui_snapshot` printed it, the wait
+   * called it "0×0", and `scroll_until` read it neither past the far edge
+   * nor in the frame. `rect` is clamped to zero size at the container's
+   * edge (`y` 297, height 0), so it is never a target, and this says which
+   * way it went: `top` — clipped out above its scroll container — and
+   * `bottom`, `left`, `right` likewise. Read by the wait's hint
+   * (interact/resolve.ts#zeroAreaHint) and by `scroll_until`, which reads a
+   * node clipped out past its far edge as beyond it (interact/scroll-
+   * rounds.ts#observe). Absent on iOS and on every node dumped the right
+   * way round.
+   */
+  clippedOut?: ClippedSide;
   /**
    * Set on the ROOT of a tree its source gives as a FLAT LIST (code review
    * of deep/r5-covers, P1, 2026-10-09): idb's `describe-all`, every element

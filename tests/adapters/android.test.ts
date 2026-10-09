@@ -8,6 +8,7 @@ import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
+import { resolveSettled } from '../../src/interact/resolve.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
@@ -199,6 +200,50 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
       });
     }
     expect(widened).toEqual(['accountDetail transactions.list.row_29 1784 143', 'accountDetail transactions.list.row_30 2044 143']);
+  });
+});
+
+describe('parseUiautomatorXml — bounds dumped inverted are a node clipped out of its container (docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md)', () => {
+  // Settings' homepage, its first rows scrolled under the collapsing app bar (run9-android, 5e5a3d1): uiautomator's raw bounds.
+  const SETTINGS = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="com.android.settings:id/collapsing_toolbar" bounds="[0,66][1080,297]">
+    <node class="android.widget.TextView" resource-id="com.android.settings:id/homepage_title" text="Settings" bounds="[66,66][428,44]" />
+  </node>
+  <node class="androidx.recyclerview.widget.RecyclerView" resource-id="com.android.settings:id/recycler_view" scrollable="true" bounds="[0,297][1080,2220]">
+    <node class="android.widget.LinearLayout" bounds="[0,297][1080,58]">
+      <node class="android.widget.TextView" resource-id="android:id/title" text="Apps" bounds="[198,297][324,58]" />
+      <node class="android.widget.TextView" resource-id="android:id/summary" text="Assistant, recent apps, default apps" bounds="[198,297][819,111]" />
+    </node>
+    <node class="android.widget.LinearLayout" bounds="[0,400][1080,600]"><node class="android.widget.TextView" text="Display" bounds="[198,450][400,520]" /></node>
+    <node class="android.widget.LinearLayout" bounds="[0,2400][1080,2220]"><node class="android.widget.TextView" text="System" bounds="[198,2450][400,2220]" /></node>
+    <node class="android.widget.HorizontalScrollView" bounds="[1200,500][1080,600]" />
+  </node>
+</node>
+</hierarchy>`;
+  const tree = parseUiautomatorXml(SETTINGS);
+  const byLabel = (label: string) => [...everyNode(tree)].find((n) => n.label === label)!;
+
+  it('clamped to zero size at the container\'s edge, the side it lies past kept: above (Apps, its summary, the title under the app bar), below (System), right of', () => {
+    expect(byLabel('Apps')).toMatchObject({ rect: { x: 198, y: 297, width: 126, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('Assistant, recent apps, default apps')).toMatchObject({ rect: { x: 198, y: 297, width: 621, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('Settings')).toMatchObject({ rect: { x: 66, y: 66, width: 362, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('System')).toMatchObject({ rect: { x: 198, y: 2220, width: 202, height: 0 }, clippedOut: 'bottom' });
+    const sideways = tree.children[1].children[3];
+    expect(sideways).toMatchObject({ rect: { x: 1080, y: 500, width: 0, height: 100 }, clippedOut: 'right' });
+  });
+
+  it('no negative side anywhere; a node dumped the right way round carries no mark', () => {
+    for (const n of everyNode(tree)) expect([n.rect.width, n.rect.height].every((side) => side >= 0)).toBe(true);
+    expect(byLabel('Display')).not.toHaveProperty('clippedOut');
+    expect(byLabel('Display').rect).toEqual({ x: 198, y: 450, width: 202, height: 70 });
+  });
+
+  it('tap text:"Apps" says where it went and the way back — not "0×0"', async () => {
+    const error = await resolveSettled(new FakeAdapter({ s: tree }, 's'), 'text:"Apps"', { ambiguous: 'refuse', timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe(
+      'Timed out after 20ms waiting for element text:"Apps" to appear\n  (it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first)',
+    );
   });
 });
 

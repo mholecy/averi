@@ -49,6 +49,7 @@ Alternatively, detect on a button or row id.
 - **`… was not tapped: after back was pressed …` / `after id:"…" was tapped …`**: the keyboard guard hid the keyboard first, and the layout then moved the element off screen. The screen has changed; take a `screenshot`, then `scroll_until` it.
 - **`either way up`** in the refusal or a `scroll_until` failure: the tree suggested the screen may be turned but nothing confirmed it, so averi counted both orientations, and the element is outside both.
 - **`… to appear` with `(it matched only 0×0 nodes (scrolled off screen, or collapsed) …)`**: the selector matched only zero-area nodes. iOS (idb) reports a node scrolled above the top that way. Run `scroll_until` with `direction: up`, then retry. If it is not in a scroll view, the view is collapsed or not laid out yet.
+- **`… to appear` with `(it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first)`** (or `below` / `"down"`, Android): uiautomator reported the element scrolled wholly past its list (inverted bounds; `ui_snapshot` shows it zero-size with `clippedOut`). Run `scroll_until` with the direction it names, then retry. A plain `scroll_until` (direction down) does not turn back for an element already clipped out above on its first read.
 
 ## Typing and fields
 

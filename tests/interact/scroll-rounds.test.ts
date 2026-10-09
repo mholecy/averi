@@ -1563,3 +1563,38 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(reaches(played)).toEqual([1]);
   });
 });
+
+describe('round — a target uiautomator dumped CLIPPED OUT of its scroll container (docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md)', () => {
+  /** Settings' list under the collapsing app bar: `[0,297][1080,2220]`. */
+  const scroller: Rect = { x: 0, y: 297, width: 1080, height: 1923 };
+  /** `Apps` (126 wide at x 198), 60 tall at y. */
+  const apps = (y: number): Row => ({ found: [match({ x: 198, y, width: 126, height: 60 }, 'apps')], scroller });
+  /** `Apps` dumped inverted past `side`, as the parser normalizes it (adapters/android.ts#nodeBounds): zero size at the list's edge, the side kept. */
+  const clippedOut = (side: 'top' | 'bottom'): Row => ({
+    found: [{ ...match({ x: 198, y: side === 'top' ? 297 : 2220, width: 126, height: 0 }, 'apps'), clippedOut: side }],
+    scroller,
+  });
+  const SETTINGS: Rules = { ...ANDROID, maxSwipes: 6, timeoutMs: 15_000 };
+  const reaches = (played: Played): number[] => played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []));
+
+  it('seen short (its centre below the screen), then flung clipped out past the TOP — the far edge of a scroll down: the next stroke turns (content down), half the reach — not on down past it', () => {
+    const played = play(SETTINGS, [apps(2200), clippedOut('top'), apps(800), apps(800)]);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+    expect(reaches(played)).toEqual([1, 0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('clipped out past the far edge on the FIRST read: the caller\'s direction is honoured, as iOS honours a target read wholly beyond it (the owner\'s call) — the first stroke is not flipped', () => {
+    const played = play({ ...SETTINGS, maxSwipes: 2 }, [clippedOut('top'), { ...clippedOut('top'), rest: 'a' }, { ...clippedOut('top'), rest: 'b' }]);
+    expect(strokesToward(played)).toEqual(['down', 'down']);
+    // direction: "up" — the one the wait's hint names — strokes the content down at once, full reach.
+    const up = play({ ...SETTINGS, direction: 'up' }, [clippedOut('top'), apps(800), apps(800)]);
+    expect(strokesToward(up)).toEqual(['up']);
+    expect(reaches(up)).toEqual([1]);
+  });
+
+  it('last read clipped out past the far edge, then dropped by the lazy list: not `dropped` — it already lay where the caller\'s strokes push it', () => {
+    const played = play({ ...SETTINGS, maxSwipes: 3 }, [clippedOut('top'), { found: [], scroller, rest: 'a' }, { found: [], scroller, rest: 'b' }, { found: [], scroller, rest: 'c' }]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
+  });
+});

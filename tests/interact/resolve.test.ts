@@ -833,6 +833,18 @@ describe('a selector that matched only 0×0 nodes: the never-found timeout says 
     expect((error as Error).message).toBe('Timed out after 20ms waiting for element id:iban to appear');
   });
 
+  it('Android nodes dumped clipped out of their scroll container (UiNode.clippedOut, 2026-10-09): the hint names the side and the way back; sides that disagree name both and no direction; one plain 0×0 match among them keeps the 0×0 hint', async () => {
+    const zero = (clippedOut?: 'top' | 'bottom') => node({ role: 'text', label: 'Apps', rect: { x: 198, y: clippedOut === 'bottom' ? 2220 : 297, width: 126, height: 0 }, ...(clippedOut && { clippedOut }) });
+    const hint = async (...matches: UiNode[]) => {
+      resetLayout();
+      const error = await resolveSettled(new FakeAdapter({ s: screen(...matches) }, 's'), 'text:"Apps"', { ...REFUSE, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+      return (error as Error).message.split('\n')[1];
+    };
+    expect(await hint(zero('bottom'))).toBe('  (it matched only nodes clipped out below its scroll container (scrolled past it) — scroll_until it with direction: "down" first)');
+    expect(await hint(zero('top'), zero('bottom'))).toBe('  (it matched only nodes clipped out above or below its scroll container — scroll_until it first)');
+    expect(await hint(zero('top'), zero())).toBe(HINT.slice(1));
+  });
+
   it('a last read that FAILED drops the hint: the read error is the story', async () => {
     const fake = scrolledAbove();
     let reads = 0;
