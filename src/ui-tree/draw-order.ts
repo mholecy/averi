@@ -1,4 +1,4 @@
-import { everyNode, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, rectWithin } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 
@@ -120,10 +120,10 @@ export interface Exposure {
   /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
    * `within` under no cover — `moved: false`; else the centre of the largest
-   * uncovered piece whose sides are both at least `minPiece` — `moved: true`;
-   * undefined when no piece is that large.
+   * uncovered piece whose sides are both at least `minPiece` — `moved: true`,
+   * with that `piece`; undefined when no piece is that large.
    */
-  readonly tapAt?: { readonly point: Point; readonly moved: boolean };
+  readonly tapAt?: { readonly point: Point; readonly moved: false } | { readonly point: Point; readonly moved: true; readonly piece: Rect };
   /** MIN_TAP_PIECE_FRACTION of this tree's screen's shorter side, rounded — the piece size `tapAt` needs. */
   readonly minPiece: number;
   /** The cover drawn on top at `point` — the last of `covers` that contains it — or undefined. */
@@ -140,7 +140,7 @@ interface Placed {
   readonly at: number;
   /** The index just past its subtree in the walk's order. */
   end: number;
-  /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`). */
+  /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`) or its band (`KEYBOARD_ROLE`, the tree source's mark — inside the keyboard's Window on WDA). */
   readonly inKeyboard: boolean;
   /** Its nearest ancestor that scrolls (`scrolls`), if any. */
   readonly scroller: Placed | undefined;
@@ -387,6 +387,19 @@ const NOT_DRAWN = {
   },
 
   /**
+   * THE TARGET'S OWN FRAME: a node whose rect IS the target's. `target`
+   * only (2026-10-09): a node laid exactly over another, edge for edge, is
+   * the same element listed again — idb's flat list repeats an element and
+   * its accessibility twin at one frame (the fill's `sameField` twins,
+   * tests/interact/fill.test.ts) — or a wrapper of the target's size, not a
+   * bar drawn over part of it. Residual, stated: an overlay of exactly the
+   * target's frame (a disabled-state scrim cut to a button) is not seen.
+   */
+  sameFrame: {
+    target: ({ node }, { target }) => sameRect(node.rect, target.node.rect),
+  },
+
+  /**
    * AN ITEMLESS TOOLBAR, whatever its size: a `toolbar` none of whose
    * descendants could be an item — every one an EMPTY FRAME, a `container`
    * with no label, value or identifier; it may have none at all.
@@ -436,7 +449,8 @@ const NOT_DRAWN = {
 
   /**
    * THE KEYBOARD'S OWN SUBTREES (`UiNode.ofKeyboard` on the node or an
-   * ancestor).
+   * ancestor, or the band `KEYBOARD_ROLE` marks — the same nodes on WDA,
+   * where the band lies in the keyboard's Window).
    *
    * `shadowing`: counted — the keyboard is one more thing drawn over a
    * point (see `DrawOrder.shadowing`).
@@ -450,7 +464,8 @@ const NOT_DRAWN = {
    * `target`: left out, for `drawnOver`'s reason — the keyboard is the
    * caller's, cut out of `within` with its witness; Android has no
    * keyboard node at all, so a cover read here would judge the two
-   * platforms differently.
+   * platforms differently (and an adapter with the oracle never reads the
+   * keyboard from its tree: a band there is no cover either).
    */
   keyboard: {
     drawnOver: ({ inKeyboard }) => inKeyboard,
@@ -498,7 +513,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
   const walk = (node: UiNode, parent: Placed | undefined, scroller: Placed | undefined): void => {
-    const inKeyboard = parent?.inKeyboard === true || node.ofKeyboard === true;
+    const inKeyboard = parent?.inKeyboard === true || node.ofKeyboard === true || node.role === KEYBOARD_ROLE;
     const placed: Placed = { node, at: order.length, end: 0, inKeyboard, scroller, parent };
     order.push(placed);
     for (const child of node.children) walk(child, placed, scrolls(node) ? placed : scroller);
@@ -549,12 +564,12 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const tappable = pieces
         .filter((r) => r.width >= minPiece && r.height >= minPiece)
         .reduce<Rect | undefined>((best, r) => (best === undefined || rectArea(r) > rectArea(best) ? r : best), undefined);
-      const tapAt =
+      const tapAt: Exposure['tapAt'] =
         shown !== undefined && containsPoint(shown, centre) && coverAt(centre) === undefined
           ? { point: centre, moved: false }
           : tappable === undefined
             ? undefined
-            : { point: { x: Math.round(tappable.x + tappable.width / 2), y: Math.round(tappable.y + tappable.height / 2) }, moved: true };
+            : { point: { x: Math.round(tappable.x + tappable.width / 2), y: Math.round(tappable.y + tappable.height / 2) }, moved: true, piece: { ...tappable } };
       return {
         visible: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
         covers,

@@ -1107,7 +1107,7 @@ export class FlowEngine {
   private async runFill(fill: StepPayload<'fill'>): Promise<void> {
     const { value: rawValue, clear, dismissKeyboard: closeKeyboard, ...spec } = fill;
     const { value, secret } = this.resolveValue(rawValue);
-    const filled = await this.tracingDismissal('⚠ fill', () =>
+    const filled = await this.tracingDismissal('⚠ fill', describeElementSpec(spec), () =>
       fillField(this.adapter, spec, value, {
         ...this.acting,
         clear,
@@ -1328,7 +1328,7 @@ export class FlowEngine {
    * what it did before.
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
-    await this.tracingDismissal('⚠ tap', () =>
+    await this.tracingDismissal('⚠ tap', describeElementSpec(spec), () =>
       tapElement(this.adapter, spec, { ...this.acting, timeoutMs }),
     );
     if (!quiet) this.log('tap', describeElementSpec(spec));
@@ -1351,12 +1351,17 @@ export class FlowEngine {
    *   sent") — any KeyboardGuardError, its `traceLine`.
    * A step that met no keyboard logs nothing here.
    */
-  private async tracingDismissal<T extends { keyboardHidden?: string }>(
+  private async tracingDismissal<T extends { keyboardHidden?: string; moved?: string }>(
     action: '⚠ tap' | '⚠ fill',
+    what: string,
     run: () => Promise<T>,
   ): Promise<T> {
     const result = await this.tracingGuardFailure(action, run);
     if (result.keyboardHidden !== undefined) this.log(action, result.keyboardHidden);
+    // The tap went off the target's centre, a node of the app being drawn
+    // over it (2026-10-09, interact/resolve.ts#aimClearOfChrome): said like
+    // the keyboard's line — the author's next step may depend on where.
+    if (result.moved !== undefined) this.log(action, `${what} tapped ${result.moved}`);
     return result;
   }
 

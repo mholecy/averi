@@ -1,4 +1,3 @@
-import { tapPoint } from '../ui-tree/selectors.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import type { KeyboardAdapter } from './keyboard-model.js';
 import type { Target } from './resolve.js';
@@ -14,7 +13,7 @@ export type TapAdapter = KeyboardAdapter;
 /**
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
- * node's center. Returns the resolution note, if any, for the caller to
+ * node at the guard's point. Returns the resolution note, if any, for the caller to
  * surface — the engine's trace does not print it, the MCP tool does.
  *
  * Since 2026-10-03 the node comes from resolveClearOfKeyboard (keyboard.ts):
@@ -33,6 +32,13 @@ export type TapAdapter = KeyboardAdapter;
  * content below the fold with real rects
  * (docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md).
  *
+ * Since 2026-10-09 the point is the guard's too (resolve.ts#aimClearOfChrome):
+ * the centre, unless a node of the app is drawn over it — then an uncovered
+ * piece large enough to aim at, said in `moved` (the MCP reply puts it after
+ * the selector; the flow traces it as `⚠ tap`), or a CoveredRefusal, nothing
+ * tapped (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
+ * chrome.md: "Tapped" pressed a payment form's pinned CONTINUE).
+ *
  * Moved from ui-tree/tap-element.ts on 2026-10-03, where it read the tree
  * once with the adapter's `settle` retry and threw on ambiguity. The poll is
  * now the retry, so `settle` is not asked for (adapters/types.ts: pollers
@@ -45,9 +51,8 @@ export async function tapElement(
   adapter: TapAdapter,
   target: Target,
   opts: GuardOptions,
-): Promise<{ note?: string; keyboardHidden?: string }> {
-  const { node, note, keyboardHidden } = await resolveClearOfKeyboard(adapter, target, opts);
-  const point = tapPoint(node);
+): Promise<{ note?: string; keyboardHidden?: string; moved?: string }> {
+  const { note, keyboardHidden, point, moved } = await resolveClearOfKeyboard(adapter, target, opts);
   await adapter.tap(point.x, point.y);
-  return { note, keyboardHidden };
+  return { note, keyboardHidden, moved };
 }

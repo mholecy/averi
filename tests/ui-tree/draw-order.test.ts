@@ -387,6 +387,11 @@ describe('the three questions disagree on purpose, per row', () => {
     expect(ask(later)).toEqual({ shadowing: later, drawnOver: [], target: [] });
   });
 
+  it('same frame: a node of exactly the target\'s rect covers a point and is drawn over a container, but is the target listed again (idb\'s twins), no cover of it', () => {
+    const later = uiNode({ role: 'button', label: 'twin', rect: rect(150, 280, 100, 40) });
+    expect(ask(later)).toEqual({ shadowing: later, drawnOver: [later], target: [] });
+  });
+
   it('on the target: a non-interactive SIBLING lying wholly inside the target is drawn on it (idb\'s floating label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
     const label = () => uiNode({ role: 'text', label: 'IBAN', rect: rect(160, 285, 50, 20) });
     const sibling = label();
@@ -445,7 +450,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const at754 = priority(754);
       const seen = drawOrder(idbForm(at754)).exposure(at754, IPHONE);
       expect(seen.largest).toEqual(rect(24, 754, 354, 26));
-      expect(seen.tapAt).toEqual({ point: { x: 201, y: 767 }, moved: true });
+      expect(seen.tapAt).toEqual({ point: { x: 201, y: 767 }, moved: true, piece: rect(24, 754, 354, 26) });
       // One point higher the centre (201,779) is clear of the bar: tapped where it always was.
       const at753 = priority(753);
       expect(drawOrder(idbForm(at753)).exposure(at753, IPHONE).tapAt).toEqual({ point: { x: 201, y: 779 }, moved: false });
@@ -485,7 +490,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const badge = uiNode({ role: 'image', label: 'badge', rect: rect(150, 80, 100, 140) }); // across it, top to bottom
     const seen = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, badge] })).exposure(target, rect(0, 0, 400, 800));
     expect(seen.largest).toEqual(rect(0, 100, 150, 100)); // of two equal pieces, the first found
-    expect(seen.tapAt).toEqual({ point: { x: 75, y: 150 }, moved: true });
+    expect(seen.tapAt).toEqual({ point: { x: 75, y: 150 }, moved: true, piece: rect(0, 100, 150, 100) });
     expect(seen.visible).toBeCloseTo(0.75);
     const sheet = uiNode({ role: 'image', label: 'sheet', rect: rect(0, 0, 400, 800) });
     const gone = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, sheet] })).exposure(target, rect(0, 0, 400, 800));
@@ -536,7 +541,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const seen = order.exposure(row, PIXEL);
     expect(seen.covers).toEqual([host, tab, tab.children[0]]);
     expect(seen.minPiece).toBe(65); // 0.06 × 1080, rounded
-    expect(seen.tapAt).toEqual({ point: { x: 33, y: 1940 }, moved: true }); // the 66-px column left of the host
+    expect(seen.tapAt).toEqual({ point: { x: 33, y: 1940 }, moved: true, piece: rect(0, 1840, 66, 200) }); // the 66-px column left of the host
     expect(order.exposure(tab, PIXEL).covers).toEqual([]);
   });
 

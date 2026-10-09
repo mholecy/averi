@@ -19,7 +19,7 @@ import {
   type KeyboardAdapter,
   type KeyboardDismissal,
   type KeyboardModel,
-  type ResolvedClear,
+  type ClearedLook,
 } from './keyboard-model.js';
 import { describeTarget, findTarget, onScreen, tapScreen, type Ambiguity, type TapScreen } from './resolve.js';
 
@@ -322,7 +322,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * returned the node unguarded, and the measured tap went into the
      * AutoFill bar.
      */
-    async guard({ target, opts, point: at, screen, what, covered }: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }> {
+    async guard({ target, opts, point: at, screen, what, covered }: CoveredLook): Promise<{ cleared: ClearedLook } | { hiding: Hiding }> {
       await sleep(KEYBOARD_HIDE_DELAY_MS);
       // The target not coming back for the second look (or coming back
       // ambiguous): nothing was pressed, so the screen is as the step found

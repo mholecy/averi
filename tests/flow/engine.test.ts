@@ -2606,6 +2606,54 @@ flows:
   });
 });
 
+describe('tap: / fill: on a target under the app\'s chrome — the trace says where the tap went, or the step fails naming the cover (2026-10-09)', () => {
+  // docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md; the rule is pinned in tests/interact/resolve.test.ts.
+  const form = (y: number) =>
+    new FakeAdapter(
+      {
+        form: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 402, height: 874 },
+          children: [
+            node({ role: 'textfield', identifier: 'priority', rect: { x: 24, y, width: 354, height: 52 } }),
+            node({ role: 'button', label: 'Continue to summary', identifier: 'continue', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+          ],
+        }),
+      },
+      'form',
+    );
+  const flow = (step: string) =>
+    parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - ${step}
+`);
+  const MOVED = 'at (201,767) — its centre (201,780) is under button "Continue to summary" (24,780 354x44), drawn over it; tapped the uncovered part 354x26';
+
+  it('a tap: moved off a covered centre logs ONE ⚠ tap line before the tap line; a fill: the same as ⚠ fill', async () => {
+    const tapped = form(754);
+    expect(await FlowEngine.run(flow('tap: { id: priority }'), tapped, FAST, { flow: 'f' })).toEqual([
+      { action: 'flow f', detail: 'start' },
+      { action: '⚠ tap', detail: `id:"priority" tapped ${MOVED}` },
+      { action: 'tap', detail: 'id:"priority"' },
+      { action: 'flow f', detail: 'done' },
+    ]);
+    expect(tapped.tapPoints).toEqual([{ x: 201, y: 767 }]);
+    const filled = form(754);
+    const trace = await FlowEngine.run(flow('fill: { id: priority, value: "x" }'), filled, FAST, { flow: 'f' });
+    expect(trace[1]).toEqual({ action: '⚠ fill', detail: `id:"priority" tapped ${MOVED}` });
+  });
+
+  it('a tap: whose centre is covered with too little showing fails the step, nothing tapped', async () => {
+    const fake = form(771);
+    const error = (await FlowEngine.run(flow('tap: { id: priority }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain('id:"priority" is under button "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over it; only a 354x9 part of it shows');
+    expect(fake.tapPoints).toEqual([]);
+  });
+});
+
 describe('tap: / fill: under the Android soft keyboard — the one trace line that says the keyboard was hidden', () => {
   // The measured screen (finportal login, 1080x2220, 2026-10-03); the policy
   // itself is pinned in tests/interact/keyboard-window.test.ts. Here: the STEP, and

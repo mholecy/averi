@@ -370,6 +370,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still (same policy as a flow tap: step) and fails with "Timed out … to appear" ` +
         'if it never shows (or "… to hold still (found, but …)" if it shows but keeps moving) — a selector matching nothing is a wait, not an immediate error. Ignores zero-area nodes (a timeout whose selector matched only 0×0 nodes says so — iOS reports a node scrolled above the top that way); ' +
         'a target whose centre lies OFF the screen (iOS keeps a scroll view\'s content below the fold in the tree, with its real rect) is REFUSED, nothing tapped — scroll_until it first (with fully: true when the refusal says only part of it is on screen: a plain scroll_until stops as soon as any of it is); ' +
+        'a target whose centre lies under another element of the app drawn over it (a pinned button bar, a floating tab bar) is tapped on a part of it nothing is drawn over when one is large enough (about 6 % of the screen\'s shorter side each way), and the response says where and what covered the centre; with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first. ' +
         'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector. ' +
         'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given. ' +
         'On iOS with treeSource: wda a target COVERED by the on-screen keyboard (its band: keys, AutoFill bar, accessory toolbar slot) is hidden first by tapping the first entry of averi.yaml app.ios.keyboardDismiss that is on screen (a tap: on a neutral element such as the title, or accessory: true for the input-accessory toolbar\'s Done), the element found again, then tapped — the response says so; with none configured or none on screen the tap is REFUSED, nothing tapped or pressed, since no key hides the keyboard without submitting: hide it yourself (tap a neutral, non-interactive element such as a title), then tap again. ' +
@@ -386,8 +387,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const settings = iosToolSettings((await loadForCall(TOOL_CONFIG.tap(p), cp)).cfg, p);
       const adapter = await registry.get(p, treeOpts(settings));
       if (selector !== undefined) {
-        const { note } = await tapElement(adapter, selector, guardOpts(settings));
-        return text(tapText(selector, note));
+        const { note, moved } = await tapElement(adapter, selector, guardOpts(settings));
+        return text(tapText(selector, note, moved));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
@@ -456,7 +457,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'A clear alone (empty text) on such a field reads, where the source names no placeholder (idb, Android API 33), "Cleared … — NOT verified: the field still shows N characters that the deletes did not change" (a hint, or a field ignoring deletes); ' +
         'where it names one (iOS wda, an Android dump with a hint attribute), a field showing exactly its placeholder reads "Focused … — NOT verified: the field shows exactly its placeholder\'s text" (empty, or holding that very text), as does typing a value equal to the placeholder. ' +
         'A text the app transforms (auto-capitalisation, autocorrect, a mask) FAILS the read-back; the error says whether only letter case differs, or how many characters of a same-length reading do — never the text. ' +
-        'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android, and on iOS (treeSource: wda) hidden by the first on-screen entry of averi.yaml app.ios.keyboardDismiss then refocused, or refused with none (nothing typed). The keyboard is NOT dismissed after typing here (a flow\'s fill: has dismissKeyboard for that).',
+        'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android, and on iOS (treeSource: wda) hidden by the first on-screen entry of averi.yaml app.ios.keyboardDismiss then refocused, or refused with none (nothing typed); a field whose centre lies off screen, or under another element of the app drawn over it with too little of it showing, is refused like tap, and one tapped on its uncovered part says so in the note. The keyboard is NOT dismissed after typing here (a flow\'s fill: has dismissKeyboard for that).',
       inputSchema: {
         platform,
         text: z.string(),

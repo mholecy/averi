@@ -10,6 +10,12 @@ describe('tap and type_text response lines', () => {
     );
   });
 
+  it('tapText says where the tap went when it was moved off a covered centre (2026-10-09), before the note', () => {
+    const moved = 'at (201,767) — its centre (201,780) is under button "Continue to summary" (24,780 354x44), drawn over it; tapped the uncovered part 354x26';
+    expect(tapText('id:p', undefined, moved)).toBe(`Tapped id:p ${moved}`);
+    expect(tapText('id:p', 'a note', moved)).toBe(`Tapped id:p ${moved} (a note)`);
+  });
+
   // The type_text reply WITH a selector is interact/fill-text.ts's since
   // 2026-10-09, pinned beside the flow line in tests/interact/fill-text.test.ts.
   it('typedText (no selector: nothing read back) counts characters, singular for one', () => {

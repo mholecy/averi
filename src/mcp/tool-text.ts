@@ -27,9 +27,13 @@ import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
 
-/** `Tapped <selector>`, with the resolution note in parentheses when there was one. */
-export const tapText = (selector: string, note: string | undefined): string =>
-  `Tapped ${selector}${note ? ` (${note})` : ''}`;
+/**
+ * `Tapped <selector>`, then — when the tap went elsewhere than the centre
+ * (interact/resolve.ts#aimClearOfChrome, 2026-10-09) — where and why, then
+ * the resolution note in parentheses when there was one.
+ */
+export const tapText = (selector: string, note: string | undefined, moved?: string): string =>
+  `Tapped ${selector}${moved ? ` ${moved}` : ''}${note ? ` (${note})` : ''}`;
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field
