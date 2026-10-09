@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField, type ReadBack } from '../../src/interact/fill.js';
+import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
+import type { ReadBack } from '../../src/interact/fill-facts.js';
 import { judgeFill, wordingOf } from '../../src/interact/fill-verdict.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 

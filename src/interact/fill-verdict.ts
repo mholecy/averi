@@ -14,7 +14,7 @@
  * (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
  *
  * Now the split is three-way, each part with one owner:
- * - facts — interact/fill.ts#FillResult, measured, never worded (the
+ * - facts — interact/fill-facts.ts#FillResult, measured by fill.ts, never worded (the
  *   masked-append warning was a sentence on the result until 2026-10-09; it
  *   is `maskedAppend: { held }` now, and its sentence is a row below);
  * - judgement — `judgeFill` here: the head verb (`did`), what the clear
@@ -48,16 +48,16 @@
  *   warning (fill.ts never produces both: a masked-append needs an input
  *   that took the text, a not-input finding a read-back that did not land).
  *
- * The facts' types are imported from fill.ts as types only; fill.ts imports
- * this module by value for one thing, `caveatText` (its mismatch error), so
- * there is no runtime cycle. The two values both modules need are leaves of
+ * The facts' types come from interact/fill-facts.ts, a leaf; fill.ts
+ * imports this module by value for one thing, `caveatText` (its mismatch
+ * error), and nothing here imports fill.ts. The two values both modules need are leaves of
  * their own: `INPUT_ROLE` (interact/input-role.ts) and `charactersText`
  * (util/count.ts) — neither is a judgement.
  */
 
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
-import type { FillResult, LostWhy, NearbyInput } from './fill.js';
+import type { FillResult, LostWhy, NearbyInput } from './fill-facts.js';
 import { INPUT_ROLE } from './input-role.js';
 
 /**

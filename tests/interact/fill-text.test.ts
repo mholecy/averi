@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FillResult } from '../../src/interact/fill.js';
+import type { FillResult } from '../../src/interact/fill-facts.js';
 import { judgeFill } from '../../src/interact/fill-verdict.js';
 import { fillText } from '../../src/interact/fill-text.js';
 
