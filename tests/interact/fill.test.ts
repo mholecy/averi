@@ -443,6 +443,14 @@ describe('fillField refuses a control character before anything is sent', () => 
     );
   });
 
+  it('the refusal is a FillValueFailure marked `refused`, carrying type-text.ts\'s own error as its cause', async () => {
+    const error = await fillField(formFake(), { id: 'amount_input' }, 'ab\ncd', FAST).catch((e: unknown) => e);
+    expect(error).toMatchObject({ name: 'FillValueFailure', fillValue: 'refused' });
+    const { cause, message } = error as Error;
+    expect(cause).toBeInstanceOf(Error);
+    expect((cause as Error).message).toBe(message);
+  });
+
   it('printable text — a space, non-ASCII, a C1-range letter — is typed as before', async () => {
     const fake = formFake();
     await fillField(fake, { id: 'amount_input' }, 'a b é\u0085', FAST);

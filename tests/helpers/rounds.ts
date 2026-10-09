@@ -52,6 +52,14 @@ export interface Row {
    * ui-tree/draw-order.ts#drawnOver); default none.
    */
   over?: readonly UiNode[];
+  /**
+   * The tree is idb's FLAT LIST (`UiNode.flatList`): a 0×0 root over the
+   * screen-sized Application, then the matches and `over` side by side —
+   * so a button `over` them low enough is pinned at the list's bottom and
+   * reaches the screen's bottom (ui-tree/draw-order.ts#bottomPinned).
+   * Default false; no scrollers with it.
+   */
+  flatList?: boolean;
   /** The tree shows a progress node (read-tree.ts#showsProgress); default false. */
   loading?: boolean;
   /** The answer to `ask witness` (the reading's `corroborated()`); default true. */
@@ -95,6 +103,11 @@ export function treeOf(row: Row, screen: DeviceScreen): UiNode {
   const nested = (n: UiNode): boolean => found.some((m) => m !== n && contains(m, n));
   const chain = row.scrollers ?? (row.scroller !== undefined ? [row.scroller] : []);
   const matches = found.filter((n) => !nested(n));
+  if (row.flatList === true) {
+    if (chain.length > 0 || row.mainScroller !== undefined) throw new Error('treeOf: a flat list has no scrollers');
+    const application = node({ role: 'other', rect: { x: 0, y: 0, ...screen } });
+    return node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, children: [application, ...matches, ...(row.over ?? []), ...(row.rest !== undefined ? [node({ role: 'text', label: row.rest })] : [])] });
+  }
   const inScrollers = chain.reduce<UiNode[]>((inside, rect) => [node({ role: 'container', rect: { ...rect }, clipsDescendants: true, children: inside })], matches);
   return node({
     role: 'container',

@@ -304,6 +304,8 @@ export interface Judged {
   under?: Cover;
   /** The nodes drawn over it inside the frame, pre-order; empty when none. */
   covers: readonly UiNode[];
+  /** Where each of `covers` presses, in the same order (draw-order.ts#Exposure.reaches): a pinned bar's reach, not its frame — what `observe`'s far-side test reads. */
+  reaches: readonly Rect[];
   /** The cover drawn over its centre (`tapPoint`, the point a tap presses), when the centre lies in the frame under one. */
   centreCover?: UiNode;
   /**
@@ -900,6 +902,7 @@ function judge(
       clipped: clippedEdges(node.rect, frame),
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
+      reaches: seen?.reaches ?? [],
       ...(centreCover !== undefined && { centreCover }),
       ...centreFacts(node),
       shows: seen?.shows ?? visible,
@@ -908,7 +911,7 @@ function judge(
   const scored = found.map((node): Judged => {
     if (cover === undefined || cover.keyboardSide(node)) return inFrame(node, viewport);
     const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], ...centreFacts(node), shows: 0 };
+    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], reaches: [], ...centreFacts(node), shows: 0 };
     return inFrame(node, above, cover.cover);
   });
   return scored.sort((a, b) => better(a, b, fully))[0];
@@ -992,6 +995,19 @@ const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
   a === undefined || b === undefined ? a === b : a.node === b.node && a.visible === b.visible;
 
 /**
+ * The FAR edge of a scroll toward `direction` — the edge of the frame its
+ * strokes move content out through (for content below, `down`, the top) —
+ * and the NEAR one content comes in through: what `beyondFarEdge` reads of
+ * the target and `overFarSide` of a cover over it.
+ */
+const FAR_EDGE: Readonly<Record<Direction, { readonly far: Edge; readonly near: Edge }>> = {
+  down: { far: 'top', near: 'bottom' },
+  up: { far: 'bottom', near: 'top' },
+  right: { far: 'left', near: 'right' },
+  left: { far: 'right', near: 'left' },
+};
+
+/**
  * The target lies BEYOND the edge of `frame` that a scroll toward
  * `direction` moves content out through — past that far edge, or across
  * it — and not across the near one: for content below (down) the content
@@ -1007,20 +1023,14 @@ const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
  * frame) is not beyond either: turning back could not help it.
  */
 function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
-  const top = rect.y < frame.y;
-  const bottom = rect.y + rect.height > frame.y + frame.height;
-  const left = rect.x < frame.x;
-  const right = rect.x + rect.width > frame.x + frame.width;
-  switch (direction) {
-    case 'down':
-      return top && !bottom;
-    case 'up':
-      return bottom && !top;
-    case 'right':
-      return left && !right;
-    case 'left':
-      return right && !left;
-  }
+  const past: Record<Edge, boolean> = {
+    top: rect.y < frame.y,
+    bottom: rect.y + rect.height > frame.y + frame.height,
+    left: rect.x < frame.x,
+    right: rect.x + rect.width > frame.x + frame.width,
+  };
+  const { far, near } = FAR_EDGE[direction];
+  return past[far] && !past[near];
 }
 
 /**
@@ -1042,23 +1052,18 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * half: not turned for, either way.
  */
 function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect): boolean {
-  const top = cover.y <= rect.y;
-  const bottom = cover.y + cover.height >= rect.y + rect.height;
-  const left = cover.x <= rect.x;
-  const right = cover.x + cover.width >= rect.x + rect.width;
+  const over: Record<Edge, boolean> = {
+    top: cover.y <= rect.y,
+    bottom: cover.y + cover.height >= rect.y + rect.height,
+    left: cover.x <= rect.x,
+    right: cover.x + cover.width >= rect.x + rect.width,
+  };
   // Twice the centre against twice the middle: whole numbers, no rounding at the boundary.
   const vertical = 2 * cover.y + cover.height - (2 * frame.y + frame.height);
   const sideways = 2 * cover.x + cover.width - (2 * frame.x + frame.width);
-  switch (direction) {
-    case 'down':
-      return vertical < 0 && top && !bottom;
-    case 'up':
-      return vertical > 0 && bottom && !top;
-    case 'right':
-      return sideways < 0 && left && !right;
-    case 'left':
-      return sideways > 0 && right && !left;
-  }
+  const inHalfOf: Record<Edge, boolean> = { top: vertical < 0, bottom: vertical > 0, left: sideways < 0, right: sideways > 0 };
+  const { far, near } = FAR_EDGE[direction];
+  return inHalfOf[far] && over[far] && !over[near];
 }
 
 /** The same set of rects, each within a pixel — every match where it was. Empty sets say nothing. */
@@ -1176,8 +1181,12 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // "content exhausted … a layout defect" after two, and from -20
     // `direction: "up"` flung it to 771 under CONTINUE and swiped up six
     // times more. The target is right there: the strokes turn at once.
+    // Where a cover presses, as exposure judged it (`Judged.reaches`, code
+    // review of round 6b P1): CONTINUE pinned at idb's flat list reaches the
+    // screen's bottom, so the row flung to 776–828 has it over its far
+    // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
-    const atFarEdge = best.visible > 0 && (beyond || best.covers.some((c) => overFar(c.rect)));
+    const atFarEdge = best.visible > 0 && (beyond || best.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyond) s.seenShort = true;
     if (best.visible > 0) s.inFrameAfter = s.swipes;

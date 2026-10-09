@@ -750,7 +750,8 @@ describe('a Compose label under its own control (2026-10-09)', () => {
   /** A fake on one screen of the round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json); its taps recorded by point (the snapshot's Compose nodes carry no ids for the fake to hit). */
   const snapshot = async (screen: string) => {
     const { screens } = JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
-    const fake = new FakeAdapter({ s: screens[screen] }, 's');
+    // The root marked as the parser marks every uiautomator root since the snapshots were taken (types.ts#UiNode.paddedTouchTargets).
+    const fake = new FakeAdapter({ s: { ...screens[screen], paddedTouchTargets: true } }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     fake.tap = async (x, y) => {
       fake.tapPoints.push({ x, y });

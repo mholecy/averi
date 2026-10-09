@@ -980,10 +980,11 @@ export function parseUiautomatorXml(xml: string): UiNode {
   const roots: RawNode[] = parsed.hierarchy?.node ?? [];
   if (roots.length === 0) throw new Error('uiautomator dump contained no nodes');
   const children = roots.map(normalizeNode);
-  if (children.length === 1) return children[0];
+  // The source's mark (types.ts#UiNode.paddedTouchTargets): Compose lists a control's touch target as its wrapper.
+  if (children.length === 1) return { ...children[0], paddedTouchTargets: true };
   return {
     role: 'container', label: null, identifier: null, value: null,
-    rect: zeroRect(), children,
+    rect: zeroRect(), children, paddedTouchTargets: true,
   };
 }
 

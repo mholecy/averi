@@ -1082,9 +1082,16 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     const find = (p: (n: UiNode) => boolean) => [...everyNode(tree)].find(p)!;
     return { tree, find, order: drawOrder(tree) };
   };
-  /** The round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json), by screen. */
+  /**
+   * The round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json), by screen — each root marked
+   * `paddedTouchTargets`, as the parser marks every uiautomator root since the snapshots were taken (code review of round 6b, P2).
+   */
   const snapshots = async (): Promise<Record<string, UiNode>> =>
-    (JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+    Object.fromEntries(
+      Object.entries((JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens).map(
+        ([screen, tree]) => [screen, { ...tree, paddedTouchTargets: true as const }],
+      ),
+    );
   /** Every text in `tree` with a later `button` sibling holding it whole — the shape the bug note measured. */
   const labelled = (tree: UiNode): UiNode[] =>
     [...everyNode(tree)].flatMap((parent) =>
@@ -1190,9 +1197,9 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     const text = () => uiNode({ role: 'text', label: 'LOGIN', rect: TEXT });
     const button = (r = rect(44, 1402, 992, 121), partial: Partial<UiNode> = {}) => uiNode({ role: 'button', rect: r, ...partial });
     const WRAPPER = rect(44, 1397, 992, 132);
-    /** The label and `later` in `parent`'s rect, on a Compose screen. */
+    /** The label and `later` in `parent`'s rect, on a Compose screen (uiautomator's root mark, `paddedTouchTargets`). */
     const inParent = (target: UiNode, later: UiNode, parent = WRAPPER) =>
-      uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: parent, children: [target, later] })] })] });
+      uiNode({ role: 'container', rect: PIXEL, paddedTouchTargets: true, children: [uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: parent, children: [target, later] })] })] });
     const coversOf = (target: UiNode, later: UiNode, parent = WRAPPER) => drawOrder(inParent(target, later, parent)).exposure(target, PIXEL).covers;
 
     it('an interactive target is no label: a later button holding a button whole in their wrapper covers it', () => {
@@ -1292,6 +1299,27 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       it('residual, stated: an icon button CUT by a list\'s or scroll view\'s edge — insets 11, 11, 11, 41 — is still refused', () => {
         const cut = button(rect(22, 99, 110, 80));
         expect(coversOf(icon(rect(44, 121, 66, 56)), cut, ICON_WRAPPER)).toEqual([cut]);
+      });
+
+      it('only where measured — uiautomator\'s tree (`paddedTouchTargets`; code review of round 6b, P2): under WDA an unlabelled button centred over a text with an even margin in its card stays a cover; spanning the card\'s width, it is the text\'s own control there too', () => {
+        // The same shape on the iPhone 17 under WDA: a card `Other` → its text, then an unlabelled overlay `Button` 8 pt in.
+        const label = uiNode({ role: 'text', label: 'Cancel', rect: rect(40, 220, 40, 20) });
+        const overlay = button(rect(20, 200, 80, 60));
+        const card = uiNode({ role: 'container', rect: rect(12, 192, 96, 76), children: [label, overlay] });
+        const wda = uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: [uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: [card] })] });
+        expect(drawOrder(wda).exposure(label, rect(0, 0, 402, 874)).covers).toEqual([overlay]);
+        // The mark alone makes it the label's own: the shape is the measured one.
+        expect(drawOrder({ ...wda, paddedTouchTargets: true }).exposure(label, rect(0, 0, 402, 874)).covers).toEqual([]);
+        // spansWidth is not gated: a text button's control (the card's x and width) is the text's own on any tree.
+        const wide = button(rect(12, 200, 96, 60));
+        const spanning = uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: [uiNode({ role: 'container', rect: rect(12, 192, 96, 76), children: [label, wide] })] });
+        expect(drawOrder(spanning).exposure(label, rect(0, 0, 402, 874)).covers).toEqual([]);
+      });
+
+      it('through the WDA parser: no tree it gives carries the mark', async () => {
+        const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-keyboard.json', import.meta.url), 'utf8'));
+        expect([...everyNode(tree)].some((n) => n.paddedTouchTargets === true)).toBe(false);
+        expect(parseUiautomatorXml(COMPOSE.login).paddedTouchTargets).toBe(true);
       });
 
       it('a centred dialog-like overlay in a screen-sized parent, padded evenly, still covers', () => {

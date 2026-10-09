@@ -49,8 +49,9 @@ import { isInteractive, tapPoint } from './selectors.js';
  * cover but off the screen, cut out of `within` by the caller
  * (interact/swipe.ts#belowStatusBand). Knows no
  * platform commands; the platform shapes are in the rows, each with the
- * device tree it was measured on, and the one mark of a source it reads is
- * on the tree (`UiNode.flatList`). The rect arithmetic it asks — the
+ * device tree it was measured on, and the marks of a source it reads are
+ * on the tree's root (`UiNode.flatList`, `UiNode.paddedTouchTargets`). The
+ * rect arithmetic it asks — the
  * subtraction of a cover from a target included — is geometry.ts's.
  */
 export interface DrawOrder {
@@ -126,6 +127,14 @@ export interface Exposure {
   readonly shows: number;
   /** The nodes drawn over it inside `within`, in pre-order; empty when none. */
   readonly covers: readonly UiNode[];
+  /**
+   * Where each of `covers` presses, in the same order: its rect, or — for a
+   * node pinned at a flat list's bottom (`bottomPinned`) — its reach
+   * (`pinnedReach`). The rects `shows`, `largest` and `coverAt` are judged
+   * against, so a caller asking where a cover lies over the target (scroll-
+   * rounds.ts#overFarSide) asks of the same rect.
+   */
+  readonly reaches: readonly Rect[];
   /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
   /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — `coverAt` of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
@@ -187,7 +196,9 @@ interface SeenFor extends Seen {
   /** The walk index of the reading-order break after a flat list's CONTENT target (`readingBreak`): the later nodes from it on are no cover of it. The walk's length when there is none, the target is the top bar's, or the tree is not a flat list. */
   readonly readingBreak: number;
   /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`) and idb's keyboard (`keyboardOf`): never past the break. */
-  readonly chrome: ReadonlySet<Placed>;
+  readonly bottomChrome: ReadonlySet<Placed>;
+  /** The tree's source lists a control's touch target as its wrapper (`UiNode.paddedTouchTargets` on its root): `ownControl`'s padded shape is asked only then. */
+  readonly paddedTouchTargets: boolean;
 }
 
 /**
@@ -535,9 +546,10 @@ const NOT_DRAWN = {
    * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
    * where idb resumes listing another container in reading order
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
-   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target` only: the owner's decision of 2026-10-09 on
-   * docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-
-   * covered-by-the-content-behind-it.md, a regression of `flatListChrome`.
+   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target`
+   * only: the owner's decision of 2026-10-09 on docs/bugs/2026-10-09-ios-
+   * idb-modal-listed-before-content-reads-covered-by-the-content-behind-
+   * it.md, a regression of `flatListChrome`.
    *
    * Measured (tests/fixtures/idb-modal-listed-before-content.json): idb
    * lists mp-native's payment-type chooser — a card drawn over the dimmed
@@ -567,9 +579,11 @@ const NOT_DRAWN = {
    * rows under it, and a bar between the form and the keys (CONTINUE lifted
    * onto the number pad, run2-ios #250, `24,512` above a row at 545) must
    * neither excuse them nor be excused. Nor does a node that holds the
-   * target whole break (r6b-icon's padded control `22,1099 110x110` round
-   * its icon at 1121; in the 69 device dumps only a pinned CONTINUE and the
-   * keyboard's background enclose a later-listed target), nor one ending
+   * target whole break (pinned on a SYNTHETIC tree, no device dump:
+   * r6b-icon's padded control `22,1099 110x110` round its icon at 1121, an
+   * Android shape put in a flat list — tests/ui-tree/draw-order.test.ts; in
+   * the 69 device dumps only a pinned CONTINUE and the keyboard's background
+   * enclose a later-listed target), nor one ending
    * inside the top bar's band (`barLine`; review MEDIUM: Contacts' New
    * Contact lists `Toolbar 0,83 402x48` last, over `add birthday 20,109`
    * scrolled under it) — each a cover candidate in its own right. Bar items
@@ -592,7 +606,7 @@ const NOT_DRAWN = {
    * this row: neither is marked.
    */
   flatListReadingOrder: {
-    target: (placed, { readingBreak, chrome }) => placed.at >= readingBreak && !chrome.has(placed),
+    target: (placed, { readingBreak, bottomChrome }) => placed.at >= readingBreak && !bottomChrome.has(placed),
   },
 
   /**
@@ -676,20 +690,21 @@ const NOT_DRAWN = {
   },
 
   /**
-   * THE TARGET'S OWN CONTROL: an INTERACTIVE node with no label and no
-   * value, a sibling of a NON-INTERACTIVE target, that holds the target's
-   * rect whole and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and
-   * width exactly (`spansWidth`) — or is PADDED in it on all four sides,
-   * evenly and centred on the target (`paddedOn`); the parent not the
-   * screen's size (`screenSized`), nor the control. `target` only (2026-10-09, docs/bugs/2026-10-09-android-
-   * compose-button-text-refused-as-under-its-own-button.md — a regression of
-   * this column's first round): a Compose `Button` reaches uiautomator as a
-   * wrapper holding its label text and, AFTER it, an unlabelled clickable
-   * `button` — mp-native's `container 44,1397 992x132` → `text 'LOGIN'
-   * 481,1438 118x49`, `button 44,1402 992x121`. That button read as drawn
-   * over the text: `tap text:"LOGIN"` was refused, `scroll_until` called
-   * the screen a layout defect, and an `optional:` tap skipped. A tap at
-   * the label's centre lands on the button — what the caller means.
+   * THE TARGET'S OWN CONTROL: an INTERACTIVE node with no label and no value,
+   * a sibling of a NON-INTERACTIVE target, that holds the target's rect whole
+   * and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
+   * exactly (`spansWidth`) — or is PADDED in it on all four sides, evenly and
+   * centred on the target (`paddedOn`); the parent not the screen's size
+   * (`screenSized`), nor the control. `target` only (2026-10-09,
+   * docs/bugs/2026-10-09-android-compose-button-text-refused-
+   * as-under-its-own-button.md — a regression of this column's first round):
+   * a Compose `Button` reaches uiautomator as a wrapper holding its label
+   * text and, AFTER it, an unlabelled clickable `button` — mp-native's
+   * `container 44,1397 992x132` → `text 'LOGIN' 481,1438 118x49`, `button
+   * 44,1402 992x121`. That button read as drawn over the text: `tap
+   * text:"LOGIN"` was refused, `scroll_until` called the screen a layout
+   * defect, and an `optional:` tap skipped. A tap at the label's centre lands
+   * on the button — what the caller means.
    *
    * The two shapes are the round-5 ui_snapshots' (tests/fixtures/android-
    * ui-snapshot-compose.json; every node there under a later unlabelled
@@ -721,49 +736,56 @@ const NOT_DRAWN = {
    * list's or scroll view's edge, whose insets are then uneven (`button
    * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, as
    * at round 6, the safe direction; nor one spanning its wrapper's height
-   * only (a tall narrow one).
+   * only (a tall narrow one). And only on a tree whose source lists a
+   * control's touch target as its wrapper (`UiNode.paddedTouchTargets`,
+   * uiautomator's root; code review of round 6b, P2): the shape was
+   * measured there alone. No other mark tells uiautomator's tree from
+   * WDA's — `clipsDescendants` is a node's, absent on an Android screen with
+   * no scroller, and `ofKeyboard` comes only with a keyboard — so the source
+   * marks its root, as idb's does `flatList`. Under WDA and idb an
+   * unlabelled button padded evenly over a centred text stays a cover (a
+   * false refusal, the safe direction). The width shape (`spansWidth`) is
+   * asked of every tree, as at round 6.
    *
    * What still covers: a pinned CTA in the SAME parent as a text (review of
-   * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over
-   * "Forgot password?" in its 1080-wide ConstraintLayout with the keyboard
-   * up, `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"`
-   * over its fee) — labelled, inset from its layout's sides and not evenly
-   * on all four (LOG IN: 40, 40, 940, 20); a
-   * non-interactive node holding the label (an opaque card, a loading
-   * view); an interactive TARGET under a later control (a button over a
-   * button); a control in a screen-sized parent, or screen-sized itself
-   * (`screenSized`: at least SCREEN_SIZED_FRACTION, 0.9, of the screen) —
-   * a scrim, an RN transparent Modal's backdrop, a dismiss region, ONLY
-   * when it or its parent is that large (see the residual); one that
-   * does not hold the label whole (a field's clear button); one in another
-   * parent. idb's flat list never meets this row: every node's parent is
-   * its 0×0 root, which no control spans or lies in. Residual, stated: an
+   * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over "Forgot
+   * password?" in its 1080-wide ConstraintLayout with the keyboard up,
+   * `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"` over
+   * its fee) — labelled, inset from its layout's sides and not evenly on all
+   * four (LOG IN: 40, 40, 940, 20); a non-interactive node holding the label
+   * (an opaque card, a loading view); an interactive TARGET under a later
+   * control (a button over a button); a control in a screen-sized parent, or
+   * screen-sized itself (`screenSized`: at least SCREEN_SIZED_FRACTION, 0.9,
+   * of the screen) — a scrim, an RN transparent Modal's backdrop, a dismiss
+   * region, ONLY when it or its parent is that large (see the residual); one
+   * that does not hold the label whole (a field's clear button); one in
+   * another parent. idb's flat list never meets this row: every node's parent
+   * is its 0×0 root, which no control spans or lies in. Residual, stated: an
    * unlabelled interactive node spanning the width of a wrapper it shares
-   * with a label, or padded evenly in it and centred on the label, is read
-   * as the label's control, and the tap is sent to it — geometry cannot
-   * tell it from a Compose Button. So: a Compose
-   * `clickable(role = Role.Button)` overlay laid over a text in a Box of
-   * its width (a card's tap target, a disabled-state scrim cut to the
-   * card), an unlabelled `ImageButton` filling a thumbnail's FrameLayout
-   * over its caption text, an unlabelled full-width bar button pinned over
-   * a text in the bar's own layout, and — under WDA — a React Native
-   * in-tree dismiss backdrop (a `Pressable` with `absoluteFill` and
-   * `accessibilityRole="button"`, no label) inside a safe-area container
-   * `0,59 402x781`, 0.894 of the screen and so not screen-sized: the
-   * backdrop spans the container's width and holds the sheet's texts — all
-   * excused; and an unlabelled clickable overlay laid with an even margin
-   * over a centred text in its card (the margin at most half the overlay's
-   * side).
+   * with a label, or padded evenly in it and centred on the label, is read as
+   * the label's control, and the tap is sent to it — geometry cannot tell it
+   * from a Compose Button. So: a Compose `clickable(role = Role.Button)`
+   * overlay laid over a text in a Box of its width (a card's tap target, a
+   * disabled-state scrim cut to the card), an unlabelled `ImageButton`
+   * filling a thumbnail's FrameLayout over its caption text, an unlabelled
+   * full-width bar button pinned over a text in the bar's own layout, and —
+   * under WDA — a React Native in-tree dismiss backdrop (a `Pressable` with
+   * `absoluteFill` and `accessibilityRole="button"`, no label) inside a
+   * safe-area container `0,59 402x781`, 0.894 of the screen and so not
+   * screen-sized: the backdrop spans the container's width and holds the
+   * sheet's texts — all excused; and, on uiautomator's tree, an unlabelled
+   * clickable overlay laid with an even margin over a centred text in its
+   * card (the margin at most half the overlay's side).
    */
   ownControl: {
-    target: (placed, { target, screenArea }) =>
+    target: (placed, { target, screenArea, paddedTouchTargets }) =>
       siblingOf(placed, target) &&
       isInteractive(placed.node) &&
       !placed.node.label &&
       !placed.node.value &&
       !isInteractive(target.node) &&
       rectWithin(target.node.rect, placed.node.rect) &&
-      (spansWidth(placed.node.rect, placed.parent.node.rect) || paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect)) &&
+      (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect))) &&
       !screenSized(placed.parent.node, screenArea) &&
       !fillsScreen(placed.node.rect, screenArea),
   },
@@ -932,21 +954,20 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
 export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 
 /**
- * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): idb
- * marks no keyboard node, so its keys — plain `button`s listed LAST — are
- * the only covers of the rows under it. Its background is a screen-wide,
- * unlabelled structural node ending at the screen's bottom and starting
- * below the top bar's band (so never the screen's size), listed right
- * after the keys; the
+ * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): idb marks
+ * no keyboard node, so its keys — plain `button`s listed LAST — are the only
+ * covers of the rows under it. Its background is a screen-wide, unlabelled
+ * structural node ending at the screen's bottom and starting below the top
+ * bar's band (so never the screen's size), listed right after the keys; the
  * keyboard is that node and the run of nodes listed beside it (before and
  * after, in the list's order) lying wholly inside it. Measured on all four
- * keyboard dumps of the round-2 to round-8 device checks: run2-ios #250
- * (the SWIFT form's number pad, `other 0,589 402x285` after `1`…`Delete`),
+ * keyboard dumps of the round-2 to round-8 device checks: run2-ios #250 (the
+ * SWIFT form's number pad, `other 0,589 402x285` after `1`…`Delete`),
  * run3-ios #45 and #51 and run8-ios #233 (`other 0,590 402x284` after the
  * QWERTY keys, `Dictate 325,805 68x69` after it). Shape, not labels: key
- * labels follow the language and the layout. The app's own PIN pad
- * (run5-ios #81) has no such background, and is content. Undefined when no
- * node has that shape (the last one listed is taken).
+ * labels follow the language and the layout. The app's own PIN pad (run5-ios
+ * #81) has no such background, and is content. Undefined when no node has
+ * that shape (the last one listed is taken).
  */
 function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
   const bottom = screen.y + screen.height;
@@ -980,7 +1001,11 @@ function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { 
  * the screen's bottom and its keys left out of "listed after it"; it
  * reaches the keyboard's top. Measured: run2-ios #250, CONTINUE `24,512
  * 354x44` (bottom 556, 33 pt above the keyboard at 589), listed after the
- * form and before the keys. Residual, stated (as before this rule): the
+ * form and before the keys — the SHAPE; its reach down to the keyboard's
+ * top is INFERRED, not measured by a tap (kept by the owner, code review of
+ * round 6b P4): checked on the screenshot `run2-ios/img-253-0.png`, the
+ * lifted bar's background between it and the keys; no tap below a lifted
+ * bar's frame has been sent. Residual, stated (as before this rule): the
  * last row of a list that ends inside the band, with nothing listed after
  * it, reads as pinned — it reaches down over what lies below it in its
  * column (on screen, only content listed before it: a false refusal, the
@@ -1005,23 +1030,24 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
  * The reading-order break after a flat list's CONTENT target
  * (`flatListReadingOrder`): the walk index of the first node after it with
  * area whose top lies above the target's — but never a node of the bottom
- * chrome (`chrome`: pinned at the bottom, or idb's keyboard), one that
+ * chrome (`bottomChrome`: pinned at the bottom, or idb's keyboard), one that
  * holds the target whole (a later node enclosing it is a cover in its own
- * right — r6b-icon's padded control; in the 69 device dumps only a pinned
- * CONTINUE and the keyboard's background), or one ending inside the top
- * bar's band (`barLine`: a bar listed last — Contacts' `Toolbar 0,83
- * 402x48`, run3-ios #102 — lies over the rows scrolled under it).
+ * right — r6b-icon's padded control, on a synthetic tree, not a device
+ * dump; in the 69 device dumps only a pinned CONTINUE and the keyboard's
+ * background), or one ending inside the top bar's band (`barLine`: a bar
+ * listed last — Contacts' `Toolbar 0,83 402x48`, run3-ios #102 — lies over
+ * the rows scrolled under it).
  * `order.length` when there is none, or when the target is the top bar's
  * (`contentFrom`; never on a tree that is not a flat list, whose
  * `contentFrom` is the walk's length).
  */
-function readingBreak(order: readonly Placed[], target: Placed, contentFrom: number, chrome: ReadonlySet<Placed>, barLine: number): number {
+function readingBreak(order: readonly Placed[], target: Placed, contentFrom: number, bottomChrome: ReadonlySet<Placed>, barLine: number): number {
   if (target.at < contentFrom) return order.length;
   const t = target.node.rect;
   return (
     order
       .slice(target.end)
-      .find(({ node }, i, later) => rectArea(node.rect) > 0 && !chrome.has(later[i]) && node.rect.y < t.y && node.rect.y + node.rect.height > barLine && !rectWithin(t, node.rect))?.at ??
+      .find(({ node }, i, later) => rectArea(node.rect) > 0 && !bottomChrome.has(later[i]) && node.rect.y < t.y && node.rect.y + node.rect.height > barLine && !rectWithin(t, node.rect))?.at ??
     order.length
   );
 }
@@ -1040,6 +1066,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
   const seen: Seen = { screenArea: rectArea(screen) };
   const flatList = tree.flatList === true;
+  const paddedTouchTargets = tree.paddedTouchTargets === true;
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
   const walk = (node: UiNode, parent: Placed | undefined, scroller: Placed | undefined): void => {
@@ -1055,23 +1082,24 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
   const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
   /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`). */
-  const chrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
+  const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
   /**
-   * Where a cover of a target presses (`exposure`): its rect — or, for a
-   * node pinned at a flat list's bottom (`bottomPinned`), its rect run down
-   * to the screen's bottom edge — or a bar lifted onto idb's keyboard down
-   * to the keyboard's top (inferred from H-1, not measured: the lifted
-   * bar's background between it and the keys) — across its own x-range. Measured (round-6
-   * device check, H-1, `run8-ios/img-147-0.png`): with the SWIFT form's
-   * `Payee’s bank street & no.` label at `42,817 186x20`, 3 pt below
-   * CONTINUE's frame `24,780 354x44`, a tap at (135,827) opened SUMMARY —
-   * CONTINUE's hit area reaches below its accessibility frame, and the bar's
-   * opaque background, which idb lists as no node, hides the form from
-   * CONTINUE's top down to the screen's bottom. Its x-range, not the screen's
-   * width: the tap that pressed it lay inside it, and the screenshot cannot
-   * say more (the form's rows span CONTINUE's 24–378 exactly); a narrow
-   * button at the bottom (a floating action button) run across the screen
-   * would hide its neighbours.
+   * Where a cover of a target presses (`exposure`): its rect — or, for a node
+   * pinned at a flat list's bottom (`bottomPinned`), its rect run down to the
+   * screen's bottom edge — or a bar lifted onto idb's keyboard down to the
+   * keyboard's top (inferred from H-1 and checked on the screenshot
+   * `run2-ios/img-253-0.png` — the lifted bar's background between it and the
+   * keys — not measured by a tap; code review of round 6b P4) — across its
+   * own x-range. Measured (round-6 device check, H-1,
+   * `run8-ios/img-147-0.png`): with the SWIFT form's `Payee’s bank street &
+   * no.` label at `42,817 186x20`, 3 pt below CONTINUE's frame `24,780
+   * 354x44`, a tap at (135,827) opened SUMMARY — CONTINUE's hit area reaches
+   * below its accessibility frame, and the bar's opaque background, which idb
+   * lists as no node, hides the form from CONTINUE's top down to the screen's
+   * bottom. Its x-range, not the screen's width: the tap that pressed it lay
+   * inside it, and the screenshot cannot say more (the form's rows span
+   * CONTINUE's 24–378 exactly); a narrow button at the bottom (a floating
+   * action button) run across the screen would hide its neighbours.
    */
   const pinnedReach = (placed: Placed): Rect => {
     const r = placed.node.rect;
@@ -1110,7 +1138,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, chrome, barLine), chrome };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets };
       const over =
         shown === undefined || about === undefined
           ? []
@@ -1133,6 +1161,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       return {
         shows: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
         covers,
+        reaches: over.map((c) => ({ ...c.reach })),
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         ...(tapAt !== undefined && { tapAt }),

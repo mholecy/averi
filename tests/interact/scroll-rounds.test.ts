@@ -148,7 +148,7 @@ describe('round — the soft keyboard', () => {
     expect(failureOf(played, 'id:priority_select').message).toBe(
       'scroll_until id:priority_select failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
         'the viewport above the soft keyboard over [0,1398][1080,2220], and the content is exhausted: swiping down no longer moves ' +
-        'it, nor does a swipe up. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
+        'it, nor does swiping up. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
         'tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again; only if it stays clipped with ' +
         'the keyboard down is it a layout defect. Last rect {"x":66,"y":1360,"width":948,"height":73} in a 1080x2220 viewport',
     );
@@ -1257,7 +1257,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
       expect(strokesToward(played)).toEqual(['down', 'down', 'up']); // one stroke back before the defect is declared
       expect(failureOf(played, 'id:priority').message).toBe(
         `scroll_until id:priority failed after 3 swipes — element is in the viewport but under ${COVER} at its centre (201,797), drawn over it — 17% of it shows — ` +
-          'and the content is exhausted: swiping down no longer moves it, nor does a swipe up. The app draws that over it at the end of the content — a layout defect ' +
+          'and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect ' +
           '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":24,"y":771,"width":354,"height":52} in a 402x874 viewport',
       );
     }
@@ -1325,7 +1325,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(played.outcome?.kind).toBe('stuck');
     expect(failureOf(played, 'id:r').message).toBe(
       'scroll_until id:r failed after 3 swipes — element is in the viewport but under button "Bar" (0,800 402x74) at its centre (201,870), drawn over it — 0% of it shows — ' +
-        'and the content is exhausted: swiping down no longer moves it, nor does a swipe up. The app draws that over it at the end of the content — a layout defect ' +
+        'and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect ' +
         '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":0,"y":840,"width":402,"height":60} in a 402x874 viewport',
     );
   });
@@ -1465,7 +1465,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(reaches(played)).toEqual([1]);
   });
 
-  it('a stroke back that MOVES the row but leaves it short (776 → 760, still under CONTINUE) is no "nor does a swipe": the scroll goes on, and stops', () => {
+  it('a stroke back that MOVES the row but leaves it short (776 → 760, still under CONTINUE) is no "nor does swiping": the scroll goes on, and stops', () => {
     const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), form(760), form(514), form(514)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'down']);
     expect(resultOf(played)).toEqual({ swipes: 5, visible: 1, clipped: [] });
@@ -1517,11 +1517,30 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(strokesToward(play({ ...IPHONE, fully: true }, [one(320), one(100), one(100)]))).toEqual(['up']);
   });
 
+  // A nested tree (WDA's): no pinned reach, so CONTINUE is its frame, over neither edge. idb's flat list: below (P1).
   it('measured shape, direction up, fully: true: flung to 776 — its top under CONTINUE, its bottom (828) below the bar\'s, so no side of it is the bar\'s — stuck up, then ONE stroke back before the defect: it reveals the row', () => {
     const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), form(514), form(514)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down']);
     expect(reaches(played)).toEqual([1, 1, 1, 0.5]);
     expect(resultOf(played)).toEqual({ swipes: 4, visible: 1, clipped: [] });
+  });
+
+  describe('under idb\'s flat list, the far side is where a cover PRESSES — CONTINUE pinned at the bottom reaches the screen\'s bottom (draw-order.ts#bottomPinned; code review of round 6b P1)', () => {
+    /** The same read as idb gives it: a flat list, CONTINUE listed last and pinned. */
+    const idb = (y: number): Row => ({ ...form(y), flatList: true });
+
+    it('measured, direction up from -20: flung to 776–828 — CONTINUE\'s reach (780 down to 874) is over its far (bottom) side — turned at once, half the reach; not two unmoved strokes and the stuck turn', () => {
+      const played = play({ ...MEASURED, direction: 'up', fully: true }, [idb(-20), idb(776), idb(514), idb(514)]);
+      expect(strokesToward(played)).toEqual(['up', 'down']);
+      expect(reaches(played)).toEqual([1, 0.5]);
+      expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    });
+
+    it.each([776, 800, 850])('no false turn the other way: direction down, the row at %i under CONTINUE — the reach is over its near (bottom) edge too, or lies in the near half — stroked down, the caller\'s way', (y) => {
+      const played = play({ ...MEASURED, fully: true, maxSwipes: 1 }, [idb(y), idb(y + 1)]);
+      expect(strokesToward(played)).toEqual(['down']);
+      expect(reaches(played)).toEqual([1]);
+    });
   });
 
   it('the stuck turn is ONE stroke, once: a stroke back that moves it, and a second stuck, fail as before — no third direction change for the stuck test', () => {
