@@ -703,6 +703,16 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     }
   });
 
+  /** The way the finger moved: +1 down (content up), -1 up (content down). */
+  const fingerWay = (sw: { from: Point; to: Point }): number => Math.sign(sw.to.y - sw.from.y);
+  /**
+   * A target pinned with its centre in the band, the default direction down (2026-10-09, docs/bugs/2026-10-09-ios-scroll-
+   * until-never-turns-back-when-target-stays-clipped-or-in-status-band.md): turned up at once — it lies at the edge a down
+   * stroke pushes it out through — up twice, then one stroke down, the way never stroked, before it is called pinned.
+   * Until then: down twice, and "try direction: up".
+   */
+  const PINNED_STROKES = [1, 1, -1];
+
   /** A screen that does not scroll, holding one image at `rect`. */
   const still = (rect: Rect) => {
     resetLayout();
@@ -722,8 +732,10 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   });
 
   it('a header whose centre stays in the band (0,0 402x106 on a screen that does not scroll): the failure names iOS\'s status bar — no clip, no layout defect', async () => {
-    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
+    const fake = still({ x: 0, y: 0, width: 402, height: 106 });
+    const error = (await scrollUntilVisible(fake, 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
+    expect(fake.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
     expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
@@ -732,8 +744,10 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   // below the band — full-bleed content whose ROUNDED centre lies in the band (at y 0: 122 pt or less under 62) never
   // stops, and says why. The verification round: 123 pt rounds its centre 61.5 to 62, and stops.
   it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
-    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    const fake = still({ x: 0, y: 0, width: 402, height: 106 });
+    const error = (await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
+    expect(fake.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
     expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
@@ -743,25 +757,61 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
       const fake = still({ x: 0, y: 0, width: 402, height });
       expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
     }
-    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 122 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    const short = still({ x: 0, y: 0, width: 402, height: 122 });
+    const error = (await scrollUntilVisible(short, 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    expect(short.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
     expect(error.message).toContain("its centre stays under iOS's status bar at (201,61), in the top 62 pt of the screen");
   });
 
   // Until docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md the
   // default direction swiped DOWN twice and advised `direction: "up"`; the row lies at the edge a down stroke pushes it out
-  // through, so the scroll now turns up itself, at once — and with that tried too, the failure says it is pinned.
-  it('a screen that does not scroll, the target under the bar (24,10 354x52): the default direction down turns up at once; up moves it neither — pinned, no "try direction"', async () => {
-    const fake = still({ x: 24, y: 10, width: 354, height: 52 });
-    const error = (await scrollUntilVisible(fake, 'id:hero', FAST).catch((e: unknown) => e)) as Error;
-    expect(error.message).toContain(
+  // through, so the scroll now turns up itself, at once; stuck that way, it swipes once down — the way never stroked —
+  // and then says it is pinned. `direction: "up"` from the start: up twice, once down, the same sentence.
+  it('a screen that does not scroll, the target under the bar (24,10 354x52): both directions are swiped before it is called pinned — no "try direction"', async () => {
+    const pinned =
       "its centre stays under iOS's status bar at (201,36), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted: " +
-        'swiping up no longer moves it out from under the status bar, and the scroll turned to up because swiping down carries it further under or past the edge — ' +
-        'it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.',
-    );
-    expect(fake.swipes.map((sw) => Math.sign(sw.to.y - sw.from.y))).toEqual([1, 1]); // the finger moves down: content up, both strokes
-    // direction: "up" from the start — the band is its NEAR edge, nothing turns it: the advice stands as it was.
-    const up = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', { ...FAST, direction: 'up' }).catch((e: unknown) => e)) as Error;
-    expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down"; if no direction moves it');
+      'swiping up no longer moves it out from under the status bar, nor does swiping down — ' +
+      'it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.';
+    for (const direction of ['down', 'up'] as const) {
+      const fake = still({ x: 24, y: 10, width: 354, height: 52 });
+      const error = (await scrollUntilVisible(fake, 'id:hero', { ...FAST, direction }).catch((e: unknown) => e)) as Error;
+      expect(error.message).toContain(pinned);
+      // the finger's way: down (+1) is content up
+      expect(fake.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
+    }
+  });
+
+  // Review of the at-the-far-edge turn (2026-10-09): replays on the SWIFT fixture, the content following the finger.
+  /** The SWIFT form, `priority_select` at `start`, moved by `moveBy(finger travel, y)` after each stroke. */
+  async function following(start: number, moveBy: (travel: number, y: number) => number) {
+    const { readFile } = await import('node:fs/promises');
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    const row = tree.children.find((n) => n.identifier === 'swift_payment.form.priority_select')!;
+    row.rect = { ...row.rect, y: start };
+    class Following extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        row.rect = { ...row.rect, y: moveBy(to.y - from.y, row.rect.y) };
+      }
+    }
+    const fake = new Following({ form: tree }, 'form');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    return fake;
+  }
+
+  it.each([785, 790])('a row coming in from below whose top is under CONTINUE (24,780 354x44) at y %d, direction down: one stroke on, as before — CONTINUE lies in the near half, no turn', async (start) => {
+    const fake = await following(start, (travel, y) => y + travel);
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6 })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
+  });
+
+  it('direction up, fully: true, from -20 flung to 776 — its top under CONTINUE, its bottom (828) below the bar\'s: stuck up twice, then ONE stroke back reveals it — not "a layout defect"', async () => {
+    const fake = await following(-20, (travel, y) => (travel > 0 ? 776 : y + travel));
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6, direction: 'up', fully: true })).toEqual({ swipes: 4, visible: 1, clipped: [] });
+    expect(fake.swipes.map(fingerWay)).toEqual([1, 1, 1, -1]);
   });
 
   it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {

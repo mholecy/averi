@@ -92,8 +92,9 @@ describe('round — the judgement and the stop', () => {
     const played = play({ ...SCROLLING, fully: true }, reads([2580, 1980, 1380, 1380], (y) => button(y)));
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'confirm', 'stop']);
     expect(resultOf(played).swipes).toBe(2);
-    // scrollingFake(1980, 0): nothing moves it — two identical strokes, then the defect.
-    const stuck = play({ ...SCROLLING, fully: true }, reads([1980, 1980, 1980], (y) => button(y)));
+    // scrollingFake(1980, 0): nothing moves it — two identical strokes, one back (the stuck turn), then the defect.
+    const stuck = play({ ...SCROLLING, fully: true }, reads([1980, 1980, 1980, 1980], (y) => button(y)));
+    expect(strokesToward(stuck)).toEqual(['down', 'down', 'up']);
     expect(failureOf(stuck, 'id:submit_button').message).toMatch(/content is exhausted[\s\S]*cannot be fully revealed — that is a layout defect/);
   });
 
@@ -142,12 +143,12 @@ describe('round — the soft keyboard', () => {
   });
 
   it('Android, fully: true at the end of the content with the row still under the IME: the keyboard is named, with how to hide it — not a layout defect', () => {
-    const played = play({ ...ANDROID, fully: true }, reads([1360, 1360, 1360], formRow, { cover: UP_IME }));
-    // After TWO identical swipes that did not move it (review round 2: one can be a transient), not one.
+    const played = play({ ...ANDROID, fully: true }, reads([1360, 1360, 1360, 1360], formRow, { cover: UP_IME }));
+    // After TWO identical swipes that did not move it (review round 2: one can be a transient), not one — and one back.
     expect(failureOf(played, 'id:priority_select').message).toBe(
-      'scroll_until id:priority_select failed after 2 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
+      'scroll_until id:priority_select failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
         'the viewport above the soft keyboard over [0,1398][1080,2220], and the content is exhausted: swiping down no longer moves ' +
-        'it. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
+        'it, nor does a swipe up. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
         'tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again; only if it stays clipped with ' +
         'the keyboard down is it a layout defect. Last rect {"x":66,"y":1360,"width":948,"height":73} in a 1080x2220 viewport',
     );
@@ -296,7 +297,7 @@ describe('round — the soft keyboard', () => {
 
   it('keyboard up, element stuck clipped at a NON-keyboard edge (right): the layout-defect wording, not the keyboard\'s', () => {
     const wide = (): Row => ({ found: [match({ x: 900, y: 500, width: 300, height: 73 }, 'wide')], cover: UP_IME });
-    expect(failureOf(play({ ...ANDROID, fully: true }, [wide(), wide(), wide()]), 'id:wide').message).toMatch(
+    expect(failureOf(play({ ...ANDROID, fully: true }, [wide(), wide(), wide(), wide()]), 'id:wide').message).toMatch(
       /CLIPPED at right, 60% of it is in the viewport above the soft keyboard over \[0,1398\]\[1080,2220\], and the content is exhausted[\s\S]*cannot be fully revealed — that is a layout defect/,
     );
   });
@@ -543,9 +544,9 @@ describe('round — after the device check', () => {
 
   it('fully: true, clipped: the two unmoved strokes must be the SAME stroke — one above the IME, then one whole-screen once the window reads hidden, are two attempts', () => {
     const wide = (row: Row): Row => ({ ...row, found: [match({ x: 900, y: 1360, width: 300, height: 73 }, 'row')] }); // clipped at the right edge whatever the keyboard
-    const played = play({ ...ANDROID, fully: true }, [wide({ cover: UP_IME }), wide({}), wide({}), wide({})]); // no stroke is taken
-    expect(strokeCovers(played)).toEqual([1398, undefined, undefined]);
-    expect(failureOf(played, 'id:row').message).toMatch(/^scroll_until id:row failed after 3 swipes — element is in the viewport but CLIPPED at right/);
+    const played = play({ ...ANDROID, fully: true }, [wide({ cover: UP_IME }), wide({}), wide({}), wide({}), wide({})]); // no stroke is taken
+    expect(strokeCovers(played)).toEqual([1398, undefined, undefined, undefined]); // the last, the stuck turn's stroke back
+    expect(failureOf(played, 'id:row').message).toMatch(/^scroll_until id:row failed after 4 swipes — element is in the viewport but CLIPPED at right/);
   });
 
   it('fully: true, clipped: a confirming read is not a stroke for the stuck test, even once two strokes left the row unmoved', () => {
@@ -1251,18 +1252,19 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
 
   it('a row no swipe moves from under the bar (the end of the content): stuck, naming the bar — fully or not', () => {
     for (const fully of [true, false]) {
-      const played = play({ ...IPHONE, fully }, [form(771), form(771), form(771)]);
+      const played = play({ ...IPHONE, fully }, [form(771), form(771), form(771), form(771)]);
       expect(played.outcome?.kind).toBe('stuck');
+      expect(strokesToward(played)).toEqual(['down', 'down', 'up']); // one stroke back before the defect is declared
       expect(failureOf(played, 'id:priority').message).toBe(
-        `scroll_until id:priority failed after 2 swipes — element is in the viewport but under ${COVER} at its centre (201,797), drawn over it — 17% of it shows — ` +
-          'and the content is exhausted: swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect ' +
+        `scroll_until id:priority failed after 3 swipes — element is in the viewport but under ${COVER} at its centre (201,797), drawn over it — 17% of it shows — ` +
+          'and the content is exhausted: swiping down no longer moves it, nor does a swipe up. The app draws that over it at the end of the content — a layout defect ' +
           '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":24,"y":771,"width":354,"height":52} in a 402x874 viewport',
       );
     }
   });
 
   it('fully: true, the centre clear and only an edge under the bar: stuck names the bar without a centre', () => {
-    const played = play({ ...IPHONE, fully: true }, [form(740), form(740), form(740)]);
+    const played = play({ ...IPHONE, fully: true }, [form(740), form(740), form(740), form(740)]);
     expect(failureOf(played, 'id:priority').message).toContain(`element is in the viewport but under ${COVER}, drawn over it — 77% of it shows — and the content is exhausted`);
   });
 
@@ -1319,11 +1321,11 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
   it('stuck without fully, the row clipped AND its centre under a bar: the bar leads, as at the bound — not "cannot be fully revealed" (code review S1)', () => {
     const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 800, width: 402, height: 74 } });
     const row: Row = { found: [match({ x: 0, y: 840, width: 402, height: 60 }, 'r')], over: [bar] };
-    const played = play(IPHONE, [row, row, row]);
+    const played = play(IPHONE, [row, row, row, row]);
     expect(played.outcome?.kind).toBe('stuck');
     expect(failureOf(played, 'id:r').message).toBe(
-      'scroll_until id:r failed after 2 swipes — element is in the viewport but under button "Bar" (0,800 402x74) at its centre (201,870), drawn over it — 0% of it shows — ' +
-        'and the content is exhausted: swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect ' +
+      'scroll_until id:r failed after 3 swipes — element is in the viewport but under button "Bar" (0,800 402x74) at its centre (201,870), drawn over it — 0% of it shows — ' +
+        'and the content is exhausted: swiping down no longer moves it, nor does a swipe up. The app draws that over it at the end of the content — a layout defect ' +
         '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":0,"y":840,"width":402,"height":60} in a 402x874 viewport',
     );
   });
@@ -1391,11 +1393,11 @@ describe('round — a target resting in the frame at the edge the strokes push i
   });
 
   it('a row pinned in the band (a screen that does not scroll): turned up at once, and when that does not move it either, stuck naming the status bar as pinned — no "try direction" the scroll already tried', () => {
-    const played = play(MEASURED, [form(10), form(10), form(10)]);
-    expect(strokesToward(played)).toEqual(['up', 'up']);
+    const played = play(MEASURED, [form(10), form(10), form(10), form(10)]);
+    expect(strokesToward(played)).toEqual(['up', 'up', 'down']); // turned at once; stuck up; one stroke down, the way never stroked
     expect(played.outcome?.kind).toBe('stuck');
     const message = failureOf(played, 'id:priority').message;
-    expect(message).toContain('swiping up no longer moves it out from under the status bar, and the scroll turned to up because swiping down carries it further under');
+    expect(message).toContain('swiping up no longer moves it out from under the status bar, nor does swiping down — it is pinned under the status bar');
     expect(message).toContain('it is pinned under the status bar');
     expect(message).not.toContain('try direction');
   });
@@ -1414,6 +1416,94 @@ describe('round — a target resting in the frame at the edge the strokes push i
     const played = play({ ...IPHONE, direction: 'up', fully: true }, [row(-30), row(300), row(300)]);
     expect(strokesToward(played)).toEqual(['up']);
     expect(reaches(played)).toEqual([1]);
+  });
+
+  // Review of the first cut (2026-10-09): the edge test alone turned a row coming in from below whose top a bottom bar
+  // covers — the bar is over its far edge, but it sits in the near half of the frame. Only a cover in the far half counts.
+  it('a snackbar low on the screen (0,1700 1000x80) over the top of a row coming in from below (1720): stroked on down, as before — not turned away', () => {
+    const snack = node({ role: 'button', identifier: 'snack', label: 'Undo', rect: { x: 0, y: 1700, width: 1000, height: 80 } });
+    const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 1000, height: 100 })], over: [snack] });
+    const played = play(SCROLLING, [row(1720), row(1120), row(1120)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(reaches(played)).toEqual([1]);
+  });
+
+  it.each([
+    // content to the right: the strokes move it left, out through the left edge — a rail on the left over the card's left part
+    ['right', { x: 0, y: 300, width: 100, height: 200 }, 'left'],
+    // content to the left: mirrored, a rail on the right
+    ['left', { x: 302, y: 300, width: 100, height: 200 }, 'right'],
+  ] as const)('sideways (%s): a rail over the far side of a card in a carousel turns the strokes at once, half the reach', (direction, rail, back) => {
+    const over = [node({ role: 'other', label: 'Rail', rect: rail })];
+    const card = (x: number): Row => ({ found: [match({ x, y: 350, width: 200, height: 100 }, 'card')], over });
+    const [start, clear] = direction === 'right' ? [50, 110] : [152, 50];
+    const played = play({ ...IPHONE, direction, fully: true }, [card(start), card(clear), card(clear)]);
+    expect(strokesToward(played)).toEqual([back]);
+    expect(reaches(played)).toEqual([0.5]);
+  });
+
+  it.each([
+    ['down', { x: 0, y: 62, width: 402, height: 300 }, 200],
+    ['up', { x: 0, y: 500, width: 402, height: 300 }, 600],
+  ] as const)('a sheet over the WHOLE row in the far half (%s) is no side\'s: turning back could not uncover it — stroked on the caller\'s way', (direction, rect, y) => {
+    const over = [node({ role: 'other', label: 'Sheet', rect })];
+    const row = (at: number): Row => ({ found: [match({ x: 24, y: at, width: 354, height: 52 }, 'priority')], over });
+    const played = play({ ...IPHONE, direction, fully: true, maxSwipes: 1 }, [row(y), row(y + 1)]);
+    expect(strokesToward(played)).toEqual([direction]);
+  });
+
+  it.each([
+    // content to the right (far edge: left) — a cover over the card's left edge, but in the RIGHT half of the frame
+    ['right', { x: 200, y: 300, width: 100, height: 200 }, 250],
+    // content to the left (far edge: right) — a cover over the card's right edge, in the LEFT half
+    ['left', { x: 102, y: 300, width: 100, height: 200 }, 52],
+  ] as const)('sideways (%s): a cover over the far edge but in the near half of the frame is not turned for', (direction, rect, x) => {
+    const over = [node({ role: 'other', label: 'Badge', rect })];
+    const card = (at: number): Row => ({ found: [match({ x: at, y: 350, width: 100, height: 100 }, 'card')], over });
+    const played = play({ ...IPHONE, direction, fully: true, maxSwipes: 1 }, [card(x), card(x + 1)]);
+    expect(strokesToward(played)).toEqual([direction]);
+    expect(reaches(played)).toEqual([1]);
+  });
+
+  it('a read that fails after the stuck turn\'s stroke back strokes back again — as the last read round decided — and the read after it answers the turn', () => {
+    const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), { error: 'idb describe-all timed out' }, form(514), form(514)]);
+    expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'down']);
+    expect(resultOf(played)).toEqual({ swipes: 5, visible: 1, clipped: [] });
+  });
+
+  it('a cover is on the far side only in EVERY frame the round judged in, as `beyond` is: either way up, a bar in the upper half of the portrait box lies in the lower half of the landscape one — no turn', () => {
+    const portrait = IPHONE_BOX;
+    const landscape: Rect = { x: 0, y: 0, width: 874, height: 402 };
+    const screen: ScreenBox = { box: portrait, boxes: [portrait, landscape] };
+    const bar = node({ role: 'other', label: 'Bar', rect: { x: 0, y: 300, width: 402, height: 60 } });
+    const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [bar], screen });
+    const played = play({ ...IPHONE, fully: true }, [row(320), row(100), row(100)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(reaches(played)).toEqual([1]);
+    // …and with the portrait box alone, the same bar is the far half's: turned.
+    const one = (y: number): Row => ({ ...row(y), screen: { box: portrait, boxes: [portrait] } });
+    expect(strokesToward(play({ ...IPHONE, fully: true }, [one(320), one(100), one(100)]))).toEqual(['up']);
+  });
+
+  it('measured shape, direction up, fully: true: flung to 776 — its top under CONTINUE, its bottom (828) below the bar\'s, so no side of it is the bar\'s — stuck up, then ONE stroke back before the defect: it reveals the row', () => {
+    const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), form(514), form(514)]);
+    expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down']);
+    expect(reaches(played)).toEqual([1, 1, 1, 0.5]);
+    expect(resultOf(played)).toEqual({ swipes: 4, visible: 1, clipped: [] });
+  });
+
+  it('the stuck turn is ONE stroke, once: a stroke back that moves it, and a second stuck, fail as before — no third direction change for the stuck test', () => {
+    // The stroke back stops it at 300; the confirming read finds it flung back to 776 (a bounce), and up twice moves it no more.
+    const played = play({ ...MEASURED, direction: 'up', fully: true, maxSwipes: 10 }, [form(-20), form(776), form(776), form(776), form(300), form(776), form(776), form(776)]);
+    expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'up', 'up']);
+    expect(played.outcome).toMatchObject({ kind: 'stuck', lastStroke: 'up', otherWay: 'stroked' });
+  });
+
+  it('no swipe left for the stuck turn: stuck at once, as before, and the status-bar sentence still advises the way not tried', () => {
+    const played = play({ ...MEASURED, direction: 'up', maxSwipes: 2 }, [form(10), form(10), form(10)]);
+    expect(strokesToward(played)).toEqual(['up', 'up']);
+    expect(played.outcome).toMatchObject({ kind: 'stuck', otherWay: 'untried' });
+    expect(failureOf(played, 'id:priority').message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down"');
   });
 
   it('a row clipped at the NEAR edge (the bottom, scrolling down) is stroked on the caller\'s way, as before', () => {

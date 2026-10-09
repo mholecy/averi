@@ -253,6 +253,9 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const { judged } = short;
       const n = swipesText(o.swipes);
       const last = `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`;
+      const back = OPPOSITE[o.lastStroke];
+      // One stroke the other way moved it neither (scroll-rounds.ts#round's stuck turn).
+      const neither = o.otherWay === 'unmoved' ? `, nor does a swipe ${back}` : '';
       // Under something of the app (2026-10-09, scroll-rounds.ts#shortOf) that
       // stays over it at the end of the content: no clearance for a pinned
       // bar. Led by the cover whenever that is what it is short of — a plain
@@ -260,14 +263,13 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // Its centre under iOS's status bar at the end of the content (2026-10-09): no defect of the app's — the
       // point a tap presses is the status bar's, and no swipe that way moves it out. The other way may; a target
       // pinned there moves neither way (code review of round 6, P1), which is said rather than promised away.
-      // Turned (2026-10-09, scroll-rounds.ts#nextStroke): the scroll already went the other way, or skipped it as
-      // carrying the row further under — "try direction" would send the reader to a way that cannot help.
+      // The other way tried (2026-10-09, scroll-rounds.ts#round's stuck turn): "try direction" would send the
+      // reader to a way the scroll already swiped; only one it had no budget left for is still advised.
       if (short.of === 'statusBar') {
         const other =
-          o.turns > 0
-            ? `, and the scroll turned to ${o.lastStroke} because swiping ${OPPOSITE[o.lastStroke]} carries it further under or past the edge — ` +
-              `${PINNED_UNDER_STATUS_BAR}, and no step taps it. `
-            : ` — try direction: "${OPPOSITE[o.lastStroke]}"; if no direction moves it, ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `;
+          o.otherWay === 'untried'
+            ? ` — try direction: "${back}"; if no direction moves it, ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `
+            : `${o.otherWay === 'unmoved' ? `, nor does swiping ${back}` : `, and swiping ${back} was tried earlier in the scroll`} — ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `;
         return new Error(
           `scroll_until ${describe} failed after ${n} — ${statusBarText(judged, short.band)}, and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
@@ -276,7 +278,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       if (short.of === 'covered') {
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it. The app draws that over it at the end of the content — a layout defect ` +
+            `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
             `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
         );
       }
@@ -289,14 +291,14 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
             `${describeClip(judged.clipped, judged.visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
-            `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
+            `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
             `stays clipped with the keyboard down is it a layout defect. ${last}`,
         );
       }
       return new Error(
         `scroll_until ${describe} failed after ${n} — ` +
           `element is in the viewport but ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)}, ` +
-          `and the content is exhausted: swiping ${o.lastStroke} no longer moves it. ` +
+          `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
           `The element cannot be fully revealed — that is a layout defect ` +
           `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
       );
