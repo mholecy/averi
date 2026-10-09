@@ -65,8 +65,9 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * hidden or unknown 1; up but clear of the point 2; covering it 3 (the
  * first look's `over`), `back`, then the look after it — 1 more when the
  * keyboard went, 2 when it still reads shown; a witness veto adds, per
- * re-check round (`over` on a fresh reading), 3 while it still reads shown
- * or 1 once it does not, at most six rounds. A `scroll_until` confirming
+ * re-check round (`over` on a fresh reading), 3 while the point stays
+ * covered, 2 once the keyboard reads shown but elsewhere (state, touchable;
+ * no witness), or 1 once it reads hidden or unknown, at most six rounds. A `scroll_until` confirming
  * read (scroll.ts#SETTLE_CONFIRM_READS, up to 3 after a stroke) is a round
  * like any other and pays the same. Rounds: at most 1 + (1 +
  * SETTLE_CONFIRM_READS) × `maxSwipes` — 25 at the defaults, pinned in
@@ -107,10 +108,10 @@ export type Uncovered = Extract<FrameVerdict, { kind: 'clear' | 'unknown' }>;
  *   tap; act on neither guess (the window guard's re-check starts here).
  *   Decided by `witnessDenies` and nowhere else.
  */
-export type Verdict = Uncovered | { kind: 'covered'; frame: Rect; confirmed: boolean } | { kind: 'denied'; frame: Rect };
+export type KeyboardVerdict = Uncovered | { kind: 'covered'; frame: Rect; confirmed: boolean } | { kind: 'denied'; frame: Rect };
 
 /** A verdict with a frame over the point — what reaches a keyboard model's guard. */
-export type Covering = Extract<Verdict, { frame: Rect }>;
+export type Covering = Extract<KeyboardVerdict, { frame: Rect }>;
 
 /** Everything a SHOWN keyboard covers, for a reader with many subjects (`scroll_until`). */
 export interface KeyboardCover {
@@ -134,7 +135,7 @@ export interface KeyboardReading {
    * key but the finger. The in-tree model's `covered` is `confirmed`: its
    * band is read off the very tree being judged.
    */
-  over(point: Point, subject?: UiNode): Promise<Verdict>;
+  over(point: Point, subject?: UiNode): Promise<KeyboardVerdict>;
   /**
    * `over` without the input method: the frame decides. For a look taken
    * AFTER the one side effect (the window model's `back` is already
@@ -196,7 +197,7 @@ export interface KeyboardReading {
  * `covering` row, `scroll_until` before a band may change its judgement or
  * its stroke) — no reader applies it itself.
  */
-export const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden';
+const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden';
 
 /**
  * Why `panelsBeyond` refused a region, or part of one — a closed set, one

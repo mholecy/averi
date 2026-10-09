@@ -106,10 +106,9 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  * counted. A `type_pin` keypad taps once per digit, so it asks once per
  * digit — a 6-digit PIN is 6 dumpsys calls (12 with a keyboard up), beside
  * six tree-settle waits of seconds each. On iOS: no device read for the
- * keyboard on any look, ever. The
- * on-screen rule adds `viewport()` per tap, which the adapter memoizes:
- * one `wm size` / `idb describe` per adapter, re-asked only after a failed
- * read. A raw coordinate tap does not come through here: the caller chose
+ * keyboard on any look, ever. The on-screen rule adds `viewport()` per tap,
+ * which the adapter memoizes: one `wm size` / `idb describe` per adapter,
+ * re-asked only after a failed read. A raw coordinate tap does not come through here: the caller chose
  * that point.
  *
  * Rejected: hiding the keyboard before every tap (a `back` per tap, and a
@@ -163,7 +162,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     hiding.looks,
     async () => {
       const look = await lookAgain(adapter, target, opts, hiding.failed);
-      return look.reading.kind === 'covered' ? { stillUp: { frame: look.reading.frame, point: look.point } } : { gone: withNote(look.resolved, hiding.hidden(look.reading)) };
+      return look.verdict.kind === 'covered' ? { stillUp: { frame: look.verdict.frame, point: look.point } } : { gone: withNote(look.resolved, hiding.hidden(look.verdict)) };
     },
     (seen, looks) => hiding.stillCovering(seen, looks),
   );

@@ -219,6 +219,11 @@ export function recheck(now: Covering, waitedMs: number): 'back' | 'hold' | 'ref
  * AndroidAdapter's keyboardWitness). It can only ADD a sentence there, never
  * a key. The window state is read without its region (`anywhere`): with no
  * point, a floating panel changes nothing here.
+ *
+ * The WINDOW model's alone: its `unknown → back` row assumes an oracle that
+ * could not answer. A reading without one (the in-tree model) also reads
+ * `unknown` — no band in the tree — and must never come here; its dismissal
+ * presses nothing on `unknown` (keyboard-in-tree.ts, `dismiss`).
  */
 export async function dismissal(reading: KeyboardReading): Promise<DismissalDecision> {
   const window = await reading.anywhere();
@@ -482,8 +487,9 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
      * One oracle query per dismissal (its cost: AndroidAdapter's
      * keyboardState), and the witness query when that query says shown or
      * hidden — a reading with no tree, asked `anywhere`, then `corroborated`
-     * or `unlocated`; never the region. No read after the `back` confirms it went: best effort, as the
-     * warning the in-tree model returns instead of a throw relies on. Reads
+     * or `unlocated`; never the region. No read after the `back` confirms it
+     * went: best effort, as the warning the in-tree model returns instead of
+     * a throw relies on. Reads
      * none of the options; its result is empty except for the `unlocated`
      * warning — a run with dismissals configured is byte-identical to one
      * without.

@@ -161,9 +161,11 @@ describe('over / frameOver / overlapping — geometry, with the frame when it co
   });
 
   it('overlapping: any positive-area overlap, the band first — an edge-touching rect is not covered; hidden or unknown is never covered', async () => {
-    const { fake } = withOracle({ state: 'shown', frame: FRAME });
+    const { fake, oracle } = withOracle({ state: 'shown', frame: FRAME }, 'hidden');
     const reading = readKeyboard(fake, screen());
     expect(await reading.overlapping({ x: 0, y: 1200, width: 100, height: 100 })).toEqual(FRAME);
+    // The pixel poll's question never asks the witness, even over a covered rect and a witness that would deny it.
+    expect(calls(oracle)).toEqual([1, 1, 0]);
     expect(await reading.overlapping({ x: 0, y: 1185, width: 100, height: 100 })).toBeUndefined(); // its bottom edge on the frame's top
     expect(await readKeyboard(withOracle({ state: 'hidden' }).fake, screen()).overlapping({ x: 0, y: 1200, width: 100, height: 100 })).toBeUndefined();
     expect(await readKeyboard(withOracle({ state: 'unknown' }).fake, screen()).overlapping({ x: 0, y: 1200, width: 100, height: 100 })).toBeUndefined();
@@ -348,6 +350,12 @@ describe('the keyboard window\'s region, read only once the band is up — the f
     await readKeyboard(other.fake).cover();
     expect(said).toHaveBeenCalledTimes(2);
     expect(said.mock.calls[1]).toEqual(said.mock.calls[0]);
+  });
+
+  it('cover never asks the witness, even over a shown band it would deny', async () => {
+    const { fake, oracle } = withOracle({ state: 'shown', frame: GBOARD_STRIP }, 'hidden');
+    expect((await readKeyboard(fake).cover())?.band).toEqual(GBOARD_STRIP);
+    expect(calls(oracle)).toEqual([1, 1, 0]);
   });
 
   it('hidden or unknown: one query, the region never asked', async () => {

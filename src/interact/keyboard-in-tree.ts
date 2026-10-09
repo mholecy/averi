@@ -201,7 +201,9 @@ interface DismissalPick {
  * (`shadowing`, ui-tree/geometry.ts: an alert, a sheet, a navigation bar's
  * label). An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
- * check is repeated here.
+ * check is repeated here. `keyboard` must be a reading OF `tree`: its band
+ * and its `ofKeyboard` set are that tree's, and a node of another tree is
+ * never the keyboard's by identity.
  */
 async function pickDismissal(
   tree: UiNode,
@@ -345,17 +347,17 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       // tree with the target moved out from under it — the keyboard-avoiding
       // layout re-flowed — is "still up", so the note never claims a keyboard
       // left the screen that is still on it.
-      if (second.reading.kind !== 'covered') {
+      if (second.verdict.kind !== 'covered') {
         return {
           cleared: withNote(
             second.resolved,
-            second.reading.kind === 'clear' ? `${covered}; still up on the second look, but no longer over it` : `${covered}; gone on the second look`,
+            second.verdict.kind === 'clear' ? `${covered}; still up on the second look, but no longer over it` : `${covered}; gone on the second look`,
           ),
         };
       }
       const { point } = second;
       const dismissals = opts.dismissals ?? [];
-      const { picked, skipped } = await pickDismissal(second.resolved.tree, second.keyboard, dismissals, opts.ambiguous, screen);
+      const { picked, skipped } = await pickDismissal(second.resolved.tree, second.reading, dismissals, opts.ambiguous, screen);
       if (picked === undefined) {
         // Names MCP tools and "a flow" — the deliberate exception recorded at
         // the window model's "back did not close it" error. The platform's
@@ -365,7 +367,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
         // one was passed over.
         const cannot = cannotHide(adapter.keyboardAdvice);
         throw new KeyboardWithoutDismissal(
-          `The soft keyboard covers ${what}: the band it draws over ${frameText(second.reading.frame)} contains the tap point ` +
+          `The soft keyboard covers ${what}: the band it draws over ${frameText(second.verdict.frame)} contains the tap point ` +
             `(${point.x},${point.y}) on two looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; ${cannot}, and ${nothingPicked(dismissals, skipped)}. Nothing was tapped: ` +
             `the tap would have pressed the keyboard and been reported done. From the MCP tools: hide the keyboard first, ` +
             `then tap ${what} again. In a flow: hide it with a step before this one (a tap: on an element the keyboard ` +

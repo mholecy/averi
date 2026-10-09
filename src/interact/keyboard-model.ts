@@ -172,8 +172,8 @@ export function failedLookMessage(e: unknown, refused: string, failed: (headline
 export interface Look {
   resolved: ResolvedSettled;
   point: Point;
-  reading: FrameVerdict;
-  keyboard: KeyboardReading;
+  verdict: FrameVerdict;
+  reading: KeyboardReading;
 }
 
 /**
@@ -207,7 +207,7 @@ export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: 
   }
   const point = tapPoint(resolved.node);
   const keyboard = readKeyboard(adapter, resolved.tree);
-  return { resolved, point, reading: await keyboard.frameOver(point, resolved.node), keyboard };
+  return { resolved, point, verdict: await keyboard.frameOver(point, resolved.node), reading: keyboard };
 }
 
 /** One confirming look after the side effect: the keyboard gone, with what the caller returns, or still up, with what its refusal needs to say. */
@@ -246,7 +246,9 @@ export interface CoveredLook {
    * What the first look's reading said (`readKeyboard(…).over`): the frame
    * (or band, or panel) that covered it, and the input method's word over
    * it — `covered` (confirmed, or the witness could not be asked) or
-   * `denied`, the veto. The in-tree model reads only `covered`, confirmed.
+   * `denied`, the veto. Read by the window model only; the in-tree model
+   * ignores it and takes a second look of its own (its reading is always
+   * `covered`, confirmed, here).
    */
   verdict: Covering;
   /** The target as the messages name it: `id:login_submit`, `id:"login_submit"` for an ElementSpec. */
@@ -292,10 +294,10 @@ export interface KeyboardModel {
    * including — the one side effect: the model's own re-checks (the window
    * model, on a first look the input method DENIED, waits out a stale
    * window state; the in-tree model takes a second look and picks a
-   * dismissal). Three endings: the
-   * keyboard left on its own and the target is handed back clear, with a
-   * note that says what was waited for; a refusal is thrown, nothing sent;
-   * or the hiding to perform, with its words.
+   * dismissal). Three endings: the keyboard left on its own and the target
+   * is handed back clear, with a note that says what was waited for; a
+   * refusal is thrown, nothing sent; or the hiding to perform, with its
+   * words.
    */
   guard(covered: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }>;
   /**
