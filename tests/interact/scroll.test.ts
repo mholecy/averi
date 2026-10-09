@@ -560,6 +560,14 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
     expect(result.flush).toEqual({ edge: 'top', container: under.rect, checked: false, why: 'room' });
   });
 
+  it('no screen box at all (the device 0x0, a tree with no geometry): the round judges on, and the stroke it asks for throws screenBox\'s error — nothing swiped', async () => {
+    const zero = { x: 0, y: 0, width: 0, height: 0 };
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: zero, children: [node({ role: 'button', identifier: 'row', rect: zero })] }) }, 's');
+    fake.viewportSize = { width: 0, height: 0 };
+    await expect(scrollUntilVisible(fake, 'id:row', FAST)).rejects.toThrow(/^No screen box to swipe in: the device reported 0x0, and the UI tree has no geometry/);
+    expect(fake.swipes).toEqual([]);
+  });
+
   it('a list still loading its next page (a spinner below the last row) is not called exhausted after two strokes — the scroll runs to its bound', async () => {
     const SETTINGS: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
     const rows = Array.from({ length: 20 }, (_, i) => `row_${i}`);

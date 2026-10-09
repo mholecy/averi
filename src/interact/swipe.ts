@@ -160,30 +160,34 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
 
 /**
  * The stroke `scroll_until` draws for one of its `stroke` steps
- * (interact/scroll-rounds.ts#RoundStep) over the gesture `box`: toward
- * `toward` (where the content lies), clear of a cover whose top edge is
- * `coverTop` (`swipeVectorAbove`), its reach scaled by `reach`
- * (`shortenStroke`, along the side of the box it is drawn in) — and, since
- * 2026-10-09, drawn over `within` met with `box` when the step names one:
- * the target's scroll container, so the touch-down lands on the content
- * that scrolls and the stroke's length is the container's, not the
- * screen's. Measured why (docs/bugs/2026-10-09-android-scroll-until-fully-
- * trusts-bounds-clipped-to-scroll-container.md, the triage of it): Settings'
- * list is [0,737][1080,2154]; the screen box's content-up stroke touches
- * down at y 444, in the header above the list, and a probe drawn there
- * moves nothing — which the flush check would take for "nothing beyond the
- * edge". Falls back to `box` when `within` is no stroke box (`strokeBox`:
- * the two do not overlap, or what they share — above the cover — is under
- * MIN_STROKE_BOX along the stroke). `maxTravel`, when set, caps the
- * finger's travel (the probe's, scroll-rounds.ts#PROBE_MAX_TRAVEL_FRACTION),
- * never below `shortenStroke`'s floors. Pure; the driver's one call
- * (interact/scroll.ts).
+ * (interact/scroll-rounds.ts#RoundStep): over `box` — the box the round
+ * DECIDED (`strokeRoom`: the target's scroll container met with the
+ * screen, above a keyboard, or the screen whole) — toward `toward` (where
+ * the content lies), clear of a cover whose top edge is `coverTop`
+ * (`swipeVectorAbove`), its reach scaled by `reach` (`shortenStroke`, along
+ * the box's side along the stroke). Why a container (2026-10-09, measured,
+ * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-
+ * scroll-container.md, the triage of it): Settings' list is
+ * [0,737][1080,2154]; the screen box's content-up stroke touches down at y
+ * 444, in the header above the list, and a probe drawn there moves nothing —
+ * which the flush check would take for "nothing beyond the edge"; over the
+ * list it touches down at 1021 and its length is the list's, not the
+ * screen's. `maxTravel`, when set, caps the finger's travel (the probe's,
+ * scroll-rounds.ts#PROBE_MAX_TRAVEL_FRACTION), never below `shortenStroke`'s
+ * floors.
+ *
+ * It judges nothing (deep/r3-scroll, 2026-10-09): until then it took the
+ * container and met it with the screen itself, above the keyboard, and fell
+ * back to the screen when that left no room — while the round had judged
+ * the room over the screen with no keyboard, so a probe the round believed
+ * had room was drawn off its container under the IME, moved nothing, and was
+ * reported checked. Pure; the driver's one call (interact/scroll.ts) and
+ * the test adapter's (tests/helpers/rounds.ts#drawnFor).
  */
-export function scrollStroke(box: Rect, step: { toward: Direction; reach: number; coverTop?: number; within?: Rect; maxTravel?: number }): Stroke {
-  const { toward, reach, coverTop, within, maxTravel } = step;
-  const over = (within === undefined ? undefined : strokeBox(box, within, toward, coverTop)) ?? box;
-  const side = toward === 'up' || toward === 'down' ? over.height : over.width;
-  const vector = coverTop === undefined ? swipeVector(over, toward, 'content') : swipeVectorAbove(over, coverTop, toward, 'content');
+export function scrollStroke(step: { toward: Direction; reach: number; coverTop?: number; box: Rect; maxTravel?: number }): Stroke {
+  const { toward, reach, coverTop, box, maxTravel } = step;
+  const side = toward === 'up' || toward === 'down' ? box.height : box.width;
+  const vector = coverTop === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, coverTop, toward, 'content');
   const stroke = shortenStroke(vector, reach, side);
   const travel = strokeLength(stroke);
   return maxTravel === undefined || travel <= maxTravel ? stroke : shortenStroke(stroke, maxTravel / travel, side);
@@ -208,15 +212,37 @@ export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRAC
  * The box a scroll stroke toward `toward` is drawn in over `within` (a
  * clipping container): `within` met with the gesture `box`, when what they
  * share — above `coverTop`, for a vertical stroke under a keyboard — is at
- * least MIN_STROKE_BOX along the stroke; undefined otherwise (the caller
- * falls back to a larger box). Pure; read by `scrollStroke` and by
- * scroll-rounds.ts, which picks the clipping ancestor to name.
+ * least MIN_STROKE_BOX along the stroke; undefined otherwise. Pure; the one
+ * judgement of room, asked through `strokeRoom`.
  */
 export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?: number): Rect | undefined {
   const met = rectIntersection(box, within);
   if (met === undefined) return undefined;
   const side = toward === 'up' || toward === 'down' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
   return side >= MIN_STROKE_BOX ? met : undefined;
+}
+
+/**
+ * THE STROKE BOX's one owner (deep/r3-scroll, 2026-10-09): the first of
+ * `candidates` — clipping containers, nearest first — that leaves room for a
+ * stroke toward `toward` over the gesture `box` (`screenBox`'s, the box the
+ * driver draws in), above a keyboard whose top edge is `coverTop`
+ * (`strokeBox`: the container ∩ the screen ∩ above the keyboard, at least
+ * MIN_STROKE_BOX along the stroke): `within`, the candidate as the tree
+ * gives it, and `box`, what the stroke is drawn in. Undefined is NO ROOM:
+ * what the caller does then is its own — scroll-rounds.ts reports a probe
+ * `flush.why: 'room'` and sends none, and draws a stroke toward the target
+ * over the screen whole, the stroke as it was before 2026-10-09. Until
+ * deep/r3-scroll the round judged room over the screen and the driver again
+ * above the keyboard, falling back to the screen; one judgement now, the
+ * keyboard in it. Pure.
+ */
+export function strokeRoom(box: Rect, candidates: readonly Rect[], toward: Direction, coverTop?: number): { within: Rect; box: Rect } | undefined {
+  for (const within of candidates) {
+    const met = strokeBox(box, within, toward, coverTop);
+    if (met !== undefined) return { within, box: met };
+  }
+  return undefined;
 }
 
 /**
@@ -335,12 +361,14 @@ export interface JudgingScreen {
  */
 export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<JudgingScreen | undefined> {
   try {
-    const { boxes } = await screenBox(adapter, read);
-    return { box: boxes[0], boxes };
+    return judgingOf(await screenBox(adapter, read));
   } catch {
     return undefined;
   }
 }
+
+/** The judging screen of a `screenBox` already read — `judgingScreen` without the read, for a caller that also strokes in the box (interact/scroll.ts reads one a round). */
+export const judgingOf = ({ boxes }: ScreenBox): JudgingScreen => ({ box: boxes[0], boxes });
 
 /**
  * The screen box a gesture swipes in — the ONE owner, read by `swipeScreen`

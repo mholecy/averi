@@ -3,7 +3,7 @@ import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
-import type { Direction, JudgingScreen } from '../../src/interact/swipe.js';
+import { scrollStroke, type JudgingScreen } from '../../src/interact/swipe.js';
 import { node } from './fake.js';
 
 /**
@@ -44,32 +44,29 @@ export interface Row {
   corroborated?: boolean;
   /** The answer to `ask unlocated` (the reading's `unlocated()`); default false. */
   unlocated?: boolean;
-  /** The stroke the previous step drew, when it was a stroke; default `drawnFor` that step — the same points exactly when the step is the same. */
+  /** swipe.ts#screenBox's box this round (`RoundSeen.gesture`); default `screen`'s box, else the device as built — as the driver's is on a screen held as built. */
+  gesture?: Rect;
+  /** The stroke the previous step drew, when it was a stroke; default `drawnFor` that step — the driver's points for it. */
   drawn?: Stroke;
   /** ms since the scroll began; default 0. */
   elapsedMs?: number;
 }
 
-/** One point per direction, for `drawnFor`. */
-const DIR: Record<Direction, number> = { up: 1, down: 2, left: 3, right: 4 };
-
 /**
- * The stroke a row hands back when it names none: points built from the
- * step's own shape — its cover cut, its reach, its direction, its box and
- * travel cap — so two strokes are the same stroke (swipe.ts#sameStroke)
- * exactly when the driver's would be: on one screen the driver's points are
- * a function of those and nothing else (review round 1 of the deepening: a
- * constant made every stroke "the same", an identity the driver cannot
- * produce). Always longer than twice TOUCH_SLOP, as the driver's are on a
- * real screen: a row that means a shorter one hands it in `drawn`.
+ * The stroke a row hands back when it names none: the driver's own points
+ * for the step (swipe.ts#scrollStroke) — the step carries every fact the
+ * points are made of, its box decided by the round (deep/r3-scroll), so
+ * nothing here re-derives geometry; until then a stand-in built from the
+ * step's shape, which could not see the driver's own judgement of the box
+ * (the probe drawn off its container under the IME passed through it). A
+ * row that means another stroke — one shorter than twice TOUCH_SLOP —
+ * hands it in `drawn`.
  */
-export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => ({
-  from: { x: 0, y: step.coverTop ?? -1 },
-  to: {
-    x: Math.round(step.reach * 1000) + (step.maxTravel ?? 0) + (step.within === undefined ? 0 : step.within.y * 10_000 + step.within.height * 100_000_000),
-    y: DIR[step.toward] * 1000,
-  },
-});
+export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => {
+  const { box } = step;
+  if (box === undefined) throw new Error('drawnFor: a stroke step with no box (the round had no gesture box)');
+  return scrollStroke({ ...step, box });
+};
 
 type Step = Exclude<RoundStep, { do: 'ask' }>;
 export type Ask = 'witness' | 'unlocated';
@@ -97,6 +94,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
           ? { error: new Error(row.error) }
           : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollersOf: () => row.scrollers ?? (row.scroller !== undefined ? [row.scroller] : []), ...(row.mainScroller && { mainScroller: row.mainScroller }), ...(row.fingerprint !== undefined && { fingerprint: row.fingerprint }), ...(row.loading === true && { loading: true }), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
+      gesture: row.gesture ?? row.screen?.box ?? { x: 0, y: 0, ...rules.screen },
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };
     const asks: Ask[] = [];
