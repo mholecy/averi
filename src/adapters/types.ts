@@ -308,7 +308,8 @@ export interface UiNode {
    * in the list's order — no node has a parent of its own, so nothing in
    * the tree says what a node belongs to. Read by ui-tree/draw-order.ts,
    * whose `target` question judges such a list by an interim rule of its
-   * own (`flatListAbove`). A mark of the source, like `ofKeyboard` and
+   * own (`flatListAbove`) and asks an on-target text to repeat the target
+   * (`onTarget`), the sibling guard being void there. A mark of the source, like `ofKeyboard` and
    * `clipsDescendants`: ui-tree knows no platform, and the shape alone (a
    * rectless root over leaves) would also match a test's or a future
    * source's tree that is not idb's. Absent on WDA and Android trees.

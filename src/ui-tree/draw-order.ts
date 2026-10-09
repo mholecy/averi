@@ -489,7 +489,10 @@ const NOT_DRAWN = {
    * its parent, so the sibling guard already rejects it. Residual, stated:
    * a text laid on a target in the target's own parent with no wrapper of
    * its own — absolutely positioned, or a layout-only view flattened away —
-   * is excused there, as an outlined field's floating label is.
+   * is excused there, as an outlined field's floating label is. So is a
+   * bare footer text beside a CONTAINER target (a FrameLayout holding a
+   * RecyclerView and a TextView, a Scaffold whose bottom bar is a bare
+   * Text, `fully` asked of the list): same shape, same answer as before.
    */
   onTarget: {
     target: ({ node, parent }, { target, flatList }) =>
