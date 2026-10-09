@@ -22,7 +22,7 @@ import {
 } from '../../src/interact/resolve.js';
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { screenBox } from '../../src/interact/swipe.js';
+import { IOS_MIN_STATUS_BAND, iosStatusBand, screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
@@ -1035,5 +1035,79 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     await scrollUntilVisible(fake, 'id:go', { direction: 'right', fully: true, maxSwipes: 2, settleMs: 0 }).catch(() => undefined);
     expect(fake.swipes).toHaveLength(2);
     for (const s of fake.swipes) expect(s.to.x).toBeLessThan(s.from.x); // content to the right both times: finger left, never turned
+  });
+});
+
+/**
+ * iOS's status band counts as OFF the screen for a tap (2026-10-09, the owner's decision on device check C3-1.3 of
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): a plain `scroll_until` stopped with
+ * `priority_select` at `24,-20` and the tap went to (201,6) — the status bar, which scrolled the form to its top.
+ * The band is the top safe-area inset (interact/swipe.ts#iosStatusBand): 62 pt on the measured 402x874.
+ */
+describe('iOS\'s status band (2026-10-09)', () => {
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  /** The SWIFT form as idb lists it (tests/fixtures/idb-swift-form-continue.json), `priority_select` at `y`, on `platform`. */
+  const swiftForm = async (y: number, platform: 'ios' | 'android' = 'ios') => {
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    tree.children.find((n) => n.identifier === 'swift_payment.form.priority_select')!.rect.y = y;
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.platform = platform;
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  };
+  const PRIORITY = 'id:swift_payment.form.priority_select';
+
+  it('the measured stop (24,-20, centre (201,6)): refused as under the status bar, nothing tapped', async () => {
+    const fake = await swiftForm(-20);
+    const error = await tapElement(fake, PRIORITY, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OffScreenRefusal);
+    expect((error as Error).message).toBe(
+      `${PRIORITY} is under iOS's status bar at (201,6) — the top 62 pt of a 402x874 screen, where a tap goes to the status bar ` +
+        '(rect 24,-20 354x52) — scroll_until it first; nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('the band\'s edge: a centre at y 61 is refused, at y 62 tapped', async () => {
+    await expect(tapElement(await swiftForm(35), PRIORITY, OPTS)).rejects.toBeInstanceOf(OffScreenRefusal);
+    const clear = await swiftForm(36);
+    await tapElement(clear, PRIORITY, OPTS);
+    expect(clear.tapPoints).toEqual([{ x: 201, y: 62 }]);
+  });
+
+  it('a moved tap never lands in the band: a row whose only uncovered piece lies in it is refused, not tapped there', async () => {
+    // The row 30–100 (centre 65, below the band) under a bar laid after it at 62–100: the uncovered piece is 30–62, all band.
+    const fake = await swiftForm(30);
+    fake.live().children.push(node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 62, width: 402, height: 40 } }));
+    fake.live().children.find((n) => n.identifier === 'swift_payment.form.priority_select')!.rect.height = 70;
+    const error = await tapElement(fake, PRIORITY, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CoveredRefusal);
+    expect((error as Error).message).toContain('nothing of it shows');
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('…and a piece below the band is aimed at instead of a larger one reaching into it: the band is cut before the largest piece is chosen', async () => {
+    // The row 30–160 (centre 95) under a bar at 90–120: uncovered 30–90 (60 tall, its centre (201,60) in the band) and
+    // 120–160 (40 tall). Less the band, 62–90 is 28 tall: the piece below the bar is the larger, and the tap goes there.
+    const fake = await swiftForm(30);
+    fake.live().children.find((n) => n.identifier === 'swift_payment.form.priority_select')!.rect.height = 130;
+    fake.live().children.push(node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 90, width: 402, height: 30 } }));
+    const result = await tapElement(fake, PRIORITY, OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 140 }]);
+    expect(result.moved).toContain('tapped the uncovered part 354x40');
+  });
+
+  it('Android is unaffected: its status bar lies outside the app\'s window — the same tree on an Android adapter is tapped at (201,6)', async () => {
+    const fake = await swiftForm(-20, 'android');
+    await tapElement(fake, PRIORITY, OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 6 }]);
+  });
+
+  it('the band by the screen\'s size: measured 62 on 402x874, published insets elsewhere, 20 on an unknown portrait, none in landscape; on iOS only', async () => {
+    expect([iosStatusBand({ width: 402, height: 874 }), iosStatusBand({ width: 393, height: 852 }), iosStatusBand({ width: 375, height: 667 })]).toEqual([62, 59, 20]);
+    expect([iosStatusBand({ width: 1024, height: 1366 }), iosStatusBand({ width: 874, height: 402 })]).toEqual([IOS_MIN_STATUS_BAND, 0]);
+    expect((await screenBox(await swiftForm(771), { tree: undefined })).statusBand).toBe(62);
+    expect((await screenBox(await swiftForm(771, 'android'), { tree: undefined })).statusBand).toBeUndefined();
   });
 });

@@ -36,7 +36,7 @@ export interface ScrollOptions {
  * reader the driver hands it to takes a `Pick` of its own
  * (`readTreeOrError`, `judgingScreen`, `screenBox`, `readKeyboard`).
  */
-export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed'>;
+export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed' | 'platform'>;
 
 /**
  * Swipe until the element is present AND visibly inside the viewport

@@ -43,9 +43,11 @@ import { isInteractive, tapPoint } from './selectors.js';
  * The three columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
  * they differ the row says why. Only nodes of the tree are covers: what a
- * tree does not list (iOS's status bar, the translucent top bar idb gives
- * as its button and title only, a top bar WDA lists BEFORE the scroll view
- * it is drawn over) is not inferred — the bug note's decision 4. Knows no
+ * tree does not list (the translucent top bar idb gives as its button and
+ * title only, a top bar WDA lists BEFORE the scroll view it is drawn over)
+ * is not inferred — the bug note's decision 4; iOS's status bar is no
+ * cover but off the screen, cut out of `within` by the caller
+ * (interact/swipe.ts#belowStatusBand). Knows no
  * platform commands; the platform shapes are in the rows, each with the
  * device tree it was measured on, and the one mark of a source it reads is
  * on the tree (`UiNode.flatList`). The rect arithmetic it asks — the

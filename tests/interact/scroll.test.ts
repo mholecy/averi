@@ -630,3 +630,59 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
     expect(await scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 });
+
+/**
+ * iOS's status band is off the screen for `scroll_until`'s stop too (2026-10-09, device check C3-1.3 of
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): one 0.3-s stroke (`idb ui swipe 201 699 201
+ * 175`) flung `priority_select` from 771 to `24,-20`, its centre (201,6) — on the screen and under no tree node — and
+ * the plain stop stopped there; the tap that followed went to the status bar. interact/swipe.ts#iosStatusBand.
+ */
+describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
+  /** The SWIFT form as idb lists it, `priority_select` moved by each stroke to the next of `ys` (the last one standing). */
+  async function flungForm(platform: 'ios' | 'android', ys: number[]) {
+    const { readFile } = await import('node:fs/promises');
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    const row = tree.children.find((n) => n.identifier === 'swift_payment.form.priority_select')!;
+    class Flung extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        row.rect = { ...row.rect, y: ys.length > 1 ? ys.shift()! : ys[0] };
+      }
+    }
+    const fake = new Flung({ form: tree }, 'form');
+    fake.platform = platform;
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  }
+
+  it('the measured fling to y -20 is no stop: the scroll turns back and stops where the tap will open the row', async () => {
+    const fake = await flungForm('ios', [-20, 550]);
+    const result = await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST);
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([
+      { from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }, // the measured stroke
+      { from: { x: 201, y: 175 }, to: { x: 201, y: 437 } }, // turned back, half its reach
+    ]);
+  });
+
+  it('a row lying wholly in the band (y 10–52) is not in the viewport: neither a plain stop nor a fully: true one', async () => {
+    const plain = await flungForm('ios', [10, 550]);
+    expect(await scrollUntilVisible(plain, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    const fully = await flungForm('ios', [10, 550]);
+    expect(await scrollUntilVisible(fully, 'id:swift_payment.form.priority_select', { ...FAST, fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('a row reaching into the band with its centre below it is a plain stop, clipped at the top by the band — and no fully: true one', async () => {
+    const fake = await flungForm('ios', [36, 550]); // 36–88, centre 62: 26 of 52 pt below the band
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 1, visible: 0.5, clipped: ['top'] });
+    const fully = await flungForm('ios', [36, 550]);
+    expect(await scrollUntilVisible(fully, 'id:swift_payment.form.priority_select', { ...FAST, fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {
+    const fake = await flungForm('android', [-20, 550]);
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 1, visible: expect.closeTo(0.615, 3), clipped: ['top'] });
+  });
+});
