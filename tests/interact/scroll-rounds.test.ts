@@ -1598,3 +1598,48 @@ describe('round — a target uiautomator dumped CLIPPED OUT of its scroll contai
     expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
   });
 });
+
+describe('round — a cover the target shows past only on its far side (the round-6b device check\'s S-1 residual: Contacts\' toolbar 5 pt below the row\'s top)', () => {
+  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], statusBand: 62 };
+  /** Contacts' New Contact sheet under idb: `Toolbar` `0,83 402x48`, listed last. */
+  const TOOLBAR = node({ role: 'other', label: 'Toolbar', rect: { x: 0, y: 83, width: 402, height: 48 } });
+  /** `add url` (362x51 at x 20) at y, the toolbar — or `bar` — drawn over the rest. */
+  const url = (y: number, bar: UiNode = TOOLBAR): Row => ({ found: [match({ x: 20, y, width: 362, height: 51 }, 'url')], over: [bar], screen: BANDED });
+  const FULLY_IPHONE: Rules = { ...IPHONE, fully: true, maxSwipes: 6, timeoutMs: 15_000 };
+  const reaches = (played: Played): number[] => played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []));
+
+  it('measured: `add url` at 78 under the toolbar at 83, the default direction down — turned at once, half the reach, plain and fully: true (was one stroke the wrong way, then back)', () => {
+    for (const fully of [false, true]) {
+      const played = play({ ...FULLY_IPHONE, fully }, [url(78), url(400), url(400)]);
+      expect(strokesToward(played)).toEqual(['up']);
+      expect(reaches(played)).toEqual([0.5]);
+      expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    }
+  });
+
+  it('measured: from 69 — 14 pt showing above the bar, its bottom under it — turned at once too (was two strokes the wrong way)', () => {
+    expect(strokesToward(play(FULLY_IPHONE, [url(69), url(400), url(400)]))).toEqual(['up']);
+  });
+
+  it('…mirrored: scrolling up, a row whose bottom 5 pt show below a bar in the lower half that covers the rest of it — turned at once', () => {
+    const bottomBar = node({ role: 'other', label: 'Bar', rect: { x: 0, y: 760, width: 402, height: 60 } });
+    const played = play({ ...FULLY_IPHONE, direction: 'up' }, [url(774, bottomBar), url(400, bottomBar), url(400, bottomBar)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(reaches(played)).toEqual([0.5]);
+  });
+
+  it('no turn when something of the row shows on the bar\'s other side or beside it: a bar narrower than the row, a bar ending above the row\'s bottom (a badge, a thin strip)', () => {
+    const narrow = node({ role: 'other', label: 'Toolbar', rect: { x: 40, y: 83, width: 300, height: 48 } });
+    expect(strokesToward(play({ ...FULLY_IPHONE, maxSwipes: 1 }, [url(78, narrow), url(78, narrow)]))).toEqual(['down']);
+    const thin = node({ role: 'other', label: 'Toolbar', rect: { x: 0, y: 83, width: 402, height: 20 } });
+    expect(strokesToward(play({ ...FULLY_IPHONE, maxSwipes: 1 }, [url(78, thin), url(78, thin)]))).toEqual(['down']);
+  });
+
+  it('…nor in the frame\'s near half: a row coming up from below with its top showing above a bottom bar is swiped on, not turned away (CONTINUE at 780, unchanged)', () => {
+    const CONTINUE = node({ role: 'button', label: 'Continue to summary', rect: { x: 24, y: 780, width: 354, height: 44 } });
+    const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [CONTINUE], screen: BANDED });
+    const played = play(FULLY_IPHONE, [row(775), row(304), row(304)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(reaches(played)).toEqual([1]);
+  });
+});
