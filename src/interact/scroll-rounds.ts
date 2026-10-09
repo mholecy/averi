@@ -247,8 +247,17 @@ export type ScrollOutcome =
  * the screen instead would touch down off the container and move nothing
  * whatever lies beyond — code review round 2, so none is sent); or the
  * probe was drawn under twice TOUCH_SLOP and may have been a tap (`tap`).
+ *
+ * `fills` (code review of round 3, 2026-10-09): flush with BOTH of its
+ * nearest container's `edges` along the scroll, and with ONE edge of no
+ * clipping ancestor — a row taller than its list, cut at both ends, reads
+ * exactly the list's rect. Never probed (one probe cannot tell which side,
+ * if either, is cut), so never checked; until then such a stop was a plain
+ * "fully visible", the residual stated only in code.
  */
-export type Flush = { edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'tap' });
+export type Flush =
+  | ({ edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'tap' }))
+  | { edges: readonly [Edge, Edge]; container: Rect; checked: false; why: 'fills' };
 
 /**
  * Which bound ended the scroll: the same stroke twice moved nothing (with
@@ -369,8 +378,10 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * flush with the left edge of its container is the ordinary grid layout,
  * and a sideways stroke there could turn a page of a pager around it. Not
  * when BOTH edges on the axis are flush — the match fills its container,
- * and one probe cannot tell which side, if either, is cut (accepted,
- * stated: such a match is reported as before). One probe per candidate stop:
+ * and one probe cannot tell which side, if either, is cut: unless an outer
+ * ancestor gives it a one-edge flush (below), such a stop is reported
+ * unchecked, `flush.why` `fills` (`Flush`), and the reply says so — it was
+ * a plain "fully visible" until the code review of round 3. One probe per candidate stop:
  * a probe after which the match is where it was settles it.
  *
  * A quarter of the stroke — over the container, 15 % of its side
@@ -436,28 +447,39 @@ export const PROBE_MAX_TRAVEL_FRACTION = 0.08;
 const REVEALS: Record<Edge, Direction> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
 
 /**
- * The judged match's edge that lies on its container's edge, along the
- * scroll's axis (`direction`'s), within a pixel — undefined when none does,
- * when both do (it fills the container: PROBE_REACH), or when the
- * container has no area.
+ * The judged match's edges that lie on its container's edges, along the
+ * scroll's axis (`direction`'s), within a pixel, low edge first — none, one,
+ * or both (it fills the container: PROBE_REACH); none when the container
+ * has no area.
  */
-function flushEdge(rect: Rect, container: Rect, direction: Direction): Edge | undefined {
-  if (rectArea(container) === 0) return undefined;
+function flushEdges(rect: Rect, container: Rect, direction: Direction): Edge[] {
+  if (rectArea(container) === 0) return [];
   const on = (a: number, b: number) => Math.abs(a - b) <= 1;
   const [low, high]: [Edge, Edge] = direction === 'up' || direction === 'down' ? ['top', 'bottom'] : ['left', 'right'];
   const atLow = low === 'top' ? on(rect.y, container.y) : on(rect.x, container.x);
   const atHigh =
     high === 'bottom' ? on(rect.y + rect.height, container.y + container.height) : on(rect.x + rect.width, container.x + container.width);
-  return atLow === atHigh ? undefined : atLow ? low : high;
+  return [...(atLow ? [low] : []), ...(atHigh ? [high] : [])];
 }
 
-/** The nearest of `chain` (clipping ancestors, nearest first) the match is flush with on ONE edge along the scroll, its edge and its index — undefined when none is. */
-function flushWith(rect: Rect, chain: readonly Rect[], direction: Direction): { edge: Edge; at: number } | undefined {
+/**
+ * Where the match lies flush, of `chain` (clipping ancestors, nearest
+ * first): the nearest it is flush with on ONE edge along the scroll — that
+ * edge and the ancestor's index, the probe's question — else, when it
+ * fills the NEAREST along the scroll, both edges (`fills`: reported, never
+ * probed); undefined when neither.
+ */
+function flushWith(
+  rect: Rect,
+  chain: readonly Rect[],
+  direction: Direction,
+): { edge: Edge; at: number } | { fills: readonly [Edge, Edge] } | undefined {
   for (const [at, container] of chain.entries()) {
-    const edge = flushEdge(rect, container, direction);
-    if (edge !== undefined) return { edge, at };
+    const edges = flushEdges(rect, container, direction);
+    if (edges.length === 1) return { edge: edges[0], at };
   }
-  return undefined;
+  const nearest = chain.length === 0 ? [] : flushEdges(rect, chain[0], direction);
+  return nearest.length === 2 ? { fills: [nearest[0], nearest[1]] } : undefined;
 }
 
 /**
@@ -951,7 +973,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       let flush: Flush | undefined;
       const chain = fully ? read.scrollersOf(best.node) : [];
       const flushed = flushWith(best.node.rect, chain, s.rules.direction);
-      if (flushed !== undefined) {
+      if (flushed !== undefined && 'fills' in flushed) flush = { edges: flushed.fills, container: chain[0], checked: false, why: 'fills' };
+      else if (flushed !== undefined) {
         const { edge, at } = flushed;
         const container = chain[at];
         const within = strokeWithin(chain, at, REVEALS[edge], s.frame.box);

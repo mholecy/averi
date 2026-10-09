@@ -70,9 +70,11 @@ export interface ScrollUntilResult {
    * node's bounds, so the rect cannot say whether more of it lies beyond.
    * `checked`: a probe swipe toward that edge moved nothing, so nothing
    * does (the probe is one of `swipes`). Not checked (`why`, scroll-rounds.ts
-   * #Flush): no swipe or time left, no container with room for a probe, or
-   * a probe short enough to be a tap — the reply says it may be cut.
-   * Absent otherwise.
+   * #Flush): no swipe or time left, no container with room for a probe, a
+   * probe short enough to be a tap, or — `fills`, with both `edges` and no
+   * one `edge` — it fills its nearest container along the scroll, which no
+   * probe can check (code review of round 3, 2026-10-09); the reply says it
+   * may be cut. Absent otherwise.
    */
   flush?: Flush;
 }
@@ -153,6 +155,13 @@ export function describeScrollResult(r: ScrollUntilResult): string {
  */
 function flushText(flush: ScrollUntilResult['flush']): string {
   if (flush === undefined) return '';
+  const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
+  if ('edges' in flush) {
+    return (
+      `; but it fills its scroll container (${rectText(flush.container)}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
+      `the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — ${cut}`
+    );
+  }
   const where = `its ${flush.edge} edge lies on its scroll container's (${rectText(flush.container)})`;
   if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
   const unchecked = {
@@ -160,7 +169,7 @@ function flushText(flush: ScrollUntilResult['flush']): string {
     room: 'no scroll container around it has room for a probe swipe to check it',
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
-  return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — it may be cut there, a rect assert or screenshot may measure part of it`;
+  return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — ${cut}`;
 }
 
 /** The `settled: false` note — what the reader should know before measuring the element. */

@@ -662,13 +662,29 @@ describe('round — a fully: true stop flush with its clipping scroll container 
 
   it.each([
     ['no clipping container (every iOS node; an Android node with no scrollable ancestor)', { found: [match({ x: 66, y: 242, width: 948, height: 92 })] }],
-    ['flush with BOTH edges along the scroll: it fills the container, one probe cannot tell', formRead(242, 1736)],
     ['flush across the scroll only (a grid cell at the left edge of a vertical list)', { found: [match({ x: 0, y: 500, width: 300, height: 143 })], scroller: FORM }],
     ['inside the container by more than a pixel', formRead(244, 90)],
   ] as const)('no probe: %s', (_, row) => {
     const played = play(FULLY_ANDROID, [row as Row]);
     expect(played.steps.map((s) => s.do)).toEqual(['stop']);
     expect(resultOf(played).flush).toBeUndefined();
+  });
+
+  it('flush with BOTH edges along the scroll — a row taller than its list, cut at both ends, reads the list\'s rect: NOT probed (one probe cannot tell which side is cut), reported unchecked, `fills`, and the reply says so (code review of round 3)', () => {
+    const played = play(FULLY_ANDROID, [formRead(242, 1736)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    const result = resultOf(played);
+    expect(result).toEqual({ swipes: 0, visible: 1, clipped: [], flush: { edges: ['top', 'bottom'], container: FORM, checked: false, why: 'fills' } });
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 0 swipes; but it fills its scroll container (0,242 1080x1736) exactly — its top and bottom edges lie on the container's, " +
+        "where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, " +
+        'a rect assert or screenshot may measure part of it',
+    );
+    // Within a pixel, as a one-edge flush is; and along the scroll's axis: a sideways scroll's are left and right.
+    expect(resultOf(play(FULLY_ANDROID, [formRead(243, 1734)])).flush).toMatchObject({ why: 'fills' });
+    const PAGER: Rect = { x: 0, y: 500, width: 1080, height: 600 };
+    const page: Row = { found: [match({ x: 0, y: 520, width: 1080, height: 500 }, 'page')], scroller: PAGER };
+    expect(resultOf(play({ ...FULLY_ANDROID, direction: 'right' }, [page])).flush).toEqual({ edges: ['left', 'right'], container: PAGER, checked: false, why: 'fills' });
   });
 
   it('within a pixel counts as flush (a rounding in the tree source)', () => {
@@ -830,9 +846,18 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(play({ ...FULLY_ANDROID, maxSwipes: 1 }, [row, row]).steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, within: LIST });
   });
 
-  it('exempt only when flush with BOTH edges of every clipping ancestor (it fills them all)', () => {
+  it('not probed only when flush with BOTH edges of every clipping ancestor (it fills them all) — and then reported unchecked, `fills`, against the nearest', () => {
     const row: Row = { found: [card(1900)], scrollers: [carousel(78), carousel(78)] };
-    expect(play(FULLY_ANDROID, [row]).steps.map((st) => st.do)).toEqual(['stop']);
+    const played = play(FULLY_ANDROID, [row]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    expect(resultOf(played).flush).toEqual({ edges: ['top', 'bottom'], container: carousel(78), checked: false, why: 'fills' });
+  });
+
+  it('a card that fills a carousel lying whole inside the list: `fills`, named against the carousel — the list around it is no edge of it', () => {
+    const MIDDLE: Rect = { x: 0, y: 1000, width: 1080, height: 400 };
+    const played = play(FULLY_ANDROID, [{ found: [match({ x: 40, y: 1000, width: 600, height: 400 }, 'card')], scrollers: [MIDDLE, LIST] }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    expect(resultOf(played).flush).toEqual({ edges: ['top', 'bottom'], container: MIDDLE, checked: false, why: 'fills' });
   });
 
   it('no clipping ancestor with room for a stroke (a lone 30- or 79-px scroller): NO probe — over the screen it would touch down off the container — and the stop is reported unchecked, saying why', () => {
