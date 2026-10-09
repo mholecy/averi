@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { MIN_STROKE_FRACTION, sameStroke, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -323,5 +323,58 @@ describe('sameStroke — the same touch-down and lift-off, point for point (code
     expect(sameStroke(s, { ...s, from: { x: 540, y: 1117 } })).toBe(false);
     expect(sameStroke(s, { ...s, to: { x: 539, y: 280 } })).toBe(false);
     expect(sameStroke(s, { ...s, to: { x: 540, y: 699 } })).toBe(false);
+  });
+});
+
+describe('scrollStroke — the scroll step\'s stroke, over the target\'s scroll container when it names one (2026-10-09)', () => {
+  const BOX = { x: 0, y: 0, width: 1080, height: 2220 };
+  const SETTINGS = { x: 0, y: 737, width: 1080, height: 1417 };
+  it('without `within`: the box\'s stroke, as before (swipeVector, swipeVectorAbove, shortenStroke)', () => {
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1 })).toEqual(swipeVector(BOX, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398 })).toEqual(swipeVectorAbove(BOX, 1398, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 0.5 })).toEqual(shortenStroke(swipeVector(BOX, 'down', 'content'), 0.5, 2220));
+  });
+  it('with `within`: over the container, so a content-up stroke touches down inside the list (1021), not on the header above it (444)', () => {
+    expect(scrollStroke(BOX, { toward: 'up', reach: 1 }).from.y).toBe(444);
+    expect(scrollStroke(BOX, { toward: 'up', reach: 1, within: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1871 } });
+    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } });
+  });
+  it('met with the box (a container reaching past the screen), clear of a cover inside it, and the box whole when the two do not meet or the cover starts above the container', () => {
+    const tall = { x: 0, y: 242, width: 1080, height: 5000 };
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: tall })).toEqual(swipeVector({ x: 0, y: 242, width: 1080, height: 1978 }, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398, within: SETTINGS })).toEqual(swipeVectorAbove(SETTINGS, 1398, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: { x: 0, y: 3000, width: 1080, height: 100 } })).toEqual(swipeVector(BOX, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 700, within: SETTINGS })).toEqual(swipeVectorAbove(BOX, 700, 'down', 'content'));
+  });
+});
+
+describe('dragMs — a stroke\'s duration at the adapter\'s drag speed (2026-10-09)', () => {
+  const PIXEL_3A = { width: 1080, height: 2220 };
+  it('length ÷ (speed × the long side), in whole ms rounded up: 0.45 of 2220 is 999 px/s', () => {
+    expect(dragMs({ from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } }, 0.45, PIXEL_3A)).toBe(1334); // the screen stroke, 1332 px
+    expect(dragMs({ from: { x: 540, y: 1871 }, to: { x: 540, y: 1021 } }, 0.45, PIXEL_3A)).toBe(851); // Settings' list stroke
+    expect(dragMs({ from: { x: 0, y: 0 }, to: { x: 1332, y: 0 } }, 0.45, { width: 2220, height: 1080 })).toBe(1334); // landscape: the long side still
+  });
+  it(`never under MIN_DRAG_MS (${MIN_DRAG_MS}, Android's own default): a probe or a halved stroke is not sent faster than before`, () => {
+    expect(dragMs({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } }, 0.45, PIXEL_3A)).toBe(300);
+  });
+});
+
+describe('strokeBox and the travel cap — no stroke that is a tap (code review of fix/r3-scroll, 2026-10-09)', () => {
+  const BOX = { x: 0, y: 0, width: 1080, height: 2220 };
+  it(`a box under MIN_STROKE_BOX (${MIN_STROKE_BOX}) along the stroke is no stroke box — 60 % of it is under twice TOUCH_SLOP — and scrollStroke falls back to the screen`, () => {
+    expect(MIN_STROKE_BOX).toBe(80);
+    const strip = { x: 0, y: 1948, width: 1080, height: 30 };
+    expect(strokeBox(BOX, strip, 'down')).toBeUndefined();
+    expect(strokeBox(BOX, { ...strip, y: 1898, height: 80 }, 'down')).toEqual({ ...strip, y: 1898, height: 80 });
+    expect(strokeBox(BOX, strip, 'left')).toEqual(strip); // 1080 wide: room for a sideways stroke
+    expect(scrollStroke(BOX, { toward: 'down', reach: 0.25, within: strip })).toEqual(scrollStroke(BOX, { toward: 'down', reach: 0.25 }));
+    // Above a keyboard, only the part above it counts.
+    expect(strokeBox(BOX, { x: 0, y: 1300, width: 1080, height: 600 }, 'down', 1350)).toBeUndefined();
+  });
+  it('maxTravel caps the finger\'s travel, the touch-down kept, never under twice TOUCH_SLOP', () => {
+    const list = { x: 0, y: 242, width: 1080, height: 1736 };
+    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: list, maxTravel: 177 })).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 766 } });
+    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: list, maxTravel: 10 }).to.y).toBe(589 + 52); // the 3 %-of-side floor, 52 px
   });
 });

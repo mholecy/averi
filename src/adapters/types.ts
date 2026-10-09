@@ -235,6 +235,48 @@ export interface UiNode {
    * tell the two apart).
    */
   placeholder?: string;
+  /**
+   * Set on a node whose DESCENDANTS' rects the tree source has already
+   * intersected with this node's own rect (2026-10-09,
+   * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-
+   * to-scroll-container.md): Android only, on every node uiautomator dumps
+   * with `scrollable="true"` — a RecyclerView or ScrollView, and a Compose
+   * scroller, which dumps as a plain `android.view.View` (role `container`)
+   * and is told apart by this attribute alone. uiautomator reports each
+   * node's bounds clipped to its scroll container (and the display), so a
+   * row half behind a pinned bar reads shorter, with an edge exactly on the
+   * container's edge — measured on the SWIFT form, container
+   * `[0,242][1080,1978]`, a 143-px row read `{y:242, height:92}` — and
+   * nothing in the rect says the rest exists. Read by
+   * ui-tree/geometry.ts#scrollersOf, which hands `scroll_until` each match's
+   * such ancestors so a `fully: true` stop flush with one is checked
+   * before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
+   *
+   * A flag, not a role (decided 2026-10-09): mapping a Compose scroller to
+   * `scrollable` would change three things this fix does not want to touch —
+   * ui-tree/bare-tree.ts counts any non-structural role as content, so a
+   * Compose screen whose only node is an empty scroller would stop reading
+   * bare (the unsafe direction for `absent:`, verdict.ts); `role:container`
+   * and `role:scrollable` selectors written against today's trees would
+   * change what they match; and geometry.ts#shadowing's
+   * CONTENT_FRAMED_ROLES would start excusing those frames. Absent on iOS:
+   * WDA and idb report a node's frame unclipped — a row under the top bar
+   * reads at y -48, past the frame (interact/scroll-rounds.ts#beyondFarEdge
+   * is built on that) — so there is nothing to mark. Absent too on an
+   * Android node that cannot scroll now (`scrollable="false"`: a list whose
+   * content fits), whose children are not cut by it.
+   *
+   * Residuals, stated (code review of fix/r3-scroll, 2026-10-09): a View's
+   * accessibility bounds are cut to EVERY ancestor's visible rect, not only
+   * a scroller's, and Compose also subtracts what an overlay sibling covers
+   * — a row cut by a pinned bar drawn over the list reads cut at the bar's
+   * edge, not flush with any marked node, so the flag cannot reveal it (the
+   * pinned-chrome bug, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-
+   * pinned-app-chrome.md, out of scope). A RecyclerView with padding and
+   * clipToPadding draws a row cut at its padding edge while the row's rect
+   * runs on to the view's edge: not flush, not caught either.
+   */
+  clipsDescendants?: true;
 }
 
 /**
@@ -592,6 +634,18 @@ export interface DeviceAdapter {
    * that the adapter cannot hide it on its own.
    */
   readonly keyboardAdvice?: string;
+  /**
+   * How fast a finger may move — in screens per second, the screen's LONG
+   * side — for a stroke to DRAG this platform's scroll views about its own
+   * length rather than fling them on (2026-10-09, docs/bugs/2026-10-09-
+   * scroll-until-fling-skips-target-in-lazy-list.md). `scroll_until` sizes
+   * each stroke's duration from it (interact/swipe.ts#dragMs); absent, the
+   * adapter's own default duration is used, as before. A platform fact, so
+   * the adapter's: the fling is the platform's scroll physics, and the
+   * scroll is platform-agnostic. Set by Android only — the reasons for iOS
+   * are on `IosAdapter`'s absence of it (adapters/ios.ts#swipe).
+   */
+  readonly dragSpeed?: number;
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;

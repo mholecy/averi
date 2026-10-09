@@ -1,4 +1,4 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { everyNode, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
 import type { Verdict } from './verdict.js';
 
@@ -286,4 +286,46 @@ export async function pollTree<T>(
     if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree };
     await sleep(opts.pollMs);
   }
+}
+
+/**
+ * A fingerprint of the whole tree: every node, pre-order, by role, label,
+ * identifier, value and rect, hashed (FNV-1a, 32-bit, as 8 hex digits) —
+ * two reads of an unchanged screen give the same string, and any node that
+ * moved, appeared, vanished or changed its text a different one (bar a
+ * hash collision, one in 4·10⁹). For `scroll_until`'s "the same stroke
+ * twice changed nothing at all" when the target is not in the tree
+ * (2026-10-09, interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST). Cheap:
+ * one walk, no copy — a round's tree is a few hundred nodes; kept as 8
+ * characters, not the tree. Here because it is a question about a READ,
+ * asked of two of them.
+ */
+export function treeFingerprint(tree: UiNode): string {
+  let h = 0x811c9dc5;
+  const feed = (text: string): void => {
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+  };
+  for (const n of everyNode(tree)) {
+    const { x, y, width, height } = n.rect;
+    feed(`${n.role}\u0000${n.label ?? ''}\u0000${n.identifier ?? ''}\u0000${n.value ?? ''}\u0000${x},${y},${width},${height}\u0001`);
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+/**
+ * The tree shows a progress indicator: a `progress` node with area —
+ * Android's ProgressBar (adapters/android.ts's role map), which a Compose
+ * CircularProgressIndicator / LinearProgressIndicator also dumps as (its
+ * progress-range semantics give the node that class name). A spinner keeps
+ * a fixed rect and no text, so `treeFingerprint` reads a loading screen as
+ * unchanged; `scroll_until` asks this so a list still loading its next
+ * page is not called exhausted (code review of fix/r3-scroll, 2026-10-09).
+ * One walk.
+ */
+export function showsProgress(tree: UiNode): boolean {
+  for (const n of everyNode(tree)) if (n.role === 'progress' && n.rect.width > 0 && n.rect.height > 0) return true;
+  return false;
 }

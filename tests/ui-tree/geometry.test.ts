@@ -10,6 +10,8 @@ import {
   rectsOverlap,
   sameRect,
   sameRectWithinPixel,
+  scrollersOf,
+  largestScroller,
   shadowing,
 } from '../../src/ui-tree/geometry.js';
 import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
@@ -521,5 +523,37 @@ describe('rect equality — one owner, two questions (code review of round 2, 20
     expect(sameRectWithinPixel(r, { ...r, y: 19 })).toBe(false);
     expect(sameRectWithinPixel(r, { ...r, width: 31 })).toBe(false);
     expect(sameRectWithinPixel(r, { ...r, height: 39 })).toBe(false);
+  });
+});
+
+describe('scrollersOf — each node\'s clipping ancestors, nearest first (2026-10-09)', () => {
+  const rect = (y: number, height: number) => ({ x: 0, y, width: 1080, height });
+  const leaf = (y: number) => ({ role: 'text', label: 'r', identifier: null, value: null, rect: rect(y, 100), children: [] });
+  it('the marked ancestors\' rects, the nearest first — an inner list before the page around it; none for the outermost scroller or a node outside', () => {
+    const inInner = leaf(600);
+    const inOuter = leaf(300);
+    const inner = { role: 'scrollable', label: null, identifier: 'inner', value: null, rect: rect(500, 400), children: [inInner], clipsDescendants: true as const };
+    const outer = { role: 'container', label: null, identifier: 'page', value: null, rect: rect(242, 1736), children: [inOuter, inner], clipsDescendants: true as const };
+    const bare = leaf(2000);
+    const root = { role: 'container', label: null, identifier: null, value: null, rect: rect(0, 2220), children: [outer, bare] };
+    const of = scrollersOf(root);
+    expect(of(inInner)).toEqual([rect(500, 400), rect(242, 1736)]);
+    expect(of(inOuter)).toEqual([rect(242, 1736)]);
+    expect(of(inner)).toEqual([rect(242, 1736)]);
+    expect(of(outer)).toEqual([]);
+    expect(of(bare)).toEqual([]);
+    expect(of(leaf(600))).toEqual([]); // a node of another read
+  });
+});
+
+describe('largestScroller — the screen\'s own scroll view (2026-10-09)', () => {
+  const box = (y: number, height: number, clips: boolean, children: UiNode[] = []): UiNode => ({
+    role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y, width: 1080, height }, children, ...(clips && { clipsDescendants: true as const }),
+  });
+  it('the largest clipping node by area — a carousel above the list is the smaller; none without one', () => {
+    const carousel = box(300, 300, true);
+    const list = box(737, 1417, true);
+    expect(largestScroller(box(0, 2220, false, [carousel, list]))).toEqual(list.rect);
+    expect(largestScroller(box(0, 2220, false, [box(300, 300, false)]))).toBeUndefined();
   });
 });

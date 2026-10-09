@@ -79,6 +79,22 @@ describe('parseUiautomatorXml', () => {
     });
     expect(t.children[1]).toMatchObject({ role: 'scrollable', value: null });
   });
+
+  it('marks a node uiautomator dumps scrollable="true" as clipping its descendants — a Compose scroller keeps its role (container), only the flag says it scrolls; scrollable="false" and absent are not marked', () => {
+    // 2026-10-09, docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md: the SWIFT form's scroller.
+    const t = parseUiautomatorXml(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" scrollable="true" bounds="[0,242][1080,1978]">
+    <node class="android.view.View" resource-id="app:id/fees_select" bounds="[66,242][1014,334]" />
+  </node>
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="false" bounds="[0,1979][1080,2111]"><node class="android.widget.TextView" text="x" bounds="[0,1979][100,2000]" /></node>
+</node>
+</hierarchy>`);
+    expect(t.children[0]).toMatchObject({ role: 'container', clipsDescendants: true });
+    expect(t.children[0].children[0].clipsDescendants).toBeUndefined();
+    expect(t.children[1].clipsDescendants).toBeUndefined();
+    expect('clipsDescendants' in t).toBe(false); // absent, not false: ui_snapshot prints the tree as JSON
+  });
 });
 
 describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
@@ -116,6 +132,18 @@ describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
 });
 
 describe('AndroidAdapter interactions', () => {
+  it('drags at 0.45 screens a second (types.ts#dragSpeed, 2026-10-09): the duration a caller passes reaches `input swipe`; none passed is still 300 ms', async () => {
+    const { fn, calls } = fakeExec({});
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect(adapter.dragSpeed).toBe(0.45);
+    await adapter.swipe({ x: 540, y: 1871 }, { x: 540, y: 1021 }, 851);
+    await adapter.swipe({ x: 540, y: 1776 }, { x: 540, y: 444 });
+    expect(calls.filter((c) => c.includes('input swipe'))).toEqual([
+      'adb -s emulator-5554 shell input swipe 540 1871 540 1021 851',
+      'adb -s emulator-5554 shell input swipe 540 1776 540 444 300',
+    ]);
+  });
+
   it('uiTree strips the trailing uiautomator status line', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
     const tree = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree();

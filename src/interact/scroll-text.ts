@@ -1,10 +1,10 @@
 import type { DeviceScreen, Rect } from '../adapters/types.js';
-import { frameText } from '../ui-tree/geometry.js';
+import { frameText, rectText } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { absenceError } from './resolve.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 
 /**
  * Every sentence `scroll_until` says (2026-10-09, the scroll-rounds
@@ -63,6 +63,18 @@ export interface ScrollUntilResult {
    * run that settles reports what it always did. The reply says so.
    */
   settled?: false;
+  /**
+   * Set on a `fully: true` stop whose edge along the scroll lies exactly on
+   * its scroll container's edge (2026-10-09, Android only:
+   * interact/scroll-rounds.ts#PROBE_REACH) — where uiautomator cuts a
+   * node's bounds, so the rect cannot say whether more of it lies beyond.
+   * `checked`: a probe swipe toward that edge moved nothing, so nothing
+   * does (the probe is one of `swipes`). Not checked (`why`, scroll-rounds.ts
+   * #Flush): no swipe or time left, no container with room for a probe, or
+   * a probe short enough to be a tap — the reply says it may be cut.
+   * Absent otherwise.
+   */
+  flush?: Flush;
 }
 
 /**
@@ -93,6 +105,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     clipped: judged.clipped,
     ...(keyboard !== undefined && { keyboard }),
     ...(!o.settled && { settled: false as const }),
+    ...(o.flush !== undefined && { flush: o.flush }),
   };
 }
 
@@ -125,12 +138,29 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   if (r.clipped.length === 0) {
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
-    return `fully visible after ${n}${above}${unlocated}${moving}`;
+    return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}`;
   }
   return (
     `visible after ${n} — ${describeClip(r.clipped, r.visible, topCover)}` +
     `. A rect assert or screenshot on this element will measure the CLIPPED box${moving}`
   );
+}
+
+/**
+ * The flush clause (scroll-rounds.ts#PROBE_REACH): what the stop's edge on
+ * its scroll container means — checked by a probe, or not checked. The
+ * container is quoted as a node's rect (`rectText`): it is one.
+ */
+function flushText(flush: ScrollUntilResult['flush']): string {
+  if (flush === undefined) return '';
+  const where = `its ${flush.edge} edge lies on its scroll container's (${rectText(flush.container)})`;
+  if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
+  const unchecked = {
+    budget: 'no swipe or time was left to check it',
+    room: 'no scroll container around it has room for a probe swipe to check it',
+    tap: 'the probe swipe was too short to tell from a tap',
+  }[flush.why];
+  return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — it may be cut there, a rect assert or screenshot may measure part of it`;
 }
 
 /** The `settled: false` note — what the reader should know before measuring the element. */
@@ -231,7 +261,11 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
 function boundText(by: BoundBy, swipes: number): string {
   switch (by.of) {
     case 'exhausted':
-      return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`;
+      // `tree` (2026-10-09): there is no match to watch, so the sentence
+      // says what was watched — the whole screen.
+      return by.unchanged === 'tree'
+        ? `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not change the screen: content exhausted, still loading, or the swipes were not taken)`
+        : `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`;
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
     case 'timeout':
@@ -252,6 +286,11 @@ function shortText(short: Shortfall): string {
       return 'element never appeared in the tree';
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
+    case 'left':
+      // 2026-10-09: it WAS in the tree — "never appeared" (the bug note's
+      // third observation) was false, and its class (a plain Error, the
+      // element was sighted) already said so.
+      return `element was in the tree ${whenInFrame(short.inTreeAfter)} (off the viewport, or under the soft keyboard), never in the viewport, and is no longer in the tree — a swipe carried it out (a fling?) and a lazy list drops what scrolls away`;
     case 'offFrame': {
       const offFrame = `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
       const rect = `(last rect ${JSON.stringify(short.rect)})`;

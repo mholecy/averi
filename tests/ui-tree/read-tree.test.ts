@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, showsProgress, treeFingerprint } from '../../src/ui-tree/read-tree.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -303,5 +303,27 @@ describe('readErrorLine — a poll timeout\'s read error on one line, read back 
 
   it('a one-line read error followed by a line of something else keeps its own closing parenthesis, nothing added', () => {
     expect(readErrorLine('Timed out\n  (last UI tree read failed: a)\nsomething else')).toBe('(last UI tree read failed: a)');
+  });
+});
+
+describe('treeFingerprint — the whole tree, as 8 hex digits (2026-10-09)', () => {
+  const leaf = (label: string, y: number) => ({ role: 'text', label, identifier: null, value: null, rect: { x: 0, y, width: 10, height: 10 }, children: [] });
+  const root = (...children: ReturnType<typeof leaf>[]) => ({ role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 100, height: 100 }, children });
+  it('the same for an unchanged tree read twice; different for a node moved, renamed, added or removed', () => {
+    const f = treeFingerprint(root(leaf('a', 0), leaf('b', 10)));
+    expect(f).toMatch(/^[0-9a-f]{8}$/);
+    expect(treeFingerprint(root(leaf('a', 0), leaf('b', 10)))).toBe(f);
+    for (const other of [root(leaf('a', 0), leaf('b', 11)), root(leaf('a', 0), leaf('c', 10)), root(leaf('a', 0)), root(leaf('a', 0), leaf('b', 10), leaf('c', 20))]) {
+      expect(treeFingerprint(other)).not.toBe(f);
+    }
+  });
+});
+
+describe('showsProgress — a progress node with area (2026-10-09)', () => {
+  const n = (role: string, height: number, children: UiNode[] = []): UiNode => ({ role, label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 80, height }, children });
+  it('true for a ProgressBar / Compose indicator anywhere in the tree; false for none, or one with no area', () => {
+    expect(showsProgress(n('container', 100, [n('text', 10), n('container', 50, [n('progress', 80)])]))).toBe(true);
+    expect(showsProgress(n('container', 100, [n('text', 10)]))).toBe(false);
+    expect(showsProgress(n('container', 100, [n('progress', 0)]))).toBe(false);
   });
 });
