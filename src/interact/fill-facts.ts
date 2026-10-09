@@ -14,8 +14,9 @@
  * the DEFINITION every measurement of a field is taken in — what it holds as
  * opposed to what it shows — so the driver (fill.ts), the clear's rules
  * (fill-clear.ts) and the mismatch's classifier
- * (fill-verdict.ts#differenceOf) count the same characters (2026-10-09, the fill-clear deepening; it was a
- * closure inside fillField until then, and only fillField could ask it).
+ * (fill-verdict.ts#differenceOf) count the same characters (2026-10-09,
+ * the fill-clear deepening; it was a closure inside fillField until then,
+ * and only fillField could ask it).
  */
 
 import type { Rect } from '../adapters/types.js';
@@ -83,7 +84,8 @@ export interface FillResult {
    * the field: nothing then says the field is empty — review 2026-10-08,
    * m-1, a field the keyboard moved still held `XX` behind "cleared 7
    * characters first"); 0 when it held none (an input's null value is an empty one: the
-   * adapters turn "" into null). `unmeasured` when the matched node is not
+   * adapters turn "" into null), or when the first round of deletes changed
+   * nothing (fill-clear.ts#ClearFacts, `clearUnchanged`). `unmeasured` when the matched node is not
    * an input: its length is not the field's — a label's text, or no value
    * at all — so no delete was sent (review 2026-10-08: deletes counted off a
    * WDA label's text went into whatever had focus, and a label with no value
@@ -107,8 +109,8 @@ export interface FillResult {
    * nothing anyone saw (so when it was the FIRST round, `cleared` is 0:
    * review of this branch, probe J — "cleared 9 characters first" of an
    * empty hinted field). Never set on a MASKED reading: bullets are no
-   * hint, and an unchanged masked field fails as clear-twice (fill.ts,
-   * `deletesChangedNothing`).
+   * hint, and an unchanged masked field fails as clear-twice
+   * (fill-clear.ts, `deletesChangedNothing`).
    */
   clearUnchanged?: { shows: number; deletes: number };
   /**
