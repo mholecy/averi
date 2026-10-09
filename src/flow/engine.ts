@@ -17,7 +17,6 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
-  resolveLaunchActivity,
   flowIsDestructive,
   flowItselfIsDestructive,
   keyboardDismissals,
@@ -29,6 +28,7 @@ import {
   type TapSpec,
 } from './config.js';
 import { describeCondition, evaluateCondition } from './condition.js';
+import { launchApp, launchedLine, type EngineSession } from './launch.js';
 import { resolveCredentials, type Credentials, type EnvValues, type ResolvedValue } from './credentials.js';
 
 export interface TraceEntry {
@@ -221,36 +221,6 @@ type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
  * cannot drift.
  */
 const FLOW_AMBIGUITY: Ambiguity = 'first';
-
-/**
- * What outlives one engine run: the state of the SESSION that runs it. Today
- * that is one number, how many `launch { clearState: true }` steps the
- * session's runs have performed — the `⚠ clearState` line's "(3 this
- * session)", which is what makes a finite resource (a device registration)
- * budgetable.
- *
- * Owned by the caller and handed in (`EngineOptions.session`), as the
- * environment is (2026-10-04). Until 2026-10-07 it was a module-level `let`
- * with an exported reset for tests: every engine in the PROCESS shared it, so
- * a second server built in one process (each test file, an embedder of
- * createAveriServer) continued the first one's count, and each engine test
- * file had to remember to zero it. The MCP server (mcp/tools.ts) now makes one
- * per server — the server IS the session — and passes it to every tool that
- * runs the engine.
- */
-export class EngineSession {
-  #clearStateCount = 0;
-
-  /** How many wipes this session's runs have performed so far. */
-  get clearStateCount(): number {
-    return this.#clearStateCount;
-  }
-
-  /** Counts one wipe and returns the new total — the number the `⚠ clearState` line prints. */
-  recordClearState(): number {
-    return ++this.#clearStateCount;
-  }
-}
 
 /**
  * What one engine run does: ensure a state, run a flow, or both — in that
@@ -1032,54 +1002,17 @@ export class FlowEngine {
   private async runLaunch(spec: StepPayload<'launch'>): Promise<void> {
     const app = this.cfg.app[this.adapter.platform];
     if (!app) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
-    const appId = 'package' in app ? app.package : app.bundleId;
-    // Step-level activity wins over app.android.activity, which applies only
-    // when the step names neither an activity nor an intent (2026-10-03: an
-    // intent alone is delivered within the package, not forced onto the
-    // config's launcher activity). On iOS neither applies unless the step
-    // names one — the adapter then rejects it loudly. The rule, its "when"
-    // included, is flow/config.ts's (shared with launch_app).
-    const activity = resolveLaunchActivity(this.cfg, {
-      platform: this.adapter.platform,
-      appId,
-      activity: spec.activity,
-      intent: spec.intent,
+    // The launch itself — activity, adapter call, wipe count, wording — is
+    // flow/launch.ts's, shared with launch_app; the step's app id is the
+    // config's. Its caveat and its wipe each get a `⚠` line right under the
+    // line they qualify.
+    const launched = await launchApp(this.adapter, this.cfg, this.session, {
+      appId: 'package' in app ? app.package : app.bundleId,
+      ...spec,
     });
-    const { note } = await this.adapter.launch(appId, {
-      clearState: spec.clearState,
-      activity,
-      intent: spec.intent,
-    });
-    this.log(
-      'launch',
-      appId +
-        (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
-        (spec.clearState ? ' (state cleared)' : ''),
-    );
-    // The launch's caveat (LaunchOutcome.note — today iOS's foreground wait
-    // giving up: the tree may still be the app this launch covered,
-    // adapters/ios-foreground.ts), right under the line it qualifies, in the
-    // words launch_app's reply uses. A `⚠` line, not a failure: the app was
-    // launched, and the steps after it poll — a `wait:`/`assert` that reads
-    // the wrong app's tree is what the line warns about.
-    if (note !== undefined) this.log('⚠ launch', note);
-    // The cost of a wipe is invisible at the moment it is paid, and nothing in
-    // the trace said so. The line states the MECHANISM and leaves the price to
-    // the reader: what it costs is app-specific, and averi drives any app. Be
-    // precise about the mechanism too — this deletes the app's data container
-    // (iOS) / runs `pm clear` (Android); it does not clear the iOS keychain,
-    // whatever a re-registration afterwards may suggest. The running count
-    // spans tool calls on purpose: it is the SESSION's (EngineSession, the
-    // MCP server's, handed in), and "3rd this session" is what makes a finite
-    // resource budgetable.
-    if (spec.clearState) {
-      const count = this.session.recordClearState();
-      this.log(
-        '⚠ clearState',
-        'app state wiped (data container deleted) — anything the app persisted, ' +
-          `a device registration included, is gone (${count} this session)`,
-      );
-    }
+    this.log('launch', launchedLine(launched));
+    if (launched.note !== undefined) this.log('⚠ launch', launched.note);
+    if (launched.wiped !== undefined) this.log('⚠ clearState', launched.wiped);
   }
 
   private async runType(spec: StepPayload<'type'>): Promise<void> {

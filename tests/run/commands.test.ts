@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AveriConfig } from '../../src/flow/config.js';
-import { EngineSession } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { loadForCall, REQUIRED_CONFIG_AND_ENV } from '../../src/flow/tool-config.js';
 import {

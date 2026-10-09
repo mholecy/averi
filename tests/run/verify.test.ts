@@ -5,7 +5,7 @@ import { PNG } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { EngineSession } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
 import {
   appHealth,
   assertSummary,

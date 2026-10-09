@@ -60,7 +60,7 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
  * (LaunchOutcome.note, 2026-10-09 — today iOS's foreground wait, when the
  * tree was not seen to be the launched app's: adapters/ios-foreground.ts),
  * laid out as swipeText lays out its note. The flow's `⚠ launch` trace line
- * carries the same words (flow/engine.ts#runLaunch).
+ * carries the same words (flow/launch.ts).
  */
 export const launchText = (launch: {
   appId: string;

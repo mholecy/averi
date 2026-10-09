@@ -11,7 +11,8 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, EngineSession, FlowError, idbContainerIdHint, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, idbContainerIdHint, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 

@@ -7,7 +7,8 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setT
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, EngineSession, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
 
 /**

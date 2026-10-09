@@ -21,13 +21,8 @@ import { formatSeconds } from '../util/duration.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
-import {
-  baselineDirFor,
-  EngineSession,
-  runAsserts,
-  runEnsureState,
-  runNamedFlow,
-} from '../run/commands.js';
+import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run/commands.js';
+import { EngineSession } from '../flow/launch.js';
 import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
@@ -188,7 +183,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   const registerTool: typeof server.registerTool = server.registerTool.bind(server);
 
   // The session's state that outlives one engine run — the clearState count
-  // (flow/engine.ts#EngineSession, made through run/commands.ts). One per server: the server IS the
+  // (flow/launch.ts#EngineSession). One per server: the server IS the
   // session. Every tool that runs the engine (ensure_state, run_flow, verify)
   // hands it down; until 2026-10-07 it was a module global in the engine,
   // shared by every server in the process.
