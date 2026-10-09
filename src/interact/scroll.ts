@@ -1,12 +1,11 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { readTreeOrError, showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
-import { largestScroller, scrollersOf } from '../ui-tree/geometry.js';
+import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
-import { dragMs, judgingScreen, screenBox, scrollStroke, type Direction } from './swipe.js';
+import { dragMs, screenBox, scrollStroke, type Direction, type ScreenBox } from './swipe.js';
 
 export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
 
@@ -182,7 +181,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   above it between two reads, in none — `Display` two rows below the fold
  *   was never reached. Each stroke is now drawn over the target's scroll
  *   container (the screen's largest before the target is read in one;
- *   swipe.ts#scrollStroke), its length the container's, and on an adapter
+ *   the round decides the box, swipe.ts#strokeRoom, above the keyboard),
+ *   its length the container's, and on an adapter
  *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
  *   time it costs against the 15 s default is on adapters/android.ts
  *   #dragSpeed; the default is unchanged.
@@ -202,12 +202,13 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md):
  * uiautomator cuts each node's bounds to its scroll container, so a row
  * half behind a pinned bar read whole and `fully: true` said "fully visible
- * after 0 swipes". Each round hands the reducer every match's nearest
- * clipping ancestors (ui-tree/geometry.ts#scrollersOf, over the
- * `clipsDescendants` the parser sets), and a `fully: true` stop flush with
+ * after 0 swipes". Each round hands the reducer its tree, from which it
+ * reads every match's nearest clipping ancestors (ui-tree/geometry.ts
+ * #scrollersOf, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
  * one of them is answered with one short probe toward that edge, drawn over
- * a container with room for it (scroll-rounds.ts#PROBE_REACH has the rule and its cost;
- * swipe.ts#scrollStroke the box). Only the box comes from here.
+ * a container with room for it above the keyboard (scroll-rounds.ts
+ * #PROBE_REACH has the rule and its cost; swipe.ts#strokeRoom the box).
+ * Only the screen box comes from here — the round decides the stroke's.
  *
  * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
  * method says shown, the window state gives it no area: one still coming
@@ -246,6 +247,21 @@ export async function scrollUntilVisible(
     // A failed read is a miss, not a failure — see readTreeOrError.
     const read = await readTreeOrError(adapter);
     const { tree } = read;
+    // The round's screen box (swipe.ts#screenBox), read once and handed to
+    // the round whole (`RoundSeen.screen`): the frame it judges in and the
+    // gesture box it decides the stroke's box over.
+    // Oriented by this round's tree; after a failed read, the device box
+    // as built (its note is not reported here, the stop already quotes the
+    // read error); the device size is memoized. When there is none it does
+    // not throw here: the round judges on, and only a stroke — which needs
+    // a box — throws its error.
+    let screen: ScreenBox | undefined;
+    let noBox: unknown;
+    try {
+      screen = await screenBox(adapter, read);
+    } catch (e) {
+      noBox = e;
+    }
     // The keyboard this round, off this round's tree (no subject: every
     // match is judged against it, the keyboard's own exempted). ONE reading
     // a round, never held across rounds (ui-tree/keyboard-cover.ts): the
@@ -262,25 +278,23 @@ export async function scrollUntilVisible(
       // that returned nothing is a miss, as every failed read is.
       seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0 };
     } else {
-      const screen = await judgingScreen(adapter, read);
       const found = findTarget(tree, target);
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
-      const mainScroller = largestScroller(tree);
+      // The tree itself: what the round asks of it — the matches' clipping
+      // ancestors, the largest scroller, the fingerprint, progress — it
+      // derives (scroll-rounds.ts#TreeFacts); nothing to hand in or forget.
       seen = {
         read: {
+          tree,
           found,
           ofKeyboard: reading.ofKeyboard,
-          scrollersOf: scrollersOf(tree),
-          fingerprint: treeFingerprint(tree),
-          loading: showsProgress(tree),
-          ...(mainScroller !== undefined && { mainScroller }),
-          ...(screen !== undefined && { screen }),
           ...(cover !== undefined && { cover }),
         },
         elapsedMs: 0,
       };
     }
+    if (screen !== undefined) seen.screen = screen;
     if (drawn !== undefined) seen.drawn = drawn;
     drawn = undefined;
     // The clock is stamped on every call, re-entry included: a witness that
@@ -300,13 +314,11 @@ export async function scrollUntilVisible(
       throw scrollFailure(outcome, describe);
     }
     if (step.do === 'stroke') {
-      // The gesture's box is swipe.ts#screenBox's — the same owner as a
-      // `swipe:` step's, oriented by this round's tree (after a failed read:
-      // the device box as built; its note is not reported here, the stop
-      // already quotes the read error). Worked out per swipe because the
-      // round's tree is the witness; the device size is memoized. A 0×0
-      // viewport does not throw above (pre-existing): the stroke then falls
-      // back to the tree's window while the stop still judges against 0×0.
+      // The stroke's box is the round's (`step.box`, swipe.ts#strokeRoom over
+      // this round's screen box): the target's scroll container met with the
+      // screen box and kept above the keyboard, or the screen box whole —
+      // decided once, there; here it only becomes points (scrollStroke, which
+      // judges nothing). No box: this round had no screen box to stroke in.
       // `toward` names where the CONTENT lies — the finger moves the other
       // way (content below → finger up). See swipeVector. Under a cover the
       // stroke is `swipeVectorAbove` (2026-10-08, the iOS device check): the
@@ -315,18 +327,19 @@ export async function scrollUntilVisible(
       // box above it alone touched down in the app's top bar for a
       // content-up scroll. The round says which cover (`coverTop`): this
       // round's, or — on a round whose tree did not read — the last read
-      // round's. `within` (the flush check's probe, 2026-10-09): over the
-      // target's scroll container, so it touches down on what scrolls
-      // (swipe.ts#scrollStroke has the measured why).
+      // round's. A 0×0 viewport does not throw above (pre-existing): the
+      // stroke then falls back to the tree's window while the stop still
+      // judges against 0×0.
       // Drawn at the adapter's drag speed when it has one (Android, since
       // 2026-10-09: adapters/android.ts#dragSpeed has the measured fling and
       // the time it costs), so one stroke moves the content about its own
       // length and a row cannot cross the list between two reads; else at
       // the adapter's default duration, as before (iOS).
-      const { box } = await screenBox(adapter, read);
-      drawn = scrollStroke(box, step);
+      const { box } = step;
+      if (box === undefined || screen === undefined) throw noBox;
+      drawn = scrollStroke({ ...step, box });
       if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
-      else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, box));
+      else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.box));
     }
     await sleep(settleMs);
   }

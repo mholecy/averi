@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, strokeRoom, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -326,25 +326,19 @@ describe('sameStroke — the same touch-down and lift-off, point for point (code
   });
 });
 
-describe('scrollStroke — the scroll step\'s stroke, over the target\'s scroll container when it names one (2026-10-09)', () => {
+describe('scrollStroke — the scroll step\'s stroke over the box the round decided (2026-10-09; it judges nothing since deep/r3-scroll)', () => {
   const BOX = { x: 0, y: 0, width: 1080, height: 2220 };
   const SETTINGS = { x: 0, y: 737, width: 1080, height: 1417 };
-  it('without `within`: the box\'s stroke, as before (swipeVector, swipeVectorAbove, shortenStroke)', () => {
-    expect(scrollStroke(BOX, { toward: 'down', reach: 1 })).toEqual(swipeVector(BOX, 'down', 'content'));
-    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398 })).toEqual(swipeVectorAbove(BOX, 1398, 'down', 'content'));
-    expect(scrollStroke(BOX, { toward: 'down', reach: 0.5 })).toEqual(shortenStroke(swipeVector(BOX, 'down', 'content'), 0.5, 2220));
+  it('over the screen box: the box\'s stroke, as before (swipeVector, swipeVectorAbove, shortenStroke)', () => {
+    expect(scrollStroke({ toward: 'down', reach: 1, box: BOX })).toEqual(swipeVector(BOX, 'down', 'content'));
+    expect(scrollStroke({ toward: 'down', reach: 1, coverTop: 1398, box: BOX })).toEqual(swipeVectorAbove(BOX, 1398, 'down', 'content'));
+    expect(scrollStroke({ toward: 'down', reach: 0.5, box: BOX })).toEqual(shortenStroke(swipeVector(BOX, 'down', 'content'), 0.5, 2220));
   });
-  it('with `within`: over the container, so a content-up stroke touches down inside the list (1021), not on the header above it (444)', () => {
-    expect(scrollStroke(BOX, { toward: 'up', reach: 1 }).from.y).toBe(444);
-    expect(scrollStroke(BOX, { toward: 'up', reach: 1, within: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1871 } });
-    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } });
-  });
-  it('met with the box (a container reaching past the screen), clear of a cover inside it, and the box whole when the two do not meet or the cover starts above the container', () => {
-    const tall = { x: 0, y: 242, width: 1080, height: 5000 };
-    expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: tall })).toEqual(swipeVector({ x: 0, y: 242, width: 1080, height: 1978 }, 'down', 'content'));
-    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398, within: SETTINGS })).toEqual(swipeVectorAbove(SETTINGS, 1398, 'down', 'content'));
-    expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: { x: 0, y: 3000, width: 1080, height: 100 } })).toEqual(swipeVector(BOX, 'down', 'content'));
-    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 700, within: SETTINGS })).toEqual(swipeVectorAbove(BOX, 700, 'down', 'content'));
+  it('over a container\'s box: a content-up stroke touches down inside the list (1021), not on the header above it (444)', () => {
+    expect(scrollStroke({ toward: 'up', reach: 1, box: BOX }).from.y).toBe(444);
+    expect(scrollStroke({ toward: 'up', reach: 1, box: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1871 } });
+    expect(scrollStroke({ toward: 'up', reach: 0.25, box: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } });
+    expect(scrollStroke({ toward: 'down', reach: 1, coverTop: 1398, box: SETTINGS })).toEqual(swipeVectorAbove(SETTINGS, 1398, 'down', 'content'));
   });
 });
 
@@ -360,21 +354,38 @@ describe('dragMs — a stroke\'s duration at the adapter\'s drag speed (2026-10-
   });
 });
 
-describe('strokeBox and the travel cap — no stroke that is a tap (code review of fix/r3-scroll, 2026-10-09)', () => {
+describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one owner, and no stroke that is a tap (code review of fix/r3-scroll; deep/r3-scroll, 2026-10-09)', () => {
   const BOX = { x: 0, y: 0, width: 1080, height: 2220 };
-  it(`a box under MIN_STROKE_BOX (${MIN_STROKE_BOX}) along the stroke is no stroke box — 60 % of it is under twice TOUCH_SLOP — and scrollStroke falls back to the screen`, () => {
+  const SETTINGS = { x: 0, y: 737, width: 1080, height: 1417 };
+  it(`a box under MIN_STROKE_BOX (${MIN_STROKE_BOX}) along the stroke is no stroke box — 60 % of it is under twice TOUCH_SLOP`, () => {
     expect(MIN_STROKE_BOX).toBe(80);
     const strip = { x: 0, y: 1948, width: 1080, height: 30 };
     expect(strokeBox(BOX, strip, 'down')).toBeUndefined();
     expect(strokeBox(BOX, { ...strip, y: 1898, height: 80 }, 'down')).toEqual({ ...strip, y: 1898, height: 80 });
     expect(strokeBox(BOX, strip, 'left')).toEqual(strip); // 1080 wide: room for a sideways stroke
-    expect(scrollStroke(BOX, { toward: 'down', reach: 0.25, within: strip })).toEqual(scrollStroke(BOX, { toward: 'down', reach: 0.25 }));
     // Above a keyboard, only the part above it counts.
     expect(strokeBox(BOX, { x: 0, y: 1300, width: 1080, height: 600 }, 'down', 1350)).toBeUndefined();
   });
+  it('met with the box (a container reaching past the screen), above a cover inside it; no room when the two do not meet or the cover starts above the container', () => {
+    expect(strokeBox(BOX, { x: 0, y: 242, width: 1080, height: 5000 }, 'down')).toEqual({ x: 0, y: 242, width: 1080, height: 1978 });
+    expect(strokeBox(BOX, SETTINGS, 'down', 1398)).toEqual(SETTINGS); // the box is the container's; the stroke keeps clear of the cover (scrollStroke)
+    expect(strokeBox(BOX, { x: 0, y: 3000, width: 1080, height: 100 }, 'down')).toBeUndefined();
+    expect(strokeBox(BOX, SETTINGS, 'down', 700)).toBeUndefined();
+  });
+  it('strokeRoom: the FIRST candidate with room, nearest first — the candidate as given and the box met with the screen — or none (no room): a list running on under the IME from 58 px above it has room on the screen, none above the keyboard', () => {
+    const strip = { x: 0, y: 1948, width: 1080, height: 30 };
+    const list = { x: 0, y: 242, width: 1080, height: 5000 };
+    expect(strokeRoom(BOX, [strip, list], 'down')).toEqual({ within: list, box: { x: 0, y: 242, width: 1080, height: 1978 } });
+    expect(strokeRoom(BOX, [strip], 'down')).toBeUndefined();
+    expect(strokeRoom(BOX, [], 'down')).toBeUndefined();
+    const under = { x: 0, y: 1340, width: 1080, height: 800 };
+    expect(strokeRoom(BOX, [under], 'up')).toEqual({ within: under, box: under });
+    expect(strokeRoom(BOX, [under], 'up', 1398)).toBeUndefined();
+    expect(strokeRoom(BOX, [under, SETTINGS], 'up', 1398)).toEqual({ within: SETTINGS, box: SETTINGS });
+  });
   it('maxTravel caps the finger\'s travel, the touch-down kept, never under twice TOUCH_SLOP', () => {
     const list = { x: 0, y: 242, width: 1080, height: 1736 };
-    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: list, maxTravel: 177 })).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 766 } });
-    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: list, maxTravel: 10 }).to.y).toBe(589 + 52); // the 3 %-of-side floor, 52 px
+    expect(scrollStroke({ toward: 'up', reach: 0.25, box: list, maxTravel: 177 })).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 766 } });
+    expect(scrollStroke({ toward: 'up', reach: 0.25, box: list, maxTravel: 10 }).to.y).toBe(589 + 52); // the 3 %-of-side floor, 52 px
   });
 });

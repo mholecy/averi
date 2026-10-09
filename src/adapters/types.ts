@@ -265,9 +265,9 @@ export interface UiNode {
    * container's edge — measured on the SWIFT form, container
    * `[0,242][1080,1978]`, a 143-px row read `{y:242, height:92}` — and
    * nothing in the rect says the rest exists. Read by
-   * ui-tree/geometry.ts#scrollersOf, which hands `scroll_until` each match's
-   * such ancestors so a `fully: true` stop flush with one is checked
-   * before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
+   * ui-tree/geometry.ts#scrollersOf, which `scroll_until`'s round asks for
+   * each match's such ancestors so a `fully: true` stop flush with one is
+   * checked before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
    *
    * A flag, not a role (decided 2026-10-09): mapping a Compose scroller to
    * `scrollable` would change three things this fix does not want to touch —
