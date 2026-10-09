@@ -111,6 +111,7 @@ Failure lines:
 
 ## Launch and logs
 
+- **iOS `⚠ … after launching <app>, the UI tree was still …`** (the second line of a `launch_app` reply, or a `⚠ launch` trace line): averi waited 3 s for the tree to show the launched app and it still showed another app, or SpringBoard. A read now may judge the wrong app, and an `absent` check would pass on it. Take a `screenshot`. If it shows the launched app, its on-screen name differs from its Info.plist name (a localized display name) and you can go on. Otherwise read again before you trust the tree.
 - **Launch opened LeakCanary (or another launcher)**: set `app.android.activity`.
 - **`Android started no activity in <package> for this intent`**: no exported activity matches the intent, or the matching one refused it. The quoted `am start said:` line tells which.
 - **`get_logs`**: always pass `grep`, a case-insensitive regex. Only the last `maxLines` (400) come back, and the header says how many matched. Narrow the regex before you widen the tail.
