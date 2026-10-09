@@ -897,7 +897,7 @@ describe('fillField — a field that shows its hint or placeholder as its value 
       const { fake } = hintedField('', { hint: 'Company', named: true });
       const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
       expect(fake.deletes).toEqual([]);
-      expect(result).toMatchObject({ cleared: 0, readBack: { kind: 'placeholder' } });
+      expect(result).toMatchObject({ cleared: 0, clearPlaceholder: 'shown', readBack: { kind: 'nothing-typed' } }); // the facts; judgeFill makes them the placeholder reason
       expect(fillReply(result, 'id:last_name')).toBe(
         "Focused id:last_name — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
       );
@@ -1095,7 +1095,7 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([10]);
     expect(real()).toBe('Company'); // held, not the placeholder
-    expect(result).toMatchObject({ cleared: 10, readBack: { kind: 'placeholder' } });
+    expect(result).toMatchObject({ cleared: 10, clearPlaceholder: 'prefix', readBack: { kind: 'nothing-typed' } });
     expect(fillReply(result, 'id:last_name')).toBe(
       "Cleared id:last_name (10 deletes sent) — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
     );

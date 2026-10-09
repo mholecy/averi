@@ -84,7 +84,12 @@ import { heldText, type Difference, type FillResult, type LostWhy, type NearbyIn
  * - `clear-no-length`: the clear sent no delete because the node gave no
  *   length at all (`cleared: 0` on a `no-value` read-back).
  * - `placeholder`: the field shows exactly its named placeholder — empty,
- *   or holding that very text (ReadBack `placeholder`).
+ *   or holding that very text: the read-back after typing (ReadBack
+ *   `placeholder`), or a clear alone that ended on it without seeing the
+ *   field empty (`clearPlaceholder` `shown` or `prefix`; never `other`).
+ *   Decided here since 2026-10-09 (the fill-clear deepening): until then
+ *   fill.ts folded seven conditions into a `placeholder` read-back of its
+ *   own for the clear alone.
  * - `clear-unchanged`: the clear's last deletes left the field showing the
  *   same `shows` characters (`clearUnchanged`) — its hint or placeholder
  *   on an empty field, or a field ignoring deletes; nothing saw it empty.
@@ -146,7 +151,7 @@ export function judgeFill(r: FillResult): FillVerdict {
   if (readBack.kind === 'no-value') reasons.push({ code: 'no-value', role });
   if (readBack.kind === 'not-taken') reasons.push({ code: 'not-taken', role });
   if (readBack.kind === 'lost') reasons.push({ code: 'lost', why: readBack.why });
-  if (readBack.kind === 'placeholder') reasons.push({ code: 'placeholder' });
+  if (readBack.kind === 'placeholder' || (readBack.kind === 'nothing-typed' && clearSawNoEmpty(r.clearPlaceholder))) reasons.push({ code: 'placeholder' });
   if (readBack.kind !== 'landed') {
     if (cleared === 'unmeasured') reasons.push({ code: 'clear-unmeasured', role });
     else if (r.clearUnchanged !== undefined) reasons.push({ code: 'clear-unchanged', shows: r.clearUnchanged.shows });
@@ -178,6 +183,19 @@ export function judgeFill(r: FillResult): FillVerdict {
     note: r.note,
   };
 }
+
+/**
+ * A clear that ended on exactly the named placeholder did NOT see the field
+ * empty when the placeholder was there before any delete (`shown`: nothing
+ * was deleted, so nothing was seen go) or the last deletes went into a
+ * reading that started with its text (`prefix`: deletes go from the end, so
+ * `Companyabc` with 3 of 10 landing leaves `Company` — review round 2,
+ * probe K). From any other reading (`other`) the placeholder can only be
+ * the field showing empty, and the clear is verified. Only a clear alone
+ * asks (read-back `nothing-typed`): with a value, the exact read-back
+ * decides.
+ */
+const clearSawNoEmpty = (end: FillResult['clearPlaceholder']): boolean => end === 'shown' || end === 'prefix';
 
 /**
  * A read-back that missed the value, as fillField saw it — the strings

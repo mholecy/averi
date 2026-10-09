@@ -286,20 +286,10 @@ export async function fillField(
   // says "did not change" when it still shows exactly this.
   const shownBeforeTyping = current?.value ?? null;
   await startTyping(value);
-  // A clear alone that ended on exactly its named placeholder, either shown
-  // before any delete or deleted into from a reading that started with it
-  // (fill-clear.ts, ClearFacts `placeholder`): empty, or holding that very
-  // text — the tree cannot tell (review of this branch, probes C and K).
-  // Not verified. A field cleared INTO its placeholder from a reading that
-  // did not start with it was seen to empty, and is.
-  const showsOnlyPlaceholder =
-    value === '' && clearEnd?.kind === 'empty' && (clearEnd.placeholder === 'shown' || clearEnd.placeholder === 'prefix');
-  let readBack: ReadBack =
-    value === '' && clearEnd?.kind === 'lost'
-      ? { kind: 'lost', why: clearEnd.why }
-      : showsOnlyPlaceholder
-        ? { kind: 'placeholder' }
-        : { kind: 'nothing-typed' };
+  // Nothing typed: the clear's lost field is the read-back's (nothing saw it
+  // empty); a clear that ended on its placeholder is reported as a fact
+  // (`clearPlaceholder`) and judged by judgeFill.
+  let readBack: ReadBack = value === '' && clearEnd?.kind === 'lost' ? { kind: 'lost', why: clearEnd.why } : { kind: 'nothing-typed' };
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -408,6 +398,7 @@ export async function fillField(
     typed: value.length,
     cleared,
     clearUnchanged,
+    clearPlaceholder: clearEnd?.kind === 'empty' ? clearEnd.placeholder : undefined,
     readBack,
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };

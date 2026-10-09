@@ -154,6 +154,24 @@ describe('judgeFill — what the facts mean', () => {
     for (const [f, sent] of rows) expect([f, judgeFill(fact(f)).sent]).toEqual([f, sent]);
   });
 
+  // Review of the hint-aware clear, probes C and K: a clear alone that ended
+  // on its named placeholder without seeing the field empty. fill.ts reports
+  // the fact (clearPlaceholder); the judgement is here since 2026-10-09.
+  it('clearPlaceholder: `shown` and `prefix` make a clear alone NOT verified (placeholder); `other`, or anything typed, does not', () => {
+    const rows: [Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>, Pick<FillVerdict, 'did' | 'sent' | 'reasons'>][] = [
+      // C: the field read its placeholder before any delete — nothing sent.
+      [{ typed: 0, readBack: nothingTyped, cleared: 0, clearPlaceholder: 'shown' }, { did: 'focused', sent: undefined, reasons: [{ code: 'placeholder' }] }],
+      // K: the deletes went into `Companyabc` and left `Company`.
+      [{ typed: 0, readBack: nothingTyped, cleared: 10, clearPlaceholder: 'prefix' }, { did: 'cleared', sent: { what: 'deletes', n: 10 }, reasons: [{ code: 'placeholder' }] }],
+      // Deleted INTO the placeholder from `Zed`: seen empty.
+      [{ typed: 0, readBack: nothingTyped, cleared: 3, clearPlaceholder: 'other' }, { did: 'filled', sent: { what: 'characters', n: 3 }, reasons: [] }],
+      // With a value the exact read-back decides, whatever the clear ended on.
+      [{ typed: 4, readBack: landed, cleared: 10, clearPlaceholder: 'prefix' }, { did: 'filled', sent: { what: 'characters', n: 10 }, reasons: [] }],
+      [{ typed: 0, readBack: { kind: 'lost', why: 'unmatched' }, cleared: 0, clearPlaceholder: 'shown' }, { did: 'focused', sent: undefined, reasons: [{ code: 'lost', why: 'unmatched' }] }],
+    ];
+    for (const [f, v] of rows) expect([f, judgeFill(fact(f))]).toMatchObject([f, v]);
+  });
+
   it('the invariants hold over every read-back, clear and length combination', () => {
     const readBacks: FillResult['readBack'][] = [landed, { kind: 'no-value' }, { kind: 'not-taken' }, { kind: 'lost', why: 'unmatched' }, nothingTyped, { kind: 'placeholder' }];
     const clears: FillResult['cleared'][] = [undefined, 0, 3, 'unmeasured'];
