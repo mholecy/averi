@@ -9,9 +9,30 @@
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the
  * deepening series, S8).
+ *
+ * One function lives here beside the types, `heldText`: not a judgement but
+ * the DEFINITION every measurement of a field is taken in — what it holds as
+ * opposed to what it shows — so the driver (fill.ts) and the clear's rules
+ * (fill-clear.ts) count the same characters (2026-10-09, the fill-clear deepening; it was a
+ * closure inside fillField until then, and only fillField could ask it).
  */
 
 import type { Rect } from '../adapters/types.js';
+
+/**
+ * What a field HOLDS, as opposed to what it SHOWS: a reading exactly equal
+ * to the placeholder the tree source names (UiNode.placeholder — WDA's
+ * placeholderValue, a dump's hint) is an empty field, and so is no reading.
+ * Every source reports an empty field's placeholder as its value (measured
+ * 2026-10-09, both platforms: docs/bugs/2026-10-09-android-clear-reads-
+ * edittext-hint-as-content.md), and the clear counted it as content to
+ * delete. Exact equality, and a known cost: a field that really holds the
+ * text of its own placeholder reads as empty — the tree cannot tell the two
+ * apart. Where the source names no placeholder (idb, the API 33 dump), the
+ * clear's unchanged-reading rule (fill-clear.ts) is what catches a hint.
+ */
+export const heldText = (shown: string | null | undefined, placeholder: string | undefined): string =>
+  shown === undefined || shown === null || shown === placeholder ? '' : shown;
 
 /**
  * An input on the screen near a matched node that is not one — what the
