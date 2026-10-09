@@ -388,3 +388,87 @@ IME up after `type_text` into the amount (`ITYPE_IME frame=[0,1398][1080,2220] v
   clips each node to its scrollable (`bounds="[0,242][1080,1978]"`), so a `fully: true` stop against either edge of a Compose
   scroll container is not proof. A height check against siblings is not available from the tree; the scrollable's own bounds
   are (both cuts sit exactly on them).
+
+## Device check (2026-10-09 Android, re-run at 347e70d)
+
+Measured 11:30–11:42 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi = mobile-verify `fix/round-3` @
+`347e70d` (`dist/` built 11:21 UTC, stdio, cwd mp-native). Fixtures: mp-native SWIFT form (IBAN focused, holding
+`AT611904300234573201`; IME `[0,1398][1080,2220]`, `mInputShown=true` before and after every call), Google Contacts "Create contact"
+(`First name` focused; Gboard `[0,1398]`, growing to `[0,1285]` with its suggestion strip). Strokes from the `adb` shim. Handoff items j
+(SWIFT IME-up), g, h and §4.
+
+- **Holds (j) — `my_note_input`.** 11:30:38 `scroll_until { selector: "id:swift_payment.form.my_note_input", fully: true }` →
+  ```
+  scroll_until id:swift_payment.form.my_note_input failed after 5 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 6 of the 6 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again
+  ```
+  (17.9 s; at 610660f 3 swipes / 10.5 s). Strokes `input swipe 540 1167 540 473 695` ×5 — 694 px at 695 ms each (drag, not fling), so
+  3 strokes to the end of the form instead of 1, then the 2 unmoved. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-46-0.png`: keyboard up, form at its end.
+- **Holds (j) — `debit_select` up, with a still-moving note.** 11:31:09 `scroll_until { selector: "id:swift_payment.form.debit_select",
+  direction: "up", fully: true }` → `Element id:swift_payment.form.debit_select fully visible after 4 swipes; still moving at the last read
+  (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match` (16.6 s). Strokes `540 589 540 1167 579`
+  ×3, then `540 589 540 734 300` (145 px — the shortened stroke). debit_select `66,286 948x297` after (the form's top); screenshot
+  `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-49-0.png` shows it whole, IBAN unchanged (the screenshot itself warned "did not settle", the caret). The `settled: false` is
+  the one-off kind handoff §3 lists; probably the top-edge stretch overscroll still animating at the last read — not chased.
+- **Holds (g) — Contacts, strokes over the editor's container above the IME.** `First name` focused (the editor's scroll container
+  resizes to the IME: `0,242 1080x1156`, later `0,242 1080x1043`). 11:40:51 `scroll_until { selector: 'text:"Notes"', fully: true }` →
+  `Element text:"Notes" fully visible after 3 swipes` (16.2 s): `540 1167 540 473 695` ×2, then `540 1077 540 921 300` (Gboard had
+  grown to 1285; 1077 = 242 + 0.8 × 1043). 11:41:23 `text~"[Ff]ields"` → `Element text~"[Ff]ields" fully visible after 1 swipe` (7.6 s),
+  `540 1077 540 451 627`. 11:41:38 `text:"First name"` up → `fully visible after 2 swipes` (10.8 s), `540 451 540 1077 627` ×2. No
+  stop said "judged above the soft keyboard" — the container already ends at the IME top, so the band never changed a stop (the
+  plain wording is the expected one then). Every stroke inside the container and above the IME top of its round.
+- **Not reached (g) — sibling case.** No screen with two scrollers (a form over a list) was found on these fixtures.
+- **Holds (h) — nothing typed.** After every IME-up run: IBAN still `AT611904300234573201` (tree `val`, screenshots 46/49), Contacts
+  `First name` still its hint (`val='First name'`), bank search field empty; the shim shows only `input swipe` lines during these
+  calls — no `keyevent` or `input text` I did not send. Both ends of every stroke lie above the IME top (table below).
+
+### §4 — stroke y vs the IME top (every IME-up stroke of this run)
+
+| time | call | stroke (shim) | length, ms | IME top | container (tree) |
+|---|---|---|---|---|---|
+| 11:30:40 ×5 | SWIFT `my_note_input` | 540 1167 → 540 473 | 694, 695 | 1398 | 0,242 1080x1736 |
+| 11:31:11 ×3 | SWIFT `debit_select` up | 540 589 → 540 1167 | 578, 579 | 1398 | 0,242 1080x1736 |
+| 11:31:23 | (same, shortened) | 540 589 → 540 734 | 145, 300 | 1398 | 0,242 1080x1736 |
+| 11:34:55 | SWIFT `fees_select`, Gboard FLOATING | 540 1064 → 540 448 | 616, 617 | 1269 (panel top) | 0,242 1080x1736 |
+| 11:36:00 | Account Detail `filter_panel` probe (f contrast) | 540 1104 → 540 1152 | 48, 300 | 1398 | 0,825 1080x1395 |
+| 11:40:53 ×2 | Contacts `Notes` | 540 1167 → 540 473 | 694, 695 | 1398 | 0,242 1080x1156 |
+| 11:41:02 | (same, shortened) | 540 1077 → 540 921 | 156, 300 | 1285 | 0,242 1080x1043 |
+| 11:41:25 | Contacts `Add fields` | 540 1077 → 540 451 | 626, 627 | 1285 | 0,242 1080x1043 |
+| 11:41:40 ×2 | Contacts `First name` up | 540 451 → 540 1077 | 626, 627 | 1285 | 0,242 1080x1043 |
+
+Reading: on the SWIFT form and Contacts the strokes are 0.8/0.2 (0.3/0.8 for content-up) of the container cut at the IME top
+(242 + 0.8 × 1156 = 1167; 242 + 0.8 × 1027 = 1064 floating), so cutting the box earlier would change nothing there. The one stroke drawn
+from the UNCUT box is the Account Detail probe: its touch-down 1104 is 0.2 of the whole container (825 + 0.2 × 1395) and its lift-off is
+held at 1152, a 48-px probe where the same row with the keyboard down got 177 px (`540 1104 540 1281`). That is the case where cutting the
+box at the keyboard first would change the stroke's length.
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52 (with the hardware-keyboard prefs off), PIN-only
+`login_pin_ios_here` (11:37:11, `branch: matched state logged_in`), Account Detail → PAY → SWIFT payment.
+
+iOS WDA, keyboard up, a target under it / below the fold.
+
+- **Holds — SWIFT form** (scratch `treeSource: wda`, decimal pad up after a focus tap on the amount, `keyboard 0 572 402 302`;
+  target `payee_country_select 24 1005 354 52`):
+  ```
+  11:38:50 scroll_until { selector: "id:swift_payment.form.payee_country_select", fully: true }                    (8.0 s)
+  → Element id:swift_payment.form.payee_country_select fully visible after 1 swipe
+  shim: 11:38:52 ui swipe 201 458 201 114 --duration 0.3          (both ends above the keyboard top 572)
+  ```
+  After: target `24 306 354 52` (bottom 358 < 572), the pad still up, the amount field empty (no key typed). Screenshot
+  `run5-ios/img-105-0.png`.
+- **Holds — Contacts "New Contact"** (keyboard `0 573 402 301`, target the cell `container 'add related name' 20 1171 362 52`):
+  `11:35:11 scroll_until { selector: 'role:container label:"add related name"', fully: true }` → `Element … fully visible after
+  1 swipe` (17.7 s); shim `11:35:14 ui swipe 201 459 201 115 --duration 0.3`; after: `20 342 362 52`. UIKit dismissed the
+  keyboard on the drag (`0 matches for role:keyboard` after; the sheet's own behaviour).
+- **New, not a regression of this fix — a false `fully visible after 0 swipes` under WDA** for the same row's TEXT
+  (`role:text text:"add related name"`, 11:34:15, 3.4 s, no swipe): WDA lists an off-screen cell's StaticText at a parked frame
+  `0,62 286x22` inside the viewport. Filed as
+  [2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md](2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md).
+- Seen on the idb side, by design (the tool description states idb reads no keyboard): `scroll_until
+  id:swift_payment.form.debit_select direction: up fully: true` (11:39:21, default idb; the decimal pad was up at the last WDA
+  read, ~11:39:00, and nothing hid it in between) swiped
+  `201 175 → 201 699` — lift-off inside the keyboard band; nothing was typed (amount still empty after).

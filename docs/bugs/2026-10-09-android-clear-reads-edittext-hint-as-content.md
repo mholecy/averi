@@ -117,3 +117,83 @@ after clearing twice`. The failure needs a field whose tree exposes its placehol
 text (`textfield None … None`; placeholders `BIC*`, `IBAN*` on screen), and `clear: true` with empty text on the empty BIC →
 `Filled id:swift_payment.form.bic_input (0 characters)` in 6.9 s, no delete sent (same through a flow `fill`). Compose
 `TextField` placeholders are not reported as the node's text; the bug stays specific to classic `EditText` hints.
+
+## Device check (2026-10-09 Android, re-run at 347e70d)
+
+Measured 11:29–11:40 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd mp-native). Fixtures: Settings search
+(`id:open_search_view_edit_text`, hint "Search settings", 15 chars), Google Contacts "Create contact" editor ("Last name", 9 chars;
+no resource-ids, selected as `role:textfield label~"^(Q|Probe|Last name)$"` so one selector matches every state), the mp-native SWIFT
+form. Keys from the `adb` shim (`keyevent 123` = MOVE_END, `67` = DEL, `112` = FORWARD_DEL; one delete "round" = MOVE_END + N×DEL +
+N×FORWARD_DEL).
+
+- **Holds — empty field + value (probe J).** 11:37:17 `type_text { selector: "id:open_search_view_edit_text", text: "wifi", clear: true }`
+  → `Filled id:open_search_view_edit_text (4 characters)` (13.5 s). Shim: `tap 540 154`, `keyevent 123`, 15×`67`, 15×`112`, then
+  `w` `i` `f` `i`, `21` `22` — ONE round of 15, no "cleared … first". Tree after: `val='wifi'`.
+- **Holds — field holding text.** "Last name" holding `Q` (typed by hand): 11:39:39 `type_text { selector: <above>, text: "Probe", clear: true }`
+  → `Filled role:textfield label~"^(Q|Probe|Last name)$" (5 characters, cleared 1 character first)` (15.5 s). Shim: `123`, 1×`67`,
+  1×`112`, `123`, 9×`67`, 9×`112`, then `P r o b e` — deletes **1 then 9**. Tree after: `val='Probe'`.
+- **Holds — clear alone.** Settings search holding `wifi`: 11:37:40 `text: "", clear: true` → `Cleared id:open_search_view_edit_text (19
+  deletes sent) — NOT verified: the field still shows 15 characters that the deletes did not change — its hint or placeholder (shown
+  while empty), or a field that ignores deletes` (14.2 s; shim 4+4, then 15+15). Again on the now-empty field, 11:37:56 → the same text
+  with `(15 deletes sent)` (12.1 s; one round of 15). "Last name" holding `Probe`: 11:40:01 → `Cleared … (14 deletes sent) — NOT
+  verified: the field still shows 9 characters that the deletes did not change — …` (14.1 s; 5+5, then 9+9); empty, 11:40:18 → `(9
+  deletes sent)`, same wording (11.6 s). The hint showed afterwards each time (`val='Search settings'` / `'Last name'`).
+- **Holds — bank SWIFT form regression.** 11:29:17 `type_text { selector: "id:swift_payment.form.bic_input", text: "", clear: true }` on the
+  empty BIC → `Filled id:swift_payment.form.bic_input (0 characters)` (6.9 s); shim: `input tap 540 1073` only, no delete.
+- **Holds — IBAN clear over a value (handoff j).** IBAN holding `AT611904300234573201` (20 chars, typed by `type_text` at 11:29:32):
+  11:29:54 `type_text { selector: "id:swift_payment.form.iban_input", text: "AT611904300234573201", clear: true }` → `Filled
+  id:swift_payment.form.iban_input (20 characters, cleared 20 characters first)` (16.7 s). Shim: `tap 540 886`, `123`, 20×`67`, 20×`112`,
+  then the 20 characters, `21` `22` — one round of the value's length, no second round. Also 11:32:44 `DE89370400440532013000` over it →
+  `Filled … (22 characters, cleared 20 characters first)` (17.1 s).
+- **Not reached — masked field, focus missed.** No password field on these fixtures; the focus-miss shape was not produced (unit test "A" only).
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`.
+
+**WDA sends `placeholderValue` — yes.** Contacts "New Contact", Company empty (11:29:50, `curl -s
+'http://localhost:8100/source?format=json'`, `run5-ios/wda-src1.json`): 5 `placeholderValue` keys; the fields read
+`TextField 'Company' value 'Company' placeholderValue 'Company'`, `'First name'` likewise; the `Notes` TextView has
+`placeholderValue: None`.
+
+- **Holds — fill with clear on the empty placeholder field sends no delete:**
+  `11:30:16 run_flow fill_company` (`fill: { id: Company, value: "Acme", clear: true }`, scratch `treeSource: wda`) →
+  `fill: id:"Company" = Acme` / `done` (11.7 s). Shim: `11:30:23 ui tap 201 523`, `11:30:24 ui text Acme` — no `key-sequence`.
+- **Holds — clear holding text:** `11:30:41 run_flow clear_company` (`fill: { id: Company, value: "", clear: true }`) on `Acme` →
+  `fill: id:"Company" =  (cleared 4 characters first)` (17.0 s). Shim: `ui tap 201 500`, `ui key-sequence 42 42 42 42`,
+  `ui key-sequence 76 76 76 76` — one round of 4, no second round.
+- **Holds — clear alone on the empty field (placeholder named by the source):**
+  ```
+  11:31:18 type_text { platform: ios, selector: "id:Company", text: "", clear: true, configPath: <scratch wda> }   (13.5 s)
+  → Focused id:Company — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the
+    tree cannot tell which
+  ```
+  Shim: `11:31:27 ui tap 201 500` only, no delete. As a flow step (11:30:58, 13.3 s):
+  `⚠ fill: id:"Company" =  — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text;
+  the tree cannot tell which` / `done`. Screenshot `run5-ios/img-55-0.png`: Company empty, caret in it.
+
+**iOS idb counterpart of the unchanged-round rule (no placeholder in idb's tree) — Holds**, bank Account Detail search field
+(`textfield accounts.detail.search_field value 'Search'` while empty, 6 characters):
+
+```
+11:41:21 type_text { selector: "id:accounts.detail.search_field", text: "", clear: true }                            (3.3 s)
+→ Cleared id:accounts.detail.search_field (6 deletes sent) — NOT verified: the field still shows 6 characters that the deletes
+  did not change — its hint or placeholder (shown while empty), or a field that ignores deletes
+  shim: ui tap 175 91, ui key-sequence 42×6, ui key-sequence 76×6
+11:41:30 type_text { …search_field, text: "Loan", clear: true }                                                         (3.5 s)
+→ Filled id:accounts.detail.search_field (4 characters)
+  shim: ui tap 175 91, 42×6, 76×6, ui text Loan          (one round of 6, no "cleared … first")
+11:41:33 type_text { …search_field, text: "", clear: true }   (holding Loan)                                            (3.9 s)
+→ Cleared id:accounts.detail.search_field (10 deletes sent) — NOT verified: the field still shows 6 characters that the deletes
+  did not change — its hint or placeholder (shown while empty), or a field that ignores deletes
+  shim: ui tap 175 91, 42×4, 76×4, then 42×6, 76×6     (4 + 6 = 10, as on Android; no third round)
+```
+
+Screenshot `run5-ios/img-125-0.png`: the field empty (placeholder "Search").
+
+**Masked field, focus missed — Not reached** (iOS): no password field on the screens in reach (Contacts, bank logged in); the
+bank's "Password login" path was not entered, to keep the session.

@@ -139,3 +139,19 @@ recorded with an `idb` PATH shim.
 06:07:03  tap { selector: 'text:"Payee’s street"' }                        → Tapped (idb tap 94 194)
 06:07:04  type_text { text: "Hauptstrasse 1" }                              → field read `Hauptstrasse 1` at 42,191
 ```
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default `treeSource: idb`,
+`idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder: `scratchpad/averi-repo/run5-ios`.
+
+**Holds.** Bank Account Detail, list at the top; `transactions.list.row_6` in the tree at `24 971 354 52` (below 874):
+
+```
+11:41:18 tap { platform: ios, selector: "id:transactions.list.row_6" }                                        (1.2 s)
+→ [isError] id:transactions.list.row_6 is off screen at (201,997) on a 402x874 screen (rect 24,971 354x52) — scroll_until it
+  first; nothing was tapped
+```
+
+No idb tap in the shim log after 11:41:10 (the Discard tap); Account Detail unchanged (`run5-ios/img-121-0.png`).

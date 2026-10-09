@@ -40,3 +40,23 @@ reads in ~4 s).
 
 1. iOS, any UIKit text view with sentence auto-capitalisation (Contacts → + → Notes), `treeSource: wda`.
 2. `type_text { selector: "role:textfield label:Notes", text: "hello" }` → `typed 5 characters but the field shows 5`.
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`.
+
+**Holds.** Contacts "New Contact", scratch `treeSource: wda`, `Notes` scrolled into view first (`textfield 'Notes' 36 584 330 23`,
+empty, software keyboard parked):
+
+```
+11:35:53 type_text { platform: ios, selector: "role:textfield label:Notes", text: "hello", configPath: <scratch wda> }   (36.6 s)
+→ [isError] fill: typed 5 characters but the field shows 5 — the typed text is there but for letter case, 1 character
+  differing: the app transformed the input (auto-capitalisation?); content withheld from this error
+```
+
+idb shim: `11:36:02 ui tap 201 596`, `11:36:06 ui text hello`; then `textfield 'Notes' value 'Hello'`. No character or position
+named; the 36 s poll is the documented cost. The other kinds (`as many characters as were typed, K differing`, `the field did
+not change`) were not met.

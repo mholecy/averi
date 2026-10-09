@@ -156,3 +156,24 @@ Cleanup: `AutomaticMinimizationEnabled` was set back to `1`, and the `com.apple.
 after are identical. No xcodebuild, WebDriverAgent or server from this run is left. Ports 8100–8110 and 8199 are quiet.
 The other session's `npm exec averi@0.9.0` (pid 703/1199) was not touched. The iOS app is on the login screen; Android
 is on the login screen with empty fields.
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52, PIN-only `login_pin_ios_here` (11:37:11), Account
+Detail → PAY → SWIFT payment; default `treeSource: idb` unless stated.
+
+- **Not reached — `text: "", clear: true` on an EMPTY field under idb, expected `Filled … (0 characters)`, no delete.** On
+  the SWIFT form every empty input is `TextField id:'TextFieldWithComponentStyle' value null` (12 of them, ids shared with their
+  labels), and the selector grammar (`id/text/role/label/value`) has no way to name one (`role:textfield value:""` → 0 matches;
+  `role:textfield` → 12). Nearest measured:
+  `11:40:28 type_text { selector: 'text:"BIC*"', text: "", clear: true }` → `Focused text:"BIC*" — NOT verified: clear sent no
+  delete — a role text node's length is not the field's` + `⚠ the matched node is role text, not a textfield — nothing was
+  deleted, … the nearest input is textfield id:"TextFieldWithComponentStyle" at 42,395 318x20 …` (2.0 s; shim: `ui tap 59 435`
+  only, no delete). The empty fields that idb CAN name (bank search, Contacts) read their placeholder as the value, so they take
+  the unchanged-round path instead (see the 347e70d section of
+  [2026-10-09-android-clear-reads-edittext-hint-as-content.md](2026-10-09-android-clear-reads-edittext-hint-as-content.md)).
+- Under WDA the empty-with-placeholder case answers without a delete: `Focused id:Company — NOT verified: the field shows exactly
+  its placeholder's text …` (same note).

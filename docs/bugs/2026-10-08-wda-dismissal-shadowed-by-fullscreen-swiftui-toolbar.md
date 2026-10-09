@@ -202,3 +202,27 @@ opened (`priority_sheet.row_0/1` at y 456/502). The form's `scrollable 0 0 402 5
 - Odd, once: the very first WDA `tap id:swift_payment.form.amount_input` after the form opened (05:58:07) failed `Timed out after
   5000ms waiting for element … to hold still (found, but never at the same position in two consecutive reads)`; three reads
   right after gave the same rect `24 273 354 52`, and the retry at 05:58:31 tapped (3.1 s). Not reproduced.
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52 (with the hardware-keyboard prefs off), PIN-only
+`login_pin_ios_here` (11:37:11, `branch: matched state logged_in`), Account Detail → PAY → SWIFT payment.
+
+**Holds.** Scratch `treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`. Focus TAP
+`id:swift_payment.form.amount_input` (11:37:59, 3.0 s) → `keyboard 0 572 402 302`; `priority_select` at `24 681 354 52`:
+
+```
+11:38:11 tap { selector: "id:swift_payment.form.priority_select", configPath: <scratch wda> }                 (10.5 s)
+→ Tapped id:swift_payment.form.priority_select (the soft keyboard covered id:swift_payment.form.priority_select; hidden by
+  tapping id:"swift_payment.form.title" before tapping)
+```
+
+Shim: `11:38:18 ui tap 201 84` (title), `11:38:21 ui tap 201 707` (row). After: `0 matches for role:keyboard`; the sheet
+`swift_payment.form.priority_sheet` with `row_0 'Standard'` / `row_1 'Express'` opened (closed again with `row_0`); screenshot
+`run5-ios/img-94-0.png`. The dcd089b silent-wrong-action shape is absent here: the form's only `toolbar` is `toolbar 'Toolbar'
+0 0 402 874` with a child (`container 0 0 402 874`), screen-sized, excused as a host; nothing itemless is drawn over the title.
+(The UIKit Contacts sheet still refuses its title dismissal — see
+[2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md](2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md), 347e70d section.)

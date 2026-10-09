@@ -218,3 +218,26 @@ recorded with an `idb` PATH shim.
   did not occur: no app switch was made this session (every launch was cold, after a terminate).
 - Side note: the first `screenshot` on the PIN screen (05:56:4x) returned `⚠ frame: the screen did not settle: 6 captures, each
   different from the last …`; the screen looked static (PIN keypad).
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default `treeSource: idb`,
+`idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder: `scratchpad/averi-repo/run5-ios`.
+
+**Holds — cold launch, foreground wait and bare-tree rules together, no double warning.** Contacts in front; bank app
+terminated (`xcrun simctl terminate`), then:
+
+```
+11:36:52 launch_app { platform: ios, appId: com.finshape.dbosbanking }                                      (3.5 s)
+→ Launched com.finshape.dbosbanking on ios                    (no ⚠ line: the foreground wait matched "Skeleton Internal")
+11:36:56 ui_snapshot { platform: ios }                                                                      (0.4 s)
+→ 21 nodes, no ⚠: other 'Skeleton Internal' 0 0 402 874, button 'Password login', 'Log in', 'Enter your PIN to log in',
+  4 × pinDotEmpty, keys 1–0, 'delete 1', 'Forgot PIN?'
+```
+
+Screenshot `run5-ios/img-82-0.png`: the PIN screen, rendered. The 3.5 s is the foreground wait reading through the launch
+(SpringBoard / the previous app) until the bank's label appeared; nothing reached the bare-tree ⚠, and the wait's own note was
+not printed, so the two did not double up. Other cold launches in the run: Contacts 11:28:50 (3.4 s), 11:29:33 (3.2 s),
+11:32:28 (3.5 s), all without ⚠, first reads Contacts'. The PIN login then ran (`login_pin_ios_here`, 7.7 s, `branch: matched
+state logged_in`).

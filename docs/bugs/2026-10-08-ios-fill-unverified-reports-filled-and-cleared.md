@@ -268,3 +268,33 @@ Measured 05:58–06:03 UTC, mp-native SWIFT form (logged in by the owner), emula
   (nothing else); clear of the filled IBAN `fill: … =  (cleared 20 characters first)`. Same counts as the MCP replies.
 - The hint bug ([2026-10-09-android-clear-reads-edittext-hint-as-content.md](2026-10-09-android-clear-reads-edittext-hint-as-content.md))
   did not hit: the empty Compose fields read `text=None` (no placeholder exposed).
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52, PIN-only `login_pin_ios_here` (11:37:11), Account
+Detail → PAY → SWIFT payment; default `treeSource: idb` unless stated.
+
+**Holds** (as at 610660f; the clear now stops after one round).
+
+- Flow `fill: { id: swift_payment.form.amount_input, value: "3.10", clear: true, dismissKeyboard: true }` (`cfg4-idb`, 11:39:37)
+  → `Timed out after 5000ms waiting for element id:"swift_payment.form.amount_input" to appear` (5.6 s): under idb that id is a
+  SwiftUI container id, which idb never lists (documented; the 610660f run used this flow under WDA). Re-run with `value:`
+  selectors, as at 610660f:
+- `11:40:21 type_text { selector: 'text:"Value*"', text: "4.2" }` → `Typed 3 characters into text:"Value*" — NOT verified: the
+  field could not be found again (the screen changed while typing)` + `⚠ the matched node is role text, not a textfield — …
+  textfield id:"TextFieldWithComponentStyle" at 42,296 194x20 …` (3.2 s; shim `ui tap 67 299`, `ui text 4.2`).
+- `11:40:25 type_text { selector: 'role:textfield value:"4.2"', text: "5.5", clear: true }` → `Typed 3 characters into
+  role:textfield value:"4.2" (cleared 3 characters first) — NOT verified: the field could not be found again (the screen changed
+  while typing)` (3.5 s; shim `ui tap 139 306`, `42×3`, `76×3`, `ui text 5.5`) — the known §3 case (the amount was the only
+  filled field; its own clear button).
+- With the IBAN also filled (`text:"IBAN*"` + `XX12345`, 11:40:38): `11:40:41 type_text { selector: 'role:textfield
+  value:"5,50"', text: "7.25", clear: true }` → **`Filled role:textfield value:"5,50" (4 characters, cleared 4 characters
+  first)`** (2.9 s; shim `ui tap 139 322`, `42×4`, `76×4`, `ui text 7.25` — one round); field `7,25`.
+- Clear alone: `11:40:44 type_text { selector: 'role:textfield value:"XX12345"', text: "", clear: true }` → `Cleared
+  role:textfield value:"XX12345" (7 deletes sent) — NOT verified: the field could not be found again (the selector no longer
+  matches it)` (2.6 s; shim `ui tap 182 412`, `42×7`, `76×7` — one round, no second); IBAN empty after (§3: the emptied
+  field's rect moves).
+- Left with `BackButton` → "Exit confirmation" → `Discard` (no payment step reached).

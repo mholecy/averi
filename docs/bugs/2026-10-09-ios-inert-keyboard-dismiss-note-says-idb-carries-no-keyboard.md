@@ -56,3 +56,22 @@ as an untyped `other`, which averi does not classify as `role:keyboard`.
 1. iOS 27 simulator, a config with `app.ios.keyboardDismiss: [tap: { … }]` and no `treeSource` (idb).
 2. Start the server: the note above is printed.
 3. Focus any text field with the software keyboard up; `ui_snapshot` lists `button 'Q' …` and the band `other 0 ~590 402 ~285`.
+
+## Device check (2026-10-09 iOS, re-run at 347e70d)
+
+Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
+`scratchpad/averi-repo/run5-ios`.
+
+**Holds.** Two scratch configs for Contacts, each with `keyboardDismiss: [tap: { role: text, text: "New Contact" }]`: one with no
+`treeSource`, one with `treeSource: idb`. Each loaded twice (`ui_snapshot { configPath }`, 11:29:03–11:29:04). Server stderr got
+exactly one line per config:
+
+```
+averi: …/cfg-inert-default/averi.yaml: app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply
+averi: …/cfg-inert-idb/averi.yaml: app.ios.keyboardDismiss is set but app.ios.treeSource is idb: the idb tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply
+```
+
+`(the default)` only on the first. "carries no keyboard" appears 0 times in the served tool descriptions (`tools/list` dump,
+`run5-ios/tools.txt`); in `dist/` only in a source comment that quotes it as the wrong wording (`flow/config.js` l. 14).
