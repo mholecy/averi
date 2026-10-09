@@ -724,6 +724,23 @@ interface StrokeContainer {
 /** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.drawnOver`). */
 const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.drawnOver(rect)?.map((n) => ({ ...n.rect }));
 
+/**
+ * The container a round's stroke toward the target goes over (`round`):
+ * with no read this round (`facts` undefined), the last read round's; the
+ * screen box (undefined) when the target was last found in no container
+ * with room (`'none'`); the target's container, cut by what this read draws
+ * over it — or by what it carried, when this read has lost its rect; else
+ * the screen's largest scroller, or none.
+ */
+function strokeContainer(s: State, facts: TreeFacts | undefined): StrokeContainer | undefined {
+  if (facts === undefined) return s.lastWithin;
+  const target = s.targetScroller;
+  if (target === 'none') return undefined;
+  if (target !== undefined) return { rect: target.rect, over: overIn(facts, target.rect) ?? target.over };
+  const main = facts.mainScroller;
+  return main === undefined ? undefined : { rect: main, over: overIn(facts, main) ?? [] };
+}
+
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
 export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
   const box: Rect = { x: 0, y: 0, ...asBuilt };
@@ -1220,17 +1237,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // it in no container with room (`'none'`, P5). A round whose tree did not
   // read keeps the last read round's.
   const target = s.targetScroller;
-  const main = now?.facts.mainScroller;
-  const within: StrokeContainer | undefined =
-    now === undefined
-      ? s.lastWithin
-      : target === 'none'
-        ? undefined
-        : target !== undefined
-          ? { rect: target.rect, over: overIn(now.facts, target.rect) ?? target.over }
-          : main === undefined
-            ? undefined
-            : { rect: main, over: overIn(now.facts, main) ?? [] };
+  const within = strokeContainer(s, now?.facts);
   s.lastWithin = within;
   // The latest cut read for the target's container is the one a later read
   // that has lost that rect falls back to — not the oldest (review round 2).
