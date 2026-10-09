@@ -244,6 +244,24 @@ describe('parseWdaSource — normalization and input shapes', () => {
     expect(tree.children.find((n) => n.identifier === 'offscreen')).toBeDefined();
   });
 
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md (iOS
+  // section): WDA's `value` of an EMPTY field is its placeholder — `textfield
+  // id:Company value 'Company'` on the Contacts sheet, iOS 27.0. The shape
+  // below is that reading; `placeholderValue` is XCUITest's own field, not
+  // in the shrunk fixtures (wda-source-keyboard.test.ts strips it).
+  it('carries placeholderValue as the node\'s placeholder, value untouched; absent when none, null or ""', () => {
+    const empty = parseWdaSourceValue(el('TextField', { rawIdentifier: 'Company', value: 'Company', placeholderValue: 'Company' }));
+    expect(empty).toMatchObject({ role: 'textfield', identifier: 'Company', value: 'Company', placeholder: 'Company' });
+    const full = parseWdaSourceValue(el('TextField', { value: 'Acme', placeholderValue: 'Company' }));
+    expect(full).toMatchObject({ value: 'Acme', placeholder: 'Company' });
+    for (const placeholderValue of [undefined, null, ''])
+      expect(parseWdaSourceValue(el('TextField', { value: 'Acme', placeholderValue }))).not.toHaveProperty('placeholder');
+    // Nested like every other field: a child's placeholder is the child's.
+    const tree = parseWdaSourceValue(el('Window', { children: [el('TextField', { rawIdentifier: 'q', placeholderValue: 'Search' })] }));
+    expect(tree).not.toHaveProperty('placeholder');
+    expect(findOne(tree, 'id:q').placeholder).toBe('Search');
+  });
+
   it('rejects payloads with no element root', () => {
     expect(() => parseWdaSource('{"sessionId":"X"}')).toThrow(/no element root/);
     expect(() => parseWdaSource('[1,2,3]')).toThrow(/no element root/);

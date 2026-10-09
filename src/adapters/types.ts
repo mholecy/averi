@@ -212,6 +212,29 @@ export interface UiNode {
    * Absent everywhere on Android and on an idb tree.
    */
   ofKeyboard?: true;
+  /**
+   * The text the field shows while it is EMPTY — its hint or placeholder —
+   * when the tree source reports one apart from the value (2026-10-09,
+   * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md).
+   * Every source reports an empty field's placeholder AS its value (WDA
+   * `value`, idb `AXValue`, uiautomator `text` on API 33, all measured that
+   * day), so `value` alone cannot tell "empty, showing `Company`" from
+   * "holds `Company`". Set only where the source names the placeholder
+   * separately: WDA's `placeholderValue` (wda-source.ts) and a uiautomator
+   * dump's `hint` attribute on a text input (android.ts — the API 33 dump
+   * has none; newer dumps may). idb names none. Absent, never null or "",
+   * when there is none, so trees that carry none are unchanged.
+   *
+   * `value` is NOT rewritten: a selector on `value:"Company"` and the
+   * ui_snapshot JSON read what the source reported, as before; the
+   * placeholder rides beside it (and ui_snapshot prints it, which is how a
+   * reader tells the empty field from the full one). The one reader that
+   * acts on it is interact/fill.ts, which counts a value EXACTLY equal to
+   * the placeholder as an empty field — so a real value equal to its own
+   * placeholder reads as empty there (the accepted cost: the tree cannot
+   * tell the two apart).
+   */
+  placeholder?: string;
 }
 
 /**

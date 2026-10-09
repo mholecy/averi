@@ -72,12 +72,19 @@ const ROLE_MAP: Record<string, string> = {
  * `isVisible` is read for ONE purpose (since 2026-10-07): whether a
  * `Keyboard` is on screen (keyboardMarks). Nothing else reads it, and the
  * normalized node does not carry it.
+ * `placeholderValue` (since 2026-10-09) is the text XCUITest says the field
+ * shows while empty; WDA's `value` of an EMPTY field is that same text
+ * (measured 2026-10-09, iPhone 17 / iOS 27.0, Contacts "New Contact":
+ * `textfield id:Company value 'Company'`), so it is carried as the node's
+ * `placeholder` (UiNode) and fill counts a value equal to it as empty.
+ * Not seen in a captured fixture: the shrunk ones dropped it.
  */
 interface WdaElement {
   type?: string;
   rawIdentifier?: string | null;
   label?: string | null;
   value?: string | null;
+  placeholderValue?: string | null;
   rect?: Rect;
   isVisible?: string | number | null;
   children?: WdaElement[] | null;
@@ -137,6 +144,8 @@ function toUiNode(el: WdaElement, marks: KeyboardMarks): UiNode {
   // label, identifier and children stay what WDA reported.
   if (marks.bands.has(el)) node.role = KEYBOARD_ROLE;
   if (marks.roots.has(el)) node.ofKeyboard = true;
+  // A string only, and not an empty one: absent means "none reported".
+  if (typeof el.placeholderValue === 'string' && el.placeholderValue !== '') node.placeholder = el.placeholderValue;
   if (isTextEcho(el, node)) node.children = [];
   return node;
 }
