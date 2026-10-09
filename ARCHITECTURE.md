@@ -125,6 +125,13 @@ an `IosAdapter` without a UDID (simctl's `booted` alias, a lazily resolved UDID 
 idb, a `uiTree()` that refused) and an `AndroidAdapter` without a serial (adb without
 `-s`, "the default adb device", a "more than one device" diagnosis). The serial / UDID
 (and on iOS the tree source) is now a constructor invariant, and that mode is gone.
+Since 2026-10-09 (C5) the Android listing also keeps an `unauthorized` device (state
+`unauthorized`, Android only), and `discovery.ts#androidUnusable` words why an
+`unauthorized` or `offline` Android device cannot be driven and what to do; the
+registry puts it after the device's name in its three refusals (auto-pick,
+`select_device`, a pinned device), which until then said "No booted Android
+emulator/device found", "boot it first" and "is no longer booted". Such a device is
+never picked.
 `setClipboard` went the same day: an interface member with no caller, which Android
 only threw for; a first caller (pasting an OTP) would bring it back as an optional
 capability, like `keyboard?`.

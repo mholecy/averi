@@ -2,7 +2,7 @@ import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import { createIosTreeSource } from '../adapters/ios-tree-source.js';
-import { listAndroidDevices, listIosDevices } from '../adapters/discovery.js';
+import { androidUnusable, listAndroidDevices, listIosDevices } from '../adapters/discovery.js';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 
@@ -135,7 +135,12 @@ export class AdapterRegistry {
       throw new Error(`Unknown ${platform} device "${deviceId}" — known: ${known}`);
     }
     if (device.state !== 'booted') {
-      throw new Error(`Device "${deviceId}" is ${device.state} — boot it first`);
+      const unusable = androidUnusable(device);
+      throw new Error(
+        unusable === undefined
+          ? `Device "${deviceId}" is ${device.state} — boot it first`
+          : `Android device "${deviceId}" ${unusable}`,
+      );
     }
     this.assertOpen(); // before the write, as in get(): a shutdown during the probe must not leave a binding behind
     const previous = this.bindings.get(platform);
@@ -148,9 +153,8 @@ export class AdapterRegistry {
     this.assertOpen();
     const binding = this.bindings.get(platform);
     if (binding) {
-      const stillBooted = (await this.probe(platform)).some(
-        (d) => d.id === binding.deviceId && d.state === 'booted',
-      );
+      const listed = (await this.probe(platform)).find((d) => d.id === binding.deviceId);
+      const stillBooted = listed?.state === 'booted';
       // A select() may have rebound the platform while we awaited the probe.
       // Acting on the CAPTURED binding would re-cache the evicted (already
       // disposed) device's adapter — start over against the current binding.
@@ -158,20 +162,34 @@ export class AdapterRegistry {
       if (this.bindings.get(platform) !== binding) return this.get(platform, opts);
       if (stillBooted) return this.adapterFor(platform, binding.deviceId, opts);
       if (binding.pinned) {
+        // Still listed, but unauthorized (a revoked key) or offline: say which.
+        const unusable = listed === undefined ? undefined : androidUnusable(listed);
         throw new Error(
-          `Selected ${platform} device "${binding.deviceId}" is no longer booted — ` +
-            'reboot it or select_device another one',
+          unusable === undefined
+            ? `Selected ${platform} device "${binding.deviceId}" is no longer booted — ` +
+              'reboot it or select_device another one'
+            : `Selected ${platform} device "${binding.deviceId}" ${unusable} Or select_device another one.`,
         );
       }
       this.bindings.delete(platform);
       this.evict(platform, binding.deviceId);
     }
 
-    const booted = (await this.probe(platform)).filter((d) => d.state === 'booted');
+    const devices = await this.probe(platform);
+    const booted = devices.filter((d) => d.state === 'booted');
     // Same race on the unbound path: a select() that landed during this probe
     // owns the binding now — honor it instead of auto-picking over it.
     if (this.bindings.get(platform) !== undefined) return this.get(platform, opts);
     if (booted.length === 0) {
+      // adb lists devices it cannot drive (unauthorized, offline): name them
+      // and the remedy rather than "no booted device" (C5, 2026-10-09).
+      const unusable = devices.flatMap((d) => {
+        const why = androidUnusable(d);
+        return why === undefined ? [] : [`"${d.id}" ${why}`];
+      });
+      if (unusable.length > 0) {
+        throw new Error(`No usable Android emulator/device found (adb devices): ${unusable.join(' ')}`);
+      }
       throw new Error(
         platform === 'android'
           ? 'No booted Android emulator/device found (adb devices)'

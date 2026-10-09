@@ -67,7 +67,7 @@ describe('AdapterRegistry', () => {
   });
 
   it('no booted device in the listing: each platform says where it looked, and nothing is built', async () => {
-    const { registry, created } = makeRegistry([device('phone', 'offline'), device('sim', 'offline', 'ios')]);
+    const { registry, created } = makeRegistry([device('sim', 'offline', 'ios')]);
     await expect(registry.get('android')).rejects.toThrow('No booted Android emulator/device found (adb devices)');
     await expect(registry.get('ios')).rejects.toThrow('No booted iOS simulator found (xcrun simctl list)');
     expect(created).toEqual([]);
@@ -106,6 +106,72 @@ describe('AdapterRegistry', () => {
   it('select rejects an offline device', async () => {
     const { registry } = makeRegistry([device('phone', 'offline')]);
     await expect(registry.select('android', 'phone')).rejects.toThrow(/offline/);
+  });
+
+  // C5 (2026-10-09): adb lists a phone waiting on its RSA prompt as
+  // `unauthorized`, and a transport it cannot talk to as `offline`. Both
+  // read "No booted Android emulator/device found" / "is no longer booted";
+  // the reply now names the device and the state, and says what to do —
+  // the wording is adapters/discovery.ts#androidUnusable's, pinned there.
+  describe('an Android device adb lists but cannot drive is named, with what to do — never picked', () => {
+    const UNAUTHORIZED = /"R58M123" is unauthorized: .*accept the "Allow USB debugging\?" prompt.*`adb kill-server`/;
+    const OFFLINE = /"emulator-5556" is offline: adb sees it but cannot talk to it\..*`adb kill-server && adb start-server`/;
+
+    it('auto-pick with only an unauthorized device: named, not "no booted device", nothing built or bound', async () => {
+      const { registry, created } = makeRegistry([device('R58M123', 'unauthorized')]);
+      const err = await registry.get('android').then(() => undefined, (e: Error) => e);
+      expect(err?.message).toMatch(/^No usable Android emulator\/device found \(adb devices\): "R58M123" is unauthorized: /);
+      expect(err?.message).toMatch(UNAUTHORIZED);
+      expect(created).toEqual([]);
+      expect(registry.boundId('android')).toBeUndefined();
+    });
+
+    it('auto-pick with an unauthorized and an offline device names both', async () => {
+      const { registry } = makeRegistry([device('R58M123', 'unauthorized'), device('emulator-5556', 'offline')]);
+      const err = await registry.get('android').then(() => undefined, (e: Error) => e);
+      expect(err?.message).toMatch(UNAUTHORIZED);
+      expect(err?.message).toMatch(OFFLINE);
+    });
+
+    it('auto-pick passes over an unauthorized device listed first and binds the booted one', async () => {
+      const { registry, bound } = makeRegistry([device('R58M123', 'unauthorized'), device('phone')]);
+      await registry.get('android');
+      expect(bound).toEqual(['phone']);
+    });
+
+    it('select_device on an unauthorized device refuses, naming the state and the remedy', async () => {
+      const { registry } = makeRegistry([device('R58M123', 'unauthorized')]);
+      await expect(registry.select('android', 'R58M123')).rejects.toThrow(/^Android device "R58M123" is unauthorized: /);
+      await expect(registry.select('android', 'R58M123')).rejects.toThrow(UNAUTHORIZED);
+      expect(registry.boundId('android')).toBeUndefined();
+    });
+
+    it('select_device on an offline Android device says offline and what to do, not "boot it first"', async () => {
+      const { registry } = makeRegistry([device('emulator-5556', 'offline')]);
+      const err = await registry.select('android', 'emulator-5556').then(() => undefined, (e: Error) => e);
+      expect(err?.message).toMatch(/^Android device "emulator-5556" is offline: /);
+      expect(err?.message).toMatch(OFFLINE);
+      expect(err?.message).not.toContain('boot it first');
+    });
+
+    it('a PINNED device turning unauthorized (a revoked key) or offline says so, not "no longer booted"', async () => {
+      const { registry, devices } = makeRegistry([device('R58M123'), device('emulator-5556')]);
+      await registry.select('android', 'R58M123');
+      devices[0] = device('R58M123', 'unauthorized');
+      const err = await registry.get('android').then(() => undefined, (e: Error) => e);
+      expect(err?.message).toMatch(/^Selected android device "R58M123" is unauthorized: /);
+      expect(err?.message).toMatch(/ Or select_device another one\.$/);
+      expect(err?.message).not.toContain('no longer booted');
+
+      await registry.select('android', 'emulator-5556');
+      devices[1] = device('emulator-5556', 'offline');
+      await expect(registry.get('android')).rejects.toThrow(/^Selected android device "emulator-5556" is offline: /);
+    });
+
+    it('iOS keeps its wording: a shut-down simulator is "boot it first"', async () => {
+      const { registry } = makeRegistry([device('sim', 'offline', 'ios')]);
+      await expect(registry.select('ios', 'sim')).rejects.toThrow('Device "sim" is offline — boot it first');
+    });
   });
 
   it('a vanished PINNED device is an error, not a silent fallback', async () => {
