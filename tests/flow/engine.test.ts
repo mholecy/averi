@@ -1714,12 +1714,12 @@ flows:
 `);
 
   it('reports the CLIPPED fraction instead of a bare "visible" when the element straddles an edge', async () => {
-    // 40px tall, stopping at y=1980 in a 1000x2000 viewport → half of it below the fold.
-    const fake = scrollingFake(2580);
+    // 40px tall, stopping at y=1970 in a 1000x2000 viewport → a quarter of it below the fold, its centre on screen.
+    const fake = scrollingFake(2570);
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
     const row = trace.find((t) => t.action.endsWith('scroll_until'));
     expect(row?.detail).toContain('CLIPPED at bottom');
-    expect(row?.detail).toContain('50% of it is in the viewport');
+    expect(row?.detail).toContain('75% of it is in the viewport');
     // The caller is told what it costs them, in the terms of their next call.
     expect(row?.detail).toContain('will measure the CLIPPED box');
     // ...and the row is marked, so it is visible in a long trace.

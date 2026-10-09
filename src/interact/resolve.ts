@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, nodeText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, drawnOverText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { judgingScreen, type JudgingScreen } from './swipe.js';
@@ -38,9 +38,44 @@ export type Target = Selector | ElementSpec;
 export const describeTarget = (target: Target): string =>
   typeof target === 'string' ? target : describeElementSpec(target);
 
-/** Every match, unfiltered — the scroll loop judges all of them; resolveNow is the policy over them. */
+/** Every match, unfiltered — resolveNow is the policy over them, and `scroll_until` judges them through `matchesToJudge`. */
 export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
   typeof target === 'string' ? findAll(tree, target) : findBySpec(tree, target);
+
+/**
+ * THE preference among a target's matches, before the caller's Ambiguity:
+ * zero-area nodes are never targets, and among several survivors a sole
+ * interactive one wins (preferInteractive, with its note). `chosen` when
+ * that leaves one node — the node a tap acts on whatever its Ambiguity —
+ * else the `survivors`: none, or several for the Ambiguity to decide.
+ * One owner since code review P2 (2026-10-09): `resolveNow` and
+ * `scroll_until`'s judgement (`matchesToJudge`) both read it.
+ */
+export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: string } | { survivors: UiNode[] } {
+  const survivors = found.filter((n) => n.rect.width > 0 && n.rect.height > 0);
+  if (survivors.length === 1) return { chosen: survivors[0] };
+  const pick = survivors.length > 1 ? preferInteractive(survivors) : undefined;
+  return pick === undefined ? { survivors } : { chosen: pick.node, note: pick.note };
+}
+
+/**
+ * The matches `scroll_until` judges (interact/scroll.ts, code review P2,
+ * 2026-10-09): the one a tap would act on when the preference picks one
+ * (`preferred`) — so the stop and the next tap judge the SAME node by
+ * construction — else every match, as found. Until then the scroll judged
+ * every match and stopped on the one more of which showed: an id on a
+ * container and on its button stopped on the container ("PARTLY UNDER …,
+ * its centre clear"), and the tap that followed acted on the button and
+ * was refused under the bar. With several matches and no preference the
+ * scroll still judges them all (the MCP tap refuses such a selector; the
+ * flow's `ambiguous: 'first'` tap takes the first — a stop on another is
+ * the residual, stated).
+ */
+export function matchesToJudge(tree: UiNode, target: Target): UiNode[] {
+  const found = findTarget(tree, target);
+  const pick = preferred(found);
+  return 'chosen' in pick ? [pick.chosen] : found;
+}
 
 /** A node the caller may act on, plus how it was chosen when the choice was not forced. */
 export interface Resolved {
@@ -149,11 +184,10 @@ export interface SettleOptions extends ResolveOptions {
  * between keystrokes and must not wait for anything.
  */
 export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): Resolved | undefined {
-  const candidates = findTarget(tree, target).filter((n) => n.rect.width > 0 && n.rect.height > 0);
+  const pick = preferred(findTarget(tree, target));
+  if ('chosen' in pick) return { node: pick.chosen, ...(pick.note !== undefined && { note: pick.note }) };
+  const candidates = pick.survivors;
   if (candidates.length === 0) return undefined;
-  if (candidates.length === 1) return { node: candidates[0] };
-  const preferred = preferInteractive(candidates);
-  if (preferred !== undefined) return preferred;
   const summary = (sep: string) =>
     candidates
       .slice(0, 5)
@@ -410,9 +444,11 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
  * and the visible part of such a node is a sliver at a screen edge — on iOS
  * the bottom one is the home indicator's gesture zone, the top the status
  * bar — where a tap is least likely to reach the element. Its remedy is
- * `scroll_until … fully: true`: a plain `scroll_until` stops on any
- * intersection and would hand back the same clipped node (review
- * 2026-10-08, M1).
+ * `scroll_until … fully: true` (review 2026-10-08, M1: a plain
+ * `scroll_until` then stopped on any intersection and handed back the same
+ * clipped node); since code review P3 (2026-10-09) a plain one also goes on
+ * until the centre is on the screen (scroll-rounds.ts#stops), so either
+ * agrees with this rule.
  *
  * Before refusing, the device's screen is read AGAIN (`viewport({ fresh:
  * true })`, once, on this path only — the clear path costs nothing new):
@@ -491,6 +527,14 @@ export interface Aim {
   moved?: string;
 }
 
+/**
+ * The flow trace's line for a tap that `Aim.moved`: `<what> tapped at
+ * (201,767) — its centre …` — beside the clause it completes, so the clause
+ * and its subject are worded in one place (code review S6; the fill's
+ * focus tap says it as `focus tap …`, interact/fill-text.ts#focusTapNote,
+ * and the MCP reply as `Tapped <selector> …`, mcp/tool-text.ts#tapText).
+ */
+export const movedTapText = (what: string, moved: string): string => `${what} tapped ${moved}`;
 
 /**
  * THE chrome check for a point about to be tapped on a resolved node
@@ -519,11 +563,11 @@ export interface Aim {
  * Only nodes of the tree cover (decision 4): iOS's status bar and a top bar
  * the tree lists before the form — WDA's, idb's (only its button and title)
  * — are not inferred, so a row scrolled up under them is tapped at its
- * centre as before the check existed. The other way round is a residual
- * under idb: a row scrolled under the bar reads as drawn over BackButton
- * and the title (idb's flat list, ui-tree/draw-order.ts's `scrolledContent`
- * row), so a tap on them is moved or refused, nothing pressed — open for
- * the owner.
+ * centre as before the check existed. The other way round — a row
+ * scrolled under the bar read as drawn over BackButton and the title, under
+ * idb, whose list is flat — is judged by an INTERIM rule, unmeasured
+ * (ui-tree/draw-order.ts's `flatListAbove` row: in idb's list a later node
+ * covers only when its top lies at or below the target's).
  */
 export async function aimClearOfChrome(
   target: Target,
@@ -536,24 +580,23 @@ export async function aimClearOfChrome(
   const centre = tapPoint(node);
   const box = screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect);
   const order = drawOrder(tree);
-  const cover = order.exposure(node, box).coverAt(centre);
+  const cover = order.exposure(node, box).centreCover;
   if (cover === undefined) return { point: centre };
   const top = await keyboardTop();
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
   const seen = order.exposure(node, within);
-  const under = `under ${nodeText(cover)}`;
   if (seen.tapAt !== undefined) {
     const { point } = seen.tapAt;
     if (!seen.tapAt.moved) return { point };
     const { width, height } = seen.tapAt.piece;
-    return { point, moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${under}, drawn over it; tapped the uncovered part ${width}x${height}${above}` };
+    return { point, moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${drawnOverText(cover)}; tapped the uncovered part ${width}x${height}${above}` };
   }
   const shows =
     seen.largest === undefined
       ? `nothing of it shows${above}`
       : `only a ${seen.largest.width}x${seen.largest.height} part of it shows${above}, under the ${seen.minPiece}x${seen.minPiece} a tap may be moved to`;
-  const finding = `${under} at its centre (${centre.x},${centre.y}), drawn over it; ${shows} — scroll_until it first`;
+  const finding = `${drawnOverText(cover, centre)}; ${shows} — scroll_until it first`;
   const what = describeTarget(target);
   throw new CoveredRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }

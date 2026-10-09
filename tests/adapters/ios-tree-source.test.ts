@@ -123,6 +123,9 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
     });
     expect(tree.children).toHaveLength(3);
     expect(tree.children.every((c) => c.children.length === 0)).toBe(true); // flat stays flat
+    // The root says so: its children's order is the list's (ui-tree/draw-order.ts reads it — code review P1).
+    expect(tree.flatList).toBe(true);
+    expect(tree.children.every((c) => c.flatList === undefined)).toBe(true);
   });
 
   it('normalizes roles, identifiers, values and rounds frames', () => {

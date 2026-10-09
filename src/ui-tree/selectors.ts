@@ -1,5 +1,6 @@
 import type { Point, Selector, UiNode } from '../adapters/types.js';
 import { SELECTOR_FIELDS, type ElementSpec } from './element-spec.js';
+import { rectCentre } from './geometry.js';
 
 /**
  * Selector syntax (ARCHITECTURE.md §3): space-separated conditions, all must match.
@@ -193,10 +194,7 @@ export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string
 // visibleFractionInViewport, clippedEdges) lived here until 2026-10-04; they
 // are geometry, not selection, and sit in geometry.ts with the rest of it.
 
-/** Center of the node's rect — where taps land. */
+/** Center of the node's rect — where taps land (geometry.ts#rectCentre, rounded as a tap is sent). */
 export function tapPoint(node: UiNode): Point {
-  return {
-    x: Math.round(node.rect.x + node.rect.width / 2),
-    y: Math.round(node.rect.y + node.rect.height / 2),
-  };
+  return rectCentre(node.rect);
 }

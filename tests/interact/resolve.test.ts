@@ -7,6 +7,7 @@ afterEach(() => {
 import { readFile } from 'node:fs/promises';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { tapText } from '../../src/mcp/tool-text.js';
 import {
   absenceError,
@@ -526,6 +527,30 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect([result.moved, bar.moved, result.note]).toEqual([undefined, undefined, undefined]);
   });
 
+  it('a pinned footer\'s text inside a row, after it in idb\'s flat list (code review P4, repro E): a cover — the tap moves off it, never onto the footer', async () => {
+    const fake = new FakeAdapter(
+      {
+        s: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 0, height: 0 },
+          flatList: true,
+          children: [
+            node({ role: 'other', label: 'app', rect: { x: 0, y: 0, width: 402, height: 874 } }),
+            node({ role: 'button', identifier: 'row', label: 'Row', rect: { x: 0, y: 760, width: 402, height: 60 } }),
+            node({ role: 'text', label: 'Total 100 EUR', rect: { x: 16, y: 785, width: 200, height: 30 } }),
+          ],
+        }),
+      },
+      's',
+    );
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const result = await tapElement(fake, 'id:row', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 773 }]);
+    expect(result.moved).toBe('at (201,773) — its centre (201,790) is under text "Total 100 EUR" (16,785 200x30), drawn over it; tapped the uncovered part 402x25');
+  });
+
   it('the fill\'s focus tap goes through the same check: refused before anything is tapped or typed; moved, the note says where it focused', async () => {
     const refused = swiftForm();
     refused.live().children[3].role = 'textfield';
@@ -544,6 +569,37 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
+  });
+
+  it('idb, a row scrolled up under the top bar (code review P1, repro C — the interim flat-list rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+    const debit = tree.children.find((n) => n.identifier === 'swift_payment.form.debit_select')!;
+    debit.rect = { x: 24, y: 40, width: 354, height: 72 };
+    tree.children.find((n) => n.role === 'textfield')!.rect.y = 27;
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const scrolled = await scrollUntilVisible(fake, 'text:"SWIFT PAYMENT"', { maxSwipes: 0, settleMs: 0 });
+    expect(scrolled).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    for (const selector of ['text:"BackButton"', 'text:"SWIFT PAYMENT"']) expect(await tapElement(fake, selector, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect(fake.tapPoints).toEqual([{ x: 44, y: 84 }, { x: 201, y: 84 }]);
+    // …and the pinned CONTINUE bar over priority_select is still refused, as measured.
+    await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
+  });
+
+  it('WDA, a React Native view whose texts it lists as the view\'s siblings (tests/fixtures/wda-source-rn-myport.json — verification of P4): scroll_until stops on placeholder_screen and the tap lands on its centre — as at 13d68a2', async () => {
+    const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-myport.json', import.meta.url), 'utf8'));
+    const fake = new FakeAdapter({ rn: tree }, 'rn');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const banner = { role: 'container', label: '!, Open debugger to view warnings.', identifier: null, rect: { x: 10, y: 787, width: 382, height: 49 } };
+    expect(await scrollUntilVisible(fake, 'id:placeholder_screen', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [], covered: { by: banner, shows: expect.closeTo(0.915, 3) } });
+    // `fully` is kept off by the dev build's warning banner at the bottom — a real cover — never by the screen's own text.
+    await expect(scrollUntilVisible(fake, 'id:placeholder_screen', { maxSwipes: 0, settleMs: 0, fully: true })).rejects.toThrow(
+      'element reached the viewport but stayed under container "!, Open debugger to view warnings." (10,787 382x49), drawn over it — 91% of it shows',
+    );
+    expect(await tapElement(fake, 'id:placeholder_screen', OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 495 }]);
   });
 
   it('after the keyboard guard tapped a dismissal: the refusal says what was sent first', async () => {
