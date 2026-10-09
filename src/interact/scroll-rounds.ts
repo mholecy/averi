@@ -6,7 +6,7 @@ import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { belowStatusBand, judgingOf, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { belowStatusBand, judgingOf, OPPOSITE, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -625,9 +625,6 @@ function flushWith(
   const nearest = chain.length === 0 ? [] : flushEdges(rect, chain[0], direction);
   return nearest.length === 2 ? { fills: [nearest[0], nearest[1]] } : undefined;
 }
-
-/** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
-const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
 /** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
 type Since = 'start' | 'stroke' | 'settle';
