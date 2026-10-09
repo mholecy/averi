@@ -168,7 +168,7 @@ export class IosAdapter implements DeviceAdapter {
       bundleId,
       label: () => this.treeSource.applicationLabel(),
       names: () => this.appNames(bundleId),
-      ownerOf: (label) => [...this.appNamesCache].find(([, names]) => names.includes(label))?.[0],
+      ownerOf: (label) => this.ownerOf(label),
     });
     return note === undefined ? {} : { note };
   }
@@ -178,6 +178,12 @@ export class IosAdapter implements DeviceAdapter {
    * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter's launches looked up (the idb source — WDA declines the check before asking; this process), so an app opened by hand or before the server started is not in it.
    */
   private readonly appNamesCache = new Map<string, readonly string[]>();
+
+  /** The bundle in `appNamesCache` one of whose names is `label` — the first when several share it; undefined when none does. No device call. */
+  private ownerOf(label: string): string | undefined {
+    for (const [bundle, names] of this.appNamesCache) if (names.includes(label)) return bundle;
+    return undefined;
+  }
 
   /**
    * The bundle's display names, from `simctl appinfo` — THROWS when the
