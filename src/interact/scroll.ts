@@ -83,10 +83,9 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * screen centre, its start at y ≈ 1776 of 2220 — began on a key and scrolled
  * nothing for 15 s; the same on iOS 27 with the pad up (y ≈ 699 of 874). So
  * every round reads the keyboard the way the tap guard and the pixel poll do
- * — a reading off the round's tree (`readKeyboard`; the oracle's `state()` on
- * Android, one query a round, two with the keyboard up since 2026-10-08 —
- * its window's region, for a floating panel — and three when the band
- * changes the round, the witness below; the WDA band on iOS, no device read) — and
+ * — a reading off the round's tree (`readKeyboard`: the oracle on Android,
+ * the WDA band on iOS; what it asks the device is counted on
+ * ui-tree/keyboard-cover.ts, WHAT A READING ASKS) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
  * shown keyboard (scroll-rounds.ts#coverOf): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke keeps clear of it

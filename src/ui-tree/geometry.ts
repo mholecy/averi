@@ -545,11 +545,15 @@ export function clippedEdges(
  * sat in interact/keyboard-model.ts, so scroll-text.ts imported the tap
  * guard's model seam to quote a rect). The layer and the subject pick one,
  * never the caller's taste:
- * - `rectText`, `x,y wxh` — a NODE's rect as the tree gives it: verify/'s
+ * - `rectText`, `x,y wxh` — a NODE's rect as the tree gives it, and any
+ *   rect a ui-tree/ or verify/ sentence quotes, the keyboard's included:
+ *   verify/'s
  *   sentences (the text table's off-screen region, the pixel poll's
  *   position change and its soft-keyboard miss, which quotes the keyboard
  *   beside the element this way), resolve.ts's off-screen tap, the fill's
- *   not-an-input caveat.
+ *   not-an-input caveat, and keyboard-cover.ts's stderr diagnostic for a
+ *   refused floating panel (the touchable region and the band beside it,
+ *   both quoted as rects).
  * - `frameText`, `[x,y][x2,y2]` — the soft KEYBOARD's frame as dumpsys
  *   prints it (the oracle's, or the in-tree band): the tap guard's and the
  *   dismissal's messages on either model, and `scroll_until`'s keyboard

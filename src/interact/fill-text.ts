@@ -31,14 +31,18 @@
  * module for one sentence, `caveatText` (its mismatch error names the input
  * in the same words); nothing here imports fill.ts.
  *
- * THE RULE for every renderer here (and any added later, e.g. a JSON
- * reply): take the facts, judge them first (`judgeFill`, once), then
- * branch only on the verdict's `did` and on whether `sent` / `unverified`
- * are present — never on a ReadBack, on `cleared`, or on a Reason or
- * Caveat code. Those are judged once, in judgeFill; a renderer that looked
- * at them again would be a second judge, which is the bug this module ends.
- * A renderer that wants codes (structured output) reads the verdict as
- * data; it does not re-derive them.
+ * THE RULE for every layout here (`fillReply`, `fillStepText`, and any
+ * added later, e.g. a JSON reply): take the facts, judge them first
+ * (`judgeFill`, once), then branch only on the verdict's `did` and on
+ * whether `sent` / `unverified` are present — never on a ReadBack, on
+ * `cleared`, or on a Reason or Caveat code. The sentence tables below are
+ * keyed by code by design: each row words ONE code from the fields the
+ * judge put on it (`not-input` says which `input` it carries), and none
+ * re-judges the facts. What is verified, the head verb and the unit are
+ * decided once, in judgeFill; a layout that looked at the facts again
+ * would be a second judge, which is the bug this module ends. A renderer
+ * that wants codes (structured output) reads the verdict as data; it does
+ * not re-derive them.
  *
  * No renderer sees the typed value: the step medium takes `shown`,
  * the caller's own rendering of it (`***` for a secret — the engine's
