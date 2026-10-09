@@ -43,6 +43,8 @@ describe('clearStep — what one reading means for the clear', () => {
   it('a field that holds nothing gets no delete: no value, or exactly its named placeholder (shown before any delete)', () => {
     expect(play([null])).toEqual({ trace: [], facts: { cleared: 0, end: { kind: 'empty' } } });
     expect(play(['Company'], 'Company')).toEqual({ trace: [], facts: { cleared: 0, end: { kind: 'empty', placeholder: 'shown' } } });
+    // No reading is not the placeholder: empty, and no placeholder fact.
+    expect(play([null], 'Company')).toEqual({ trace: [], facts: { cleared: 0, end: { kind: 'empty' } } });
     // The placeholder names the field's own hint only: other text is content.
     expect(play(['Company', null], 'Search').trace).toEqual(['delete 7']);
   });
@@ -56,6 +58,8 @@ describe('clearStep — what one reading means for the clear', () => {
   // a prefix of what was there.
   it('deleted INTO the named placeholder: `other` from a reading that did not start with it, `prefix` from one that did (K)', () => {
     expect(play(['Zed', 'Company'], 'Company')).toEqual({ trace: ['delete 3'], facts: { cleared: 3, end: { kind: 'empty', placeholder: 'other' } } });
+    // STARTS with, not contains: `ZCompany` cut to `Company` is not a prefix left behind.
+    expect(play(['ZCompany', 'Company'], 'Company')).toEqual({ trace: ['delete 8'], facts: { cleared: 8, end: { kind: 'empty', placeholder: 'other' } } });
     expect(play(['Companyabc', 'Company'], 'Company')).toEqual({ trace: ['delete 10'], facts: { cleared: 10, end: { kind: 'empty', placeholder: 'prefix' } } });
   });
 

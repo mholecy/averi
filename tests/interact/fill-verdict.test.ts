@@ -178,8 +178,9 @@ describe('judgeFill — what the facts mean', () => {
     for (const readBack of readBacks)
       for (const cleared of clears)
         for (const typed of [0, 1, 5])
-          for (const clearUnchanged of typeof cleared === 'number' ? [undefined, { shows: 9, deletes: 12 }] : [undefined]) {
-            const v = judgeFill(fact({ typed, readBack, cleared, clearUnchanged }));
+          for (const clearUnchanged of typeof cleared === 'number' ? [undefined, { shows: 9, deletes: 12 }] : [undefined])
+          for (const clearPlaceholder of [undefined, 'shown', 'prefix', 'other'] as const) {
+            const v = judgeFill(fact({ typed, readBack, cleared, clearUnchanged, clearPlaceholder }));
             expect(v.did === 'filled').toBe(v.reasons.length === 0);
             if (v.did !== 'filled') expect(v.did === 'typed').toBe(typed > 0);
             if (v.did !== 'filled' && typed === 0) expect(v.did === 'cleared').toBe(v.sent !== undefined);
@@ -221,6 +222,7 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['autocorrect `teh` → `the`: same length, how many differ', { observed: 'the', value: 'teh' }, { kind: 'same-length', positions: 2 }],
     ['held `HELLo` is not the typing: only `hxllo` after it is compared', { observed: 'HELLohxllo', before: 'HELLo', value: 'hello' }, { kind: 'same-length', positions: 1 }],
     ['a mask that inserts a space', { observed: '1234 5', value: '12345' }, { kind: 'length' }],
+    ['typing onto a field showing only its placeholder: the placeholder is no held text, so nothing is sliced off', { observed: 'Searchx', before: 'Search', value: 'searchx', placeholder: 'Search' }, { kind: 'case', positions: 1 }],
     ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
     ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
     ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],

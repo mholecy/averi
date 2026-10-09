@@ -36,8 +36,9 @@ import { heldText, type FillFailure, type LostWhy } from './fill-facts.js';
  *   `fail` carries the clear-twice FillFailure the driver throws (its words
  *   are fill-text.ts's).
  *
- * BOUND: at most three delete rounds, each followed by at most one re-read
- * — seven readings after the first. Cost: no I/O; one copy of the state
+ * BOUND: at most three delete rounds, each followed by one read and at most
+ * one re-read — six readings after the first (a third round's reading that
+ * still changed the field fails; one that did not ends the clear). Cost: no I/O; one copy of the state
  * record a call.
  *
  * What it does NOT decide: whether the fill is verified. `done` carries
