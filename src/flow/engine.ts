@@ -720,7 +720,7 @@ export class FlowEngine {
         // descriptor must fail the call even on a screen that happens to be
         // in the state, and a nested refusal already looked.
         if (e instanceof OptionalNotSkipped && (await this.detects(state.detect, 0)).answer === 'yes') {
-          this.log(`⚠ reach ${flow}`, `failed — ${headline(e)}`);
+          this.log(`⚠ reach ${flow}`, `failed — ${headline(e)} — state reached anyway`);
           this.log(`state ${name}`, `reached after ${flow}`);
           return;
         }

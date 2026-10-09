@@ -2782,6 +2782,45 @@ flows:
       // it", not "never look". A rung that reached the state before a
       // TRAILING optional tap was refused has done its job — the ladder's
       // post-failure probe sees it, and the call passes.
+      // The probe is OptionalNotSkipped's alone: a SetupError is a broken
+      // descriptor and fails the call even on a screen already in the state.
+      it('a rung that reached the state and THEN raised a SetupError: no probe rescues it, the call fails', async () => {
+        const broken = parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login_registered, login]
+flows:
+  login_registered:
+    steps:
+      - tap: { id: continue }
+      - type: { value: $nope }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+        const full = { x: 0, y: 0, width: 402, height: 874 };
+        const home = node({
+          role: 'container',
+          rect: full,
+          children: [
+            node({ identifier: 'dashboard_root', rect: { x: 0, y: 0, width: 402, height: 40 } }),
+            node({ role: 'textfield', identifier: 'priority', rect: { x: 24, y: 771, width: 354, height: 52 } }),
+            node({ role: 'button', label: 'Pay', identifier: 'pay', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+          ],
+        });
+        const fake = form(100, { home });
+        fake.onTap = (id, self) => {
+          if (id === 'continue') self.current = 'home';
+        };
+        const error = (await FlowEngine.run(broken, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e)) as FlowError;
+        expect(error).toBeInstanceOf(FlowError);
+        expect(error.message).toMatch(/^Unknown credential "\$nope"/);
+        expect(fake.launches).toEqual([]);
+        expect(error.trace.some((t) => t.action === 'state logged_in')).toBe(false);
+      });
+
       it('a rung that reached the state before its trailing optional tap was refused: the probe sees it, the call passes, no escalation', async () => {
         const reached = parseConfig(`
 app: { android: { package: md.bank.app } }
@@ -2816,7 +2855,7 @@ flows:
         expect(fake.launches).toEqual([]);
         expect(trace).toContainEqual({ action: '✗ tap id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: its element is present, but the tap was refused/) as string });
         expect(trace.slice(-2)).toEqual([
-          { action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed — optional step not skipped:/) as string },
+          { action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed — optional step not skipped:.* — state reached anyway$/) as string },
           { action: 'state logged_in', detail: 'reached after login_registered' },
         ]);
       });
