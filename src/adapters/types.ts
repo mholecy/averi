@@ -225,8 +225,8 @@ export interface UiNode {
    * container's edge — measured on the SWIFT form, container
    * `[0,242][1080,1978]`, a 143-px row read `{y:242, height:92}` — and
    * nothing in the rect says the rest exists. Read by
-   * ui-tree/geometry.ts#scrollerOf, which hands `scroll_until` each match's
-   * nearest such ancestor so a `fully: true` stop flush with it is checked
+   * ui-tree/geometry.ts#scrollersOf, which hands `scroll_until` each match's
+   * such ancestors so a `fully: true` stop flush with one is checked
    * before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
    *
    * A flag, not a role (decided 2026-10-09): mapping a Compose scroller to
@@ -242,6 +242,16 @@ export interface UiNode {
    * is built on that) — so there is nothing to mark. Absent too on an
    * Android node that cannot scroll now (`scrollable="false"`: a list whose
    * content fits), whose children are not cut by it.
+   *
+   * Residuals, stated (code review of fix/r3-scroll, 2026-10-09): a View's
+   * accessibility bounds are cut to EVERY ancestor's visible rect, not only
+   * a scroller's, and Compose also subtracts what an overlay sibling covers
+   * — a row cut by a pinned bar drawn over the list reads cut at the bar's
+   * edge, not flush with any marked node, so the flag cannot reveal it (the
+   * pinned-chrome bug, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-
+   * pinned-app-chrome.md, out of scope). A RecyclerView with padding and
+   * clipToPadding draws a row cut at its padding edge while the row's rect
+   * runs on to the view's edge: not flush, not caught either.
    */
   clipsDescendants?: true;
 }

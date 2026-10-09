@@ -485,6 +485,16 @@ export class AndroidAdapter implements DeviceAdapter {
    * stroke now moves the content ≈ its own length, not ≈ 1.6×, so content
    * far below the fold takes more strokes. What it buys: no row is carried
    * across the list between two reads.
+   *
+   * NET, in one place (code review of fix/r3-scroll): within the unchanged
+   * 15 s default, Settings' list is reached about 40 % less far — the
+   * measured fling runs fit 5 rounds of ≈ 3 s, ≈ 5 × 1332 ≈ 6700 px of
+   * finger travel (≈ 6800 px of content once flung, rows skipped); now ≈ 4
+   * rounds of ≈ 3.5 s, each ≈ 850 px over the list plus ≈ 90 of fling,
+   * ≈ 3950 px, every row read. And the deadline is checked once a round,
+   * before the stroke, so the last round can overrun `timeoutMs` by a
+   * stroke (up to ≈ 1.33 s, the full-screen one), a settle (400 ms) and a
+   * tree read.
    */
   readonly dragSpeed = 0.45;
 
