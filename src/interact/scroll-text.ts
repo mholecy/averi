@@ -230,6 +230,9 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
+/** The direction that scrolls the other way — the status-bar failure's hint: a target the strokes pushed up under the bar is reached by scrolling back. */
+const OTHER_WAY = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
+
 /** `its centre (201,53) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar` — resolve.ts#refuseOffScreen's words for the same point. */
 const statusBarText = (judged: Judged, band: number): string => {
   const { x, y } = tapPoint(judged.node);
@@ -264,7 +267,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       if (short.of === 'statusBar') {
         return new Error(
           `scroll_until ${describe} failed after ${n} — ${statusBarText(judged, short.band)}, and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it out from under the status bar. ${last}`,
+            `swiping ${o.lastStroke} no longer moves it out from under the status bar — try direction: "${OTHER_WAY[o.lastStroke]}". ${last}`,
         );
       }
       if (short.of === 'covered') {

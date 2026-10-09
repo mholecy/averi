@@ -725,6 +725,16 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen.tapAt).toEqual({ point: { x: 75, y: 88 }, moved: true, piece: rect(0, 70, 150, 36) });
     });
 
+    it('the band\'s line sits at 20 % of the screen (174.8 on 874): content ending at 170 is excused over a bar item, content ending at 180 is not', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
+      const flat = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, row, later] });
+      const short = uiNode({ role: 'textfield', rect: rect(20, 80, 318, 90) }); // 80–170
+      expect(drawOrder(flat(short)).exposure(back, IPHONE).covers).toEqual([]);
+      const long = uiNode({ role: 'textfield', rect: rect(20, 80, 318, 100) }); // 80–180
+      expect(drawOrder(flat(long)).exposure(back, IPHONE).covers).toEqual([long]);
+    });
+
     it('a row reaching past the band\'s line starts the content: a text ending inside the band over its top covers it', () => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 150, 402, 50) }); // 150–200, past the line at 174.8
