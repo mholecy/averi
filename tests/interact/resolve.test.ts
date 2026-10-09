@@ -526,6 +526,29 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect([result.moved, bar.moved, result.note]).toEqual([undefined, undefined, undefined]);
   });
 
+  it('a pinned footer\'s text inside a row, after it in idb\'s flat list (code review P4, repro E): a cover — the tap moves off it, never onto the footer', async () => {
+    const fake = new FakeAdapter(
+      {
+        s: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 0, height: 0 },
+          children: [
+            node({ role: 'other', label: 'app', rect: { x: 0, y: 0, width: 402, height: 874 } }),
+            node({ role: 'button', identifier: 'row', label: 'Row', rect: { x: 0, y: 760, width: 402, height: 60 } }),
+            node({ role: 'text', label: 'Total 100 EUR', rect: { x: 16, y: 785, width: 200, height: 30 } }),
+          ],
+        }),
+      },
+      's',
+    );
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const result = await tapElement(fake, 'id:row', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 773 }]);
+    expect(result.moved).toBe('at (201,773) — its centre (201,790) is under text "Total 100 EUR" (16,785 200x30), drawn over it; tapped the uncovered part 402x25');
+  });
+
   it('the fill\'s focus tap goes through the same check: refused before anything is tapped or typed; moved, the note says where it focused', async () => {
     const refused = swiftForm();
     refused.live().children[3].role = 'textfield';

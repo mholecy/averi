@@ -398,8 +398,8 @@ describe('the three questions disagree on purpose, per row', () => {
     expect(ask(later)).toEqual({ shadowing: later, drawnOver: [later], target: [] });
   });
 
-  it('on the target: a non-interactive SIBLING lying wholly inside the target is drawn on it (idb\'s floating label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
-    const label = () => uiNode({ role: 'text', label: 'IBAN', rect: rect(160, 285, 50, 20) });
+  it('on the target: a non-interactive SIBLING lying wholly inside the target and repeating its text is drawn on it (idb\'s floating label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
+    const label = () => uiNode({ role: 'text', label: 'title', rect: rect(160, 285, 50, 20) });
     const sibling = label();
     expect(ask(sibling, true)).toEqual({ shadowing: sibling, drawnOver: [], target: [] });
     const button = uiNode({ role: 'button', label: 'clear', rect: rect(160, 285, 50, 20) });
@@ -608,8 +608,8 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       for (const cover of [shaped({ role: 'other' }), shaped({ identifier: 'pager' })]) expect(drawOrder(tree(cover)).exposure(row, IPHONE).covers).toEqual([cover]);
     });
 
-    it('an outlined field\'s floating label straddling its top border (a narrower sibling, its centre on the field): drawn on it; a full-width sibling is a header, a cover', () => {
-      const field = uiNode({ role: 'textfield', identifier: 'iban', rect: rect(24, 300, 354, 56) });
+    it('an outlined field\'s floating label straddling its top border (a narrower sibling repeating the field\'s label, its centre on the field): drawn on it; a full-width sibling is a header, a cover', () => {
+      const field = uiNode({ role: 'textfield', identifier: 'iban', label: 'IBAN', rect: rect(24, 300, 354, 56) });
       const label = uiNode({ role: 'text', label: 'IBAN', rect: rect(36, 292, 40, 16) });
       const header = uiNode({ role: 'text', label: 'Section', rect: rect(24, 290, 354, 20) });
       const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), field, later] });
@@ -618,6 +618,23 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       // A pinned footer's text straddling the BOTTOM edge (review round 2) — narrower, its centre on the field — still covers.
       const footer = uiNode({ role: 'text', label: 'Total 120 CZK', rect: rect(24, 330, 250, 40) });
       expect(drawOrder(tree(footer)).exposure(field, IPHONE).covers).toEqual([footer]);
+    });
+
+    it('a narrower text on the target that repeats nothing of it is a cover (code review of deep/r5-covers, P4): a pinned footer\'s text inside a row, a bare-text sticky header', () => {
+      const row = uiNode({ role: 'button', identifier: 'row', label: 'Row', rect: rect(0, 760, 402, 60) });
+      const footer = uiNode({ role: 'text', label: 'Total 100 EUR', rect: rect(16, 785, 200, 30) });
+      const header = uiNode({ role: 'text', label: 'SECTION', rect: rect(16, 770, 200, 40) });
+      const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), row, later] });
+      for (const cover of [footer, header]) expect(drawOrder(tree(cover)).exposure(row, IPHONE).covers).toEqual([cover]);
+      // What a field's own label repeats — its label, placeholder, value, or (idb) its identifier — is drawn on it.
+      const field = uiNode({ role: 'textfield', identifier: 'iban_field', label: 'IBAN', placeholder: 'Enter IBAN', value: 'DE89', rect: rect(24, 300, 354, 56) });
+      const on = (partial: Partial<UiNode>) => uiNode({ role: 'text', rect: rect(36, 310, 120, 18), ...partial });
+      const withField = (text: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [field, text] });
+      for (const text of [on({ label: 'IBAN' }), on({ label: 'Enter IBAN' }), on({ label: 'DE89' }), on({ identifier: 'iban_field', label: 'International account' })]) {
+        expect(drawOrder(withField(text)).exposure(field, IPHONE).covers).toEqual([]);
+      }
+      const other = on({ label: 'Required' });
+      expect(drawOrder(withField(other)).exposure(field, IPHONE).covers).toEqual([other]);
     });
 
     it('idb residual, open for the owner (review round 2): a row scrolled up under the top bar follows BackButton in the flat list and reads as drawn over it — pinned so a fix flips it on purpose', async () => {
