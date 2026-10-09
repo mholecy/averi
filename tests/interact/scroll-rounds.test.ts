@@ -4,6 +4,7 @@ import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
+import { containsPoint } from '../../src/ui-tree/geometry.js';
 import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Row } from '../helpers/rounds.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
@@ -1035,6 +1036,25 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
       { found: [], rest: 'b' },
     ]);
     expect(strokes(scrolled)[0].from).toEqual({ x: 540, y: 1553 }); // the shim's 1857 was on the bar
+  });
+
+  it('the measured shape both ways (code review of fix/r4, P1): the uncut stroke touches down at 1942 on the bar\'s rect; the cut one at 1638, above 1840, and an exhausted run then names no bar', () => {
+    const row = (rest: string): Row => ({ found: [], mainScroller: LIST, over: [BAR], rest });
+    const played = play(ANDROID, [row('a'), row('a'), row('a')]);
+    const [first] = played.steps.filter((st) => st.do === 'stroke');
+    expect(first).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1840, box: LIST });
+    // Without the overlay's cut — the stroke as it was drawn on the device — it touches down on the bar's host, on a tab.
+    const uncut = drawnFor({ do: 'stroke', toward: 'down', reach: 1, box: LIST });
+    expect(uncut.from).toEqual({ x: 540, y: 1942 });
+    expect(containsPoint(BAR.rect, uncut.from)).toBe(true);
+    // With it: above the host, on the list — and so the exhausted fail has no node drawn over the list to name.
+    for (const stroke of strokes(played)) {
+      expect(stroke.from.y).toBeLessThan(1840);
+      expect(containsPoint(BAR.rect, stroke.from)).toBe(false);
+    }
+    expect(failureOf(played, 'id:t').message).toBe(
+      'scroll_until id:t failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
+    );
   });
 
   it('the target\'s own container too — and a round whose tree did not read keeps the cut, as it keeps the keyboard\'s', () => {
