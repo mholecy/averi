@@ -231,6 +231,50 @@ describe('AndroidAdapter interactions', () => {
       expect(calls.at(-1)).toBe('adb -s emulator-5554 get-state');
     });
 
+    // C5 (2026-10-09): a get-state that TIMES OUT carries no stderr of its own
+    // — exec.ts substitutes node's "Command failed: <cmd>" — and the reply
+    // quoted that as what adb "says". A get-state that never answered is a
+    // hung adb server or transport, not a device state.
+    it('get-state TIMING OUT is worded as a timeout, not as something adb said', async () => {
+      const calls: string[] = [];
+      const fn: ExecFn = async (cmd, args) => {
+        const full = [cmd, ...args].join(' ');
+        calls.push(full);
+        throw execErrorLikeExec(full, null, '', { timedOut: true });
+      };
+      const err = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree().then(() => undefined, (e: Error) => e);
+      expect(err?.message).toBe(
+        'device emulator-5554 is not answering: adb get-state timed out after 5 s — the adb server or this ' +
+          "device's transport is hung, not the app. Run `adb devices`: if it hangs too, `adb kill-server && " +
+          'adb start-server`; if only this device is stuck, restart the emulator (or reconnect the USB cable). ' +
+          'Not an averi or uiautomator fault. (uiautomator dump timed out after 15 s)',
+      );
+      expect(err?.message).not.toContain('says');
+      expect(calls.at(-1)).toBe('adb -s emulator-5554 get-state');
+    });
+
+    it('get-state timing out after a dump that answered without XML keeps the dump as evidence', async () => {
+      const fn: ExecFn = async (cmd, args) => {
+        const full = [cmd, ...args].join(' ');
+        if (full.includes('uiautomator dump')) return { stdout: Buffer.from('Killed'), stderr: '' };
+        throw execErrorLikeExec(full, null, '', { timedOut: true });
+      };
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /^device emulator-5554 is not answering: adb get-state timed out after 5 s — .*\(uiautomator dump returned no XML: Killed\)$/s,
+      );
+    });
+
+    it('get-state that ANSWERED with a failure (exit 1) is still quoted as what adb says', async () => {
+      const fn: ExecFn = async (cmd, args) => {
+        const full = [cmd, ...args].join(' ');
+        if (full.includes('uiautomator dump')) return { stdout: Buffer.from('Killed'), stderr: '' };
+        throw execErrorLikeExec(full, 1, '');
+      };
+      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+        /^device emulator-5554 is not reachable: adb get-state says "Command failed: adb -s emulator-5554 get-state"/,
+      );
+    });
+
     it('adb itself failing on the dump (device not found, exit 255) is diagnosed as unreachable, with the cause kept', async () => {
       const fn: ExecFn = async (cmd, args) => {
         const full = [cmd, ...args].join(' ');

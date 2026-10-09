@@ -28,6 +28,8 @@ interface AdbCallOptions {
 const NULL_ROOT_RE = /null root node/i;
 const NULL_ROOT_RETRY_MS = 1_000;
 const DUMP_TIMEOUT_MS = 15_000;
+/** diagnoseDumpFailure's `adb get-state` — a one-line answer; past this, adb is not answering. */
+const GET_STATE_TIMEOUT_MS = 5_000;
 
 /**
  * Budget for the soft-keyboard question (the measured cost of the call is on
@@ -393,7 +395,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * calls were spent on uiautomator hypotheses before `adb shell wm size`
    * said `device offline`. `adb get-state` is that one-line discriminator,
    * so run it HERE, after the failure, and lead with what it says. (Spends up
-   * to 5 s of device time — hence "diagnose", not "explain".)
+   * to GET_STATE_TIMEOUT_MS of device time — hence "diagnose", not "explain".)
    */
   private async diagnoseDumpFailure(
     kind: 'no-xml' | 'timeout' | 'exec-error',
@@ -407,8 +409,19 @@ export class AndroidAdapter implements DeviceAdapter {
         : `uiautomator dump returned no XML: ${status}`;
     let state: string;
     try {
-      state = (await this.adb(['get-state'], { timeoutMs: 5_000 })).stdout.toString('utf8').trim();
+      state = (await this.adb(['get-state'], { timeoutMs: GET_STATE_TIMEOUT_MS })).stdout.toString('utf8').trim();
     } catch (e) {
+      // A get-state that never answered has no state to quote: its stderr is
+      // node's "Command failed: <cmd>" (exec.ts substitutes it for an empty
+      // one), and the reply read `adb get-state says "Command failed: …"`
+      // (C5, 2026-10-09). What hangs is adb — its server or this device's
+      // transport — so say that, and how to tell which.
+      if (e instanceof ExecError && e.timedOut) {
+        return `device ${this.serial} is not answering: adb get-state timed out after ${formatSeconds(GET_STATE_TIMEOUT_MS)} — ` +
+          `the adb server or this device's transport is hung, not the app. Run \`adb devices\`: if it hangs too, ` +
+          `\`adb kill-server && adb start-server\`; if only this device is stuck, restart the emulator (or reconnect ` +
+          `the USB cable). Not an averi or uiautomator fault. (${dump})`;
+      }
       // `adb get-state` on an offline/missing device exits 1 with
       // "error: device offline" / "error: device '<id>' not found" on stderr.
       state = e instanceof ExecError

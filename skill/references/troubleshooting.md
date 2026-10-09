@@ -21,6 +21,7 @@ Find the line or error you see, then act on it. Each entry gives the meaning, th
   2. the simulator reboot the error names;
   3. or `app.ios.treeSource: wda` as an alternative source.
 - **Android `device <id> is not reachable: adb get-state says "device offline"`**: recover the emulator (wait for `adb devices` to show `device`, else `adb kill-server && adb start-server`). Do not call `ensure_state` meanwhile: its probes read nothing.
+- **Android `device <id> is not answering: adb get-state timed out`**: adb itself hangs, not the app. Run `adb devices`; if it hangs too, `adb kill-server && adb start-server`, otherwise restart the emulator (or reconnect the USB cable).
 - **Android `is still settling`** (uiautomator's null root right after a launch): take a `screenshot` (it waits for stability), then retry.
 - **Android `is reachable but SLOW`**: the host is under load. The app is not dead.
 - **`absent` assert fails with "could not verify"**: the tree was bare. Absence is never passed on an empty screen.
