@@ -1,7 +1,6 @@
-import type { DeviceAdapter, Point, Rect, SoftKeyboard } from '../adapters/types.js';
-import { containsPoint } from '../ui-tree/geometry.js';
+import type { DeviceAdapter, Point, Rect } from '../adapters/types.js';
+import { readKeyboard, type Covering, type FrameVerdict, type KeyboardReading, type Uncovered } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { coveringRect, readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type TapScreen, type Target } from './resolve.js';
@@ -27,16 +26,14 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * decisions and words. The shape is `keyboard.ts`'s now; the decisions, the
  * side effect and the words are the model's (`KeyboardModel`, `Hiding`).
  *
- * The READING half — the keyboard read for a SUBJECT, the node about to be
- * tapped or measured — has its own switch, one layer down:
- * `ui-tree/soft-keyboard.ts#readSoftKeyboard`, because the pixel poll
+ * The READING half — what the keyboard covers, and whether the input
+ * method stands by it — has its own switch, one layer down:
+ * `ui-tree/keyboard-cover.ts#readKeyboard`, because the pixel poll
  * (verify/, which may not import interact/) reads the keyboard too and
- * must read it the same way. Every look the guard takes goes through it,
- * so the guard and the poll see one keyboard by construction. The
- * dismissal after a fill has no subject and reads its model's own source
- * (`dismiss`: the oracle's `state()`, the tree's band) — routing it through
- * readSoftKeyboard would need a tree the window model never reads and a
- * subject the in-tree model does not have.
+ * must read it the same way. Every look the guard takes, every re-check
+ * round and both models' dismissals ask a reading, so the guard and the
+ * poll see one keyboard by construction, and neither model calls the
+ * oracle itself (since 2026-10-09).
  */
 
 /**
@@ -135,33 +132,6 @@ export interface DismissResult {
   warning?: string;
 }
 
-/** The guard's reading of one keyboard state against the tap point, with the frame when it covers — so a message can quote it without a second look. */
-export type CoverReading = { over: 'covering'; frame: Rect } | ClearReading;
-
-/** A reading that lets the tap go ahead: nothing over the point, or a state that could not be read (fail open — the guard's one rule, stated in `keyboard.ts`). */
-export type ClearReading = { over: 'clear' } | { over: 'unknown' };
-
-/**
- * Is the keyboard over the point about to be tapped? Geometry only
- * (`containsPoint`, ui-tree/geometry.ts); the models judge. One reading for
- * both models: the oracle's frame and the tree's band are both a
- * `SoftKeyboard` (named `windowOver` until the review of the model split,
- * which was the window model's word). Since 2026-10-08 the point is tested
- * against every rect the keyboard covers (`keyboardRects`: the band, then a
- * floating panel the oracle reading (`oracleKeyboard`) found beside it —
- * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md, where a tap
- * inside the panel pressed Gboard's `d` key), and `frame` is the rect that
- * holds it, so a message quotes the panel, not the band, when the panel is
- * what covered. A point under a panel takes the path a point under the band
- * always took: the witness, one `back` (measured that day to hide the
- * floating keyboard without popping the form), one look.
- */
-export const keyboardOver = (keyboard: SoftKeyboard, point: Point): CoverReading => {
-  if (keyboard.state === 'unknown') return { over: 'unknown' };
-  const frame = coveringRect(keyboard, (r) => containsPoint(r, point));
-  return frame === undefined ? { over: 'clear' } : { over: 'covering', frame };
-};
-
 /**
  * `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling of the
  * KEYBOARD's frame (the oracle's, or the in-tree band) in the guard's and the
@@ -198,11 +168,12 @@ export function failedLookMessage(e: unknown, refused: string, failed: (headline
   return [failed(headline), ...rest].join('\n');
 }
 
-/** What one look found: the target resolved again, where it is now, and the keyboard read against that point. */
+/** What one look found: the target resolved again, where it is now, the keyboard read against that point, and the reading it came from (off the look's tree — the in-tree model's picker asks it again). */
 export interface Look {
   resolved: ResolvedSettled;
   point: Point;
-  reading: CoverReading;
+  verdict: FrameVerdict;
+  reading: KeyboardReading;
 }
 
 /**
@@ -210,12 +181,14 @@ export interface Look {
  * SAME options — so it proves it holds still again, and so an
  * adjustResize activity's re-layout (or the iOS keyboard-avoiding layout's)
  * is followed to where the node is now — and the keyboard read against
- * that point through `readSoftKeyboard`, off the tree that resolved it (the
- * in-tree model pays no device read; the window model asks its oracle
- * once). The reading is the first look's rule on every look, the window
- * model's look after `back` included: a target that is the keyboard's own
- * UI reads `unknown` and the oracle is not asked — until 2026-10-07 that
- * look called `oracle.state()` directly, so an oracle adapter handed an
+ * that point by a reading off the tree that resolved it
+ * (`readKeyboard(…).frameOver`: the in-tree model pays no device read; the
+ * window model asks its oracle once, twice with the keyboard up). The frame
+ * decides, never the witness: on the window model this is the look after
+ * `back`, and the key is already pressed. The reading is the first look's
+ * rule on every look: a target that is the keyboard's own UI reads
+ * `unknown` and the oracle is not asked — until 2026-10-07 that look called
+ * `oracle.state()` directly, so an oracle adapter handed an
  * `ofKeyboard`-marked tree would now skip that read and proceed as unknown;
  * no real adapter produces one (the Android tree is never marked), so the
  * difference is unreachable, and the event-log pins hold. A resolution that
@@ -233,8 +206,8 @@ export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: 
     throw failed(e);
   }
   const point = tapPoint(resolved.node);
-  const reading = keyboardOver((await readSoftKeyboard(adapter, resolved.tree, resolved.node)).keyboard, point);
-  return { resolved, point, reading };
+  const keyboard = readKeyboard(adapter, resolved.tree);
+  return { resolved, point, verdict: await keyboard.frameOver(point, resolved.node), reading: keyboard };
 }
 
 /** One confirming look after the side effect: the keyboard gone, with what the caller returns, or still up, with what its refusal needs to say. */
@@ -269,8 +242,15 @@ export interface CoveredLook {
   point: Point;
   /** The screen the first look was judged on (resolve.ts#tapScreen), for a model that judges a point of its own — the in-tree model's dismissal (`onScreen`). */
   screen: TapScreen | undefined;
-  /** The frame (or band) that covered it. */
-  frame: Rect;
+  /**
+   * What the first look's reading said (`readKeyboard(…).over`): the frame
+   * (or band, or panel) that covered it, and the input method's word over
+   * it — `covered` (confirmed, or the witness could not be asked) or
+   * `denied`, the veto. Read by the window model only; the in-tree model
+   * ignores it and takes a second look of its own (its reading is always
+   * `covered`, confirmed, here).
+   */
+  verdict: Covering;
   /** The target as the messages name it: `id:login_submit`, `id:"login_submit"` for an ElementSpec. */
   what: string;
   /** `the soft keyboard covered <what>` — the fact every sentence starts from; each outcome appends its own ending. */
@@ -294,7 +274,7 @@ export interface Hiding {
   /** The look could not resolve the target: the model's error over `failedLookMessage`, saying what it did to the screen first, with `e` as the cause. */
   failed(e: unknown): KeyboardGuardError;
   /** A look found the point clear (or the state unreadable — fail open, but the note must not claim what was not seen): the `keyboardHidden` sentence. */
-  hidden(after: ClearReading): string;
+  hidden(after: Uncovered): string;
   /** The last look still found it covering: the model's refusal — nothing more is done. */
   stillCovering(seen: { frame: Rect; point: Point }, looks: number): KeyboardGuardError;
 }
@@ -312,11 +292,12 @@ export interface KeyboardModel {
   /**
    * The guard from a first look that found the point covered up to — not
    * including — the one side effect: the model's own re-checks (the window
-   * model asks the witness and waits out a stale window state; the in-tree
-   * model takes a second look and picks a dismissal). Three endings: the
-   * keyboard left on its own and the target is handed back clear, with a
-   * note that says what was waited for; a refusal is thrown, nothing sent;
-   * or the hiding to perform, with its words.
+   * model, on a first look the input method DENIED, waits out a stale
+   * window state; the in-tree model takes a second look and picks a
+   * dismissal). Three endings: the keyboard left on its own and the target
+   * is handed back clear, with a note that says what was waited for; a
+   * refusal is thrown, nothing sent; or the hiding to perform, with its
+   * words.
    */
   guard(covered: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }>;
   /**

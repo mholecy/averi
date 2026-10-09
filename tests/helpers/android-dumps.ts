@@ -15,7 +15,7 @@ export const INPUT_SHOWN_LINE = (shown: boolean) =>
  * reads; `touchable`: what AndroidAdapter's keyboardTouchable command prints
  * — the `mInputShown` line of `dumpsys input_method`, then the `touchable
  * region=` line of `dumpsys window InputMethod`. Shared by the adapter's
- * parser tests, the reader's rules (tests/ui-tree/soft-keyboard.test.ts) and
+ * parser tests, the reader's rules (tests/ui-tree/keyboard-cover.test.ts) and
  * the end-to-end keyboard test.
  */
 export const GBOARD = {

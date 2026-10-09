@@ -1,7 +1,8 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
 import { shadowing } from '../ui-tree/geometry.js';
+import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { accessoryDismissButton, cannotHide, keyboardInTree, partOfKeyboard } from '../ui-tree/soft-keyboard.js';
+import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
 import {
   confirmHidden,
@@ -10,7 +11,6 @@ import {
   KEYBOARD_HIDE_DELAY_MS,
   KeyboardGuardError,
   lookAgain,
-  keyboardOver,
   withNote,
   type CoveredLook,
   type DismissOptions,
@@ -29,7 +29,8 @@ import { describeTarget, findTarget, onScreen, tapScreen, type Ambiguity, type T
  * the band it draws over (`KEYBOARD_ROLE`) and the Windows that are its own
  * UI (`ofKeyboard`; adapters/wda-source.ts#keyboardMarks has the rules and
  * the measurements). Nothing is asked of the device to read it: the band is
- * read off the tree that resolved the target (`ui-tree/soft-keyboard.ts`),
+ * read off the tree that resolved the target (a reading,
+ * `ui-tree/keyboard-cover.ts#readKeyboard`, over `ui-tree/soft-keyboard.ts`),
  * and there is no key that hides it without a side effect — the return key
  * and the blind `enter` SUBMIT from the field (K5d, docs/bugs/2026-10-05-ios-
  * tap-lands-on-soft-keyboard.md), so a covered point is refused unless the
@@ -175,7 +176,8 @@ interface DismissalPick {
 /**
  * The FIRST configured dismissal that is usable, judged on one tree — the
  * one that found the keyboard covering, so no device read is spent on the
- * choice — and no wait: a dismissal that is not there now is not there.
+ * choice; `keyboard` is the reading off that same tree — and no wait: a
+ * dismissal that is not there now is not there.
  * Every strategy passed over gets a reason (`DismissalPick.skipped`).
  *
  * A `tap` strategy is usable when its target matches a NON-INTERACTIVE node
@@ -187,7 +189,8 @@ interface DismissalPick {
  * unambiguous under the caller's `refuse` mode (the guard must not pick one
  * of two titles; under `first` the first is taken, as a flow step would,
  * and the choice is said in `what`), is not the keyboard's own UI
- * (`partOfKeyboard`: a tap on a key or on Done is what `accessory` is for),
+ * (the reading's `ofKeyboard`: a tap on a key or on Done is what `accessory`
+ * is for),
  * has its centre clear of the band (a configured element under the keyboard
  * would be the very tap this guard refuses), on screen — `onScreen`
  * (resolve.ts), the tap's own rule since 2026-10-08, over `screen` (the
@@ -198,10 +201,17 @@ interface DismissalPick {
  * (`shadowing`, ui-tree/geometry.ts: an alert, a sheet, a navigation bar's
  * label). An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
- * check is repeated here.
+ * check is repeated here. `keyboard` must be a reading OF `tree`: its band
+ * and its `ofKeyboard` set are that tree's, and a node of another tree is
+ * never the keyboard's by identity.
  */
-function pickDismissal(tree: UiNode, dismissals: readonly KeyboardDismissal[], ambiguous: Ambiguity, screen: TapScreen | undefined): DismissalPick {
-  const band = keyboardInTree(tree);
+async function pickDismissal(
+  tree: UiNode,
+  keyboard: KeyboardReading,
+  dismissals: readonly KeyboardDismissal[],
+  ambiguous: Ambiguity,
+  screen: TapScreen | undefined,
+): Promise<DismissalPick> {
   const skipped: string[] = [];
   for (const d of dismissals) {
     const name = describeDismissal(d);
@@ -229,12 +239,12 @@ function pickDismissal(tree: UiNode, dismissals: readonly KeyboardDismissal[], a
     }
     const node = neutral[0];
     const what = neutral.length > 1 ? `${describeTarget(d.target)} (${neutral.length} matches, the first)` : describeTarget(d.target);
-    if (partOfKeyboard(tree, node)) {
+    if (keyboard.ofKeyboard(node)) {
       skipped.push(`${name}: the keyboard's own control`);
       continue;
     }
     const at = tapPoint(node);
-    if (keyboardOver(band, at).over === 'covering') {
+    if ((await keyboard.frameOver(at)).kind === 'covered') {
       skipped.push(`${name}: under the keyboard`);
       continue;
     }
@@ -280,7 +290,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      *   window clear / unknown                    → proceed
      *     No band in the tree (none on screen, or a source that carries
      *     none — idb), a band elsewhere, or a target that is the keyboard's
-     *     own UI (`partOfKeyboard`, read as unknown): the guard's fail-open
+     *     own UI (`ofKeyboard`, read as unknown): the guard's fail-open
      *     rule, as everywhere — the node of that look, with the note that
      *     the keyboard is gone (no band) or still up but no longer over the
      *     target (a band elsewhere: the layout re-flowed).
@@ -337,17 +347,17 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       // tree with the target moved out from under it — the keyboard-avoiding
       // layout re-flowed — is "still up", so the note never claims a keyboard
       // left the screen that is still on it.
-      if (second.reading.over !== 'covering') {
+      if (second.verdict.kind !== 'covered') {
         return {
           cleared: withNote(
             second.resolved,
-            second.reading.over === 'clear' ? `${covered}; still up on the second look, but no longer over it` : `${covered}; gone on the second look`,
+            second.verdict.kind === 'clear' ? `${covered}; still up on the second look, but no longer over it` : `${covered}; gone on the second look`,
           ),
         };
       }
       const { point } = second;
       const dismissals = opts.dismissals ?? [];
-      const { picked, skipped } = pickDismissal(second.resolved.tree, dismissals, opts.ambiguous, screen);
+      const { picked, skipped } = await pickDismissal(second.resolved.tree, second.reading, dismissals, opts.ambiguous, screen);
       if (picked === undefined) {
         // Names MCP tools and "a flow" — the deliberate exception recorded at
         // the window model's "back did not close it" error. The platform's
@@ -357,7 +367,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
         // one was passed over.
         const cannot = cannotHide(adapter.keyboardAdvice);
         throw new KeyboardWithoutDismissal(
-          `The soft keyboard covers ${what}: the band it draws over ${frameText(second.reading.frame)} contains the tap point ` +
+          `The soft keyboard covers ${what}: the band it draws over ${frameText(second.verdict.frame)} contains the tap point ` +
             `(${point.x},${point.y}) on two looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; ${cannot}, and ${nothingPicked(dismissals, skipped)}. Nothing was tapped: ` +
             `the tap would have pressed the keyboard and been reported done. From the MCP tools: hide the keyboard first, ` +
             `then tap ${what} again. In a flow: hide it with a step before this one (a tap: on an element the keyboard ` +
@@ -387,7 +397,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           // the target now clear of it, is said as such — the tap moved the
           // layout, or something else did; it did not hide the keyboard.
           hidden: (after) =>
-            after.over === 'clear'
+            after.kind === 'clear'
               ? `${covered}; tapped ${picked.what}, and the keyboard is still up but no longer over it`
               : `${covered}; hidden by tapping ${picked.what} before tapping`,
           stillCovering: ({ frame, point: targetAt }, looks) =>
@@ -441,8 +451,9 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      */
     async dismiss({ dismissals = [], ambiguous }: DismissOptions): Promise<DismissResult> {
       const tree = await adapter.uiTree();
-      if (keyboardInTree(tree).state !== 'shown') return {};
-      const { picked, skipped } = pickDismissal(tree, dismissals, ambiguous, await tapScreen(adapter, tree));
+      const keyboard = readKeyboard(adapter, tree);
+      if ((await keyboard.anywhere()) !== 'shown') return {};
+      const { picked, skipped } = await pickDismissal(tree, keyboard, dismissals, ambiguous, await tapScreen(adapter, tree));
       if (picked === undefined) {
         return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, skipped)} — the next tap under it will be refused` };
       }
@@ -467,8 +478,8 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           } catch (e) {
             throw failed(e);
           }
-          const after = keyboardInTree(reread);
-          return after.state !== 'shown' ? { gone: { hiddenBy: `tapping ${picked.what}` } } : { stillUp: after.frame };
+          const after = await readKeyboard(adapter, reread).cover();
+          return after === undefined ? { gone: { hiddenBy: `tapping ${picked.what}` } } : { stillUp: after.band };
         },
         (frame, reads) =>
           new AfterDismissalTap(

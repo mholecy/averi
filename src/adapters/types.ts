@@ -206,7 +206,7 @@ export interface UiNode {
    * `inputView` placeholder (adapters/wda-source.ts#keyboardMarks). A node
    * under such a root is never COVERED by the keyboard: it is the keyboard,
    * and a tap on it — a digit, Done, the Passwords bar — is what the user
-   * does (ui-tree/soft-keyboard.ts#partOfKeyboard walks the ancestry). On
+   * does (ui-tree/soft-keyboard.ts#keyboardSideNodes walks the ancestry). On
    * the roots only, not on every descendant: `ui_snapshot` prints the tree
    * as JSON, and one mark per window says it where seventy would be noise.
    * Absent everywhere on Android and on an idb tree.
@@ -260,14 +260,14 @@ export type SoftKeyboard =
        * a floating Gboard on API 33 keeps only a 132-px collapse strip as its
        * IME inset — `frame` — while its panel, mid-screen, is a second rect of
        * the IME window's touchable region. Never set by `KeyboardOracle.state()`
-       * (one command, the band only): `ui-tree/soft-keyboard.ts#oracleKeyboard`,
-       * the one composer of an oracle reading (behind `readSoftKeyboard` and
-       * the guard's re-check loop in interact/keyboard-window.ts), adds them
-       * from `KeyboardOracle.touchable()` when the band is up, by
-       * `panelsBeyond`'s rules. Absent: none, or not read (the
-       * in-tree model, a docked keyboard whose region IS the band, a region
-       * that could not be trusted). Every reader that tests the keyboard
-       * against a point or a rect tests `frame` AND these (`keyboardRects`).
+       * (one command, the band only): a reading
+       * (`ui-tree/keyboard-cover.ts#readKeyboard`, the one composer of an
+       * oracle reading, behind every reader of the keyboard) adds them from
+       * `KeyboardOracle.touchable()` when the band is up, by `panelsBeyond`'s
+       * rules there. Absent: none, or not read (the in-tree model, a docked
+       * keyboard whose region IS the band, a region that could not be
+       * trusted). Every question a reading answers about a point or a rect
+       * tests `frame` AND these.
        */
       panels?: readonly Rect[];
     }
@@ -342,18 +342,20 @@ export interface KeyboardOracle {
    * first answer can be stale: measured that day on Android 13, right after
    * a tap that navigated away the window state still read "shown" with the
    * full frame for a few seconds, while the input method itself already said
-   * it was not. interact/keyboard-window.ts asks this immediately before it presses
+   * it was not. It is asked (a reading's `over`, once the frame covers the
+   * tap point) immediately before interact/keyboard-window.ts presses
    * `back` for keyboard reasons — never on an ordinary tap. Since 2026-10-08
    * also in two places that press nothing: where `state()` read HIDDEN and
    * the caller has no tap point — the post-fill dismissal, and
-   * `scroll_until` on a failed or `fully: true` stop
-   * (interact/keyboard.ts#keyboardUnlocated, the `unlocated` row:
-   * window hidden, input method shown, only reported) — and in
-   * `scroll_until` before a `shown` band may change its judgement or its
-   * stroke (keyboard.ts#keyboardCorroborated, the same veto; at most once a
-   * round, on every round a band matters — the answer is never kept). Those callers
-   * (interact/keyboard-window.ts#windowUnlocated, #windowCorroborated) rely
-   * on the never-throws contract above and have no catch.
+   * `scroll_until` on a failed or `fully: true` stop (a reading's
+   * `unlocated`, the `unlocated` row: window hidden, input method shown,
+   * only reported) — and in `scroll_until` before a `shown` band may change
+   * its judgement or its stroke (a reading's `corroborated`, the same veto;
+   * at most once a round, on every round a band matters — the answer is
+   * never kept). Since 2026-10-09 every one of them asks through a reading
+   * (ui-tree/keyboard-cover.ts#readKeyboard), the one caller of this method,
+   * which asks it at most once per reading, relies on the never-throws
+   * contract above and has no catch.
    *
    * A method of its own rather than an option on `state()`: the caller needs
    * it at a different moment (after the frame has been tested against the
@@ -368,8 +370,9 @@ export interface KeyboardOracle {
    * policy: what of the region counts as covered — only beside a `shown`
    * band, only with the input method saying shown, only rects that fit the
    * band's screen, never the band itself — is
-   * `ui-tree/soft-keyboard.ts#panelsBeyond`'s, and its one caller,
-   * `oracleKeyboard` there, asks this only after `state()` read `shown` (the region alone was measured
+   * `ui-tree/keyboard-cover.ts#panelsBeyond`'s, and its one caller, a
+   * reading there (`readKeyboard`), asks this only after `state()` read
+   * `shown`, and only for a question about area (the region alone was measured
    * non-empty while hidden and stale after a rotation, so it is never
    * evidence on its own). A method of its own, not part of `state()`, for
    * the reason `witness` gives: one call that sometimes runs two commands
