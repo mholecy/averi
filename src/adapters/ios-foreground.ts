@@ -50,8 +50,35 @@ import { sleep } from '../util/sleep.js';
  * The note's honesty. A label that never matches is either the previous app
  * (or SpringBoard) still in idb's tree, or THIS app under a name its Info.plist
  * does not carry — a localized display name (InfoPlist.strings) on a device
- * in another language, unmeasured — and the check cannot tell which. The
- * note says both and names the one check that can (screenshot).
+ * in another language, unmeasured. The screenshot does NOT tell them apart
+ * (corrected 2026-10-09, docs/bugs/2026-10-09-ios-launch-give-up-note-says-
+ * ignore-when-tree-is-stale.md): the pixels switch before idb's tree does,
+ * so in both cases it shows the launched app — measured at 347e70d, the
+ * first switch after the bank app had been in front for minutes: the
+ * screenshot showed Contacts while idb served "Skeleton Internal" for
+ * ≥ 4.5 s, past the bound, and the note's "if the screenshot shows
+ * <bundle> … this can be ignored" licensed exactly the wrong-app read this
+ * wait exists to prevent. What does tell them apart is the label itself,
+ * so the note is chosen by it, from what the adapter already holds and
+ * with no device call:
+ *  - SpringBoard's `' '` — never the launched app under another name: read
+ *    again.
+ *  - the name of ANOTHER app the adapter has read names for (`ownerOf`;
+ *    IosAdapter's appinfo cache — every bundle it launched; the measured
+ *    case, an app launched earlier then left): the tree is that app's,
+ *    whatever the screenshot shows — read again; no localized-name reading.
+ *  - any other label — an app averi never launched (opened by hand, or
+ *    before the server started), or a localized name: both readings, told
+ *    apart by TIME, not pixels — the label still the same a few seconds
+ *    later with the screenshot showing the launched app is its localized
+ *    name. "A few seconds", not one: the measured stale window ran ≥ 4.5 s
+ *    from the launch, the note comes at ~3 s.
+ * Considered and not done: one more read after the bound before writing the
+ * note (one read ~3.3 s in would not have outlasted the measured ≥ 4.5 s,
+ * and a longer bound is paid by every localized-name launch); asking every
+ * installed app's name (`simctl listapps`, a device call of unmeasured
+ * cost and format on every never-matching launch) — the cache covers the
+ * app averi switched away from, the case measured.
  *
  * What it costs: every iOS launch through `launch_app` or a flow's `launch:`
  * on the idb source pays at least ONE describe-all read (a few tenths of a
@@ -108,6 +135,12 @@ export interface ForegroundCheck {
    * note quotes. Called at most once per wait.
    */
   names(): Promise<readonly string[]>;
+  /**
+   * The bundle id of an app whose names include `label`, among those the
+   * caller already holds (IosAdapter: every bundle it read appinfo for) —
+   * undefined when none does. No device call: asked only for the note.
+   */
+  ownerOf(label: string): string | undefined;
 }
 
 /**
@@ -163,7 +196,7 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
     // Pause only if the read after it would START before the deadline.
     if (Date.now() + FOREGROUND_POLL_MS >= deadline) {
       // The most telling thing read wins: a real label, then an unlabelled tree, then nothing at all.
-      if (stale !== undefined) return notInFront(check.bundleId, stale, names ?? []);
+      if (stale !== undefined) return notInFront(check.bundleId, stale, names ?? [], check.ownerOf(stale));
       if (unlabelled) return unchecked(check.bundleId, `the tree's Application element had no label, or there was none, for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`);
       return emptyThroughout(check.bundleId);
     }
@@ -181,20 +214,30 @@ const whose = (label: string) =>
   label.trim() === '' ? "SpringBoard's (the home screen or the launch animation)" : `the app labelled "${label}"`;
 
 /**
- * The localized-name reading applies only to an APP's label: SpringBoard's
- * `' '` is never the launched app under another name, so its note says
- * only to read again.
+ * The note for a label that never matched, chosen by the label (see the
+ * module comment): SpringBoard's — read again; another known app's name
+ * (`owner`) — that app's tree, read again; else both readings, told apart
+ * by a later read. The head is the same for all three.
  */
-function notInFront(bundleId: string, label: string, names: readonly string[]): string {
+function notInFront(bundleId: string, label: string, names: readonly string[], owner: string | undefined): string {
   const head =
     `${formatSeconds(FOREGROUND_WAIT_MS)} after launching ${bundleId}${names.length > 0 ? ` (${quoted(names)})` : ''}, ` +
     `the UI tree was still ${whose(label)} — iOS can hand idb the previous app's tree for a second or more after an app ` +
-    'switch, so a read now may judge the wrong app (an absent check passes on it). Compare with screenshot. ';
-  if (label.trim() === '') return head + 'Read again before trusting what the tree says';
+    'switch, so a read now may judge the wrong app (an absent check passes on it). ';
+  if (label.trim() === '') return head + 'Compare with screenshot. Read again before trusting what the tree says';
+  if (owner !== undefined) {
+    return (
+      head +
+      `"${label}" is the name of ${owner}, which averi launched earlier, not of ${bundleId}: the tree is still that app's, ` +
+      `even if the screenshot already shows ${bundleId} (it switches before idb's tree does) — read again before trusting what the tree says`
+    );
+  }
   return (
     head +
-    `If the screenshot shows ${bundleId}, its on-screen name differs from its Info.plist name (a localized display name) and ` +
-    'this can be ignored; otherwise read again before trusting what the tree says'
+    `Read again in a few seconds: if the tree is still labelled "${label}" and the screenshot shows ${bundleId}, that label ` +
+    "is its on-screen name (a localized display name its Info.plist does not carry) and this can be ignored; if the label " +
+    "changed, this read was the previous app's. The screenshot alone cannot tell them apart: it shows the launched app " +
+    "before idb's tree does"
   );
 }
 
