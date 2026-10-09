@@ -49,7 +49,7 @@ export interface Row {
   /**
    * Nodes drawn OVER the rest of the screen — put last in the tree, after
    * the containers (a floating tab bar's host and its tabs,
-   * geometry.ts#drawnOver); default none.
+   * ui-tree/draw-order.ts#drawnOver); default none.
    */
   over?: readonly UiNode[];
   /** The tree shows a progress node (read-tree.ts#showsProgress); default false. */
