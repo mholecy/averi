@@ -439,6 +439,11 @@ describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one own
     expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ x: 0, y: 940, width: 1080, height: 1280 }])).toEqual({ within: list, box: list });
     // …while the lower-half rule's cut stands under it: the bar's 1840 kept, the wrapper not cut for.
     expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ x: 66, y: 1840, width: 948, height: 248 }, { x: 0, y: 940, width: 1080, height: 1280 }])).toEqual({ within: list, box: list, coverTop: 1840 });
+    // The floor is a third of the box ABOVE the keyboard: 215 of 573 is enough, though not of the whole 1395.
+    expect(strokeRoom(BOX, [list], 'down', 1398, () => [{ x: 0, y: 1040, width: 1080, height: 300 }])?.coverTop).toBe(1040);
+    // The HIGHEST node over the touch-down is judged: one from 300 over a 670-px box leaves 200, under the floor — uncut, though a cut above the lower one, at 340, would have cleared it.
+    const box = { x: 0, y: 100, width: 1080, height: 670 };
+    expect(strokeRoom(BOX, [box], 'down', undefined, () => [{ x: 0, y: 300, width: 1080, height: 600 }, { x: 0, y: 340, width: 1080, height: 400 }])).toEqual({ within: box, box });
     // Off the touch-down (beside the stroke's line, or below the touch-down): no cut, as before.
     expect(strokeRoom(BOX, [short], 'down', undefined, () => [{ x: 600, y: 1840, width: 480, height: 248 }])).toEqual({ within: short, box: short });
     expect(strokeRoom(BOX, [short], 'down', undefined, () => [{ x: 0, y: 1600, width: 1080, height: 100 }])).toEqual({ within: short, box: short });
