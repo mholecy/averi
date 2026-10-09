@@ -853,13 +853,12 @@ function judge(
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  const whole: Rect = viewport;
   // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
-  const band = { boxes: [whole], statusBand };
-  const screen: Rect = belowStatusBand(whole, band);
+  const band = { boxes: [viewport], statusBand };
+  const screen: Rect = belowStatusBand(viewport, band);
   const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
     const centre = tapPoint(node);
-    return { centreOnScreen: containsPoint(screen, centre), ...(inStatusBand(centre, band) && { bandOverCentre: screen.y - whole.y }) };
+    return { centreOnScreen: containsPoint(screen, centre), ...(inStatusBand(centre, band) && { bandOverCentre: screen.y - viewport.y }) };
   };
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
     const box: Rect = { x: 0, y: 0, ...frame };
