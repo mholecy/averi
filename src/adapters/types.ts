@@ -318,8 +318,11 @@ export interface UiNode {
    * the tree says what a node belongs to. Read by ui-tree/draw-order.ts,
    * whose `target` question judges such a list by a rule of its own —
    * the top bar listed before the content is no cover's target
-   * (`flatListChrome`) — and asks an on-target text to repeat the target
-   * (`onTarget`), the sibling guard being void there. A mark of the source, like `ofKeyboard` and
+   * (`flatListChrome`), later content past a reading-order break is no
+   * cover of a content target (`flatListReadingOrder`), and a node pinned
+   * at the list's bottom covers down
+   * to the screen's bottom (`bottomPinned`) — and asks an on-target text to
+   * repeat the target (`onTarget`), the sibling guard being void there. A mark of the source, like `ofKeyboard` and
    * `clipsDescendants`: ui-tree knows no platform, and the shape alone (a
    * rectless root over leaves) would also match a test's or a future
    * source's tree that is not idb's. Absent on WDA and Android trees.

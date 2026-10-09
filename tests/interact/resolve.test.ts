@@ -575,6 +575,46 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
   });
 
+  it('idb, a modal listed before the content it is drawn over (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-…, a round-6 regression): the chooser\'s rows and the value-date picker are tapped at their centres; scroll_until stops on the picker uncovered', async () => {
+    const screens = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')).screens;
+    const fake = new FakeAdapter({ chooser: parseIdbDescribeAll(JSON.stringify(screens.chooser)), picker: parseIdbDescribeAll(JSON.stringify(screens.valueDatePicker)) }, 'chooser');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    for (const id of ['row_own', 'row_swift']) {
+      expect(await tapElement(fake, `id:accounts.detail.payment_type_sheet.${id}`, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    }
+    fake.current = 'picker';
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.value_date_picker', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    await tapElement(fake, 'id:swift_payment.form.value_date_picker', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 423 }, { x: 201, y: 479 }, { x: 205, y: 479 }]);
+    // …and on the same screen the pinned CONTINUE, listed last, still covers what lies under it.
+    await expect(tapElement(fake, 'text:"Payee\u2019s name"', OPTS)).rejects.toThrow(`text:"Payee\u2019s name" is under ${CONTINUE} at its centre (94,827)`);
+  });
+
+  it('idb, the number pad up with CONTINUE lifted onto it (run2-ios #250, review of fix/r6b-idb HIGH 1): a row under the keys is never tapped on key "2" — refused, nothing tapped', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 570, width: 354, height: 60 } }));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:fees', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
+    await expect(tapElement(fake, 'id:swift_payment.form.value_date_select', OPTS)).rejects.toThrow(`is under button "Continue to summary" (24,512 354x44) at its centre (201,571)`);
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('idb, a label 3 pt below the pinned CONTINUE (round-6 device check H-1, which pressed CONTINUE): refused, nothing tapped — the bar reaches the screen\'s bottom', async () => {
+    const elements = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')).positions.pos1;
+    const tree = parseIdbDescribeAll(JSON.stringify(elements));
+    tree.children.find((n) => n.label === 'Payee\u2019s bank street & no.*')!.rect = { x: 42, y: 817, width: 186, height: 20 };
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'text:"Payee\u2019s bank street & no.*"', OPTS)).rejects.toThrow(
+      `text:"Payee\u2019s bank street & no.*" is under ${CONTINUE} at its centre (135,827), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped`,
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
   it('idb, a row scrolled up under the top bar (code review P1, repro C — since device check C3-3 the chrome-before-content rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
     const debit = tree.children.find((n) => n.identifier === 'swift_payment.form.debit_select')!;

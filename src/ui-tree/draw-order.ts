@@ -97,7 +97,10 @@ export interface DrawOrder {
    * covers are the nodes after `node`'s subtree in pre-order (its first
    * place in the tree, as `shadowing`) that draw for a target
    * (`NOT_DRAWN`'s `target` column) and share area with the part of `node`
-   * inside `within`. A node not in this tree has no covers.
+   * inside `within` — a cover's rect, or, for a node pinned at the bottom of
+   * idb's flat list, that rect run down to the screen's bottom edge
+   * (`bottomPinned`, `pinnedReach`: the pinned bar's background and hit
+   * area, which idb lists as no node). A node not in this tree has no covers.
    */
   exposure(node: UiNode, within: Rect): Exposure;
 }
@@ -137,7 +140,7 @@ export interface Exposure {
   readonly tapAt?: { readonly point: Point; readonly moved: false } | { readonly point: Point; readonly moved: true; readonly piece: Rect };
   /** MIN_TAP_PIECE_FRACTION of this tree's screen's shorter side, rounded — the piece size `tapAt` needs. */
   readonly minPiece: number;
-  /** The cover drawn on top at `point` — the last of `covers` that contains it — or undefined. */
+  /** The cover drawn on top at `point` — the last of `covers` whose rect (a pinned node's reach, `exposure`) contains it — or undefined. */
   coverAt(point: Point): UiNode | undefined;
 }
 
@@ -181,6 +184,10 @@ interface SeenFor extends Seen {
   readonly contentFrom: number;
   /** The bottom of the top bar's band (`FLAT_LIST_TOP_BAR_FRACTION` of the screen): content ending above it may lie under the bar. */
   readonly barLine: number;
+  /** The walk index of the reading-order break after a flat list's CONTENT target (`readingBreak`): the later nodes from it on are no cover of it. The walk's length when there is none, the target is the top bar's, or the tree is not a flat list. */
+  readonly readingBreak: number;
+  /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`) and idb's keyboard (`keyboardOf`): never past the break. */
+  readonly chrome: ReadonlySet<Placed>;
 }
 
 /**
@@ -494,8 +501,9 @@ const NOT_DRAWN = {
    * floating label, a textfield, a helper line with its top at 75, 80 or 82,
    * inside Back's 70–98 — all three false. Here the bar's items are listed
    * before the content, and content listed after them is no cover of them,
-   * wherever its top lies; between content nodes nothing changes — the
-   * pinned CONTINUE, listed after the rows, still covers `priority_select`.
+   * wherever its top lies; between content nodes this row changes nothing —
+   * the pinned CONTINUE, listed after the rows, still covers
+   * `priority_select` (content over content is `flatListReadingOrder`'s).
    * Only content that ENDS inside the bar's band (`barLine`,
    * `FLAT_LIST_TOP_BAR_FRACTION`) is excused — a row scrolled under the bar
    * lies in it (the measured IBAN at 75–95, `will_remain` at 80–95), while a
@@ -511,13 +519,80 @@ const NOT_DRAWN = {
    * "clear": the tap may press it). A node of the bar listed after
    * the first content node (`firstContent`'s misses) still meets content as
    * content: a row scrolled under it reads as cover — a false refusal, the
-   * safe direction. Improved on the interim rule: a sheet laid over a
-   * target it starts above is a cover again — a content target always, a
-   * bar item whenever the sheet reaches past the band. WDA's nested tree and
-   * Android's never meet this row: neither is marked.
+   * safe direction. Improved on the interim rule: a sheet laid over a bar
+   * item it starts above is a cover again whenever it reaches past the band
+   * (over a CONTENT target listed before it, it is not — the reading-order
+   * break, `flatListReadingOrder`). WDA's nested tree and Android's never
+   * meet this row: neither is marked.
    */
   flatListChrome: {
     target: ({ node, at }, { target, contentFrom, barLine }) => target.at < contentFrom && at >= contentFrom && node.rect.y + node.rect.height <= barLine,
+  },
+
+  /**
+   * CONTENT LISTED PAST A READING-ORDER BREAK, IN A FLAT LIST: under idb
+   * (`UiNode.flatList`), a node at or after the first node listed after a
+   * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
+   * where idb resumes listing another container in reading order
+   * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
+   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target` only: the owner's decision of 2026-10-09 on
+   * docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-
+   * covered-by-the-content-behind-it.md, a regression of `flatListChrome`.
+   *
+   * Measured (tests/fixtures/idb-modal-listed-before-content.json): idb
+   * lists mp-native's payment-type chooser — a card drawn over the dimmed
+   * Account Detail, with no node of its own for the card or the backdrop —
+   * in the MIDDLE of the screen's content: after the action buttons, its
+   * rows `row_own 45,397 312x52` and `row_swift 45,453 312x52`, then the
+   * transaction list it is drawn over (`filter_icon 348,358`,
+   * `date_header_0 0,399`, `row_0 24,435`, …). Read as draw order, the list
+   * behind covered the chooser, and `tap` refused `row_swift` "under button
+   * 'Loan repayment…'". idb lists in reading order WITHIN a container, so
+   * a node starting above the target is the next container's: for
+   * `row_own` the break is `filter_icon` (358 < 397), for `row_swift` it
+   * comes at once, for the SWIFT form's value-date picker
+   * (`56,291 298x375`, listed after the title, before every row) the
+   * debit row at 150 breaks it. Round 5's interim rule (a later node
+   * covers only when its top lies at or below the target's) was not
+   * enough: `date_header_0`'s top 399 lies below `row_own`'s 397. Between
+   * the target and the break nothing changes: the pinned CONTINUE, listed
+   * last after `priority_select`, still covers it, as a node listed after
+   * a row and starting at or below it covers it (a footer's text in a
+   * row). Nodes of no area never break (idb lists a 0×0 field).
+   *
+   * The bottom chrome is no break and never past one (review of
+   * fix/r6b-idb, HIGH 1): CONTINUE starts above a label lying under it
+   * (`42,807`) and covers it down to the screen's bottom; idb marks no
+   * keyboard node, so its keys, listed last, are the only covers of the
+   * rows under it, and a bar between the form and the keys (CONTINUE lifted
+   * onto the number pad, run2-ios #250, `24,512` above a row at 545) must
+   * neither excuse them nor be excused. Nor does a node that holds the
+   * target whole break (r6b-icon's padded control `22,1099 110x110` round
+   * its icon at 1121; in the 69 device dumps only a pinned CONTINUE and the
+   * keyboard's background enclose a later-listed target), nor one ending
+   * inside the top bar's band (`barLine`; review MEDIUM: Contacts' New
+   * Contact lists `Toolbar 0,83 402x48` last, over `add birthday 20,109`
+   * scrolled under it) — each a cover candidate in its own right. Bar items
+   * are `flatListChrome`'s and never break: a menu listed after the content
+   * that reaches past the band still covers them.
+   *
+   * Residuals, stated (accepted by the owner): a menu, sheet or popover
+   * listed after the content that starts ABOVE a content target is no
+   * cover of it — nor is anything listed after such a node (a false
+   * "clear": the tap may press the menu). So is what follows a node that
+   * starts above the target for another reason: a floating label listed
+   * after its field and above it (`IBAN 42,359` after the field at
+   * `42,380`) ends the field's covers — only a pinned bottom bar still
+   * counts after it. Conversely a pinned bottom bar of the content behind
+   * a modal still covers the modal's rows where it reaches them (a false
+   * refusal, the safe direction). idb's keyboard is read by its background
+   * (`keyboardOf`): keys listed with no such background — none in the
+   * device dumps — are content, and a node starting above the target
+   * before them excuses them. WDA's nested tree and Android's never meet
+   * this row: neither is marked.
+   */
+  flatListReadingOrder: {
+    target: (placed, { readingBreak, chrome }) => placed.at >= readingBreak && !chrome.has(placed),
   },
 
   /**
@@ -846,6 +921,111 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
   return order.length;
 }
 
+/**
+ * The bottom of the screen a flat list's pinned bar lies in (`bottomPinned`),
+ * as a fraction of the screen's height: 6 %, 52 pt of the 874-pt iPhone 17.
+ * Measured (round-6 device check, H-1): the SWIFT form's pinned CONTINUE
+ * `24,780 354x44` ends at 824, 50 pt above the screen's bottom — the home
+ * indicator's safe area and the bar's margin; the floating tab bar idb lists
+ * on Account Detail (`37,755 82x64`, bottom 819, 55 pt) lies outside it.
+ */
+export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
+
+/**
+ * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): idb
+ * marks no keyboard node, so its keys — plain `button`s listed LAST — are
+ * the only covers of the rows under it. Its background is a screen-wide,
+ * unlabelled structural node ending at the screen's bottom and starting
+ * below the top bar's band (so never the screen's size), listed right
+ * after the keys; the
+ * keyboard is that node and the run of nodes listed beside it (before and
+ * after, in the list's order) lying wholly inside it. Measured on all four
+ * keyboard dumps of the round-2 to round-8 device checks: run2-ios #250
+ * (the SWIFT form's number pad, `other 0,589 402x285` after `1`…`Delete`),
+ * run3-ios #45 and #51 and run8-ios #233 (`other 0,590 402x284` after the
+ * QWERTY keys, `Dictate 325,805 68x69` after it). Shape, not labels: key
+ * labels follow the language and the layout. The app's own PIN pad
+ * (run5-ios #81) has no such background, and is content. Undefined when no
+ * node has that shape (the last one listed is taken).
+ */
+function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
+  const bottom = screen.y + screen.height;
+  let back: Placed | undefined;
+  for (let i = order.length - 1; i > 0 && back === undefined; i--) {
+    const { node } = order[i];
+    const r = node.rect;
+    if (STRUCTURAL_ROLES.has(node.role) && !node.label && r.x === screen.x && r.width === screen.width && r.y + r.height === bottom && r.y >= barLine) back = order[i];
+  }
+  if (back === undefined) return undefined;
+  const inside = (p: Placed | undefined): boolean => p !== undefined && rectWithin(p.node.rect, back.node.rect);
+  let from = back.at;
+  while (from > 1 && inside(order[from - 1])) from--;
+  let to = back.at + 1;
+  while (inside(order[to])) to++;
+  return { top: back.node.rect.y, keys: new Set(order.slice(from, to)) };
+}
+
+/**
+ * The nodes of a flat list PINNED AT ITS BOTTOM, each with the line its
+ * reach runs down to (the `exposure` question's reach, `pinnedReach`): an
+ * interactive node whose bottom lies on the screen and inside
+ * its bottom band (`FLAT_LIST_BOTTOM_BAR_FRACTION`) — so content: a node of
+ * the top bar (`firstContent`) lies wholly in the top 20 % — and below
+ * which nothing listed after it starts (at or below its bottom) — not a row
+ * in the middle of a list that runs on past the screen (Account Detail's
+ * `row_4 24,817 354x52` under the payment-type chooser, followed by
+ * `date_header_5` at 876); it reaches the screen's bottom. Measured: the
+ * SWIFT form's CONTINUE, listed last at every position. And a bar LIFTED
+ * onto idb's keyboard (`keyboardOf`): the same, with the keyboard's top for
+ * the screen's bottom and its keys left out of "listed after it"; it
+ * reaches the keyboard's top. Measured: run2-ios #250, CONTINUE `24,512
+ * 354x44` (bottom 556, 33 pt above the keyboard at 589), listed after the
+ * form and before the keys. Residual, stated (as before this rule): the
+ * last row of a list that ends inside the band, with nothing listed after
+ * it, reads as pinned — it reaches down over what lies below it in its
+ * column (on screen, only content listed before it: a false refusal, the
+ * safe direction). Empty on a tree that is not a flat list.
+ */
+function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnType<typeof keyboardOf>): ReadonlyMap<Placed, number> {
+  const band = screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
+  const pinned = new Map<Placed, number>();
+  const floors = [{ floor: screen.y + screen.height, keys: new Set<Placed>() }, ...(keyboard === undefined ? [] : [{ floor: keyboard.top, keys: keyboard.keys }])];
+  for (const placed of order) {
+    if (!isInteractive(placed.node)) continue;
+    const r = placed.node.rect;
+    const end = r.y + r.height;
+    const later = order.slice(placed.end).filter(({ node }) => rectArea(node.rect) > 0);
+    const on = floors.find(({ floor, keys }) => end <= floor && end >= floor - band && !later.some((p) => !keys.has(p) && p.node.rect.y >= end));
+    if (on !== undefined) pinned.set(placed, on.floor);
+  }
+  return pinned;
+}
+
+/**
+ * The reading-order break after a flat list's CONTENT target
+ * (`flatListReadingOrder`): the walk index of the first node after it with
+ * area whose top lies above the target's — but never a node of the bottom
+ * chrome (`chrome`: pinned at the bottom, or idb's keyboard), one that
+ * holds the target whole (a later node enclosing it is a cover in its own
+ * right — r6b-icon's padded control; in the 69 device dumps only a pinned
+ * CONTINUE and the keyboard's background), or one ending inside the top
+ * bar's band (`barLine`: a bar listed last — Contacts' `Toolbar 0,83
+ * 402x48`, run3-ios #102 — lies over the rows scrolled under it).
+ * `order.length` when there is none, or when the target is the top bar's
+ * (`contentFrom`; never on a tree that is not a flat list, whose
+ * `contentFrom` is the walk's length).
+ */
+function readingBreak(order: readonly Placed[], target: Placed, contentFrom: number, chrome: ReadonlySet<Placed>, barLine: number): number {
+  if (target.at < contentFrom) return order.length;
+  const t = target.node.rect;
+  return (
+    order
+      .slice(target.end)
+      .find(({ node }, i, later) => rectArea(node.rect) > 0 && !chrome.has(later[i]) && node.rect.y < t.y && node.rect.y + node.rect.height > barLine && !rectWithin(t, node.rect))?.at ??
+    order.length
+  );
+}
+
 /** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). */
 function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
@@ -872,6 +1052,32 @@ export function drawOrder(tree: UiNode): DrawOrder {
   walk(tree, undefined, undefined);
   const barLine = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
+  const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
+  const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
+  /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`). */
+  const chrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
+  /**
+   * Where a cover of a target presses (`exposure`): its rect — or, for a
+   * node pinned at a flat list's bottom (`bottomPinned`), its rect run down
+   * to the screen's bottom edge — or a bar lifted onto idb's keyboard down
+   * to the keyboard's top (inferred from H-1, not measured: the lifted
+   * bar's background between it and the keys) — across its own x-range. Measured (round-6
+   * device check, H-1, `run8-ios/img-147-0.png`): with the SWIFT form's
+   * `Payee’s bank street & no.` label at `42,817 186x20`, 3 pt below
+   * CONTINUE's frame `24,780 354x44`, a tap at (135,827) opened SUMMARY —
+   * CONTINUE's hit area reaches below its accessibility frame, and the bar's
+   * opaque background, which idb lists as no node, hides the form from
+   * CONTINUE's top down to the screen's bottom. Its x-range, not the screen's
+   * width: the tap that pressed it lay inside it, and the screenshot cannot
+   * say more (the form's rows span CONTINUE's 24–378 exactly); a narrow
+   * button at the bottom (a floating action button) run across the screen
+   * would hide its neighbours.
+   */
+  const pinnedReach = (placed: Placed): Rect => {
+    const r = placed.node.rect;
+    const floor = pinned.get(placed);
+    return floor === undefined ? r : { ...r, height: Math.max(r.height, floor - r.y) };
+  };
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
@@ -904,15 +1110,16 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine };
-      const covers =
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, chrome, barLine), chrome };
+      const over =
         shown === undefined || about === undefined
           ? []
-          : laterThan(places, (p) => rectIntersection(p.node.rect, shown) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
-      const pieces = covers.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.rect)), shown === undefined ? [] : [shown]);
+          : laterThan(places, (p) => rectIntersection(pinnedReach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: pinnedReach(p) }));
+      const covers = over.map((c) => c.node);
+      const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
       const largest = largestRect(pieces);
-      const coverAt = (point: Point): UiNode | undefined => covers.filter((c) => containsPoint(c.rect, point)).at(-1);
+      const coverAt = (point: Point): UiNode | undefined => over.filter((c) => containsPoint(c.reach, point)).at(-1)?.node;
       const centre = tapPoint(node);
       const onCentre = shown !== undefined && containsPoint(shown, centre);
       const centreCover = onCentre ? coverAt(centre) : undefined;
