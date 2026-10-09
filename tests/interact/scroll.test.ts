@@ -717,6 +717,20 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
+  // Code review of round 6, P2: `fully` judges clipping against the whole screen, but the stop also needs the centre
+  // below the band — full-bleed content shorter than twice the band (124 pt here) never stops, and says why.
+  it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
+    const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
+    expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
+  });
+
+  it('…and at twice the band (0,0 402x124, centre y 62) it is fully visible after 0 swipes', async () => {
+    const fake = still({ x: 0, y: 0, width: 402, height: 124 });
+    expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
   it('a list already at its bottom end, the target pushed up under the bar (24,10 354x52) by the default direction down: the failure says to try direction "up"', async () => {
     const error = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain(

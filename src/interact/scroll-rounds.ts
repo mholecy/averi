@@ -924,8 +924,11 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * tap pressed the status bar — for both stops: `fully: true` asks the
  * centre to be on the screen too (an unclipped rect's centre always is,
  * but in the band). Only the centre: what of the rect lies in the band is
- * judged against the screen as before, so full-bleed content at the top (a
- * hero image at y 0) is "fully visible".
+ * judged against the screen as before — `fully` judges clipping against the
+ * whole screen — so full-bleed content at the top (a hero image at y 0)
+ * stops once its centre lies below the band; one shorter than twice the
+ * band has its centre in it, stops neither way, and fails naming the status
+ * bar (`shortOf`'s `statusBar`; code review of round 6, P2).
  */
 function stops(j: Judged, fully: boolean): boolean {
   return j.visible > 0 && j.centreOnScreen && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);
