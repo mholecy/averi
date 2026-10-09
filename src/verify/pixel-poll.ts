@@ -131,13 +131,10 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * keep a 132-px band, and its panel is now read beside it, `keyboardOverElement`
  * below; the transient read right after the focus tap was hidden); the API 34+ `type=ime` line is taken from AOSP and has not been
  * captured on a device; a multi-display device reads unknown. The check sits after the deadline check so a round that
- * would capture nothing queries nothing either. Cost: one `dumpsys window
- * displays` per round, tens of ms (the measured figures are on
- * AndroidAdapter's `keyboardState`), and since 2026-10-08 one more adb call
- * on a round that reads the keyboard up (`touchable()`, AndroidAdapter's
- * `keyboardTouchable`: `dumpsys input_method` and `dumpsys window
- * InputMethod`, filtered on the device), on Android only, against a round of
- * ~2.6–4.3 s there. The verify legs are untouched: their text table already
+ * would capture nothing queries nothing either. Cost: the reading's
+ * `overlapping` once per round, on Android only — its adb calls are counted
+ * on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the one place they
+ * are — against a round of ~2.6–4.3 s there. The verify legs are untouched: their text table already
  * reports this case as OCCLUDED.
  *
  * Since 2026-10-07 an adapter WITHOUT the oracle (iOS: the keyboard is part

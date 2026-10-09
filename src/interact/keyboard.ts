@@ -95,17 +95,12 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  *   untapped). One look after `back`, KEYBOARD_HIDE_CONFIRM_LOOKS after a
  *   dismissal tap — the model's number, its reason beside it.
  *
- * Cost on Android: what the reading's `over` asks — ONE oracle query per
- * tap when the keyboard reads hidden or unknown, TWO when it reads shown
- * (since 2026-10-08 the band's window region beside it, because a floating
- * Gboard's panel lies outside its 132-px band and a tap there pressed a
- * key — docs/bugs/2026-10-05-android-floating-gboard-keyboard.md; a point
- * under the panel takes the band's path), and the witness only in the
- * overlap case, where the second resolve and the second look happen too;
- * the totals are on ui-tree/keyboard-cover.ts, the one place they are
- * counted. A `type_pin` keypad taps once per digit, so it asks once per
- * digit — a 6-digit PIN is 6 dumpsys calls (12 with a keyboard up), beside
- * six tree-settle waits of seconds each. On iOS: no device read for the
+ * Cost on Android: what the reading's `over` asks on the first look, and
+ * what the look after a dismissal and the re-check rounds add — every
+ * figure is on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the one
+ * place they are counted. A `type_pin` keypad taps once per digit, so it
+ * pays a tap's first look per digit — a 6-digit PIN is 6 dumpsys calls (12
+ * with a keyboard up), beside six tree-settle waits of seconds each. On iOS: no device read for the
  * keyboard on any look, ever. The on-screen rule adds `viewport()` per tap,
  * which the adapter memoizes: one `wm size` / `idb describe` per adapter,
  * re-asked only after a failed read. A raw coordinate tap does not come through here: the caller chose

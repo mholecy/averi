@@ -120,13 +120,12 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * stale window on round 0 can be followed by a real keyboard — a new
  * screen that auto-focuses a field — and a confirmed keyboard can be hidden
  * by the scroll itself (a list that dismisses it on drag) and leave the
- * window state stale-shown behind it. At most one query a round (what one
- * costs: AndroidAdapter's keyboardWitness); none on iOS, whose band is
- * read off the tree being judged. The rounds — strokes and confirming
- * reads alike — number at most 1 + (1 + SETTLE_CONFIRM_READS) ×
- * `maxSwipes`, 25 at the defaults, and stop at the deadline whichever
- * comes first. A failed or `fully: true` stop may add one more, the
- * `unlocated` row's (below). A band that does not change the round is not reported
+ * window state stale-shown behind it. What a round asks the device is
+ * counted on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the one place
+ * it is. The rounds — strokes and confirming reads alike — number at most
+ * 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes`, 25 at the defaults, and
+ * stop at the deadline whichever comes first. A failed or `fully: true`
+ * stop may add one more query, the `unlocated` row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
  * judged under one this round — a clip at its edge, or another of several
  * matches judged. The witness is no longer remembered, so one that times

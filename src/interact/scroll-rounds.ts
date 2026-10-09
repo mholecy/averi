@@ -231,11 +231,9 @@ export type Shortfall =
  * after 1 swipe" — and a read 1 s later had it at y -48 / -121 / -133,
  * behind the top bar, three runs of three. What it costs: each confirming
  * read is a round like any other — one more settle, one more tree read
- * and, on Android, what a round's keyboard reading costs: the window query,
- * the touchable-region query too while the keyboard reads shown, and a
- * witness query when the band matters on that read (1 to 3 adb calls;
- * ui-tree/keyboard-cover.ts has the table); a stop at 0
- * swipes sent no stroke and spends none. A target still
+ * and, on Android, what a round's keyboard reading costs
+ * (ui-tree/keyboard-cover.ts has the table); a stop at 0 swipes sent no
+ * stroke and spends none. A target still
  * moving inside the viewport is read again, up to this many reads a
  * stroke, then reported with `settled: false` and a note saying so: a
  * fling is over well inside 3 × 400 ms plus the reads, and a target that

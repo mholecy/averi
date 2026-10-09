@@ -48,8 +48,9 @@ import { resolveSettled } from './resolve.js';
  * by the third of three samples taken a second apart — while the input
  * method already said not shown. Three seconds covers that; half a second
  * is the settle poll's cadence (resolve.ts), so a stale state is noticed
- * clearing within one round. Six rounds, twelve cheap queries at worst
- * (their cost: AndroidAdapter's keyboardState / keyboardWitness).
+ * clearing within one round. Six rounds at most (500 ms to 3000 ms); what a
+ * round asks — 3 queries while the point stays covered, 18 at worst — is
+ * counted on ui-tree/keyboard-cover.ts (WHAT A READING ASKS).
  */
 export const KEYBOARD_DISAGREEMENT_POLL_MS = 500;
 export const KEYBOARD_DISAGREEMENT_BUDGET_MS = 3_000;
@@ -283,10 +284,8 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
      *
      * Cost: the witness query was the first look's (its `over`); the second
      * resolve and the second look happen only here, in the overlap case. A
-     * re-check round is `over` on a fresh reading — `state()`, `touchable()`
-     * while the band is up, and the witness while the point stays covered:
-     * three calls a round then, at most six rounds (ui-tree/keyboard-cover.ts
-     * has the whole table).
+     * re-check round is `over` on a fresh reading (ui-tree/keyboard-cover.ts
+     * counts it, and the whole wait).
      */
     async guard({ target, opts, point: at, verdict, what, covered }: CoveredLook): Promise<{ cleared: ResolvedClear } | { hiding: Hiding }> {
       const backPressed = `${covered}; back pressed`;

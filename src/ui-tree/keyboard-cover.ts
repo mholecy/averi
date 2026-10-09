@@ -67,11 +67,14 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * keyboard went, 2 when it still reads shown; a witness veto adds, per
  * re-check round (`over` on a fresh reading), 3 while the point stays
  * covered, 2 once the keyboard reads shown but elsewhere (state, touchable;
- * no witness), or 1 once it reads hidden or unknown, at most six rounds. A `scroll_until` confirming
- * read (scroll-rounds.ts#SETTLE_CONFIRM_READS, up to 3 after a stroke) is a round
- * like any other and pays the same. Rounds: at most 1 + (1 +
- * SETTLE_CONFIRM_READS) × `maxSwipes` — 25 at the defaults, pinned in
- * tests/interact/scroll.test.ts (the reads) and scroll-rounds.test.ts (the rounds) — and cut short by the deadline.
+ * no witness), or 1 once it reads hidden or unknown, at most six rounds
+ * (keyboard-window.ts#KEYBOARD_DISAGREEMENT_BUDGET_MS) — 18 at worst. A
+ * `scroll_until` confirming read (scroll-rounds.ts#SETTLE_CONFIRM_READS, up
+ * to 3 after a stroke) is a round like any other and pays the same; how
+ * many rounds there are is scroll.ts's (its bound, 25 at the defaults, and
+ * the deadline). The per-round counts are pinned at the driver, through a
+ * fake oracle, in tests/interact/scroll.test.ts, and as asks in
+ * scroll-rounds.test.ts.
  *
  * A reading is of ONE moment: build one per look, per round, per tree, and
  * never hold one across them — it remembers what the oracle answered, and a
