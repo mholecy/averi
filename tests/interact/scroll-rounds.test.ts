@@ -1293,6 +1293,38 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
   });
 
+  it('without fully, the centre must lie on the SCREEN — the frame the next tap\'s on-screen rule judges (code review P3, repro B): a row whose centre is off the bottom edge is scrolled on, and stops once it is on', () => {
+    const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 402, height: 60 }, 'r')] });
+    const played = play(IPHONE, [row(850), row(600), row(600)]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
+    // The centre (201,873) still on the 874-pt screen, the row clipped: a stop, as before — the tap presses the centre.
+    expect(describeScrollResult(resultOf(play(IPHONE, [row(843)])))).toBe(
+      'visible after 0 swipes — CLIPPED at bottom, 52% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box',
+    );
+    // No swipe moves it: the bound says what it was short of — the clip, not a cover.
+    expect(failureOf(play({ ...IPHONE, maxSwipes: 1 }, [row(850), row(851)]), 'id:r').message).toBe(
+      'scroll_until id:r failed after 1 swipe (maxSwipes) — element reached the viewport but stayed CLIPPED at bottom, 38% of it is in the viewport (last rect {"x":0,"y":851,"width":402,"height":60})',
+    );
+  });
+
+  it('…but the keyboard\'s band is NOT that frame: a centre under the band, on the screen, still stops a plain scroll (the tap\'s keyboard guard hides the keyboard) — and a centre off the screen under a band does not', () => {
+    const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 402, height: 60 }, 'r')], cover: coverOver(WDA_BAND, NO_BACK) });
+    expect(play(IPHONE, [row(560)]).steps.map((st) => st.do)).toEqual(['stop']); // centre (201,590), under the band from 572
+    expect(play(IPHONE, [row(850), row(500), row(500)]).steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
+  });
+
+  it('stuck without fully, the row clipped AND its centre under a bar: the bar leads, as at the bound — not "cannot be fully revealed" (code review S1)', () => {
+    const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 800, width: 402, height: 74 } });
+    const row: Row = { found: [match({ x: 0, y: 840, width: 402, height: 60 }, 'r')], over: [bar] };
+    const played = play(IPHONE, [row, row, row]);
+    expect(played.outcome?.kind).toBe('stuck');
+    expect(failureOf(played, 'id:r').message).toBe(
+      'scroll_until id:r failed after 2 swipes — element is in the viewport but under button "Bar" (0,800 402x74) at its centre (201,870), drawn over it — 0% of it shows — ' +
+        'and the content is exhausted: swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect ' +
+        '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":0,"y":840,"width":402,"height":60} in a 402x874 viewport',
+    );
+  });
+
   it('a plain stop both clipped and partly under a bar says both, the clip first', () => {
     const by = { role: 'button', label: 'Continue to summary', identifier: null, rect: CONTINUE_RECT };
     expect(describeScrollResult({ swipes: 1, visible: 0.5, clipped: ['bottom'], covered: { by, shows: 0.3 } })).toBe(

@@ -410,9 +410,11 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
  * and the visible part of such a node is a sliver at a screen edge — on iOS
  * the bottom one is the home indicator's gesture zone, the top the status
  * bar — where a tap is least likely to reach the element. Its remedy is
- * `scroll_until … fully: true`: a plain `scroll_until` stops on any
- * intersection and would hand back the same clipped node (review
- * 2026-10-08, M1).
+ * `scroll_until … fully: true` (review 2026-10-08, M1: a plain
+ * `scroll_until` then stopped on any intersection and handed back the same
+ * clipped node); since code review P3 (2026-10-09) a plain one also goes on
+ * until the centre is on the screen (scroll-rounds.ts#stops), so either
+ * agrees with this rule.
  *
  * Before refusing, the device's screen is read AGAIN (`viewport({ fresh:
  * true })`, once, on this path only — the clear path costs nothing new):

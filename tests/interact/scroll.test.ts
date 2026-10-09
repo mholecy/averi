@@ -74,11 +74,12 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
   });
 
   it('reports the CLIPPED fraction and edges instead of a bare "visible" (the 2026-08-27 finding)', async () => {
-    // 40px tall, stopping at y=1980 → half of it below the fold.
-    const result = await scrollUntilVisible(scrollingFake(2580), { id: 'submit_button' }, FAST);
-    expect(result).toEqual({ swipes: 1, visible: 0.5, clipped: ['bottom'] });
+    // 40px tall, stopping at y=1970 → a quarter of it below the fold, its centre (1990) still on screen — a plain stop
+    // needs that since code review P3 (at y=1980 the centre lies on the edge, off screen, and the scroll goes on).
+    const result = await scrollUntilVisible(scrollingFake(2570), { id: 'submit_button' }, FAST);
+    expect(result).toEqual({ swipes: 1, visible: 0.75, clipped: ['bottom'] });
     expect(describeScrollResult(result)).toBe(
-      'visible after 1 swipe — CLIPPED at bottom, 50% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box',
+      'visible after 1 swipe — CLIPPED at bottom, 75% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box',
     );
   });
 

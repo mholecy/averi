@@ -246,31 +246,32 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
 export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
   switch (o.kind) {
     case 'stuck': {
-      const { judged, viewport } = o;
+      const { short, viewport } = o;
+      const { judged } = short;
       const n = swipesText(o.swipes);
+      const last = `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`;
+      // Under something of the app (2026-10-09, scroll-rounds.ts#shortOf) that
+      // stays over it at the end of the content: no clearance for a pinned
+      // bar. Led by the cover whenever that is what it is short of — a plain
+      // stop's centre under a bar, however clipped (code review S1).
+      if (short.of === 'covered') {
+        return new Error(
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
+            `swiping ${o.lastStroke} no longer moves it. The app draws that over it at the end of the content — a layout defect ` +
+            `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
+        );
+      }
       // Clipped at the keyboard's edge at the end of the content: the
       // keyboard, not the layout, is what hides the rest — a container that
       // does not resize for it keeps its last rows under it. Said as such,
       // with how to hide it; the layout-defect wording only when the
       // keyboard is not the edge in question.
-      // Not clipped, so under something of the app (2026-10-09,
-      // scroll-rounds.ts#stops) that stays over it at the end of the
-      // content: no clearance for a pinned bar.
-      if (judged.clipped.length === 0) {
-        return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it. The app draws that over it at the end of the content — a layout defect ` +
-            `(no clearance for a pinned bar?), not a scroll that needs more swipes. ` +
-            `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
-        );
-      }
       if (judged.under !== undefined && judged.clipped.includes('bottom')) {
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
             `${describeClip(judged.clipped, judged.visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
             `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
-            `stays clipped with the keyboard down is it a layout defect. ` +
-            `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+            `stays clipped with the keyboard down is it a layout defect. ${last}`,
         );
       }
       return new Error(
@@ -278,8 +279,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
           `element is in the viewport but ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)}, ` +
           `and the content is exhausted: swiping ${o.lastStroke} no longer moves it. ` +
           `The element cannot be fully revealed — that is a layout defect ` +
-          `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
-          `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+          `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
       );
     }
     case 'covered': {

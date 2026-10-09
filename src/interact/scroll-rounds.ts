@@ -306,6 +306,13 @@ export interface Judged {
   covers: readonly UiNode[];
   /** The cover drawn over its centre (`tapPoint`, the point a tap presses), when the centre lies in the frame under one. */
   centreCover?: UiNode;
+  /**
+   * Its centre lies on the SCREEN judged (the whole box, never cut above a
+   * keyboard) — what the next tap's on-screen rule asks of the same point
+   * (resolve.ts#onScreen). A centre under a keyboard band is on the screen:
+   * the tap's keyboard guard deals with that one.
+   */
+  centreOnScreen: boolean;
   /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
   shows: number;
 }
@@ -319,9 +326,9 @@ export interface Judged {
  *   target still (the reply says so); `unlocated` only on a `fully: true`
  *   stop judged with no cover under it; `flush` only on a `fully: true`
  *   stop whose edge lies on its clipping container's (PROBE_REACH).
- * - `stuck`: the judged match in the frame but short of the stop — clipped
- *   (`fully: true`), or since 2026-10-09 under a node of the app (`stops`) —
- *   and UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
+ * - `stuck`: the judged match in the frame but short of the stop (`short`,
+ *   `shortOf`: clipped, or since 2026-10-09 under a node of the app) — and
+ *   UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
  *   layout defect, or the keyboard's edge when it is the bottom clip.
  * - `covered`: a corroborated cover leaves nothing above its top edge;
  *   nothing judged, no stroke sent.
@@ -331,7 +338,7 @@ export interface Judged {
  */
 export type ScrollOutcome =
   | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush }
-  | { kind: 'stuck'; swipes: number; judged: Judged; lastStroke: Direction; viewport: Rect }
+  | { kind: 'stuck'; swipes: number; short: InFrameShort; lastStroke: Direction; viewport: Rect }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
   | {
       kind: 'bound';
@@ -390,9 +397,10 @@ export interface TouchedOn {
 /**
  * What the target was short of at a bound, by the last round:
  * - `readFailed`: the last tree read failed — quoted, whatever came before;
- * - `clipped`: in the frame but clipped (the `fully: true` bar not met);
- * - `covered` (2026-10-09): in the frame, not clipped, but a node of the app
- *   drawn over it — over any of it with `fully: true`, over its centre
+ * - `clipped`: in the frame but clipped — an edge cut with `fully: true`,
+ *   its centre off the screen without (`shortOf`);
+ * - `covered` (2026-10-09): in the frame, not clipped so, but a node of the
+ *   app drawn over it — over any of it with `fully: true`, over its centre
  *   without (`stops`);
  * - `absent`: not in the last tree, and never in the frame before it;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
@@ -406,12 +414,14 @@ export interface TouchedOn {
  */
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
-  | { of: 'clipped'; judged: Judged }
-  | { of: 'covered'; judged: Judged }
+  | InFrameShort
   | { of: 'absent' }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number }
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean };
+
+/** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
+export type InFrameShort = { of: 'clipped'; judged: Judged } | { of: 'covered'; judged: Judged };
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
@@ -836,6 +846,7 @@ function judge(
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
+  const screen: Rect = { x: 0, y: 0, ...viewport };
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
     const box: Rect = { x: 0, y: 0, ...frame };
     const seen = order?.exposure(node, box);
@@ -849,13 +860,14 @@ function judge(
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
       ...(centreCover !== undefined && { centreCover }),
+      centreOnScreen: containsPoint(screen, centre),
       shows: seen?.shows ?? visible,
     };
   };
   const scored = found.map((node): Judged => {
     if (cover === undefined || cover.keyboardSide(node)) return inFrame(node, viewport);
     const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], shows: 0 };
+    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], centreOnScreen: containsPoint(screen, tapPoint(node)), shows: 0 };
     return inFrame(node, above, cover.cover);
   });
   return scored.sort((a, b) => better(a, b, fully))[0];
@@ -881,16 +893,32 @@ function better(a: Judged, b: Judged, fully: boolean): number {
 /**
  * THE stop condition: the judged match is in the frame, and — `fully: true`
  * — clipped at no edge with nothing of the app drawn over any of it; or —
- * without — nothing drawn over its centre, the point the next tap presses
- * (2026-10-09, the bug note's decisions 2 and 3). Until that date a plain
- * stop was any intersection and a `fully: true` one any unclipped rect, and
- * a row under a pinned CONTINUE bar was "fully visible after 0 swipes".
- * The centre is not required to lie in the frame: a plain stop with the
- * centre off the screen stays a stop, and the tap's own on-screen rule says
- * so (resolve.ts#refuseOffScreen) — unchanged.
+ * without — its centre, the point the next tap presses, on the screen and
+ * under nothing (2026-10-09, the bug note's decisions 2 and 3: keep
+ * scrolling until the tap point is uncovered, so the next tap agrees).
+ * Until that date a plain stop was any intersection and a `fully: true` one
+ * any unclipped rect, and a row under a pinned CONTINUE bar was "fully
+ * visible after 0 swipes". On the SCREEN (`Judged.centreOnScreen`, code
+ * review P3): a plain stop with its centre past the screen's edge was a
+ * stop, "visible … CLIPPED 40%", and the next tap was refused off screen
+ * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
+ * keyboard — a centre under the band stops as before, and the tap's
+ * keyboard guard hides the keyboard.
  */
 function stops(j: Judged, fully: boolean): boolean {
-  return j.visible > 0 && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);
+  return j.visible > 0 && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreOnScreen && j.centreCover === undefined);
+}
+
+/**
+ * What a judged match in the frame is short of a stop (`stops`) — the one
+ * rule the stuck and the bound sentences read: `clipped` — an edge cut
+ * with `fully: true`, or without it the centre off the screen; else
+ * `covered` — something of the app drawn over it (over its centre, without
+ * `fully`). With `fully: true` a cut edge leads, as it always has.
+ */
+function shortOf(j: Judged, fully: boolean): InFrameShort {
+  const clipped = fully ? j.clipped.length > 0 : !j.centreOnScreen;
+  return { of: clipped ? 'clipped' : 'covered', judged: j };
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
@@ -1251,7 +1279,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     }
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
-    if (observed.stuck) return stop(s, { kind: 'stuck', swipes: s.swipes, judged: best, lastStroke: s.lastStroke, viewport });
+    if (observed.stuck) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best, fully), lastStroke: s.lastStroke, viewport });
   }
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
@@ -1432,7 +1460,7 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
  */
 function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
-  if (best !== undefined && best.visible > 0) return s.rules.fully && best.clipped.length > 0 ? { of: 'clipped', judged: best } : { of: 'covered', judged: best };
+  if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
   const left = s.inFrameAfter;
   if (found.length === 0) {
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };
