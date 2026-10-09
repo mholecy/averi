@@ -12,8 +12,9 @@
  *
  * One function lives here beside the types, `heldText`: not a judgement but
  * the DEFINITION every measurement of a field is taken in — what it holds as
- * opposed to what it shows — so the driver (fill.ts) and the clear's rules
- * (fill-clear.ts) count the same characters (2026-10-09, the fill-clear deepening; it was a
+ * opposed to what it shows — so the driver (fill.ts), the clear's rules
+ * (fill-clear.ts) and the mismatch's classifier
+ * (fill-verdict.ts#differenceOf) count the same characters (2026-10-09, the fill-clear deepening; it was a
  * closure inside fillField until then, and only fillField could ask it).
  */
 
@@ -209,7 +210,10 @@ export type FillFailure =
 
 /**
  * What differs between the typed value and a read-back that did not match
- * it, measured by fill.ts without carrying either string:
+ * it, without carrying either string — classified by ONE function,
+ * interact/fill-verdict.ts#differenceOf, all five kinds (until 2026-10-09
+ * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
+ * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
  *   bullets it held after focus, without `clear` (undefined with it).
  * - `case`: the typed text IS there but for letter case — at `positions`

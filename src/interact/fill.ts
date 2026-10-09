@@ -1,5 +1,5 @@
 import { everyNode, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
-import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
+import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -7,8 +7,9 @@ import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
 import { fillFailureText } from './fill-text.js';
-import { heldText, type Difference, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
+import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
+import { differenceOf } from './fill-verdict.js';
 import { INPUT_ROLE } from './input-role.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
@@ -380,18 +381,7 @@ export async function fillField(
           code: 'mismatch',
           typed: value.length,
           shows: observed.length,
-          differs:
-            observed === shownBeforeTyping
-              ? { kind: 'unchanged' }
-              : isMaskedValue(observed)
-                ? { kind: 'masked', held: clear ? undefined : maskedHeld }
-                : // Partly masked (Android's show-the-last-character password
-                  // field, `•••••t`): its content is not comparable either;
-                  // the lengths are all that may be said (hasBullet: • and ●
-                  // only — `*` and `·` are ordinary text too).
-                  hasBullet(observed)
-                  ? { kind: 'length' }
-                  : differenceOf(held(observed), value, clear === true, clear ? '' : held(shownBeforeTyping)),
+          differs: differenceOf({ observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
           notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
         });
       }
@@ -426,46 +416,6 @@ export async function fillField(
 /** A fill's error: its words are fill-text.ts's, like every fill sentence. */
 function failure(f: FillFailure): Error {
   return new Error(fillFailureText(f));
-}
-
-/**
- * What can be said of a non-masked read-back that missed the value, without
- * carrying either string (fill-facts.ts#Difference): with `clear` the field
- * must EQUAL the value, so the two are compared whole; without, it must
- * CONTAIN it, so every run of the new text (`prior`: what the field held
- * before typing) as long as the value is compared and the closest one
- * counts. `shown` is what the field HOLDS (a named placeholder is no text). Only position-for-position: an inserted or
- * dropped character is a length difference (`length`), as before.
- * Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for
- * the measured auto-capitalisation; a case pair whose forms differ in length
- * (`ß`/`SS`) reads as a plain difference, never as a pass.
- */
-function differenceOf(shown: string, value: string, clear: boolean, prior: string): Difference {
-  // Without clear the field may hold text from before the typing; only what
-  // came AFTER it is compared, when the field still starts with it (typing
-  // appends at the cursor, which the focus tap leaves at the end). A field
-  // whose earlier text changed too is compared whole — the limit: a run of
-  // the old text can then be named as the "transformed" typing.
-  const observed = prior !== '' && shown.startsWith(prior) ? shown.slice(prior.length) : shown;
-  let caseOnly: number | undefined; // fewest case-only differing characters over the runs compared
-  const starts = clear ? (observed.length === value.length ? [0] : []) : Array.from({ length: Math.max(0, observed.length - value.length + 1) }, (_, i) => i);
-  for (const at of starts) {
-    let differ = 0;
-    let caseAlone = true;
-    for (let i = 0; i < value.length && caseAlone; i++) {
-      const a = observed[at + i];
-      const b = value[i];
-      if (a === b) continue;
-      differ++;
-      caseAlone = a.toLowerCase() === b.toLowerCase() || a.toUpperCase() === b.toUpperCase();
-    }
-    if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
-  }
-  if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
-  if (observed.length !== value.length) return { kind: 'length' };
-  let differ = 0;
-  for (let i = 0; i < value.length; i++) if (observed[i] !== value[i]) differ++;
-  return { kind: 'same-length', positions: differ };
 }
 
 /**

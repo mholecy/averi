@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { FillResult } from '../../src/interact/fill-facts.js';
-import { judgeFill, type FillVerdict } from '../../src/interact/fill-verdict.js';
+import type { Difference, FillResult } from '../../src/interact/fill-facts.js';
+import { differenceOf, judgeFill, type FillVerdict, type Mismatch } from '../../src/interact/fill-verdict.js';
 
 /**
  * The judgement is asserted as CODES — `did`, `sent`, `reasons`, `caveats`
@@ -171,4 +171,41 @@ describe('judgeFill — what the facts mean', () => {
             if (clearUnchanged !== undefined && readBack.kind !== 'landed') expect(v.reasons.at(-1)).toEqual({ code: 'clear-unchanged', shows: 9 });
           }
   });
+});
+
+/**
+ * The mismatch's classification, as `Difference` codes — the wording is
+ * fill-text.test.ts's, and fill.test.ts pins a few end to end. One row per
+ * rule of differenceOf, in its order, each row naming the shape it stands
+ * for; `before` defaults to null (nothing shown when typing began), `clear`
+ * to false.
+ */
+describe('differenceOf — what a missed read-back differs by, without content', () => {
+  const m = (f: Partial<Mismatch> & Pick<Mismatch, 'observed' | 'value'>): Mismatch => ({ before: null, clear: false, maskedHeld: 0, placeholder: undefined, ...f });
+  const rows: [string, Partial<Mismatch> & Pick<Mismatch, 'observed' | 'value'>, Difference][] = [
+    // 1. unchanged — first, whatever the reading is
+    ['typing dropped on held text (D2: it matches but for case)', { observed: 'Hello', before: 'Hello', value: 'hello' }, { kind: 'unchanged' }],
+    ['typing dropped on a field showing only its placeholder (D)', { observed: 'Search', before: 'Search', value: 'search', placeholder: 'Search' }, { kind: 'unchanged' }],
+    ['typing dropped on held bullets: unchanged, not masked', { observed: '••••', before: '••••', value: 'abcdef' }, { kind: 'unchanged' }],
+    // 2. masked
+    ['bullets, no clear: the held count rides along', { observed: '•••••', value: '123456', maskedHeld: 0 }, { kind: 'masked', held: 0 }],
+    ['bullets onto held bullets, no clear', { observed: '•'.repeat(32), before: '•'.repeat(20), value: 'x'.repeat(16), maskedHeld: 20 }, { kind: 'masked', held: 20 }],
+    ['bullets with clear: no held count (the clear emptied it)', { observed: '•••••', value: 'secret', clear: true, maskedHeld: 4 }, { kind: 'masked', held: undefined }],
+    // 3. partly masked
+    ['show-the-last-character (`•••••t`): lengths only', { observed: '•••••t', value: 'secret' }, { kind: 'length' }],
+    // 4. held text compared
+    ['auto-capitalised, no clear', { observed: 'Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
+    ['auto-capitalised, with clear', { observed: 'Hello world', value: 'hello world', clear: true }, { kind: 'case', positions: 1 }],
+    ['no clear onto held text: only the run after it is compared', { observed: 'NOTE: HI THERE', before: 'Note: ', value: 'hi there' }, { kind: 'case', positions: 7 }],
+    ['no clear: of several runs that match but for case, the closest counts — not the first', { observed: 'HELLO Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
+    ['no clear, the held text changed too: compared whole, closest run', { observed: 'NOTE: HI THERE', before: 'xyz', value: 'hi there' }, { kind: 'case', positions: 7 }],
+    ['with clear the field must EQUAL the value: longer but for case is a length', { observed: 'Re: Hello', value: 'hello', clear: true }, { kind: 'length' }],
+    ['autocorrect `teh` → `the`: same length, how many differ', { observed: 'the', value: 'teh' }, { kind: 'same-length', positions: 2 }],
+    ['held `HELLo` is not the typing: only `hxllo` after it is compared', { observed: 'HELLohxllo', before: 'HELLo', value: 'hello' }, { kind: 'same-length', positions: 1 }],
+    ['a mask that inserts a space', { observed: '1234 5', value: '12345' }, { kind: 'length' }],
+    ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
+    ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
+    ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],
+  ];
+  for (const [shape, f, kind] of rows) it(shape, () => expect(differenceOf(m(f))).toEqual(kind));
 });
