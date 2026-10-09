@@ -165,9 +165,11 @@ export async function fillField(
   let screenBeforeTyping: string | null | undefined;
   // Why the newest refetch found nothing (undefined: it found the field) —
   // the read-back's `lost` when the poll ends on such a read (2026-10-08).
+  // pollValue sees only the node; the clear reads `lost` off refetch's own
+  // answer, which carries the why with the missing field.
   let lostOnLastRead: LostWhy | undefined;
   const isInput = node.role === INPUT_ROLE;
-  const refetch = async (): Promise<UiNode | undefined> => {
+  const refetch = async (): Promise<{ node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy }> => {
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
     // selector finding with its own wording, not a device that went away.
@@ -180,12 +182,14 @@ export async function fillField(
     lastTree = tree;
     lostOnLastRead = undefined;
     const bySelector = resolveNow(tree, target, opts)?.node;
-    if (bySelector !== undefined) return bySelector;
+    if (bySelector !== undefined) return { node: bySelector };
     const screenChanged = typeof screenBeforeTyping === 'string' && screenSignature(tree) !== screenBeforeTyping;
     const twin = screenBeforeTyping === undefined || (screenBeforeTyping !== null && !screenChanged) ? sameField(tree, node) : undefined;
-    if (twin === undefined) lostOnLastRead = screenChanged ? 'screen-changed' : 'unmatched';
-    return twin;
+    if (twin !== undefined) return { node: twin };
+    lostOnLastRead = screenChanged ? 'screen-changed' : 'unmatched';
+    return { lost: lostOnLastRead };
   };
+  const refetchNode = async (): Promise<UiNode | undefined> => (await refetch()).node;
   const startTyping = async (text: string): Promise<void> => {
     screenBeforeTyping ??= lastTree === undefined ? null : screenSignature(lastTree);
     await adapter.typeText(text);
@@ -194,14 +198,14 @@ export async function fillField(
   await adapter.tap(point.x, point.y);
   await sleep(DEFAULT_FOCUS_DELAY_MS); // focus + keyboard — a constant, not an option: tests mock util/sleep
 
-  // What the field HOLDS, as opposed to what it SHOWS (fill-facts.ts#heldText:
-  // a reading equal to the named placeholder is an empty field). The node's
-  // own placeholder is the field's: refetch finds the same field.
+  // What the field HOLDS, as opposed to what it SHOWS, is heldText's
+  // (fill-facts.ts: a reading equal to the named placeholder is an empty
+  // field). The node's own placeholder is the field's: refetch finds the
+  // same field.
   const placeholder = node.placeholder;
-  const held = (shown: string | null | undefined): string => heldText(shown, placeholder);
 
   let current: UiNode | undefined = node;
-  let preText = held(node.value); // what the field holds when typing starts (see `landed`)
+  let preText = heldText(node.value, placeholder); // what the field holds when typing starts (see `landed`)
   let maskedAppend: FillResult['maskedAppend'];
   if (value !== '' && !clear && (preText === '' || isMaskedValue(preText))) {
     // The pre-tap read is stale for exactly the fields the length rule cares
@@ -212,10 +216,10 @@ export async function fillField(
     // an empty value (2026-10-07): it is a focus without typing, which has no
     // read-back to feed and nothing that could append, so the masked-append
     // finding below would name a typing that never happened.
-    const focused = await refetch();
+    const focused = await refetchNode();
     if (focused !== undefined) {
       current = focused;
-      preText = held(focused.value);
+      preText = heldText(focused.value, placeholder);
     }
     if (isMaskedValue(preText)) {
       // The length rule cannot see content: a password typed onto an
@@ -261,7 +265,7 @@ export async function fillField(
       // empty field. A clear WITH a value needs no such read: its read-back
       // compares the field to the value and wipes a mismatch before the
       // retry. Same re-read as the `!clear` branch above (2026-10-07).
-      const focused = await refetch();
+      const focused = await refetchNode();
       if (focused !== undefined) current = focused;
     }
     // Every rule of the clear is fill-clear.ts's (clearStep): this loop only
@@ -271,9 +275,9 @@ export async function fillField(
     while (next.step.do === 'delete' || next.step.do === 'reread') {
       if (next.step.do === 'delete') await adapter.clearText(next.step.count);
       else await sleep(pollMs);
-      current = await refetch();
-      // refetch sets lostOnLastRead whenever it finds no field.
-      next = clearStep(next.state, current === undefined ? { lost: lostOnLastRead ?? 'unmatched' } : { value: current.value });
+      const read = await refetch();
+      current = read.node;
+      next = clearStep(next.state, read.node === undefined ? { lost: read.lost } : { value: read.node.value });
     }
     if (next.step.do === 'fail') throw failure(next.step.failure);
     const { facts } = next.step;
@@ -344,8 +348,8 @@ export async function fillField(
             // `Search`, nothing typed must not pass for a typed `ear`.
             // Raw equality first: a value equal to the placeholder is the
             // one reading that cannot be told from it (see `held`).
-            observed === value || held(observed).includes(value));
-    let observed = await pollValue(refetch, landed, pollMs);
+            observed === value || heldText(observed, placeholder).includes(value));
+    let observed = await pollValue(refetchNode, landed, pollMs);
     // undefined: the node withholds its text — nothing to compare. Since
     // 2026-10-08 that is SAID (readBack 'no-value'), never passed as landed;
     // and when the last read did not find the field at all, that is said
@@ -360,10 +364,10 @@ export async function fillField(
       if (clear) {
         // What the field holds: a field showing only its placeholder (the
         // typing never landed) gets no deletes.
-        const wipe = held(observed).length;
+        const wipe = heldText(observed, placeholder).length;
         if (wipe > 0) await adapter.clearText(wipe);
         await adapter.typeText(value);
-        observed = await pollValue(refetch, landed, pollMs);
+        observed = await pollValue(refetchNode, landed, pollMs);
       }
       if (observed !== undefined && !landed(observed)) {
         const wrong = await notInput();

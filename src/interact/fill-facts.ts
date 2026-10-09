@@ -128,7 +128,7 @@ export interface FillResult {
    * `placeholder` reason of a clear alone (2026-10-09; until then fill.ts
    * decided it and reported a `placeholder` read-back).
    */
-  clearPlaceholder?: 'shown' | 'prefix' | 'other';
+  clearPlaceholder?: ClearPlaceholder;
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
@@ -141,6 +141,15 @@ export interface FillResult {
    */
   notInput?: { input: NearbyInput | 'none' | 'unread' };
 }
+
+/**
+ * Which reading a clear that ended on EXACTLY the named placeholder came
+ * from — FillResult.clearPlaceholder, measured by fill-clear.ts (ClearFacts)
+ * and spelled once, here: `shown` (before any delete), `prefix` (deletes
+ * into a reading that started with the placeholder's text), `other` (into
+ * one that did not).
+ */
+export type ClearPlaceholder = 'shown' | 'prefix' | 'other';
 
 /**
  * Why a `lost` read-back did not find the field:
