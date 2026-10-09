@@ -1,5 +1,5 @@
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -235,9 +235,9 @@ export class FakeAdapter implements DeviceAdapter {
    * make every test exercise the mismatch note instead of the table under
    * test. A test that wants a mismatch must ask for one.
    */
-  viewportSize: { width: number; height: number; statusBand?: number } | undefined;
+  viewportSize: DeviceScreen | undefined;
 
-  async viewport(): Promise<{ width: number; height: number; statusBand?: number }> {
+  async viewport(): Promise<DeviceScreen> {
     if (this.viewportSize !== undefined) return this.viewportSize;
     const { width, height } = this.screens[this.current].rect;
     return { width, height };

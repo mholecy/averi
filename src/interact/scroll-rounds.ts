@@ -850,12 +850,12 @@ function judge(
   viewport: DeviceScreen,
   order: DrawOrder | undefined,
   fully: boolean,
-  band: Pick<JudgingScreen, 'statusBand'>,
+  statusBand: number | undefined,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
   const whole: Rect = { x: 0, y: 0, ...viewport };
   // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
-  const screen: Rect = belowStatusBand(whole, band);
+  const screen: Rect = belowStatusBand(whole, { statusBand });
   const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
     const centre = tapPoint(node);
     const centreOnScreen = containsPoint(screen, centre);
@@ -890,7 +890,7 @@ function judge(
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
 function judgeOver(found: readonly UiNode[], { boxes, statusBand }: JudgingScreen, order: DrawOrder | undefined, fully: boolean): Judged | undefined {
   return boxes
-    .map((box) => judge(found, box, order, fully, { statusBand }))
+    .map((box) => judge(found, box, order, fully, statusBand))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
 }
 
@@ -1207,7 +1207,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   let cover: Cover | undefined;
   let best = whole;
   if (offered !== undefined && read !== undefined) {
-    const covered = judge(found, viewport, order, fully, s.frame, { cover: offered, keyboardSide: read.ofKeyboard });
+    const covered = judge(found, viewport, order, fully, s.frame.statusBand, { cover: offered, keyboardSide: read.ofKeyboard });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a
