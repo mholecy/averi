@@ -1,5 +1,6 @@
 import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { clippedEdges, containsPoint, drawnOver, largestScroller, rectArea, rectWithin, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
+import { clippedEdges, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -159,17 +160,16 @@ interface TreeFacts {
    */
   mainScroller: Rect | undefined;
   /**
-   * The nodes drawn OVER a clipping container — after its subtree in the
-   * tree, meeting its rect, drawing something (ui-tree/geometry.ts
-   * #drawnOver; 2026-10-09, the floating tab bar): what a stroke over it
-   * keeps clear of (swipe.ts#strokeRoom cuts the box above them) and what
-   * a stroke that still touched down on one names (`touchedOn`). Asked of
-   * the rects `scrollersOf` and `mainScroller` give; undefined when this
-   * tree has no container with that rect (one remembered from an earlier
-   * read: the list has moved since); never any on iOS, which has no
-   * clipping container.
+   * What is drawn OVER a clipping container (ui-tree/draw-order.ts;
+   * 2026-10-09, the floating tab bar): `drawnOver`, what a stroke over it
+   * keeps clear of (swipe.ts#strokeRoom cuts the box above them), and
+   * `drawnOverAt`, the one a stroke that still touched down on it names
+   * (`touchedOn`). Asked of the rects `scrollersOf` and `mainScroller`
+   * give; undefined when this tree has no container with that rect (one
+   * remembered from an earlier read: the list has moved since); never any
+   * on iOS, which has no clipping container.
    */
-  drawnOver: (within: Rect) => readonly UiNode[] | undefined;
+  drawOrder: Pick<DrawOrder, 'drawnOver' | 'drawnOverAt'>;
   /**
    * A cheap fingerprint of the WHOLE tree (ui-tree/read-tree.ts
    * #treeFingerprint) — every node's role, text, id and rect — for "the
@@ -188,7 +188,7 @@ interface TreeFacts {
 
 /**
  * `TreeFacts` of a tree: five walks — four as the driver made them before
- * deep/r3-scroll, and `drawnOver`'s (2026-10-09). Derived ONCE per call of
+ * deep/r3-scroll, and the draw order's (2026-10-09). Derived ONCE per call of
  * `round`, after the keyboard's witness — the ask that most rounds re-enter
  * for, which needs none of them — and handed along (`ThisRead`). A call that re-enters after an
  * `ask unlocated` (a `fully: true` or bound stop, once a scroll) or an
@@ -200,7 +200,7 @@ function factsOf(tree: UiNode): TreeFacts {
   return {
     scrollersOf: scrollersOf(tree),
     mainScroller: largestScroller(tree),
-    drawnOver: drawnOver(tree),
+    drawOrder: drawOrder(tree),
     fingerprint: treeFingerprint(tree),
     loading: showsProgress(tree),
   };
@@ -709,7 +709,7 @@ interface State {
 /**
  * A container strokes go over, as one value (review round 1 of
  * fix/r4-stroke: the two were separate fields that had to move together):
- * its rect, and the rects drawn over it (`TreeFacts.drawnOver`) at the read
+ * its rect, and the rects drawn over it (`TreeFacts.drawOrder`) at the read
  * that chose it — the stroke box's cut (swipe.ts#strokeRoom). A later read
  * that still holds a container of that rect gives its own; one that does
  * not (the list moved — measured on Account Detail, 0,825 → 0,401) keeps
@@ -721,8 +721,8 @@ interface StrokeContainer {
   over: readonly Rect[];
 }
 
-/** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.drawnOver`). */
-const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.drawnOver(rect)?.map((n) => ({ ...n.rect }));
+/** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.drawOrder`). */
+const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.drawOrder.drawnOver(rect)?.map((n) => ({ ...n.rect }));
 
 /**
  * The container a round's stroke toward the target goes over (`round`):
@@ -1304,11 +1304,12 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
  * The node drawn over its container that the last stroke touched down on,
  * when the strokes ended exhausted (2026-10-09, docs/bugs/2026-10-09-
  * android-scroll-stroke-touches-down-on-floating-tab-bar.md): the last of
- * `TreeFacts.drawnOver` — the one drawn on top — that contains the stroke's
- * touch-down, in the tree that read unchanged. A gesture belongs to the view
- * the finger first touches (swipe.ts#swipeVectorAbove), so such a node took
+ * what is drawn over it — the one drawn on top — that contains the stroke's
+ * touch-down, in the tree that read unchanged (`TreeFacts.drawOrder
+ * .drawnOverAt`, which leaves out a wrapper holding the container whole).
+ * A gesture belongs to the view the finger first touches (swipe.ts#swipeVectorAbove), so such a node took
  * the strokes — MAY have: the tree does not say whether a node takes touches
- * (geometry.ts#drawnOver), so the sentence names it first and keeps the
+ * (ui-tree/draw-order.ts), so the sentence names it first and keeps the
  * other causes after it (review round 1) — and "content exhausted" alone
  * would send the reader the wrong way: the measured fast fail said so of a
  * list with 34 more rows. The stroke
@@ -1325,9 +1326,7 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
 function touchedOn(s: State, facts: TreeFacts): TouchedOn | undefined {
   const { strokeWithin: container, lastDrawn } = s;
   if (container === undefined || lastDrawn === undefined) return undefined;
-  // A node whose rect holds the container's whole — a wrapper the list's
-  // size or larger — is no evidence of a cover at the touch-down: not named.
-  const on = (facts.drawnOver(container) ?? []).filter((n) => containsPoint(n.rect, lastDrawn.from) && !rectWithin(container, n.rect)).at(-1);
+  const on = facts.drawOrder.drawnOverAt(container, lastDrawn.from);
   if (on === undefined) return undefined;
   const { role, label, identifier, rect } = on;
   return { at: { ...lastDrawn.from }, on: { role, label, identifier, rect: { ...rect } }, container };

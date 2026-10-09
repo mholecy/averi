@@ -1,5 +1,4 @@
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { isInteractive } from './selectors.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -15,11 +14,10 @@ import { isInteractive } from './selectors.js';
  * join this module. tapPoint stays in selectors.ts on purpose: it is the
  * tap-target rule (where a resolved node is pressed), its importers include
  * the interact/keyboard*.ts modules, and the move deliberately left it alone. Since
- * 2026-10-07 the point-in-rect test (`containsPoint`) and the draw-order
- * question (`shadowing`, at the end) are here too: the tap guard's
- * dismissal picker had spelled both in interact/keyboard.ts, and the review
- * of that branch sent them where the rect arithmetic is — a layer that may
- * ask the tree anything, below the one that acts on it (ARCHITECTURE.md §2).
+ * 2026-10-07 the point-in-rect test (`containsPoint`) is here too: the tap
+ * guard's dismissal picker had spelled it in interact/keyboard.ts. What is
+ * drawn over what — a walk of the tree read as paint order, not rect
+ * arithmetic — is ui-tree/draw-order.ts's, which asks these predicates.
  */
 
 interface ScreenWidth {
@@ -514,7 +512,7 @@ export { rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel
  * `rectsOverlap` (two rects sharing area: a different question), and the
  * ONE spelling of it: the tap guard asks it of the keyboard's frame and the
  * tap point (ui-tree/keyboard-cover.ts#readKeyboard, its `over` and `frameOver`), the dismissal picker of the
- * root's rect, and `shadowing` below of every candidate. Until 2026-10-07 it
+ * root's rect, and ui-tree/draw-order.ts of every candidate. Until 2026-10-07 it
  * was interact/keyboard.ts's `inside`, with a `covers` wrapper beside it.
  */
 export function containsPoint(rect: Rect, point: Point): boolean {
@@ -523,7 +521,7 @@ export function containsPoint(rect: Rect, point: Point): boolean {
 
 /**
  * Does `inner` lie wholly inside `outer` — edges included. The rect-in-rect
- * companion of `containsPoint`; scroll-rounds.ts#touchedOn asks it so that a
+ * companion of `containsPoint`; draw-order.ts#drawnOverAt asks it so that a
  * wrapper whose rect holds the whole stroke container is not named as what
  * the stroke touched down on (review round 1 of fix/r4-stroke, 2026-10-09).
  */
@@ -634,310 +632,3 @@ export function rectText(r: Rect): string {
  * two docs each claimed to be the one way) — see the pair's note above.
  */
 export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
-
-// ─── Draw order ──────────────────────────────────────────────────────────────
-
-/**
- * The roles whose frame is not a surface: a node of one, non-interactive and
- * with children, covers a point only through its content (`shadowing`
- * below, 2026-10-08). One role, deliberately — see the rejected ones there.
- */
-const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
-
-/**
- * The node DRAWN OVER `point` on top of `node`, if any (review round 1): the
- * last node in pre-order AFTER `node`'s subtree — later siblings and their
- * descendants are drawn over earlier ones, later Windows over earlier (UIKit
- * orders them by level) — that is content (not a structural wrapper: a
- * full-screen `Other` of a later Window contains every point and draws
- * nothing), has area and contains the point. The keyboard's own nodes are
- * NOT exempt: a strategy under the keyboard is caught first by the band
- * check (with its own reason), and a keyboard-owned node over the point
- * that the band missed is a real cover (review 2026-10-07). `undefined` when
- * nothing shadows the point. Ancestors and earlier siblings never count:
- * they are beneath. A heuristic, not a compositor — a transparent overlay
- * smaller than the screen reads as cover, a label inside a sheet that does
- * not contain the point does not — but it refuses the measured kind of
- * false target: an alert's or a sheet's content over the title, a
- * navigation bar's own label.
- *
- * Asked by the tap guard's dismissal picker (interact/keyboard-in-tree.ts
- * #pickDismissal). Here, not in soft-keyboard.ts, since 2026-10-07: it is
- * a draw-order question over rects asked of any tree — the keyboard is one
- * more thing that can be drawn over a point, not what the question is about.
- *
- * A screen-sized HOST is not a cover by itself either (2026-10-08,
- * docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md):
- * a non-structural, non-interactive node WITH children whose area reaches
- * `SCREEN_SIZED_FRACTION` of the screen — the root's rect, the screen the
- * dismissal picker's on-screen check uses, or the tree's largest rect when
- * the root has none (bare-tree.ts's `wrapperBySize` notion). WDA gives a
- * SwiftUI pushed screen's toolbar host as `toolbar 'Toolbar'` with the
- * screen's full frame AFTER the title in pre-order; it draws nothing over
- * the title, yet every `keyboardDismiss` tap on that screen was refused as
- * "covered by toolbar". Its descendants are still walked, so a full-screen
- * host over the point covers through the CONTENT it carries there (a text,
- * a button, a card smaller than the screen). Not exempt, whatever their
- * size: an interactive node (a full-screen `button` backdrop — an RN
- * transparent Modal's Pressable — takes the tap) and a childless one (a
- * full-screen image or text draws itself; a `toolbar` with no item —
- * childless, or holding only empty frames — is the one exception since
- * 2026-10-09: ITEMLESS TOOLBAR below). The measured
- * refusals above are kept. Accepted trade-off: a full-screen non-interactive host with nothing
- * of its own at the point (a host whose content sits elsewhere — a
- * full-screen `scrollable` or `webview`, such as an RN ScrollView in a
- * transparent modal whose rows are below the title) reads as not covering,
- * and the dismissal tap lands on it. "Has children" is a weak signal: the
- * measured toolbar's only child is an empty container. What a tap on it
- * then does (corrected in review 2026-10-08): on the guard's path a keyboard
- * that stays, or a target gone after the tap, ends in `AfterDismissalTap`;
- * but a tap that DOES hide the keyboard and also did something of its own
- * (an RN ScrollView with `keyboardShouldPersistTaps="never"` resigning on
- * any touch, a row selection that resigns the keyboard) passes the guard
- * silently — the note says `hidden by tapping <title> before tapping` and
- * the target is tapped after it (interact/keyboard-in-tree.ts, the
- * `hidden` wording). On the post-fill `dismiss()` path a tap that changed
- * the screen and took the keyboard with it is reported as `hiddenBy:
- * tapping <title>` — the same as any dismissal tap whose side effect the
- * band cannot see. iOS dimming views come through as `other` (structural), never a
- * cover before this change, so they are not a new cost.
- *
- * A SCROLL VIEW with content is not a cover by itself either, whatever its
- * size (2026-10-08, the device check of that fix in the same bug note, at
- * e9e6509): with the toolbar host excused, the next node after the title
- * in pre-order — the form's `scrollable 0 0 402 512`, 58 % of the screen,
- * so no host by size — covered the title at (201,84) and the dismissal was
- * refused "covered by scrollable". Its frame runs under the translucent
- * top bar, as an iOS scroll view's does by default (the content inset, not
- * the frame, keeps the rows below the bar); nothing of its content was at
- * the point — the first row started at y 150. The first test was built
- * from an abridged tree in which the later toolbar shadowed the
- * scrollable, so it never asked. The rule: a non-interactive node in
- * `CONTENT_FRAMED_ROLES` (`scrollable` alone — UIScrollView, Table and
- * CollectionView; Android's scroll containers, whose guard has an oracle
- * and never asks this) WITH children covers a point only through its
- * descendants, never through its own frame — the screen-sized-host rule
- * without the size. Why a scroll view and not every container with
- * children — DRAW ORDER, not paint (a scroll view may well paint: the
- * UITableView / UICollectionView behind a SwiftUI List or Form draws the
- * grouped background, an RN ScrollView its `backgroundColor`): an iOS
- * scroll view routinely extends under the bars around it, and WDA lists
- * those bars' content (the navigation title) EARLIER in pre-order although
- * they draw OVER the scroll view, so at such a point the scroll view's own
- * frame is not what the user sees; pre-order alone cannot tell that point
- * from one where the scroll view really is on top, and the scroll view's
- * content is the only part of it that can be judged. Considered and rejected: `webview` under the
- * screen size (a screen-sized one with children is a host already) — it paints
- * its page itself (backgrounds, canvas, images without an accessibility
- * node), its accessibility children are sparse, so its frame IS its
- * surface; `toolbar` under the screen size — the input-accessory bar
- * (48 pt) draws an opaque bar, measured 2026-10-07 (it HAS items:
- * Toolbar → Other → Button "Done", so the itemless-toolbar rule below
- * leaves it covering); and a rule over any
- * non-interactive parent ("judge only by leaves"), which would also drop
- * a smaller card or sheet whose own background is the cover. What still
- * covers: a scrollable's own content at the point (a row's text, a
- * button), so an alert's or a sheet's list whose row text sits over the
- * title is refused as before; a childless scrollable (nothing to judge
- * it by); an interactive node of any role. Accepted trade-off, this rule
- * LOOSENS the guard: a scroll view that really is drawn over the point,
- * with its opaque background and nothing non-structural there — a sheet's
- * table whose row at the title is a bare `Cell` (container, structural:
- * the tap would select that row) or an empty band — reads as not
- * covering, and the dismissal tap lands on it. What then happens is the
- * toolbar trade-off's above: on the guard's path a keyboard that stays (or
- * a target gone) ends in `AfterDismissalTap` (the screen was touched, said
- * so; never a second strategy), while a tap that hides the keyboard AND
- * does something of its own (a row selected, an RN ScrollView with
- * `keyboardShouldPersistTaps="never"`) passes silently: `hidden by tapping
- * <title> before tapping`, then the target is tapped; on the post-fill
- * `dismiss()` path a tap that changed the screen and took the keyboard
- * with it is reported as `hiddenBy: tapping <title>`. Follow-up, deferred
- * (review 2026-10-08) until a device re-run gives the full WDA tree:
- * inside a scroll view any descendant with area at the point — a
- * structural `Cell` included — could count as cover; not done now
- * because a full-frame `Other` wrapper inside the form's collection view
- * that reaches y 84 would re-break the measured case. A residual the
- * other way (unchanged): content scrolled UNDER a translucent bar is
- * after the bar's title in WDA's pre-order, so a row's text that has
- * scrolled up under the title still reads as cover — a false refusal, the
- * safe direction; telling it apart needs the bar's draw order, which the
- * tree does not give.
- *
- * An ITEMLESS TOOLBAR is not a cover, whatever its size (2026-10-09,
- * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-
- * dismissal.md): a `toolbar` none of whose descendants could be an item —
- * every one an EMPTY FRAME, a `container` with no label, value or
- * identifier; it may have none at all. `container` only, not `other`
- * (review round 1, 2026-10-09): the iOS parsers give `container` to the
- * wrapper types they name (WDA's `Other`, `Cell`, `Window`, the bars —
- * adapters/ios-node.ts, wda-source.ts) and `other` to every type they do
- * NOT map — a SegmentedControl, Stepper, SearchField, Link, Picker — so an
- * unlabelled `other` may be a control and counts as an item.
- * Measured under WDA on the stock Contacts "New Contact" sheet (UIKit,
- * iPhone 17, iOS 27): after the title `text 'New Contact' 149 89 104 22`
- * in pre-order come the form's `scrollable 0 62 402 812` (with children,
- * excused above) and two `toolbar 'Toolbar'`s, `0 83 402 48` and
- * `0 62 402 812`, each holding ONE empty `Other` (→ `container`) of its own
- * rect — no label, value, identifier or children (raw `/source` at
- * 347e70d); EACH alone contained the title's point (201,100) and refused
- * the configured title dismissal as "covered by toolbar", while the
- * screenshot shows the title with nothing over it — every keyboard-covered
- * tap on that sheet failed. The rule's first version (`ae23890`) asked for
- * NO children, after the note's first reading of that tree; the empty
- * child was in the capture all along, the rule never applied on the
- * device, and the unit test passed on a shape no device gave (corrected
- * the same day, at the 347e70d device check). So "itemless" is judged by
- * content, not by child count. Extending the host rule to screen-sized
- * frames would not have fixed it: the 48-pt one is a bar's size, not a
- * host's. The rule is the role's: a toolbar's surface is its ITEMS (WDA
- * lists a bar button, a title, a Done as its descendants, as the
- * accessory bar's), so one listing none is judged to draw nothing at the
- * point (on the measured sheet nothing of either was visible over the
- * title). Narrow on purpose: only `toolbar` (a childless `image`, `text`,
- * `scrollable` or `webview` still draws itself, and a childless
- * screen-sized one still covers); only an EMPTY frame is not an item — a
- * descendant with a label, a value or an identifier (a frame WDA named,
- * possibly a custom item), or of any other role (an unlabelled button or
- * icon, a text, an unmapped control as `other`) is one, at any depth, and the toolbar then covers as
- * itself at any size under the screen (the input-accessory bar measured
- * 2026-10-07 has its Done, and the keyboard's band contains that slot
- * anyway); `toolbar` is not an interactive role (ui-tree/selectors.ts),
- * and neither is `container`, so no control the parsers name is excused; a
- * keyboard-owned itemless toolbar (none measured) is excused like any
- * other, the band — which contains the accessory slot — still catching a
- * point there. Earlier passes it cannot reopen: the measured covers
- * this function exists for — an alert's or a sheet's text, a navigation
- * bar's label, a keyboard-owned key or band, a full-screen backdrop
- * `button` — are none of them an itemless toolbar, and the round-2 pin "a
- * childless screen-sized toolbar still covers" was the generic
- * childless-node rule written with a toolbar, not a measured toolbar that
- * covered (no device has shown one). Accepted residual, this rule LOOSENS
- * the guard: a UIToolbar draws its bar background even with no items, so a
- * genuinely opaque itemless toolbar drawn over the dismissal (an app's
- * empty bar laid over the title) reads as not covering and the dismissal
- * tap lands on the bar — it then has no item to trigger, so the likely
- * outcome is a keyboard that stays, on which both paths (the guard's and the
- * post-fill `dismiss()`) end in `AfterDismissalTap` — the screen was
- * touched, and said so; the silent pass of the trade-offs above needs a
- * tap that hides the keyboard, which a bar with no items is not known to
- * do. The one SILENT WRONG ACTION this loosening opens (review 2026-10-09):
- * a bar whose item WDA does not list as content — a custom view that is
- * not an accessibility element, or one hidden from accessibility, listed
- * not at all or only as an empty frame — reads as itemless, and
- * "itemless" is then false evidence: the dismissal tap can TRIGGER that
- * item (Save, Cancel, a sheet's close), and if the keyboard goes with it
- * the guard reports `hidden by tapping <title>` and taps the target on a
- * screen it did not mean to change. Rare — the unlisted item must sit
- * exactly at the dismissal target's centre — but not caught; judging by
- * content widens it by one case (an item WDA lists only as an empty frame,
- * which the child-count rule would have kept as a cover — on the measured
- * sheet, the one shape seen, that frame is the bar's own size, not an
- * item's).
- * Platform scope: the `toolbar` role is assigned only by the WDA parser
- * (adapters/wda-source.ts, `Toolbar: 'toolbar'`); a future idb or Android
- * mapping to `toolbar` would inherit this excuse and must be judged
- * against it.
- */
-export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
-  const screen = screenAreaOf(tree);
-  const coversOnlyThroughContent = (n: UiNode) =>
-    !isInteractive(n) && ((n.children.length > 0 && CONTENT_FRAMED_ROLES.has(n.role)) || screenSizedHost(n, screen));
-  /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see above). */
-  const emptyFrame = (n: UiNode) => n.role === 'container' && !n.label && !n.value && !n.identifier;
-  /** A toolbar with no items: nothing of it is what is seen at the point (the UIKit sheet's two, 2026-10-09 — see above). */
-  const itemlessToolbar = (n: UiNode) => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
-  let after = false;
-  let over: UiNode | undefined;
-  const walk = (n: UiNode): void => {
-    if (n === node) {
-      after = true; // the node's own subtree is the node
-      return;
-    }
-    if (after && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && !coversOnlyThroughContent(n) && !itemlessToolbar(n) && containsPoint(n.rect, point)) over = n;
-    for (const child of n.children) walk(child);
-  };
-  walk(tree);
-  return over;
-}
-
-/** The screen's area as a draw-order question sizes a host against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion). */
-function screenAreaOf(tree: UiNode): number {
-  return rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
-}
-
-/** A screen-sized HOST: a node with children whose area reaches SCREEN_SIZED_FRACTION of `screen` (`screenAreaOf`) — it draws through its content, which is walked. One rule for `shadowing` and `drawnOver`. */
-const screenSizedHost = (n: UiNode, screen: number): boolean => n.children.length > 0 && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION;
-
-/**
- * The nodes DRAWN OVER a clipping container (2026-10-09, docs/bugs/
- * 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md), in
- * pre-order: every node AFTER the container's subtree — later in the tree,
- * taken as drawn later (the draw-order rule `shadowing` reads), never an ancestor
- * or a descendant: its own rows scroll with it — whose rect meets the
- * container's with area and that DRAWS something. Measured on mp-native's
- * Account Detail (Compose): the transaction list `0,825 1080x1395` runs to
- * the screen's bottom under a floating tab bar, whose host — an unlabelled
- * `container` `66,1840 948x248` — and its tabs `nav.tab_*` (1876–2052)
- * come after the list; a touch-down at y ≥ ~1840 went to the bar, and the
- * list never moved. `scroll_until`'s stroke box is cut above them
- * (interact/swipe.ts#strokeRoom has the rule; scroll-rounds.ts#TreeFacts
- * asks this) and a stroke that still touched down on one names it.
- *
- * "Draws", for a node of ANY role — not `shadowing`'s "content" (a
- * non-structural role): a Compose tree is all `container`/`other`
- * (adapters/android.ts maps `android.view.View` so), the bar's host and its
- * tabs included, so a structural role is no evidence of nothing drawn. Not
- * counted: a node with no area; a structural LEAF with no label and no
- * value (a spacer, an empty Box — empty area); a screen-sized HOST with
- * children (`SCREEN_SIZED_FRACTION`, `shadowing`'s rule — a full-screen
- * overlay layer draws through its content, which is walked); and the
- * keyboard's own subtrees (`ofKeyboard`: the keyboard is the round's cover,
- * read with its witness — never second-guessed here; only a WDA tree marks
- * them, and an iOS tree has no clipping container, so today the exclusion
- * never runs — it keeps a future Android mark from cutting twice). Counted, so: a
- * structural container WITH children under the screen's size — the bar's
- * host, which took the measured touch-down at y 1857 above its tabs (a
- * Material Surface swallows touches through its whole rect). The tree does
- * not say whether a node takes touches (the parser keeps no `clickable`),
- * so a transparent wrapper reaching over a list counts too: its cost is a
- * shorter stroke box, never a stroke off the list — and a failure that
- * names it says it MAY have taken the strokes, never that it did.
- *
- * "Later in pre-order = drawn later" is measured on Compose only (the bar
- * above, 2026-10-09). For classic Views uiautomator's sibling order is the
- * accessibility child order, which Android may sort by position rather
- * than by Z (not measured): there the rule reads "a later sibling
- * overlapping the list", which may include one drawn beneath it — the
- * same premise, and the same residual, as `shadowing`'s.
- *
- * The container is found in the tree by its rect — the outermost clipping
- * node (`clipsDescendants`) with that rect, whose subtree is then the
- * largest that is excluded — since the round carries containers as rects
- * (`scrollersOf`, `largestScroller`); UNDEFINED when this tree has no such
- * container (a rect of another read — the list has moved since), so the
- * caller can tell "nothing over it" from "not asked of this tree". One walk
- * when called; each answer a scan of it.
- */
-export function drawnOver(tree: UiNode): (within: Rect) => readonly UiNode[] | undefined {
-  const screen = screenAreaOf(tree);
-  const draws = (n: UiNode): boolean =>
-    rectArea(n.rect) > 0 &&
-    !screenSizedHost(n, screen) &&
-    !(STRUCTURAL_ROLES.has(n.role) && n.children.length === 0 && !n.label && !n.value);
-  // Pre-order, each node with the index just past its subtree; the keyboard's subtrees left out.
-  const order: { node: UiNode; end: number }[] = [];
-  const walk = (n: UiNode): void => {
-    if (n.ofKeyboard === true) return;
-    const at = order.length;
-    order.push({ node: n, end: at + 1 });
-    for (const child of n.children) walk(child);
-    order[at].end = order.length;
-  };
-  walk(tree);
-  return (within) => {
-    const container = order.find(({ node }) => node.clipsDescendants === true && sameRect(node.rect, within));
-    if (container === undefined) return undefined;
-    return order.slice(container.end).flatMap(({ node }) => (rectIntersection(node.rect, within) !== undefined && draws(node) ? [node] : []));
-  };
-}

@@ -1,5 +1,6 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
-import { frameText, shadowing } from '../ui-tree/geometry.js';
+import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
+import { frameText } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
@@ -198,7 +199,7 @@ interface DismissalPick {
  * above the viewport is still in the tree, WDA keeps off-screen nodes;
  * until that date this judged the root's rect alone, which `onScreen`
  * still falls back to when there is no screen — and not drawn over by later content
- * (`shadowing`, ui-tree/geometry.ts: an alert, a sheet, a navigation bar's
+ * (ui-tree/draw-order.ts#shadowing: an alert, a sheet, a navigation bar's
  * label). An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
  * check is repeated here. `keyboard` must be a reading OF `tree`: its band
@@ -213,6 +214,7 @@ async function pickDismissal(
   screen: TapScreen | undefined,
 ): Promise<DismissalPick> {
   const skipped: string[] = [];
+  let order: DrawOrder | undefined; // walked once, by the first strategy that gets as far as asking it
   for (const d of dismissals) {
     const name = describeDismissal(d);
     if (d.kind === 'accessory') {
@@ -252,7 +254,7 @@ async function pickDismissal(
       skipped.push(`${name}: off screen at (${at.x},${at.y})`);
       continue;
     }
-    const over = shadowing(tree, node, at);
+    const over = (order ??= drawOrder(tree)).shadowing(node, at);
     if (over !== undefined) {
       skipped.push(`${name}: covered by ${over.role}${over.label === null ? '' : ` ${JSON.stringify(over.label)}`}`);
       continue;
