@@ -148,7 +148,8 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // After the guard: `sent` only when something WAS sent (the hiding path);
   // a model that handed the node back clear sent nothing.
   const onScreen = async (r: ClearedLook, sent?: string, reading = readKeyboard(adapter, r.tree)): Promise<ResolvedClear> => {
-    await refuseOffScreen(adapter, target, r.node, first.tree, screen, sent);
+    // r.tree, the read that holds r.node: the status-bar remedy looks the node up in it (resolve.ts#statusBarRemedy).
+    await refuseOffScreen(adapter, target, r.node, r.tree, screen, sent);
     return aimed(r, reading, sent);
   };
   const at = tapPoint(first.node);
