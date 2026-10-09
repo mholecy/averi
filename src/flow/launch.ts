@@ -89,11 +89,26 @@ const wipeSentence = (count: number): string =>
   `a device registration included, is gone (${count} this session)`;
 
 /**
+ * The label of the wipe's `⚠` line — the flow's trace action and the prefix
+ * of launch_app's reply line (`⚠ clearState: <wiped>`). One spelling, as the
+ * sentence is.
+ */
+export const WIPE_LABEL = '⚠ clearState';
+
+/**
  * Launch `request.appId` on `adapter`: the activity resolved against
  * averi.yaml (flow/config.ts#resolveLaunchActivity — `cfg` undefined when
  * there is none), the adapter's launch, and a wipe counted against
  * `session`. Throws what the adapter throws; a wipe is counted only once the
  * launch returned.
+ *
+ * Known gap (review 2026-10-09, not a regression — the flow step had it
+ * before the merge): the adapters wipe BEFORE they launch (Android `pm
+ * clear`, iOS `clearAppData`), so a wiping launch that then throws — an
+ * activity that does not resolve — has paid the wipe and counts nothing.
+ * Counting it needs the adapter to say the wipe happened (an error or
+ * outcome carrying it); counting every thrown clearState launch would
+ * overcount the ones refused before `pm clear` ran.
  */
 export async function launchApp(
   adapter: DeviceAdapter,

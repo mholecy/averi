@@ -23,7 +23,7 @@ import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
-import { launchedLine, type Launched } from '../flow/launch.js';
+import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
 
@@ -68,7 +68,7 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
 export const launchText = (platform: Platform, launched: Launched): string =>
   `Launched ${launchedLine(launched, platform)}` +
   (launched.note !== undefined ? `\n⚠ ${launched.note}` : '') +
-  (launched.wiped !== undefined ? `\n⚠ clearState: ${launched.wiped}` : '');
+  (launched.wiped !== undefined ? `\n${WIPE_LABEL}: ${launched.wiped}` : '');
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

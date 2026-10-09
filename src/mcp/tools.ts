@@ -7,7 +7,7 @@ import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
-import type { DismissOptions } from '../interact/keyboard.js';
+import type { GuardOptions } from '../interact/keyboard.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
@@ -122,7 +122,7 @@ const treeOpts = (settings: IosToolSettings): AdapterOpts => ({ treeSource: sett
  * (2026-10-09; the two handlers spelled it out until then); a fill adds its
  * `clear`.
  */
-const guardOpts = (settings: IosToolSettings): DismissOptions => ({ ambiguous: 'refuse', dismissals: settings.dismissals });
+const guardOpts = (settings: IosToolSettings): Pick<GuardOptions, 'ambiguous' | 'dismissals'> => ({ ambiguous: 'refuse', dismissals: settings.dismissals });
 
 const text = (value: unknown) => ({
   content: [

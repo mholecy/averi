@@ -28,7 +28,7 @@ import {
   type TapSpec,
 } from './config.js';
 import { describeCondition, evaluateCondition } from './condition.js';
-import { launchApp, launchedLine, type EngineSession } from './launch.js';
+import { launchApp, launchedLine, WIPE_LABEL, type EngineSession } from './launch.js';
 import { resolveCredentials, type Credentials, type EnvValues, type ResolvedValue } from './credentials.js';
 
 export interface TraceEntry {
@@ -381,7 +381,10 @@ export class FlowEngine {
    * `app.ios.keyboardDismiss` in interact/'s vocabulary (flow/config.ts#
    * keyboardDismissals), converted once here. Every tap, fill, presence probe
    * and post-fill dismissal gets it; a site adds only what is its own (a
-   * timeout, a clear). The engine never branches on the platform for the
+   * timeout, a clear). Each callee reads its own part: the presence probe
+   * (resolvePresent) only `ambiguous` and `pollMs` — it acts on nothing, so
+   * the dismissals are carried, not used — and the dismissal only
+   * `ambiguous` and `dismissals`. The engine never branches on the platform for the
    * dismissals: interact/ reads the list only where the adapter has no
    * keyboard oracle, so on Android it is carried and never read.
    */
@@ -1009,12 +1012,12 @@ export class FlowEngine {
     // config's. Its caveat and its wipe each get a `⚠` line right under the
     // line they qualify.
     const launched = await launchApp(this.adapter, this.cfg, this.session, {
-      appId: 'package' in app ? app.package : app.bundleId,
       ...spec,
+      appId: 'package' in app ? app.package : app.bundleId,
     });
     this.log('launch', launchedLine(launched));
     if (launched.note !== undefined) this.log('⚠ launch', launched.note);
-    if (launched.wiped !== undefined) this.log('⚠ clearState', launched.wiped);
+    if (launched.wiped !== undefined) this.log(WIPE_LABEL, launched.wiped);
   }
 
   private async runType(spec: StepPayload<'type'>): Promise<void> {
