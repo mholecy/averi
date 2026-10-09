@@ -127,9 +127,10 @@ export interface Exposure {
   readonly centreCover?: UiNode;
   /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
-   * `within` under no cover (no `centreCover`) — `moved: false`; else the centre (`rectCentre`) of the largest
-   * uncovered piece whose sides are both at least `minPiece` — `moved: true`,
-   * with that `piece`; undefined when no piece is that large.
+   * `within` under no cover (no `centreCover`) — `moved: false`; else the
+   * centre (`rectCentre`) of the largest uncovered piece whose sides are
+   * both at least `minPiece` — `moved: true`, with that `piece`; undefined
+   * when no piece is that large.
    */
   readonly tapAt?: { readonly point: Point; readonly moved: false } | { readonly point: Point; readonly moved: true; readonly piece: Rect };
   /** MIN_TAP_PIECE_FRACTION of this tree's screen's shorter side, rounded — the piece size `tapAt` needs. */
