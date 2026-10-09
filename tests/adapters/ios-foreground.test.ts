@@ -178,6 +178,8 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
   it("never past SpringBoard: the note calls it SpringBoard's, not \" \"", async () => {
     const outcome = await device([SPRINGBOARD]).adapter.launch('com.apple.MobileAddressBook');
     expect(outcome.note).toMatch(/the UI tree was still SpringBoard's \(the home screen or the launch animation\) — /);
+    // never "a localized display name": SpringBoard is not the app under another name
+    expect(outcome.note).toMatch(/Compare with screenshot\. Read again before trusting what the tree says$/);
   });
 
   it('empty for the whole bound: a note that nothing was checked', async () => {

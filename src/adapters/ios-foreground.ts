@@ -165,12 +165,20 @@ const quoted = (names: readonly string[]) => names.map((n) => `"${n}"`).join(' o
 const whose = (label: string) =>
   label.trim() === '' ? "SpringBoard's (the home screen or the launch animation)" : `the app labelled "${label}"`;
 
+/**
+ * The localized-name reading applies only to an APP's label: SpringBoard's
+ * `' '` is never the launched app under another name, so its note says
+ * only to read again.
+ */
 function notInFront(bundleId: string, label: string, names: readonly string[]): string {
-  return (
+  const head =
     `${formatSeconds(FOREGROUND_WAIT_MS)} after launching ${bundleId}${names.length > 0 ? ` (${quoted(names)})` : ''}, ` +
     `the UI tree was still ${whose(label)} — iOS can hand idb the previous app's tree for a second or more after an app ` +
-    'switch, so a read now may judge the wrong app (an absent check passes on it). Compare with screenshot. If the ' +
-    `screenshot shows ${bundleId}, its on-screen name differs from its Info.plist name (a localized display name) and ` +
+    'switch, so a read now may judge the wrong app (an absent check passes on it). Compare with screenshot. ';
+  if (label.trim() === '') return head + 'Read again before trusting what the tree says';
+  return (
+    head +
+    `If the screenshot shows ${bundleId}, its on-screen name differs from its Info.plist name (a localized display name) and ` +
     'this can be ignored; otherwise read again before trusting what the tree says'
   );
 }
