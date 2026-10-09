@@ -67,10 +67,12 @@ type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
  * marks them, not that they are absent. Marking them under idb is a
  * separate step. The sentence the loader prints once per config
  * (flow/load.ts), so a project that set the key and forgot the tree source
- * is told at load time rather than by a tap that went into the keys (idb
- * drops a node the keyboard covers fully — the tap waits for it to appear
- * — but one only partly covered keeps its rect, and its centre can lie
- * under the keys). Pure: config in, sentence or nothing out.
+ * is told at load time rather than by a tap that went into the keys
+ * (measured once, iOS 27, on one form — docs/bugs/2026-10-08-scroll-until-
+ * ignores-android-soft-keyboard.md §3: a covered target was absent from the
+ * idb tree and the tap timed out waiting for it to appear; a target only
+ * partly covered is presumably kept with its rect, and its centre can lie
+ * under the keys — inferred, not measured). Pure: config in, sentence or nothing out.
  */
 export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   const ios = cfg.app.ios;

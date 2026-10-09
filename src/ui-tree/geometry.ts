@@ -623,8 +623,8 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * size: an interactive node (a full-screen `button` backdrop — an RN
  * transparent Modal's Pressable — takes the tap) and a childless one (a
  * full-screen image or text draws itself; a childless `toolbar` is the one
- * exception since 2026-10-09 — ITEMLESS TOOLBAR below). The measured refusals above are
- * kept. Accepted trade-off: a full-screen non-interactive host with nothing
+ * exception since 2026-10-09 — ITEMLESS TOOLBAR below). The measured
+ * refusals above are kept. Accepted trade-off: a full-screen non-interactive host with nothing
  * of its own at the point (a host whose content sits elsewhere — a
  * full-screen `scrollable` or `webview`, such as an RN ScrollView in a
  * transparent modal whose rows are below the title) reads as not covering,
@@ -745,7 +745,18 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * post-fill `dismiss()`) end in `AfterDismissalTap` — the screen was
  * touched, and said so; the silent pass of the trade-offs above needs a
  * tap that hides the keyboard, which a bar with no items is not known to
- * do. A toolbar whose items WDA failed to list would read the same way.
+ * do. The one SILENT WRONG ACTION this loosening opens (review 2026-10-09):
+ * a bar whose item WDA does not list — a custom view that is not an
+ * accessibility element, or one hidden from accessibility — reads as
+ * childless, and "childless" is then false evidence: the dismissal tap can
+ * TRIGGER that item (Save, Cancel, a sheet's close), and if the keyboard
+ * goes with it the guard reports `hidden by tapping <title>` and taps the
+ * target on a screen it did not mean to change. Rare — the unlisted item
+ * must sit exactly at the dismissal target's centre — but not caught.
+ * Platform scope: the `toolbar` role is assigned only by the WDA parser
+ * (adapters/wda-source.ts, `Toolbar: 'toolbar'`); a future idb or Android
+ * mapping to `toolbar` would inherit this excuse and must be judged
+ * against it.
  */
 export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
   const screen = rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
