@@ -17,7 +17,7 @@
 
 import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
-import { charactersText, fillCaveats, fillClearedText, fillUnverifiedText, type FillResult } from '../interact/fill.js';
+import { charactersText, wordingOf, type FillVerdict } from '../interact/fill-verdict.js';
 import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
@@ -27,55 +27,34 @@ export const tapText = (selector: string, note: string | undefined): string =>
   `Tapped ${selector}${note ? ` (${note})` : ''}`;
 
 /**
- * What a fill did, from its result (interact/fill.ts#FillResult) — the
- * wording of each fact is fill.ts's, shared with the flow line:
- * - read back and landed (or nothing to type):
+ * What a fill did, from its verdict (interact/fill-verdict.ts#judgeFill) —
+ * the words are fill-verdict.ts's (`wordingOf`), shared with the flow line;
+ * only the layout is here, and it branches on `did` alone:
+ * - `filled` (read back and landed, or nothing to type):
  *   `Filled <selector> (N characters[, cleared M characters first])[ (note)]`
- * - nothing to read back (`readBack.kind` `no-value`, `not-taken`, `lost`):
- *   `Typed N characters into <selector> — NOT verified: <reason>[; clear
- *   sent no delete …][ (note)]`, the reason e.g. `the matched node exposes
- *   no value (role R)` or `the field could not be found again (the screen
- *   changed while typing)` — a different verb, so "Filled" never stands for
- *   a fill nobody saw. A clear alone (no text) has its own head there,
- *   `Cleared <selector> (N deletes sent)` or `Focused
- *   <selector>` (`clearAloneHead`).
- * Every count goes through util/count.ts#countOf: `1 character`,
- * `1 delete`, never the plural for one (2026-10-08 device checks).
- * Then each caveat (fill.ts#fillCaveats: a matched node that is not an
- * input, the masked-append warning) on its own `⚠` line, so it is not lost
- * inside the parentheses. "cleared" is what was SENT, never the requested
- * option: until 2026-10-08 the reply printed `clear` as asked, and an idb
- * label node read "cleared first" with nothing deleted (docs/bugs/
- * 2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
+ * - `typed` (not verified, something typed): `Typed N characters into
+ *   <selector>[ (cleared M characters first)] — NOT verified: <reasons>[ (note)]`
+ *   — a different verb, so "Filled" never stands for a fill nobody saw.
+ * - `cleared` (a clear alone, deletes sent, not seen to land):
+ *   `Cleared <selector> (N deletes sent) — NOT verified: …`
+ * - `focused` (nothing typed, nothing deleted, not verified):
+ *   `Focused <selector> — NOT verified: …` — the focus tap is all that was
+ *   done.
+ * Then each caveat (the not-an-input finding, the masked-append warning)
+ * on its own `⚠` line, so it is not lost inside the parentheses.
  */
-export const fillText = (selector: string, fill: { length: number } & FillResult): string => {
-  const unverified = fillUnverifiedText(fill);
-  const cleared = fillClearedText(fill, fill.length);
+export const fillText = (selector: string, v: FillVerdict): string => {
+  const w = wordingOf(v);
   const head =
-    unverified === undefined
-      ? `Filled ${selector} (${charactersText(fill.length)}${cleared === undefined ? '' : `, ${cleared}`})`
-      : fill.length === 0 && fill.cleared !== undefined
-        ? `${clearAloneHead(selector, cleared)} — ${unverified}`
-        : `Typed ${charactersText(fill.length)} into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
-  return head + (fill.note ? ` (${fill.note})` : '') + fillCaveats(fill).map((c) => `\n⚠ ${c}`).join('');
+    v.did === 'filled'
+      ? `Filled ${selector} (${w.typed}${w.sent === undefined ? '' : `, ${w.sent}`})`
+      : v.did === 'typed'
+        ? `Typed ${w.typed} into ${selector}${w.sent === undefined ? '' : ` (${w.sent})`} — ${w.unverified}`
+        : v.did === 'cleared'
+          ? `Cleared ${selector} (${w.sent}) — ${w.unverified}`
+          : `Focused ${selector} — ${w.unverified}`;
+  return head + (v.note ? ` (${v.note})` : '') + w.caveats.map((c) => `\n⚠ ${c}`).join('');
 };
-
-/**
- * The head of a clear ALONE (empty text, `clear: true`) that could not be
- * verified (code review of round 2, 2026-10-08): it typed nothing, so
- * "Typed 0 characters into … (cleared 7 characters first)" said neither
- * what was done nor what is unknown. Its two unverified paths:
- * - deletes went out and the read after them lost the field (readBack
- *   `lost`): `Cleared <selector> (N deletes sent)` — sent,
- *   not seen to land;
- * - no delete went out (`cleared: 'unmeasured'`, a node that is not the
- *   input): `Focused <selector>` — the focus tap is all that was done.
- * `sent` is fill.ts#fillClearedText's clause, the flow line's too, so the
- * two say one thing. A verified clear alone keeps `Filled <selector> (0
- * characters, cleared N characters first)`.
- */
-const clearAloneHead = (selector: string, sent: string | undefined): string =>
-  sent !== undefined ? `Cleared ${selector} (${sent})` : `Focused ${selector}`;
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field

@@ -1,5 +1,4 @@
 import { everyNode, rectArea, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
-import { rectText } from '../ui-tree/geometry.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
@@ -7,7 +6,7 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
-import { countOf } from '../util/count.js';
+import { caveatText, charactersText, INPUT_ROLE } from './fill-verdict.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -28,23 +27,6 @@ export interface FillOptions extends GuardOptions {
 }
 
 /**
- * The normalised role of every text input (adapters/ios-node.ts: TextField,
- * SecureTextField, TextView; adapters/android.ts: EditText,
- * AutoCompleteTextView and the Compose input that dumps as a focusable,
- * long-clickable scroll view). The one role a fill expects to type into.
- */
-export const INPUT_ROLE = 'textfield';
-
-/**
- * `1 character`, `N characters` — every count fill and type_text print goes
- * through this. Until 2026-10-08 they all said `characters`, and the device
- * checks of docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-
- * cleared.md read `Typed 1 characters` and `(1 characters, cleared 3
- * characters first)` on both platforms.
- */
-export const charactersText = (n: number): string => countOf(n, 'character');
-
-/**
  * An input on the screen near a matched node that is not one — what the
  * caller probably meant. Identifier and rect only: never the label or the
  * value (on Android an EditText's label falls back to its text, and a field
@@ -58,24 +40,33 @@ export interface NearbyInput {
 }
 
 /**
- * What the fill DID, as facts — the MCP reply (mcp/tool-text.ts#fillText)
- * and the flow line (flow/engine.ts#runFill) render from these through the
- * wording below, and neither restates the request. Until 2026-10-08 both
- * printed the REQUESTED `clear` ("cleared first", "(cleared)") and an
- * unreadable read-back passed as landed: on iOS idb a floating-label `text`
- * node was "Filled … (22 characters, cleared first)" with nothing cleared
- * and nothing typed (docs/bugs/2026-10-08-ios-fill-unverified-reports-
- * filled-and-cleared.md).
+ * What the fill DID, as facts — measured, never worded. What they mean
+ * (verified or not, and why; the head verb; what the clear sent) is decided
+ * once by interact/fill-verdict.ts#judgeFill, and every sentence about them
+ * is that module's; the MCP reply and the flow line render the verdict, and
+ * neither restates the request. Until 2026-10-08 both printed the REQUESTED
+ * `clear` ("cleared first", "(cleared)") and an unreadable read-back passed
+ * as landed: on iOS idb a floating-label `text` node was "Filled … (22
+ * characters, cleared first)" with nothing cleared and nothing typed
+ * (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
+ * Until 2026-10-09 the masked-append finding was a sentence here
+ * (`warning`), and the typed length was glued on by each caller.
  */
 export interface FillResult {
   /** How the field was chosen when several nodes matched (see resolveNow). */
   note?: string;
   /** The soft keyboard covered the field and was hidden before the focus tap (keyboard.ts: `back`, or a configured dismissal tapped) — the sentence, also in `note`. */
   keyboardHidden?: string;
-  /** The fill was legal but suspicious — a masked field already held text and `clear` is off. */
-  warning?: string;
+  /**
+   * The fill was legal but suspicious: a masked field already held `held`
+   * characters after focus and `clear` is off — typing APPENDS, and the
+   * length rule cannot tell that from a correct fill (see `landed`).
+   */
+  maskedAppend?: { held: number };
   /** The matched node's role (the one tapped, typed into and read back). */
   role: string;
+  /** The length of the value typed — a length, never content (values may be credentials). 0 for a focus or a clear alone. */
+  typed: number;
   /**
    * With `clear` only (absent otherwise): how many characters the input held
    * when the clear began — what clearText deleted, the field verified empty
@@ -152,83 +143,6 @@ export type ReadBack =
   | { kind: 'not-taken' }
   | { kind: 'lost'; why: LostWhy }
   | { kind: 'nothing-typed' };
-
-/**
- * What the clear sent, only when a delete was actually sent — the one
- * clause the MCP reply and the flow line both print:
- * - `cleared N character(s) first`, normally;
- * - `N delete(s) sent` for a clear ALONE (`typed` 0) that could not be
- *   verified (code review of round 2, 2026-10-08): nothing typed after it
- *   and nothing seen empty, so "cleared … first" claimed both a result and
- *   a sequel that never came. Counted as deletes, not characters: what is
- *   known is what went out.
- * `typed` is the length of the text the fill typed (the result does not
- * carry it).
- */
-export function fillClearedText(r: Pick<FillResult, 'cleared' | 'readBack' | 'role'>, typed: number): string | undefined {
-  if (typeof r.cleared !== 'number' || r.cleared === 0) return undefined;
-  return typed === 0 && fillUnverifiedText(r) !== undefined ? `${countOf(r.cleared, 'delete')} sent` : `cleared ${charactersText(r.cleared)} first`;
-}
-
-/**
- * `NOT verified: …` with every reason the fill could not be checked, or
- * undefined when it was:
- * - the read-back had nothing to compare (`no-value`), showed a node that
- *   never took the text (`not-taken`), or did not find the field at all
- *   (`lost` — said as the field's absence, never as the node's lack of a
- *   value: the node may well hold the text);
- * - a clear sent no delete because the length it needed was not the
- *   field's (`cleared: 'unmeasured'`) or not there (0 on a node with no
- *   value). Said whatever else happened, EXCEPT when the read-back landed:
- *   with clear, `landed` is "the field shows exactly the value", which is
- *   what the clear was for.
- */
-export function fillUnverifiedText(r: Pick<FillResult, 'readBack' | 'role' | 'cleared'>): string | undefined {
-  const reasons: string[] = [];
-  const { readBack } = r;
-  if (readBack.kind === 'no-value') reasons.push(`the matched node exposes no value (role ${r.role})`);
-  if (readBack.kind === 'not-taken') reasons.push(`the matched node's value does not show the typed text (role ${r.role}) — it is not the field`);
-  if (readBack.kind === 'lost') reasons.push(`the field could not be found again${lostWhyText(readBack.why)}`);
-  if (readBack.kind !== 'landed') {
-    if (r.cleared === 'unmeasured') reasons.push(`clear sent no delete — a role ${r.role} node's length is not the field's`);
-    else if (r.cleared === 0 && readBack.kind === 'no-value') reasons.push('clear sent no delete — the node gave no length to delete');
-  }
-  return reasons.length === 0 ? undefined : `NOT verified: ${reasons.join('; ')}`;
-}
-
-/**
- * The sentences that go on lines of their own (`⚠` in the reply, `⚠ fill`
- * in a flow): the not-an-input finding, then the masked-append warning.
- */
-export function fillCaveats(r: Pick<FillResult, 'role' | 'notInput' | 'warning' | 'readBack'>): string[] {
-  const out: string[] = [];
-  if (r.notInput !== undefined) out.push(notInputText(r.role, r.notInput.input, r.readBack.kind !== 'nothing-typed'));
-  if (r.warning !== undefined) out.push(r.warning);
-  return out;
-}
-
-/** ` (why)` for a `lost` read-back, chosen per reason (review 2026-10-08, n-3: it read as "the selector no longer matches it" whatever the reason). */
-function lostWhyText(why: LostWhy): string {
-  switch (why) {
-    case 'screen-changed':
-      return ' (the screen changed while typing)';
-    case 'unmatched':
-      return ' (the selector no longer matches it)';
-  }
-}
-
-function notInputText(role: string, input: NearbyInput | 'none' | 'unread', typed: boolean): string {
-  const head =
-    `the matched node is role ${role}, not a ${INPUT_ROLE} — ` +
-    (typed ? 'typing goes wherever the focus tap left the focus' : 'nothing was deleted, and the focus is wherever the tap left it');
-  if (input === 'none') return `${head}; no ${INPUT_ROLE} is on the screen`;
-  if (input === 'unread') return `${head}; the screen could not be read again to name the input`;
-  const id = input.identifier === null ? '' : ` id:"${input.identifier}"`;
-  return (
-    `${head}; the ${input.overlaps ? 'input overlapping it' : 'nearest input'} is ${INPUT_ROLE}${id} at ${rectText(input.rect)} — ` +
-    `select the input itself (role:${INPUT_ROLE} with its id:, or its current value: when inputs share an id)`
-  );
-}
 
 /**
  * The input a non-input match most likely labels: the one overlapping it
@@ -399,7 +313,7 @@ export async function fillField(
 
   let current: UiNode | undefined = node;
   let preLen = node.value?.length ?? 0; // what the field holds when typing starts (see `landed`)
-  let warning: string | undefined;
+  let maskedAppend: FillResult['maskedAppend'];
   if (value !== '' && !clear && (preLen === 0 || isMaskedValue(current?.value ?? ''))) {
     // The pre-tap read is stale for exactly the fields the length rule cares
     // about: Android autofill POPULATES a password field on focus, and a
@@ -408,7 +322,7 @@ export async function fillField(
     // fields with content skip this — `includes` never uses preLen. So does
     // an empty value (2026-10-07): it is a focus without typing, which has no
     // read-back to feed and nothing that could append, so the masked-append
-    // warning below would name a typing that never happened.
+    // finding below would name a typing that never happened.
     const focused = await refetch();
     if (focused !== undefined) {
       current = focused;
@@ -418,7 +332,7 @@ export async function fillField(
       // The length rule cannot see content: a password typed onto an
       // autofilled one reads as a perfect append (finportal 2026-09-17:
       // backend `invalid_grant`). Say so where the trace is read.
-      warning = `masked field already held ${charactersText(preLen)} and clear is not set — typing APPENDS; pass clear: true to replace`;
+      maskedAppend = { held: preLen };
     }
   }
   let cleared: FillResult['cleared'];
@@ -502,7 +416,7 @@ export async function fillField(
     // keystrokes; without `clear` the field must show at least what it held
     // after focus plus what was typed. It cannot tell a correct append from
     // typing onto an autofilled password (both read `held + typed`); that
-    // case is the `warning` above, not a failure.
+    // case is `maskedAppend` above, not a failure.
     // A non-input proves it took the text only by CHANGING to show it: a WDA
     // StaticText exposes its label as its value, and "Meno".includes("e") is
     // no fill; a label that changes on focus (`Name` → `Name*`) is no fill
@@ -546,7 +460,7 @@ export async function fillField(
             (isMaskedValue(observed)
               ? `(masked field — compared by length${clear ? '' : `; it held ${preLen} after focus`})`
               : '(content withheld from this error)') +
-            (wrong === undefined ? '' : `; ${notInputText(node.role, wrong.input, true)}`),
+            (wrong === undefined ? '' : `; ${caveatText({ code: 'not-input', role: node.role, typed: true, input: wrong.input })}`),
         );
       }
     }
@@ -557,8 +471,9 @@ export async function fillField(
   return {
     note,
     keyboardHidden,
-    warning,
+    maskedAppend,
     role: node.role,
+    typed: value.length,
     cleared,
     readBack,
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { fillText, launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
+import { fillText as renderFill, launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
+import { judgeFill } from '../../src/interact/fill-verdict.js';
+import type { FillResult } from '../../src/interact/fill.js';
+
+const fillText = (selector: string, { length, ...f }: { length: number } & Omit<FillResult, 'typed'>) => renderFill(selector, judgeFill({ ...f, typed: length }));
 import { el, node, screen } from '../helpers/fake.js';
 
 describe('tap and type_text response lines', () => {
@@ -23,7 +27,7 @@ describe('tap and type_text response lines', () => {
       fillText('id:pw', {
         length: 16,
         ...landed,
-        warning: 'masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
+        maskedAppend: { held: 20 },
       }),
     ).toBe(
       'Filled id:pw (16 characters)\n⚠ masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
