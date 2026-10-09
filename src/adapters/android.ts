@@ -632,7 +632,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * portrait (`SkRegion((0,948,2220,1080))`) — which is why this is read only
    * once `state()` said shown, why `mInputShown` comes from the same call
    * (the two are of one moment), and why what counts is decided by
-   * ui-tree/soft-keyboard.ts#panelsBeyond, not here.
+   * ui-tree/keyboard-cover.ts#panelsBeyond, not here.
    *
    * Cost: one adb call running two filtered dumpsys commands on the device
    * (TOUCHABLE_COMMAND) — UNMEASURED as one command (written in a round with

@@ -132,7 +132,7 @@ describe('scrollUntilVisible — which stops are ElementNotFoundError', () => {
  * 2026-10-08 (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
  * the stop is judged, and the stroke drawn, in the screen ABOVE a shown soft
  * keyboard — read each round the way the tap guard and the pixel poll read it
- * (`readSoftKeyboard`: the oracle on Android, the WDA band on iOS).
+ * (a reading, `readKeyboard`: the oracle on Android, the WDA band on iOS).
  */
 describe('scrollUntilVisible — the soft keyboard', () => {
   /** The measured Android screen and IME (Pixel_3a, 1080x2220): `InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220]`. */
@@ -458,7 +458,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     );
   });
 
-  it('iOS (WDA band): the keyboard\'s OWN UI as the target is judged against the whole screen, as readSoftKeyboard reads it for a subject', async () => {
+  it('iOS (WDA band): the keyboard\'s OWN UI as the target is judged against the whole screen, as a reading reads it for a subject', async () => {
     resetLayout();
     const key = node({ role: 'button', identifier: 'kb_done', rect: { x: 300, y: 800, width: 80, height: 40 } });
     const band = node({ role: KEYBOARD_ROLE, rect: { ...IOS_BAND }, children: [node({ role: 'container', ofKeyboard: true, rect: { ...IOS_BAND }, children: [key] })] });

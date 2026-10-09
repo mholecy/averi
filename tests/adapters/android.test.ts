@@ -853,7 +853,8 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
  * The keyboard window's touchable region with the input method's word, one
  * adb call (2026-10-08, the floating-Gboard device check —
  * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). The adapter
- * reads; what counts is ui-tree/soft-keyboard.ts#panelsBeyond's (its tests).
+ * reads; what counts is ui-tree/keyboard-cover.ts#panelsBeyond's (its tests:
+ * tests/ui-tree/keyboard-cover.test.ts).
  */
 describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable region, read beside mInputShown', () => {
   it('reads the four measured regions as rects: floating (panel + strip), docked (the band), hidden (the strip), stale landscape', () => {

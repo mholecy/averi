@@ -511,7 +511,7 @@ export { rectArea, rectsOverlap, sameRect, sameRectWithinPixel };
  * exclusive, like the Android frame test. The point-in-rect companion of
  * `rectsOverlap` (two rects sharing area: a different question), and the
  * ONE spelling of it: the tap guard asks it of the keyboard's frame and the
- * tap point (interact/keyboard-model.ts#keyboardOver), the dismissal picker of the
+ * tap point (ui-tree/keyboard-cover.ts#readKeyboard, its `over` and `frameOver`), the dismissal picker of the
  * root's rect, and `shadowing` below of every candidate. Until 2026-10-07 it
  * was interact/keyboard.ts's `inside`, with a `covers` wrapper beside it.
  */
