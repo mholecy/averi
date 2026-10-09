@@ -905,6 +905,39 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(down.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: { x: 0, y: 1340, width: 1080, height: 800 } });
   });
 
+  it('a stroke toward a target not read yet: the screen\'s largest scroller is met above the keyboard too — one running on under the IME from 58 px above it leaves no room, so the stroke goes over the screen box; a failed read\'s stroke, which keeps that scroller and that cover, likewise', () => {
+    const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
+    const played = play({ ...ANDROID, maxSwipes: 2 }, [
+      { found: [], mainScroller: UNDER, cover: UP_IME, rest: 'a' },
+      { error: 'uiautomator dump returned no XML' },
+      { found: [], mainScroller: UNDER, cover: UP_IME, rest: 'b' },
+    ]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [[st.coverTop, st.box]] : []))).toEqual([
+      [1398, SCREEN_1080],
+      [1398, SCREEN_1080],
+    ]);
+    // With the keyboard down it has room, and is the box.
+    const down = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: UNDER, rest: 'a' }, { found: [], rest: 'b' }]);
+    expect(down.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: UNDER });
+  });
+
+  it('a lone strip under a band the moot rule left unasked: no room even over the whole screen — `room` at once, the witness NOT asked (room is judged first without the band, so the ask order is as before deep/r3-scroll)', () => {
+    const LOW_BAND = coverOver({ x: 0, y: 2000, width: 1080, height: 220 }); // the card ends at 1978, above it: moot
+    const played = play(FULLY_ANDROID, [{ found: [card(1978 - 30 + 4)], scrollers: [carousel(30)], cover: LOW_BAND }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: carousel(30), checked: false, why: 'room' });
+    expect(played.asks).toEqual(['unlocated']);
+  });
+
+  it('room is judged over the GESTURE box the stroke would be drawn in, not the judged frame: a landscape window crowned as a child turns the gesture box but not the frame — a container below the turned box\'s bottom has no room there, so no probe', () => {
+    const PORTRAIT: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+    const screen = { box: { x: 0, y: 0, width: 2220, height: 1080 }, boxes: [PORTRAIT] }; // swipe.ts#judgedBoxes: turned gesture, panel as built judged
+    const LOW: Rect = { x: 0, y: 1100, width: 1080, height: 600 };
+    const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 1100, width: 948, height: 143 }, 'row')], scroller: LOW, screen }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    expect(resultOf(played).flush).toEqual({ edge: 'top', container: LOW, checked: false, why: 'room' });
+  });
+
   it('a probe drawn shorter than twice TOUCH_SLOP (a tap?) that moved nothing is reported NOT checked — never "nothing of it is cut there"', () => {
     const LIST_TOP = formLikeRow(242);
     const tap = { from: { x: 540, y: 1972 }, to: { x: 540, y: 1954 } }; // 18 px — the review's reproduction
