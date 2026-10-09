@@ -225,3 +225,21 @@ Floating at 11:34:16: `touchable region=SkRegion((359,1269,1040,1912)(0,2088,108
   at 610660f `1016 → 254, 300`). Row at y 882 after; IBAN unchanged.
 - `server-stderr.log`: only the `.env.averi` load line; no refusal notice.
 - Gboard restored to docked at 11:35:19 (`touchable region=SkRegion((0,1398,1080,2220))`).
+
+## Device check (2026-10-09 Android, re-run at 86eb42d)
+
+Measured 13:01–13:03 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220), averi = mobile-verify `fix/round-3` @ `86eb42d` (`dist/`
+built 12:50 UTC, HTTP daemon port 47821, cwd mp-native), mp-native SWIFT form, IBAN focused (holding `AT611904300234573201`). Gboard → grid →
+Floating at ~13:01:40: `touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))`, `ITYPE_IME frame=[0,2088][1080,2220]` (as in
+every earlier check). Keys/taps from the `adb` shim. Round-4 handoff §5.
+
+- **Holds — tap under the panel.** 13:01:51 `tap { selector: "id:swift_payment.form.value_date_select" }` (66,1375 948x143, centre (540,1447)
+  under the panel) → `Tapped id:swift_payment.form.value_date_select (the soft keyboard covered id:swift_payment.form.value_date_select;
+  hidden before tapping)` (11.5 s). Shim: `13:01:56 keyevent 4` then `13:02:02 input tap 540 1447` — back first, then the row. The date
+  picker opened (`/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-64-0.png`); cancelled by hand; IBAN unchanged.
+- **Holds — scroll with the panel up.** IBAN refocused (averi `tap`, panel floating again, same region), 13:02:31 `scroll_until { selector:
+  "id:swift_payment.form.fees_select", fully: true }` → `Element id:swift_payment.form.fees_select fully visible after 1 swipe` (7.7 s),
+  `input swipe 540 1064 540 448 617` — identical to 347e70d, both ends above the panel top 1269. Row at y 886 after; screenshot
+  `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-69-0.png` (flagged "did not settle" — the caret/teardrop handle) shows it clear of the panel, IBAN unchanged.
+- `server-stderr.log`: only the `.env.averi` load line; no refusal notice.
+- Gboard restored to docked at 13:03:00 (`touchable region=SkRegion((0,1398,1080,2220))`).

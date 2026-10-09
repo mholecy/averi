@@ -140,3 +140,22 @@ Account Detail transaction list (Compose lazy list, `transactions.list.row_0…r
 - **Not reached — `left` wording.** The Contacts editor resizes with the IME on this image (its scroll container became `0,242 1080x1156`,
   ending at the IME top 1398, the moment `First name` was focused), so `Last name` was never under the band at round 0
   (`Last name` 132,1223 816x160 above it). Neither the PASS nor the `left` failure could be produced.
+
+## Device check (2026-10-09 Android, re-run at 86eb42d)
+
+Measured 12:52–12:57 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked, keyboard down), averi = mobile-verify
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, HTTP daemon port 47821, cwd mp-native). Fixtures: Settings home, the mp-native
+Account Detail list. Strokes from the `adb` shim. Round-4 handoff item 1.5 (round-3 item d).
+
+- **Holds — Settings drag.** Settings force-stopped and started at its top. 12:56:50 `scroll_until { selector: 'text:"Display"', fully: true }`
+  → `Element text:"Display" fully visible after 1 swipe` (8.2 s). Shim `input swipe 540 1736 540 484 1254` — byte-identical to 347e70d (1252
+  px → 1254 ms ✓; Settings has no overlay, so the round-4 cut changes nothing). Display at y 1180 after, rows Battery…Privacy listed in
+  order — nothing skipped.
+- **Holds — bank list fast fail from the end** (written in full in the tab-bar note): `row_40` → `failed after 2 swipes` (bar shown,
+  8.8 s) / `after 3 swipes` (bar hidden, 12.7 s), every stroke ≥ 300 ms on the formula.
+- **Observed — the default budget vs drag speed on a long list.** From the list top, `scroll_until row_36, fully: true` (default 15 s)
+  timed out after 4 strokes with the list moving (row_14 reached); with `timeoutMs: 60000` it reached row_36 in 5 more strokes (21.2 s).
+  Each stroke carries ~3.3 rows (865 px), a round ~3–3.5 s. Same shape as the 347e70d "not the fast fail when the list still has to
+  travel": correct outcome, the budget. Noted because the round-4 handoff expected success at the default budget on this call; a flow
+  that scrolls 30+ rows of this list needs `timeoutMs` (and the `(timeout) — element never appeared` reply does not say the list was
+  still moving).

@@ -72,3 +72,55 @@ holds for any app with a floating bottom bar / FAB band over a list whose contai
 2. `scroll_until { platform: android, selector: "id:transactions.list.row_36", fully: true }` → `failed after 2 swipes (the last 2,
    swiping down, did not change the screen: content exhausted …)`, shim `input swipe 540 1942 540 1104 839` ×2, list unmoved.
 3. `adb shell input swipe 540 1700 540 862 839` → the list scrolls.
+
+## Device check (2026-10-09 Android, re-run at 86eb42d)
+
+Measured 12:52–12:59 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi = mobile-verify `fix/round-3` @
+`86eb42d` (`dist/` built 12:50 UTC, HTTP daemon on port 47821, cwd mp-native, default config). mp-native Account Detail
+(`com.finshape.skeleton.dev`, "My Account CZK", `transactions.list.row_0…row_36`), tab bar shown on arrival, its host
+`66,1840 948x248` as at 347e70d. Strokes from the `adb` shim; page placement and bar hide/show by manual strokes with the real `adb`
+(not in the shim log). Run folder `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android`. Handoff round 4, items 1.1–1.6.
+
+- **Holds (1.1) — the stroke starts above the bar and the list moves; the default 15 s budget does not reach row_36.** List at the top
+  (container `0,825 1080x1395`, row_0 at 1112), bar shown, keyboard down. 12:52:53 `scroll_until { platform: android, selector:
+  "id:transactions.list.row_36", fully: true }` →
+  ```
+  scroll_until id:transactions.list.row_36 failed after 15000ms (timeout) — element never appeared in the tree
+  ```
+  (15.1 s). Shim: `12:52:55 input swipe 540 1638 540 1028 611` (exactly the expected stroke: the box cut at the bar host's top 1840,
+  825 + 0.8 × 1015 = 1637), then — the page had scrolled, container `0,401 1080x1819` — `540 1553 540 689 865` ×3. The list MOVED:
+  row_14…row_20 on screen after (row_0 gone). Not a "content exhausted" fast fail — the 347e70d failure is gone. The timeout is the
+  budget (see the fling note's 86eb42d section): at drag speed one stroke carries ~3.3 rows and a round takes ~3–3.5 s, so 36 rows need
+  ~11 strokes / ~35 s. The handoff's "fully visible after N swipes" is reachable only with a larger budget (next bullet).
+- **Holds (1.2) — after the page scroll.** Continuing from row_14 (container `0,401 1080x1819`, bar still shown): 12:53:37 the same call
+  with `timeoutMs: 60000, maxSwipes: 20` → `Element id:transactions.list.row_36 fully visible after 5 swipes` (21.2 s). Shim
+  `input swipe 540 1553 540 689 865` ×5 — touch-down 1553 (401 + 0.8 × (1840 − 401)), as expected. row_36 `66,1697 948x143` after, its
+  bottom 1840 = the bar host's top; screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-12-0.png`: rows to 30.09.2025 above the bar, bar shown.
+- **Holds (1.3) — fast fail, bar hidden, no node named.** The bar does not hide under averi's drag strokes (the app hides it only on a
+  per-frame step > 12 dp, `BottomBarScrollController`; a 1 px/ms drag is ~16 px/frame) — it stayed shown at the list end; hidden by a
+  manual 150-ms flick. List at its end, container `0,401 1080x1753`: 12:55:05 `scroll_until { selector: "id:transactions.list.row_40",
+  fully: true }` →
+  ```
+  scroll_until id:transactions.list.row_40 failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree
+  ```
+  (12.7 s; 3 swipes, not 2, because the first still moved the list 66 px: row_36 1697 → 1631 once the bar had hidden). Shim `540 1804 540
+  752 1054` ×3 (the 347e70d bar-hidden stroke, uncut). No node named. **Also, bar SHOWN at the end** (12:54:13, before the flick): the same
+  call → `failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were
+  not taken) — element never appeared in the tree` (8.8 s), `540 1553 540 689 865` ×2 — cut above the bar, no node named (the touch-down
+  is no longer on it, so naming it would be wrong).
+- **Holds (1.4) — content-up stroke uncut.** Bar shown (by a manual flick up), page scrolled (container `0,401 1080x1819`), rows 29–35 on
+  screen. 12:55:36 `scroll_until { selector: "id:transactions.list.row_0", direction: "up", fully: true, timeoutMs: 60000, maxSwipes: 20 }`
+  → `Element id:transactions.list.row_0 fully visible after 6 swipes` (26.0 s). Shim `input swipe 540 765 540 1857 1094` ×6: touch-down
+  765 = 401 + 0.2 × 1819, lift-off 1857 = 401 + 0.8 × 1819 — the UNCUT container (cut it would be 689 → 1552); the lift-off lies on the bar
+  host, which does not stop a drag already in the list. The handoff's "about 540 1104" is the list-at-top shape (825 + 0.2 × 1395), which a
+  content-up scroll cannot start from; the page here was scrolled, so 765 is the same rule. row_0 `66,747` after.
+- **Holds (1.5) — regressions d / e / g / h.** One case each, written in the notes that own them: Settings drag `text:"Display"` →
+  `fully visible after 1 swipe`, `540 1736 540 484 1254` (identical to 347e70d; fling note); carousel `fills` reply on
+  `accounts.detail.header` verbatim as at 347e70d, no stroke, plus the `filter_panel` probe `540 1104 540 1281 300` (clipped-bounds
+  note); Contacts editor with the IME up, every stroke above the IME top, the same strokes as the round-3 table (soft-keyboard note).
+- **Not reached (1.6) — a bar above the open keyboard.** On Account Detail with `search_field` focused (docked IME `[0,1398][1080,2220]`)
+  the tab bar stays in the tree at 1876 but is drawn UNDER the IME (screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-40-0.png`) — not above it. Contrast, measured:
+  12:58:37 `scroll_until { selector: "id:transactions.list.row_2", fully: true }` (row_2 `66,1632`, under the IME) → `Element
+  id:transactions.list.row_2 fully visible after 1 swipe` (7.5 s), `input swipe 540 1284 540 940 345` — box cut at the IME top only
+  (825 + 0.8 × 573 = 1283); the bar node (top 1840, below the IME top) did not cut it further, as the cover rule says. No other screen
+  with a bar or FAB over a list above the open keyboard was found (the SWIFT form's CONTINUE sits below its container).

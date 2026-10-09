@@ -110,3 +110,39 @@ childless frames (here `Other`/`container` with no label, value or identifier) l
 stated on `shadowing` is unchanged by that.
 
 **Not reached:** whether a title tap hides this UIKit sheet's keyboard (the refusal came first).
+
+## Device check (2026-10-09 iOS, re-run at 86eb42d)
+
+Measured 13:10–13:12 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only, `idb`
+PATH shim. Run folder: `scratchpad/averi-repo/run6-ios`. Setup as in the 347e70d section: `AutomaticMinimizationEnabled` /
+`HardwareKeyboardLastSeen` = NO, Contacts terminate+launch through averi (13:10:4x, 3.6 s), `tap role:button text:"Add"` (idb
+`13:10:56 ui tap 350 822`) → "New Contact" with `First name` focused and the software keyboard up (screenshot `run6-ios/img-45-0.png`).
+WDA snapshot (13:11:12, `run6-ios/wda-c1.txt`) shows the round-3 shape unchanged: `toolbar 'Toolbar' 0 83 402 48` → one
+`container 0 83 402 48`, `toolbar 'Toolbar' 0 62 402 812` → one `container 0 62 402 812`, `keyboard 0 573 402 301`, title
+`text 'New Contact' 149 89 104 22`, target `text 'add pronouns' 80 714 286 23`.
+
+**2.1 Holds — no toolbar refusal.** Scratch `treeSource: wda` + `keyboardDismiss: [tap: { role: text, text: "New Contact" }]`:
+
+```
+13:11:29 tap { platform: ios, selector: 'role:text text:"add pronouns"', configPath: <scratch wda> }          (29.2 s)
+→ [isError] Tapped text:"New Contact" role:"text" at (201,100) to hide the soft keyboard covering role:text text:"add pronouns",
+  but it is still up: the band [0,573][402,874] still contains the tap point (223,726) on 2 looks 300ms apart; nothing else was
+  tapped. That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look
+  at it (ui_snapshot / screenshot) before retrying. From the MCP tools: hide the keyboard another way, then tap role:text
+  text:"add pronouns" again. In a flow: configure a dismissal that hides the keyboard on THIS screen, or lay the screen out so
+  role:text text:"add pronouns" is not under it
+```
+
+Shim: `13:11:45 ui tap 201 100` (the title) and nothing after it. The round-3 `covered by toolbar "Toolbar"` refusal is gone:
+the 48-pt toolbar is now excused by content (its only descendant is an empty `container`) and the title was tapped at the
+handoff's (201,100). The handoff's second expectation (the `hidden by tapping …` reply, then the row tap) was **not reached**,
+for the reason 2.2 records — not because of the cover judgement.
+
+**2.2 Measured — a title tap does NOT hide this UIKit sheet's keyboard.** The `AfterDismissalTap` error above is the
+handoff's "correct behaviour, not a regression": averi re-looked twice 300 ms apart, found the band unchanged, and tapped
+nothing else. Screenshot after (`run6-ios/img-48-0.png`, 13:12): visually the same sheet as before (compared by eye with `img-45-0.png`) — keyboard up,
+`First name` still focused with its caret, no field changed, no sheet moved; the title tap changed nothing visible. So on the
+stock Contacts "New Contact" sheet a title tap is not a usable dismissal at all; the reply says so and points at the
+alternatives. (Duration: 16 s from the call to the title tap — WDA reads; then ~13 s of re-looks.) Sheet closed with
+`tap role:button text:"close"` (WDA config, 6.6 s), nothing saved.

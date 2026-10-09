@@ -472,3 +472,46 @@ iOS WDA, keyboard up, a target under it / below the fold.
   id:swift_payment.form.debit_select direction: up fully: true` (11:39:21, default idb; the decimal pad was up at the last WDA
   read, ~11:39:00, and nothing hid it in between) swiped
   `201 175 → 201 699` — lift-off inside the keyboard band; nothing was typed (amount still empty after).
+
+## Device check (2026-10-09 Android, re-run at 86eb42d)
+
+Measured 12:57–13:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi = mobile-verify `fix/round-3` @
+`86eb42d` (`dist/` built 12:50 UTC, HTTP daemon port 47821, cwd mp-native). Fixtures: Google Contacts "Create contact" (`First name`
+focused by an averi `tap`, IME `[0,1398]`, growing to `[0,1285]`), mp-native SWIFT form (IBAN focused and typed
+`AT611904300234573201` by `type_text`; IME `[0,1398][1080,2220]`, `mInputShown=true` before and after), Account Detail with the search
+field focused. Strokes from the `adb` shim. Round-4 handoff items 1.5 (round-3 g/h) and §5 (SWIFT `my_note_input`).
+
+- **Holds (g) — Contacts editor, IME up.** 12:57:27 `scroll_until { selector: 'text:"Notes"', fully: true }` → `Element text:"Notes" fully
+  visible after 3 swipes` (14.1 s): `540 1167 540 473 695` ×2, then `540 1077 540 451 627` (Gboard grown to 1285; 242 + 0.8 × 1043).
+  12:57:41 `text~"[Ff]ields"` → `fully visible after 0 swipes` (2.1 s; the third Notes stroke was a full one, at 347e70d a 156-px
+  shortened one, so Add fields was already on screen). 12:57:43 `text:"First name"` up → `fully visible after 2 swipes` (10.8 s),
+  `540 451 540 1077 627` ×2. Every stroke inside the editor's container and above the IME top of its round — the table's values unchanged.
+- **Holds (h) — nothing typed.** Contacts `First name` still its hint (`val='First name'`) after; IBAN still `AT611904300234573201` after
+  every SWIFT call (tree `val`, screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-69-0.png`); bank search field empty after the 1.6 call. The shim shows no `keyevent`
+  / `input text` I did not send (the only ones are the `type_text` fill's 20 `input text` + `keyevent 21/22`).
+- **Holds (§5) — SWIFT `my_note_input`, IBAN focused: no overlay cut.** 13:00:33 `scroll_until { selector:
+  "id:swift_payment.form.my_note_input", fully: true }` →
+  ```
+  scroll_until id:swift_payment.form.my_note_input failed after 15000ms (timeout) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 5 of the 5 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again
+  ```
+  (15.9 s). Strokes `input swipe 540 1167 540 473 695` ×4 — the round-3 stroke exactly; the CONTINUE bar did not cut the box. At 347e70d the
+  same call ended `failed after 5 swipes (the last 2 … did not move it …)` in 17.9 s; here the rounds ran ~0.2 s slower and the 15 s ran
+  out after the 4th stroke, before the second unmoved one — the budget, not the rule. Re-run at the form's end, 13:00:57 → `scroll_until
+  id:swift_payment.form.my_note_input failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were
+  not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard … in 3 of the 3 rounds read …` (8.4 s),
+  `540 1167 540 473 695` ×2 — the round-3 wording. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-57-0.png`: keyboard up, form at its end.
+
+### §4 — stroke y vs the IME top (every IME-up stroke of this run)
+
+| time | call | stroke (shim) | length, ms | IME top | container (tree) |
+|---|---|---|---|---|---|
+| 12:57:29 ×2 | Contacts `Notes` | 540 1167 → 540 473 | 694, 695 | 1398 | 0,242 1080x1156 |
+| 12:57:36 | (same) | 540 1077 → 540 451 | 626, 627 | 1285 | 0,242 1080x1043 |
+| 12:57:46 ×2 | Contacts `First name` up | 540 451 → 540 1077 | 626, 627 | 1285 | 0,242 1080x1043 |
+| 12:58:39 | Account Detail `row_2` (search focused) | 540 1284 → 540 940 | 344, 345 | 1398 | 0,825 1080x1395 |
+| 13:00:35 ×4 | SWIFT `my_note_input` | 540 1167 → 540 473 | 694, 695 | 1398 | 0,242 1080x1736 |
+| 13:00:59 ×2 | (same, at the form's end) | 540 1167 → 540 473 | 694, 695 | 1398 | 0,242 1080x1736 |
+| 13:02:33 | SWIFT `fees_select`, Gboard FLOATING | 540 1064 → 540 448 | 616, 617 | 1269 (panel top) | 0,242 1080x1736 |
+
+Reading: every touch-down and lift-off lies above the IME top. The Account Detail stroke is new to the table: the list's box is cut at the
+IME top (825 + 0.8 × 573 = 1283), and the tab bar, in the tree at 1876 but drawn under the IME, did not cut it further.

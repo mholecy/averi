@@ -226,3 +226,32 @@ Shim: `11:38:18 ui tap 201 84` (title), `11:38:21 ui tap 201 707` (row). After: 
 0 0 402 874` with a child (`container 0 0 402 874`), screen-sized, excused as a host; nothing itemless is drawn over the title.
 (The UIKit Contacts sheet still refuses its title dismissal — see
 [2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md](2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md), 347e70d section.)
+
+## Device check (2026-10-09 iOS, re-run at 86eb42d)
+
+Measured 13:13–13:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+(mp-native's `averi.yaml` untouched), `idb` PATH shim, hardware-keyboard prefs off. Run folder: `scratchpad/averi-repo/run6-ios`.
+The SWIFT form first showed "That's an error / We could not display the page you requested" (twice, also after TRY AGAIN):
+the bank session had gone stale. Cold relaunch through averi → PIN screen → `login_pin_ios_here` (13:13:52, 7.8 s,
+`branch: matched state logged_in`) → PAY → SWIFT payment loaded.
+
+**Holds.** Scratch `treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`. Focus TAP
+`id:swift_payment.form.amount_input` (13:14:23, 3.1 s; shim `13:14:26 ui tap 201 299`) → WDA `keyboard 0 572 402 302`;
+`priority_select` at `24 681 354 52` (WDA dump `run6-ios/wda-swift1.txt`):
+
+```
+13:14:33 tap { selector: "id:swift_payment.form.priority_select", configPath: <scratch wda> }                 (10.3 s)
+→ Tapped id:swift_payment.form.priority_select (the soft keyboard covered id:swift_payment.form.priority_select; hidden by
+  tapping id:"swift_payment.form.title" before tapping)
+```
+
+Shim: `13:14:40 ui tap 201 84` (title), `13:14:43 ui tap 201 707` (row) — the 347e70d numbers exactly. After: `0 matches for
+role:keyboard`, `swift_payment.form.priority_sheet 31 438 340 373` open (closed with `row_0 'Standard'`); screenshot
+`run6-ios/img-80-0.png`. Left with Back (the form was untouched, no Discard prompt); no payment created.
+
+On the handoff's caveat ("the SwiftUI toolbars there hold labelled items"): at 86eb42d the form's only `toolbar` is still
+`toolbar 'Toolbar' 0 0 402 874` with ONE child `container 0 0 402 874` and no label/value/id below it — so the new content rule
+reads it as itemless too, on top of the screen-sized-host excuse it already had. The tab buttons (`nav.tab_*`, labelled) are its
+siblings, not its descendants. Nothing that covers the title is newly excused here, and the outcome is unchanged; but this screen
+does not exercise "a toolbar WITH labelled items still covers" — that case stays unit-test evidence only.
