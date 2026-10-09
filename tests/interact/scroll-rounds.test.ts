@@ -1,0 +1,584 @@
+import { describe, expect, it } from 'vitest';
+import type { Rect, Stroke, UiNode } from '../../src/adapters/types.js';
+import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve.js';
+import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
+import { describeScrollResult } from '../../src/interact/scroll-text.js';
+import { node } from '../helpers/fake.js';
+import { coverOver, DRAWN, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, type Row } from '../helpers/rounds.js';
+
+/**
+ * `scroll_until`'s round as observation tables (2026-10-09, the
+ * scroll-rounds deepening): each test is the reads a scroll saw and what
+ * the rounds did with them — through tests/helpers/rounds.ts#play, the
+ * reducer's test adapter, with no device, no clock and no timers. Until
+ * that date each was a scripted FakeAdapter whose physics produced these
+ * reads; the reads are written out here, one row each, with the fake they
+ * came from named in the comment. What only the driver can show — stroke
+ * points, adb query counts, a read failure quoted end to end, the error
+ * classes, the deadline passing during a stroke — stays in
+ * tests/interact/scroll.test.ts.
+ */
+
+type Rules = RoundRules & { screen: { width: number; height: number } };
+/** scroll.test.ts's FAST (maxSwipes 4, 2 s) on scrollingFake's 1000x2000 screen. */
+const SCROLLING: Rules = { direction: 'down', fully: false, maxSwipes: 4, timeoutMs: 2_000, screen: { width: 1000, height: 2000 } };
+/** The same bounds on the measured Android screen (Pixel_3a, 1080x2220). */
+const ANDROID: Rules = { ...SCROLLING, screen: { width: 1080, height: 2220 } };
+/** The same bounds on the iPhone 17 under WDA (402x874 pt). */
+const IPHONE: Rules = { ...SCROLLING, screen: { width: 402, height: 874 } };
+
+/** The measured Android IME: `InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220]`. */
+const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
+/** The measured iOS 27 pad's band (`other None None None 0 589 402 285`). */
+const IOS_BAND: Rect = { x: 0, y: 589, width: 402, height: 285 };
+/** The measured WDA pad on the iPhone 17: `role:keyboard 0 572 402 302`. */
+const WDA_BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
+const UP_IME = coverOver(IME);
+
+/** scrollingFake's target: 100 wide, `height` tall, at y. */
+const button = (y: number, height = 40) => match({ x: 0, y, width: 100, height }, 'submit_button');
+/** The Android form's row (scroll.test.ts#formFake): x 66, 948x73. */
+const formRow = (y: number) => match({ x: 66, y, width: 948, height: 73 });
+/** The WDA form's row (scroll.test.ts#wdaForm): x 24, 354 wide; every read with the pad up, the in-tree model (corroborated by construction). */
+const wdaRow = (y: number, height = 52): Row => ({ found: [match({ x: 24, y, width: 354, height }, 'row')], cover: coverOver(WDA_BAND, NO_BACK) });
+/** A WDA read the target is not in (a lazy list dropped it), the pad still up. */
+const wdaGone: Row = { found: [], cover: coverOver(WDA_BAND, NO_BACK) };
+/** Rows reading `ys` in turn, each one match built by `at`, with `extra` on every row. */
+const reads = (ys: readonly number[], at: (y: number) => UiNode, extra: Row = {}): Row[] => ys.map((y) => ({ ...extra, found: [at(y)] }));
+
+describe('round — the protocol', () => {
+  it('an ask leaves the state as it came in, and the same seen with the answer goes on', () => {
+    const state = startRounds({ ...ANDROID, fully: true }, ANDROID.screen);
+    const seen = { read: { found: [formRow(1906)], cover: UP_IME, ofKeyboard: () => false }, elapsedMs: 0 };
+    const asked = round(state, seen);
+    expect(asked).toEqual({ state, step: { do: 'ask', what: 'witness' } });
+    expect(round(state, { ...seen, corroborated: true }).step).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
+  });
+
+  it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
+    const state = startRounds(ANDROID, ANDROID.screen);
+    const off = { read: { found: [formRow(2900)], ofKeyboard: () => false }, elapsedMs: 0 };
+    expect(() => round(state, { ...off, drawn: DRAWN })).toThrow('none asked for');
+    const stroked = round(state, off).state;
+    expect(() => round(stroked, off)).toThrow('without the stroke drawn');
+    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0, drawn: DRAWN });
+    expect(stopped.step.do).toBe('confirm');
+    const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0 });
+    expect(done.step.do).toBe('stop');
+    expect(() => round(done.state, off)).toThrow('after the scroll stopped');
+  });
+});
+
+describe('round — the judgement and the stop', () => {
+  it('judges the MOST revealed match when an id sits on a container and its child', () => {
+    const child = match({ x: 0, y: 1900, width: 100, height: 40 }, 'row');
+    const container = node({ role: 'container', identifier: 'row', rect: { x: 0, y: 1900, width: 100, height: 400 }, children: [child] });
+    expect(resultOf(play(SCROLLING, [{ found: [container, child] }]))).toEqual({ swipes: 0, visible: 1, clipped: [] }); // the child, not the 25%-visible container
+  });
+
+  it('fully: true keeps swiping past a clipped stop, and names the layout defect when swiping no longer moves it', () => {
+    // scrollingFake(2580): 600 a stroke; 1980–2020 is clipped at the bottom, where the default would have stopped at 1.
+    const played = play({ ...SCROLLING, fully: true }, reads([2580, 1980, 1380, 1380], (y) => button(y)));
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'confirm', 'stop']);
+    expect(resultOf(played).swipes).toBe(2);
+    // scrollingFake(1980, 0): nothing moves it — two identical strokes, then the defect.
+    const stuck = play({ ...SCROLLING, fully: true }, reads([1980, 1980, 1980], (y) => button(y)));
+    expect(failureOf(stuck, 'id:submit_button').message).toMatch(/content is exhausted[\s\S]*cannot be fully revealed — that is a layout defect/);
+  });
+
+  it('fully: true, clipped: ONE stroke that does not move it is a transient, not the layout defect — the next one scrolls (review round 2)', () => {
+    // 1980–2020 clipped; the first stroke is not taken, the second moves it to 1380.
+    expect(resultOf(play({ ...SCROLLING, fully: true }, reads([1980, 1980, 1380, 1380], (y) => button(y))))).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('names the stop bound that ended it: maxSwipes, or the timeout in ms', () => {
+    // scrollingFake(50_000, 10): 10 px a stroke, never near the frame.
+    const bound = play(SCROLLING, reads([50_000, 49_990, 49_980, 49_970, 49_960], (y) => button(y)));
+    expect(failureOf(bound, 'id:submit_button').message).toMatch(
+      /scroll_until id:submit_button failed after 4 swipes \(maxSwipes\) — element in tree but never intersected the 1000x2000 viewport/,
+    );
+    const timedOut = play({ ...SCROLLING, maxSwipes: 50, timeoutMs: 1 }, [{ found: [button(50_000)], elapsedMs: 1 }]);
+    expect(failureOf(timedOut, describeTarget({ id: 'submit_button' })).message).toMatch(/scroll_until id:"submit_button" failed after 1ms \(timeout\)/);
+  });
+
+  it('a stop at 0 swipes was not stroked: reported on its one read, no confirming read', () => {
+    const played = play(IPHONE, [wdaRow(300)]);
+    expect(played.steps).toHaveLength(1);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+});
+
+describe('round — the soft keyboard', () => {
+  it('Android, symptom 1: a row WHOLLY under the IME is not "fully visible after 0 swipes" — it is scrolled out from under it first', () => {
+    const played = play({ ...ANDROID, fully: true }, reads([1906, 1306, 1306], formRow, { cover: UP_IME })); // the measured rect: y 1906–1979, inside the IME
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
+    // The witness on the round the band changes; none on the moot stop. `unlocated` is put to a SHOWN reading, which asks nothing.
+    expect(played.rounds.map((r) => r.asks)).toEqual([['witness'], [], ['unlocated']]);
+    // Clear of the band at the stop: the band changes nothing there, so it is not reported (review 2026-10-08).
+    const result = resultOf(played);
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(describeScrollResult(result)).toBe('fully visible after 1 swipe');
+  });
+
+  it('Android, partly under the IME: CLIPPED at the keyboard\'s edge, never "fully visible"', () => {
+    const result = resultOf(play(ANDROID, [{ found: [formRow(1360)], cover: UP_IME }])); // 1360–1433 straddles 1398
+    expect(result.clipped).toEqual(['bottom']);
+    expect(describeScrollResult(result)).toBe(
+      'visible after 0 swipes — CLIPPED at bottom, 52% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. ' +
+        'A rect assert or screenshot on this element will measure the CLIPPED box',
+    );
+  });
+
+  it('Android, fully: true at the end of the content with the row still under the IME: the keyboard is named, with how to hide it — not a layout defect', () => {
+    const played = play({ ...ANDROID, fully: true }, reads([1360, 1360, 1360], formRow, { cover: UP_IME }));
+    // After TWO identical swipes that did not move it (review round 2: one can be a transient), not one.
+    expect(failureOf(played, 'id:priority_select').message).toBe(
+      'scroll_until id:priority_select failed after 2 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
+        'the viewport above the soft keyboard over [0,1398][1080,2220], and the content is exhausted: swiping down no longer moves ' +
+        'it. The soft keyboard covers the rest — to reach it with the keyboard down, hide it first (press_key back from the MCP ' +
+        'tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again; only if it stays clipped with ' +
+        'the keyboard down is it a layout defect. Last rect {"x":66,"y":1360,"width":948,"height":73} in a 1080x2220 viewport',
+    );
+  });
+
+  it('Android, a stop bound with the IME up names the keyboard — the 15 s "never appeared" no longer reads as a wrong selector — and stays ElementNotFoundError', () => {
+    const error = failureOf(play({ ...ANDROID, maxSwipes: 2 }, [{ cover: UP_IME }, { cover: UP_IME }, { cover: UP_IME }]), 'id:payee_street_input');
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toBe(
+      'scroll_until id:payee_street_input failed after 2 swipes (maxSwipes) — element never appeared in the tree. The soft ' +
+        'keyboard was up over [0,1398][1080,2220] in 3 of the 3 rounds read: in those, visibility was judged, and the swipe drawn, in ' +
+        'the screen above it — to ' +
+        'reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the ' +
+        'fill before this step in a flow) and scroll again',
+    );
+  });
+
+  it('Android, two matches — one under the IME, one above it: the band changes WHICH is judged, so the clean stop says it was judged above the keyboard (review round 3)', () => {
+    const result = resultOf(play(ANDROID, [{ found: [formRow(1906), formRow(500)], cover: UP_IME }]));
+    expect(result).toEqual({ swipes: 0, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IME } });
+    expect(describeScrollResult(result)).toBe('fully visible after 0 swipes, judged above the soft keyboard over [0,1398][1080,2220]');
+  });
+
+  it('Android, a band that changes nothing (the target clear above it, a clean stop) is not asked about and not reported', () => {
+    const played = play(ANDROID, [{ found: [formRow(500)], cover: UP_IME }]);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(played.asks).toEqual([]);
+  });
+
+  it('Android, a STALE window state (review 2026-10-08: frame shown, input method says hidden — measured for seconds after a navigating tap) is vetoed: the on-screen target is not scored 0, no stroke is sent, no keyboard reported', () => {
+    const played = play({ ...ANDROID, fully: true }, [{ found: [formRow(1906)], cover: UP_IME, corroborated: false }]);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    expect(played.asks.filter((a) => a === 'witness')).toHaveLength(1);
+  });
+
+  it('Android, a vetoed band is not claimed at a failed stop either', () => {
+    const denied: Row = { cover: UP_IME, corroborated: false };
+    expect(failureOf(play({ ...ANDROID, maxSwipes: 1 }, [denied, denied]), 'id:nope').message).toBe(
+      'scroll_until id:nope failed after 1 swipe (maxSwipes) — element never appeared in the tree',
+    );
+  });
+
+  it('Android, a vetoed band leaves the stroke whole-screen too — and a denial is not kept: the witness is asked again on every round the band matters', () => {
+    const played = play(ANDROID, reads([2900, 2300, 1700, 1700], formRow, { cover: UP_IME, corroborated: false }));
+    expect(strokeCovers(played)).toEqual([undefined, undefined]); // the whole screen's stroke
+    // y 2900 and 2300 stroke (the band matters), y 1700 is under the band (the judgements differ), and so is the read
+    // confirming that stop: four rounds, four denials.
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(played.asks.filter((a) => a === 'witness')).toHaveLength(4);
+  });
+
+  it('Android, a denial followed by a real keyboard (review round 1: a stale window on round 0, then a new screen auto-focuses a field) — asked again, so the row under the IME is not "fully visible after 1 swipe"', () => {
+    const played = play({ ...ANDROID, fully: true }, [
+      { found: [formRow(2506)], cover: UP_IME, corroborated: false }, // denied once…
+      { found: [formRow(1906)], cover: UP_IME }, // …then confirmed: inside the IME, the band applied, one more swipe
+      { found: [formRow(1306)], cover: UP_IME },
+      { found: [formRow(1306)], cover: UP_IME },
+    ]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(strokeCovers(played)[1]).toBe(1398); // drawn above the IME
+    expect(played.asks.filter((a) => a === 'witness')).toHaveLength(2);
+  });
+
+  it('Android, a keyboard the scroll itself HIDES (a list that dismisses it on drag) with the window left stale-shown: asked again, denied, and the later rounds judged and stroked whole-screen — no keyboard claimed', () => {
+    const played = play({ ...ANDROID, fully: true }, [
+      { found: [formRow(2900)], cover: UP_IME }, // confirmed on round 0…
+      { found: [formRow(2300)], cover: UP_IME, corroborated: false }, // …gone after the first swipe, the window still reporting it
+      { found: [formRow(1700)], cover: UP_IME, corroborated: false },
+      { found: [formRow(1700)], cover: UP_IME, corroborated: false },
+    ]);
+    expect(strokeCovers(played)).toEqual([1398, undefined]); // round 0 above the band, round 1 the whole screen
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] }); // y 1700–1773: judged whole-screen, not "under" a phantom band
+    expect(played.asks.filter((a) => a === 'witness')).toHaveLength(4); // the confirming read of the stop asks again, denied again
+  });
+
+  it('a round whose tree did not read strokes in the box of the last round that DID read — whole-screen when that round applied no band', () => {
+    // 100 px a stroke; the window reads shown on round 0, hidden after; the third read fails.
+    const played = play({ ...ANDROID, maxSwipes: 3 }, [
+      { found: [formRow(2900)], cover: UP_IME },
+      { found: [formRow(2800)] },
+      { error: 'uiautomator dump returned no XML' },
+      { found: [formRow(2600)] },
+    ]);
+    expect(strokeCovers(played)).toEqual([1398, undefined, undefined]); // round 2, unread: round 1's whole screen, not round 0's band
+  });
+
+  it('a round whose tree did not read strokes in the box the last read round\'s band left, not through the keyboard', () => {
+    const played = play(ANDROID, [
+      { found: [formRow(2900)], cover: UP_IME },
+      { error: 'uiautomator dump returned no XML' },
+      { found: [formRow(1700)], cover: UP_IME },
+      { found: [formRow(1100)], cover: UP_IME },
+      { found: [formRow(1100)], cover: UP_IME },
+    ]);
+    expect(strokeCovers(played).length).toBeGreaterThanOrEqual(2);
+    for (const coverTop of strokeCovers(played)) expect(coverTop).toBe(IME.y);
+  });
+
+  it('iOS (WDA band): once a band was applied, a later moot stop on the keyboard\'s OWN node does not call the key "above the soft keyboard"', () => {
+    const key = (y: number): Row => {
+      const node = match({ x: 300, y, width: 80, height: 40 }, 'kb_done');
+      return { found: [node], cover: coverOver(IOS_BAND, NO_BACK), ofKeyboard: (n) => n === node };
+    };
+    // Round 0: the key below the screen, the round strokes — the band applied (in-tree: corroborated by construction).
+    const played = play(IPHONE, [key(900), key(800), key(800)]);
+    expect(strokeCovers(played)).toEqual([IOS_BAND.y]);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('iOS (WDA band): the keyboard\'s OWN UI as the target is judged against the whole screen, as a reading reads it for a subject', () => {
+    const key = match({ x: 300, y: 800, width: 80, height: 40 }, 'kb_done');
+    expect(resultOf(play(IPHONE, [{ found: [key], cover: coverOver(IOS_BAND, NO_BACK), ofKeyboard: (n) => n === key }]))).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
+  it('a band from the top edge (y 0, a full-screen extract-mode IME — unmeasured) covers everything: no bare "fully visible", no stroke, a failure naming it', () => {
+    const played = play(ANDROID, [{ found: [formRow(500)], cover: coverOver({ x: 0, y: 0, width: 1080, height: 2220 }) }]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']); // no stroke
+    const error = failureOf(played, 'id:priority_select');
+    expect(error).not.toBeInstanceOf(ElementNotFoundError); // it was in the tree
+    expect(error.message).toBe(
+      'scroll_until id:priority_select failed after 0 swipes — the element is in the tree but under the soft keyboard; the soft ' +
+        'keyboard over [0,0][1080,2220] covers the whole screen, so nothing under it can be judged and no swipe was sent — to reach it with the keyboard down, hide it first (press_key ' +
+        'back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again',
+    );
+  });
+
+  it('a band from the top edge with the target NOT in the tree: still absence — ElementNotFoundError, so an optional step is skipped — with the keyboard named', () => {
+    const played = play(ANDROID, [{ found: [], cover: coverOver({ x: 0, y: 0, width: 1080, height: 2220 }) }]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    const error = failureOf(played, 'id:nope');
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toMatch(/^scroll_until id:nope failed after 0 swipes — element never appeared in the tree; the soft keyboard over \[0,0\]\[1080,2220\] covers the whole screen/);
+  });
+
+  it('keyboard up, element stuck clipped at a NON-keyboard edge (right): the layout-defect wording, not the keyboard\'s', () => {
+    const wide = (): Row => ({ found: [match({ x: 900, y: 500, width: 300, height: 73 }, 'wide')], cover: UP_IME });
+    expect(failureOf(play({ ...ANDROID, fully: true }, [wide(), wide(), wide()]), 'id:wide').message).toMatch(
+      /CLIPPED at right, 60% of it is in the viewport above the soft keyboard over \[0,1398\]\[1080,2220\], and the content is exhausted[\s\S]*cannot be fully revealed — that is a layout defect/,
+    );
+  });
+
+  it('a stop bound with the element still partly under the band reports the clip at the KEYBOARD\'s edge', () => {
+    // 5 px a stroke: it moves, never clears 1398, is never stuck.
+    const played = play({ ...ANDROID, fully: true, maxSwipes: 2 }, reads([1380, 1375, 1370], formRow, { cover: UP_IME }));
+    expect(failureOf(played, 'id:priority_select').message).toMatch(
+      /^scroll_until id:priority_select failed after 2 swipes \(maxSwipes\) — element reached the viewport but stayed CLIPPED at bottom, 38% of it is in the viewport above the soft keyboard over \[0,1398\]\[1080,2220\] \(last rect /,
+    );
+  });
+
+  it('in tree but entirely under the band at the stop: "never intersected" names the frame actually judged', () => {
+    const played = play({ ...ANDROID, maxSwipes: 1 }, reads([1906, 1906], formRow, { cover: UP_IME }));
+    expect(failureOf(played, 'id:priority_select').message).toMatch(
+      /element in tree but never intersected the 1080x1398 screen above the soft keyboard over \[0,1398\]\[1080,2220\] \(last rect/,
+    );
+  });
+
+  it('the `unlocated` row on a DEFAULT clean stop: not asked (review 2026-10-08 — a witness query on every clean stop buys a sentence nobody acts on)', () => {
+    const played = play(ANDROID, [{ found: [formRow(500)], unlocated: true }]);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(played.asks).toEqual([]);
+  });
+
+  it('the `unlocated` row at a failed stop: named, with the swipes it may have eaten', () => {
+    const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [] }, { found: [], unlocated: true }]);
+    expect(played.asks).toEqual(['unlocated']); // asked of the stop round's reading
+    expect(failureOf(played, 'id:nope').message).toBe(
+      'scroll_until id:nope failed after 1 swipe (maxSwipes) — element never appeared in the tree; the input method reports a ' +
+        'soft keyboard shown, but the window state gives it no area on screen (one still coming up? not measured), so ' +
+        'where it lies is unknown — the swipes may have landed on it; hide or dock it and scroll again',
+    );
+  });
+
+  it('iOS (WDA band): the measured partly-covered row (y 545, h 52, band from 589) is not "fully visible after 0 swipes"; fully: true scrolls it above the band', () => {
+    const iosRow = (y: number): Row => ({ found: [match({ x: 66, y, width: 336, height: 52 }, 'priority_select')], cover: coverOver(IOS_BAND, NO_BACK) });
+    const played = play({ ...IPHONE, fully: true }, [iosRow(545), iosRow(345), iosRow(345)]);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    // The stroke started above the band (the old one: y ≈ 699, on a key).
+    expect(strokeCovers(played)).toEqual([IOS_BAND.y]);
+  });
+
+  it('iOS (WDA band): a stop bound names the keyboard with the in-tree remedy — no back, the adapter\'s advice', () => {
+    const band: Row = { found: [], cover: coverOver(IOS_BAND, NO_BACK) };
+    expect(failureOf(play({ ...IPHONE, maxSwipes: 1 }, [band, band]), 'id:nope').message).toBe(
+      'scroll_until id:nope failed after 1 swipe (maxSwipes) — element never appeared in the tree. The soft keyboard was up over ' +
+        '[0,589][402,874] in 2 of the 2 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — ' +
+        'to reach it with the keyboard ' +
+        'down, hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and scroll again; this ' +
+        'adapter cannot hide it on its own (ADVICE)',
+    );
+  });
+});
+
+/**
+ * 2026-10-08, the two "Device check" sections of
+ * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
+ * review round 1: the settled stop, the turn after a fling past the target,
+ * and a target off the frame that the strokes no longer move — the reads of
+ * scroll.test.ts#wdaForm (the SwiftUI form under WDA, the pad up) and of
+ * the Android forms, written out.
+ */
+describe('round — after the device check', () => {
+  const FULLY = { ...IPHONE, fully: true };
+
+  it('iOS (WDA): a stop the settle read caught MID-FLING is not reported — the confirming read finds the row past the top, and the next stroke brings it back', () => {
+    // The measured priority_select: y 681 under the pad; the settle read sees it at 300, it comes to rest at -48 (4 pt left on screen).
+    const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaRow(-48), wdaRow(94), wdaRow(94)]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] }); // not "fully visible after 1 swipe"
+    // Turned round: content up, its reach halved on the turn.
+    expect(played.steps).toEqual([
+      { do: 'stroke', toward: 'down', reach: 1, coverTop: 572 },
+      { do: 'confirm' },
+      { do: 'stroke', toward: 'up', reach: 0.5, coverTop: 572 },
+      { do: 'confirm' },
+      expect.objectContaining({ do: 'stop' }),
+    ]); // five reads: round 0; 300 (stop) and its confirmation -48; 94 (stop) and its confirmation 94
+  });
+
+  it('iOS (WDA), the worse case: a fling that carries the row across the whole viewport between two reads (613 → -357) turns the next stroke round instead of swiping on DOWN into exhausted content', () => {
+    const played = play({ ...FULLY, maxSwipes: 6 }, [613, -357, -215, -73, 69, 69].map((y) => wdaRow(y)));
+    expect(resultOf(played)).toEqual({ swipes: 4, visible: 1, clipped: [] }); // the turned strokes halved
+    expect(strokesToward(played)).toEqual(['down', 'up', 'up', 'up']); // down, then back up three times — ONE turn
+  });
+
+  it('a read that fails after a turn strokes as the last read round decided — turned — as it keeps that round\'s stroke box', () => {
+    const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaRow(-48), { error: 'WDA /source timed out' }]); // the read after the turned stroke
+    expect(strokesToward(played)).toEqual(['down', 'up', 'up']);
+    expect(strokeCovers(played)).toEqual([572, 572, 572]);
+  });
+
+  it('a read that no longer finds the target after a turn clears it: nothing to turn for, the caller\'s direction again', () => {
+    const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaRow(-48), wdaGone]); // the turned stroke drops it from the tree
+    expect(strokesToward(played)).toEqual(['down', 'up', 'down']);
+  });
+
+  it('a target first seen short only at a stop the confirming read then lost (not on the round-0 read) still turns the next stroke — where it stands is recorded on every read', () => {
+    // Not in the tree on round 0 (a lazy list); the first stroke brings it in, the settle read catches it at 300, it rests at -48.
+    const played = play(FULLY, [wdaGone, wdaRow(300), wdaRow(-48), wdaRow(94), wdaRow(94)]);
+    expect(strokesToward(played)[1]).toBe('up'); // turned round after -48
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('a target read beyond the far edge before any read saw it short of it is the caller\'s direction to honour — on every round it stays there, not only round 0', () => {
+    // Above the screen from the start; each content-down stroke carries it further up.
+    const played = play(FULLY, [-357, -701, -1045, -1389, -1733].map((y) => wdaRow(y)));
+    expect(strokesToward(played)).toEqual(['down', 'down', 'down', 'down']);
+  });
+
+  it('the turn is judged in the frame the round judged in: with the pad up, a row a content-up fling carried WHOLLY under the pad is beyond the frame\'s far edge, though inside the screen', () => {
+    // Short (above the frame), flung to 600–652 — inside the 874-pt screen, wholly under the pad.
+    const played = play({ ...FULLY, direction: 'up' }, [wdaRow(-200), wdaRow(600), wdaRow(256), wdaRow(256)]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+    expect(strokesToward(played)[1]).toBe('down'); // turned round: content down
+  });
+
+  it.each([
+    ['down', [300, -44, -388], ['down', 'down']], // 300–1000 → -44–656: clipped at the top AND under the pad
+    ['up', [-400, -117, 166], ['up', 'up']], // -400–300 → -117–583: clipped at the top AND under the pad
+  ] as const)('a row TALLER than the frame, clipped at both edges, is not beyond either: no turn (%s)', (direction, ys, toward) => {
+    const played = play({ ...FULLY, direction, maxSwipes: 2 }, ys.map((y) => wdaRow(y, 700)));
+    expect(strokesToward(played)).toEqual(toward);
+  });
+
+  it(`a target still moving inside the viewport is read again until it holds still; one that never does is reported after SETTLE_CONFIRM_READS (${SETTLE_CONFIRM_READS}) more reads with settled: false, and the reply says so`, () => {
+    const slowing = play(FULLY, [681, 300, 250, 250].map((y) => wdaRow(y))); // round 0, 300, 250, 250
+    expect(resultOf(slowing)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    const restless = play(FULLY, [681, 300, 301, 302, 303].map((y) => wdaRow(y))); // round 0, the stop at 300, then three confirming reads — reported at 303
+    const result = resultOf(restless);
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
+    expect(restless.steps.filter((s) => s.do === 'stroke')).toHaveLength(1);
+    expect(describeScrollResult(result)).toBe(
+      'fully visible after 1 swipe; still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match',
+    );
+  });
+
+  it('the confirming budget is per stroke: a stop after a turn gets its own SETTLE_CONFIRM_READS', () => {
+    // Stroke 1 spends two confirming reads (300 → 290 → -48, beyond); the turned stroke's stop needs three (235 → 240 → 245 → 245).
+    const played = play(FULLY, [681, 300, 290, -48, 235, 240, 245, 245].map((y) => wdaRow(y)));
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
+  });
+
+  it('a stop reached at the deadline is reported unconfirmed — no confirming read past it', () => {
+    const played = play({ ...FULLY, timeoutMs: 30 }, [wdaRow(681), { ...wdaRow(300), elapsedMs: 60 }]); // the deadline passed during the stroke
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
+  });
+
+  it('a confirming read that fails is read again, not answered with a stroke away from the stop', () => {
+    const played = play(FULLY, [wdaRow(681), wdaRow(300), { error: 'WDA /source timed out' }, wdaRow(300)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'confirm', 'stop']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('a target flung past and turned round, which the turned strokes no longer move: the failure names the turns and the direction last swiped', () => {
+    const played = play(FULLY, [613, -357, -357, -357].map((y) => wdaRow(y))); // carried past, then nothing moves it
+    expect(failureOf(played, 'id:row').message).toMatch(
+      /^scroll_until id:row failed after 3 swipes \(the last 2, swiping up, did not move it: content exhausted, or the swipes were not taken\) — element in tree but never intersected the 402x572 screen above the soft keyboard over \[0,572\]\[402,874\] \(last rect \{"x":24,"y":-357,"width":354,"height":52\}\)\. It was turned round 1 time: a swipe carried it past the viewport \(a fling\), so the next was drawn the other way\. The soft keyboard was up/,
+    );
+  });
+
+  it('in the viewport after a swipe and gone by the last read: the failure says it was there — not "never appeared" (a lazy list drops what a fling carries off)', () => {
+    const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaGone, wdaGone, wdaGone, wdaGone]);
+    const error = failureOf(played, 'id:row');
+    expect(error.message).toMatch(
+      /failed after 4 swipes \(maxSwipes\) — element was in the viewport after swipe 1 but did not stay — it is no longer in the tree \(a fling carried it off\? a lazy list drops what scrolls away\)/,
+    );
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('in the viewport after a swipe and off the frame at the last read: "was in the viewport after swipe 1 but did not stay", not "never intersected"', () => {
+    const played = play(FULLY, [681, 300, 700, 700, 700].map((y) => wdaRow(y))); // bounces back under the pad, then stuck
+    expect(failureOf(played, 'id:row').message).toMatch(
+      /failed after 3 swipes \(the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken\) — element was in the viewport after swipe 1 but did not stay \(a fling\?\) — in tree, off the 402x572 screen above the soft keyboard over \[0,572\]\[402,874\] at the last read \(last rect/,
+    );
+  });
+
+  /** The form's last field under an IME its container does not resize for: nothing moves it. */
+  const lastField = (rect: Rect): Row => ({ found: [match(rect, 'my_note_input')], cover: UP_IME });
+
+  it('Android: a row WHOLLY under the IME at the end of the content fails after the two identical swipes that did not move it — not at the 15 s timeout — in the stop bound\'s words, naming the keyboard', () => {
+    const field = lastField({ x: 66, y: 1769, width: 948, height: 143 }); // the measured my_note_input
+    const played = play({ ...ANDROID, fully: true, maxSwipes: 6, timeoutMs: 15_000 }, [field, field, field]);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(2);
+    const error = failureOf(played, 'id:my_note_input');
+    expect(error).not.toBeInstanceOf(ElementNotFoundError); // it was in the tree
+    expect(error.message).toBe(
+      'scroll_until id:my_note_input failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes ' +
+        'were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] ' +
+        '(last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 3 of the 3 rounds ' +
+        'read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it ' +
+        'first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again',
+    );
+  });
+
+  it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', () => {
+    const field = lastField({ x: 66, y: 1769, width: 948, height: 0 });
+    expect(failureOf(play(ANDROID, [field, field, field, field, field]), 'id:my_note_input').message).toMatch(/failed after 4 swipes \(maxSwipes\)/);
+  });
+
+  it('one stroke that moves nothing is a transient (a snackbar dismissed by the first touch), not exhausted content: the next one scrolls', () => {
+    expect(resultOf(play({ ...SCROLLING, maxSwipes: 6 }, reads([3100, 3100, 2500, 1900, 1900], (y) => button(y))))).toEqual({ swipes: 3, visible: 1, clipped: [] });
+  });
+
+  it('several matches off the frame: exhausted only when NO match moved — a static duplicate first in tree order is not the target the strokes move (review round 1)', () => {
+    const ghost = () => match({ x: 5000, y: 100, width: 100, height: 40 }, 'submit_button'); // another page
+    const rows = [3700, 3100, 2500, 1900, 1900].map((y): Row => ({ found: [ghost(), button(y)] }));
+    expect(resultOf(play(SCROLLING, rows))).toEqual({ swipes: 3, visible: 1, clipped: [] }); // 3700 → 1900
+  });
+
+  it('a match that LEAVES the tree is a change: the set the strokes compare is every match, counted — a static duplicate left behind starts the count afresh', () => {
+    const ghost = () => match({ x: 5000, y: 100, width: 100, height: 40 }, 'submit_button');
+    // Stroke 1: the set changed (two → one); strokes 2 and 3 leave the one where it was.
+    const played = play({ ...SCROLLING, maxSwipes: 6 }, [{ found: [ghost(), button(3700)] }, { found: [ghost()] }, { found: [ghost()] }, { found: [ghost()] }]);
+    expect(failureOf(played, 'id:submit_button').message).toMatch(/^scroll_until id:submit_button failed after 3 swipes \(the last 2/);
+  });
+
+  /** A whole-screen content-down stroke on the 1080x2220 screen, and the one drawn above the IME (scroll.test.ts pins both). */
+  const WHOLE: Stroke = { from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } };
+  const ABOVE: Stroke = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } };
+
+  it('two unmoved strokes count only when they are the SAME stroke: a whole-screen stroke on an IME still coming up, then one drawn above it, is two attempts, not exhaustion', () => {
+    // Round 0: the stale window denied, so a whole-screen stroke; the first two strokes are not taken.
+    const played = play({ ...ANDROID, maxSwipes: 6 }, [
+      { found: [formRow(2900)], cover: UP_IME, corroborated: false },
+      { found: [formRow(2900)], cover: UP_IME, drawn: WHOLE },
+      { found: [formRow(2900)], cover: UP_IME, drawn: ABOVE },
+      { found: [formRow(2300)], cover: UP_IME, drawn: ABOVE },
+      { found: [formRow(1700)], cover: UP_IME, drawn: ABOVE },
+      { found: [formRow(1100)], cover: UP_IME, drawn: ABOVE },
+      { found: [formRow(1100)], cover: UP_IME },
+    ]);
+    expect(strokeCovers(played).slice(0, 2)).toEqual([undefined, 1398]);
+    expect(resultOf(played)).toEqual({ swipes: 5, visible: 1, clipped: [] }); // 2900 → 2300 → 1700 → 1100
+  });
+
+  it('fully: true, clipped: the two unmoved strokes must be the SAME stroke — one above the IME, then one whole-screen once the window reads hidden, are two attempts', () => {
+    const wide = (row: Row): Row => ({ ...row, found: [match({ x: 900, y: 1360, width: 300, height: 73 }, 'row')] }); // clipped at the right edge whatever the keyboard
+    const played = play({ ...ANDROID, fully: true }, [wide({ cover: UP_IME }), wide({ drawn: ABOVE }), wide({ drawn: WHOLE }), wide({ drawn: WHOLE })]); // no stroke is taken
+    expect(strokeCovers(played)).toEqual([1398, undefined, undefined]);
+    expect(failureOf(played, 'id:row').message).toMatch(/^scroll_until id:row failed after 3 swipes — element is in the viewport but CLIPPED at right/);
+  });
+
+  it('fully: true, clipped: a confirming read is not a stroke for the stuck test, even once two strokes left the row unmoved', () => {
+    // 1360 straddles the IME: clipped (two strokes not taken); the window reads hidden — a clean stop; its confirmation
+    // reads the IME again and clips it — not "content exhausted": the next stroke scrolls (760).
+    const played = play({ ...ANDROID, fully: true }, [
+      { found: [formRow(1360)], cover: UP_IME },
+      { found: [formRow(1360)], cover: UP_IME },
+      { found: [formRow(1360)] },
+      { found: [formRow(1360)], cover: UP_IME },
+      { found: [formRow(760)], cover: UP_IME },
+      { found: [formRow(760)], cover: UP_IME },
+    ]);
+    expect(resultOf(played)).toEqual({ swipes: 3, visible: 1, clipped: [] });
+  });
+
+  it('a confirming read is not a stroke for the exhausted count: the stop read without the band, its confirmation under it, then ONE stroke not taken — not "content exhausted"', () => {
+    // Round 0 under the IME (stroke above it: 2506 → 1906); the stop at 1906 read with the window hidden; its confirmation with
+    // it shown (off the frame); the next stroke is not taken; the one after scrolls (1306).
+    const played = play(ANDROID, [
+      { found: [formRow(2506)], cover: UP_IME },
+      { found: [formRow(1906)] },
+      { found: [formRow(1906)], cover: UP_IME },
+      { found: [formRow(1906)], cover: UP_IME },
+      { found: [formRow(1306)], cover: UP_IME },
+      { found: [formRow(1306)], cover: UP_IME },
+    ]);
+    expect(resultOf(played)).toEqual({ swipes: 3, visible: 1, clipped: [] });
+  });
+
+  it('a confirming read is not a stroke for the fully: true stuck test either: a stop it finds clipped at the band, unmoved, is swiped on — not "content exhausted"', () => {
+    // 1960 under the IME → 1360; the stop read with the window hidden (fully visible); its confirmation clips it at 1398.
+    const played = play({ ...ANDROID, fully: true }, [
+      { found: [formRow(1960)], cover: UP_IME },
+      { found: [formRow(1360)] },
+      { found: [formRow(1360)], cover: UP_IME },
+      { found: [formRow(760)], cover: UP_IME },
+      { found: [formRow(760)], cover: UP_IME },
+    ]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] }); // → 760
+  });
+
+  it('a confirming read sent no stroke: a target it finds unmoved but under a keyboard the stop round did not apply is not counted against the content', () => {
+    // Denied on round 0 and on the stop at y 1906 (judged whole-screen); confirmed on the read confirming it.
+    const played = play({ ...ANDROID, fully: true }, [
+      { found: [formRow(2506)], cover: UP_IME, corroborated: false },
+      { found: [formRow(1906)], cover: UP_IME, corroborated: false },
+      { found: [formRow(1906)], cover: UP_IME },
+      { found: [formRow(1306)], cover: UP_IME },
+      { found: [formRow(1306)], cover: UP_IME },
+    ]);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] }); // 1906 under the IME → one stroke above it → 1306
+    expect(strokeCovers(played)[1]).toBe(1398);
+  });
+});
+
+describe('round — the round bound (code review of round 2, 2026-10-08)', () => {
+  it(`at the defaults the rounds number at most 1 + (1 + SETTLE_CONFIRM_READS) × maxSwipes = 25: a target that leaves the frame every fourth read after a stroke`, () => {
+    // Round 0 below the fold; after any stroke, three reads in the frame each at a new y (a stop that never confirms), then one off it.
+    const ys = [3000, ...Array.from({ length: 24 }, (_, i) => (i % 4 === 3 ? 3000 : 100 + i * 10))];
+    const played = play({ direction: 'down', fully: false, maxSwipes: 6, timeoutMs: 15_000, screen: SCROLLING.screen }, ys.map((y) => ({ found: [button(y)] })));
+    expect(played.steps).toHaveLength(1 + (1 + SETTLE_CONFIRM_READS) * 6);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(6);
+    expect(failureOf(played, 'id:t').message).toContain('failed after 6 swipes (maxSwipes)');
+  });
+});
