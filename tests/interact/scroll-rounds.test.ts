@@ -873,11 +873,11 @@ describe('round — the flush check across nested clipping containers, and a pro
   // The stroke box judged twice (deep/r3-scroll, 2026-10-09): the round judged room over the screen, the driver over the
   // screen ABOVE the keyboard, and fell back to the whole screen when that had none — a probe touching down off the
   // container moves nothing, and that was reported "nothing of it is cut there".
-  it.fails('a probe whose container has room on the screen but not above the keyboard is not sent — `room`, never `checked` — and an outer ancestor with room above it is probed instead', () => {
+  it('a probe whose container has room on the screen but not above the keyboard is not sent — `room`, never `checked` — and an outer ancestor with room above it is probed instead', () => {
     // A list running on under the IME from y 1340: 800 px on the screen, 58 above the keyboard's top (1398).
     const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
     const row = (scrollers: readonly Rect[]): Row => ({ found: [match({ x: 66, y: 1340, width: 948, height: 50 }, 'row')], scrollers, cover: UP_IME });
-    const lone = play(FULLY_ANDROID, [row([UNDER]), row([UNDER])]);
+    const lone = play(FULLY_ANDROID, [row([UNDER])]);
     expect(lone.steps.map((st) => st.do)).toEqual(['stop']);
     expect(resultOf(lone).flush).toEqual({ edge: 'top', container: UNDER, checked: false, why: 'room' });
     expect(lone.asks).toEqual(['witness', 'unlocated']); // the band asked about before the room above it is judged

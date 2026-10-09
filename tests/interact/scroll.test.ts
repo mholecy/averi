@@ -548,7 +548,7 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
     expect(result.flush?.checked).toBe(true); // the static fake moves nothing: accepted, after a stroke that could have moved it
   });
 
-  it.fails('a probe whose container has room on the screen but not above the IME is not drawn over the whole screen: no swipe, reported unchecked (`room`) — not "nothing of it is cut there" after a stroke that touched down off the list', async () => {
+  it('a probe whose container has room on the screen but not above the IME is not drawn over the whole screen: no swipe, reported unchecked (`room`) — not "nothing of it is cut there" after a stroke that touched down off the list', async () => {
     const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
     const row = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 1340, width: 948, height: 50 } });
     const under = node({ role: 'container', identifier: 'list', rect: { x: 0, y: 1340, width: 1080, height: 800 }, clipsDescendants: true, children: [row] });

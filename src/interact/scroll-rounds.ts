@@ -489,8 +489,8 @@ function flushWith(
  * a strip by the list around it gives way to the list — as that ancestor's
  * rect; undefined when none does (the stroke goes over the box).
  */
-function strokeWithin(chain: readonly Rect[], from: number, direction: Direction, box: Rect): Rect | undefined {
-  return chain.slice(from).find((c) => strokeBox(box, c, direction) !== undefined);
+function strokeWithin(chain: readonly Rect[], from: number, direction: Direction, box: Rect, coverTop?: number): Rect | undefined {
+  return chain.slice(from).find((c) => strokeBox(box, c, direction, coverTop) !== undefined);
 }
 
 /** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
@@ -977,9 +977,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       else if (flushed !== undefined) {
         const { edge, at } = flushed;
         const container = chain[at];
-        const within = strokeWithin(chain, at, REVEALS[edge], s.frame.box);
+        const room = { checked: false, why: 'room' } as const;
         if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
-        else if (within === undefined) flush = { edge, container, checked: false, why: 'room' };
+        else if (strokeWithin(chain, at, REVEALS[edge], s.frame.box) === undefined) flush = { edge, container, ...room };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
           // Clear of a keyboard as any stroke is — and one the moot rule
           // never asked about (the stop was clean either way) is asked
@@ -990,8 +990,17 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
             if (seen.corroborated === undefined) return ask('witness');
             if (seen.corroborated) probeCover = offered;
           }
-          const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
-          return probe(s, edge, best.node.rect, within, maxTravel, probeCover);
+          // Room judged again ABOVE that keyboard (deep/r3-scroll): a list
+          // running on under the IME may have room on the screen and none
+          // above it — the probe would touch down off it and move nothing.
+          // Twice only to keep the ask order: no room even over the whole
+          // screen is `room` with no witness asked, as it was.
+          const within = strokeWithin(chain, at, REVEALS[edge], s.frame.box, probeCover?.topCover.y);
+          if (within === undefined) flush = { edge, container, ...room };
+          else {
+            const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
+            return probe(s, edge, best.node.rect, within, maxTravel, probeCover);
+          }
         } else flush = { edge, container, checked: false, why: 'budget' };
       }
       // The `unlocated` row on a `fully: true` stop only — where the answer
