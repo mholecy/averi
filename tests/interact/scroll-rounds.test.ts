@@ -1079,6 +1079,14 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     expect(played.steps[0]).toMatchObject({ do: 'stroke', box: LIST });
   });
 
+  it('a short list whose upper half the bar\'s host starts in, the host still over the touch-down at 0.8: cut above the host (D3, 2026-10-09) — 1782, not 2086 on it', () => {
+    const SHORT: Rect = { x: 0, y: 1550, width: 1080, height: 670 };
+    const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: SHORT, over: [BAR], rest: 'a' }, { found: [], rest: 'b' }]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1840, box: SHORT });
+    expect(strokes(played)[0].from).toEqual({ x: 540, y: 1782 });
+    expect(containsPoint(BAR.rect, strokes(played)[0].from)).toBe(false);
+  });
+
   it('with the IME up, the higher of the two tops cuts — the keyboard\'s', () => {
     const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: LIST, over: [BAR], cover: UP_IME, rest: 'a' }, { found: [], rest: 'b' }]);
     expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398, box: LIST });

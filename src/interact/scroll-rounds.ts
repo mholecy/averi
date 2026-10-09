@@ -1313,10 +1313,11 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
  * other causes after it (review round 1) — and "content exhausted" alone
  * would send the reader the wrong way: the measured fast fail said so of a
  * list with 34 more rows. The stroke
- * box is cut above what is drawn over a container's lower half
- * (swipe.ts#strokeRoom), so what is left to name is what the cut does not
+ * box is cut above what is drawn over a container's lower half or over
+ * a content-down touch-down (swipe.ts#strokeRoom), so what is left to name is what the cut does not
  * model — a floating header a content-up stroke touches down on, a node
- * beside a sideways stroke's centre. Undefined when the stroke went over
+ * beside a sideways stroke's centre, a node over nearly all of the box that
+ * a cut would leave no room above. Undefined when the stroke went over
  * the gesture box whole (no container to be drawn over: the screen box,
  * P5), when this tree holds no container of the remembered rect (the list
  * moved; the stroke was still cut by the overlays kept with it,

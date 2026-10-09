@@ -1,5 +1,5 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Rect, type Stroke } from '../adapters/types.js';
-import { inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
+import { containsPoint, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -321,8 +321,25 @@ export function strokeRoom(
  * missed it. The lower half and no higher: a cut there leaves at least
  * half the box, so the stroke keeps a list's length, never a sliver's.
  *
+ * And then a node over the TOUCH-DOWN, wherever its top lies (2026-10-09,
+ * D3): the stroke's would-be touch-down under the cut so far
+ * (`swipeVector`, or `swipeVectorAbove` under a cut — `scrollStroke`'s
+ * own) inside a node of `over` is cut above the highest such node, and the
+ * touch-down placed again, until it lies on none: a short list `0,1550
+ * 1080x670` under the measured bar's host `66,1840 948x248` — the host's
+ * top above the list's centre, 1885 — touched down at 2086, on the host,
+ * and is cut to 1840, touching down at 1782. Only while the cut leaves at
+ * least MIN_STROKE_BOX above it: a node over nearly all of the box (a sheet
+ * risen over the list) is left uncut and the stroke drawn as before — a cut
+ * would leave no room, and the stroke would go to an outer container or the
+ * screen box (`strokeRoom`'s none), as covered there as here, with the fast
+ * fail's sentence naming the node lost (`touchedOn` names only a node over
+ * the stroked container). The lower-half rule stays first, so every cut it
+ * made is made as it was; this one only cuts higher, and only when the
+ * finger would land on a node.
+ *
  * Not cut, stated: a node drawn over the box's UPPER half (a floating
- * header), where a content-up stroke touches down at 0.2 of the box — the
+ * header) clear of the touch-down, where a content-up stroke touches down at 0.2 of the box — the
  * cut models a cover from below only, as the keyboard's does; that fast
  * fail names the node (scroll-rounds.ts#touchedOn), but a `fully: true`
  * probe toward a top edge that touched down on one and moved nothing is
@@ -336,7 +353,16 @@ function overlayTop(box: Rect, over: readonly Rect[], toward: Direction, coverTo
   const tops = over
     .filter((r) => r.x <= cx && cx < r.x + r.width && r.y > (box.y + bottom) / 2 && r.y < bottom)
     .map((r) => r.y);
-  return tops.length === 0 ? undefined : Math.min(...tops);
+  let drawn = tops.length === 0 ? undefined : Math.min(...tops);
+  // Then the touch-down as it would be drawn under that cut: a node over it is cut above, while that leaves room.
+  for (;;) {
+    const top = drawn ?? coverTop;
+    const at = (top === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, top, toward, 'content')).from;
+    const under = over.filter((r) => containsPoint(r, at)).map((r) => r.y);
+    const cut = under.length === 0 ? undefined : Math.min(...under);
+    if (cut === undefined || cut >= (top ?? Number.POSITIVE_INFINITY) || cut - box.y < MIN_STROKE_BOX) return drawn;
+    drawn = cut;
+  }
 }
 
 /**
