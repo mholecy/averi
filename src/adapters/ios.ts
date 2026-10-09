@@ -10,7 +10,8 @@ import { errorMessage } from '../util/error-message.js';
 import { IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
-import { appInfoNames, awaitForeground } from './ios-foreground.js';
+import { awaitForeground } from './ios-foreground.js';
+import { appInfoNames } from './simctl-appinfo.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 

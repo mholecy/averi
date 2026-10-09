@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { appInfoNames, FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
+import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
 import { Verifier } from '../../src/verify/assert.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { appinfo } from '../helpers/simctl-appinfo.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake
 // clock each recorded sleep moves the clock by its length, so the wait's
@@ -39,16 +40,6 @@ const SPRINGBOARD = JSON.stringify([
 /** idb's launch transient: a lone 0×0 Application — IdbEmptyTreeError. */
 const EMPTY = JSON.stringify([{ type: 'Application', AXLabel: 'Contacts', frame: f(0, 0, 0, 0) }]);
 
-/** `simctl appinfo` as it prints (an old-style plist), trimmed to the keys read and two around them. */
-const appinfo = (display: string | undefined, name: string) =>
-  '{\n' +
-  '    ApplicationType = System;\n' +
-  '    CFBundleExecutable = Contacts;\n' +
-  (display === undefined ? '' : `    CFBundleDisplayName = ${display};\n`) +
-  '    CFBundleIdentifier = "com.apple.MobileAddressBook";\n' +
-  `    CFBundleName = ${name};\n` +
-  '    GroupContainers =     {\n        "group.com.apple.contacts" = "file:///tmp/x/";\n    };\n' +
-  '}\n';
 const CONTACTS_INFO = appinfo('Contacts', 'Contacts');
 
 /**
@@ -96,40 +87,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
-});
-
-describe('appInfoNames — the names an app\'s Application may carry, from `simctl appinfo`', () => {
-  it('CFBundleDisplayName then CFBundleName, quoted or bare; a repeat is listed once', () => {
-    expect(appInfoNames(appinfo('"Skeleton Internal"', 'Skeleton'))).toEqual(['Skeleton Internal', 'Skeleton']);
-    expect(appInfoNames(CONTACTS_INFO)).toEqual(['Contacts']);
-  });
-
-  it('without a display name, the bundle name alone', () => {
-    expect(appInfoNames(appinfo(undefined, 'Runner'))).toEqual(['Runner']);
-  });
-
-  it('decodes the plist escapes inside quotes — \\U for non-ASCII, \\" and \\\\', () => {
-    expect(appInfoNames(appinfo('"Caf\\U00e9 \\"Bar\\" \\\\ 1"', 'Cafe'))).toEqual(['Café "Bar" \\ 1', 'Cafe']);
-  });
-
-  it('an output with neither key — not installed, or not a plist at all — is no names', () => {
-    expect(appInfoNames('')).toEqual([]);
-    expect(appInfoNames('An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=2)')).toEqual([]);
-  });
-
-  it("only TOP-LEVEL keys count: a nested dictionary's CFBundleName (an extension's) is not the app's, before or after", () => {
-    const nested =
-      '{\n' +
-      '    Extensions =     {\n        "com.app.widget" =         {\n            CFBundleName = WidgetExt;\n            CFBundleDisplayName = "Widget; Ext";\n        };\n    };\n' +
-      '    Path = "/x/{y;z";\n' + // a brace and a `;` inside a string are text
-      '    CFBundleName = Skeleton;\n' +
-      '}\n';
-    expect(appInfoNames(nested)).toEqual(['Skeleton']);
-  });
-
-  it('a key is matched whole: CFBundleNameSuffix-like keys are not CFBundleName', () => {
-    expect(appInfoNames('{\n    CFBundleNameSomething = Wrong;\n    CFBundleName = Right;\n}\n')).toEqual(['Right']);
-  });
 });
 
 describe('IosAdapter.launch waits until the tree is the launched app\'s', () => {
