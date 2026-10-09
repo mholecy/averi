@@ -312,7 +312,8 @@ export function strokeRoom(
  * x = the box's centre, where `swipeVector` draws a vertical stroke — a
  * FAB in the corner takes no touch-down, and cutting for it would only
  * shorten the stroke) and whose TOP lies in the box's LOWER HALF, below
- * its centre and above its bottom, where the touch-down is. Everything
+ * its centre and above its bottom (the keyboard's top, when one is up),
+ * where the touch-down is. Everything
  * below that top is then treated as covered, the keyboard's rule
  * (`swipeVectorAbove`): its width and height are not read — the measured
  * bar's host is 948 of 1080 wide and stops 132 px above the screen's
