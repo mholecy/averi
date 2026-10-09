@@ -127,8 +127,9 @@ interface RoundRead {
   /**
    * This round's tree, as read (in-process data: the round stays pure).
    * Never mutated once handed in — by the driver, a test or the round:
-   * its facts are cached by the tree object (`factsOf`), so a tree changed
-   * in place would be read with the facts of what it was.
+   * its facts (`factsOf`) are derived from it on each call, so a tree
+   * changed between an `ask` and the re-entry would be judged by two
+   * different trees in one round.
    */
   tree: UiNode;
   /** Every match of the target, in tree order (resolve.ts#findTarget) — nodes OF `tree`: their clipping ancestors are looked up by identity. */
@@ -174,20 +175,33 @@ interface TreeFacts {
 }
 
 /**
- * `TreeFacts` of a tree, derived once per tree whatever the re-entries (an
- * `ask` calls `round` again with the same seen): four walks, as the driver
- * made them before deep/r3-scroll. The cache is keyed by the tree object
- * and holds nothing a round can observe — the same tree gives the same
- * facts — so `round` stays pure and deterministic.
+ * `TreeFacts` of a tree: four walks, as the driver made them before
+ * deep/r3-scroll. Derived ONCE per call of `round`, after the keyboard's
+ * witness — the ask that most rounds re-enter for, which needs none of
+ * them — and handed along (`ThisRead`). A call that re-enters after an
+ * `ask unlocated` (a `fully: true` or bound stop, once a scroll) or an
+ * `ask witness` before a probe derives them again: no cache, so the module
+ * holds no state between calls (code review of deep/r3-scroll, S6: until
+ * then a WeakMap by tree object saved those walks).
  */
-const treeFacts = new WeakMap<UiNode, TreeFacts>();
 function factsOf(tree: UiNode): TreeFacts {
-  let facts = treeFacts.get(tree);
-  if (facts === undefined) {
-    facts = { scrollersOf: scrollersOf(tree), mainScroller: largestScroller(tree), fingerprint: treeFingerprint(tree), loading: showsProgress(tree) };
-    treeFacts.set(tree, facts);
-  }
-  return facts;
+  return { scrollersOf: scrollersOf(tree), mainScroller: largestScroller(tree), fingerprint: treeFingerprint(tree), loading: showsProgress(tree) };
+}
+
+/**
+ * One read that read, as the round has gathered it by `observe`: the read,
+ * its tree's facts, the frames the round judged in (the screen above an
+ * applied keyboard, or each box that counts), the gesture box (the round's
+ * `RoundSeen.screen` box; undefined when there is none) and the cover the
+ * round applied. One value, so the steps after the judgement read the same
+ * facts (code review of deep/r3-scroll, S6/S7).
+ */
+interface ThisRead {
+  read: RoundRead;
+  facts: TreeFacts;
+  frames: readonly Rect[];
+  gesture: Rect | undefined;
+  cover: Cover | undefined;
 }
 
 /** What to do next. */
@@ -808,25 +822,17 @@ interface Observed {
 }
 
 /**
- * One read that read: every match found, the one judged, the frames it was
- * judged in (the screen above an applied keyboard, or each box that
- * counts), and the swipe count — recorded into `s`. `current` is what the
+ * One read that read (`ThisRead`): every match found, the one judged, the
+ * frames it was judged in, and the swipe count — recorded into `s`. `current` is what the
  * read followed. Where the target stands against the far edge is recorded
  * HERE, on every read — a stop round strokes nothing, and a target seen
  * short only at a stop the confirming read then lost must still turn the
  * next stroke (review round 2).
  */
-function observe(
-  s: Mutable<State>,
-  current: Since,
-  read: RoundRead,
-  best: Judged | undefined,
-  frames: readonly Rect[],
-  gesture: Rect | undefined,
-  cover: Cover | undefined,
-): Observed {
+function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
+  const { read, facts, frames, gesture, cover } = now;
   const { found } = read;
-  const { fingerprint, loading } = factsOf(read.tree);
+  const { fingerprint, loading } = facts;
   const rects = found.map((n) => ({ ...n.rect }));
   const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
   if (current === 'stroke') {
@@ -872,7 +878,7 @@ function observe(
     s.inTreeAfter = s.swipes;
     // The container the strokes go over: room judged as the stroke will be
     // drawn — over the gesture box, above this round's cover.
-    const room = gesture === undefined ? undefined : strokeRoom(gesture, factsOf(read.tree).scrollersOf(best.node), s.rules.direction, cover?.topCover.y);
+    const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y);
     if (room !== undefined) s.targetScroller = { ...room.within };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
@@ -1007,13 +1013,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // nothing about motion: the comparisons wait for the next one that does.
   const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : s.frame.boxes;
   const gesture = seen.screen?.box;
-  const observed = read === undefined ? undefined : observe(s, current, read, best, judgedFrames, gesture, cover);
+  const now: ThisRead | undefined = read === undefined ? undefined : { read, facts: factsOf(read.tree), frames: judgedFrames, gesture, cover };
+  const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
   const probed = s.probe;
   if (read !== undefined) s.probe = undefined;
 
-  if (best !== undefined && best.visible > 0 && observed !== undefined && read !== undefined) {
+  if (best !== undefined && best.visible > 0 && observed !== undefined && now !== undefined) {
     if (!fully || best.clipped.length === 0) {
       // The probe moved nothing: the match is where it was sent from — the
       // stop holds (it held still through a stroke), and nothing lies
@@ -1031,13 +1038,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // `fully: true`, an edge flush with the clipping container: possibly
       // cut there — probe once toward it, or say it could not be checked.
       let flush: Flush | undefined;
-      const chain = fully ? factsOf(read.tree).scrollersOf(best.node) : [];
+      const chain = fully ? now.facts.scrollersOf(best.node) : [];
       const flushed = flushWith(best.node.rect, chain, s.rules.direction);
       if (flushed !== undefined && 'fills' in flushed) flush = { edges: flushed.fills, container: chain[0], checked: false, why: 'fills' };
       else if (flushed !== undefined) {
         const { edge, at } = flushed;
         const container = chain[at];
-        const room = { checked: false, why: 'room' } as const;
+        const noRoom = { checked: false, why: 'room' } as const;
         // With no gesture box (`RoundSeen.screen` absent) nothing has room
         // and the stop says `room` — the wrong reason (it is "no screen
         // box"), accepted as unreachable in practice: screenBox throws only
@@ -1046,9 +1053,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         // — so it takes a device reporting 0×0 throughout, and a tree whose
         // window stood in on an earlier round (else the frame is 0×0 and no
         // stop is ever visible) but not on this one.
-        const roomOver = (coverTop?: number) => (gesture === undefined ? undefined : strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop));
+        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop);
         if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
-        else if (roomOver() === undefined) flush = { edge, container, ...room };
+        else if (roomOver() === undefined) flush = { edge, container, ...noRoom };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
           // Clear of a keyboard as any stroke is — and one the moot rule
           // never asked about (the stop was clean either way) is asked
@@ -1065,7 +1072,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           // Twice only to keep the ask order: no room even over the whole
           // screen is `room` with no witness asked, as it was.
           const over = roomOver(probeCover?.topCover.y);
-          if (over === undefined) flush = { edge, container, ...room };
+          if (over === undefined) flush = { edge, container, ...noRoom };
           else {
             const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
             return probe(s, edge, best.node.rect, over.box, maxTravel, probeCover);
@@ -1139,14 +1146,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // stroke touches down on what scrolls, and its length is that
   // container's 60 %, never the screen's — a 1417-px list is not stroked
   // 1332 px. A round whose tree did not read keeps the last read round's.
-  const within = read === undefined ? s.lastWithin : (s.targetScroller ?? factsOf(read.tree).mainScroller);
+  const within = read === undefined ? s.lastWithin : (s.targetScroller ?? now?.facts.mainScroller);
   s.lastWithin = within;
   // The box, decided once (swipe.ts#strokeRoom): that container met with
   // the gesture box above the stroke's cover, or the gesture box whole
   // when it leaves no room — a stroke toward the target is still worth
   // drawing over the screen; a probe never comes here.
   const coverTop = strokeCover?.topCover.y;
-  const box = gesture === undefined ? undefined : ((within === undefined ? undefined : strokeRoom(gesture, [within], toward, coverTop)?.box) ?? gesture);
+  const box = strokeRoom(gesture, within === undefined ? [] : [within], toward, coverTop)?.box ?? gesture;
   if (turn) s.turns++;
   s.strokesSent++;
   s.lastStroke = toward;

@@ -235,9 +235,10 @@ export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?:
  * over the screen whole, the stroke as it was before 2026-10-09. Until
  * deep/r3-scroll the round judged room over the screen and the driver again
  * above the keyboard, falling back to the screen; one judgement now, the
- * keyboard in it. Pure.
+ * keyboard in it. No gesture `box` at all (screenBox threw): no room. Pure.
  */
-export function strokeRoom(box: Rect, candidates: readonly Rect[], toward: Direction, coverTop?: number): { within: Rect; box: Rect } | undefined {
+export function strokeRoom(box: Rect | undefined, candidates: readonly Rect[], toward: Direction, coverTop?: number): { within: Rect; box: Rect } | undefined {
+  if (box === undefined) return undefined;
   for (const within of candidates) {
     const met = strokeBox(box, within, toward, coverTop);
     if (met !== undefined) return { within, box: met };
