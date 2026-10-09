@@ -6,7 +6,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -239,7 +239,15 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.adb(['install', '-r', appPath], { timeoutMs: 120_000 });
   }
 
-  async launch(packageName: string, opts: LaunchOptions = {}): Promise<void> {
+  /**
+   * Returns once `am start`/monkey has started something — no wait for the
+   * tree to be the app's, unlike iOS (ios-foreground.ts, 2026-10-09). Whether
+   * uiautomator hands out the previous app's tree for a moment after a
+   * switch, as idb does, has not been measured on Android (it dumps the
+   * focused window, which may close the gap or not), so nothing waits here
+   * and LaunchOutcome carries no note.
+   */
+  async launch(packageName: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
     if (opts.clearState) await this.shell(['pm', 'clear', packageName]);
     if (opts.activity === undefined && opts.intent === undefined) {
       // monkey resolves the launcher activity for us, but picks ARBITRARILY
@@ -263,7 +271,7 @@ export class AndroidAdapter implements DeviceAdapter {
           causeOf(outcome),
         );
       }
-      return;
+      return {};
     }
     const argv = ['am', 'start'];
     let component: string | undefined;
@@ -300,6 +308,7 @@ export class AndroidAdapter implements DeviceAdapter {
     for (const [key, value] of Object.entries(intent.extras ?? {})) argv.push('--es', key, value);
     const outcome = await runStart(argv, (start) => this.shell(start));
     if (outcome.kind === 'refused') throw launchRefused(outcome, { packageName, component, intent: opts.intent });
+    return {};
   }
 
   async terminate(packageName: string): Promise<void> {

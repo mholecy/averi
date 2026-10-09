@@ -1,5 +1,5 @@
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -243,8 +243,12 @@ export class FakeAdapter implements DeviceAdapter {
     return { width, height };
   }
 
-  async launch(appId: string, opts: LaunchOptions = {}): Promise<void> {
+  /** What the next launches report as their LaunchOutcome note — iOS's foreground-wait caveat, for the renderers' tests. */
+  launchNote: string | undefined;
+
+  async launch(appId: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
     this.launches.push({ appId, ...opts });
+    return this.launchNote === undefined ? {} : { note: this.launchNote };
   }
 
   async isAppRunning(): Promise<boolean> {

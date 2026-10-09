@@ -389,8 +389,9 @@ describe('ensure_state and run_flow — the flow tools', () => {
       );
       const launch = fake.launch.bind(fake);
       fake.launch = async (appId, opts) => {
-        await launch(appId, opts);
+        const launched = await launch(appId, opts);
         if (opts?.clearState === true) fake.current = 'login';
+        return launched;
       };
       return fake;
     };

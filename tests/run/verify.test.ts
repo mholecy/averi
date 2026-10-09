@@ -1150,8 +1150,9 @@ describe('flow composition', () => {
     adapter.nextScreenshot = whitePng();
     const launch = adapter.launch.bind(adapter);
     adapter.launch = async (appId, opts) => {
-      await launch(appId, opts);
+      const launched = await launch(appId, opts);
       adapter.current = 's';
+      return launched;
     };
     const out = await runVerification(
       request({ platforms: ['android'], cfg: wiping, state: 'ready', flow: 'nonexistent' }),

@@ -690,8 +690,9 @@ const lateInterstitial = () => {
   });
   const launch = fake.launch.bind(fake);
   fake.launch = async (appId, opts) => {
-    await launch(appId, opts);
+    const launched = await launch(appId, opts);
     fake.current = 'interstitial';
+    return launched;
   };
   return fake;
 };
@@ -1091,8 +1092,9 @@ flows:
     );
     const launch = fake.launch.bind(fake);
     fake.launch = async (appId, opts) => {
-      await launch(appId, opts);
+      const launched = await launch(appId, opts);
       fake.current = 'dashboard'; // the state IS reached when the trailing tap dies
+      return launched;
     };
     const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.find((t) => t.action === '⚠ reach login')?.detail).toMatch(/never_there/);
@@ -1139,8 +1141,9 @@ flows:
     );
     const launch = fake.launch.bind(fake);
     fake.launch = async (appId, opts) => {
-      await launch(appId, opts);
+      const launched = await launch(appId, opts);
       fake.current = 'dashboard'; // reached, and then the rung dies on its next step
+      return launched;
     };
     const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
