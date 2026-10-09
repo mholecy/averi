@@ -416,7 +416,8 @@ const NOT_DRAWN = {
    * idb the sibling guard is void — its list is flat, every node a sibling
    * of every other — so there the row reads "a later, non-interactive,
    * narrower node whose centre lies on the target and which does not reach
-   * below it".
+   * below it". Residual, stated: a sticky section header given as a bare
+   * text narrower than its row is excused the same way.
    */
   onTarget: {
     target: ({ node, parent }, { target }) =>
