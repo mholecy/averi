@@ -187,7 +187,7 @@ interface SeenFor extends Seen {
   /** The walk index of the reading-order break after a flat list's CONTENT target (`readingBreak`): the later nodes from it on are no cover of it. The walk's length when there is none, the target is the top bar's, or the tree is not a flat list. */
   readonly readingBreak: number;
   /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`) and idb's keyboard (`keyboardOf`): never past the break. */
-  readonly chrome: ReadonlySet<Placed>;
+  readonly bottomChrome: ReadonlySet<Placed>;
 }
 
 /**
@@ -592,7 +592,7 @@ const NOT_DRAWN = {
    * this row: neither is marked.
    */
   flatListReadingOrder: {
-    target: (placed, { readingBreak, chrome }) => placed.at >= readingBreak && !chrome.has(placed),
+    target: (placed, { readingBreak, bottomChrome }) => placed.at >= readingBreak && !bottomChrome.has(placed),
   },
 
   /**
@@ -1005,7 +1005,7 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
  * The reading-order break after a flat list's CONTENT target
  * (`flatListReadingOrder`): the walk index of the first node after it with
  * area whose top lies above the target's — but never a node of the bottom
- * chrome (`chrome`: pinned at the bottom, or idb's keyboard), one that
+ * chrome (`bottomChrome`: pinned at the bottom, or idb's keyboard), one that
  * holds the target whole (a later node enclosing it is a cover in its own
  * right — r6b-icon's padded control; in the 69 device dumps only a pinned
  * CONTINUE and the keyboard's background), or one ending inside the top
@@ -1015,13 +1015,13 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
  * (`contentFrom`; never on a tree that is not a flat list, whose
  * `contentFrom` is the walk's length).
  */
-function readingBreak(order: readonly Placed[], target: Placed, contentFrom: number, chrome: ReadonlySet<Placed>, barLine: number): number {
+function readingBreak(order: readonly Placed[], target: Placed, contentFrom: number, bottomChrome: ReadonlySet<Placed>, barLine: number): number {
   if (target.at < contentFrom) return order.length;
   const t = target.node.rect;
   return (
     order
       .slice(target.end)
-      .find(({ node }, i, later) => rectArea(node.rect) > 0 && !chrome.has(later[i]) && node.rect.y < t.y && node.rect.y + node.rect.height > barLine && !rectWithin(t, node.rect))?.at ??
+      .find(({ node }, i, later) => rectArea(node.rect) > 0 && !bottomChrome.has(later[i]) && node.rect.y < t.y && node.rect.y + node.rect.height > barLine && !rectWithin(t, node.rect))?.at ??
     order.length
   );
 }
@@ -1055,7 +1055,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
   const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
   /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`). */
-  const chrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
+  const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
   /**
    * Where a cover of a target presses (`exposure`): its rect — or, for a
    * node pinned at a flat list's bottom (`bottomPinned`), its rect run down
@@ -1110,7 +1110,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, chrome, barLine), chrome };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome };
       const over =
         shown === undefined || about === undefined
           ? []
