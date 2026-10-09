@@ -1045,7 +1045,7 @@ export class FlowEngine {
       activity: spec.activity,
       intent: spec.intent,
     });
-    await this.adapter.launch(appId, {
+    const { note } = await this.adapter.launch(appId, {
       clearState: spec.clearState,
       activity,
       intent: spec.intent,
@@ -1056,6 +1056,13 @@ export class FlowEngine {
         (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
         (spec.clearState ? ' (state cleared)' : ''),
     );
+    // The launch's caveat (LaunchOutcome.note — today iOS's foreground wait
+    // giving up: the tree may still be the app this launch covered,
+    // adapters/ios-foreground.ts), right under the line it qualifies, in the
+    // words launch_app's reply uses. A `⚠` line, not a failure: the app was
+    // launched, and the steps after it poll — a `wait:`/`assert` that reads
+    // the wrong app's tree is what the line warns about.
+    if (note !== undefined) this.log('⚠ launch', note);
     // The cost of a wipe is invisible at the moment it is paid, and nothing in
     // the trace said so. The line states the MECHANISM and leaves the price to
     // the reader: what it costs is app-specific, and averi drives any app. Be

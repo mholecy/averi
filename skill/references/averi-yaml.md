@@ -42,7 +42,7 @@ states:
 ```
 
 - `detect` takes `element`, `state`, `any` and `all`. An element condition can carry `absent: true`, so "row visible AND card face gone" is expressible.
-- A bare tree (a cold launch's decor or splash; on iOS also SpringBoard's status bar and the launching app's icon) decides no condition. An `absent:` check there is not satisfied, `ensure_state` looks again for up to ~20 s, and `wait:`/`branch:` keep polling. It is therefore safe to call `ensure_state` right after `launch_app`.
+- A bare tree (a cold launch's decor or splash; on iOS also SpringBoard's status bar and the launching app's icon) decides no condition. An `absent:` check there is not satisfied, `ensure_state` looks again for up to ~20 s, and `wait:`/`branch:` keep polling. On iOS with the default idb tree source, a `launch_app` or `launch:` also waits (up to 3 s) until the tree is the launched app's, not the app it covered. It is therefore safe to call `ensure_state` right after `launch_app` there. With `treeSource: wda` the launch does not wait (unmeasured there): after switching apps, `assert` the launched app's own screen before you trust an absence.
 - A state with no `reach:` can only be detected. `ensure_state` on it fails if it is not already on screen.
 
 ## Flows

@@ -690,8 +690,9 @@ const lateInterstitial = () => {
   });
   const launch = fake.launch.bind(fake);
   fake.launch = async (appId, opts) => {
-    await launch(appId, opts);
+    const launched = await launch(appId, opts);
     fake.current = 'interstitial';
+    return launched;
   };
   return fake;
 };
@@ -1091,8 +1092,9 @@ flows:
     );
     const launch = fake.launch.bind(fake);
     fake.launch = async (appId, opts) => {
-      await launch(appId, opts);
+      const launched = await launch(appId, opts);
       fake.current = 'dashboard'; // the state IS reached when the trailing tap dies
+      return launched;
     };
     const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.find((t) => t.action === '⚠ reach login')?.detail).toMatch(/never_there/);
@@ -1139,8 +1141,9 @@ flows:
     );
     const launch = fake.launch.bind(fake);
     fake.launch = async (appId, opts) => {
-      await launch(appId, opts);
+      const launched = await launch(appId, opts);
       fake.current = 'dashboard'; // reached, and then the rung dies on its next step
+      return launched;
     };
     const trace = await FlowEngine.run(cfg2, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
@@ -1368,6 +1371,35 @@ flows:
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'share' });
     expect(fake.launches).toEqual([{ appId: 'md.bank.app', intent: { action: 'android.intent.action.SEND' } }]);
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
+  });
+
+  // 2026-10-09: the launch's caveat (LaunchOutcome.note — iOS's foreground
+  // wait giving up, adapters/ios-foreground.ts) is a ⚠ line right under the
+  // launch line, in launch_app's words; the flow goes on.
+  it("the launch's note is a `⚠ launch` line right under the launch line, and the flow goes on; no note, no line", async () => {
+    const cfg = parseConfig(`
+app:
+  ios: { bundleId: md.bank.app }
+flows:
+  open:
+    steps:
+      - launch: {}
+      - assert: [{ element: { id: dashboard_root } }]
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    fake.platform = 'ios';
+    fake.launchNote = 'the UI tree was still the app labelled "Contacts"';
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
+    const at = trace.findIndex((t) => t.action === 'launch');
+    expect(trace.slice(at, at + 2)).toEqual([
+      { action: 'launch', detail: 'md.bank.app' },
+      { action: '⚠ launch', detail: 'the UI tree was still the app labelled "Contacts"' },
+    ]);
+    expect(trace.at(-1)).toEqual({ action: 'flow open', detail: 'done' });
+
+    fake.launchNote = undefined;
+    const quiet = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
+    expect(quiet.filter((t) => t.action === '⚠ launch')).toEqual([]);
   });
 });
 

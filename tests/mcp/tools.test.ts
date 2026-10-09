@@ -389,8 +389,9 @@ describe('ensure_state and run_flow — the flow tools', () => {
       );
       const launch = fake.launch.bind(fake);
       fake.launch = async (appId, opts) => {
-        await launch(appId, opts);
+        const launched = await launch(appId, opts);
         if (opts?.clearState === true) fake.current = 'login';
+        return launched;
       };
       return fake;
     };
@@ -530,6 +531,19 @@ describe('launch_app — the entry activity', () => {
     const [byTool] = viaTool.fakes.android!.launches;
     expect(viaFlow.fakes.android!.launches).toEqual([byTool]);
     expect(byTool).toEqual({ appId: 'md.bank.app', ...entry, activity });
+  });
+
+  // 2026-10-09: what the adapter's launch says (LaunchOutcome.note — iOS's
+  // foreground wait, adapters/ios-foreground.ts) reaches the reply.
+  it("the launch's note reaches the reply as a ⚠ line; a launch with none replies with the one line", async () => {
+    const ios = home();
+    ios.launchNote = '3 s after launching md.bank.app, the UI tree was still the app labelled "Contacts"';
+    const { call } = await connect({ ios });
+    const result = await call('launch_app', { platform: 'ios', appId: 'md.bank.app', configPath: await validConfig() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Launched md.bank.app on ios\n⚠ 3 s after launching md.bank.app, the UI tree was still the app labelled "Contacts"');
+    const { text } = await launch({ appId: 'md.bank.app' }, { platform: 'ios' });
+    expect(text).toBe('Launched md.bank.app on ios');
   });
 
   it('ios never gets an activity from the config', async () => {

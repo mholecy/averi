@@ -350,7 +350,7 @@ describe('AndroidAdapter interactions', () => {
       'declares a matching <intent-filter> (with category DEFAULT), or the one that does refused the launch ' +
       "(not exported / permission — am's message below says which). Fix the action/mime type or the manifest, " +
       `or name the activity explicitly: \`activity:\` on the launch step / launch_app. am start said: ${said}`;
-    const messageOf = (launching: Promise<void>) => launching.then(() => 'resolved', (e: Error) => e.message);
+    const messageOf = (launching: Promise<unknown>) => launching.then(() => 'resolved', (e: Error) => e.message);
 
     it.each([
       ['on stderr', { stdout: 'Starting: Intent { act=android.intent.action.SEND }\n', stderr: `${UNRESOLVED}\n` }],
@@ -403,7 +403,7 @@ describe('AndroidAdapter interactions', () => {
     // that the launch reads its am start through it.
     it('a launch whose echoed intent has "Error" mid-line resolves', async () => {
       const printed = 'Starting: Intent { act=android.intent.action.VIEW dat=app://x/Error/y pkg=md.bank.app }\n';
-      await expect(amAnswers({ stdout: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toBeUndefined();
+      await expect(amAnswers({ stdout: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toEqual({});
     });
 
     it('a timed-out am start passes through as the timeout, whatever it had printed', async () => {
@@ -421,7 +421,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('pm clear printing an Error line with exit 0 does not fail the launch here (its output is not am\'s)', async () => {
       const { adapter, argvs } = amAnswers({}, { stdout: 'Error: something pm said\n' });
-      await expect(adapter.launch('md.bank.app', { clearState: true, intent: SEND })).resolves.toBeUndefined();
+      await expect(adapter.launch('md.bank.app', { clearState: true, intent: SEND })).resolves.toEqual({});
       expect(argvs).toHaveLength(2);
     });
 
@@ -430,7 +430,7 @@ describe('AndroidAdapter interactions', () => {
         stdout: 'Starting: Intent { cmp=md.bank.app/.MainActivity }\n',
         stderr: 'Warning: Activity not started, its current task has been brought to the front\n',
       });
-      await expect(adapter.launch('md.bank.app', { activity: '.MainActivity' })).resolves.toBeUndefined();
+      await expect(adapter.launch('md.bank.app', { activity: '.MainActivity' })).resolves.toEqual({});
     });
 
     it('an adb failure that is not am\'s diagnosis passes through as it is', async () => {
@@ -452,7 +452,7 @@ describe('AndroidAdapter interactions', () => {
       };
       return new AndroidAdapter({ serial: 'e', exec: fn });
     };
-    const messageOf = (starting: Promise<void>) => starting.then(() => 'resolved', (e: Error) => e.message);
+    const messageOf = (starting: Promise<unknown>) => starting.then(() => 'resolved', (e: Error) => e.message);
     const UNRESOLVED_VIEW =
       'Error: Activity not started, unable to resolve Intent { act=android.intent.action.VIEW dat=nosuch://x flg=0x10000000 }';
 
@@ -492,7 +492,7 @@ describe('AndroidAdapter interactions', () => {
     });
 
     it('the monkey launch: exit 0 resolves; an adb failure passes through as it is', async () => {
-      await expect(answering({}).launch('md.bank.app')).resolves.toBeUndefined();
+      await expect(answering({}).launch('md.bank.app')).resolves.toEqual({});
       const offline = execErrorLikeExec('adb -s e shell monkey', 255, "adb: device 'e' not found\n");
       await expect(answering(offline).launch('md.bank.app')).rejects.toBe(offline);
     });

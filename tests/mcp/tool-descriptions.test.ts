@@ -57,6 +57,11 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
   DEFAULT_ENSURE_TIMEOUT_MS: 20_250,
 }));
 
+vi.mock('../../src/adapters/ios-foreground.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/adapters/ios-foreground.js')>()),
+  FOREGROUND_WAIT_MS: 3_250,
+}));
+
 type Listed = Awaited<ReturnType<Client['listTools']>>['tools'][number];
 let tools: Map<string, Listed>;
 let close: () => Promise<void>;
@@ -104,6 +109,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
   it('ensure_state: the second look (flow/engine.ts DEFAULT_ENSURE_TIMEOUT_MS)', () => {
     expect(description('ensure_state')).toContain('the whole ~20.25 s second look');
     expect(description('ensure_state')).not.toMatch(/(?<![\d.])20 s\b/);
+  });
+
+  it("launch_app: the iOS foreground wait's bound (adapters/ios-foreground.ts FOREGROUND_WAIT_MS)", () => {
+    expect(description('launch_app')).toContain('waiting at most 3.25 s');
+    expect(description('launch_app')).not.toMatch(/(?<![\d.])3 s\b/);
   });
 
   it('scroll_until: the swipe and time bounds (interact/scroll.ts DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS)', () => {

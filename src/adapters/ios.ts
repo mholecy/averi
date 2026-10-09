@@ -9,7 +9,8 @@ import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import { IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
+import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
+import { appInfoNames, awaitForeground } from './ios-foreground.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 
@@ -146,7 +147,7 @@ export class IosAdapter implements DeviceAdapter {
     await this.simctl(['install', this.udid, appPath], 120_000);
   }
 
-  async launch(bundleId: string, opts: LaunchOptions = {}): Promise<void> {
+  async launch(bundleId: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
     if (opts.activity !== undefined || opts.intent !== undefined) {
       throw new Error(
         'activity/intent launch is Android-only (iOS apps have a single entry point) — ' +
@@ -156,6 +157,42 @@ export class IosAdapter implements DeviceAdapter {
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.enableAccessibilityAutomation(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
+    // `simctl launch` returns before the app is in front: for ~1–2 s idb can
+    // still hand out the previous app's (or SpringBoard's) tree, complete and
+    // labelled, which no reader doubts. Wait here — the one place both
+    // launch_app and a flow's `launch:` pass, once — until the tree's
+    // Application is this app's, bounded and failing open; the facts, the
+    // bound and the cost are ios-foreground.ts's.
+    const note = await awaitForeground({
+      bundleId,
+      label: () => this.treeSource.applicationLabel(),
+      names: () => this.appNames(bundleId),
+    });
+    return note === undefined ? {} : { note };
+  }
+
+  /** appInfoNames per bundle, read once per adapter — a name does not change under a session (a reinstall that renames the app is the exception, and costs one stale note at most). */
+  private readonly appNamesCache = new Map<string, readonly string[]>();
+
+  /**
+   * The bundle's display names, from `simctl appinfo` — THROWS when the
+   * call fails or lists neither name, and the foreground wait then says it
+   * could not check, quoting the first line (review 2026-10-09: appinfo's
+   * format is unmeasured, and a drift must not switch the check off
+   * unseen). Only a lookup that found names is cached, so a failed one is
+   * asked again on the next launch. 10 s, not simctl's 30 s default: the
+   * lookup is an aid to the launch, not part of it, and a simulator that
+   * cannot answer it in 10 s fails the reads that follow anyway (the same
+   * reasoning as the defaults writes below).
+   */
+  private async appNames(bundleId: string): Promise<readonly string[]> {
+    const cached = this.appNamesCache.get(bundleId);
+    if (cached !== undefined) return cached;
+    const { stdout } = await this.simctl(['appinfo', this.udid, bundleId], 10_000);
+    const names = appInfoNames(stdout.toString('utf8'));
+    if (names.length === 0) throw new Error('simctl appinfo listed neither CFBundleDisplayName nor CFBundleName');
+    this.appNamesCache.set(bundleId, names);
+    return names;
   }
 
   /** The simulator-wide write below is announced once per adapter, not per launch. */
@@ -222,6 +259,8 @@ export class IosAdapter implements DeviceAdapter {
 
   async openDeepLink(url: string): Promise<void> {
     // A link can cold-start the app: that is a launch (enableAccessibilityAutomation).
+    // But no foreground wait (launch's): a link may legitimately bring
+    // ANOTHER app forward, and there is no bundle here to wait for.
     await this.enableAccessibilityAutomation(`opening ${url}`);
     await this.simctl(['openurl', this.udid, url]);
   }

@@ -55,14 +55,22 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
  * `pkg/pkg.MainActivity` reads as `pkg.MainActivity` — and is whichever one
  * the launch actually used, so a fallback to averi.yaml's is visible in the
  * response. Moved out of the handler 2026-10-03: wording, not delegation.
+ *
+ * And on its own line below, `⚠ <note>` when the launch said one
+ * (LaunchOutcome.note, 2026-10-09 — today iOS's foreground wait, when the
+ * tree was not seen to be the launched app's: adapters/ios-foreground.ts),
+ * laid out as swipeText lays out its note. The flow's `⚠ launch` trace line
+ * carries the same words (flow/engine.ts#runLaunch).
  */
 export const launchText = (launch: {
   appId: string;
   platform: Platform;
   activity?: string;
   clearState?: boolean;
+  note?: string;
 }): string =>
-  `Launched ${launch.appId}${launch.activity === undefined ? '' : `/${launch.activity.split('/').pop()}`} on ${launch.platform}${launch.clearState ? ' (state cleared)' : ''}`;
+  `Launched ${launch.appId}${launch.activity === undefined ? '' : `/${launch.activity.split('/').pop()}`} on ${launch.platform}${launch.clearState ? ' (state cleared)' : ''}` +
+  (launch.note !== undefined ? `\n⚠ ${launch.note}` : '');
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

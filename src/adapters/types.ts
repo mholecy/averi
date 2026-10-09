@@ -426,6 +426,18 @@ export interface LaunchOptions {
   intent?: LaunchIntent;
 }
 
+/**
+ * What a launch has to say beyond "launched" (2026-10-09). `note` is a
+ * caveat the caller shows as a `⚠` line — the launch_app reply's second line
+ * (mcp/tool-text.ts#launchText), a flow's `⚠ launch` trace line — and is set
+ * today by one rule: iOS's foreground wait, when the tree was not seen to be
+ * the launched app's within its bound (adapters/ios-foreground.ts). A launch
+ * never FAILS for that: the app was launched, the caveat is about the next read.
+ */
+export interface LaunchOutcome {
+  note?: string;
+}
+
 export interface DeviceAdapter {
   readonly platform: Platform;
   /**
@@ -446,7 +458,13 @@ export interface DeviceAdapter {
 
   /** Reinstall triggers the app's login requirement — intentional. */
   install(appPath: string): Promise<void>;
-  launch(bundleId: string, opts?: LaunchOptions): Promise<void>;
+  /**
+   * Returns when the platform has started the app — on iOS (the idb source)
+   * not before the tree is the launched app's, or a bounded wait says it was
+   * not (LaunchOutcome.note; adapters/ios-foreground.ts). Android returns at
+   * once: the stale-tree window after a switch is unmeasured there.
+   */
+  launch(bundleId: string, opts?: LaunchOptions): Promise<LaunchOutcome>;
   terminate(bundleId: string): Promise<void>;
   /**
    * Throws when the platform says nothing was opened — on Android an

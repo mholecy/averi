@@ -32,6 +32,7 @@ import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES, runVerification } from
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
 import type { Platform, UiNode } from '../adapters/types.js';
+import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
 
 /**
  * The averi tool surface: every tool's schema, description and handler,
@@ -151,6 +152,7 @@ const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/reso
 const ASSERT_BUDGET = formatSeconds(ASSERT_TIMEOUT_MS); // verify/assert.ts
 const PIXEL_ASSERT_BUDGET = formatSeconds(PIXEL_ASSERT_TIMEOUT_MS); // verify/assert.ts
 const ENSURE_BUDGET = formatSeconds(DEFAULT_ENSURE_TIMEOUT_MS); // flow/engine.ts
+const FOREGROUND_BUDGET = formatSeconds(FOREGROUND_WAIT_MS); // adapters/ios-foreground.ts
 const SWIPE_REACH = `${Number((SWIPE_REACH_FRACTION * 100).toFixed(2))}%`; // interact/swipe.ts
 
 const assertsInput = z
@@ -256,7 +258,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'averi.yaml) the launcher activity is picked arbitrarily, which opens LeakCanary instead of the ' +
         'app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND); an intent ' +
         "without an activity is delivered within the app's package (never to another app, and not to " +
-        'app.android.activity), and fails if no activity there handles it. averi.yaml is read only for that fallback (android, neither activity nor intent named), and an invalid one then fails the call instead of launching without its activity.',
+        'app.android.activity), and fails if no activity there handles it. averi.yaml is read only for that fallback (android, neither activity nor intent named), and an invalid one then fails the call instead of launching without its activity. ' +
+        "iOS (idb tree source): returns once the UI tree is the launched app's — for a second or two after an app switch idb still " +
+        `lists the previous app's tree, on which an absent assert would pass — waiting at most ${FOREGROUND_BUDGET}; when it never ` +
+        'saw the app, the reply carries a ⚠ line naming what the tree showed: compare with screenshot before trusting a read.',
       inputSchema: {
         platform,
         appId: z.string().describe('Android package name or iOS bundle id'),
@@ -275,8 +280,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const entry = { platform: p, appId, activity: named, intent };
       const { cfg } = await loadForCall(TOOL_CONFIG.launch_app(entry), cp);
       const activity = resolveLaunchActivity(cfg, entry);
-      await (await registry.get(p)).launch(appId, { clearState, activity, intent });
-      return text(launchText({ appId, platform: p, activity, clearState }));
+      const { note } = await (await registry.get(p)).launch(appId, { clearState, activity, intent });
+      return text(launchText({ appId, platform: p, activity, clearState, note }));
     },
   );
 

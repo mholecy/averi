@@ -35,6 +35,7 @@ function fakeExec(responses: Record<string, string | Buffer>) {
 const NO_TREE: IosTreeSource = {
   kind: 'idb',
   read: () => Promise.reject(new Error('this test reads no tree')),
+  applicationLabel: () => Promise.reject(new Error('this test reads no tree')),
   dispose: () => Promise.resolve(),
 };
 
@@ -181,6 +182,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
         state.reads++;
         return structuredClone(TREE);
       },
+      applicationLabel: () => Promise.reject(new Error('unused')),
       // Resolves on a MACROTASK, so `await adapter.dispose()` observes the
       // release only if dispose really returned this chain — a fire-and-forget
       // dispose would pass on microtask ordering alone (review 2026-09-18).
@@ -225,6 +227,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
           if (answer instanceof Error) throw answer;
           return structuredClone(answer);
         },
+        applicationLabel: () => Promise.reject(new Error('unused')),
         dispose: () => Promise.resolve(),
       };
       return { source, state };
@@ -331,7 +334,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
 
   it('the same on a WDA-source adapter — a wda project\'s teardown poisons idb for every other reader of the simulator', async () => {
     const { fn, calls } = fakeExec({});
-    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), dispose: () => Promise.resolve() };
+    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), applicationLabel: async () => undefined, dispose: () => Promise.resolve() };
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
