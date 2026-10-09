@@ -314,11 +314,11 @@ export interface Judged {
    */
   centreOnScreen: boolean;
   /**
-   * Set when its centre lies on the screen but inside iOS's status band
-   * (swipe.ts#belowStatusBand, 2026-10-09) — so not `centreOnScreen`: the
-   * band's height, which the failure quotes (`shortOf`'s `statusBar`).
+   * The height of iOS's status band (swipe.ts#belowStatusBand, 2026-10-09),
+   * set only when its centre lies on the screen but inside that band — so
+   * not `centreOnScreen`; the failure quotes it (`shortOf`'s `statusBar`).
    */
-  centreInBand?: number;
+  bandOverCentre?: number;
   /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
   shows: number;
 }
@@ -856,10 +856,10 @@ function judge(
   const whole: Rect = { x: 0, y: 0, ...viewport };
   // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
   const screen: Rect = belowStatusBand(whole, band);
-  const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'centreInBand'> => {
+  const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
     const centre = tapPoint(node);
     const centreOnScreen = containsPoint(screen, centre);
-    return { centreOnScreen, ...(!centreOnScreen && containsPoint(whole, centre) && { centreInBand: screen.y - whole.y }) };
+    return { centreOnScreen, ...(!centreOnScreen && containsPoint(whole, centre) && { bandOverCentre: screen.y - whole.y }) };
   };
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
     const box: Rect = { x: 0, y: 0, ...frame };
@@ -918,7 +918,7 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
  * keyboard — a centre under the band stops as before, and the tap's
  * keyboard guard hides the keyboard. On iOS a centre inside the status
- * band is off the screen (`Judged.centreInBand`, adapters/ios-status-
+ * band is off the screen (`Judged.bandOverCentre`, adapters/ios-status-
  * band.ts, 2026-10-09) — measured, one stroke flung `priority_select` to
  * `24,-20` and the plain stop stopped with its centre at (201,6), where the
  * tap pressed the status bar — for both stops: `fully: true` asks the
@@ -942,7 +942,7 @@ function stops(j: Judged, fully: boolean): boolean {
  */
 function shortOf(j: Judged, fully: boolean): InFrameShort {
   if (fully && j.clipped.length > 0) return { of: 'clipped', judged: j };
-  if (j.centreInBand !== undefined) return { of: 'statusBar', judged: j, band: j.centreInBand };
+  if (j.bandOverCentre !== undefined) return { of: 'statusBar', judged: j, band: j.bandOverCentre };
   return { of: !j.centreOnScreen ? 'clipped' : 'covered', judged: j };
 }
 
