@@ -757,8 +757,13 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * An ITEMLESS TOOLBAR is not a cover, whatever its size (2026-10-09,
  * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-
  * dismissal.md): a `toolbar` none of whose descendants could be an item —
- * every one an EMPTY FRAME, a wrapper role (STRUCTURAL_ROLES: `container`,
- * `other`) with no label, value or identifier; it may have none at all.
+ * every one an EMPTY FRAME, a `container` with no label, value or
+ * identifier; it may have none at all. `container` only, not `other`
+ * (review round 1, 2026-10-09): the iOS parsers give `container` to the
+ * wrapper types they name (WDA's `Other`, `Cell`, `Window`, the bars —
+ * adapters/ios-node.ts, wda-source.ts) and `other` to every type they do
+ * NOT map — a SegmentedControl, Stepper, SearchField, Link, Picker — so an
+ * unlabelled `other` may be a control and counts as an item.
  * Measured under WDA on the stock Contacts "New Contact" sheet (UIKit,
  * iPhone 17, iOS 27): after the title `text 'New Contact' 149 89 104 22`
  * in pre-order come the form's `scrollable 0 62 402 812` (with children,
@@ -784,11 +789,11 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * screen-sized one still covers); only an EMPTY frame is not an item — a
  * descendant with a label, a value or an identifier (a frame WDA named,
  * possibly a custom item), or of any other role (an unlabelled button or
- * icon, a text) is one, at any depth, and the toolbar then covers as
+ * icon, a text, an unmapped control as `other`) is one, at any depth, and the toolbar then covers as
  * itself at any size under the screen (the input-accessory bar measured
  * 2026-10-07 has its Done, and the keyboard's band contains that slot
  * anyway); `toolbar` is not an interactive role (ui-tree/selectors.ts),
- * and neither is a wrapper role, so no control is excused; a
+ * and neither is `container`, so no control the parsers name is excused; a
  * keyboard-owned itemless toolbar (none measured) is excused like any
  * other, the band — which contains the accessory slot — still catching a
  * point there. Earlier passes it cannot reopen: the measured covers
@@ -828,8 +833,8 @@ export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | un
   const screen = rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
   const coversOnlyThroughContent = (n: UiNode) =>
     n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION);
-  /** A descendant that cannot be an item: a wrapper with nothing of its own (see above). */
-  const emptyFrame = (n: UiNode) => STRUCTURAL_ROLES.has(n.role) && !n.label && !n.value && !n.identifier;
+  /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see above). */
+  const emptyFrame = (n: UiNode) => n.role === 'container' && !n.label && !n.value && !n.identifier;
   /** A toolbar with no items: nothing of it is what is seen at the point (the UIKit sheet's two, 2026-10-09 — see above). */
   const itemlessToolbar = (n: UiNode) => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
   let after = false;

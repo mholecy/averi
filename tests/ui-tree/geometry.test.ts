@@ -456,7 +456,27 @@ describe('shadowing — the later content node drawn over a point (the dismissal
 
     it('itemless is judged by content, not by child count: no child, or empty frames nested any depth, list no item', () => {
       expect(shadowing(app(toolbar(BAR, [])), title, at)).toBeUndefined();
-      expect(shadowing(app(toolbar(BAR, [frame(BAR, [uiNode({ role: 'other', rect: BAR }), frame(BAR)])])), title, at)).toBeUndefined();
+      expect(shadowing(app(toolbar(BAR, [frame(BAR, [frame(BAR), frame(BAR, [frame(BAR)])])])), title, at)).toBeUndefined();
+    });
+
+    it('`other` is not a frame: the role an iOS parser gives every type it does not map — a SegmentedControl, a Stepper — so an unlabelled one is an item (review round 1)', () => {
+      const bar = toolbar(BAR, [frame(BAR, [uiNode({ role: 'other', rect: { x: 120, y: 90, width: 160, height: 32 } })])]);
+      expect(shadowing(app(bar), title, at)).toBe(bar);
+      // Through the WDA parser: a Toolbar holding an unlabelled, childless SegmentedControl → `other` → the toolbar covers.
+      const wdaRect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+      const parsed = parseWdaSource(
+        JSON.stringify({
+          type: 'Application', label: 'Contacts', rect: wdaRect(0, 0, 402, 874), children: [
+            { type: 'StaticText', label: 'New Contact', rect: wdaRect(149, 89, 104, 22) },
+            { type: 'Toolbar', label: 'Toolbar', rect: wdaRect(0, 83, 402, 48), children: [{ type: 'SegmentedControl', rect: wdaRect(120, 90, 160, 32) }] },
+          ],
+        }),
+      );
+      const nodes = [...everyNode(parsed)];
+      const parsedTitle = nodes.find((n) => n.label === 'New Contact')!;
+      const parsedBar = nodes.find((n) => n.role === 'toolbar')!;
+      expect(parsedBar.children.map((c) => c.role)).toEqual(['other']);
+      expect(shadowing(parsed, parsedTitle, at)).toBe(parsedBar);
     });
 
     it('a descendant that could be an item — labelled, valued, identified, or of any non-frame role, at any depth — and the toolbar covers as itself', () => {
