@@ -540,20 +540,38 @@ export function clippedEdges(
 // ─── Rect identity and wording ───────────────────────────────────────────────
 
 /**
- * How a sentence quotes a NODE's rect: `x,y wxh`, in tree units. Owned here
- * (2026-10-06) because two failure sentences in verify/ spelled it inline —
- * the text table's off-screen region and the pixel poll's position change.
- * The pixel poll's soft-keyboard miss quotes both of its rects through it too
- * (later that day); there they are device pixels, Android's tree units. Not
- * the only rect spelling (corrected 2026-10-08): the keyboard guard's
- * refusals in interact/ quote the keyboard's FRAME as dumpsys prints it,
- * `[x,y][x2,y2]`, through `interact/keyboard-model.ts#frameText` — so a
- * verify/ sentence reads like the tree and a guard sentence like the
- * window state it is checked against.
+ * THE TWO RECT SPELLINGS, both byte-stable (tests pin sentences through
+ * them), here side by side since 2026-10-09 (code review S5: `frameText`
+ * sat in interact/keyboard-model.ts, so scroll-text.ts imported the tap
+ * guard's model seam to quote a rect). The layer and the subject pick one,
+ * never the caller's taste:
+ * - `rectText`, `x,y wxh` — a NODE's rect as the tree gives it: verify/'s
+ *   sentences (the text table's off-screen region, the pixel poll's
+ *   position change and its soft-keyboard miss, which quotes the keyboard
+ *   beside the element this way), resolve.ts's off-screen tap, the fill's
+ *   not-an-input caveat.
+ * - `frameText`, `[x,y][x2,y2]` — the soft KEYBOARD's frame as dumpsys
+ *   prints it (the oracle's, or the in-tree band): the tap guard's and the
+ *   dismissal's messages on either model, and `scroll_until`'s keyboard
+ *   clauses — so a guard sentence reads like the window state it is checked
+ *   against.
+ */
+
+/**
+ * How a sentence quotes a NODE's rect: `x,y wxh`, in tree units (device
+ * pixels on Android). Owned here since 2026-10-06, when two failure
+ * sentences in verify/ spelled it inline.
  */
 export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;
 }
+
+/**
+ * How a sentence quotes the KEYBOARD's frame: `[x,y][x2,y2]`, as dumpsys
+ * prints it. Not `rectText` for the keyboard in interact/ (2026-10-08: the
+ * two docs each claimed to be the one way) — see the pair's note above.
+ */
+export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
 
 // ─── Draw order ──────────────────────────────────────────────────────────────
 

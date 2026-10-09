@@ -124,6 +124,25 @@ export interface KeyboardCover {
   remedy: KeyboardRemedy;
 }
 
+/**
+ * The `unlocated` row's sentence (`KeyboardReading.unlocated`) — the one
+ * wording, for the window model's post-fill dismissal warning
+ * (interact/keyboard-window.ts) and for `scroll_until`'s report
+ * (interact/scroll-text.ts), which asks the same question at its stop.
+ * Here, beside the question, since 2026-10-09 (code review S5): the reading
+ * owns the row, and until then scroll-text.ts reached into the tap guard's
+ * window model (keyboard-window.ts, re-exported by keyboard.ts) for it.
+ * The cause is said as a question. Until the device check of 2026-10-08 it
+ * was "a floating keyboard?"; measured that day on API 33, a floating Gboard
+ * does NOT read this way (a 132-px band plus its panel, read as `panels` —
+ * `panelsBeyond` below), and the one window-hidden read seen beside an IME
+ * on screen was the panel still coming up, right after the focus tap
+ * (whether `mInputShown` was already true then was not captured).
+ */
+export const UNLOCATED_KEYBOARD =
+  'the input method reports a soft keyboard shown, but the window state gives it no area on screen ' +
+  '(one still coming up? not measured), so where it lies is unknown';
+
 /** One reading of the soft keyboard off one tree — the questions every reader asks (the module doc has what each one costs). */
 export interface KeyboardReading {
   /**
@@ -164,11 +183,10 @@ export interface KeyboardReading {
   /**
    * The `unlocated` row (2026-10-08): the window state reads HIDDEN while
    * the input method says a keyboard IS shown — one it gives no area
-   * (interact/keyboard-window.ts#UNLOCATED_KEYBOARD has the sentence and
-   * what was measured). Asks the witness only for a hidden reading — a
-   * `shown` one has its frame and an `unknown` one has nothing to
-   * contradict; false without a query on the in-tree model, which has no
-   * second source.
+   * (`UNLOCATED_KEYBOARD` above has the sentence and what was measured).
+   * Asks the witness only for a hidden reading — a `shown` one has its frame
+   * and an `unknown` one has nothing to contradict; false without a query
+   * on the in-tree model, which has no second source.
    */
   unlocated(): Promise<boolean>;
   /** Shown anywhere, hidden, or unknown — the state only, no region: for the one reader with no point (the post-fill dismissal). */

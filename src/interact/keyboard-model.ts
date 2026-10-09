@@ -132,16 +132,6 @@ export interface DismissResult {
   warning?: string;
 }
 
-/**
- * `[x,y][x2,y2]`, the frame as dumpsys prints it — the one spelling of the
- * KEYBOARD's frame (the oracle's, or the in-tree band) in the guard's and the
- * dismissal's messages, on either model. verify/ quotes the same frame as
- * `x,y wxh` beside the element's (the pixel poll's soft-keyboard miss,
- * `ui-tree/geometry.ts#rectText`): the layer picks the spelling, not the
- * subject (2026-10-08: the two docs each claimed to be the one way).
- */
-export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
-
 /** The guard's answer: the node, with the keyboard sentence folded into the resolution note and kept alone beside it. */
 export const withNote = (resolved: Resolved, keyboardHidden: string): ResolvedClear => ({
   node: resolved.node,

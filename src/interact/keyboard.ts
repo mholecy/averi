@@ -27,7 +27,7 @@ import { describeTarget, refuseOffScreen, resolveSettled, tapScreen, type Resolv
  * failures they catch are the classes re-exported below.
  */
 export { KeyboardGuardError, type DismissOptions, type DismissResult, type GuardOptions, type KeyboardDismissal, type ResolvedClear } from './keyboard-model.js';
-export { AfterKeyboardDismissal, KeyboardStateDisagreement, UNLOCATED_KEYBOARD } from './keyboard-window.js';
+export { AfterKeyboardDismissal, KeyboardStateDisagreement } from './keyboard-window.js';
 export { AfterDismissalTap, KeyboardWithoutDismissal } from './keyboard-in-tree.js';
 
 /**

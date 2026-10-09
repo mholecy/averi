@@ -187,7 +187,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   not move is the defect it reports). For both, only strokes count: a
  *   confirming read sent none.
  *
- * The unlocated keyboard (keyboard-window.ts#UNLOCATED_KEYBOARD — the input
+ * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
  * method says shown, the window state gives it no area: one still coming
  * up? not measured. Not the floating keyboard any more: measured on API 33,
  * a floating Gboard keeps a band and its panel is read from the window's

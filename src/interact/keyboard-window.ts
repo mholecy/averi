@@ -1,9 +1,9 @@
-import { readKeyboard, type Covering, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
+import { frameText } from '../ui-tree/geometry.js';
+import { readKeyboard, UNLOCATED_KEYBOARD, type Covering, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { sleep } from '../util/sleep.js';
 import {
   failedLookMessage,
-  frameText,
   KeyboardGuardError,
   withNote,
   type CoveredLook,
@@ -231,23 +231,6 @@ export async function dismissal(reading: KeyboardReading): Promise<DismissalDeci
   if (window === 'hidden') return (await reading.unlocated()) ? 'unlocated' : 'nothing';
   return (await reading.corroborated()) ? 'back' : 'nothing';
 }
-
-/**
- * The `unlocated` row's sentence — the one wording, for the post-fill
- * dismissal's warning and for `scroll_until`'s report (interact/scroll-text.ts),
- * which asks the same question at its stop (the reading's `unlocated`,
- * ui-tree/keyboard-cover.ts).
- * The cause is said as a question. Until the device check of 2026-10-08 it
- * was "a floating keyboard?"; measured that day on API 33, a floating Gboard
- * does NOT read this way (a 132-px band plus its panel, read as `panels` —
- * ui-tree/keyboard-cover.ts#panelsBeyond), and the one window-hidden read
- * seen beside an IME on screen was the panel still coming up, right after
- * the focus tap (whether `mInputShown` was already true then was not
- * captured).
- */
-export const UNLOCATED_KEYBOARD =
-  'the input method reports a soft keyboard shown, but the window state gives it no area on screen ' +
-  '(one still coming up? not measured), so where it lies is unknown';
 
 // ─── The model ───────────────────────────────────────────────────────────────
 

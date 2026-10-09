@@ -1,5 +1,5 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
-import { shadowing } from '../ui-tree/geometry.js';
+import { frameText, shadowing } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
@@ -7,7 +7,6 @@ import { sleep } from '../util/sleep.js';
 import {
   confirmHidden,
   failedLookMessage,
-  frameText,
   KEYBOARD_HIDE_DELAY_MS,
   KeyboardGuardError,
   lookAgain,

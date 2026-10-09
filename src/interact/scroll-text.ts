@@ -1,8 +1,8 @@
 import type { DeviceScreen, Rect } from '../adapters/types.js';
+import { frameText } from '../ui-tree/geometry.js';
+import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { UNLOCATED_KEYBOARD } from './keyboard.js';
-import { frameText } from './keyboard-model.js';
 import { absenceError } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 
@@ -48,7 +48,7 @@ export interface ScrollUntilResult {
    *   of the review, 2026-10-08); a band that changes nothing is not applied;
    * - `unlocated`: the window model's `unlocated` row — the input method
    *   says a keyboard is shown, the window state gives it no area (one still
-   *   coming up? not measured — keyboard-window.ts#UNLOCATED_KEYBOARD; a
+   *   coming up? not measured — ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD; a
    *   floating Gboard does not read this way, its panel is read from the
    *   window's touchable region and covers as the band does) — so nothing
    *   could be judged against it and the report says so
