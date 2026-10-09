@@ -379,6 +379,16 @@ const NOT_DRAWN = {
    * a row under the title still covering (accepted there as a false
    * refusal, the safe direction for a keyboard dismissal; for a tap target
    * it is not: it refuses BackButton).
+   *
+   * RESIDUAL under idb, open for the owner (review round 2): idb's list is
+   * FLAT, so no node has a scroll-view ancestor and this row never fires.
+   * A row scrolled up under the top bar — idb keeps its real rect, the bug
+   * note measured the IBAN input at y 27 — follows BackButton and the title
+   * in the list and reads as drawn over them: `tap BackButton` is refused
+   * (`… under button "Debit account" … nothing of it shows`), or moved,
+   * nothing pressed. CONTINUE over a row is the same order and geometry,
+   * so no rule is written for it without a device read of idb's order
+   * (pinned in tests/ui-tree/draw-order.test.ts, "idb residual").
    */
   scrolledContent: {
     target: ({ scroller }, { target }) => scroller !== undefined && !within(target, scroller),
@@ -398,9 +408,15 @@ const NOT_DRAWN = {
    * over a large row (the Compose tab's `Home` text inside the row's rect)
    * is part of a cover, not of the target. Its centre on the target, not
    * its whole rect (review round 1): an outlined field's floating label
-   * straddles the field's top border. Narrower: a full-width sibling over
-   * a row is a sticky section header, a cover. An interactive one (a clear
-   * button) still covers, at its own rect.
+   * straddles the field's top border — and only that border: its bottom
+   * may not pass the target's (review round 2: a pinned footer's text
+   * straddling a row's BOTTOM edge is the bug's own shape). Narrower: a
+   * full-width sibling over a row is a sticky section header, a cover. An
+   * interactive one (a clear button) still covers, at its own rect. Under
+   * idb the sibling guard is void — its list is flat, every node a sibling
+   * of every other — so there the row reads "a later, non-interactive,
+   * narrower node whose centre lies on the target and which does not reach
+   * below it".
    */
   onTarget: {
     target: ({ node, parent }, { target }) =>
@@ -408,6 +424,7 @@ const NOT_DRAWN = {
       parent === target.parent &&
       !isInteractive(node) &&
       node.rect.width < target.node.rect.width &&
+      node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
       containsPoint(target.node.rect, tapPoint(node)),
   },
 

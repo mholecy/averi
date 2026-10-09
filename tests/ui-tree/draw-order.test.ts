@@ -615,6 +615,21 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), field, later] });
       expect(drawOrder(tree(label)).exposure(field, IPHONE).covers).toEqual([]);
       expect(drawOrder(tree(header)).exposure(field, IPHONE).covers).toEqual([header]);
+      // A pinned footer's text straddling the BOTTOM edge (review round 2) — narrower, its centre on the field — still covers.
+      const footer = uiNode({ role: 'text', label: 'Total 120 CZK', rect: rect(24, 330, 250, 40) });
+      expect(drawOrder(tree(footer)).exposure(field, IPHONE).covers).toEqual([footer]);
+    });
+
+    it('idb residual, open for the owner (review round 2): a row scrolled up under the top bar follows BackButton in the flat list and reads as drawn over it — pinned so a fix flips it on purpose', async () => {
+      const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+      const nodes = [...everyNode(tree)];
+      const back = nodes.find((n) => n.label === 'BackButton')!;
+      const debit = nodes.find((n) => n.identifier === 'swift_payment.form.debit_select')!;
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([]); // at rest, the row at y 150
+      debit.rect = { ...debit.rect, y: 60 };
+      const seen = drawOrder(tree).exposure(back, IPHONE);
+      expect(seen.covers).toEqual([debit]);
+      expect([seen.largest, seen.tapAt]).toEqual([undefined, undefined]);
     });
 
     it('a bar button with the form scrolled under the translucent bar (WDA lists the bar first): the scroll view\'s rows are no cover of it', () => {
