@@ -50,6 +50,15 @@ describe('launch_app response line', () => {
       'Launched md.bank.app/.MainActivity on android (state cleared)',
     );
   });
+
+  // 2026-10-09: the launch's caveat (LaunchOutcome.note — iOS's foreground
+  // wait giving up) on its own ⚠ line, as swipeText lays out its note.
+  it('puts the launch\'s note on a ⚠ line of its own, after everything else; no note, no line', () => {
+    expect(launchText({ appId: 'com.apple.MobileAddressBook', platform: 'ios', clearState: true, note: 'the tree was still another app' })).toBe(
+      'Launched com.apple.MobileAddressBook on ios (state cleared)\n⚠ the tree was still another app',
+    );
+    expect(launchText({ appId: 'md.bank.app', platform: 'ios', note: undefined })).toBe('Launched md.bank.app on ios');
+  });
 });
 
 describe('ui_snapshot note (2026-10-06: `[]` right after launch_app was indistinguishable from "no such element")', () => {

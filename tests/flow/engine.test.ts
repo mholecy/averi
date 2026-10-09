@@ -1372,6 +1372,35 @@ flows:
     expect(fake.launches).toEqual([{ appId: 'md.bank.app', intent: { action: 'android.intent.action.SEND' } }]);
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
   });
+
+  // 2026-10-09: the launch's caveat (LaunchOutcome.note — iOS's foreground
+  // wait giving up, adapters/ios-foreground.ts) is a ⚠ line right under the
+  // launch line, in launch_app's words; the flow goes on.
+  it("the launch's note is a `⚠ launch` line right under the launch line, and the flow goes on; no note, no line", async () => {
+    const cfg = parseConfig(`
+app:
+  ios: { bundleId: md.bank.app }
+flows:
+  open:
+    steps:
+      - launch: {}
+      - assert: [{ element: { id: dashboard_root } }]
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    fake.platform = 'ios';
+    fake.launchNote = 'the UI tree was still the app labelled "Contacts"';
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
+    const at = trace.findIndex((t) => t.action === 'launch');
+    expect(trace.slice(at, at + 2)).toEqual([
+      { action: 'launch', detail: 'md.bank.app' },
+      { action: '⚠ launch', detail: 'the UI tree was still the app labelled "Contacts"' },
+    ]);
+    expect(trace.at(-1)).toEqual({ action: 'flow open', detail: 'done' });
+
+    fake.launchNote = undefined;
+    const quiet = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
+    expect(quiet.filter((t) => t.action === '⚠ launch')).toEqual([]);
+  });
 });
 
 describe('transient UI-tree read failures', () => {
