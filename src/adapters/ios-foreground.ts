@@ -103,9 +103,9 @@ export interface ForegroundCheck {
   /** IosTreeSource.applicationLabel — one device read per call. */
   label(): Promise<ApplicationLabel>;
   /**
-   * The bundle's names (simctl-appinfo.ts's appInfoNames), never empty; THROWS when they could
-   * not be read — the error's first line is what the note quotes. Called at
-   * most once per wait.
+   * The bundle's names (simctl-appinfo.ts's appInfoNames), never empty;
+   * THROWS when they could not be read — the error's first line is what the
+   * note quotes. Called at most once per wait.
    */
   names(): Promise<readonly string[]>;
 }

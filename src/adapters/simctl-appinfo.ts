@@ -23,8 +23,9 @@
  * bare otherwise; inside quotes `\"`, `\\`, `\n`, `\t` and `\Uxxxx`
  * (non-ASCII) escapes are decoded. An octal escape (`\341`, a raw byte) is
  * NOT decoded — not seen in simctl's output; a name carrying one would not
- * match, and the foreground wait's note (ios-foreground.ts) says so. Parsed here rather than through
- * `plutil` to keep the lookup one exec. Neither key → `[]`.
+ * match, and the foreground wait's note (ios-foreground.ts) says so. Parsed
+ * here rather than through `plutil` to keep the lookup one exec. Neither
+ * key → `[]`.
  */
 export function appInfoNames(stdout: string): string[] {
   const entries = topLevelEntries(stdout);
