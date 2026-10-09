@@ -347,7 +347,7 @@ export async function fillField(
           : // A placeholder is not content: on an empty field showing
             // `Search`, nothing typed must not pass for a typed `ear`.
             // Raw equality first: a value equal to the placeholder is the
-            // one reading that cannot be told from it (see `held`).
+            // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
             observed === value || heldText(observed, placeholder).includes(value));
     let observed = await pollValue(refetchNode, landed, pollMs);
     // undefined: the node withholds its text — nothing to compare. Since
