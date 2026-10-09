@@ -215,6 +215,70 @@ describe('resolveSettled — appear AND hold still', () => {
     expect((error as Error).message).toMatch(/to hold still \(found, /);
   });
 
+  // docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-
+  // element.md: the first WDA tap after WebDriverAgent starts spent the 5 s
+  // budget inside ONE read (start-up ≈4–5 s) of a title that never moves
+  // (`135,73 131x22`), and the timeout said two reads disagreed.
+  describe('a budget spent inside the first read: one sighting, no second read', () => {
+    /** The SWIFT title; read 1 outlasts the budget, the later ones answer `next(read)`. */
+    function wdaStart(next: (read: number, title: UiNode) => UiNode | Error) {
+      resetLayout();
+      const title = node({ role: 'text', identifier: 'swift_payment.form.title', label: 'SWIFT', rect: { x: 135, y: 73, width: 131, height: 22 } });
+      const root = node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [title] });
+      let reads = 0;
+      const fake = new FakeAdapter({ root }, 'root');
+      fake.uiTree = async () => {
+        reads++;
+        if (reads === 1) {
+          await new Promise((r) => setTimeout(r, 30)); // WDA starting: the whole 20 ms budget
+          return structuredClone(root);
+        }
+        const answer = next(reads, title);
+        if (answer instanceof Error) throw answer;
+        return structuredClone(answer);
+      };
+      return { fake, root, reads: () => reads };
+    }
+    const BUDGET = { ...FIRST, timeoutMs: 20, pollMs: 2 };
+
+    it('a static element: one more read at the same rect settles it — no timeout', async () => {
+      const { fake, root, reads } = wdaStart(() => root);
+      const { node: settled } = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET);
+      expect(settled.rect).toEqual({ x: 135, y: 73, width: 131, height: 22 });
+      expect(reads()).toBe(2);
+    });
+
+    it('the late read fails: "found once, but no second read came", the read error beneath — never "two consecutive reads"', async () => {
+      const { fake, reads } = wdaStart(() => new Error('WDA session not created'));
+      const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
+      expect(reads()).toBe(2);
+      expect(error).not.toBeInstanceOf(ElementNotFoundError);
+      expect((error as Error).message.split('\n')).toEqual([
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once, but no second read came within the budget to confirm its position)',
+        '  (last UI tree read failed: WDA session not created)',
+      ]);
+    });
+
+    it('the late read no longer finds it: the same sentence, no read error', async () => {
+      const { fake } = wdaStart(() => node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 } }));
+      const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once, but no second read came within the budget to confirm its position)',
+      );
+    });
+
+    it('the late read finds it elsewhere: genuine movement keeps "never at the same position in two consecutive reads"', async () => {
+      const { fake, root } = wdaStart((_, title) => {
+        title.rect = { ...title.rect, y: 120 };
+        return root;
+      });
+      const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found, but never at the same position in two consecutive reads)',
+      );
+    });
+  });
+
   it('a wait that read good trees and then LOST the device is not ElementNotFoundError: the last read is the fresher fact', async () => {
     const fake = new FakeAdapter({ s: screen() }, 's');
     const real = fake.uiTree.bind(fake);

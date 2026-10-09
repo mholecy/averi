@@ -2,7 +2,7 @@ import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, typ
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
+import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
 
@@ -237,6 +237,15 @@ export interface ResolvedSettled extends Resolved {
  *   moving, or kept vanishing): a plain Error, "…waiting for element X to
  *   hold still (found, but never at the same position in two consecutive
  *   reads)".
+ * - the ONE round that resolved it was the last that read a tree — no second
+ *   read came within the budget (2026-10-09, docs/bugs/2026-10-09-hold-
+ *   still-timeout-after-one-read-blames-a-moving-element.md: WDA's start-up,
+ *   ≈4–5 s, spent the 5 s budget inside the first read of a static title).
+ *   One more read is taken past the deadline — the slack pollTree's last
+ *   round already has: the same rect settles it, a different one is the
+ *   movement above; otherwise a plain Error, "…to hold still (found once,
+ *   but no second read came within the budget to confirm its position)" —
+ *   nothing disagreed, so nothing is said to have moved.
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
  */
@@ -248,6 +257,7 @@ export async function resolveSettled(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
   let sighted = false;
+  let sightings = 0;
   let zeroOnly = false;
   const outcome = await pollTree(
     adapter,
@@ -259,6 +269,7 @@ export async function resolveSettled(
         return undefined;
       }
       sighted = true;
+      sightings++;
       const rect = JSON.stringify(resolved.node.rect);
       if (rect === lastRect) return { ...resolved, tree };
       lastRect = rect;
@@ -267,12 +278,29 @@ export async function resolveSettled(
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
+  let { readError } = outcome;
+  // lastRect still set: the one sighting was the last tree read.
+  if (sightings === 1 && lastRect !== undefined) {
+    const late = await readTreeOrError(adapter);
+    readError = late.error; // the late read is now the last one
+    const resolved = late.tree === undefined ? undefined : resolveNow(late.tree, target, opts);
+    if (late.tree !== undefined && resolved !== undefined && JSON.stringify(resolved.node.rect) === lastRect) return { ...resolved, tree: late.tree };
+    if (resolved === undefined) {
+      throw new Error(
+        pollTimeoutMessage(
+          `element ${describeTarget(target)} to hold still (found once, but no second read came within the budget to confirm its position)`,
+          timeoutMs,
+          readError,
+        ),
+      );
+    }
+  }
   if (sighted) {
     throw new Error(
       pollTimeoutMessage(
         `element ${describeTarget(target)} to hold still (found, but never at the same position in two consecutive reads)`,
         timeoutMs,
-        outcome.readError,
+        readError,
       ),
     );
   }
