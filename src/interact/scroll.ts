@@ -2,7 +2,7 @@ import type { DeviceAdapter, Stroke } from '../adapters/types.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
-import { describeTarget, findTarget, type Target } from './resolve.js';
+import { describeTarget, matchesToJudge, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
 import { dragMs, screenBox, scrollStroke, type Direction, type ScreenBox } from './swipe.js';
@@ -285,7 +285,8 @@ export async function scrollUntilVisible(
       // that returned nothing is a miss, as every failed read is.
       seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0 };
     } else {
-      const found = findTarget(tree, target);
+      // The matches the round judges: the one the next tap would act on, when the preference picks one (resolve.ts#matchesToJudge).
+      const found = matchesToJudge(tree, target);
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
       // The tree itself: what the round asks of it — the matches' clipping

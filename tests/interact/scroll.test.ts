@@ -591,3 +591,42 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
     expect((error as Error).message).toContain('failed after 4 swipes (maxSwipes)');
   });
 });
+
+/**
+ * Code review P2 (2026-10-09): a selector matching two nodes — a container and its button sharing an id — was judged by
+ * scroll_until on the match more of which showed (the container, its centre clear), while the next tap acted on the
+ * button (resolveNow's preference for a sole interactive match) and refused it. The scroll judges the tap's match.
+ */
+describe('scrollUntilVisible — the match the next tap acts on (code review P2)', () => {
+  const ios = (children: UiNode[]) => {
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children }) }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  };
+  const APP = node({ role: 'other', label: 'app', rect: { x: 0, y: 0, width: 402, height: 874 } });
+  const BAR = node({ role: 'button', label: 'Continue', identifier: 'cont', rect: { x: 24, y: 780, width: 354, height: 44 } });
+
+  it('a container and its button sharing an id: the button is judged — its centre under the bar, no stop — as the tap would refuse it', async () => {
+    const fake = ios([
+      APP,
+      node({ role: 'container', identifier: 'prio', rect: { x: 24, y: 700, width: 354, height: 130 } }),
+      node({ role: 'button', identifier: 'prio', label: 'Priority', rect: { x: 24, y: 771, width: 354, height: 52 } }),
+      BAR,
+    ]);
+    await expect(scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).rejects.toThrow(
+      'scroll_until id:prio failed after 0 swipes (maxSwipes) — element reached the viewport but stayed under button "Continue" (24,780 354x44) at its centre (201,797), drawn over it — 17% of it shows (last rect {"x":24,"y":771,"width":354,"height":52})',
+    );
+  });
+
+  it('…and with no one match the tap prefers (two non-interactive nodes), every match is judged as before: the one that stops wins', async () => {
+    const fake = ios([
+      APP,
+      node({ role: 'text', identifier: 'prio', label: 'Priority', rect: { x: 24, y: 700, width: 354, height: 40 } }),
+      node({ role: 'text', identifier: 'prio', label: 'Priority hint', rect: { x: 24, y: 771, width: 354, height: 52 } }),
+      BAR,
+    ]);
+    expect(await scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+});

@@ -134,7 +134,7 @@ interface RoundRead {
    * different trees in one round.
    */
   tree: UiNode;
-  /** Every match of the target, in tree order (resolve.ts#findTarget) — nodes OF `tree`: their clipping ancestors are looked up by identity. */
+  /** The matches of the target to judge, in tree order (resolve.ts#matchesToJudge: the one the next tap acts on when the preference picks one, else every match) — nodes OF `tree`: their clipping ancestors are looked up by identity. */
   found: readonly UiNode[];
   /** The reading's `cover()`: everything a shown keyboard covers; undefined when hidden or unknown. */
   cover?: KeyboardCover;
@@ -829,7 +829,10 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
 
 /**
  * The MOST revealed match, not the first: an id can sit on a container and
- * its child, and reporting the clipped one of the two would invent a defect.
+ * its child, and reporting the clipped one of the two would invent a defect
+ * (since code review P2 the driver hands in only the match the next tap
+ * acts on when the preference picks one — resolve.ts#matchesToJudge — so
+ * this chooses only among matches the tap could not tell apart either).
  * Most revealed by what SHOWS — in the frame and under nothing of the app
  * (`order.exposure`, 2026-10-09) — which is what is in the frame when
  * nothing is drawn over it; a match that stops the round first (`better`). Under a cover, a keyboard-side node (the round's

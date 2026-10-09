@@ -38,9 +38,44 @@ export type Target = Selector | ElementSpec;
 export const describeTarget = (target: Target): string =>
   typeof target === 'string' ? target : describeElementSpec(target);
 
-/** Every match, unfiltered — the scroll loop judges all of them; resolveNow is the policy over them. */
+/** Every match, unfiltered — resolveNow is the policy over them, and `scroll_until` judges them through `matchesToJudge`. */
 export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
   typeof target === 'string' ? findAll(tree, target) : findBySpec(tree, target);
+
+/**
+ * THE preference among a target's matches, before the caller's Ambiguity:
+ * zero-area nodes are never targets, and among several survivors a sole
+ * interactive one wins (preferInteractive, with its note). `chosen` when
+ * that leaves one node — the node a tap acts on whatever its Ambiguity —
+ * else the `survivors`: none, or several for the Ambiguity to decide.
+ * One owner since code review P2 (2026-10-09): `resolveNow` and
+ * `scroll_until`'s judgement (`matchesToJudge`) both read it.
+ */
+export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: string } | { survivors: UiNode[] } {
+  const survivors = found.filter((n) => n.rect.width > 0 && n.rect.height > 0);
+  if (survivors.length === 1) return { chosen: survivors[0] };
+  const pick = survivors.length > 1 ? preferInteractive(survivors) : undefined;
+  return pick === undefined ? { survivors } : { chosen: pick.node, note: pick.note };
+}
+
+/**
+ * The matches `scroll_until` judges (interact/scroll.ts, code review P2,
+ * 2026-10-09): the one a tap would act on when the preference picks one
+ * (`preferred`) — so the stop and the next tap judge the SAME node by
+ * construction — else every match, as found. Until then the scroll judged
+ * every match and stopped on the one more of which showed: an id on a
+ * container and on its button stopped on the container ("PARTLY UNDER …,
+ * its centre clear"), and the tap that followed acted on the button and
+ * was refused under the bar. With several matches and no preference the
+ * scroll still judges them all (the MCP tap refuses such a selector; the
+ * flow's `ambiguous: 'first'` tap takes the first — a stop on another is
+ * the residual, stated).
+ */
+export function matchesToJudge(tree: UiNode, target: Target): UiNode[] {
+  const found = findTarget(tree, target);
+  const pick = preferred(found);
+  return 'chosen' in pick ? [pick.chosen] : found;
+}
 
 /** A node the caller may act on, plus how it was chosen when the choice was not forced. */
 export interface Resolved {
@@ -149,11 +184,10 @@ export interface SettleOptions extends ResolveOptions {
  * between keystrokes and must not wait for anything.
  */
 export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): Resolved | undefined {
-  const candidates = findTarget(tree, target).filter((n) => n.rect.width > 0 && n.rect.height > 0);
+  const pick = preferred(findTarget(tree, target));
+  if ('chosen' in pick) return { node: pick.chosen, ...(pick.note !== undefined && { note: pick.note }) };
+  const candidates = pick.survivors;
   if (candidates.length === 0) return undefined;
-  if (candidates.length === 1) return { node: candidates[0] };
-  const preferred = preferInteractive(candidates);
-  if (preferred !== undefined) return preferred;
   const summary = (sep: string) =>
     candidates
       .slice(0, 5)
