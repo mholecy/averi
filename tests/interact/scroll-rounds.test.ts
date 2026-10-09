@@ -1465,6 +1465,38 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(reaches(played)).toEqual([1]);
   });
 
+  it('a stroke back that MOVES the row but leaves it short (776 → 760, still under CONTINUE) is no "nor does a swipe": the scroll goes on, and stops', () => {
+    const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), form(760), form(514), form(514)]);
+    expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'down']);
+    expect(resultOf(played)).toEqual({ swipes: 5, visible: 1, clipped: [] });
+  });
+
+  it('stuck on the LAST swipe: no swipe left for the stroke back — the stuck sentence, not "maxSwipes", and it says the other way was never tried', () => {
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [form(771), form(771), form(771)]);
+    expect(strokesToward(played)).toEqual(['down', 'down']);
+    expect(played.outcome).toMatchObject({ kind: 'stuck', otherWay: 'untried' });
+    expect(failureOf(played, 'id:priority').message).toContain(
+      'swiping down no longer moves it, and swiping up was never tried (no swipe or time was left). The app draws that over it at the end of the content',
+    );
+    const clipped = play({ ...SCROLLING, fully: true, maxSwipes: 2 }, reads([1980, 1980, 1980], (y) => button(y)));
+    expect(failureOf(clipped, 'id:submit_button').message).toContain('swiping down no longer moves it, and swiping up was never tried (no swipe or time was left). The element cannot be fully revealed');
+  });
+
+  it.each([
+    // the frame 0–874, its middle 437: a cover 407–467 is centred ON it
+    ['down', 420],
+    ['up', 380],
+  ] as const)('a cover centred exactly on the frame\'s middle is in neither far half (%s): not turned for', (direction, y) => {
+    const over = [node({ role: 'other', label: 'Bar', rect: { x: 0, y: 407, width: 402, height: 60 } })];
+    const row = (at: number): Row => ({ found: [match({ x: 24, y: at, width: 354, height: 52 }, 'priority')], over });
+    const played = play({ ...IPHONE, direction, fully: true, maxSwipes: 1 }, [row(y), row(y + 1)]);
+    expect(strokesToward(played)).toEqual([direction]);
+    // a point toward the far edge, and it is the far half's: turned
+    const nudged = [node({ role: 'other', label: 'Bar', rect: { x: 0, y: direction === 'down' ? 406 : 408, width: 402, height: 60 } })];
+    const near = (at: number): Row => ({ ...row(at), over: nudged });
+    expect(strokesToward(play({ ...IPHONE, direction, fully: true, maxSwipes: 1 }, [near(y), near(y + 1)]))).toEqual([direction === 'down' ? 'up' : 'down']);
+  });
+
   it('a read that fails after the stuck turn\'s stroke back strokes back again — as the last read round decided — and the read after it answers the turn', () => {
     const played = play({ ...MEASURED, direction: 'up', fully: true }, [form(-20), form(776), form(776), form(776), { error: 'idb describe-all timed out' }, form(514), form(514)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'down']);

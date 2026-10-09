@@ -254,8 +254,9 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const n = swipesText(o.swipes);
       const last = `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`;
       const back = OPPOSITE[o.lastStroke];
-      // One stroke the other way moved it neither (scroll-rounds.ts#round's stuck turn).
-      const neither = o.otherWay === 'unmoved' ? `, nor does a swipe ${back}` : '';
+      // One stroke the other way moved it neither (scroll-rounds.ts#round's stuck turn) — or none was left to try it with.
+      const neither =
+        o.otherWay === 'unmoved' ? `, nor does a swipe ${back}` : o.otherWay === 'untried' ? `, and swiping ${back} was never tried (no swipe or time was left)` : '';
       // Under something of the app (2026-10-09, scroll-rounds.ts#shortOf) that
       // stays over it at the end of the content: no clearance for a pinned
       // bar. Led by the cover whenever that is what it is short of — a plain

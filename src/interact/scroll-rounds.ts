@@ -1038,24 +1038,26 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * turned away from the bar it was about to clear, and bounced for five
  * strokes where one stopped it (review of the first cut, 2026-10-09). A
  * pinned bar sits at the edge it is pinned to, so the half it lies in is
- * that edge's.
+ * that edge's. A cover centred exactly on the middle lies in neither far
+ * half: not turned for, either way.
  */
 function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect): boolean {
   const top = cover.y <= rect.y;
   const bottom = cover.y + cover.height >= rect.y + rect.height;
   const left = cover.x <= rect.x;
   const right = cover.x + cover.width >= rect.x + rect.width;
-  const above = 2 * cover.y + cover.height < 2 * frame.y + frame.height;
-  const before = 2 * cover.x + cover.width < 2 * frame.x + frame.width;
+  // Twice the centre against twice the middle: whole numbers, no rounding at the boundary.
+  const vertical = 2 * cover.y + cover.height - (2 * frame.y + frame.height);
+  const sideways = 2 * cover.x + cover.width - (2 * frame.x + frame.width);
   switch (direction) {
     case 'down':
-      return above && top && !bottom;
+      return vertical < 0 && top && !bottom;
     case 'up':
-      return !above && bottom && !top;
+      return vertical > 0 && bottom && !top;
     case 'right':
-      return before && left && !right;
+      return sideways < 0 && left && !right;
     case 'left':
-      return !before && right && !left;
+      return sideways > 0 && right && !left;
   }
 }
 
