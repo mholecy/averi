@@ -101,6 +101,8 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
 
     The `✗` line reads `optional step not skipped: its element is present, but the tap was refused — …`.
   - A `fill` whose text did not land: the read-back shows something else (`fill: typed N characters but the field shows M …`), the clear left text twice (`fill: field still shows … after clearing twice`), or the field could not be read again after the focus tap (`fill: could not re-read …`). The field was tapped and may hold partial text, and a half-typed form must not run on. The `✗` line reads `optional step not skipped: its field is present, but its value did not land — …`.
+
+    This is an exception, kept on purpose: a dead device or an `adb` error during an optional fill's read-back fails the flow; elsewhere it is skipped.
   - A `fill` whose value holds a control character (`cannot type U+000A …`). The `✗` line reads `optional step not skipped: averi refused its value before anything was typed — …`.
 
     For each of these three, inside a `reach:` ladder averi then checks `detect` once more: if the rung already reached the state, the call passes. Otherwise the ladder stops there and does NOT escalate to the next rung, even when a later rung might have cleared the screen, because that rung may be the destructive one. Fix the step (`scroll_until` the element first, configure a dismissal, or hide the keyboard in an earlier step) or the screen. For a target pinned under the status bar only the screen's layout can be fixed.
