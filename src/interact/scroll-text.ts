@@ -1,0 +1,263 @@
+import type { DeviceScreen, Rect } from '../adapters/types.js';
+import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { countOf } from '../util/count.js';
+import { UNLOCATED_KEYBOARD } from './keyboard.js';
+import { frameText } from './keyboard-model.js';
+import { absenceError } from './resolve.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+
+/**
+ * Every sentence `scroll_until` says (2026-10-09, the scroll-rounds
+ * deepening): the reply for a stop (`describeScrollResult`, over the result
+ * `scrollResult` makes of a `visible` outcome) and the failure for every
+ * other outcome (`scrollFailure`, one switch over its kind) — rendered here
+ * and nowhere else, from interact/scroll-rounds.ts#ScrollOutcome, which
+ * carries exactly the facts each sentence quotes. Pure. Until that date the
+ * failures were spelled inline in the loop of interact/scroll.ts, the bound's
+ * as a chain of nested ternaries, so a sentence could be pinned only through
+ * a scripted device; now each is a function of a literal.
+ */
+
+/**
+ * What the scroll actually achieved — not just how many swipes it took.
+ *
+ * `swipes` alone was the old return, and it made the tool unable to tell the
+ * truth: the stop condition is INTERSECTION, so a row clipped at the viewport
+ * edge stops the loop and used to be reported as a bare "visible". The caller's
+ * very next step is normally an assert or a screenshot on that rect, i.e. the
+ * one operation a clipped rect silently corrupts.
+ */
+export interface ScrollUntilResult {
+  swipes: number;
+  /** Fraction of the element's area inside the viewport at the stop (0..1) — the screen above the soft keyboard when `keyboard` is shown. */
+  visible: number;
+  /** Viewport edges the element still extends past, [] when fully revealed — `bottom` is the keyboard's top edge when `keyboard` is shown. */
+  clipped: Edge[];
+  /**
+   * The soft keyboard at the stop, when it changed what the result means
+   * (2026-10-08) — absent when none was read, so a run without a keyboard
+   * reports what it always did:
+   * - `shown`: the stop was judged against the screen ABOVE `frame` (the
+   *   highest covered rect, `Cover.topCover`: the band, or a floating
+   *   panel above it), not the whole screen, and that changed it — the
+   *   part under it is not visible, whatever the tree says
+   *   (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md).
+   *   Only where the band changed the stop: a clip at its edge, or — when
+   *   several nodes match — a different match judged (one under the band
+   *   loses to one above it), which can be a clean "fully visible" (round 3
+   *   of the review, 2026-10-08); a band that changes nothing is not applied;
+   * - `unlocated`: the window model's `unlocated` row — the input method
+   *   says a keyboard is shown, the window state gives it no area (one still
+   *   coming up? not measured — keyboard-window.ts#UNLOCATED_KEYBOARD; a
+   *   floating Gboard does not read this way, its panel is read from the
+   *   window's touchable region and covers as the band does) — so nothing
+   *   could be judged against it and the report says so
+   *   (the reading's `unlocated`, ui-tree/keyboard-cover.ts). Only on a clean `fully: true` stop.
+   */
+  keyboard?: { state: 'shown'; frame: Rect } | { state: 'unlocated' };
+  /**
+   * `false` when the stop was reached after a stroke and no read confirmed
+   * it held still (2026-10-08, review round 1): the target still moved on
+   * each of SETTLE_CONFIRM_READS confirming reads (an animated row? a long
+   * fling), or the stop came at the deadline. Absent on a settled stop — a
+   * run that settles reports what it always did. The reply says so.
+   */
+  settled?: false;
+}
+
+/**
+ * Deliberately NOT on ScrollUntilResult: whether the content is exhausted.
+ * It is learnt only by spending swipes and seeing the rects not move — the
+ * `fully: true` path at a clipped stop, and (since 2026-10-08) any path
+ * whose target is in the tree but off the frame — and wherever it is
+ * learnt the answer is "yes, and here is the throw". A returned result
+ * would therefore carry a constitutionally `false` field. Establishing it
+ * at a stop would cost every caller an extra swipe past a stop they already
+ * accepted, which is a worse trade than the clipped fraction already
+ * reported here.
+ */
+
+/**
+ * The result a `visible` outcome reports — `keyboard` and `settled` present
+ * only when set, so a run without a keyboard, or one that settled, reports
+ * what it always did. `shown` only when THIS stop was judged under a band
+ * the witness stood by this round — never a band checked on an earlier one.
+ */
+export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): ScrollUntilResult {
+  const { judged } = o;
+  const keyboard: ScrollUntilResult['keyboard'] =
+    judged.under !== undefined ? { state: 'shown', frame: judged.under.topCover } : o.unlocated ? { state: 'unlocated' } : undefined;
+  return {
+    swipes: o.swipes,
+    visible: judged.visible,
+    clipped: judged.clipped,
+    ...(keyboard !== undefined && { keyboard }),
+    ...(!o.settled && { settled: false as const }),
+  };
+}
+
+/**
+ * How much of an element is on screen, in the terms the caller's next call
+ * cares about. Takes the already-computed edges rather than a rect and a
+ * viewport, so every site that has judged an element once can describe it
+ * without judging it again — including `describeScrollResult`, which holds a
+ * result and no rect at all.
+ */
+function describeClip(edges: readonly string[], visible: number, topCover?: Rect): string {
+  // Never round a clipped element up to a reassuring 100%: the whole point of
+  // the line is that something is missing.
+  const pct = Math.min(Math.round(visible * 100), 99);
+  const where = topCover === undefined ? 'the viewport' : `the viewport above the soft keyboard over ${frameText(topCover)}`;
+  return `CLIPPED at ${edges.join('/')}, ${pct}% of it is in ${where}`;
+}
+
+/** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
+const swipesText = (n: number): string => countOf(n, 'swipe');
+
+/** The honest one-line summary both call sites print. */
+export function describeScrollResult(r: ScrollUntilResult): string {
+  const n = swipesText(r.swipes);
+  // `shown` comes where the band changed the stop — a clip at its edge, or a
+  // different match judged, which can be clean; `unlocated` only with a
+  // clean `fully: true` stop (scroll-rounds.ts#round).
+  const topCover = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
+  const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
+  if (r.clipped.length === 0) {
+    const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
+    const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
+    return `fully visible after ${n}${above}${unlocated}${moving}`;
+  }
+  return (
+    `visible after ${n} — ${describeClip(r.clipped, r.visible, topCover)}` +
+    `. A rect assert or screenshot on this element will measure the CLIPPED box${moving}`
+  );
+}
+
+/** The `settled: false` note — what the reader should know before measuring the element. */
+const STILL_MOVING = 'still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match';
+
+/**
+ * How to judge the whole screen again — the scroll's own sentence, by what
+ * the adapter can hide a keyboard with (`KeyboardRemedy`, the reading's).
+ * Its own, not the pixel poll's or the guard's: before a scroll the useful
+ * advice is to hide the keyboard and scroll again. Names MCP tools and "a
+ * flow", the deliberate exception recorded in keyboard-window.ts.
+ */
+function hideToJudgeWholeScreen({ dismissal, advice }: KeyboardRemedy): string {
+  return dismissal === 'back'
+    ? 'to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again'
+    : 'to reach it with the keyboard down, hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and scroll again; ' +
+        cannotHide(advice);
+}
+
+/** What the stop judged against, for "never intersected …". */
+const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
+  cover?.above === undefined
+    ? `${viewport.width}x${viewport.height} viewport`
+    : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
+
+/** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
+const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);
+
+/**
+ * The failure for every outcome but `visible`, and its class: `stuck` a
+ * plain Error (the element was there and seen); `covered` and `bound`
+ * through resolve.ts#absenceError — ElementNotFoundError only when no read
+ * at any swipe held a match and the last read succeeded, so an `optional:`
+ * scroll_until to an element not on this screen is skipped "(not present)"
+ * like a tap or a fill would be (2026-10-08). `describe` is the target as
+ * the caller spelled it (resolve.ts#describeTarget).
+ */
+export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
+  switch (o.kind) {
+    case 'stuck': {
+      const { judged, viewport } = o;
+      const n = swipesText(o.swipes);
+      // Clipped at the keyboard's edge at the end of the content: the
+      // keyboard, not the layout, is what hides the rest — a container that
+      // does not resize for it keeps its last rows under it. Said as such,
+      // with how to hide it; the layout-defect wording only when the
+      // keyboard is not the edge in question.
+      if (judged.under !== undefined && judged.clipped.includes('bottom')) {
+        return new Error(
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
+            `${describeClip(judged.clipped, judged.visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
+            `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
+            `stays clipped with the keyboard down is it a layout defect. ` +
+            `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+        );
+      }
+      return new Error(
+        `scroll_until ${describe} failed after ${n} — ` +
+          `element is in the viewport but ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)}, ` +
+          `and the content is exhausted: swiping ${o.lastStroke} no longer moves it. ` +
+          `The element cannot be fully revealed — that is a layout defect ` +
+          `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
+          `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+      );
+    }
+    case 'covered': {
+      // The absence rule holds here too (review 2026-10-08): a target no
+      // read has matched is ElementNotFoundError, so an `optional:` step is
+      // skipped "(not present)" — with the keyboard named, since no swipe
+      // could look further.
+      const { cover, viewport } = o;
+      const seenAs = o.evidence.sighted ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
+      return absenceError(
+        `scroll_until ${describe} failed after ${swipesText(o.swipes)} — ${seenAs}; the soft keyboard over ` +
+          `${frameText(cover.topCover)} ${cover.topCover.y + cover.topCover.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
+          hideToJudgeWholeScreen(cover.remedy),
+        o.evidence,
+      );
+    }
+    case 'bound': {
+      const turned =
+        o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), so the next was drawn the other way` : '';
+      // The keyboard, when any round applied one: the reader must not take a
+      // scroll that worked around it — or one it hid the element under — for
+      // a wrong selector (the bug note's 15 s "never appeared").
+      const shown =
+        o.keyboard !== undefined
+          ? `. The soft keyboard was up over ${frameText(o.keyboard.cover.topCover)} in ${o.keyboard.rounds} of the ${o.keyboard.read} rounds read: ` +
+            `in those, visibility was judged, and the swipe drawn, in the screen above it — ${hideToJudgeWholeScreen(o.keyboard.cover.remedy)}`
+          : '';
+      const unlocated = o.unlocated ? `; ${UNLOCATED_KEYBOARD} — the swipes may have landed on it; hide or dock it and scroll again` : '';
+      return absenceError(`scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}`, o.evidence);
+    }
+  }
+}
+
+/** Which bound ended it, as the failure's cause. */
+function boundText(by: BoundBy, swipes: number): string {
+  switch (by.of) {
+    case 'exhausted':
+      return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`;
+    case 'maxSwipes':
+      return `after ${swipesText(swipes)} (maxSwipes)`;
+    case 'timeout':
+      return `after ${by.timeoutMs}ms (timeout)`;
+  }
+}
+
+/** What the target was short of at the bound — the one switch that was a chain of nested ternaries in the loop until 2026-10-09. */
+function shortText(short: Shortfall): string {
+  switch (short.of) {
+    case 'readFailed':
+      return `last UI tree read failed: ${short.error.message}`;
+    case 'clipped': {
+      const { judged } = short;
+      return `element reached the viewport but stayed ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)} (last rect ${JSON.stringify(judged.node.rect)})`;
+    }
+    case 'absent':
+      return 'element never appeared in the tree';
+    case 'gone':
+      return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
+    case 'offFrame': {
+      const offFrame = `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
+      const rect = `(last rect ${JSON.stringify(short.rect)})`;
+      return short.inFrameAfter !== undefined
+        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, off ${offFrame} at the last read ${rect}`
+        : `element in tree but never intersected ${offFrame} ${rect}`;
+    }
+  }
+}

@@ -1,14 +1,13 @@
-import type { DeviceAdapter, DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
-import { clippedEdges, sameRectWithinPixel, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { readKeyboard, type KeyboardCover, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
-import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import type { DeviceAdapter, Stroke } from '../adapters/types.js';
+import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
-import { UNLOCATED_KEYBOARD } from './keyboard.js';
-import { frameText } from './keyboard-model.js';
-import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
-import { judgingScreen, sameStroke, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
-import { countOf } from '../util/count.js';
+import { describeTarget, findTarget, type Target } from './resolve.js';
+import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
+import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
+import { judgingScreen, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction } from './swipe.js';
+
+export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -30,512 +29,28 @@ export interface ScrollOptions {
 }
 
 /**
- * What the scroll actually achieved — not just how many swipes it took.
- *
- * `swipes` alone was the old return, and it made the tool unable to tell the
- * truth: the stop condition is INTERSECTION, so a row clipped at the viewport
- * edge stops the loop and used to be reported as a bare "visible". The caller's
- * very next step is normally an assert or a screenshot on that rect, i.e. the
- * one operation a clipped rect silently corrupts.
+ * What a scroll needs of a device (2026-10-09): the tree, the screen's size,
+ * the stroke, and the keyboard's oracle and advice for the round's reading
+ * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
+ * adapter can scroll, and a reader sees what a scroll can touch. Every
+ * reader the driver hands it to takes a `Pick` of its own
+ * (`readTreeOrError`, `judgingScreen`, `screenBox`, `readKeyboard`).
  */
-export interface ScrollUntilResult {
-  swipes: number;
-  /** Fraction of the element's area inside the viewport at the stop (0..1) — the screen above the soft keyboard when `keyboard` is shown. */
-  visible: number;
-  /** Viewport edges the element still extends past, [] when fully revealed — `bottom` is the keyboard's top edge when `keyboard` is shown. */
-  clipped: Edge[];
-  /**
-   * The soft keyboard at the stop, when it changed what the result means
-   * (2026-10-08) — absent when none was read, so a run without a keyboard
-   * reports what it always did:
-   * - `shown`: the stop was judged against the screen ABOVE `frame` (the
-   *   highest covered rect, `Cover.topCover`: the band, or a floating
-   *   panel above it), not the whole screen, and that changed it — the
-   *   part under it is not visible, whatever the tree says
-   *   (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md).
-   *   Only where the band changed the stop: a clip at its edge, or — when
-   *   several nodes match — a different match judged (one under the band
-   *   loses to one above it), which can be a clean "fully visible" (round 3
-   *   of the review, 2026-10-08); a band that changes nothing is not applied;
-   * - `unlocated`: the window model's `unlocated` row — the input method
-   *   says a keyboard is shown, the window state gives it no area (one still
-   *   coming up? not measured — keyboard-window.ts#UNLOCATED_KEYBOARD; a
-   *   floating Gboard does not read this way, its panel is read from the
-   *   window's touchable region and covers as the band does) — so nothing
-   *   could be judged against it and the report says so
-   *   (the reading's `unlocated`, ui-tree/keyboard-cover.ts). Only on a clean `fully: true` stop.
-   */
-  keyboard?: { state: 'shown'; frame: Rect } | { state: 'unlocated' };
-  /**
-   * `false` when the stop was reached after a stroke and no read confirmed
-   * it held still (2026-10-08, review round 1): the target still moved on
-   * each of SETTLE_CONFIRM_READS confirming reads (an animated row? a long
-   * fling), or the stop came at the deadline. Absent on a settled stop — a
-   * run that settles reports what it always did. The reply says so.
-   */
-  settled?: false;
-}
-
-/**
- * Deliberately NOT on ScrollUntilResult: whether the content is exhausted.
- * It is learnt only by spending swipes and seeing the rects not move — the
- * `fully: true` path at a clipped stop, and (since 2026-10-08) any path
- * whose target is in the tree but off the frame — and wherever it is
- * learnt the answer is "yes, and here is the throw". A returned result
- * would therefore carry a constitutionally `false` field. Establishing it
- * at a stop would cost every caller an extra swipe past a stop they already
- * accepted, which is a worse trade than the clipped fraction already
- * reported here.
- */
-
-/**
- * How much of an element is on screen, in the terms the caller's next call
- * cares about. Takes the already-computed edges rather than a rect and a
- * viewport, so every site that has judged an element once can describe it
- * without judging it again — including `describeScrollResult`, which holds a
- * result and no rect at all.
- */
-function describeClip(edges: readonly string[], visible: number, topCover?: Rect): string {
-  // Never round a clipped element up to a reassuring 100%: the whole point of
-  // the line is that something is missing.
-  const pct = Math.min(Math.round(visible * 100), 99);
-  const where = topCover === undefined ? 'the viewport' : `the viewport above the soft keyboard over ${frameText(topCover)}`;
-  return `CLIPPED at ${edges.join('/')}, ${pct}% of it is in ${where}`;
-}
-
-/** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
-const swipesText = (n: number): string => countOf(n, 'swipe');
-
-/** The honest one-line summary both call sites print. */
-export function describeScrollResult(r: ScrollUntilResult): string {
-  const n = swipesText(r.swipes);
-  // `shown` comes where the band changed the stop — a clip at its edge, or a
-  // different match judged, which can be clean; `unlocated` only with a
-  // clean `fully: true` stop (scrollUntilVisible).
-  const topCover = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
-  const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
-  if (r.clipped.length === 0) {
-    const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
-    const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
-    return `fully visible after ${n}${above}${unlocated}${moving}`;
-  }
-  return (
-    `visible after ${n} — ${describeClip(r.clipped, r.visible, topCover)}` +
-    `. A rect assert or screenshot on this element will measure the CLIPPED box${moving}`
-  );
-}
-
-/** The `settled: false` note — what the reader should know before measuring the element. */
-const STILL_MOVING = 'still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match';
-
-/**
- * How to judge the whole screen again — the scroll's own sentence, by what
- * the adapter can hide a keyboard with (`KeyboardRemedy`, the reading's).
- * Its own, not the pixel poll's or the guard's: before a scroll the useful
- * advice is to hide the keyboard and scroll again. Names MCP tools and "a
- * flow", the deliberate exception recorded in keyboard-window.ts.
- */
-function hideToJudgeWholeScreen({ dismissal, advice }: KeyboardRemedy): string {
-  return dismissal === 'back'
-    ? 'to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again'
-    : 'to reach it with the keyboard down, hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and scroll again; ' +
-        cannotHide(advice);
-}
-
-type Edge = 'top' | 'bottom' | 'left' | 'right';
-
-/**
- * A shown soft keyboard as the round may apply it (2026-10-08): its frame,
- * the part of the screen it leaves — everything above its TOP edge, full
- * width — and what the adapter can do about it. Above the top edge, not
- * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
- * band from y 539/589 of 874) runs to the bottom, so the two are the same;
- * a band that does not costs content below it, which can only make the
- * scroll swipe more or fail naming the keyboard — never report as visible
- * what is under it. `above` undefined: the band starts at or above y 0 and
- * leaves nothing (a full-screen extract-mode IME, unmeasured).
- *
- * `topCover` is the HIGHEST covered rect (`KeyboardCover.top`) — named so by the
- * code review of round 2 (it was `band`, and callers read `band.y` as the
- * keyboard's top): since 2026-10-08 not always the inset band: with a
- * floating Gboard (measured that day, API 33) it is the panel,
- * [359,1269][1040,1912], 681 px wide and mid-screen. The
- * invariant: only its `.y` is meaningful as a cut — the rect need not be
- * full width nor reach the bottom; the rest of it is quoted in messages.
- * The cost of the full-width cut, accepted (it never certifies a covered
- * target): content beside the panel (x < 359 there) and in the gap between
- * the panel and the strip below it is never judged visible, so a target
- * there that cannot be scrolled above the panel fails `scroll_until` with
- * the keyboard named, though the tap guard — which tests the panel's rect
- * itself — would tap it; and a panel dragged near the top leaves a short
- * stroke box (a residual).
- */
-interface Cover {
-  topCover: Rect;
-  above: DeviceScreen | undefined;
-  remedy: KeyboardRemedy;
-}
-
-/** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
-function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
-  if (shown === undefined) return undefined;
-  // The highest covered rect, not always the inset band (2026-10-08): a
-  // floating Gboard's panel mid-screen above its 132-px strip
-  // (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md) — so a target
-  // behind it is judged under the cover and the stroke starts above it. Full
-  // width above its top, as for any band that does not reach the sides.
-  const topCover = shown.top;
-  if (topCover.y >= viewport.height) return undefined;
-  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: shown.remedy };
-}
-
-/** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the cover it was judged under (none for a whole-screen judgement or a keyboard-side node). */
-interface Judged {
-  node: UiNode;
-  visible: number;
-  clipped: Edge[];
-  under?: Cover;
-}
-
-/**
- * The MOST revealed match, not the first: an id can sit on a container and
- * its child, and reporting the clipped one of the two would invent a defect.
- * Under a cover, a keyboard-side node (the round's reading's `ofKeyboard`,
- * one walk per round) is judged against
- * the whole screen; every other node against the part above the band, or
- * scores 0 when the band leaves none.
- */
-function judge(found: readonly UiNode[], viewport: DeviceScreen, cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean }): Judged | undefined {
-  const scored = found.map((node): Judged => {
-    if (cover === undefined || cover.keyboardSide(node)) {
-      return { node, visible: visibleFractionInViewport(node.rect, viewport), clipped: clippedEdges(node.rect, viewport) };
-    }
-    const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover };
-    return { node, visible: visibleFractionInViewport(node.rect, above), clipped: clippedEdges(node.rect, above), under: cover.cover };
-  });
-  return scored.sort((a, b) => b.visible - a.visible)[0];
-}
-
-/** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], boxes: readonly DeviceScreen[]): Judged | undefined {
-  return boxes
-    .map((box) => judge(found, box))
-    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || j.visible > best.visible) ? j : best), undefined);
-}
-
-/** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
-const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== undefined && j.visible > 0 && (!fully || j.clipped.length === 0);
-
-/**
- * The two judgements say the same thing about the same node. `clipped` is
- * not compared: the box above a band lies inside the viewport, so the same
- * node scoring the same fraction against both has no area between the
- * band's top and the screen's bottom, and its edges agree (review round 1,
- * 2026-10-08: the comparison was dead — a mutation dropping it survived).
- */
-const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
-  a === undefined || b === undefined ? a === b : a.node === b.node && a.visible === b.visible;
-
-/** What the stop judged against, for "never intersected …". */
-const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
-  cover?.above === undefined
-    ? `${viewport.width}x${viewport.height} viewport`
-    : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
-
-/**
- * How many reads a stop reached after a stroke may spend waiting for the
- * target to hold still before it is reported unsettled (2026-10-08, the iOS
- * device check of docs/bugs/2026-10-08-scroll-until-ignores-android-soft-
- * keyboard.md). A stop after a stroke is CONFIRMED: one more read after a
- * further settle, in which the target's rect is unchanged and the stop
- * still holds. Measured under WDA: the 400 ms settle read caught a
- * SwiftUI form mid-fling with the row inside the viewport — "fully visible
- * after 1 swipe" — and a read 1 s later had it at y -48 / -121 / -133,
- * behind the top bar, three runs of three. What it costs: each confirming
- * read is a round like any other — one more settle, one more tree read
- * and, on Android, what a round's keyboard reading costs: the window query,
- * the touchable-region query too while the keyboard reads shown, and a
- * witness query when the band matters on that read (1 to 3 adb calls;
- * ui-tree/keyboard-cover.ts has the table); a stop at 0
- * swipes sent no stroke and spends none. A target still
- * moving inside the viewport is read again, up to this many reads a
- * stroke, then reported with `settled: false` and a note saying so: a
- * fling is over well inside 3 × 400 ms plus the reads, and a target that
- * never holds still (an animated row, a marquee) must not hold the scroll
- * until its timeout. The confirming reads count against `timeoutMs` (a stop
- * reached at the deadline is reported unsettled, unconfirmed), not against
- * `maxSwipes`: they send nothing.
- */
-const SETTLE_CONFIRM_READS = 3;
-
-/**
- * How many strokes in a row — the same stroke each time — must leave every
- * match where it was before a target in the tree but off the frame is
- * called "content exhausted" (2026-10-08). Measured on Android: the form's
- * last field, wholly under an IME its container does not resize for,
- * swiped for the whole 15 s. Two, not one (review round 1): a single
- * stroke that moves nothing can be a transient — the first touch
- * dismissing a snackbar, a stale tree read, a stroke drawn whole-screen
- * onto an IME that was still coming up while the witness denied the stale
- * window — after which the next stroke scrolls. Only the same stroke
- * counts twice: a stroke drawn differently (a band applied, the stroke
- * turned round) is a new attempt.
- */
-const UNMOVED_STROKES_EXHAUST = 2;
-
-/** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
-const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: 'right', right: 'left' };
-
-/**
- * The target lies BEYOND the edge of `frame` that a scroll toward
- * `direction` moves content out through — past that far edge, or across
- * it — and not across the near one: for content below (down) the content
- * moves up, so its top above the frame's top and its bottom inside the
- * frame or above it; for content above (up), mirrored at the frame's
- * bottom (the keyboard's top edge, when the frame is the screen above
- * one); likewise sideways. Content comes in through the near edge, so a
- * target that was ever read short of this and is now beyond it was carried
- * across the frame by a fling (`Motion.nextStroke`; measured under
- * WDA: 613 → -357 in one swipe; 681 → -48 for a 52-pt row whose last 4 pt
- * stay on screen behind the top bar) — and swiping the same way again only
- * pushes it further out. A target clipped at BOTH edges (taller than the
- * frame) is not beyond either: turning back could not help it.
- */
-function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
-  const top = rect.y < frame.y;
-  const bottom = rect.y + rect.height > frame.y + frame.height;
-  const left = rect.x < frame.x;
-  const right = rect.x + rect.width > frame.x + frame.width;
-  switch (direction) {
-    case 'down':
-      return top && !bottom;
-    case 'up':
-      return bottom && !top;
-    case 'right':
-      return left && !right;
-    case 'left':
-      return right && !left;
-  }
-}
-
-/** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). Motion's own fact, set by `stroked` and `confirming`. */
-type Since = 'start' | 'stroke' | 'settle';
-
-/** What one read says about motion (`Motion.observe`). */
-interface Observed {
-  /** The judged match is where the previous read's judged match was. */
-  bestUnmoved: boolean;
-  /**
-   * UNMOVED_STROKES_EXHAUST identical strokes in a row left the JUDGED match
-   * where it was — the `fully: true` clipped stop's "content exhausted".
-   * The judged match alone (review round 2): a visible clipped match that
-   * does not move is the defect this reports; two strokes, not one, for
-   * the transients the exhausted rule waits out.
-   */
-  stuck: boolean;
-  /** UNMOVED_STROKES_EXHAUST identical strokes in a row left EVERY match where it was, and the target is off the frame. */
-  exhausted: boolean;
-}
-
-/** What a stop is, by the confirming rule (SETTLE_CONFIRM_READS): settled; worth one more read; or reported unsettled. */
-type StopVerdict = 'settled' | 'confirm' | 'unsettled';
-
-/** The next stroke: where the content lies for it, and the factor its reach is scaled by (`shortenStroke`). */
-interface NextStroke {
-  toward: Direction;
-  reach: number;
-}
-
-/**
- * The scroll's memory of how the target moved, read for read — the one
- * owner of every rule that compares a read with an earlier one
- * (2026-10-08, review round 1: they were loose variables of the loop):
- * what each read followed, the stuck and exhausted tests, the confirming
- * reads, the turn after a fling and its shortened stroke, and the swipe
- * after which the target was last in the frame.
- *
- * Per round the loop calls `beginRead` once, then — when the tree read —
- * `observe`; at a stop `stopVerdict` (and `confirming` to spend a read);
- * before a stroke `nextStroke`, after it `stroked`.
- */
-class Motion {
-  private since: Since = 'start';
-  /** What the read being judged followed — `since` as `beginRead` found it. */
-  private current: Since = 'start';
-  /** Every match's rect at the last read that read, and the judged match's at the last read that had one. */
-  private prevRects: Rect[] | undefined;
-  private prevBest: Rect | undefined;
-  /** Identical strokes in a row after which every match, and the judged match, stayed put — the stroke the streak was counted for, and the last one drawn (`sameStroke`). */
-  private allUnmovedStrokes = 0;
-  private bestUnmovedStrokes = 0;
-  private streakDrawn: Stroke | undefined;
-  private lastDrawn: Stroke | undefined;
-  /** Some read saw the target SHORT of the far edge (`beyondFarEdge`) — so a later read beyond it means a fling carried it across. */
-  private seenShort = false;
-  /**
-   * The last read that READ found the target beyond the far edge, after an
-   * earlier read saw it short of it: the next stroke turns. Kept across a
-   * read that failed — that round strokes as the last read round decided,
-   * as it keeps that round's stroke box (`lastReadCover`); cleared by a read
-   * that does not find the target (a lazy list dropped it: nothing to turn
-   * for).
-   */
-  private carriedPast = false;
-  private confirmReads = 0;
-  private strokesSent = 0;
-  /** Where the content lay for the last stroke sent: the caller's direction, or its opposite after a fling past the target. For "swiping … no longer moves it". */
-  lastStroke: Direction;
-  /** Direction changes — a stroke drawn the other way from the one before — for the shortening and the failure text. */
-  turns = 0;
-  /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
-  inFrameAfter: number | undefined;
-
-  constructor(private readonly direction: Direction) {
-    this.lastStroke = direction;
-  }
-
-  /** A read is starting: what it follows is fixed for this round. */
-  beginRead(): void {
-    this.current = this.since;
-  }
-
-  /** The read being judged is a confirming read (nothing was sent since the last). */
-  get confirmingRead(): boolean {
-    return this.current === 'settle';
-  }
-
-  /**
-   * One read that read: every match found, the one judged, the frames it
-   * was judged in (the screen above an applied keyboard, or each box that
-   * counts), and the swipe count. Where the target stands against the far
-   * edge is recorded HERE, on every read — a stop round strokes nothing,
-   * and a target seen short only at a stop the confirming read then lost
-   * must still turn the next stroke (review round 2).
-   */
-  observe(found: readonly UiNode[], best: Judged | undefined, frames: readonly Rect[], swipes: number): Observed {
-    const rects = found.map((n) => ({ ...n.rect }));
-    const bestUnmoved = best !== undefined && this.prevBest !== undefined && sameRectWithinPixel(this.prevBest, best.node.rect);
-    if (this.current === 'stroke') {
-      // Every match, not only the judged one, for "exhausted" (review round
-      // 1): with several matches off the frame the judged one is the first
-      // in tree order, which can be a static duplicate (another page, a
-      // hidden copy) while the real one moved.
-      const allUnmoved = this.prevRects !== undefined && sameRects(this.prevRects, rects);
-      const same = this.streakDrawn !== undefined && this.lastDrawn !== undefined && sameStroke(this.streakDrawn, this.lastDrawn);
-      this.allUnmovedStrokes = !allUnmoved ? 0 : this.allUnmovedStrokes > 0 && same ? this.allUnmovedStrokes + 1 : 1;
-      this.bestUnmovedStrokes = !bestUnmoved ? 0 : this.bestUnmovedStrokes > 0 && same ? this.bestUnmovedStrokes + 1 : 1;
-      this.streakDrawn = this.lastDrawn;
-    }
-    this.prevRects = rects;
-    this.carriedPast = false;
-    if (best !== undefined) {
-      this.prevBest = { ...best.node.rect };
-      // In EVERY frame the round judged in: a target beyond the far edge one
-      // way up but across both edges the other is not turned for.
-      const beyond = frames.every((f) => beyondFarEdge(best.node.rect, this.direction, f));
-      this.carriedPast = beyond && this.seenShort;
-      if (!beyond) this.seenShort = true;
-      if (best.visible > 0) this.inFrameAfter = swipes;
-    }
-    const offFrame = best !== undefined && best.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
-    return {
-      bestUnmoved,
-      stuck: this.current === 'stroke' && this.bestUnmovedStrokes >= UNMOVED_STROKES_EXHAUST,
-      exhausted: this.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST && offFrame,
-    };
-  }
-
-  /** A stop on this read: settled (0 swipes, or a confirming read found it unmoved), worth another read, or reported unsettled. */
-  stopVerdict(o: Observed, swipes: number, deadline: number): StopVerdict {
-    if (swipes === 0 || (this.current === 'settle' && o.bestUnmoved)) return 'settled';
-    return this.mayConfirm(deadline) ? 'confirm' : 'unsettled';
-  }
-
-  /** Another confirming read is within the stroke's budget and the deadline. */
-  mayConfirm(deadline: number): boolean {
-    return this.confirmReads < SETTLE_CONFIRM_READS && Date.now() < deadline;
-  }
-
-  /** A confirming read is being spent: the next read follows a settle, not a stroke. */
-  confirming(): void {
-    this.confirmReads++;
-    this.since = 'settle';
-  }
-
-  /**
-   * The next stroke (2026-10-08, the WDA device check): toward the caller's
-   * direction — unless this read found a fling carried the target across
-   * the frame since a read saw it short of the far edge (`observe`;
-   * measured 613 → -357 in one swipe, then five more swipes DOWN into
-   * exhausted content). Then the other way, to bring it back; a stroke that
-   * throws it back past the near edge leaves it short again, and the next
-   * stroke goes the caller's way. A target read beyond the far edge before
-   * any read saw it short of it — above the screen on round 0 of a scroll
-   * down, and every round after while it stays there — is the caller's
-   * direction to honour, as it always was. Needs the target to STAY in the
-   * tree once off the frame: a lazy list (Android RecyclerView/LazyColumn,
-   * iOS List/UITableView under WDA) drops it, and then nothing turns.
-   *
-   * Converging is deliberate (review round 2): every direction change
-   * halves the reach of every stroke after it (`reach`, applied with
-   * swipe.ts#shortenStroke — the touch-down kept, never under twice
-   * TOUCH_SLOP nor 3 % of the box's side along it). A fling is the app's: with the measured content-down fling
-   * (−729 to −970 pt for the 344-pt stroke) and a content-up fling of the
-   * same size, full strokes both ways ping-pong round the target to
-   * `maxSwipes`; with the reach halved per turn the distance left shrinks
-   * geometrically whatever the app flings. A turn that overshoots too is
-   * turned again, not given up — giving up would swipe on into content the
-   * target has passed — and the failure counts the turns.
-   *
-   * The reach is deliberately NEVER restored after a turn, not even on
-   * strokes back toward the caller's direction (review round 3): a turn
-   * means the target was within one move of the frame and a full stroke
-   * just carried it past — the distance left is less than what that stroke
-   * moves. Restoring the reach would draw that stroke again and bring the
-   * oscillation back. The cost: a scroll that turned once early keeps the
-   * shorter strokes (and spends more of `maxSwipes`) if the target then
-   * turns out to be further away than one move.
-   */
-  nextStroke(): NextStroke {
-    const toward = this.carriedPast ? OPPOSITE[this.direction] : this.direction;
-    return { toward, reach: 0.5 ** (this.isTurn(toward) ? this.turns + 1 : this.turns) };
-  }
-
-  /** A stroke toward `toward` would be a turn: drawn the other way from the last one sent — the one test `nextStroke`'s reach and `stroked`'s count share. */
-  private isTurn(toward: Direction): boolean {
-    return this.strokesSent > 0 && toward !== this.lastStroke;
-  }
-
-  /** A stroke was sent: toward `toward`, drawn as `stroke`. */
-  stroked(toward: Direction, stroke: Stroke): void {
-    if (this.isTurn(toward)) this.turns++;
-    this.strokesSent++;
-    this.lastStroke = toward;
-    this.lastDrawn = stroke;
-    this.confirmReads = 0;
-    this.since = 'stroke';
-  }
-}
-
-/** The same set of rects, each within a pixel — every match where it was. Empty sets say nothing. */
-function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
-  if (a.length === 0 || a.length !== b.length) return false;
-  const left = [...a];
-  return b.every((r) => {
-    const i = left.findIndex((l) => sameRectWithinPixel(l, r));
-    if (i < 0) return false;
-    left.splice(i, 1);
-    return true;
-  });
-}
-
-/** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
-const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);
+export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice'>;
 
 /**
  * Swipe until the element is present AND visibly inside the viewport
  * (ARCHITECTURE.md §4, C1). Throws with a diagnosis of the last tree.
+ *
+ * THE DRIVER (2026-10-09, the scroll-rounds deepening): the production
+ * adapter of interact/scroll-rounds.ts#round. It owns every I/O of the
+ * scroll — the tree read, the judging screen, the round's keyboard reading
+ * and its two questions, the stroke's box and points, the swipe, the
+ * settle — and none of its rules: each round it gathers what it saw into a
+ * `RoundSeen`, asks `round` what that means, and does the step. What the
+ * rounds decide, in what order, and how many there can be, is
+ * scroll-rounds.ts's doc; what the scroll says, scroll-text.ts's. The
+ * device behaviour that shaped those rules is recorded below.
  *
  * `fully: true` raises the bar from "intersects" to "entirely inside", and
  * keeps swiping until it is — then fails naming the shortfall when the content
@@ -573,7 +88,7 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * its window's region, for a floating panel — and three when the band
  * changes the round, the witness below; the WDA band on iOS, no device read) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
- * shown keyboard (`coverOf`): an element under it scores 0 or is clipped at
+ * shown keyboard (scroll-rounds.ts#coverOf): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke keeps clear of it
  * (`swipeVectorAbove`: the whole screen's stroke, its point on or near the
  * keyboard pulled up — since the iOS device check, below), so it starts on
@@ -644,7 +159,7 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  *   inside the keyboard clearance nor higher than without a keyboard; the
  *   length is not cut. Only the covered area's top edge (`topCover.y`) is read:
  *   the band need not be full width nor reach the bottom.
- * - The stop is SETTLED (`SETTLE_CONFIRM_READS`, `Motion.stopVerdict`): a
+ * - The stop is SETTLED (scroll-rounds.ts#SETTLE_CONFIRM_READS): a
  *   stop reached after a stroke is reported only once a further read, after
  *   another settle, finds the target where the stop's read did and the stop
  *   still holds — under WDA the settle read caught a flung row inside the
@@ -653,14 +168,14 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  *   one that never holds still, or a stop at the deadline, is reported with
  *   `settled: false`. A fling that carried the target across the frame —
  *   beyond its far edge, after a read saw it short of that — turns the next
- *   stroke round (`Motion.nextStroke`), instead of swiping on into
+ *   stroke round (scroll-rounds.ts#nextStroke), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
  *   moved nothing), and every turn halves the reach of the strokes after it
  *   (review round 2: equal flings both ways ping-ponged to `maxSwipes`); it
  *   needs the target to stay in the tree, so a lazy list gets no turn. A
  *   failure counts the turns, and one after the target was in the frame
  *   says so rather than "never".
- * - Exhausted off the frame (`UNMOVED_STROKES_EXHAUST`, `Motion.observe`): a
+ * - Exhausted off the frame (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,
  *   fails then, with the stop bound's words (they name the keyboard and the
@@ -676,7 +191,7 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * method says shown, the window state gives it no area: one still coming
  * up? not measured. Not the floating keyboard any more: measured on API 33,
  * a floating Gboard keeps a band and its panel is read from the window's
- * touchable region, `coverOf` above): on a failed stop, and on a
+ * touchable region, `coverOf`): on a failed stop, and on a
  * `fully: true` stop — where the answer changes what the reader does next —
  * a window reading `hidden` is checked once against the input method
  * (the reading's `unlocated`); when it says shown, the report says the keyboard
@@ -686,266 +201,88 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * on every one buys a sentence nobody acts on).
  */
 export async function scrollUntilVisible(
-  adapter: DeviceAdapter,
+  adapter: ScrollAdapter,
   target: Target,
   opts: ScrollOptions = {},
 ): Promise<ScrollUntilResult> {
-  const direction = opts.direction ?? 'down';
-  const maxSwipes = opts.maxSwipes ?? DEFAULT_MAX_SWIPES;
-  const fully = opts.fully === true;
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS;
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
   // The device's screen, read before the loop, so a device whose screen
-  // cannot be read fails here rather than as "never intersected".
+  // cannot be read fails here rather than as "never intersected" — and the
+  // frame the rounds judge in until a round reads one of its own.
   const asBuilt = await adapter.viewport();
-  // The visibility reference frame (2026-10-08, review of the off-screen tap
-  // refusal, M2): `judgingScreen` over this round's tree — the tap's screen
-  // owner too (resolve.ts#tapScreen), so a stop the scroll calls visible is
-  // judged on the screen the next tap is judged on, by construction: the
-  // box (turned in landscape as the stroke already was; what a failure
-  // quotes) and the boxes that count (`ScreenBox.boxes`: either way up only
-  // when a turn is suggested but not witnessed — a walked width, an
-  // unreliable landscape window; never on a portrait tree that suggests no
-  // turn, where a carousel item past the right edge must make the scroll
-  // swipe). Until then it was `viewport()` as built: in landscape a button
-  // at y 500 of a 874x402 window was "fully visible" on a 402x874 panel and
-  // the tap after it refused. A round whose tree did not read, or that has
-  // no box at all (a 0×0 device and no window), keeps the last frame — the
-  // device as built until a round had one. The keyboard cover is cut from the box as chosen: a
-  // band is in the tree's coordinates, and above it is the box's width.
-  let frame: JudgingScreen = { box: { x: 0, y: 0, ...asBuilt }, boxes: [{ x: 0, y: 0, ...asBuilt }] };
-  const frameOf = async (read: TreeRead): Promise<JudgingScreen> => (await judgingScreen(adapter, read)) ?? frame;
-
-  const deadline = Date.now() + timeoutMs;
-  let lastFound: UiNode[] = [];
-  let everFound = false;
-  let treesRead = 0;
-  let lastReadError: Error | undefined;
-  // How the target moved, read for read (`Motion`): a swipe that does not
-  // move the element is the only honest signal that the container has
-  // nothing left to scroll — "give it another swipe" against "this element
-  // CANNOT be fully revealed" (a real layout defect) or "it is off the
-  // frame for good" — and a stop after a stroke holds only once a read
-  // finds it still.
-  const motion = new Motion(direction);
-  /** The last cover any round applied, and how many rounds applied one — for the failure text. */
-  let lastCover: Cover | undefined;
-  let coveredRounds = 0;
-  /** The cover the last round whose tree READ applied — undefined when that round applied none — for the stroke of a round whose tree did not read. */
-  let lastReadCover: Cover | undefined;
-  /** On a failed or `fully: true` stop only: the `unlocated` row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
-  const unlocatedAt = async (round: KeyboardReading | undefined): Promise<boolean> => round !== undefined && (await round.unlocated());
-  /** Spend a confirming read: settle again, send nothing, read again. */
-  const settleAgain = async (): Promise<void> => {
-    motion.confirming();
-    await sleep(settleMs);
+  const started = Date.now();
+  const rules = {
+    direction: opts.direction ?? 'down',
+    maxSwipes: opts.maxSwipes ?? DEFAULT_MAX_SWIPES,
+    fully: opts.fully === true,
+    timeoutMs: opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS,
   };
-  let swipes = 0;
+  let state: Rounds = startRounds(rules, asBuilt);
+  let drawn: Stroke | undefined;
   for (;;) {
     // A failed read is a miss, not a failure — see readTreeOrError.
     const read = await readTreeOrError(adapter);
-    const { tree, error } = read;
-    lastReadError = error;
-    motion.beginRead();
-    if (tree !== undefined) {
-      treesRead++;
-      frame = await frameOf(read);
+    const { tree } = read;
+    // The keyboard this round, off this round's tree (no subject: every
+    // match is judged against it, the keyboard's own exempted). ONE reading
+    // a round, never held across rounds (ui-tree/keyboard-cover.ts): the
+    // round gets its synchronous facts — the cover, which nodes are the
+    // keyboard's own — and its two questions only as answers to an `ask`.
+    // Asked in the reading's order: the screen, then `cover()` (the state,
+    // and the region while it reads shown).
+    let reading: KeyboardReading | undefined;
+    let seen: RoundSeen;
+    if (tree === undefined) {
+      seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0 };
+    } else {
+      const screen = await judgingScreen(adapter, read);
+      const found = findTarget(tree, target);
+      reading = readKeyboard(adapter, tree);
+      const cover = await reading.cover();
+      seen = { read: { found, ofKeyboard: reading.ofKeyboard, ...(screen !== undefined && { screen }), ...(cover !== undefined && { cover }) }, elapsedMs: 0 };
     }
-    lastFound = tree === undefined ? [] : findTarget(tree, target);
-    if (lastFound.length > 0) everFound = true;
-    // The keyboard this round, off this round's tree (no subject: every match
-    // is judged against it, the keyboard's own exempted in `judge`).
-    const reading = tree === undefined ? undefined : readKeyboard(adapter, tree);
-    const viewport = frame.box;
-    const offered = coverOf(await reading?.cover(), viewport);
-    const whole = judgeOver(lastFound, frame.boxes);
-    let cover: Cover | undefined;
-    let best = whole;
-    if (offered !== undefined && reading !== undefined) {
-      const covered = judge(lastFound, viewport, { cover: offered, keyboardSide: reading.ofKeyboard });
-      // Moot: the round stops cleanly either way, on the same judgement — the
-      // band changes nothing, and is neither asked about nor reported.
-      // Otherwise the witness is asked THIS round, never remembered: a
-      // scroll can hide a keyboard (a list that dismisses it on drag) and
-      // leave the window state stale-shown behind it (review 2026-10-08).
-      const moot = endsClean(whole, fully) && sameJudgement(whole, covered);
-      if (!moot && (await reading.corroborated())) {
-        cover = offered;
-        best = covered;
-      }
+    if (drawn !== undefined) seen.drawn = drawn;
+    drawn = undefined;
+    // The clock is stamped on every call, re-entry included: a witness that
+    // waits out its timeout counts against the deadline the round consults
+    // after it.
+    let next = round(state, { ...seen, elapsedMs: Date.now() - started });
+    while (next.step.do === 'ask') {
+      if (next.step.what === 'witness') seen.corroborated = reading !== undefined && (await reading.corroborated());
+      else seen.unlocated = reading !== undefined && (await reading.unlocated());
+      next = round(state, { ...seen, elapsedMs: Date.now() - started });
     }
-    if (cover !== undefined) {
-      lastCover = cover;
-      coveredRounds++;
+    state = next.state;
+    const step: Exclude<RoundStep, { do: 'ask' }> = next.step;
+    if (step.do === 'stop') {
+      const { outcome } = step;
+      if (outcome.kind === 'visible') return scrollResult(outcome);
+      throw scrollFailure(outcome, describe);
     }
-    if (tree !== undefined) lastReadCover = cover;
-    // The frames this round judged in — the screen above an applied
-    // keyboard, else every box that counts — for where the target stands
-    // against the far edge (`Motion.observe`, `beyondFarEdge`). A read that
-    // did not read says nothing about motion: the comparisons wait for the
-    // next one that does.
-    const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : frame.boxes;
-    const observed: Observed | undefined = tree === undefined ? undefined : motion.observe(lastFound, best, judgedFrames, swipes);
-    if (best !== undefined && best.visible > 0 && observed !== undefined) {
-      if (!fully || best.clipped.length === 0) {
-        // A stop after a stroke is reported only once a read finds the
-        // target where the last one did (SETTLE_CONFIRM_READS): a fling can
-        // carry it on, or out of the frame, after the settle read caught it
-        // inside. A stop at 0 swipes was not stroked: reported at once.
-        const verdict = motion.stopVerdict(observed, swipes, deadline);
-        if (verdict === 'confirm') {
-          await settleAgain();
-          continue;
-        }
-        // Shown only when THIS stop was judged under a band the witness stood
-        // by this round — never a band checked on an earlier round.
-        const keyboard: ScrollUntilResult['keyboard'] =
-          best.under !== undefined
-            ? { state: 'shown', frame: best.under.topCover }
-            : fully && (await unlocatedAt(reading))
-              ? { state: 'unlocated' }
-              : undefined;
-        return {
-          swipes,
-          visible: best.visible,
-          clipped: best.clipped,
-          ...(keyboard !== undefined && { keyboard }),
-          ...(verdict === 'unsettled' && { settled: false as const }),
-        };
-      }
-      // fully: true and still clipped — only a swipe that MOVES it can help.
-      if (observed.stuck) {
-        const n = swipesText(swipes);
-        // Clipped at the keyboard's edge at the end of the content: the
-        // keyboard, not the layout, is what hides the rest — a container that
-        // does not resize for it keeps its last rows under it. Said as such,
-        // with how to hide it; the layout-defect wording only when the
-        // keyboard is not the edge in question.
-        if (best.under !== undefined && best.clipped.includes('bottom')) {
-          throw new Error(
-            `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-              `${describeClip(best.clipped, best.visible, best.under.topCover)}, and the content is exhausted: swiping ${motion.lastStroke} ` +
-              `no longer moves it. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(best.under.remedy)}; only if it ` +
-              `stays clipped with the keyboard down is it a layout defect. ` +
-              `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
-          );
-        }
-        throw new Error(
-          `scroll_until ${describe} failed after ${n} — ` +
-            `element is in the viewport but ${describeClip(best.clipped, best.visible, best.under?.topCover)}, ` +
-            `and the content is exhausted: swiping ${motion.lastStroke} no longer moves it. ` +
-            `The element cannot be fully revealed — that is a layout defect ` +
-            `(no clearance for an overlay?), not a scroll that needs more swipes. ` +
-            `Last rect ${JSON.stringify(best.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
-        );
-      }
+    if (step.do === 'stroke') {
+      // The gesture's box is swipe.ts#screenBox's — the same owner as a
+      // `swipe:` step's, oriented by this round's tree (after a failed read:
+      // the device box as built; its note is not reported here, the stop
+      // already quotes the read error). Worked out per swipe because the
+      // round's tree is the witness; the device size is memoized. A 0×0
+      // viewport does not throw above (pre-existing): the stroke then falls
+      // back to the tree's window while the stop still judges against 0×0.
+      // `toward` names where the CONTENT lies — the finger moves the other
+      // way (content below → finger up). See swipeVector. Under a cover the
+      // stroke is `swipeVectorAbove` (2026-10-08, the iOS device check): the
+      // uncovered box's stroke, its touch-down never inside the keyboard
+      // clearance nor higher than without a keyboard — the stroke over the
+      // box above it alone touched down in the app's top bar for a
+      // content-up scroll. The round says which cover (`coverTop`): this
+      // round's, or — on a round whose tree did not read — the last read
+      // round's.
+      const { toward, reach, coverTop } = step;
+      const { box } = await screenBox(adapter, read);
+      const vector = coverTop === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, coverTop, toward, 'content');
+      drawn = shortenStroke(vector, reach, toward === 'up' || toward === 'down' ? box.height : box.width);
+      await adapter.swipe(drawn.from, drawn.to);
     }
-    // A confirming read that did not read: read again, within the same
-    // budget, rather than stroke away from a stop the last read saw.
-    if (motion.confirmingRead && tree === undefined && motion.mayConfirm(deadline)) {
-      await settleAgain();
-      continue;
-    }
-    // A keyboard that leaves nothing above it: nothing but its own UI can be
-    // judged, and no stroke can start on the content — fail now, naming it,
-    // rather than swipe on keys (review 2026-10-08: until then this fell
-    // back to the whole screen and reported a bare "fully visible").
-    // The absence rule holds here too (review 2026-10-08): a target no read
-    // has matched is ElementNotFoundError through `absenceError`, so an
-    // `optional:` step is skipped "(not present)" — with the keyboard named,
-    // since no swipe could look further.
-    if (cover !== undefined && cover.above === undefined) {
-      const seenAs = everFound ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
-      throw absenceError(
-        `scroll_until ${describe} failed after ${swipesText(swipes)} — ${seenAs}; the soft keyboard over ` +
-          `${frameText(cover.topCover)} ${cover.topCover.y + cover.topCover.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
-          hideToJudgeWholeScreen(cover.remedy),
-        { sighted: everFound, treesRead, readError: lastReadError },
-      );
-    }
-    // In the tree, off the frame, and the last UNMOVED_STROKES_EXHAUST
-    // strokes — the same stroke — moved no match (2026-10-08, the Android
-    // device check: the form's last field, wholly under an IME its
-    // container does not resize for, swiped for the whole 15 s): fail now
-    // with the stop bound's own words — they already name the keyboard and
-    // the way to hide it. See `Motion.observe` for what counts.
-    const exhausted = observed?.exhausted === true;
-    if (exhausted || swipes >= maxSwipes || Date.now() >= deadline) {
-      const partial =
-        best !== undefined && best.visible > 0
-          ? `element reached the viewport but stayed ${describeClip(best.clipped, best.visible, best.under?.topCover)} ` +
-            `(last rect ${JSON.stringify(best.node.rect)})`
-          : undefined;
-      // In the frame on an earlier read and not on this one: "never" would
-      // be false (review round 1) — a fling carried it off, or a lazy list
-      // dropped it once it scrolled away.
-      const left = motion.inFrameAfter;
-      const offFrame = `the ${frameWords(viewport, cover)}${frame.boxes.length > 1 && cover?.above === undefined ? ' either way up' : ''}`;
-      const why =
-        lastReadError !== undefined
-          ? `last UI tree read failed: ${lastReadError.message}`
-          : partial !== undefined
-            ? partial
-            : lastFound.length === 0
-              ? left !== undefined
-                ? `element was in the viewport ${whenInFrame(left)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`
-                : 'element never appeared in the tree'
-              : left !== undefined
-                ? `element was in the viewport ${whenInFrame(left)} but did not stay (a fling?) — in tree, off ${offFrame} at the last read ` +
-                  `(last rect ${JSON.stringify((best?.node ?? lastFound[0]).rect)})`
-                : `element in tree but never intersected ${offFrame} ` + `(last rect ${JSON.stringify((best?.node ?? lastFound[0]).rect)})`;
-      const cause = exhausted
-        ? `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${motion.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`
-        : swipes >= maxSwipes
-          ? `after ${swipesText(swipes)} (maxSwipes)`
-          : `after ${timeoutMs}ms (timeout)`;
-      const turned =
-        motion.turns > 0
-          ? `. It was turned round ${countOf(motion.turns, 'time')}: a swipe carried it past the viewport (a fling), so the next was drawn the other way`
-          : '';
-      // The keyboard, when any round applied one: the reader must not take a
-      // scroll that worked around it — or one it hid the element under — for
-      // a wrong selector (the bug note's 15 s "never appeared"). And the
-      // `unlocated` row, asked of the last round's reading whatever came before.
-      const shown =
-        lastCover !== undefined
-          ? `. The soft keyboard was up over ${frameText(lastCover.topCover)} in ${coveredRounds} of the ${treesRead} rounds read: ` +
-            `in those, visibility was judged, and the swipe drawn, in the screen above it — ${hideToJudgeWholeScreen(lastCover.remedy)}`
-          : '';
-      const unlocated = (await unlocatedAt(reading))
-        ? `; ${UNLOCATED_KEYBOARD} — the swipes may have landed on it; hide or dock it and scroll again`
-        : '';
-      const message = `scroll_until ${describe} failed ${cause} — ${why}${turned}${shown}${unlocated}`;
-      throw absenceError(message, { sighted: everFound, treesRead, readError: lastReadError });
-    }
-    // Toward the caller's direction, or back after a fling past the target,
-    // the reach halved per turn so the scroll converges (`Motion.nextStroke`).
-    const { toward, reach } = motion.nextStroke();
-    // The gesture's box is swipe.ts#screenBox's — the same owner as a
-    // `swipe:` step's, oriented by this round's tree (after a failed read:
-    // the device box as built; its note is not reported here, the stop
-    // already quotes the read error). Worked out per swipe because the
-    // round's tree is the witness; the device size is memoized. A 0×0
-    // viewport does not throw above (pre-existing): the stroke then falls
-    // back to the tree's window while the stop still judges against 0×0.
-    // `toward` names where the CONTENT lies — the finger moves the other
-    // way (content below → finger up). See swipeVector. Under an applied
-    // cover the stroke is `swipeVectorAbove` (2026-10-08, the iOS device
-    // check): the uncovered box's stroke, its touch-down never inside the
-    // keyboard clearance nor higher than without a keyboard — the stroke
-    // over the box above it alone touched down in the app's top bar for a
-    // content-up scroll. A round whose tree did not read has no reading of
-    // its own and keeps the cover of the last round that DID read — none if
-    // that round applied none — rather than stroke through the keyboard it
-    // last saw.
-    const { box } = await screenBox(adapter, read);
-    const strokeCover = tree === undefined ? lastReadCover : cover;
-    const drawn = strokeCover === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, strokeCover.topCover.y, toward, 'content');
-    const stroke = shortenStroke(drawn, reach, toward === 'up' || toward === 'down' ? box.height : box.width);
-    await adapter.swipe(stroke.from, stroke.to);
-    swipes++;
-    motion.stroked(toward, stroke);
     await sleep(settleMs);
   }
 }
