@@ -678,7 +678,7 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     expect(describeScrollResult(result)).toBe(
       "fully visible after 0 swipes; but it fills its scroll container (0,242 1080x1736) exactly — its top and bottom edges lie on the container's, " +
         "where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, " +
-        'a rect assert or screenshot may measure part of it',
+        'a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot',
     );
     // Within a pixel, as a one-edge flush is; and along the scroll's axis: a sideways scroll's are left and right.
     expect(resultOf(play(FULLY_ANDROID, [formRead(243, 1734)])).flush).toMatchObject({ why: 'fills' });

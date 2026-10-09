@@ -157,9 +157,13 @@ function flushText(flush: ScrollUntilResult['flush']): string {
   if (flush === undefined) return '';
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
   if ('edges' in flush) {
+    // The usual benign case named, so the reader weighs the warning: a card
+    // as tall as its horizontal carousel inside a vertical list fills the
+    // carousel (verification round of fix/r3-cr, 2026-10-09).
     return (
       `; but it fills its scroll container (${rectText(flush.container)}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
-      `the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — ${cut}`
+      `the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — ${cut}; ` +
+      'usual for a card as tall as its carousel — check with a screenshot'
     );
   }
   const where = `its ${flush.edge} edge lies on its scroll container's (${rectText(flush.container)})`;
