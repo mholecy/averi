@@ -1,6 +1,5 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { readTreeOrError, showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
-import { largestScroller, scrollersOf } from '../ui-tree/geometry.js';
+import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
@@ -202,9 +201,9 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md):
  * uiautomator cuts each node's bounds to its scroll container, so a row
  * half behind a pinned bar read whole and `fully: true` said "fully visible
- * after 0 swipes". Each round hands the reducer every match's nearest
- * clipping ancestors (ui-tree/geometry.ts#scrollersOf, over the
- * `clipsDescendants` the parser sets), and a `fully: true` stop flush with
+ * after 0 swipes". Each round hands the reducer its tree, from which it
+ * reads every match's nearest clipping ancestors (ui-tree/geometry.ts
+ * #scrollersOf, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
  * one of them is answered with one short probe toward that edge, drawn over
  * a container with room for it above the keyboard (scroll-rounds.ts
  * #PROBE_REACH has the rule and its cost; swipe.ts#strokeRoom the box).
@@ -281,15 +280,14 @@ export async function scrollUntilVisible(
       const found = findTarget(tree, target);
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
-      const mainScroller = largestScroller(tree);
+      // The tree itself: what the round asks of it — the matches' clipping
+      // ancestors, the largest scroller, the fingerprint, progress — it
+      // derives (scroll-rounds.ts#TreeFacts); nothing to hand in or forget.
       seen = {
         read: {
+          tree,
           found,
           ofKeyboard: reading.ofKeyboard,
-          scrollersOf: scrollersOf(tree),
-          fingerprint: treeFingerprint(tree),
-          loading: showsProgress(tree),
-          ...(mainScroller !== undefined && { mainScroller }),
           ...(screen !== undefined && { screen: judgingOf(screen) }),
           ...(cover !== undefined && { cover }),
         },

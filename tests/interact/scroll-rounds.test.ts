@@ -4,7 +4,8 @@ import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
-import { coverOver, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, type Row } from '../helpers/rounds.js';
+import { coverOver, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Row } from '../helpers/rounds.js';
+import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
  * `scroll_until`'s round as observation tables (2026-10-09, the
@@ -51,10 +52,13 @@ const wdaGone: Row = { found: [], cover: coverOver(WDA_BAND, NO_BACK) };
 /** Rows reading `ys` in turn, each one match built by `at`, with `extra` on every row. */
 const reads = (ys: readonly number[], at: (y: number) => UiNode, extra: Row = {}): Row[] => ys.map((y) => ({ ...extra, found: [at(y)] }));
 
+/** A `RoundRead` by hand, for the protocol's own calls: `found` in their tree (rounds.ts#treeOf), no keyboard node. */
+const readOf = (found: UiNode[], extra: { cover?: KeyboardCover } = {}) => ({ tree: treeOf({ found }, ANDROID.screen), found, ofKeyboard: () => false, ...extra });
+
 describe('round — the protocol', () => {
   it('an ask leaves the state as it came in, and the same seen with the answer goes on', () => {
     const state = startRounds({ ...ANDROID, fully: true }, ANDROID.screen);
-    const seen = { read: { found: [formRow(1906)], cover: UP_IME, ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0 };
+    const seen = { read: readOf([formRow(1906)], { cover: UP_IME }), elapsedMs: 0 };
     const asked = round(state, seen);
     expect(asked).toEqual({ state, step: { do: 'ask', what: 'witness' } });
     expect(round(state, { ...seen, corroborated: true }).step).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
@@ -62,13 +66,13 @@ describe('round — the protocol', () => {
 
   it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
     const state = startRounds(ANDROID, ANDROID.screen);
-    const off = { read: { found: [formRow(2900)], ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0 };
+    const off = { read: readOf([formRow(2900)]), elapsedMs: 0 };
     expect(() => round(state, { ...off, drawn: STROKE })).toThrow('none asked for');
     const stroked = round(state, off).state;
     expect(() => round(stroked, off)).toThrow('without the stroke drawn');
-    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0, drawn: STROKE });
+    const stopped = round(stroked, { read: readOf([formRow(500)]), elapsedMs: 0, drawn: STROKE });
     expect(stopped.step.do).toBe('confirm');
-    const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0 });
+    const done = round(stopped.state, { read: readOf([formRow(500)]), elapsedMs: 0 });
     expect(done.step.do).toBe('stop');
     expect(() => round(done.state, off)).toThrow('after the scroll stopped');
   });
@@ -148,7 +152,7 @@ describe('round — the soft keyboard', () => {
   });
 
   it('Android, a stop bound with the IME up names the keyboard — the 15 s "never appeared" no longer reads as a wrong selector — and stays ElementNotFoundError', () => {
-    const error = failureOf(play({ ...ANDROID, maxSwipes: 2 }, [{ cover: UP_IME }, { cover: UP_IME }, { cover: UP_IME }]), 'id:payee_street_input');
+    const error = failureOf(play({ ...ANDROID, maxSwipes: 2 }, ['a', 'b', 'c'].map((rest): Row => ({ cover: UP_IME, rest }))), 'id:payee_street_input'); // the form scrolls
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toBe(
       'scroll_until id:payee_street_input failed after 2 swipes (maxSwipes) — element never appeared in the tree. The soft ' +
@@ -453,7 +457,7 @@ describe('round — after the device check', () => {
   });
 
   it('in the viewport after a swipe and gone by the last read: the failure says it was there — not "never appeared" (a lazy list drops what a fling carries off)', () => {
-    const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaGone, wdaGone, wdaGone, wdaGone]);
+    const played = play(FULLY, [wdaRow(681), wdaRow(300), ...['a', 'b', 'c', 'd'].map((rest) => ({ ...wdaGone, rest }))]); // the list scrolls on without it
     const error = failureOf(played, 'id:row');
     expect(error.message).toMatch(
       /failed after 4 swipes \(maxSwipes\) — element was in the viewport after swipe 1 but did not stay — it is no longer in the tree \(a fling carried it off\? a lazy list drops what scrolls away\)/,
@@ -488,7 +492,7 @@ describe('round — after the device check', () => {
 
   it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', () => {
     // An unchanged tree too (code review: without a fingerprint the whole-tree rule could not fire here, so it did not prove the match rule's).
-    const field: Row = { ...lastField({ x: 66, y: 1769, width: 948, height: 0 }), fingerprint: 'f' };
+    const field: Row = { ...lastField({ x: 66, y: 1769, width: 948, height: 0 }), rest: 'f' };
     expect(failureOf(play(ANDROID, [field, field, field, field, field]), 'id:my_note_input').message).toMatch(/failed after 4 swipes \(maxSwipes\)/);
   });
 
@@ -743,7 +747,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
   });
 
   it('measured: WHOLLY under the IME at round 0 (in the tree, visible 0), dropped by the first stroke — turned back too: it was short of the far edge', () => {
-    const played = play({ ...FULLY_ANDROID, maxSwipes: 3 }, [lastName(1409), imeGone, imeGone, imeGone]);
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 3 }, [lastName(1409), ...['a', 'b', 'c'].map((rest) => ({ ...imeGone, rest }))]); // the editor scrolls, never back to it
     expect(strokesToward(played)).toEqual(['down', 'up', 'up']); // back, and on back while it stays out — not ping-pong
     // The wording: it WAS in the tree — not "never appeared", and the class agrees (a plain Error, it was sighted).
     const error = failureOf(played, 'text:"Last name"');
@@ -787,7 +791,8 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
     expect(play({ ...IPHONE, maxSwipes: 1 }, [{ found: [] }, { found: [] }]).steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: IPHONE_BOX });
   });
 
-  const tree = (fingerprint: string, extra: Row = {}): Row => ({ found: [], fingerprint, ...extra });
+  /** A read without the target, the rest of the screen reading `rest`. */
+  const tree = (rest: string, extra: Row = {}): Row => ({ found: [], rest, ...extra });
 
   it('measured: row_40 of a list that ends at row_36 — not in the tree, and two identical strokes after which the WHOLE tree is unchanged: content exhausted, at once — ElementNotFoundError, it was never seen', () => {
     const played = play(FULLY_ANDROID, [tree('a'), tree('b'), tree('b'), tree('b')]);
@@ -803,18 +808,19 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
     expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, ['a', 'b', 'c', 'd', 'e'].map((f) => tree(f))).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
     expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, ['a', 'a', 'b', 'b', 'c'].map((f) => tree(f))).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
     // A dropped target turns the stroke: the unchanged reads after it are counted from the new stroke.
-    const turned = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), fingerprint: 'a' }, { ...imeGone, fingerprint: 'b' }, { ...imeGone, fingerprint: 'b' }, { ...imeGone, fingerprint: 'b' }]);
+    const turned = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), rest: 'a' }, { ...imeGone, rest: 'b' }, { ...imeGone, rest: 'b' }, { ...imeGone, rest: 'b' }]);
     expect(strokesToward(turned)).toEqual(['down', 'up', 'up']);
     expect(turned.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree', lastStroke: 'up' } });
     // Unchanged after the first stroke down AND after the turned one up: two strokes, but not the same stroke — the streak starts again.
-    const twoKinds = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), fingerprint: 'a' }, { ...imeGone, fingerprint: 'a' }, { ...imeGone, fingerprint: 'a' }, { ...imeGone, fingerprint: 'a' }]);
+    const twoKinds = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), rest: 'a' }, { ...imeGone, rest: 'a' }, { ...imeGone, rest: 'a' }, { ...imeGone, rest: 'a' }]);
     expect(twoKinds.outcome).toMatchObject({ swipes: 3, by: { of: 'exhausted', unchanged: 'tree' } });
-    // No fingerprint: never.
-    expect(play({ ...FULLY_ANDROID, maxSwipes: 3 }, [{ found: [] }, { found: [] }, { found: [] }, { found: [] }]).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
+    // Every read is a tree the round reads itself (deep/r3-scroll): rows that name nothing are one unchanged screen —
+    // exhausted, as on a device. Until then a row without a fingerprint never was: the rule a driver could forget.
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 3 }, [{ found: [] }, { found: [] }, { found: [] }]).outcome).toMatchObject({ by: { of: 'exhausted', unchanged: 'tree' } });
   });
 
   it('a target IN the tree off the frame keeps the match rule\'s words ("did not move it"), whatever the tree', () => {
-    const row = (fingerprint: string): Row => ({ found: [formRow(2900)], fingerprint });
+    const row = (rest: string): Row => ({ found: [formRow(2900)], rest });
     expect(failureOf(play(ANDROID, [row('a'), row('a'), row('a')]), 'id:t').message).toMatch(/the last 2, swiping down, did not move it/);
   });
 });
@@ -928,9 +934,9 @@ describe('round — the flush check across nested clipping containers, and a pro
   });
 
   it('a list still loading its next page — a spinner, the tree otherwise unchanged — is not called exhausted; the sentence names loading among the causes when no spinner shows', () => {
-    const spinning: Row = { found: [], fingerprint: 'same', loading: true };
+    const spinning: Row = { found: [], rest: 'same', loading: true };
     expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, [spinning, spinning, spinning, spinning, spinning]).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
-    const still: Row = { found: [], fingerprint: 'same' };
+    const still: Row = { found: [], rest: 'same' };
     expect(failureOf(play({ ...FULLY_ANDROID, maxSwipes: 4 }, [still, still, still]), 'id:row').message).toMatch(/did not change the screen: content exhausted, still loading, or the swipes were not taken/);
   });
 });

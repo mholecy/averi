@@ -20,7 +20,7 @@ import { node } from './fake.js';
  * Android stay pinned at the driver (tests/interact/scroll.test.ts).
  */
 export interface Row {
-  /** Every match this read held, in tree order. Ignored with `error`. */
+  /** Every match this read held, in tree order — put into the row's tree (`treeOf`). Ignored with `error`. */
   found?: readonly UiNode[];
   /** The read failed with this message. */
   error?: string;
@@ -32,12 +32,17 @@ export interface Row {
   ofKeyboard?: (node: UiNode) => boolean;
   /** Every match's nearest clipping scroll container — shorthand for `scrollers: [scroller]`. */
   scroller?: Rect;
-  /** Every match's clipping ancestors, nearest first (geometry.ts#scrollersOf); default none — an iOS tree, or a match with no clipping ancestor. */
+  /** Every match's clipping ancestors, nearest first — clipping nodes the matches are put inside; default none (an iOS tree, or a match with no clipping ancestor). */
   scrollers?: readonly Rect[];
-  /** The tree's largest clipping container (geometry.ts#largestScroller); default none. */
+  /** Another clipping container in the tree, beside the matches' (the screen's own list, for geometry.ts#largestScroller); default none. */
   mainScroller?: Rect;
-  /** The whole tree's fingerprint (read-tree.ts#treeFingerprint); default none — the whole-tree exhaustion never fires. */
-  fingerprint?: string;
+  /**
+   * The rest of the screen — a text node of this label (read-tree.ts
+   * #treeFingerprint reads it): two rows with the same matches, containers
+   * and `rest` are the same tree. Default none, so rows that differ in
+   * nothing read as one unchanged screen, as on a device.
+   */
+  rest?: string;
   /** The tree shows a progress node (read-tree.ts#showsProgress); default false. */
   loading?: boolean;
   /** The answer to `ask witness` (the reading's `corroborated()`); default true. */
@@ -68,6 +73,35 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
   return scrollStroke({ ...step, box });
 };
 
+/**
+ * The tree a row read: the screen, the matches inside their clipping
+ * containers (outermost first, each `clipsDescendants`), `mainScroller`
+ * beside them, a progress node when `loading`, and `rest`. The round
+ * derives every tree fact from it (scroll-rounds.ts#TreeFacts) as it does
+ * from a device's — the row says what is ON the screen, never what the
+ * round should conclude. A match nested in another match (an id on a
+ * container and its child) stays where it is, under that one.
+ */
+export function treeOf(row: Row, screen: DeviceScreen): UiNode {
+  const found = row.found ?? [];
+  const nested = (n: UiNode): boolean => found.some((m) => m !== n && contains(m, n));
+  const chain = row.scrollers ?? (row.scroller !== undefined ? [row.scroller] : []);
+  const matches = found.filter((n) => !nested(n));
+  const inScrollers = chain.reduce<UiNode[]>((inside, rect) => [node({ role: 'container', rect: { ...rect }, clipsDescendants: true, children: inside })], matches);
+  return node({
+    role: 'container',
+    rect: { x: 0, y: 0, ...screen },
+    children: [
+      ...(row.mainScroller !== undefined ? [node({ role: 'container', identifier: 'main_scroller', rect: { ...row.mainScroller }, clipsDescendants: true })] : []),
+      ...inScrollers,
+      ...(row.loading === true ? [node({ role: 'progress', rect: { x: 500, y: 100, width: 80, height: 80 } })] : []),
+      ...(row.rest !== undefined ? [node({ role: 'text', label: row.rest })] : []),
+    ],
+  });
+}
+
+const contains = (root: UiNode, n: UiNode): boolean => root.children.some((c) => c === n || contains(c, n));
+
 type Step = Exclude<RoundStep, { do: 'ask' }>;
 export type Ask = 'witness' | 'unlocated';
 
@@ -92,7 +126,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       read:
         row.error !== undefined
           ? { error: new Error(row.error) }
-          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollersOf: () => row.scrollers ?? (row.scroller !== undefined ? [row.scroller] : []), ...(row.mainScroller && { mainScroller: row.mainScroller }), ...(row.fingerprint !== undefined && { fingerprint: row.fingerprint }), ...(row.loading === true && { loading: true }), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
+          : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
       gesture: row.gesture ?? row.screen?.box ?? { x: 0, y: 0, ...rules.screen },
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),

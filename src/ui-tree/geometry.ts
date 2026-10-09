@@ -546,8 +546,8 @@ export function clippedEdges(
  * cut to it), NEAREST FIRST, as their rects; empty for a node with none,
  * which is every node of an iOS tree (2026-10-09). One walk of the tree
  * when called; the answer is a lookup by node identity, so it is asked of
- * nodes of THIS tree (a node of another read answers empty). `scroll_until`
- * hands the round each match's (interact/scroll.ts), to tell a `fully:
+ * nodes of THIS tree (a node of another read answers empty). `scroll_until`'s
+ * round asks it of each match (interact/scroll-rounds.ts#TreeFacts), to tell a `fully:
  * true` stop whose edge sits exactly on a clipping ancestor's — possibly
  * cut there — from one inside them all (interact/scroll-rounds.ts
  * #PROBE_REACH), and to pick the box its strokes are drawn in. The whole
@@ -573,7 +573,7 @@ export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
  * The largest node of the tree that clips its descendants
  * (`clipsDescendants`, by area), as its rect — the screen's own scroll
  * view, which `scroll_until` strokes over while the target's own container
- * is not known yet (2026-10-09; interact/scroll-rounds.ts#RoundRead
+ * is not known yet (2026-10-09; interact/scroll-rounds.ts#TreeFacts
  * .mainScroller). Largest, not first: a carousel above a page's list is
  * the smaller of the two. Undefined when none (every iOS tree). One walk.
  */
