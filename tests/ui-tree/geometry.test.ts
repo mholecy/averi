@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
   containsPoint,
@@ -12,7 +12,7 @@ import {
   sameRectWithinPixel,
   shadowing,
 } from '../../src/ui-tree/geometry.js';
-import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { node as uiNode } from '../helpers/fake.js';
 
 /**
@@ -385,15 +385,73 @@ describe('shadowing — the later content node drawn over a point (the dismissal
     expect(shadowing(rootless(small), target, P)).toBe(small);
   });
 
-  it('a screen-sized node that is interactive or childless still covers: a full-screen backdrop button (an RN transparent Modal\'s Pressable), an image, a leaf toolbar', () => {
+  it('a screen-sized node that is interactive or childless still covers: a full-screen backdrop button (an RN transparent Modal\'s Pressable), an image, a text — but no longer a leaf toolbar (2026-10-09)', () => {
     const target = text({ label: 'title' });
     const rect = { x: 0, y: 0, width: 400, height: 800 };
     const backdrop = uiNode({ role: 'button', label: 'Close', rect, children: [text({ label: 'elsewhere', rect: { x: 0, y: 600, width: 400, height: 100 } })] });
     const image = uiNode({ role: 'image', rect });
-    const leaf = uiNode({ role: 'toolbar', rect });
+    const leafText = text({ label: 'Terms', rect });
     expect(shadowing(screen(target, backdrop), target, P)).toBe(backdrop);
     expect(shadowing(screen(target, image), target, P)).toBe(image);
-    expect(shadowing(screen(target, leaf), target, P)).toBe(leaf);
+    expect(shadowing(screen(target, leafText), target, P)).toBe(leafText);
+    // FLIPPED 2026-10-09 (docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md): this pin said a
+    // childless screen-sized `toolbar` covers. It was the generic childless-node rule written with a toolbar, never a
+    // measured toolbar that covered; the one device shape of it — UIKit's Contacts sheet under WDA — draws nothing over the
+    // title, and refused every dismissal there. A toolbar with no items is not a cover (the itemless-toolbar rule below).
+    expect(shadowing(screen(target, uiNode({ role: 'toolbar', rect })), target, P)).toBeUndefined();
+  });
+
+  /**
+   * The Contacts "New Contact" sheet under WDA (UIKit, iPhone 17, iOS 27, 2026-10-09 05:30 UTC,
+   * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md), in pre-order after the title
+   * `text 'New Contact' 149 89 104 22` (inside `container id:"New Contact" 0 78 402 54`): the form's `scrollable 0 62 402 812`
+   * WITH children, then two CHILDLESS `toolbar 'Toolbar'`s, `0 83 402 48` and `0 62 402 812`; then the keyboard's band
+   * `0 573 402 301`. Each toolbar alone contained the title's point (201,100) and refused the dismissal as covered.
+   */
+  describe('an itemless toolbar covers nothing, whatever its size (the Contacts sheet, 2026-10-09)', () => {
+    const full = { x: 0, y: 0, width: 402, height: 874 };
+    const at = { x: 201, y: 100 };
+    const BAR = { x: 0, y: 83, width: 402, height: 48 };
+    const SHEET = { x: 0, y: 62, width: 402, height: 812 };
+    const title = uiNode({ role: 'text', label: 'New Contact', rect: { x: 149, y: 89, width: 104, height: 22 } });
+    const titleBox = uiNode({ role: 'container', identifier: 'New Contact', rect: { x: 0, y: 78, width: 402, height: 54 }, children: [title] });
+    const form = uiNode({ role: 'scrollable', rect: SHEET, children: [uiNode({ role: 'textfield', identifier: 'First name', rect: { x: 20, y: 300, width: 360, height: 44 } })] });
+    const toolbar = (rect: UiNode['rect'], children: UiNode[] = []) => uiNode({ role: 'toolbar', label: 'Toolbar', rect, children });
+    const band = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: { x: 0, y: 573, width: 402, height: 301 } });
+    const app = (...after: UiNode[]) => uiNode({ role: 'application', rect: full, children: [uiNode({ role: 'other', rect: full, children: [titleBox, form, ...after] }), band] });
+
+    it('the measured shape — both toolbars — and each alone: nothing covers the title', () => {
+      expect(shadowing(app(toolbar(BAR), toolbar(SHEET)), title, at)).toBeUndefined();
+      expect(shadowing(app(toolbar(BAR)), title, at)).toBeUndefined(); // the 48-pt one: a bar's size, which no screen-sized host rule would excuse
+      expect(shadowing(app(toolbar(SHEET)), title, at)).toBeUndefined();
+    });
+
+    it('a toolbar with ANY item still covers as itself, at the bar\'s size — its item elsewhere, as the input-accessory bar\'s Done', () => {
+      const withItem = toolbar(BAR, [uiNode({ role: 'button', label: 'Cancel', rect: { x: 16, y: 90, width: 60, height: 34 } })]);
+      expect(shadowing(app(withItem), title, at)).toBe(withItem);
+      const item = uiNode({ role: 'text', label: 'Draft', rect: { x: 150, y: 90, width: 100, height: 20 } });
+      expect(shadowing(app(toolbar(SHEET, [item])), title, at)).toBe(item); // a screen-sized one: through its item at the point
+    });
+
+    it('the excuse is the toolbar\'s alone: a childless image or text of the same rect, and an interactive node, still cover', () => {
+      const image = uiNode({ role: 'image', rect: BAR });
+      const label = uiNode({ role: 'text', label: 'Toolbar', rect: BAR });
+      const button = uiNode({ role: 'button', rect: BAR });
+      for (const cover of [image, label, button]) expect(shadowing(app(toolbar(BAR), cover), title, at)).toBe(cover);
+    });
+
+    it('the measured input-accessory toolbar (wda-source-myport-2fa-keyboard-toolbar.json: Toolbar → Other → Button "Done") still covers what it is drawn over', async () => {
+      const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-2fa-keyboard-toolbar.json', import.meta.url), 'utf8'));
+      const nodes = [...everyNode(tree)];
+      const accessory = nodes.find((n) => n.role === 'toolbar')!;
+      expect(accessory.rect).toEqual({ x: 0, y: 518, width: 402, height: 48 });
+      expect(accessory.children.length).toBeGreaterThan(0);
+      // The app's support text {16,547,370,40} runs under the bar's slot (518–566). With the keyboard's band (its Window,
+      // after the accessory's) taken out, so that only the bar can answer: the bar is what is drawn over the text.
+      const text = nodes.find((n) => n.label?.startsWith('Pri probléme'))!;
+      const withoutBand = { ...tree, children: tree.children.filter((w) => ![...everyNode(w)].some((n) => n.role === KEYBOARD_ROLE)) };
+      expect(shadowing(withoutBand, text, { x: 200, y: 550 })).toBe(accessory);
+    });
   });
 
   it('a screen-sized host with content over the point still covers, through that content', () => {
