@@ -181,7 +181,9 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   above it between two reads, in none — `Display` two rows below the fold
  *   was never reached. Each stroke is now drawn over the target's scroll
  *   container (the screen's largest before the target is read in one;
- *   the round decides the box, swipe.ts#strokeRoom, above the keyboard),
+ *   the round decides the box, swipe.ts#strokeRoom, above the keyboard
+ *   and, since 2026-10-09, for content below, above a node drawn over the
+ *   container's lower part — a floating tab bar took the touch-down),
  *   its length the container's, and on an adapter
  *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
  *   time it costs against the 15 s default is on adapters/android.ts
@@ -316,7 +318,8 @@ export async function scrollUntilVisible(
     if (step.do === 'stroke') {
       // The stroke's box is the round's (`step.box`, swipe.ts#strokeRoom over
       // this round's screen box): the target's scroll container met with the
-      // screen box and kept above the keyboard, or the screen box whole —
+      // screen box and kept above the keyboard and what is drawn over the
+      // container (`coverTop`, the higher of the two), or the screen box whole —
       // decided once, there; here it only becomes points (scrollStroke, which
       // judges nothing). No box: this round had no screen box to stroke in.
       // `toward` names where the CONTENT lies — the finger moves the other

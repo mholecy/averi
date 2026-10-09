@@ -13,6 +13,7 @@ import {
   sameRectWithinPixel,
   scrollersOf,
   largestScroller,
+  drawnOver,
   shadowing,
 } from '../../src/ui-tree/geometry.js';
 import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
@@ -573,5 +574,31 @@ describe('largestScroller — the screen\'s own scroll view (2026-10-09)', () =>
     const list = box(737, 1417, true);
     expect(largestScroller(box(0, 2220, false, [carousel, list]))).toEqual(list.rect);
     expect(largestScroller(box(0, 2220, false, [box(300, 300, false)]))).toBeUndefined();
+  });
+});
+
+describe('drawnOver — the nodes drawn over a clipping container (2026-10-09, the floating tab bar)', () => {
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const LIST = rect(0, 825, 1080, 1395);
+  it('measured, mp-native Account Detail: the bar\'s unlabelled host and its tabs, after the list in the tree — never the list\'s own rows, nor anything before it, nor what misses it', () => {
+    const row = uiNode({ role: 'container', identifier: 'transactions.list.row_0', rect: rect(0, 1112, 1080, 200), children: [uiNode({ role: 'other', label: 'Coffee', rect: rect(40, 1150, 400, 50) })] });
+    const list = uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: [row] });
+    const header = uiNode({ role: 'other', label: 'Account', rect: rect(0, 300, 1080, 500) }); // before the list, and beside it
+    const tab = uiNode({ role: 'container', identifier: 'nav.tab_home', rect: rect(66, 1876, 237, 176), children: [uiNode({ role: 'other', label: 'Home', rect: rect(100, 1990, 160, 40) })] });
+    const host = uiNode({ role: 'container', rect: rect(66, 1840, 948, 248), children: [tab] });
+    const above = uiNode({ role: 'other', label: 'Toast', rect: rect(0, 100, 1080, 100) }); // after, but misses the list
+    const root = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [header, list, host, above] });
+    expect(drawnOver(root)(LIST)).toEqual([host, tab, tab.children[0]]);
+  });
+  it('draws nothing: no area, an empty structural leaf (a spacer), a screen-sized host (its content is judged), the keyboard\'s own subtree — and a rect of no clipping node in this tree is undefined, not empty', () => {
+    const list = uiNode({ role: 'container', rect: LIST, clipsDescendants: true });
+    const spacer = uiNode({ role: 'other', rect: rect(0, 1900, 1080, 100) });
+    const flat = uiNode({ role: 'text', label: 'x', rect: rect(0, 1900, 0, 100) });
+    const card = uiNode({ role: 'other', label: 'Snack', rect: rect(40, 1900, 1000, 120) });
+    const layer = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [card] });
+    const keys = uiNode({ role: 'container', rect: rect(0, 1398, 1080, 822), ofKeyboard: true, children: [uiNode({ role: 'button', label: 'q', rect: rect(0, 1500, 100, 100) })] });
+    const root = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [list, spacer, flat, layer, keys] });
+    expect(drawnOver(root)(LIST)).toEqual([card]);
+    expect(drawnOver(root)(rect(0, 825, 1080, 1000))).toBeUndefined(); // not asked of this tree — told apart from "nothing over it"
   });
 });

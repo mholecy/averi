@@ -1,5 +1,5 @@
-import type { DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { clippedEdges, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
+import { clippedEdges, containsPoint, drawnOver, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -159,6 +159,18 @@ interface TreeFacts {
    */
   mainScroller: Rect | undefined;
   /**
+   * The nodes drawn OVER a clipping container — after its subtree in the
+   * tree, meeting its rect, drawing something (ui-tree/geometry.ts
+   * #drawnOver; 2026-10-09, the floating tab bar): what a stroke over it
+   * keeps clear of (swipe.ts#strokeRoom cuts the box above them) and what
+   * a stroke that still touched down on one names (`touchedOn`). Asked of
+   * the rects `scrollersOf` and `mainScroller` give; undefined when this
+   * tree has no container with that rect (one remembered from an earlier
+   * read: the list has moved since); never any on iOS, which has no
+   * clipping container.
+   */
+  drawnOver: (within: Rect) => readonly UiNode[] | undefined;
+  /**
    * A cheap fingerprint of the WHOLE tree (ui-tree/read-tree.ts
    * #treeFingerprint) — every node's role, text, id and rect — for "the
    * strokes changed nothing at all" when the target is not in the tree
@@ -175,17 +187,23 @@ interface TreeFacts {
 }
 
 /**
- * `TreeFacts` of a tree: four walks, as the driver made them before
- * deep/r3-scroll. Derived ONCE per call of `round`, after the keyboard's
- * witness — the ask that most rounds re-enter for, which needs none of
- * them — and handed along (`ThisRead`). A call that re-enters after an
+ * `TreeFacts` of a tree: five walks — four as the driver made them before
+ * deep/r3-scroll, and `drawnOver`'s (2026-10-09). Derived ONCE per call of
+ * `round`, after the keyboard's witness — the ask that most rounds re-enter
+ * for, which needs none of them — and handed along (`ThisRead`). A call that re-enters after an
  * `ask unlocated` (a `fully: true` or bound stop, once a scroll) or an
  * `ask witness` before a probe derives them again: no cache, so the module
  * holds no state between calls (code review of deep/r3-scroll, S6: until
  * then a WeakMap by tree object saved those walks).
  */
 function factsOf(tree: UiNode): TreeFacts {
-  return { scrollersOf: scrollersOf(tree), mainScroller: largestScroller(tree), fingerprint: treeFingerprint(tree), loading: showsProgress(tree) };
+  return {
+    scrollersOf: scrollersOf(tree),
+    mainScroller: largestScroller(tree),
+    drawnOver: drawnOver(tree),
+    fingerprint: treeFingerprint(tree),
+    loading: showsProgress(tree),
+  };
 }
 
 /**
@@ -216,8 +234,10 @@ export type RoundStep =
    * Draw a stroke toward `toward` (where the content lies), its reach scaled
    * by `reach` (swipe.ts#shortenStroke; 1 until the first turn, halved by
    * each), over `box` — kept clear of a cover whose top edge is `coverTop`
-   * when set (swipe.ts#swipeVectorAbove) — and hand it back as the next
-   * round's `drawn`; swipe.ts#scrollStroke turns the step into points and
+   * when set (swipe.ts#swipeVectorAbove): the keyboard's, or, since
+   * 2026-10-09, a node's drawn over the container's lower part (a floating
+   * tab bar; swipe.ts#strokeRoom decides it with the box) — and hand it
+   * back as the next round's `drawn`; swipe.ts#scrollStroke turns the step into points and
    * judges nothing. `box` is DECIDED here (swipe.ts#strokeRoom, over the
    * round's gesture box, `RoundSeen.screen`, the keyboard included): the target's scroll
    * container met with the screen, so the stroke touches down on the
@@ -332,11 +352,23 @@ export type Flush =
 
 /**
  * Which bound ended the scroll: the same stroke twice moved nothing (with
- * the direction last swiped, and what stayed put — every match of a target
- * off the frame, or the whole tree of one not in it), `maxSwipes`, or the
- * deadline.
+ * the direction last swiped, what stayed put — every match of a target
+ * off the frame, or the whole tree of one not in it — and, when the last
+ * stroke touched down on a node drawn over its container, that node:
+ * `touchedOn`), `maxSwipes`, or the deadline.
  */
-export type BoundBy = { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree' } | { of: 'maxSwipes' } | { of: 'timeout'; timeoutMs: number };
+export type BoundBy =
+  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn }
+  | { of: 'maxSwipes' }
+  | { of: 'timeout'; timeoutMs: number };
+
+/** Where a stroke touched down on a node drawn over the container it was drawn in (`touchedOn`): the point, the node, the container. */
+export interface TouchedOn {
+  at: Point;
+  /** What the sentence quotes of the node, not the node (its subtree is no fact of the failure). */
+  on: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
+  container: Rect;
+}
 
 /**
  * What the target was short of at a bound, by the last round:
@@ -664,13 +696,33 @@ interface State {
    * none with room — the stroke then goes over the screen box (P5); undefined
    * until a read finds the target. Kept across reads that do not find it.
    */
-  readonly targetScroller: Rect | 'none' | undefined;
-  /** The container the last read that read chose to stroke over, for the stroke of a round whose tree did not read — met again with that round's gesture box. */
-  readonly lastWithin: Rect | undefined;
+  readonly targetScroller: StrokeContainer | 'none' | undefined;
+  /** The container the last read that read chose to stroke over, for the stroke of a round whose tree did not read — met again with that round's gesture box, cut by the rects it carries (kept as the keyboard's cover is, `lastReadCover`). */
+  readonly lastWithin: StrokeContainer | undefined;
+  /** The container the last stroke SENT was drawn in, a probe's included — undefined when it went over the gesture box whole — for `touchedOn`. */
+  readonly strokeWithin: Rect | undefined;
   /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
   readonly prevFingerprint: string | undefined;
   readonly treeUnmovedStrokes: number;
 }
+
+/**
+ * A container strokes go over, as one value (review round 1 of
+ * fix/r4-stroke: the two were separate fields that had to move together):
+ * its rect, and the rects drawn over it (`TreeFacts.drawnOver`) at the read
+ * that chose it — the stroke box's cut (swipe.ts#strokeRoom). A later read
+ * that still holds a container of that rect gives its own; one that does
+ * not (the list moved — measured on Account Detail, 0,825 → 0,401) keeps
+ * these, so a remembered container is not stroked as if nothing were over
+ * it.
+ */
+interface StrokeContainer {
+  rect: Rect;
+  over: readonly Rect[];
+}
+
+/** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.drawnOver`). */
+const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.drawnOver(rect)?.map((n) => ({ ...n.rect }));
 
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
 export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
@@ -707,6 +759,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     dropped: undefined,
     targetScroller: undefined,
     lastWithin: undefined,
+    strokeWithin: undefined,
     prevFingerprint: undefined,
     treeUnmovedStrokes: 0,
   };
@@ -891,9 +944,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // the screen's largest scroller is not taken either: every ancestor of
     // the target was just judged on this box, cover and axis, so a largest
     // scroller WITH room is by construction not one of them, a list that
-    // cannot hold the target. The stroke goes over the screen box.
-    const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y);
-    s.targetScroller = room === undefined ? 'none' : { ...room.within };
+    // cannot hold the target. The stroke goes over the screen box. Room
+    // judged clear of what is drawn over each (2026-10-09), as the stroke.
+    const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y, facts.drawnOver);
+    s.targetScroller = room === undefined ? 'none' : { rect: { ...room.within }, over: overIn(facts, room.within) ?? [] };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for.
@@ -1067,7 +1121,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         // — so it takes a device reporting 0×0 throughout, and a tree whose
         // window stood in on an earlier round (else the frame is 0×0 and no
         // stop is ever visible) but not on this one.
-        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop);
+        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop, now.facts.drawnOver);
         if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
         else if (roomOver() === undefined) flush = { edge, container, ...noRoom };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
@@ -1089,7 +1143,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           if (over === undefined) flush = { edge, container, ...noRoom };
           else {
             const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
-            return probe(s, edge, best.node.rect, over.box, maxTravel, probeCover);
+            return probe(s, edge, best.node.rect, over, maxTravel);
           }
         } else flush = { edge, container, checked: false, why: 'budget' };
       }
@@ -1131,9 +1185,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (seen.unlocated === undefined) return ask('unlocated');
       unlocated = seen.unlocated;
     }
+    const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s, now.facts);
     const by: BoundBy =
       exhausted !== undefined
-      ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted }
+      ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
         : { of: 'timeout', timeoutMs: s.rules.timeoutMs };
@@ -1163,14 +1218,33 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // it in no container with room (`'none'`, P5). A round whose tree did not
   // read keeps the last read round's.
   const target = s.targetScroller;
-  const within = read === undefined ? s.lastWithin : target === 'none' ? undefined : (target ?? now?.facts.mainScroller);
+  const main = now?.facts.mainScroller;
+  const within: StrokeContainer | undefined =
+    now === undefined
+      ? s.lastWithin
+      : target === 'none'
+        ? undefined
+        : target !== undefined
+          ? { rect: target.rect, over: overIn(now.facts, target.rect) ?? target.over }
+          : main === undefined
+            ? undefined
+            : { rect: main, over: overIn(now.facts, main) ?? [] };
   s.lastWithin = within;
+  // The latest cut read for the target's container is the one a later read
+  // that has lost that rect falls back to — not the oldest (review round 2).
+  if (within !== undefined && target !== undefined && target !== 'none' && now !== undefined) s.targetScroller = within;
   // The box, decided once (swipe.ts#strokeRoom): that container met with
-  // the gesture box above the stroke's cover, or the gesture box whole
-  // when it leaves no room — a stroke toward the target is still worth
-  // drawing over the screen; a probe never comes here.
-  const coverTop = strokeCover?.topCover.y;
-  const box = strokeRoom(gesture, within === undefined ? [] : [within], toward, coverTop)?.box ?? gesture;
+  // the gesture box above the stroke's cover — the keyboard's, or what is
+  // drawn over the container (2026-10-09, the floating tab bar; a round
+  // whose tree did not read keeps the last read round's, as its keyboard)
+  // — or the gesture box whole when it leaves no room, under the keyboard
+  // alone — a stroke toward the target is still worth drawing over the
+  // screen; a probe never comes here.
+  const over = (within?.over ?? []).map((rect) => ({ rect }));
+  const room = strokeRoom(gesture, within === undefined ? [] : [within.rect], toward, strokeCover?.topCover.y, () => over);
+  const coverTop = room === undefined ? strokeCover?.topCover.y : room.coverTop;
+  const box = room?.box ?? gesture;
+  s.strokeWithin = room === undefined ? undefined : { ...room.within };
   if (turn) s.turns++;
   s.strokesSent++;
   s.lastStroke = toward;
@@ -1187,15 +1261,18 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
 /**
  * Send the flush check's probe (PROBE_REACH): toward revealing `edge`, over
- * `box` (swipe.ts#strokeRoom's, above `cover`: never the screen box — a
+ * `room`'s box (swipe.ts#strokeRoom's, above the probe's keyboard and what
+ * is drawn over the container: never the screen box — a
  * stop with no ancestor that has room is reported unchecked, not probed), its travel capped at
- * `maxTravel` (PROBE_MAX_TRAVEL_FRACTION), clear of this round's cover. A swipe like any other for
+ * `maxTravel` (PROBE_MAX_TRAVEL_FRACTION), clear of `room`'s cover. A swipe like any other for
  * the count and the bound, but not a step of the scroll's course: the turn
  * (`lastStroke`, `turns`, `strokesSent`) is left as it was, so a probe the
  * other way from the caller's direction is not a turn and halves no reach.
  */
-function probe(s: Mutable<State>, edge: Edge, rect: Rect, box: Rect, maxTravel: number, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
+function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: { within: Rect; box: Rect; coverTop?: number }, maxTravel: number): { state: Rounds; step: RoundStep } {
+  const { box, coverTop } = room;
   s.probe = { rect: { ...rect }, edge };
+  s.strokeWithin = { ...room.within };
   s.lastSent = REVEALS[edge];
   s.confirmReads = 0;
   s.since = 'stroke';
@@ -1207,12 +1284,49 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, box: Rect, maxTravel: 
       do: 'stroke',
       toward: REVEALS[edge],
       reach: PROBE_REACH,
-      ...(cover !== undefined && { coverTop: cover.topCover.y }),
+      ...(coverTop !== undefined && { coverTop }),
       box: { ...box },
       probe: true,
       maxTravel,
     },
   };
+}
+
+/**
+ * The node drawn over its container that the last stroke touched down on,
+ * when the strokes ended exhausted (2026-10-09, docs/bugs/2026-10-09-
+ * android-scroll-stroke-touches-down-on-floating-tab-bar.md): the last of
+ * `TreeFacts.drawnOver` — the one drawn on top — that contains the stroke's
+ * touch-down, in the tree that read unchanged. A gesture belongs to the view
+ * the finger first touches (swipe.ts#swipeVectorAbove), so such a node took
+ * the strokes — MAY have: the tree does not say whether a node takes touches
+ * (geometry.ts#drawnOver), so the sentence names it first and keeps the
+ * other causes after it (review round 1) — and "content exhausted" alone
+ * would send the reader the wrong way: the measured fast fail said so of a
+ * list with 34 more rows. The stroke
+ * box is cut above what is drawn over a container's lower half
+ * (swipe.ts#strokeRoom), so what is left to name is what the cut does not
+ * model — a floating header a content-up stroke touches down on, a node
+ * beside a sideways stroke's centre. Undefined when the stroke went over
+ * the gesture box whole (no container to be drawn over: the screen box,
+ * P5), when this tree holds no container of the remembered rect (the list
+ * moved; the stroke was still cut by the overlays kept with it,
+ * `StrokeContainer`), or when it touched down on nothing drawn over its
+ * container. One scan of the tree, at the stop only.
+ */
+/** `inner` lies wholly inside `outer`. */
+const rectWithin = (inner: Rect, outer: Rect): boolean =>
+  inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
+
+function touchedOn(s: State, facts: TreeFacts): TouchedOn | undefined {
+  const { strokeWithin: container, lastDrawn } = s;
+  if (container === undefined || lastDrawn === undefined) return undefined;
+  // A node whose rect holds the container's whole — a wrapper the list's
+  // size or larger — is no evidence of a cover at the touch-down: not named.
+  const on = (facts.drawnOver(container) ?? []).filter((n) => containsPoint(n.rect, lastDrawn.from) && !rectWithin(container, n.rect)).at(-1);
+  if (on === undefined) return undefined;
+  const { role, label, identifier, rect } = on;
+  return { at: { ...lastDrawn.from }, on: { role, label, identifier, rect: { ...rect } }, container };
 }
 
 /** Spend a confirming read: the next read follows a settle, not a stroke. */

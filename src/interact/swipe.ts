@@ -164,7 +164,8 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
  * DECIDED (`strokeRoom`: the target's scroll container met with the
  * screen, above a keyboard, or the screen whole) — toward `toward` (where
  * the content lies), clear of a cover whose top edge is `coverTop`
- * (`swipeVectorAbove`), its reach scaled by `reach` (`shortenStroke`, along
+ * (`swipeVectorAbove`: a keyboard's, or a node's drawn over the container,
+ * `strokeRoom` — the same rule for both, everything below the top covered), its reach scaled by `reach` (`shortenStroke`, along
  * the box's side along the stroke). Why a container (2026-10-09, measured,
  * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-
  * scroll-container.md, the triage of it): Settings' list is
@@ -211,7 +212,7 @@ export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRAC
 /**
  * The box a scroll stroke toward `toward` is drawn in over `within` (a
  * clipping container): `within` met with the gesture `box`, when what they
- * share — above `coverTop`, for a vertical stroke under a keyboard — is at
+ * share — above `coverTop`, for a vertical stroke under a cover — is at
  * least MIN_STROKE_BOX along the stroke; undefined otherwise. Pure; the one
  * judgement of room, asked through `strokeRoom`.
  */
@@ -229,21 +230,89 @@ export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?:
  * driver draws in), above a keyboard whose top edge is `coverTop`
  * (`strokeBox`: the container ∩ the screen ∩ above the keyboard, at least
  * MIN_STROKE_BOX along the stroke): `within`, the candidate as the tree
- * gives it, and `box`, what the stroke is drawn in. Undefined is NO ROOM:
+ * gives it, `box`, what the stroke is drawn in, and `coverTop`, the top
+ * edge of what covers that box's lower part — the keyboard's, or a node's
+ * drawn over the container (`overlayTop`), the higher of the two — for the
+ * stroke to keep clear of (`scrollStroke`); absent when nothing does.
+ * Undefined is NO ROOM:
  * what the caller does then is its own — scroll-rounds.ts reports a probe
  * `flush.why: 'room'` and sends none, and draws a stroke toward the target
  * over the screen whole, the stroke as it was before 2026-10-09. Until
  * deep/r3-scroll the round judged room over the screen and the driver again
  * above the keyboard, falling back to the screen; one judgement now, the
- * keyboard in it. No gesture `box` at all (screenBox threw): no room. Pure.
+ * keyboard in it. No gesture `box` at all (screenBox threw): no room.
+ *
+ * `over` gives the nodes drawn over a candidate (ui-tree/geometry.ts
+ * #drawnOver, through scroll-rounds.ts#TreeFacts) — the floating tab bar
+ * of 2026-10-09 (docs/bugs/2026-10-09-android-scroll-stroke-touches-down-
+ * on-floating-tab-bar.md): the list `0,825 1080x1395` ran under the bar's
+ * host `66,1840 948x248`, the content-down stroke over it touched down at
+ * 0.8 of the list, y 1942, on the bar, and the list never moved. Cut above
+ * the host it touches down at 1638 (measured: ≤ ~1800 scrolls the list).
+ * One judgement for every stroke: the room, the strokes toward the target
+ * and the `fully: true` probe all come here. Pure.
  */
-export function strokeRoom(box: Rect | undefined, candidates: readonly Rect[], toward: Direction, coverTop?: number): { within: Rect; box: Rect } | undefined {
+export function strokeRoom(
+  box: Rect | undefined,
+  candidates: readonly Rect[],
+  toward: Direction,
+  coverTop?: number,
+  over?: (within: Rect) => readonly { rect: Rect }[] | undefined,
+): { within: Rect; box: Rect; coverTop?: number } | undefined {
   if (box === undefined) return undefined;
   for (const within of candidates) {
-    const met = strokeBox(box, within, toward, coverTop);
-    if (met !== undefined) return { within, box: met };
+    const met = rectIntersection(box, within);
+    const drawn = met === undefined ? undefined : overlayTop(met, over?.(within) ?? [], toward);
+    const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
+    const room = strokeBox(box, within, toward, top);
+    if (room !== undefined) return { within, box: room, ...(top !== undefined && { coverTop: top }) };
   }
   return undefined;
+}
+
+/**
+ * The top edge of the highest of `over` — nodes drawn over a stroke
+ * container — that the container's stroke box `box` must be cut above
+ * for a stroke toward `toward` (2026-10-09, the floating tab bar:
+ * `strokeRoom`), or undefined. Only a CONTENT-DOWN stroke is cut: it
+ * touches down at 0.8 of the box, in its lower half, and the touch-down is
+ * all that matters (a gesture belongs to the view the finger first
+ * touches, `swipeVectorAbove`); a content-up stroke touches down at 0.2
+ * and only lifts off down there, so a cut would only take a third of its
+ * reach (1104 → 1942 would become 1104 → 1638 under the measured bar, more
+ * strokes against the 15 s budget) for nothing — review round 1. A
+ * sideways stroke is not cut either: its touch-down lies off the centre
+ * line on the box's middle row, which this rule does not model (a
+ * carousel under a bar: unmeasured).
+ *
+ * The node cut for is one that the STROKE'S LINE crosses (its rect spans
+ * x = the box's centre, where `swipeVector` draws a vertical stroke — a
+ * FAB in the corner takes no touch-down, and cutting for it would only
+ * shorten the stroke) and whose TOP lies in the box's LOWER HALF, below
+ * its centre and above its bottom, where the touch-down is. Everything
+ * below that top is then treated as covered, the keyboard's rule
+ * (`swipeVectorAbove`): its width and height are not read — the measured
+ * bar's host is 948 of 1080 wide and stops 132 px above the screen's
+ * bottom, so "spans the box" or "reaches its bottom" would both have
+ * missed it. The lower half and no higher: a cut there leaves at least
+ * half the box, so the stroke keeps a list's length, never a sliver's.
+ *
+ * Not cut, stated: a node drawn over the box's UPPER half (a floating
+ * header), where a content-up stroke touches down at 0.2 of the box — the
+ * cut models a cover from below only, as the keyboard's does; that fast
+ * fail names the node (scroll-rounds.ts#touchedOn), but a `fully: true`
+ * probe toward a top edge that touched down on one and moved nothing is
+ * still reported checked (a residual: the probe's stop is not the fast
+ * fail). Pure.
+ */
+function overlayTop(box: Rect, over: readonly { rect: Rect }[], toward: Direction): number | undefined {
+  if (toward !== 'down') return undefined;
+  const cx = Math.round(box.x + box.width / 2);
+  const tops = over
+    .map(({ rect }) => rect)
+    .filter((r) => r.x <= cx && cx < r.x + r.width && r.y > box.y + box.height / 2 && r.y < box.y + box.height)
+    .map((r) => r.y);
+  return tops.length === 0 ? undefined : Math.min(...tops);
 }
 
 /**
