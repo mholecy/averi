@@ -832,7 +832,7 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
   const screen = screenAreaOf(tree);
   const coversOnlyThroughContent = (n: UiNode) =>
-    n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || screenSizedHost(n, screen));
+    !isInteractive(n) && ((n.children.length > 0 && CONTENT_FRAMED_ROLES.has(n.role)) || screenSizedHost(n, screen));
   /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see above). */
   const emptyFrame = (n: UiNode) => n.role === 'container' && !n.label && !n.value && !n.identifier;
   /** A toolbar with no items: nothing of it is what is seen at the point (the UIKit sheet's two, 2026-10-09 — see above). */
