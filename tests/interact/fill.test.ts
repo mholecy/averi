@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { charactersText, DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillCaveats, fillField, fillUnverifiedText, type ReadBack } from '../../src/interact/fill.js';
+import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField, type ReadBack } from '../../src/interact/fill.js';
+import { judgeFill, wordingOf } from '../../src/interact/fill-verdict.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
@@ -44,7 +45,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.taps).toEqual(['amount_input']);
     expect(fake.deletes).toEqual([]);
     expect(fake.typed).toEqual(['2.50']);
-    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: { kind: 'landed' } });
+    expect(result).toEqual({ note: undefined, maskedAppend: undefined, role: 'textfield', typed: 4, readBack: { kind: 'landed' } });
   });
 
   it('accepts the selector-string vocabulary too', async () => {
@@ -165,7 +166,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value ?? '').toBe(''); // the fake appends the "" to a cleared (null) field: nothing held
     expect(reads).toBe(4); // the settle wait, the post-focus read the loop counts from, the one that confirms the clear — no value poll
-    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: { kind: 'nothing-typed' } });
+    expect(result).toEqual({ note: undefined, maskedAppend: undefined, role: 'textfield', typed: 0, cleared: 4, readBack: { kind: 'nothing-typed' } });
   });
 
   it('value "" with clear: true clears what the field holds AFTER focus — a field that autofills on focus ends empty', async () => {
@@ -197,7 +198,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['']); // deliberate: the "" reaches the adapter, whose contract makes it a no-op — fillField adds no second guard
     expect(fake.focused?.value).toHaveLength(20);
     expect(reads).toBe(2); // the settle wait only
-    expect(result).toEqual({ note: undefined, warning: undefined, role: 'textfield', readBack: { kind: 'nothing-typed' } });
+    expect(result).toEqual({ note: undefined, maskedAppend: undefined, role: 'textfield', typed: 0, readBack: { kind: 'nothing-typed' } });
   });
 
   it("in 'refuse' mode a second match appearing MID-fill is a refusal in its own wording, not a device hint", async () => {
@@ -268,9 +269,9 @@ describe('fillField — masked fields verify by length', () => {
     // fill (finportal 2026-09-17: the backend said invalid_grant). The caller says it.
     const fake = formFake('•'.repeat(20));
     appendBullets(fake);
-    const { warning } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
+    const { maskedAppend } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
     expect(fake.focused?.value).toHaveLength(36);
-    expect(warning).toBe('masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace');
+    expect(maskedAppend).toEqual({ held: 20 }); // its sentence is fill-verdict.ts's (fill-verdict.test.ts)
   });
 
   // Review 2026-09-18: the pre-tap read is stale for both shapes below, and a
@@ -283,9 +284,9 @@ describe('fillField — masked fields verify by length', () => {
       if (fake.focused) fake.focused.value = '•'.repeat(20); // autofill on focus
     };
     appendBullets(fake);
-    const { warning } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
+    const { maskedAppend } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
     expect(fake.focused?.value).toHaveLength(36);
-    expect(warning).toContain('typing APPENDS'); // and the append is still named
+    expect(maskedAppend).toEqual({ held: 20 }); // and the append is still named — what autofill put there, read after focus
   });
 
   it('a re-entry screen that CLEARS the masked field on focus does not fail the fill', async () => {
@@ -296,9 +297,9 @@ describe('fillField — masked fields verify by length', () => {
       if (fake.focused) fake.focused.value = null; // wrong-PIN re-entry clears on focus
     };
     appendBullets(fake);
-    const { warning } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
+    const { maskedAppend } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
     expect(fake.focused?.value).toHaveLength(16);
-    expect(warning).toBeUndefined(); // nothing was held after focus
+    expect(maskedAppend).toBeUndefined(); // nothing was held after focus
   });
 });
 
@@ -599,12 +600,10 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(fake.deletes).toEqual([7]);
     expect(inputOf(fake)?.value).toBe('DE89370400440532013000'); // the field DID hold the text — as measured
     expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: { kind: 'lost', why: 'screen-changed' }, notInput: undefined });
-    expect(fillUnverifiedText(result)).toBe('NOT verified: the field could not be found again (the screen changed while typing)');
-    expect(fillCaveats(result)).toEqual([]);
+    expect(judgeFill(result)).toMatchObject({ did: 'typed', reasons: [{ code: 'lost', why: 'screen-changed' }], caveats: [] });
   });
 
-  it('counts are singular for one: `1 character` in the clear-twice error and charactersText itself', async () => {
-    expect([0, 1, 2].map(charactersText)).toEqual(['0 characters', '1 character', '2 characters']);
+  it('counts are singular for one: `1 character` in the clear-twice error', async () => {
     resetLayout();
     const fake = new FakeAdapter({ s: screen(el({ role: 'textfield', identifier: 'pin', value: 'xy' })) }, 's');
     fake.clearText = async (count: number) => {
@@ -661,7 +660,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       expect(fake.deletes).toEqual([7]); // sent once; the loop does not delete blind
       expect(input().value).toBe('XX');
       expect(result).toMatchObject({ role: 'textfield', cleared: 7, readBack: { kind: 'lost', why: 'unmatched' }, notInput: undefined });
-      expect(fillUnverifiedText(result)).toBe('NOT verified: the field could not be found again (the selector no longer matches it)');
+      expect(judgeFill(result)).toMatchObject({ did: 'cleared', sent: { what: 'deletes', n: 7 }, reasons: [{ code: 'lost', why: 'unmatched' }] });
     });
 
     it('with a value, the read-back decides: not landed, and still lost', async () => {
@@ -671,13 +670,9 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     });
   });
 
-  it('a lost read-back carries its reason, and says it — a lost without one does not compile (code review of round 2)', () => {
-    expect(fillUnverifiedText({ role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' } })).toBe(
-      'NOT verified: the field could not be found again (the selector no longer matches it)',
-    );
-    expect(fillUnverifiedText({ role: 'textfield', readBack: { kind: 'lost', why: 'screen-changed' } })).toBe(
-      'NOT verified: the field could not be found again (the screen changed while typing)',
-    );
+  it('a lost read-back carries its reason into the verdict — a lost without one does not compile (code review of round 2)', () => {
+    expect(judgeFill({ role: 'textfield', typed: 3, readBack: { kind: 'lost', why: 'unmatched' } }).reasons).toEqual([{ code: 'lost', why: 'unmatched' }]);
+    expect(judgeFill({ role: 'textfield', typed: 3, readBack: { kind: 'lost', why: 'screen-changed' } }).reasons).toEqual([{ code: 'lost', why: 'screen-changed' }]);
     // @ts-expect-error — the reason is part of the kind: a `lost` read-back cannot be built without it.
     const reasonless: ReadBack = { kind: 'lost' };
     expect(reasonless.kind).toBe('lost');
@@ -734,7 +729,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     );
     const result = await fillField(fake, 'id:pw_label', 'x', FAST);
     expect(result.notInput).toEqual({ input: { identifier: null, rect: { x: 0, y: 20, width: 100, height: 10 }, overlaps: false } });
-    const sentence = fillCaveats(result).join('\n');
+    const sentence = wordingOf(judgeFill(result)).caveats.join('\n');
     expect(sentence).not.toContain('hunter2');
     expect(sentence).toContain('the nearest input is textfield at 0,20 100x10');
   });
@@ -766,6 +761,6 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
   it('Android: an EditText resolved directly is verified, says what it cleared, and carries no finding', async () => {
     const fake = formFake('2.50');
     const result = await fillField(fake, { id: 'amount_input' }, '7', { ...FAST, clear: true });
-    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, warning: undefined, role: 'textfield', cleared: 4, readBack: { kind: 'landed' }, notInput: undefined });
+    expect(result).toEqual({ note: undefined, keyboardHidden: undefined, maskedAppend: undefined, role: 'textfield', typed: 1, cleared: 4, readBack: { kind: 'landed' }, notInput: undefined });
   });
 });

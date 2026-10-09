@@ -4,20 +4,24 @@
  * They are here rather than inline in server.ts because server.ts connects a
  * transport at module load and cannot be imported by a test — and these lines
  * carry information the agent acts on: the resolution note (which of several
- * nodes was tapped) and the fill warning (a masked field that already held
- * text). A regression that dropped either would otherwise be invisible to
- * every test in the repo (review 2026-10-03).
+ * nodes was tapped) and, until 2026-10-09, the fill's warnings. A regression
+ * that dropped either would otherwise be invisible to every test in the repo
+ * (review 2026-10-03).
  *
  * 2026-10-03, later the same day: the reason above no longer holds — the
  * handlers moved to mcp/tools.ts, which is importable and tested through an
  * in-memory transport. The functions stay here anyway: they are pure, and
- * tool-text.test.ts pins every wording variant (note, warning, cleared, unverified, not an input)
- * without building a server, a registry or a fake device to provoke each one.
+ * tool-text.test.ts pins every wording variant without building a server, a
+ * registry or a fake device to provoke each one.
+ *
+ * The type_text reply WITH a selector (a fill) is not here since 2026-10-09:
+ * it is interact/fill-text.ts#fillText, beside the flow's fill line it must
+ * agree with — the flow engine may not import this layer.
  */
 
 import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
-import { charactersText, fillCaveats, fillClearedText, fillUnverifiedText, type FillResult } from '../interact/fill.js';
+import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
@@ -25,57 +29,6 @@ import { formatSeconds } from '../util/duration.js';
 /** `Tapped <selector>`, with the resolution note in parentheses when there was one. */
 export const tapText = (selector: string, note: string | undefined): string =>
   `Tapped ${selector}${note ? ` (${note})` : ''}`;
-
-/**
- * What a fill did, from its result (interact/fill.ts#FillResult) — the
- * wording of each fact is fill.ts's, shared with the flow line:
- * - read back and landed (or nothing to type):
- *   `Filled <selector> (N characters[, cleared M characters first])[ (note)]`
- * - nothing to read back (`readBack.kind` `no-value`, `not-taken`, `lost`):
- *   `Typed N characters into <selector> — NOT verified: <reason>[; clear
- *   sent no delete …][ (note)]`, the reason e.g. `the matched node exposes
- *   no value (role R)` or `the field could not be found again (the screen
- *   changed while typing)` — a different verb, so "Filled" never stands for
- *   a fill nobody saw. A clear alone (no text) has its own head there,
- *   `Cleared <selector> (N deletes sent)` or `Focused
- *   <selector>` (`clearAloneHead`).
- * Every count goes through util/count.ts#countOf: `1 character`,
- * `1 delete`, never the plural for one (2026-10-08 device checks).
- * Then each caveat (fill.ts#fillCaveats: a matched node that is not an
- * input, the masked-append warning) on its own `⚠` line, so it is not lost
- * inside the parentheses. "cleared" is what was SENT, never the requested
- * option: until 2026-10-08 the reply printed `clear` as asked, and an idb
- * label node read "cleared first" with nothing deleted (docs/bugs/
- * 2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
- */
-export const fillText = (selector: string, fill: { length: number } & FillResult): string => {
-  const unverified = fillUnverifiedText(fill);
-  const cleared = fillClearedText(fill, fill.length);
-  const head =
-    unverified === undefined
-      ? `Filled ${selector} (${charactersText(fill.length)}${cleared === undefined ? '' : `, ${cleared}`})`
-      : fill.length === 0 && fill.cleared !== undefined
-        ? `${clearAloneHead(selector, cleared)} — ${unverified}`
-        : `Typed ${charactersText(fill.length)} into ${selector}${cleared === undefined ? '' : ` (${cleared})`} — ${unverified}`;
-  return head + (fill.note ? ` (${fill.note})` : '') + fillCaveats(fill).map((c) => `\n⚠ ${c}`).join('');
-};
-
-/**
- * The head of a clear ALONE (empty text, `clear: true`) that could not be
- * verified (code review of round 2, 2026-10-08): it typed nothing, so
- * "Typed 0 characters into … (cleared 7 characters first)" said neither
- * what was done nor what is unknown. Its two unverified paths:
- * - deletes went out and the read after them lost the field (readBack
- *   `lost`): `Cleared <selector> (N deletes sent)` — sent,
- *   not seen to land;
- * - no delete went out (`cleared: 'unmeasured'`, a node that is not the
- *   input): `Focused <selector>` — the focus tap is all that was done.
- * `sent` is fill.ts#fillClearedText's clause, the flow line's too, so the
- * two say one thing. A verified clear alone keeps `Filled <selector> (0
- * characters, cleared N characters first)`.
- */
-const clearAloneHead = (selector: string, sent: string | undefined): string =>
-  sent !== undefined ? `Cleared ${selector} (${sent})` : `Focused ${selector}`;
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field

@@ -1,6 +1,8 @@
 import type { IosTreeSourceKind } from '../adapters/ios-node.js';
 import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
-import { fillCaveats, fillClearedText, fillField, fillUnverifiedText } from '../interact/fill.js';
+import { fillField } from '../interact/fill.js';
+import { judgeFill } from '../interact/fill-verdict.js';
+import { fillText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
@@ -1172,13 +1174,20 @@ export class FlowEngine {
         // tests mock util/sleep instead of threading a test-only option here.
       }),
     );
-    // The caveats (interact/fill.ts#fillCaveats: a match that is not an
-    // input, the masked-append warning) are logged BEFORE the keyboard is
-    // dismissed: a dismissal that throws (a `back` the device refuses, a
-    // dismissal tap that does not hide the keyboard) must not take them down
-    // with it. The keyboard line (tracingDismissal's) comes first: it
-    // happened first, before the focus tap.
-    for (const caveat of fillCaveats(filled)) this.log('⚠ fill', `${describeElementSpec(spec)}: ${caveat}`);
+    // The words and their layout are interact/fill-text.ts's, the MCP
+    // reply's beside it: what was DONE, never what was asked (2026-10-08) —
+    // `(cleared N characters first)` only when a delete was sent, and a
+    // read-back with nothing to compare makes the line itself `⚠ fill … —
+    // NOT verified: …` (docs/bugs/2026-10-08-ios-fill-unverified-reports-
+    // filled-and-cleared.md: an idb label node printed `(cleared)` on a
+    // field nothing reached). Masking the value is this engine's call.
+    const said = fillText(judgeFill(filled), { step: describeElementSpec(spec), shown: secret ? '***' : value });
+    // The caveats (a match that is not an input, the masked-append warning)
+    // are logged BEFORE the keyboard is dismissed: a dismissal that throws
+    // (a `back` the device refuses, a dismissal tap that does not hide the
+    // keyboard) must not take them down with it. The keyboard line
+    // (tracingDismissal's) comes first: it happened first, before the focus tap.
+    for (const caveat of said.caveats) this.log(caveat.action, caveat.text);
     // What the dismissal did (stage B, 2026-10-07): on the in-tree model it
     // may tap a configured element — said on the fill line, since the step
     // did it — or leave the keyboard up with a reason, a `⚠ fill` line like
@@ -1197,19 +1206,7 @@ export class FlowEngine {
       );
     }
     if (closed.warning !== undefined) this.log('⚠ fill', `${describeElementSpec(spec)}: ${closed.warning}`);
-    // What was DONE, never what was asked (2026-10-08): `(cleared N
-    // characters first)` only when a delete was sent, and a read-back with
-    // nothing to compare makes the line itself `⚠ fill … — NOT verified: …`
-    // (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
-    // an idb label node printed `(cleared)` on a field nothing reached).
-    const cleared = fillClearedText(filled, value.length);
-    const unverified = fillUnverifiedText(filled);
-    this.log(
-      unverified === undefined ? 'fill' : '⚠ fill',
-      `${describeElementSpec(spec)} = ${secret ? '***' : value}${cleared === undefined ? '' : ` (${cleared})`}` +
-        (unverified === undefined ? '' : ` — ${unverified}`) +
-        (closed.hiddenBy === undefined ? '' : `; keyboard hidden by ${closed.hiddenBy}`),
-    );
+    this.log(said.line.action, said.line.text + (closed.hiddenBy === undefined ? '' : `; keyboard hidden by ${closed.hiddenBy}`));
   }
 
   private async runAssert(specs: StepPayload<'assert'>): Promise<void> {

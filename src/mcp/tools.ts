@@ -4,12 +4,14 @@ import type { AdapterOpts, AdapterRegistry } from './registry.js';
 import { BARE_TREE_CONTENTS } from '../ui-tree/bare-tree.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { fillField } from '../interact/fill.js';
+import { judgeFill } from '../interact/fill-verdict.js';
+import { fillText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
-import { fillText, launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
+import { launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
 import { resolveLaunchActivity } from '../flow/config.js';
 import { appBuildPath } from '../flow/load.js';
 import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
@@ -75,7 +77,7 @@ import type { Platform, UiNode } from '../adapters/types.js';
  * tree source and dismissals, which activity — flow/); one call into an
  * adapter method, interact/ or run/, handed the loaded config rather than a
  * path to read again; and the response — text through tool-text.ts or the
- * callee, wrapped by `text`/`image` below. The sequences once written out
+ * callee (a fill's through interact/fill-text.ts, shared with the flow line), wrapped by `text`/`image` below. The sequences once written out
  * here (ensure_state, run_flow, assert, the contract file read) are below
  * this layer.
  *
@@ -455,7 +457,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         return text(typedText(value.length));
       }
       const fill = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });
-      return text(fillText(selector, { length: value.length, ...fill }));
+      return text(fillText(judgeFill(fill), { reply: selector }));
     },
   );
 
