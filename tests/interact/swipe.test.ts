@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, strokeRoom, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, strokeRoom, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_DOWN_CUT_FLOOR, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -416,6 +416,39 @@ describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one own
     expect(scrollStroke({ toward: 'down', reach: 1, box: list, coverTop: 1150 }).from.y).toBeLessThan(1150);
     // Without the keyboard the same bar lies in the list's upper half: not cut, as before.
     expect(strokeRoom(BOX, [list], 'down', undefined, onKeyboard)).toEqual({ within: list, box: list });
+  });
+  it('a node over the TOUCH-DOWN is cut for wherever its top lies (2026-10-09, D3): a short list under the measured bar — the host starts in its upper half, yet covers 0.8 of it', () => {
+    const short = { x: 0, y: 1550, width: 1080, height: 670 };
+    const bar = { x: 66, y: 1840, width: 948, height: 248 };
+    // The uncut stroke touches down at 0.8 of the list, 2086, on the host (1840–2088): above its centre, 1885, so the lower-half rule missed it.
+    expect(scrollStroke({ toward: 'down', reach: 1, box: short }).from).toEqual({ x: 540, y: 2086 });
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar])).toEqual({ within: short, box: short, coverTop: 1840 });
+    expect(scrollStroke({ toward: 'down', reach: 1, box: short, coverTop: 1840 }).from).toEqual({ x: 540, y: 1782 });
+    // The cut moves the touch-down up onto another node drawn over the list: cut above that one too, while a third of the box is left.
+    const above = { x: 0, y: 1780, width: 1080, height: 20 };
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar, above])).toEqual({ within: short, box: short, coverTop: 1780 });
+    expect(scrollStroke({ toward: 'down', reach: 1, box: short, coverTop: 1780 }).from).toEqual({ x: 540, y: 1734 });
+    // All or nothing (code review of fix/r5-stroke): when the next cut would leave under a third, none is made — not the bar's alone, which still lands on the node.
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar, { x: 0, y: 1600, width: 1080, height: 200 }])).toEqual({ within: short, box: short });
+    // A node over most of the box (a sheet; under MIN_STROKE_BOX left too) is not cut for: the stroke is drawn as before, its fast fail naming the node.
+    const sheet = { x: 0, y: 1600, width: 1080, height: 620 };
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [sheet])).toEqual({ within: short, box: short });
+    // …nor a wrapper over the measured list from near its top: cut, the 838-px stroke would be 70 px (TOUCH_DOWN_CUT_FLOOR).
+    const list = { x: 0, y: 825, width: 1080, height: 1395 };
+    expect(TOUCH_DOWN_CUT_FLOOR).toBe(1 / 3);
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ x: 0, y: 940, width: 1080, height: 1280 }])).toEqual({ within: list, box: list });
+    // …while the lower-half rule's cut stands under it: the bar's 1840 kept, the wrapper not cut for.
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ x: 66, y: 1840, width: 948, height: 248 }, { x: 0, y: 940, width: 1080, height: 1280 }])).toEqual({ within: list, box: list, coverTop: 1840 });
+    // The floor is a third of the box ABOVE the keyboard: 215 of 573 is enough, though not of the whole 1395.
+    expect(strokeRoom(BOX, [list], 'down', 1398, () => [{ x: 0, y: 1040, width: 1080, height: 300 }])?.coverTop).toBe(1040);
+    // The HIGHEST node over the touch-down is judged: one from 300 over a 670-px box leaves 200, under the floor — uncut, though a cut above the lower one, at 340, would have cleared it.
+    const box = { x: 0, y: 100, width: 1080, height: 670 };
+    expect(strokeRoom(BOX, [box], 'down', undefined, () => [{ x: 0, y: 300, width: 1080, height: 600 }, { x: 0, y: 340, width: 1080, height: 400 }])).toEqual({ within: box, box });
+    // Off the touch-down (beside the stroke's line, or below the touch-down): no cut, as before.
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [{ x: 600, y: 1840, width: 480, height: 248 }])).toEqual({ within: short, box: short });
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [{ x: 0, y: 1600, width: 1080, height: 100 }])).toEqual({ within: short, box: short });
+    // A content-up stroke is still never cut.
+    expect(strokeRoom(BOX, [short], 'up', undefined, () => [bar])).toEqual({ within: short, box: short });
   });
   it('maxTravel caps the finger\'s travel, the touch-down kept, never under twice TOUCH_SLOP', () => {
     const list = { x: 0, y: 242, width: 1080, height: 1736 };
