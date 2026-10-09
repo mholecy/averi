@@ -744,6 +744,19 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen.tapAt).toEqual({ point: { x: 75, y: 88 }, moved: true, piece: rect(0, 70, 150, 36) });
     });
 
+    // Code review of round 6, P4: firstContent's stated miss, pinned. A first row lying wholly inside the band and clear
+    // of the bar's items is read as the bar's, so content listed after it that ends inside the band is no cover of it.
+    it('the residual, pinned: a first row wholly inside the band and clear of Back (120–160) is read as the bar\'s — a tip ending in the band over it reads clear; a menu reaching past the band still covers it', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const first = uiNode({ role: 'button', label: 'First', rect: rect(0, 120, 402, 40) }); // ends at 160, inside the line at 174.8
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
+      const flat = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), back, first, row, later] });
+      const tip = uiNode({ role: 'text', label: 'Tip', rect: rect(0, 130, 200, 20) }); // over First, ending at 150
+      expect(drawOrder(flat(tip)).exposure(first, IPHONE).covers).toEqual([]); // the false "clear", stated in firstContent
+      const menu = uiNode({ role: 'button', label: 'Menu', rect: rect(150, 125, 240, 130) }); // reaches 255, past the line
+      expect(drawOrder(flat(menu)).exposure(first, IPHONE).covers).toEqual([menu]);
+    });
+
     it('the band\'s line sits at 20 % of the screen (174.8 on 874): content ending at 170 is excused over a bar item, content ending at 180 is not', () => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
