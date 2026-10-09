@@ -90,5 +90,6 @@ flows:
 
 - **`↻ recovery` in a passing trace** means a late screen beat the ladder, and averi re-ran the earlier rungs that are safe to repeat, once. It is a safety net, not a design: fix the flow as above. `⚠ recovery` / `⚠ salvage` lines are diagnostics, never the cause of a failure.
 - **Config mistakes stop the ladder.** An undeclared credential, an unset `${VAR}` or a PIN with no digits fails the call at once instead of escalating to a wipe.
+- **So does a refused optional tap.** An `optional:` step is skipped only when its element is absent. When the element is on screen but averi refuses to tap it (off screen, or covered by another node), the call fails at once with `optional step not skipped: …` instead of escalating to the next rung.
 
 For every step kind, the remaining schema keys and the semantics of `optional:`, `branch:` and `detect`, see [references/averi-yaml.md](references/averi-yaml.md).

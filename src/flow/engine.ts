@@ -3,7 +3,7 @@ import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
 import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
-import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, movedTapText, resolvePresent, type Ambiguity } from '../interact/resolve.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, movedTapText, PresentElementRefusal, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -178,18 +178,47 @@ class ReentryError extends Error {
 }
 
 /**
+ * An `optional:` step whose element was PRESENT and which the interaction
+ * module refused to tap (2026-10-09, owner's decision —
+ * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md,
+ * item 3): an interact PresentElementRefusal (the target's centre off the
+ * screen, or under a node drawn over it), raised by an optional tap or by a
+ * nested step's tap (a fill's focus tap). `optional:` skips an ABSENT
+ * element; this one is on screen, so the interstitial the step exists for IS
+ * there, and skipping it ran the flow on — measured: mp-native's
+ * `login_registered` rung skipped a refused `optional: tap { text: "LOGIN" }`,
+ * its `wait:` failed, and the ladder went on to `login`, the rung that
+ * spends a device registration. Terminal (`isTerminal`) for that reason: the
+ * ladder neither escalates past it nor salvages it. The refusal is the
+ * `cause`; the message says why it was not skipped, then quotes it.
+ *
+ * Only an `optional:` raises it. The same refusal outside one is the step's
+ * plain failure and a rung that throws it escalates as before — the owner's
+ * decision is about what `optional:` may swallow.
+ */
+class OptionalNotSkipped extends Error {
+  constructor(refusal: PresentElementRefusal) {
+    super(`optional step not skipped: its element is present, but the tap was refused — ${refusal.message}`, { cause: refusal });
+    this.name = 'OptionalNotSkipped';
+  }
+}
+
+/**
  * An error the ladder must NOT escalate past, nor hand to salvage: re-running
  * flows cannot fix it, and the next rung may be the destructive one. A
  * SetupError is a broken descriptor; an UnreadTreeRefusal is a nested ladder
  * (a rung's `requires:`) that already refused — escalating the OUTER ladder
- * past it would run the wipe the inner one declined. The ladder's catch asks
+ * past it would run the wipe the inner one declined; an OptionalNotSkipped
+ * (since 2026-10-09) is a rung's interstitial that is on screen and could
+ * not be tapped — the next rung would run on the screen the cheap one was
+ * written for. The ladder's catch asks
  * (the final wait never enters a ladder, so it can see a SetupError — an
  * unknown state in a condition — but never a refusal), and since 2026-10-08
  * so does `optional:` (runOptionalSteps), which rethrows instead of
  * skipping, and runStep, which then gives such an error its ✗ line even
  * inside an `optional:`.
  */
-const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanceof UnreadTreeRefusal;
+const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanceof UnreadTreeRefusal || e instanceof OptionalNotSkipped;
 
 /**
  * What one detect probe learned. `unknown` is "every read failed — the probe
@@ -960,14 +989,22 @@ export class FlowEngine {
       // only a vaguer label (review 2026-09-18).
       // A terminal error (a config refusal) is never swallowed, even inside
       // an `optional:` (runOptionalSteps rethrows it), so it gets its ✗ on
-      // the step that raised it, not on the enclosing `optional`.
-      const seen = typeof e === 'object' && e !== null && this.loggedFailures.has(e);
-      if ((this.swallowDepth === 0 || isTerminal(e)) && !seen) {
-        this.log(`✗ ${stepSummary(step, this.adapter.platform)}`, `failed — ${headline(e)}`);
-        if (typeof e === 'object' && e !== null) this.loggedFailures.add(e);
-      }
-      throw e;
+      // the step that raised it, not on the enclosing `optional`. Nor is a
+      // tap refused on a PRESENT element inside one (2026-10-09): it becomes
+      // the terminal OptionalNotSkipped here, on the innermost step — a
+      // platform override's tap, a fill's focus tap, a tap in a `branch:`.
+      throw this.failed(step, this.swallowDepth > 0 && e instanceof PresentElementRefusal ? new OptionalNotSkipped(e) : e);
     }
+  }
+
+  /** runStep's ✗ line for `e` on `step`, once per failure (see there), and `e` back for the caller to throw. */
+  private failed(step: Step, e: unknown): unknown {
+    const seen = typeof e === 'object' && e !== null && this.loggedFailures.has(e);
+    if ((this.swallowDepth === 0 || isTerminal(e)) && !seen) {
+      this.log(`✗ ${stepSummary(step, this.adapter.platform)}`, `failed — ${headline(e)}`);
+      if (typeof e === 'object' && e !== null) this.loggedFailures.add(e);
+    }
+    return e;
   }
 
   /**
@@ -1270,6 +1307,10 @@ export class FlowEngine {
           await this.runStep(s); // swallowDepth > 0: no ✗ line, the failure is logged as skipped below
         }
       } catch (e) {
+        // The optional tap is not dispatched through runStep, so its refusal
+        // on a PRESENT element (2026-10-09, OptionalNotSkipped) gets its ✗
+        // here, on the tap — as runStep gives it to a nested step's.
+        if (tap && e instanceof PresentElementRefusal) throw this.failed(s, new OptionalNotSkipped(e));
         // A config refusal is not an absent interstitial (2026-10-08, review
         // of after-ios-idb #4): an empty secret, a `type_pin` value with no
         // digits, an undeclared credential — the same rule as the
@@ -1280,7 +1321,11 @@ export class FlowEngine {
         // own "re-running cannot fix this" set: a SetupError, and an
         // UnreadTreeRefusal, which no step inside an `optional:` can raise
         // today (only the ladder does, and no step runs one) — were one ever
-        // to, a declined destructive rung is not an absence either.
+        // to, a declined destructive rung is not an absence either. Since
+        // 2026-10-09 it holds an OptionalNotSkipped too: an element that was
+        // there and was refused a tap (interact's PresentElementRefusal —
+        // off screen, or under something drawn over it) is the interstitial
+        // itself, so the step fails the flow instead of being skipped.
         if (isTerminal(e)) throw e;
         // Why it was skipped: "(not present)" only when the interaction
         // module says the element was never found (ElementNotFoundError,
@@ -1289,10 +1334,11 @@ export class FlowEngine {
         // step's resolution or scroll_until that never saw its target. Every
         // other failure is skipped with its own headline (and the read error
         // beneath it, when the last read failed — skipReason): the element
-        // WAS there, or nobody could see the screen at the end, or the
-        // step never got as far as looking (a fill's value refused before
-        // anything is tapped), or what failed was no element at all (a
-        // `wait:` or `branch:` timeout says what it waited for).
+        // WAS there (and was not refused a tap — that threw above), or
+        // nobody could see the screen at the end, or the step never got as
+        // far as looking (a fill's value refused before anything is tapped),
+        // or what failed was no element at all (a `wait:` or `branch:`
+        // timeout says what it waited for).
         //
         // Until 2026-10-08 the engine deduced this from missing evidence: a
         // `present` flag set by the tap's presence poll, and for the other

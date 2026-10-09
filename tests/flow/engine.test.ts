@@ -2085,11 +2085,20 @@ flows:
       expect(fake.swipes).toEqual([]);
     });
 
-    it('a tap on an element BELOW THE FOLD is not (not present): it was found — skipped with the off-screen refusal, nothing tapped (2026-10-08)', async () => {
+    // 2026-10-08 it was skipped with the refusal's headline; since 2026-10-09
+    // (owner's decision) a refusal on a PRESENT element is never skipped.
+    it('a tap on an element BELOW THE FOLD is not (not present): it was found — the off-screen refusal fails the flow, not skipped, nothing tapped', async () => {
       const fake = formFake();
       fake.live().children.push(node({ role: 'button', identifier: 'promo_close', rect: { x: 40, y: 2100, width: 100, height: 40 } })); // below the 1000x2000 screen
-      expect(await skipOf(fake, 'tap: { id: promo_close }')).toEqual([
-        'skipped id:"promo_close" (id:"promo_close" is off screen at (90,2120) on a 1000x2000 screen (rect 40,2100 100x40) — scroll_until it first; nothing was tapped)',
+      const error = (await FlowEngine.run(optionalFlow('tap: { id: promo_close }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.trace.slice(1)).toEqual([
+        {
+          action: '✗ tap id:"promo_close"',
+          detail:
+            'failed — optional step not skipped: its element is present, but the tap was refused — ' +
+            'id:"promo_close" is off screen at (90,2120) on a 1000x2000 screen (rect 40,2100 100x40) — scroll_until it first; nothing was tapped',
+        },
       ]);
       expect(fake.taps).toEqual([]);
     });
@@ -2620,9 +2629,10 @@ flows:
 
 describe('tap: / fill: on a target under the app\'s chrome — the trace says where the tap went, or the step fails naming the cover (2026-10-09)', () => {
   // docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md; the rule is pinned in tests/interact/resolve.test.ts.
-  const form = (y: number) =>
+  const form = (y: number, more: Record<string, UiNode> = {}) =>
     new FakeAdapter(
       {
+        ...more,
         form: node({
           role: 'container',
           rect: { x: 0, y: 0, width: 402, height: 874 },
@@ -2663,6 +2673,84 @@ flows:
     const error = (await FlowEngine.run(flow('tap: { id: priority }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain('id:"priority" is under button "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over it; only a 354x9 part of it shows');
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  // 2026-10-09, owner's decision (docs/bugs/2026-10-09-android-compose-button-
+  // text-refused-as-under-its-own-button.md, item 3): `optional:` skips an
+  // ABSENT element only. One that is present and refused a tap is the
+  // interstitial itself — skipped, mp-native's login_registered rung ran on
+  // into its `wait:` and the ladder escalated to the registering login.
+  describe('inside optional: a covered target fails the flow, never skipped — an absent one still is', () => {
+    const NOT_SKIPPED = 'failed — optional step not skipped: its element is present, but the tap was refused — id:"priority" is under button "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over it';
+    const failedLines = (error: FlowError) => error.trace.filter((t) => t.action.startsWith('✗') || t.action === 'optional');
+
+    it.each([
+      ['an optional tap:', 'optional: [ { tap: { id: priority } } ]', '✗ tap id:"priority"'],
+      ['a platform override\'s tap (login_registered\'s shape)', 'optional: [ { android: { tap: { id: priority } } } ]', '✗ tap id:"priority"'],
+      ['a fill\'s focus tap', 'optional: [ { fill: { id: priority, value: "x" } } ]', '✗ fill id:"priority"'],
+      ['a tap in a branch:', 'optional: [ { branch: [ { when: { element: { id: priority } }, do: [ { tap: { id: priority } } ] } ] } ]', '✗ tap id:"priority"'],
+    ])('%s — ONE ✗ line on the refused step, no skip line, the flow stops there', async (_name, step, failedLine) => {
+      const fake = form(771);
+      const cfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - ${step}
+      - tap: { id: continue }
+`);
+      const error = (await FlowEngine.run(cfg, fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.message).toMatch(/^optional step not skipped: its element is present, but the tap was refused — id:"priority" is under button/);
+      expect(failedLines(error)).toEqual([{ action: failedLine, detail: expect.stringContaining(NOT_SKIPPED) as string }]);
+      expect(fake.tapPoints).toEqual([]); // neither the refused target nor the step after it
+      expect(fake.typed).toEqual([]);
+    });
+
+    it('an ABSENT element is still skipped (not present), and the flow goes on', async () => {
+      const fake = form(754);
+      const trace = await FlowEngine.run(flow('optional: [ { tap: { id: nope } } ]'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({ action: 'optional', detail: 'skipped id:"nope" (not present)' });
+      expect(trace.at(-1)).toEqual({ action: 'flow f', detail: 'done' });
+    });
+
+    describe('in a reach ladder: terminal — the ladder does not escalate past it, nor salvage it', () => {
+      const ladder = parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login_registered, login]
+flows:
+  login_registered:
+    steps:
+      - optional: [ { tap: { id: priority } } ]
+      - wait: { element: { id: dashboard_root }, timeout: 50ms }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+      const ladderFake = (y: number) =>
+        form(y, { dashboard: node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ identifier: 'dashboard_root', rect: { x: 0, y: 0, width: 402, height: 874 } })] }) });
+
+      it('a covered optional tap fails the rung, and the destructive rung never runs', async () => {
+        const fake = ladderFake(771);
+        const error = (await FlowEngine.run(ladder, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e)) as FlowError;
+        expect(error).toBeInstanceOf(FlowError);
+        expect(error.message).toMatch(/^optional step not skipped: its element is present, but the tap was refused/);
+        expect(fake.launches).toEqual([]); // no clearState → no spent device registration
+        expect(error.trace.filter((t) => t.action.startsWith('⚠ reach') || t.action.startsWith('↻') || t.action.startsWith('salvage'))).toEqual([]);
+        expect(failedLines(error)).toEqual([{ action: '✗ tap id:"priority"', detail: expect.stringContaining(NOT_SKIPPED) as string }]);
+        expect(fake.tapPoints).toEqual([]);
+      });
+
+      it('an ABSENT optional element is skipped as before, and the ladder escalates as before', async () => {
+        const fake = ladderFake(754);
+        fake.live().children = fake.live().children?.filter((c) => c.identifier !== 'priority');
+        await FlowEngine.run(ladder, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch(() => undefined);
+        expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
+      });
+    });
   });
 });
 
@@ -2908,7 +2996,9 @@ flows:
     expect(fake.taps).toEqual([]);
   });
 
-  it('an optional tap: whose target the keyboard\'s re-layout moved off screen AFTER back: the skip\'s one line says back was pressed (2026-10-08, review m2)', async () => {
+  // Skipped until 2026-10-09; a refusal on a present element now fails the
+  // flow even inside `optional:` (owner's decision), and its ✗ is the one line.
+  it('an optional tap: whose target the keyboard\'s re-layout moved off screen AFTER back: the ✗ line says back was pressed, not skipped (2026-10-08, review m2)', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const relayout = fake.onKey;
@@ -2916,13 +3006,16 @@ flows:
       relayout?.(key, self);
       self.live().children[1].rect = { x: 99, y: 2300, width: 300, height: 132 };
     };
-    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' });
-    expect(trace).toContainEqual({
-      action: 'optional',
-      detail:
-        'skipped id:"login_submit" (id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is off screen at ' +
-        '(249,2366) on a 1080x2220 screen (rect 99,2300 300x132) — scroll_until it first)',
-    });
+    const error = (await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1)).toEqual([
+      {
+        action: '✗ tap id:"login_submit"',
+        detail:
+          'failed — optional step not skipped: its element is present, but the tap was refused — ' +
+          'id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is off screen at ' +
+          '(249,2366) on a 1080x2220 screen (rect 99,2300 300x132) — scroll_until it first',
+      },
+    ]);
     expect(fake.keys).toEqual(['back']);
     expect(fake.taps).toEqual([]);
   });
