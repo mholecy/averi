@@ -233,6 +233,17 @@ describe('round — the soft keyboard', () => {
     expect(strokeCovers(played)).toEqual([1398, undefined, undefined]); // round 2, unread: round 1's whole screen, not round 0's band
   });
 
+  it('a round whose tree did not read keeps the last frame — the device as built its screen box gives then is its gesture box only: a later round with no screen box of its own still judges in the turned frame', () => {
+    const TURNED: Rect = { x: 0, y: 0, width: 2220, height: 1080 };
+    const off: Row = { found: [match({ x: 66, y: 5000, width: 948, height: 73 })] };
+    const played = play({ ...ANDROID, maxSwipes: 2 }, [
+      { ...off, screen: { box: TURNED, boxes: [TURNED] } }, // read held sideways
+      { error: 'uiautomator dump returned no XML', screen: { box: SCREEN_1080, boxes: [SCREEN_1080] } }, // unread: the device as built
+      { ...off, screen: null }, // read, but no screen box this round: the frame stays
+    ]);
+    expect(failureOf(played, 'id:t').message).toMatch(/never intersected the 2220x1080 viewport/);
+  });
+
   it('a round whose tree did not read strokes in the box the last read round\'s band left, not through the keyboard', () => {
     const played = play(ANDROID, [
       { found: [formRow(2900)], cover: UP_IME },

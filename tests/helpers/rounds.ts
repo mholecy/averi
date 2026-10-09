@@ -27,8 +27,8 @@ export interface Row {
   found?: readonly UiNode[];
   /** The read failed with this message. */
   error?: string;
-  /** swipe.ts#screenBox's answer this round (`RoundSeen.screen`: the gesture box, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box] }`. */
-  screen?: ScreenBox;
+  /** swipe.ts#screenBox's answer this round (`RoundSeen.screen`: the gesture box, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box] }`; `null`: screenBox threw — no box this round, the frame stays. */
+  screen?: ScreenBox | null;
   /** The reading's `cover()`: absent for a keyboard hidden or unknown. */
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`; default: no node is the keyboard's. */
@@ -131,7 +131,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
           ? { error: new Error(row.error) }
           : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
-      screen: row.screen ?? asBuilt,
+      ...(row.screen !== null && { screen: row.screen ?? asBuilt }),
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };
     const asks: Ask[] = [];
