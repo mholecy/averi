@@ -4,7 +4,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { absenceError } from './resolve.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 
 /**
  * Every sentence `scroll_until` says (2026-10-09, the scroll-rounds
@@ -69,10 +69,12 @@ export interface ScrollUntilResult {
    * interact/scroll-rounds.ts#PROBE_REACH) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
    * `checked`: a probe swipe toward that edge moved nothing, so nothing
-   * does (the probe is one of `swipes`). Not checked: no swipe or time was
-   * left to probe, and the reply says it may be cut. Absent otherwise.
+   * does (the probe is one of `swipes`). Not checked (`why`, scroll-rounds.ts
+   * #Flush): no swipe or time left, no container with room for a probe, or
+   * a probe short enough to be a tap — the reply says it may be cut.
+   * Absent otherwise.
    */
-  flush?: { edge: Edge; container: Rect; checked: boolean };
+  flush?: Flush;
 }
 
 /**
@@ -152,9 +154,13 @@ export function describeScrollResult(r: ScrollUntilResult): string {
 function flushText(flush: ScrollUntilResult['flush']): string {
   if (flush === undefined) return '';
   const where = `its ${flush.edge} edge lies on its scroll container's (${rectText(flush.container)})`;
-  return flush.checked
-    ? `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`
-    : `; but ${where}, where Android cuts a node's bounds to the container, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it`;
+  if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
+  const unchecked = {
+    budget: 'no swipe or time was left to check it',
+    room: 'no scroll container around it has room for a probe swipe to check it',
+    tap: 'the probe swipe was too short to tell from a tap',
+  }[flush.why];
+  return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — it may be cut there, a rect assert or screenshot may measure part of it`;
 }
 
 /** The `settled: false` note — what the reader should know before measuring the element. */

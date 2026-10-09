@@ -241,14 +241,14 @@ export type ScrollOutcome =
 /**
  * A `fully: true` stop whose edge along the scroll lies on its scroll
  * container's edge (PROBE_REACH): `checked` when a probe toward that edge
- * moved nothing — nothing of it is cut there — and false when no swipe or
- * time was left to probe, so it may be.
+ * moved nothing — nothing of it is cut there — and false, so it may be,
+ * `why`: no swipe or time was left (`budget`); no clipping ancestor from
+ * the flush one outward has room for a stroke (`room`: a probe drawn over
+ * the screen instead would touch down off the container and move nothing
+ * whatever lies beyond — code review round 2, so none is sent); or the
+ * probe was drawn under twice TOUCH_SLOP and may have been a tap (`tap`).
  */
-export interface Flush {
-  edge: Edge;
-  container: Rect;
-  checked: boolean;
-}
+export type Flush = { edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'tap' });
 
 /**
  * Which bound ended the scroll: the same stroke twice moved nothing (with
@@ -334,7 +334,9 @@ export const SETTLE_CONFIRM_READS = 3;
  * next page would read exhausted (code review of fix/r3-scroll: "failed
  * after 2 swipes" where the bound used to wait): a round whose tree shows a
  * progress node (`RoundRead.loading`) does not count as unchanged, and the
- * sentence names loading among the causes. Residual: content that loads
+ * sentence names loading among the causes. So a screen that ALWAYS shows
+ * a progress node (a step indicator, a progress header bar) never fails
+ * fast and runs to its bound, as before. Residual: content that loads
  * with no indicator in the tree (a shimmer drawn as plain views, a
  * silent fetch) can still be called exhausted after the two strokes.
  */
@@ -386,7 +388,10 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * edge. Exempt only when no ancestor is. The probe is drawn over that
  * ancestor, or an outer one, whichever is the first with room for a stroke
  * (`strokeWithin`) — a carousel cut to a 30-px strip has none, and a
- * stroke there is a tap on the card. A probe drawn shorter than twice
+ * stroke there is a tap on the card. When no ancestor has room (a lone
+ * 79-px scroller), no probe is sent — over the screen it would touch down
+ * off the container and move nothing whatever is cut — and the stop is
+ * reported with `flush.checked` false (code review round 2). A probe drawn shorter than twice
  * TOUCH_SLOP anyway (a tiny screen) never reports `checked`: it may have
  * been a tap that moved nothing.
  *
@@ -949,7 +954,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (flushed !== undefined) {
         const { edge, at } = flushed;
         const container = chain[at];
-        if (probeHeld) flush = { edge, container, checked: probeStroked };
+        const within = strokeWithin(chain, at, REVEALS[edge], s.frame.box);
+        if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
+        else if (within === undefined) flush = { edge, container, checked: false, why: 'room' };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
           // Clear of a keyboard as any stroke is — and one the moot rule
           // never asked about (the stop was clean either way) is asked
@@ -960,10 +967,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
             if (seen.corroborated === undefined) return ask('witness');
             if (seen.corroborated) probeCover = offered;
           }
-          const within = strokeWithin(chain, at, REVEALS[edge], s.frame.box);
           const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
           return probe(s, edge, best.node.rect, within, maxTravel, probeCover);
-        } else flush = { edge, container, checked: false };
+        } else flush = { edge, container, checked: false, why: 'budget' };
       }
       // The `unlocated` row on a `fully: true` stop only — where the answer
       // changes what the reader does next — and only with no cover under
@@ -1050,13 +1056,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
 /**
  * Send the flush check's probe (PROBE_REACH): toward revealing `edge`, over
- * `within` (`strokeWithin`; the box when undefined), its travel capped at
+ * `within` (`strokeWithin`: never the screen box — a stop with no ancestor
+ * that has room is reported unchecked, not probed), its travel capped at
  * `maxTravel` (PROBE_MAX_TRAVEL_FRACTION), clear of this round's cover. A swipe like any other for
  * the count and the bound, but not a step of the scroll's course: the turn
  * (`lastStroke`, `turns`, `strokesSent`) is left as it was, so a probe the
  * other way from the caller's direction is not a turn and halves no reach.
  */
-function probe(s: Mutable<State>, edge: Edge, rect: Rect, within: Rect | undefined, maxTravel: number, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
+function probe(s: Mutable<State>, edge: Edge, rect: Rect, within: Rect, maxTravel: number, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
   s.probe = { rect: { ...rect }, edge };
   s.lastSent = REVEALS[edge];
   s.confirmReads = 0;
@@ -1070,7 +1077,7 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, within: Rect | undefin
       toward: REVEALS[edge],
       reach: PROBE_REACH,
       ...(cover !== undefined && { coverTop: cover.topCover.y }),
-      ...(within !== undefined && { within: { ...within } }),
+      within: { ...within },
       probe: true,
       maxTravel,
     },

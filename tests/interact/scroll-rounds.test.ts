@@ -652,7 +652,7 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   it('no swipe left to probe with: reported fully visible with flush unchecked, and the reply says it may be cut', () => {
     const played = play({ ...FULLY_ANDROID, maxSwipes: 0 }, [formRead(242, 92)]);
     const result = resultOf(played);
-    expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: false });
+    expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: false, why: 'budget' });
     expect(describeScrollResult(result)).toBe(
       "fully visible after 0 swipes; but its top edge lies on its scroll container's (0,242 1080x1736), where Android cuts a node's bounds to the container, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it",
     );
@@ -835,9 +835,14 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(play(FULLY_ANDROID, [row]).steps.map((st) => st.do)).toEqual(['stop']);
   });
 
-  it('no ancestor with room for a stroke: the probe names none, and is drawn over the screen box', () => {
-    const row: Row = { found: [card(1950)], scrollers: [carousel(30)] };
-    expect(play(FULLY_ANDROID, [row, row]).steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, probe: true, maxTravel: 177 });
+  it('no clipping ancestor with room for a stroke (a lone 30- or 79-px scroller): NO probe — over the screen it would touch down off the container — and the stop is reported unchecked, saying why', () => {
+    for (const strip of [30, 79]) {
+      const played = play(FULLY_ANDROID, [{ found: [card(1978 - strip + 4)], scrollers: [carousel(strip)] }]);
+      expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+      const result = resultOf(played);
+      expect(result).toEqual({ swipes: 0, visible: 1, clipped: [], flush: { edge: 'bottom', container: carousel(strip), checked: false, why: 'room' } });
+      expect(describeScrollResult(result)).toMatch(/no scroll container around it has room for a probe swipe to check it — it may be cut there/);
+    }
   });
 
   it('a probe drawn shorter than twice TOUCH_SLOP (a tap?) that moved nothing is reported NOT checked — never "nothing of it is cut there"', () => {
@@ -846,8 +851,8 @@ describe('round — the flush check across nested clipping containers, and a pro
     const played = play(FULLY_ANDROID, [LIST_TOP, { ...LIST_TOP, drawn: tap }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stop']);
     const result = resultOf(played);
-    expect(result.flush).toEqual({ edge: 'top', container: LIST, checked: false });
-    expect(describeScrollResult(result)).toMatch(/no swipe or time was left to check it|it may be cut there/);
+    expect(result.flush).toEqual({ edge: 'top', container: LIST, checked: false, why: 'tap' });
+    expect(describeScrollResult(result)).toMatch(/the probe swipe was too short to tell from a tap — it may be cut there/);
   });
 
   /** A row at `y` in LIST. */
