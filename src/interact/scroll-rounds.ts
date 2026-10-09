@@ -200,7 +200,9 @@ interface ThisRead {
   read: RoundRead;
   facts: TreeFacts;
   frames: readonly Rect[];
+  /** The ROUND's gesture box (`RoundSeen.screen`), as this read was judged with it — not a fact of the read. */
   gesture: Rect | undefined;
+  /** The cover the ROUND applied (after the witness), as this read was judged under it — not a fact of the read. */
   cover: Cover | undefined;
 }
 
@@ -655,8 +657,14 @@ interface State {
    * beyond the edge it left through.
    */
   readonly dropped: Direction | undefined;
-  /** The target's clipping container with room for a stroke (swipe.ts#strokeRoom, over that read's gesture box and above its cover) at the last read that found the target — undefined when that read found it in none (P5); kept across reads that do not find it. */
-  readonly targetScroller: Rect | undefined;
+  /**
+   * The target's clipping container with room for a stroke (swipe.ts
+   * #strokeRoom, over that read's gesture box and above its cover) at the
+   * last read that found the target; `'none'` when that read found it in
+   * none with room — the stroke then goes over the screen box (P5); undefined
+   * until a read finds the target. Kept across reads that do not find it.
+   */
+  readonly targetScroller: Rect | 'none' | undefined;
   /** The container the last read that read chose to stroke over, for the stroke of a round whose tree did not read — met again with that round's gesture box. */
   readonly lastWithin: Rect | undefined;
   /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
@@ -878,12 +886,14 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     s.inTreeAfter = s.swipes;
     // The container the strokes go over: room judged as the stroke will be
     // drawn — over the gesture box, above this round's cover. None with
-    // room is NONE (code review of deep/r3-scroll, P5): the last read's
-    // container is not kept — it is stale, and may be another list — so
-    // the stroke goes the way it goes for a target not placed in one, over
-    // the screen's largest scroller or the gesture box.
+    // room is `'none'` (code review of deep/r3-scroll, P5): the last read's
+    // container is not kept — it is stale, and may be another list — and
+    // the screen's largest scroller is not taken either: every ancestor of
+    // the target was just judged on this box, cover and axis, so a largest
+    // scroller WITH room is by construction not one of them, a list that
+    // cannot hold the target. The stroke goes over the screen box.
     const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y);
-    s.targetScroller = room === undefined ? undefined : { ...room.within };
+    s.targetScroller = room === undefined ? 'none' : { ...room.within };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for.
@@ -1149,8 +1159,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // else the screen's largest (2026-10-09; swipe.ts#strokeRoom): the
   // stroke touches down on what scrolls, and its length is that
   // container's 60 %, never the screen's — a 1417-px list is not stroked
-  // 1332 px. A round whose tree did not read keeps the last read round's.
-  const within = read === undefined ? s.lastWithin : (s.targetScroller ?? now?.facts.mainScroller);
+  // 1332 px. The screen box when the last read that found the target found
+  // it in no container with room (`'none'`, P5). A round whose tree did not
+  // read keeps the last read round's.
+  const target = s.targetScroller;
+  const within = read === undefined ? s.lastWithin : target === 'none' ? undefined : (target ?? now?.facts.mainScroller);
   s.lastWithin = within;
   // The box, decided once (swipe.ts#strokeRoom): that container met with
   // the gesture box above the stroke's cover, or the gesture box whole
