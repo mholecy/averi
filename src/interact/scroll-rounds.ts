@@ -655,7 +655,7 @@ interface State {
    * beyond the edge it left through.
    */
   readonly dropped: Direction | undefined;
-  /** The target's clipping container with room for a stroke (swipe.ts#strokeRoom, over that read's gesture box and above its cover) at the last read that found it in one. */
+  /** The target's clipping container with room for a stroke (swipe.ts#strokeRoom, over that read's gesture box and above its cover) at the last read that found the target — undefined when that read found it in none (P5); kept across reads that do not find it. */
   readonly targetScroller: Rect | undefined;
   /** The container the last read that read chose to stroke over, for the stroke of a round whose tree did not read — met again with that round's gesture box. */
   readonly lastWithin: Rect | undefined;
@@ -877,9 +877,13 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
     // The container the strokes go over: room judged as the stroke will be
-    // drawn — over the gesture box, above this round's cover.
+    // drawn — over the gesture box, above this round's cover. None with
+    // room is NONE (code review of deep/r3-scroll, P5): the last read's
+    // container is not kept — it is stale, and may be another list — so
+    // the stroke goes the way it goes for a target not placed in one, over
+    // the screen's largest scroller or the gesture box.
     const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y);
-    if (room !== undefined) s.targetScroller = { ...room.within };
+    s.targetScroller = room === undefined ? undefined : { ...room.within };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for.

@@ -932,6 +932,17 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(down.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: UNDER });
   });
 
+  it('a read that finds the target in no container with room drops the last read\'s container — stale, maybe another list — and strokes as for a target not placed in one: over the largest scroller, or the screen box (code review of deep/r3-scroll, P5)', () => {
+    const OTHER: Rect = { x: 0, y: 300, width: 1080, height: 300 };
+    const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
+    const played = play({ ...ANDROID, maxSwipes: 2 }, [
+      { found: [match({ x: 66, y: 2500, width: 948, height: 73 }, 'row')], scroller: OTHER }, // placed in OTHER: stroked over it
+      { found: [match({ x: 66, y: 1700, width: 948, height: 73 }, 'row')], scroller: UNDER, cover: UP_IME }, // now in a list with no room above the IME
+      { found: [match({ x: 66, y: 1650, width: 948, height: 73 }, 'row')], scroller: UNDER, cover: UP_IME },
+    ]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [st.box] : []))).toEqual([OTHER, SCREEN_1080]); // not OTHER again
+  });
+
   it('a lone strip under a band the moot rule left unasked: no room even over the whole screen — `room` at once, the witness NOT asked (room is judged first without the band, so the ask order is as before deep/r3-scroll)', () => {
     const LOW_BAND = coverOver({ x: 0, y: 2000, width: 1080, height: 220 }); // the card ends at 1978, above it: moot
     const played = play(FULLY_ANDROID, [{ found: [card(1978 - 30 + 4)], scrollers: [carousel(30)], cover: LOW_BAND }]);
