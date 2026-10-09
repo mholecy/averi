@@ -3,7 +3,7 @@ import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
 import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
-import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, movedTapText, PresentElementRefusal, resolvePresent, type Ambiguity } from '../interact/resolve.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, movedTapText, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -181,15 +181,19 @@ class ReentryError extends Error {
  * An `optional:` step whose element was PRESENT and which the interaction
  * module refused to tap (2026-10-09, owner's decision —
  * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md,
- * item 3): an interact PresentElementRefusal (the target's centre off the
- * screen, or under a node drawn over it), raised by an optional tap or by a
+ * item 3): an error carrying interact's RefusedOnPresentElement marker (the
+ * target's centre off the screen or under a node drawn over it; the soft
+ * keyboard over it with nothing sent), raised by an optional tap or by a
  * nested step's tap (a fill's focus tap). `optional:` skips an ABSENT
  * element; this one is on screen, so the interstitial the step exists for IS
  * there, and skipping it ran the flow on — measured: mp-native's
  * `login_registered` rung skipped a refused `optional: tap { text: "LOGIN" }`,
  * its `wait:` failed, and the ladder went on to `login`, the rung that
  * spends a device registration. Terminal (`isTerminal`) for that reason: the
- * ladder neither escalates past it nor salvages it. The refusal is the
+ * ladder probes `detect` once (the rung may have reached the state first —
+ * then the call passes), and otherwise neither escalates past it nor
+ * salvages it — even where a later rung might have cleared the screen: the
+ * owner chose "never escalate past a present-but-refused element". The refusal is the
  * `cause`; the message says why it was not skipped, then quotes it.
  *
  * Only an `optional:` raises it. The same refusal outside one is the step's
@@ -197,7 +201,7 @@ class ReentryError extends Error {
  * decision is about what `optional:` may swallow.
  */
 class OptionalNotSkipped extends Error {
-  constructor(refusal: PresentElementRefusal) {
+  constructor(refusal: Error) {
     super(`optional step not skipped: its element is present, but the tap was refused — ${refusal.message}`, { cause: refusal });
     this.name = 'OptionalNotSkipped';
   }
@@ -705,6 +709,21 @@ export class FlowEngine {
         // wiping app state to re-run a step that could never have worked.
         // A nested ladder's refusal (this rung's `requires:`) is terminal for
         // the same reason: escalating past it runs the wipe it declined.
+        //
+        // An OptionalNotSkipped (2026-10-09) is terminal too, but it is a
+        // finding about the SCREEN, not the descriptor: the rung may have
+        // reached the state before a trailing optional tap was refused. So
+        // the ladder's own post-failure probe runs first — reached, the call
+        // passes (the ✗ line stays in the trace); not reached, it stops
+        // here, never escalating past an interstitial that is on screen. A
+        // SetupError and an UnreadTreeRefusal get no probe: a broken
+        // descriptor must fail the call even on a screen that happens to be
+        // in the state, and a nested refusal already looked.
+        if (e instanceof OptionalNotSkipped && (await this.detects(state.detect, 0)).answer === 'yes') {
+          this.log(`⚠ reach ${flow}`, `failed — ${headline(e)}`);
+          this.log(`state ${name}`, `reached after ${flow}`);
+          return;
+        }
         if (isTerminal(e)) throw e;
         const why = headline(e);
         // A throwing LAST rung is not the end of the ladder's obligations, it
@@ -993,7 +1012,7 @@ export class FlowEngine {
       // tap refused on a PRESENT element inside one (2026-10-09): it becomes
       // the terminal OptionalNotSkipped here, on the innermost step — a
       // platform override's tap, a fill's focus tap, a tap in a `branch:`.
-      throw this.failed(step, this.swallowDepth > 0 && e instanceof PresentElementRefusal ? new OptionalNotSkipped(e) : e);
+      throw this.failed(step, this.swallowDepth > 0 && isRefusedOnPresentElement(e) ? new OptionalNotSkipped(e) : e);
     }
   }
 
@@ -1310,7 +1329,7 @@ export class FlowEngine {
         // The optional tap is not dispatched through runStep, so its refusal
         // on a PRESENT element (2026-10-09, OptionalNotSkipped) gets its ✗
         // here, on the tap — as runStep gives it to a nested step's.
-        if (tap && e instanceof PresentElementRefusal) throw this.failed(s, new OptionalNotSkipped(e));
+        if (tap && isRefusedOnPresentElement(e)) throw this.failed(s, new OptionalNotSkipped(e));
         // A config refusal is not an absent interstitial (2026-10-08, review
         // of after-ios-idb #4): an empty secret, a `type_pin` value with no
         // digits, an undeclared credential — the same rule as the
@@ -1323,8 +1342,9 @@ export class FlowEngine {
         // today (only the ladder does, and no step runs one) — were one ever
         // to, a declined destructive rung is not an absence either. Since
         // 2026-10-09 it holds an OptionalNotSkipped too: an element that was
-        // there and was refused a tap (interact's PresentElementRefusal —
-        // off screen, or under something drawn over it) is the interstitial
+        // there and was refused a tap (interact's RefusedOnPresentElement —
+        // off screen, under something drawn over it, or under a keyboard
+        // with nothing sent) is the interstitial
         // itself, so the step fails the flow instead of being skipped.
         if (isTerminal(e)) throw e;
         // Why it was skipped: "(not present)" only when the interaction

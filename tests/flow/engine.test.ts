@@ -2750,6 +2750,76 @@ flows:
         await FlowEngine.run(ladder, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch(() => undefined);
         expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
       });
+
+      // Only `optional:` turns the refusal terminal: a rung's plain tap that
+      // is refused fails the rung, and the ladder escalates as it always has.
+      // Pins both halves — `isTerminal` NOT listing interact's refusal, and
+      // runStep wrapping it only at `swallowDepth > 0`.
+      it('the same refusal on a NON-optional tap fails the rung, and the ladder escalates to the next rung as before', async () => {
+        const plain = parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login_registered, login]
+flows:
+  login_registered:
+    steps:
+      - tap: { id: priority }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+        const fake = ladderFake(771);
+        const error = (await FlowEngine.run(plain, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch((e: unknown) => e)) as FlowError;
+        expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
+        expect(error.trace).toContainEqual({ action: '✗ tap id:"priority"', detail: expect.stringMatching(/^failed — id:"priority" is under button/) as string });
+        expect(error.trace).toContainEqual({ action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed, escalating to login — id:"priority" is under button/) as string });
+        expect(JSON.stringify(error.trace)).not.toContain('optional step not skipped');
+      });
+
+      // Code review 2026-10-09, MINOR 3: terminal is "never escalate past
+      // it", not "never look". A rung that reached the state before a
+      // TRAILING optional tap was refused has done its job — the ladder's
+      // post-failure probe sees it, and the call passes.
+      it('a rung that reached the state before its trailing optional tap was refused: the probe sees it, the call passes, no escalation', async () => {
+        const reached = parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login_registered, login]
+flows:
+  login_registered:
+    steps:
+      - tap: { id: continue }
+      - optional: [ { tap: { id: priority } } ]
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+        const full = { x: 0, y: 0, width: 402, height: 874 };
+        const home = node({
+          role: 'container',
+          rect: full,
+          children: [
+            node({ identifier: 'dashboard_root', rect: { x: 0, y: 0, width: 402, height: 40 } }),
+            node({ role: 'textfield', identifier: 'priority', rect: { x: 24, y: 771, width: 354, height: 52 } }),
+            node({ role: 'button', label: 'Pay', identifier: 'pay', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+          ],
+        });
+        const fake = form(100, { home }); // priority clear of continue here, so the tap on continue lands on it
+        fake.onTap = (id, self) => {
+          if (id === 'continue') self.current = 'home';
+        };
+        const trace = await FlowEngine.run(reached, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
+        expect(fake.launches).toEqual([]);
+        expect(trace).toContainEqual({ action: '✗ tap id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: its element is present, but the tap was refused/) as string });
+        expect(trace.slice(-2)).toEqual([
+          { action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed — optional step not skipped:/) as string },
+          { action: 'state logged_in', detail: 'reached after login_registered' },
+        ]);
+      });
     });
   });
 });
@@ -2927,13 +2997,17 @@ flows:
     expect(fake.typed).toEqual([]);
   });
 
-  it('an optional: tap refused that way is skipped with the refusal\'s headline, not "(not present)"', async () => {
+  // Skipped with its headline until 2026-10-09: nothing was sent and the
+  // target resolved, so it is a refusal on a PRESENT element — not skipped.
+  it('an optional: tap refused that way is NOT skipped: ⚠ tap, then its ✗ saying it was not skipped, nothing sent', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'hidden';
-    const trace = await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' });
-    expect(trace.slice(1, -1).map((t) => t.action)).toEqual(['⚠ tap', 'optional']);
-    expect(trace[2].detail).toMatch(/^skipped id:"login_submit" \(The window state reports a soft keyboard over id:"login_submit" — .* no flow step waits on the keyboard itself\)$/);
+    const error = (await FlowEngine.run(flow('optional: [ { tap: { id: login_submit } } ]'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1).map((t) => t.action)).toEqual(['⚠ tap', '✗ tap id:"login_submit"']);
+    expect(error.trace[2].detail).toMatch(
+      /^failed — optional step not skipped: its element is present, but the tap was refused — The window state reports a soft keyboard over id:"login_submit"/,
+    );
     expect(fake.keys).toEqual([]);
     expect(fake.taps).toEqual([]);
   });
@@ -3304,12 +3378,34 @@ ${steps}
     expect(fake.taps).toEqual([]);
   });
 
-  it('an optional: tap under the band is skipped quoting the refusal, not "not present", after its ⚠ tap line', async () => {
+  // Skipped until 2026-10-09; the target resolved on both looks and nothing
+  // was sent — a refusal on a PRESENT element, so the step fails the flow.
+  it('an optional: tap under the band with no dismissal is NOT skipped: ⚠ tap, then its ✗ saying it was not skipped', async () => {
     const fake = iosFake();
+    const error = (await FlowEngine.run(flow('      - optional:\n          - tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+    expect(error.trace.slice(1)).toEqual([
+      { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
+      {
+        action: '✗ tap id:"login_submit"',
+        detail: expect.stringMatching(/^failed — optional step not skipped: its element is present, but the tap was refused — The soft keyboard covers id:"login_submit"/) as string,
+      },
+    ]);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('…but when the SECOND look did not resolve the target again, it is not known to be there: the optional: tap is skipped with the failure', async () => {
+    const fake = iosFake();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      // read 1: the presence check; 2–3: the settled pair; 4: the guard's second look
+      if (++reads === 4) fake.live().children = fake.live().children.filter((c) => c.identifier !== 'login_submit');
+      return real();
+    };
     const trace = await FlowEngine.run(flow('      - optional:\n          - tap: { id: login_submit }'), fake, FAST, { flow: 'f' });
     expect(trace.slice(1, -1)).toEqual([
-      { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' },
-      { action: 'optional', detail: expect.stringMatching(/^skipped id:"login_submit" \(The soft keyboard covers id:"login_submit"/) },
+      { action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; nothing sent, and the second look failed' },
+      { action: 'optional', detail: expect.stringMatching(/^skipped id:"login_submit" \(After the soft keyboard covered id:"login_submit" at \(107,571\) on a first look, the second look failed/) as string },
     ]);
     expect(fake.taps).toEqual([]);
   });

@@ -363,32 +363,48 @@ export async function resolvePresent(
 
 /**
  * The typed marker for "the target was FOUND, and this module refused to tap
- * it" (2026-10-09): the element resolved and settled — it is in the tree, on
- * the screen the author meant — and a rule of this module, not its absence,
- * is why nothing (or nothing more than the keyboard guard's own `back` or
- * dismissal tap) was sent. Its subclasses are the refusals of a tap on a
- * resolved node: OffScreenRefusal and CoveredRefusal, both thrown behind
- * `tapElement` and `fillField`'s focus tap.
+ * it" (2026-10-09): the element resolved — it is in the tree, on the screen
+ * the author meant — on every look the refusal rests on, and a rule of this
+ * module, not its absence, is why nothing was tapped. Carried by:
+ * - PresentElementRefusal's subclasses, the tap rules on a resolved node:
+ *   OffScreenRefusal and CoveredRefusal (behind `tapElement` and
+ *   `fillField`'s focus tap). These may follow the keyboard guard's own
+ *   `back` or dismissal tap — the target was resolved again after it, and
+ *   it is still there.
+ * - The keyboard guard's refusals that sent NOTHING with the target resolved
+ *   on both looks: KeyboardStateDisagreement (keyboard-window.ts) and
+ *   KeyboardWithoutDismissal (keyboard-in-tree.ts) — but not the latter when
+ *   its second look did not resolve the target again (its flag is false).
  *
  * Its one reader is the flow engine's `optional:` block
  * (docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md,
  * item 3): an optional step is skipped only when its element is absent, and
  * one refused on a present element FAILS the flow — the interstitial is
- * there, and skipping it ran the flow on into the ladder's destructive rung.
+ * there, and skipping it ran the flow on into the ladder's destructive rung
+ * (on iOS the same with the keyboard up over LOGIN and no dismissal).
  *
- * Deliberately NOT a base of:
+ * Deliberately NOT carried by:
  * - AmbiguityRefusal: a selector finding, and a flow resolves with `'first'`
  *   (flow/engine.ts, FLOW_AMBIGUITY), so a flow never sees it.
- * - KeyboardGuardError (keyboard-model.ts): the soft keyboard over the point
- *   is the screen's transient state, not the app's layout, and several of
- *   its subclasses are thrown after a `back` or a dismissal tap whose effect
- *   is unknown (back may have navigated, the target may not have come back)
- *   — whether the element is still there is not known. An `optional:` skips
- *   them with their headline, as it did before this marker.
+ * - AfterKeyboardDismissal and AfterDismissalTap: thrown after a `back` or a
+ *   dismissal tap whose effect is unknown (back may have navigated, the
+ *   target may not have come back) — whether the element is still there is
+ *   not known. An `optional:` skips them with their headline.
  * - ElementNotFoundError, of course, and a zero-area-only match, which is
  *   one (nothing ACTIONABLE was ever there).
  */
-export class PresentElementRefusal extends Error {}
+export interface RefusedOnPresentElement {
+  readonly refusedOnPresentElement: boolean;
+}
+
+/** Does `e` carry the marker (RefusedOnPresentElement) — a tap refused on an element that was there? */
+export const isRefusedOnPresentElement = (e: unknown): e is Error & RefusedOnPresentElement =>
+  e instanceof Error && (e as Partial<RefusedOnPresentElement>).refusedOnPresentElement === true;
+
+/** The base of the tap rules' refusals on a resolved node — each carries the marker (RefusedOnPresentElement). */
+export class PresentElementRefusal extends Error implements RefusedOnPresentElement {
+  readonly refusedOnPresentElement = true;
+}
 
 /**
  * The target resolved and settled, but the point a tap on it would press —

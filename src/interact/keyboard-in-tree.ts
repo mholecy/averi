@@ -21,7 +21,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { describeTarget, findTarget, onScreen, tapScreen, type Ambiguity, type TapScreen } from './resolve.js';
+import { describeTarget, findTarget, onScreen, tapScreen, type Ambiguity, type RefusedOnPresentElement, type TapScreen } from './resolve.js';
 
 /**
  * The IN-TREE model (iOS under WDA, 2026-10-07): the soft keyboard is part
@@ -86,10 +86,19 @@ export const KEYBOARD_HIDE_CONFIRM_LOOKS = 2;
  * are tried before this is thrown; their reasons for being passed over are
  * in the message.
  */
-export class KeyboardWithoutDismissal extends KeyboardGuardError {
-  constructor(message: string, traceLine: string, options?: ErrorOptions) {
+export class KeyboardWithoutDismissal extends KeyboardGuardError implements RefusedOnPresentElement {
+  /**
+   * True when the target resolved on both looks — a refusal on a present
+   * element (resolve.ts#RefusedOnPresentElement), which an `optional:` does
+   * not skip; false when the second look did not resolve it again (`cause`
+   * kept), where whether it is still there is unknown and an `optional:`
+   * skips it with its headline.
+   */
+  readonly refusedOnPresentElement: boolean;
+  constructor(message: string, traceLine: string, resolvedTwice: boolean, options?: ErrorOptions) {
     super(message, traceLine, options);
     this.name = 'KeyboardWithoutDismissal';
+    this.refusedOnPresentElement = resolvedTwice;
   }
 }
 
@@ -341,6 +350,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
               (headline) => `After ${saw}, the second look failed: ${headline}. Nothing was pressed; the screen is as the step found it`,
             ),
             `${covered}; nothing sent, and the second look failed`,
+            false,
             { cause: e },
           ),
       );
@@ -375,6 +385,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
             `then tap ${what} again. In a flow: hide it with a step before this one (a tap: on an element the keyboard ` +
             `does not cover), configure a dismissal for the guard to tap, or lay the screen out so ${what} is not under the keyboard`,
           `${covered}; no dismissal, nothing sent`,
+          true,
         );
       }
       const tapped = `${covered}; tapped ${picked.what} to hide it`;
