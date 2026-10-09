@@ -11,7 +11,14 @@ import { isInteractive } from './selectors.js';
  * are the node. A heuristic, not a compositor: the tree gives neither
  * opacity nor touch handling, so what "draws" is judged from role, size and
  * content — one judgement (`NOT_DRAWN`), whose rows each name a kind of node
- * judged to draw nothing of its own, for the questions it applies to.
+ * judged to draw nothing of its own, for the questions it applies to. So a
+ * transparent overlay smaller than the screen reads as drawn, and a label
+ * inside a sheet that does not contain the point does not. "Later in
+ * pre-order = drawn later" is measured on WDA trees (Windows by level) and
+ * on Compose (the floating tab bar, 2026-10-09); for classic Android Views
+ * uiautomator's sibling order is the accessibility child order, which
+ * Android may sort by position rather than by Z (not measured) — there a
+ * later sibling drawn beneath may read as drawn over, for every question.
  *
  * Three questions, one per caller:
  * - `shadowing(node, point)` — the tap guard's dismissal picker
@@ -31,7 +38,8 @@ import { isInteractive } from './selectors.js';
 export interface DrawOrder {
   /**
    * The node drawn over `point` on top of `node`, if any: the LAST node
-   * after `node`'s subtree in pre-order that draws (`NOT_DRAWN`'s
+   * after `node`'s subtree in pre-order — its first place in the tree, and
+   * none of its own subtree wherever else the same object appears — that draws (`NOT_DRAWN`'s
    * `shadowing` column) and contains the point (`containsPoint`: right and
    * bottom edges exclusive). Undefined when nothing does, or when `node` is
    * not in this tree. The keyboard's own nodes are not exempt: a target
@@ -69,6 +77,8 @@ type Question = 'shadowing' | 'drawnOver';
 /** One node in pre-order, with what a row may ask of where it is. */
 interface Placed {
   readonly node: UiNode;
+  /** Its index in the walk's order. */
+  readonly at: number;
   /** The index just past its subtree in the walk's order. */
   end: number;
   /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`). */
@@ -108,7 +118,11 @@ const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label &&
  * against; unifying them is a behaviour change, to be judged per row.
  */
 const NOT_DRAWN = {
-  /** No area: nothing to draw (a zero-width text, a collapsed view). Both questions. */
+  /**
+   * No area: nothing to draw (a zero-width text, a collapsed view). Both
+   * questions; for `shadowing` it is belt and braces — `containsPoint`
+   * already rejects a rect of no area.
+   */
   noArea: {
     shadowing: ({ node }) => !(rectArea(node.rect) > 0),
     drawnOver: ({ node }) => !(rectArea(node.rect) > 0),
@@ -215,6 +229,7 @@ const NOT_DRAWN = {
    * `scrollable`: adapters/types.ts#UiNode.clipsDescendants).
    */
   contentFramed: {
+    // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
     shadowing: ({ node }) => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
   },
 
@@ -250,7 +265,10 @@ const NOT_DRAWN = {
    * element, or listed only as an empty frame) reads as itemless, and the
    * dismissal tap can trigger that item. Platform scope: only the WDA
    * parser assigns `toolbar` (adapters/wda-source.ts); a future mapping to
-   * it inherits this row and must be judged against it.
+   * it inherits this row and must be judged against it. A keyboard-owned
+   * itemless toolbar (none measured) is excused like any other: the
+   * `keyboard` row counts for this question, and the band — which contains
+   * the accessory slot — still catches a point there.
    *
    * `drawnOver`: not excused — no measurement asked it (no WDA tree has a
    * clipping container).
@@ -292,7 +310,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const seen: Seen = { screen: screenAreaOf(tree) };
   const order: Placed[] = [];
   const walk = (node: UiNode, inKeyboard: boolean): void => {
-    const placed: Placed = { node, end: 0, inKeyboard: inKeyboard || node.ofKeyboard === true };
+    const placed: Placed = { node, at: order.length, end: 0, inKeyboard: inKeyboard || node.ofKeyboard === true };
     order.push(placed);
     for (const child of node.children) walk(child, placed.inKeyboard);
     placed.end = order.length;
@@ -303,17 +321,20 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** Everything drawn after `placed`'s subtree. */
   const after = (placed: Placed): readonly Placed[] => order.slice(placed.end);
 
+  /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
+  const outOfDrawnOver = NOT_DRAWN.keyboard.drawnOver;
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
-    const found = order.find((p) => p.node.clipsDescendants === true && sameRect(p.node.rect, container) && !NOT_DRAWN.keyboard.drawnOver(p));
+    const found = order.find((p) => p.node.clipsDescendants === true && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p, 'drawnOver') ? [p.node] : []));
   };
 
   return {
     shadowing(node, point) {
-      const placed = order.find((p) => p.node === node);
-      if (placed === undefined) return undefined;
-      return after(placed).filter((p) => draws(p, 'shadowing') && containsPoint(p.node.rect, point)).at(-1)?.node;
+      const places = order.filter((p) => p.node === node);
+      if (places.length === 0) return undefined;
+      const ofNode = (p: Placed) => places.some((place) => p.at >= place.at && p.at < place.end);
+      return after(places[0]).filter((p) => !ofNode(p) && draws(p, 'shadowing') && containsPoint(p.node.rect, point)).at(-1)?.node;
     },
     drawnOver,
     drawnOverAt(container, point) {

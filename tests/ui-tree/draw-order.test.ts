@@ -17,6 +17,13 @@ describe('shadowing — the later node drawn over a point (the dismissal picker\
   const screen = (...children: UiNode[]): UiNode => uiNode({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children });
   const fullScreen = (partial: Partial<UiNode> = {}): UiNode => uiNode({ role: 'other', rect: { x: 0, y: 0, width: 400, height: 800 }, ...partial });
 
+  it('the same node object at two places in the tree: either place is the node, never its own cover (the old walk\'s rule)', () => {
+    const target = text({ label: 'title' });
+    expect(drawOrder(screen(target, fullScreen({ children: [target] }))).shadowing(target, P)).toBeUndefined();
+    const later = text({ label: 'later' });
+    expect(drawOrder(screen(target, fullScreen({ children: [target, later] }))).shadowing(target, P)).toBe(later);
+  });
+
   it('nothing after the node: undefined — the ancestor, an earlier sibling and the node\'s own descendant all contain the point and none counts', () => {
     const target = text({ label: 'title', children: [text({ label: 'inner' })] });
     expect(drawOrder(screen(text({ label: 'earlier' }), target)).shadowing(target, P)).toBeUndefined();
@@ -63,7 +70,9 @@ describe('shadowing — the later node drawn over a point (the dismissal picker\
     expect(drawOrder(app(uiNode({ role: 'other', rect: full, children: [title, form, toolbar(), home] }))).shadowing(title, at)).toBeUndefined();
     // The screen is the ROOT's rect, not the largest: a tall scroll content (WDA keeps off-screen nodes) earlier in the tree does not shrink the host below it.
     const tall = uiNode({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 3000 } });
-    expect(drawOrder(app(tall, title, toolbar())).shadowing(title, at)).toBeUndefined();
+    // (A host with an item away from the point: an itemless toolbar is excused at any size, which would not pin the screen.)
+    const withItem = uiNode({ role: 'toolbar', rect: full, children: [uiNode({ role: 'container', rect: full, children: [uiNode({ role: 'button', label: 'Done', rect: { x: 300, y: 800, width: 80, height: 40 } })] })] });
+    expect(drawOrder(app(tall, title, withItem)).shadowing(title, at)).toBeUndefined();
     // An inset host (402×820, 94 % of the screen: a status-bar inset) is still a host.
     expect(drawOrder(app(title, toolbar({ x: 0, y: 54, width: 402, height: 820 }))).shadowing(title, { x: 200, y: 84 })).toBeUndefined();
     // Just under SCREEN_SIZED_FRACTION (0.9) it covers as itself: 402×786 is 89.9 % — given an item (elsewhere), since an
@@ -277,6 +286,21 @@ describe('drawnOver — the nodes drawn over a clipping container (the floating 
     const root = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [list, spacer, flat, layer, keys] });
     expect(drawOrder(root).drawnOver(LIST)).toEqual([card]);
     expect(drawOrder(root).drawnOver(rect(0, 825, 1080, 1000))).toBeUndefined(); // not asked of this tree — told apart from "nothing over it"
+  });
+  it('the container is never the keyboard\'s own: a keyboard-marked clipping node of the rect is passed over — undefined alone, the later one of that rect otherwise', () => {
+    const card = () => uiNode({ role: 'other', label: 'Snack', rect: rect(40, 1900, 1000, 120) });
+    const keyboardList = uiNode({ role: 'container', rect: LIST, clipsDescendants: true, ofKeyboard: true });
+    const afterKeyboard = card();
+    expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [keyboardList, afterKeyboard] })).drawnOver(LIST)).toBeUndefined();
+    const list = uiNode({ role: 'container', rect: LIST, clipsDescendants: true });
+    const afterList = card();
+    expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [keyboardList, afterKeyboard, list, afterList] })).drawnOver(LIST)).toEqual([afterList]);
+  });
+  it('of two clipping nodes of the same rect, the OUTERMOST is the container: what is inside it after the inner one scrolls with it, not over it', () => {
+    const sibling = uiNode({ role: 'other', label: 'Footer', rect: rect(40, 1900, 1000, 120) });
+    const outer = uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: [uiNode({ role: 'container', rect: LIST, clipsDescendants: true }), sibling] });
+    const over = uiNode({ role: 'other', label: 'Bar', rect: rect(40, 2000, 1000, 120) });
+    expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [outer, over] })).drawnOver(LIST)).toEqual([over]);
   });
 });
 
