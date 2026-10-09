@@ -809,7 +809,7 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
   const screen = screenAreaOf(tree);
   const coversOnlyThroughContent = (n: UiNode) =>
-    n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION);
+    n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || screenSizedHost(n, screen));
   /** A toolbar with no items: nothing of it is what is seen at the point (the UIKit sheet's two, 2026-10-09 — see above). */
   const itemlessToolbar = (n: UiNode) => n.role === 'toolbar' && n.children.length === 0;
   let after = false;
@@ -831,11 +831,14 @@ function screenAreaOf(tree: UiNode): number {
   return rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
 }
 
+/** A screen-sized HOST: a node with children whose area reaches SCREEN_SIZED_FRACTION of `screen` (`screenAreaOf`) — it draws through its content, which is walked. One rule for `shadowing` and `drawnOver`. */
+const screenSizedHost = (n: UiNode, screen: number): boolean => n.children.length > 0 && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION;
+
 /**
  * The nodes DRAWN OVER a clipping container (2026-10-09, docs/bugs/
  * 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md), in
  * pre-order: every node AFTER the container's subtree — later in the tree,
- * so drawn later (the draw-order rule `shadowing` reads), never an ancestor
+ * taken as drawn later (the draw-order rule `shadowing` reads), never an ancestor
  * or a descendant: its own rows scroll with it — whose rect meets the
  * container's with area and that DRAWS something. Measured on mp-native's
  * Account Detail (Compose): the transaction list `0,825 1080x1395` runs to
@@ -855,25 +858,37 @@ function screenAreaOf(tree: UiNode): number {
  * children (`SCREEN_SIZED_FRACTION`, `shadowing`'s rule — a full-screen
  * overlay layer draws through its content, which is walked); and the
  * keyboard's own subtrees (`ofKeyboard`: the keyboard is the round's cover,
- * read with its witness — never second-guessed here). Counted, so: a
+ * read with its witness — never second-guessed here; only a WDA tree marks
+ * them, and an iOS tree has no clipping container, so today the exclusion
+ * never runs — it keeps a future Android mark from cutting twice). Counted, so: a
  * structural container WITH children under the screen's size — the bar's
  * host, which took the measured touch-down at y 1857 above its tabs (a
  * Material Surface swallows touches through its whole rect). The tree does
  * not say whether a node takes touches (the parser keeps no `clickable`),
  * so a transparent wrapper reaching over a list counts too: its cost is a
- * shorter stroke box, never a stroke off the list.
+ * shorter stroke box, never a stroke off the list — and a failure that
+ * names it says it MAY have taken the strokes, never that it did.
+ *
+ * "Later in pre-order = drawn later" is measured on Compose only (the bar
+ * above, 2026-10-09). For classic Views uiautomator's sibling order is the
+ * accessibility child order, which Android may sort by position rather
+ * than by Z (not measured): there the rule reads "a later sibling
+ * overlapping the list", which may include one drawn beneath it — the
+ * same premise, and the same residual, as `shadowing`'s.
  *
  * The container is found in the tree by its rect — the outermost clipping
  * node (`clipsDescendants`) with that rect, whose subtree is then the
  * largest that is excluded — since the round carries containers as rects
- * (`scrollersOf`, `largestScroller`); none found (a rect of another read):
- * none drawn over it. One walk when called; each answer a scan of it.
+ * (`scrollersOf`, `largestScroller`); UNDEFINED when this tree has no such
+ * container (a rect of another read — the list has moved since), so the
+ * caller can tell "nothing over it" from "not asked of this tree". One walk
+ * when called; each answer a scan of it.
  */
-export function drawnOver(tree: UiNode): (within: Rect) => readonly UiNode[] {
+export function drawnOver(tree: UiNode): (within: Rect) => readonly UiNode[] | undefined {
   const screen = screenAreaOf(tree);
   const draws = (n: UiNode): boolean =>
     rectArea(n.rect) > 0 &&
-    !(n.children.length > 0 && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION) &&
+    !screenSizedHost(n, screen) &&
     !(STRUCTURAL_ROLES.has(n.role) && n.children.length === 0 && !n.label && !n.value);
   // Pre-order, each node with the index just past its subtree; the keyboard's subtrees left out.
   const order: { node: UiNode; end: number }[] = [];
@@ -887,7 +902,7 @@ export function drawnOver(tree: UiNode): (within: Rect) => readonly UiNode[] {
   walk(tree);
   return (within) => {
     const container = order.find(({ node }) => node.clipsDescendants === true && sameRect(node.rect, within));
-    if (container === undefined) return [];
+    if (container === undefined) return undefined;
     return order.slice(container.end).flatMap(({ node }) => (rectIntersection(node.rect, within) !== undefined && draws(node) ? [node] : []));
   };
 }

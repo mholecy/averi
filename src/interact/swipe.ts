@@ -257,12 +257,12 @@ export function strokeRoom(
   candidates: readonly Rect[],
   toward: Direction,
   coverTop?: number,
-  over?: (within: Rect) => readonly { rect: Rect }[],
+  over?: (within: Rect) => readonly { rect: Rect }[] | undefined,
 ): { within: Rect; box: Rect; coverTop?: number } | undefined {
   if (box === undefined) return undefined;
   for (const within of candidates) {
     const met = rectIntersection(box, within);
-    const drawn = met === undefined || over === undefined ? undefined : overlayTop(met, over(within));
+    const drawn = met === undefined ? undefined : overlayTop(met, over?.(within) ?? [], toward);
     const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
     const room = strokeBox(box, within, toward, top);
     if (room !== undefined) return { within, box: room, ...(top !== undefined && { coverTop: top }) };
@@ -273,29 +273,40 @@ export function strokeRoom(
 /**
  * The top edge of the highest of `over` — nodes drawn over a stroke
  * container — that the container's stroke box `box` must be cut above
- * (2026-10-09, the floating tab bar: `strokeRoom`), or undefined. One that
- * the STROKE'S LINE crosses (its rect spans x = the box's centre, where
- * `swipeVector` draws a vertical stroke — a FAB in the corner takes no
- * touch-down, and cutting for it would only shorten the stroke) and whose
- * TOP lies in the box's LOWER HALF, below its centre and above its
- * bottom — there a content-down stroke touches down (at 0.8) and a
- * content-up one lifts off. Everything below that top is then treated as
- * covered, the keyboard's rule (`swipeVectorAbove`): its width and height
- * are not read — the measured bar's host is 948 of 1080 wide and stops
- * 132 px above the screen's bottom, so "spans the box" or "reaches its
- * bottom" would both have missed it. The lower half and no higher: a
- * cut there leaves at least half the box, so the stroke keeps a list's
- * length, never a sliver's.
+ * for a stroke toward `toward` (2026-10-09, the floating tab bar:
+ * `strokeRoom`), or undefined. Only a CONTENT-DOWN stroke is cut: it
+ * touches down at 0.8 of the box, in its lower half, and the touch-down is
+ * all that matters (a gesture belongs to the view the finger first
+ * touches, `swipeVectorAbove`); a content-up stroke touches down at 0.2
+ * and only lifts off down there, so a cut would only take a third of its
+ * reach (1104 → 1942 would become 1104 → 1638 under the measured bar, more
+ * strokes against the 15 s budget) for nothing — review round 1. A
+ * sideways stroke is not cut either: its touch-down lies off the centre
+ * line on the box's middle row, which this rule does not model (a
+ * carousel under a bar: unmeasured).
+ *
+ * The node cut for is one that the STROKE'S LINE crosses (its rect spans
+ * x = the box's centre, where `swipeVector` draws a vertical stroke — a
+ * FAB in the corner takes no touch-down, and cutting for it would only
+ * shorten the stroke) and whose TOP lies in the box's LOWER HALF, below
+ * its centre and above its bottom, where the touch-down is. Everything
+ * below that top is then treated as covered, the keyboard's rule
+ * (`swipeVectorAbove`): its width and height are not read — the measured
+ * bar's host is 948 of 1080 wide and stops 132 px above the screen's
+ * bottom, so "spans the box" or "reaches its bottom" would both have
+ * missed it. The lower half and no higher: a cut there leaves at least
+ * half the box, so the stroke keeps a list's length, never a sliver's.
  *
  * Not cut, stated: a node drawn over the box's UPPER half (a floating
- * header): the cut models a cover from below only, as the keyboard's
- * does; a content-up stroke touches down at 0.2 of the box and can land on
- * one — that fast fail names the node (scroll-rounds.ts#touchedOn). A
- * sideways stroke runs along the box's centre line, its touch-down
- * SWIPE_REACH_FRACTION off centre: a node beside the centre on that line
- * is not judged (a carousel under a bar: unmeasured). Pure.
+ * header), where a content-up stroke touches down at 0.2 of the box — the
+ * cut models a cover from below only, as the keyboard's does; that fast
+ * fail names the node (scroll-rounds.ts#touchedOn), but a `fully: true`
+ * probe toward a top edge that touched down on one and moved nothing is
+ * still reported checked (a residual: the probe's stop is not the fast
+ * fail). Pure.
  */
-function overlayTop(box: Rect, over: readonly { rect: Rect }[]): number | undefined {
+function overlayTop(box: Rect, over: readonly { rect: Rect }[], toward: Direction): number | undefined {
+  if (toward !== 'down') return undefined;
   const cx = Math.round(box.x + box.width / 2);
   const tops = over
     .map(({ rect }) => rect)

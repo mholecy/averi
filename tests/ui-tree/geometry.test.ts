@@ -590,7 +590,7 @@ describe('drawnOver — the nodes drawn over a clipping container (2026-10-09, t
     const root = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [header, list, host, above] });
     expect(drawnOver(root)(LIST)).toEqual([host, tab, tab.children[0]]);
   });
-  it('draws nothing: no area, an empty structural leaf (a spacer), a screen-sized host (its content is judged), the keyboard\'s own subtree — and a rect of no clipping node in this tree has nothing over it', () => {
+  it('draws nothing: no area, an empty structural leaf (a spacer), a screen-sized host (its content is judged), the keyboard\'s own subtree — and a rect of no clipping node in this tree is undefined, not empty', () => {
     const list = uiNode({ role: 'container', rect: LIST, clipsDescendants: true });
     const spacer = uiNode({ role: 'other', rect: rect(0, 1900, 1080, 100) });
     const flat = uiNode({ role: 'text', label: 'x', rect: rect(0, 1900, 0, 100) });
@@ -599,6 +599,6 @@ describe('drawnOver — the nodes drawn over a clipping container (2026-10-09, t
     const keys = uiNode({ role: 'container', rect: rect(0, 1398, 1080, 822), ofKeyboard: true, children: [uiNode({ role: 'button', label: 'q', rect: rect(0, 1500, 100, 100) })] });
     const root = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [list, spacer, flat, layer, keys] });
     expect(drawnOver(root)(LIST)).toEqual([card]);
-    expect(drawnOver(root)(rect(0, 825, 1080, 1000))).toEqual([]);
+    expect(drawnOver(root)(rect(0, 825, 1080, 1000))).toBeUndefined(); // not asked of this tree — told apart from "nothing over it"
   });
 });

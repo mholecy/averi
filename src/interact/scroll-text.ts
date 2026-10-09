@@ -277,9 +277,11 @@ function boundText(by: BoundBy, swipes: number): string {
       // `tree` (2026-10-09): there is no match to watch, so the sentence
       // says what was watched — the whole screen. `touched` (2026-10-09, the
       // floating tab bar): the strokes touched down on a node drawn over the
-      // list, so THAT is the cause — not led by "content exhausted", which a
-      // flow reads as "the list ends".
-      const why = by.touched !== undefined ? touchedText(by.touched) : by.unchanged === 'tree' ? 'content exhausted, still loading, or the swipes were not taken' : 'content exhausted, or the swipes were not taken';
+      // list, so THAT is named first — not led by "content exhausted", which
+      // a flow reads as "the list ends" — and the other causes after it: the
+      // tree cannot say the node takes touches (review round 1).
+      const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
+      const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken`;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${by.unchanged === 'tree' ? 'did not change the screen' : 'did not move it'}: ${why})`;
     }
     case 'maxSwipes':
@@ -289,11 +291,11 @@ function boundText(by: BoundBy, swipes: number): string {
   }
 }
 
-/** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which took them — not the list`. */
+/** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */
 function touchedText({ at, on, container }: TouchedOn): string {
   const label = on.label !== null && on.label !== '' ? ` ${JSON.stringify(on.label)}` : '';
   const id = on.identifier !== null ? ` (id ${on.identifier})` : '';
-  return `they touched down at ${at.x},${at.y} on ${on.role}${label}${id} at ${rectText(on.rect)}, drawn over the list ${rectText(container)}, which took them — not the list`;
+  return `they touched down at ${at.x},${at.y} on ${on.role}${label}${id} at ${rectText(on.rect)}, drawn over the list ${rectText(container)}, which may have taken them`;
 }
 
 /** What the target was short of at the bound — the one switch that was a chain of nested ternaries in the loop until 2026-10-09. */

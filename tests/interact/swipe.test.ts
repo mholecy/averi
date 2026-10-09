@@ -392,6 +392,9 @@ describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one own
     // The touch-down clears the bar: y 1638, not the 1942 that landed on it (and 1800 was measured to scroll).
     expect(scrollStroke({ toward: 'down', reach: 1, box: list, coverTop: 1840 })).toEqual({ from: { x: 540, y: 1638 }, to: { x: 540, y: 1028 } });
     expect(scrollStroke({ toward: 'down', reach: 1, box: list })).toEqual({ from: { x: 540, y: 1942 }, to: { x: 540, y: 1104 } });
+    // A content-up stroke touches down at 0.2 (y 1104), clear of the bar: not cut; nor a sideways one.
+    expect(strokeRoom(BOX, [list], 'up', undefined, over)).toEqual({ within: list, box: list });
+    expect(strokeRoom(BOX, [list], 'left', undefined, over)).toEqual({ within: list, box: list });
     // With a keyboard: the higher of the two tops.
     expect(strokeRoom(BOX, [list], 'down', 1398, over)?.coverTop).toBe(1398);
     expect(strokeRoom(BOX, [list], 'down', 2000, over)?.coverTop).toBe(1840);
