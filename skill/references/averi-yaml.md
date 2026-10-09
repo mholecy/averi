@@ -89,12 +89,13 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
   - **A `fill` refused for a control character** before anything was tapped: `cannot type U+000A …`.
   - **A tap or typing command the device refused** (an `adb` or WDA error) on a found element.
   - **A failed `assert`:** `N/M flow asserts failed`.
-  - **A step with no element of its own:** a `wait:` or `branch:` that timed out (the text names what it waited for), a `swipe`, a `type`, a `launch`.
+  - **A step with no element of its own:** a `wait:` or `branch:` that timed out (the text names what it waited for); a `swipe` or a `type` that failed; a `launch` the device refused (not one with no `app.<platform>` section: that is a config refusal).
+  - **A malformed `timeout:` on a nested step** (a `wait:`, `scroll_until`, or a tap inside a `branch:` or platform override): `Invalid duration "…"`. The optional `tap`'s own malformed `timeout:` is a config refusal.
   - **A dead device:** `(last UI tree read failed: …)`. The device could not be read, which is not the same as the element being missing.
 
   The first three are skipped deliberately. Each of the others means the step got further than "the interstitial is absent": the element was found, or the step failed on something other than an element. Read such a skip as a descriptor or app bug, not a missing interstitial.
 - Everything else fails the flow even inside `optional:`:
-  - A config refusal: an undeclared or empty credential, an unset `${VAR}`, a PIN with no digits.
+  - A config refusal: an undeclared or empty credential, an unset `${VAR}`, a PIN with no digits, a `launch` with no `app.<platform>` section in averi.yaml, a malformed `timeout:` on the optional `tap` itself.
   - A tap (or a `fill`'s focus tap) on an element that IS on screen but that averi refuses to tap. The interstitial the step was written for is there. Refused means one of:
     - the element's centre is off screen, or under another node drawn over it with too little of the element showing;
     - on iOS, the element's centre is under the status bar (the top safe-area inset, 62 pt on a 402x874 iPhone). This counts as off screen even though the centre lies inside the rect you see on screen, because a tap there goes to the status bar. A target PINNED there, in no scroll view (a layout that ignores the safe area, such as a close button drawn at the very top), is refused every time, and no scroll moves it: the refusal says `it is pinned under the status bar`. Under `optional:` it fails the flow like any other refusal;
