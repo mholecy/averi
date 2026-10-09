@@ -588,8 +588,10 @@ const NOT_DRAWN = {
    * over its fee) — inset from its layout's sides, and labelled; a
    * non-interactive node holding the label (an opaque card, a loading
    * view); an interactive TARGET under a later control (a button over a
-   * button); a control in a screen-sized parent, or screen-sized itself —
-   * a scrim, an RN transparent Modal's backdrop, a dismiss region; one that
+   * button); a control in a screen-sized parent, or screen-sized itself
+   * (`screenSized`: at least SCREEN_SIZED_FRACTION, 0.9, of the screen) —
+   * a scrim, an RN transparent Modal's backdrop, a dismiss region, ONLY
+   * when it or its parent is that large (see the residual); one that
    * does not hold the label whole (a field's clear button); one in another
    * parent. idb's flat list never meets this row: every node's parent is
    * its 0×0 root, which no control spans. Residual, stated: an unlabelled
@@ -600,7 +602,12 @@ const NOT_DRAWN = {
    * its width (a card's tap target, a disabled-state scrim cut to the
    * card), an unlabelled `ImageButton` filling a thumbnail's FrameLayout
    * over its caption text, an unlabelled full-width bar button pinned over
-   * a text in the bar's own layout — all excused.
+   * a text in the bar's own layout, and — under WDA — a React Native
+   * in-tree dismiss backdrop (a `Pressable` with `absoluteFill` and
+   * `accessibilityRole="button"`, no label) inside a safe-area container
+   * `0,59 402x781`, 0.894 of the screen and so not screen-sized: the
+   * backdrop spans the container's width and holds the sheet's texts — all
+   * excused.
    */
   ownControl: {
     target: (placed, { target, screen }) =>
