@@ -637,7 +637,6 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   );
 }
 
-
 /**
  * How far a window's width may fall short of (or pass) the panel's long
  * side and still say the screen is turned (review 2026-10-08, round 3): a
