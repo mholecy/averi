@@ -213,10 +213,8 @@ describe('oracleKeyboard — a refused region is said once on stderr, nothing el
   afterEach(() => vi.restoreAllMocks());
 
   it('one `averi:` line per distinct case, naming the region, the band and the reason; an admitted panel or a docked band says nothing', async () => {
-    // A band and region no other test in this file uses: the notices are kept once per PROCESS (a module-level
-    // set), so a line another test had already printed would not be printed here, whatever the order.
-    const band = { x: 0, y: 2101, width: 1080, height: 119 };
-    const panel = { x: 17, y: 1203, width: 611, height: 577 };
+    const band = GBOARD_STRIP;
+    const panel = GBOARD_PANEL;
     const said = vi.spyOn(console, 'error').mockImplementation(() => {});
     const fake = new FakeAdapter({ s: screen() }, 's');
     const oracle = fake.attachKeyboard({ state: 'shown', frame: band });
@@ -225,13 +223,29 @@ describe('oracleKeyboard — a refused region is said once on stderr, nothing el
     expect(await oracleKeyboard(oracle)).toStrictEqual({ state: 'shown', frame: band });
     expect(said.mock.calls).toEqual([
       [
-        "averi: the soft keyboard window's touchable region 17,1203 611x577 + 0,2101 1080x119 beside its band 0,2101 1080x119 — " +
+        "averi: the soft keyboard window's touchable region 359,1269 681x643 + 0,2088 1080x132 beside its band 0,2088 1080x132 — " +
           'the input method said hidden in the same call, so no panel of it is judged as covered (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md)',
       ],
     ]);
     oracle.touchableAnswers.current = { witness: 'shown', region: [panel, band] };
     expect(await oracleKeyboard(oracle)).toEqual({ state: 'shown', frame: band, panels: [panel] });
     expect(said).toHaveBeenCalledTimes(1);
+  });
+
+  it('once per ORACLE, not per process: a second oracle says the same line again — the registry keeps one adapter a session, so a server still says it once', async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const refusing = () => {
+      const oracle = new FakeAdapter({ s: screen() }, 's').attachKeyboard({ state: 'shown', frame: GBOARD_STRIP });
+      oracle.touchableAnswers.current = { witness: 'unknown', region: [GBOARD_PANEL, GBOARD_STRIP] };
+      return oracle;
+    };
+    const first = refusing();
+    await oracleKeyboard(first);
+    await oracleKeyboard(first);
+    expect(said).toHaveBeenCalledTimes(1);
+    await oracleKeyboard(refusing());
+    expect(said).toHaveBeenCalledTimes(2);
+    expect(said.mock.calls[1]).toEqual(said.mock.calls[0]);
   });
 });
 

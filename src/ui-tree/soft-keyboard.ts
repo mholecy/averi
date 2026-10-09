@@ -274,8 +274,17 @@ export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): RegionVe
   return dropped === 0 ? { panels } : { panels, refused: { kind: 'rects-dropped', dropped } };
 }
 
-/** The notices `oracleKeyboard` has written in this process — each distinct one once. */
-const noticed = new Set<string>();
+/**
+ * The notices `oracleKeyboard` has written, per oracle — each distinct one
+ * once for each. Per oracle, not per process (2026-10-09): the registry
+ * keeps one adapter, so one oracle, for a whole server session, so in
+ * production this is still "once per process"; a test that builds its own
+ * oracle starts with nothing said, and no longer depends on which test ran
+ * first (until that date a module-level `Set` did, and the notice test had
+ * to pick a band no other test used). Weak, so an oracle that is gone
+ * takes its notices with it.
+ */
+const noticed = new WeakMap<KeyboardOracle, Set<string>>();
 
 /**
  * The ORACLE's reading of the keyboard, whole (review 2026-10-08): `state()`,
@@ -292,7 +301,7 @@ const noticed = new Set<string>();
  * Cost: one `state()` query; with the band up, one `touchable()` query more
  * (AndroidAdapter's keyboardState and keyboardTouchable have the figures).
  *
- * A region `panelsBeyond` refused is said ONCE per distinct case, as a
+ * A region `panelsBeyond` refused is said ONCE per distinct case and oracle, as a
  * one-line `averi:` notice on stderr — the channel the adapters already use
  * for a non-fatal note (adapters/wda.ts, adapters/ios.ts); stdout is the MCP
  * protocol's. It reaches ONLY the server's stderr — not an MCP tool result,
@@ -311,8 +320,10 @@ export async function oracleKeyboard(oracle: KeyboardOracle): Promise<SoftKeyboa
       `averi: the soft keyboard window's touchable ${region} beside its band ${rectText(keyboard.frame)} — ` +
       `${regionRefusalText(refused)}, so ${panels.length === 0 ? 'no panel of it is' : 'only part of it is'} judged as covered ` +
       '(docs/bugs/2026-10-05-android-floating-gboard-keyboard.md)';
-    if (!noticed.has(line)) {
-      noticed.add(line);
+    const said = noticed.get(oracle) ?? new Set<string>();
+    noticed.set(oracle, said);
+    if (!said.has(line)) {
+      said.add(line);
       console.error(line);
     }
   }
