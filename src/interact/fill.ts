@@ -157,7 +157,7 @@ export async function fillField(
   try {
     assertTypeable(value);
   } catch (e) {
-    throw new FillValueFailure(errorMessage(e), 'refused');
+    throw new FillValueFailure(errorMessage(e), 'refused', { cause: e });
   }
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
@@ -438,8 +438,8 @@ export async function fillField(
 export class FillValueFailure extends Error {
   readonly fillValue: 'did-not-land' | 'refused';
 
-  constructor(message: string, fillValue: 'did-not-land' | 'refused') {
-    super(message);
+  constructor(message: string, fillValue: 'did-not-land' | 'refused', options?: ErrorOptions) {
+    super(message, options);
     this.name = 'FillValueFailure';
     this.fillValue = fillValue;
   }
