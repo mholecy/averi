@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, strokeRoom, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, strokeRoom, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_DOWN_CUT_FLOOR, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -424,13 +424,21 @@ describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one own
     expect(scrollStroke({ toward: 'down', reach: 1, box: short }).from).toEqual({ x: 540, y: 2086 });
     expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar])).toEqual({ within: short, box: short, coverTop: 1840 });
     expect(scrollStroke({ toward: 'down', reach: 1, box: short, coverTop: 1840 }).from).toEqual({ x: 540, y: 1782 });
-    // The cut moves the touch-down up onto another node drawn over the list: cut above that one too, while room is left.
-    const above = { x: 0, y: 1700, width: 1080, height: 100 };
-    expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar, above])).toEqual({ within: short, box: short, coverTop: 1700 });
-    expect(scrollStroke({ toward: 'down', reach: 1, box: short, coverTop: 1700 }).from).toEqual({ x: 540, y: 1670 });
-    // A cut that would leave under MIN_STROKE_BOX is not made: the stroke is drawn as before, its fast fail naming the node.
+    // The cut moves the touch-down up onto another node drawn over the list: cut above that one too, while a third of the box is left.
+    const above = { x: 0, y: 1780, width: 1080, height: 20 };
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar, above])).toEqual({ within: short, box: short, coverTop: 1780 });
+    expect(scrollStroke({ toward: 'down', reach: 1, box: short, coverTop: 1780 }).from).toEqual({ x: 540, y: 1734 });
+    // All or nothing (code review of fix/r5-stroke): when the next cut would leave under a third, none is made — not the bar's alone, which still lands on the node.
+    expect(strokeRoom(BOX, [short], 'down', undefined, () => [bar, { x: 0, y: 1600, width: 1080, height: 200 }])).toEqual({ within: short, box: short });
+    // A node over most of the box (a sheet; under MIN_STROKE_BOX left too) is not cut for: the stroke is drawn as before, its fast fail naming the node.
     const sheet = { x: 0, y: 1600, width: 1080, height: 620 };
     expect(strokeRoom(BOX, [short], 'down', undefined, () => [sheet])).toEqual({ within: short, box: short });
+    // …nor a wrapper over the measured list from near its top: cut, the 838-px stroke would be 70 px (TOUCH_DOWN_CUT_FLOOR).
+    const list = { x: 0, y: 825, width: 1080, height: 1395 };
+    expect(TOUCH_DOWN_CUT_FLOOR).toBe(1 / 3);
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ x: 0, y: 940, width: 1080, height: 1280 }])).toEqual({ within: list, box: list });
+    // …while the lower-half rule's cut stands under it: the bar's 1840 kept, the wrapper not cut for.
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ x: 66, y: 1840, width: 948, height: 248 }, { x: 0, y: 940, width: 1080, height: 1280 }])).toEqual({ within: list, box: list, coverTop: 1840 });
     // Off the touch-down (beside the stroke's line, or below the touch-down): no cut, as before.
     expect(strokeRoom(BOX, [short], 'down', undefined, () => [{ x: 600, y: 1840, width: 480, height: 248 }])).toEqual({ within: short, box: short });
     expect(strokeRoom(BOX, [short], 'down', undefined, () => [{ x: 0, y: 1600, width: 1080, height: 100 }])).toEqual({ within: short, box: short });

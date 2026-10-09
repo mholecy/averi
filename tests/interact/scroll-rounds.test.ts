@@ -1109,6 +1109,25 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     expect(steps[1]).toMatchObject({ toward: 'down', box: LIST, coverTop: 1826 });
   });
 
+  it('…judged every round, with that round\'s cover: the IME gone, the strip the target lies in has room again and is stroked — its nearest container, no longer the list around it (D1, code review of fix/r5-stroke)', () => {
+    const STRIP: Rect = { x: 0, y: 1350, width: 1080, height: 200 }; // 48 px above the IME at 1398
+    // Read above the frame (beyond the far edge of a scroll down), so losing it turns nothing: both strokes content-down.
+    const played = play({ ...ANDROID, maxSwipes: 2 }, [
+      { found: [match({ x: 66, y: -300, width: 948, height: 40 }, 'row')], scrollers: [STRIP, LIST], cover: UP_IME, rest: 'a' },
+      { found: [], rest: 'b' },
+      { found: [], rest: 'c' },
+    ]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [[st.box, st.coverTop]] : []))).toEqual([
+      [LIST, 1398],
+      [STRIP, undefined],
+    ]);
+  });
+
+  it('a target found in NO clipping container is stroked over the screen box, not the screen\'s largest scroller beside it (P5)', () => {
+    const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [match({ x: 66, y: 2300, width: 948, height: 40 }, 'row')], mainScroller: LIST, rest: 'a' }, { found: [], rest: 'b' }]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: SCREEN_1080 });
+  });
+
   it('with the IME up, the higher of the two tops cuts — the keyboard\'s', () => {
     const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: LIST, over: [BAR], cover: UP_IME, rest: 'a' }, { found: [], rest: 'b' }]);
     expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398, box: LIST });

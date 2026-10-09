@@ -188,10 +188,20 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
 export function scrollStroke(step: { toward: Direction; reach: number; coverTop?: number; box: Rect; maxTravel?: number }): Stroke {
   const { toward, reach, coverTop, box, maxTravel } = step;
   const side = toward === 'up' || toward === 'down' ? box.height : box.width;
-  const vector = coverTop === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, coverTop, toward, 'content');
-  const stroke = shortenStroke(vector, reach, side);
+  const stroke = shortenStroke(fullStroke(box, toward, coverTop), reach, side);
   const travel = strokeLength(stroke);
   return maxTravel === undefined || travel <= maxTravel ? stroke : shortenStroke(stroke, maxTravel / travel, side);
+}
+
+/**
+ * `scrollStroke`'s stroke at full reach: over `box` toward `toward` (where
+ * the content lies), clear of a cover whose top edge is `coverTop`. Its
+ * touch-down is `scrollStroke`'s whatever the reach or travel cap —
+ * `shortenStroke` keeps `from` — so `overlayTop` asks it where the finger
+ * would land.
+ */
+function fullStroke(box: Rect, toward: Direction, coverTop?: number): Stroke {
+  return coverTop === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, coverTop, toward, 'content');
 }
 
 /** How far a stroke's finger travels, touch-down to lift-off. */
@@ -226,6 +236,21 @@ function roomIn(met: Rect, toward: Direction, coverTop?: number): Rect | undefin
   const side = toward === 'up' || toward === 'down' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
   return side >= MIN_STROKE_BOX ? met : undefined;
 }
+
+/**
+ * The least of a box (its part above the keyboard) a cut for a node over
+ * the stroke's TOUCH-DOWN may leave, `overlayTop` (D3, code review of
+ * fix/r5-stroke): a third. The floating bar it is for is a strip over the
+ * box's bottom — the measured case leaves 290 of 670 (43 %); a node that
+ * covers the line from higher than a third of the box down past its 0.8
+ * touch-down covers most of it, and is a wrapper the tree cannot say is
+ * transparent (ui-tree/draw-order.ts's `structural` row: a structural node
+ * with children counts as drawn over a list) or a sheet over the content —
+ * a cut for it would turn an 838-px stroke into a 70-px one (a wrapper
+ * `0,940 1080x1280` over the list `0,825 1080x1395`), a dozen strokes for
+ * one against the 15 s budget, where the uncut stroke may well scroll.
+ */
+export const TOUCH_DOWN_CUT_FLOOR = 1 / 3;
 
 /**
  * What `strokeRoom` decides: the candidate container (`within`, as the tree
@@ -319,24 +344,32 @@ export function strokeRoom(
  * bar's host is 948 of 1080 wide and stops 132 px above the screen's
  * bottom, so "spans the box" or "reaches its bottom" would both have
  * missed it. The lower half and no higher: a cut there leaves at least
- * half the box, so the stroke keeps a list's length, never a sliver's.
+ * half the box, so the stroke keeps a list's length, never a sliver's —
+ * the rule below cuts higher only for a node the finger would land on,
+ * and never below a third of the box.
  *
  * And then a node over the TOUCH-DOWN, wherever its top lies (2026-10-09,
  * D3): the stroke's would-be touch-down under the cut so far
- * (`swipeVector`, or `swipeVectorAbove` under a cut — `scrollStroke`'s
- * own) inside a node of `over` is cut above the highest such node, and the
- * touch-down placed again, until it lies on none: a short list `0,1550
- * 1080x670` under the measured bar's host `66,1840 948x248` — the host's
- * top above the list's centre, 1885 — touched down at 2086, on the host,
- * and is cut to 1840, touching down at 1782. Only while the cut leaves at
- * least MIN_STROKE_BOX above it: a node over nearly all of the box (a sheet
- * risen over the list) is left uncut and the stroke drawn as before — a cut
- * would leave no room, and the stroke would go to an outer container or the
- * screen box (`strokeRoom`'s none), as covered there as here, with the fast
- * fail's sentence naming the node lost (`touchedOn` names only a node over
- * the stroked container). The lower-half rule stays first, so every cut it
- * made is made as it was; this one only cuts higher, and only when the
- * finger would land on a node.
+ * (`fullStroke`, `scrollStroke`'s own) inside a node of `over` is cut
+ * above the highest such node, and the touch-down placed again, until it
+ * lies on none: a short list `0,1550 1080x670` under the measured bar's
+ * host `66,1840 948x248` — the host's top above the list's centre, 1885 —
+ * touched down at 2086, on the host, and is cut to 1840, touching down at
+ * 1782. All or nothing: when a cut would leave less than
+ * TOUCH_DOWN_CUT_FLOOR of the box (part above the keyboard) or
+ * MIN_STROKE_BOX, none of this rule's cuts is made and the lower-half
+ * rule's stands — a partial cut would only shorten a stroke that still
+ * lands on a node (code review of fix/r5-stroke). Such a node covers most
+ * of the box: a transparent wrapper, where the uncut stroke scrolls, or a
+ * sheet over the content, where the target the stroke is for lies under it
+ * anyway; the stroke is drawn as before, and a fast fail names the node
+ * (`touchedOn` names a node over the stroked container — a cut to no room
+ * would hand the stroke to an outer container or the screen box and lose
+ * that sentence). The lower-half rule stays first, so every cut it made is
+ * made as it was; this one only cuts higher, and only when the finger
+ * would land on a node. The loop ends: the touch-down lies above the cut
+ * so far (`swipeVectorAbove`'s clearance), so each cut is a node's top
+ * strictly higher than the last.
  *
  * Not cut, stated: a node drawn over the box's UPPER half (a floating
  * header) clear of the touch-down, where a content-up stroke touches down at 0.2 of the box — the
@@ -353,14 +386,16 @@ function overlayTop(box: Rect, over: readonly Rect[], toward: Direction, coverTo
   const tops = over
     .filter((r) => r.x <= cx && cx < r.x + r.width && r.y > (box.y + bottom) / 2 && r.y < bottom)
     .map((r) => r.y);
-  let drawn = tops.length === 0 ? undefined : Math.min(...tops);
-  // Then the touch-down as it would be drawn under that cut: a node over it is cut above, while that leaves room.
+  const lowerHalf = tops.length === 0 ? undefined : Math.min(...tops);
+  // Then the touch-down as it would be drawn under that cut: a node over it is cut above — all of them, or none.
+  const floor = Math.max(MIN_STROKE_BOX, (bottom - box.y) * TOUCH_DOWN_CUT_FLOOR);
+  let drawn = lowerHalf;
   for (;;) {
-    const top = drawn ?? coverTop;
-    const at = (top === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, top, toward, 'content')).from;
+    const at = fullStroke(box, toward, drawn ?? coverTop).from;
     const under = over.filter((r) => containsPoint(r, at)).map((r) => r.y);
-    const cut = under.length === 0 ? undefined : Math.min(...under);
-    if (cut === undefined || cut >= (top ?? Number.POSITIVE_INFINITY) || cut - box.y < MIN_STROKE_BOX) return drawn;
+    if (under.length === 0) return drawn;
+    const cut = Math.min(...under);
+    if (cut - box.y < floor) return lowerHalf;
     drawn = cut;
   }
 }
