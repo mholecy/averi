@@ -6,7 +6,7 @@ import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
-import { dismissKeyboard, KeyboardGuardError, type DismissResult, type KeyboardDismissal } from '../interact/keyboard.js';
+import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
@@ -17,7 +17,6 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
-  resolveLaunchActivity,
   flowIsDestructive,
   flowItselfIsDestructive,
   keyboardDismissals,
@@ -29,6 +28,7 @@ import {
   type TapSpec,
 } from './config.js';
 import { describeCondition, evaluateCondition } from './condition.js';
+import { launchApp, launchedLine, WIPE_LABEL, type EngineSession } from './launch.js';
 import { resolveCredentials, type Credentials, type EnvValues, type ResolvedValue } from './credentials.js';
 
 export interface TraceEntry {
@@ -217,40 +217,10 @@ type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
  * are written against a known app by someone who can see its tree, and a
  * step that must not guess can say `role:` — whereas an agent exploring
  * through the MCP tools cannot, so those refuse (interact/resolve.ts,
- * Ambiguity). One constant so the policy is stated once and the three sites
- * cannot drift.
+ * Ambiguity — mcp/tools.ts#guardOpts). Stated once, in the engine's
+ * `acting`, which every site that acts on an element is handed.
  */
 const FLOW_AMBIGUITY: Ambiguity = 'first';
-
-/**
- * What outlives one engine run: the state of the SESSION that runs it. Today
- * that is one number, how many `launch { clearState: true }` steps the
- * session's runs have performed — the `⚠ clearState` line's "(3 this
- * session)", which is what makes a finite resource (a device registration)
- * budgetable.
- *
- * Owned by the caller and handed in (`EngineOptions.session`), as the
- * environment is (2026-10-04). Until 2026-10-07 it was a module-level `let`
- * with an exported reset for tests: every engine in the PROCESS shared it, so
- * a second server built in one process (each test file, an embedder of
- * createAveriServer) continued the first one's count, and each engine test
- * file had to remember to zero it. The MCP server (mcp/tools.ts) now makes one
- * per server — the server IS the session — and passes it to every tool that
- * runs the engine.
- */
-export class EngineSession {
-  #clearStateCount = 0;
-
-  /** How many wipes this session's runs have performed so far. */
-  get clearStateCount(): number {
-    return this.#clearStateCount;
-  }
-
-  /** Counts one wipe and returns the new total — the number the `⚠ clearState` line prints. */
-  recordClearState(): number {
-    return ++this.#clearStateCount;
-  }
-}
 
 /**
  * What one engine run does: ensure a state, run a flow, or both — in that
@@ -406,14 +376,19 @@ export class FlowEngine {
   private readonly pinKeyDelayMs: number;
   private readonly credentials: Credentials;
   /**
+   * How this engine acts on an element, given once (2026-10-09; until then
+   * each call site spelled it out): FLOW_AMBIGUITY, the poll interval, and
    * `app.ios.keyboardDismiss` in interact/'s vocabulary (flow/config.ts#
-   * keyboardDismissals), converted once here and handed to every tap and
-   * fill — and to the post-fill dismissal — as `GuardOptions.dismissals`.
-   * The engine never branches on the platform for it: interact/ reads the
-   * list only where the adapter has no keyboard oracle, so on Android it is
-   * carried and never read.
+   * keyboardDismissals), converted once here. Every tap, fill, presence probe
+   * and post-fill dismissal gets it; a site adds only what is its own (a
+   * timeout, a clear). Each callee reads its own part: the presence probe
+   * (resolvePresent) only `ambiguous` and `pollMs` — it acts on nothing, so
+   * the dismissals are carried, not used — and the dismissal only
+   * `ambiguous` and `dismissals`. The engine never branches on the platform for the
+   * dismissals: interact/ reads the list only where the adapter has no
+   * keyboard oracle, so on Android it is carried and never read.
    */
-  private readonly dismissals: readonly KeyboardDismissal[] | undefined;
+  private readonly acting: Omit<GuardOptions, 'timeoutMs'>;
 
   private constructor(
     private readonly cfg: AveriConfig,
@@ -434,7 +409,7 @@ export class FlowEngine {
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
-    this.dismissals = keyboardDismissals(cfg);
+    this.acting = { ambiguous: FLOW_AMBIGUITY, pollMs: this.pollMs, dismissals: keyboardDismissals(cfg) };
     this.session = opts.session;
   }
 
@@ -1032,54 +1007,17 @@ export class FlowEngine {
   private async runLaunch(spec: StepPayload<'launch'>): Promise<void> {
     const app = this.cfg.app[this.adapter.platform];
     if (!app) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
-    const appId = 'package' in app ? app.package : app.bundleId;
-    // Step-level activity wins over app.android.activity, which applies only
-    // when the step names neither an activity nor an intent (2026-10-03: an
-    // intent alone is delivered within the package, not forced onto the
-    // config's launcher activity). On iOS neither applies unless the step
-    // names one — the adapter then rejects it loudly. The rule, its "when"
-    // included, is flow/config.ts's (shared with launch_app).
-    const activity = resolveLaunchActivity(this.cfg, {
-      platform: this.adapter.platform,
-      appId,
-      activity: spec.activity,
-      intent: spec.intent,
+    // The launch itself — activity, adapter call, wipe count, wording — is
+    // flow/launch.ts's, shared with launch_app; the step's app id is the
+    // config's. Its caveat and its wipe each get a `⚠` line right under the
+    // line they qualify.
+    const launched = await launchApp(this.adapter, this.cfg, this.session, {
+      ...spec,
+      appId: 'package' in app ? app.package : app.bundleId,
     });
-    const { note } = await this.adapter.launch(appId, {
-      clearState: spec.clearState,
-      activity,
-      intent: spec.intent,
-    });
-    this.log(
-      'launch',
-      appId +
-        (activity === undefined ? '' : `/${activity.split('/').pop()}`) +
-        (spec.clearState ? ' (state cleared)' : ''),
-    );
-    // The launch's caveat (LaunchOutcome.note — today iOS's foreground wait
-    // giving up: the tree may still be the app this launch covered,
-    // adapters/ios-foreground.ts), right under the line it qualifies, in the
-    // words launch_app's reply uses. A `⚠` line, not a failure: the app was
-    // launched, and the steps after it poll — a `wait:`/`assert` that reads
-    // the wrong app's tree is what the line warns about.
-    if (note !== undefined) this.log('⚠ launch', note);
-    // The cost of a wipe is invisible at the moment it is paid, and nothing in
-    // the trace said so. The line states the MECHANISM and leaves the price to
-    // the reader: what it costs is app-specific, and averi drives any app. Be
-    // precise about the mechanism too — this deletes the app's data container
-    // (iOS) / runs `pm clear` (Android); it does not clear the iOS keychain,
-    // whatever a re-registration afterwards may suggest. The running count
-    // spans tool calls on purpose: it is the SESSION's (EngineSession, the
-    // MCP server's, handed in), and "3rd this session" is what makes a finite
-    // resource budgetable.
-    if (spec.clearState) {
-      const count = this.session.recordClearState();
-      this.log(
-        '⚠ clearState',
-        'app state wiped (data container deleted) — anything the app persisted, ' +
-          `a device registration included, is gone (${count} this session)`,
-      );
-    }
+    this.log('launch', launchedLine(launched));
+    if (launched.note !== undefined) this.log('⚠ launch', launched.note);
+    if (launched.wiped !== undefined) this.log(WIPE_LABEL, launched.wiped);
   }
 
   private async runType(spec: StepPayload<'type'>): Promise<void> {
@@ -1171,11 +1109,9 @@ export class FlowEngine {
     const { value, secret } = this.resolveValue(rawValue);
     const filled = await this.tracingDismissal('⚠ fill', () =>
       fillField(this.adapter, spec, value, {
-        ambiguous: FLOW_AMBIGUITY,
+        ...this.acting,
         clear,
         timeoutMs: this.tapTimeoutMs,
-        pollMs: this.pollMs,
-        dismissals: this.dismissals,
         // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
         // tests mock util/sleep instead of threading a test-only option here.
       }),
@@ -1208,7 +1144,7 @@ export class FlowEngine {
     let closed: DismissResult = {};
     if (closeKeyboard) {
       closed = await this.tracingGuardFailure('⚠ fill', () =>
-        dismissKeyboard(this.adapter, { dismissals: this.dismissals, ambiguous: FLOW_AMBIGUITY }),
+        dismissKeyboard(this.adapter, this.acting),
       );
     }
     if (closed.warning !== undefined) this.log('⚠ fill', `${describeElementSpec(spec)}: ${closed.warning}`);
@@ -1327,11 +1263,7 @@ export class FlowEngine {
           // Presence = "something actionable is in the tree": the same policy
           // the committed tap will apply, one-shot per round (resolvePresent),
           // so a ghost zero-area node cannot commit a tap that then cannot land.
-          await resolvePresent(this.adapter, tap.spec, {
-            ambiguous: FLOW_AMBIGUITY,
-            timeoutMs: tap.timeoutMs ?? this.optionalTimeoutMs,
-            pollMs: this.pollMs,
-          });
+          await resolvePresent(this.adapter, tap.spec, { ...this.acting, timeoutMs: tap.timeoutMs ?? this.optionalTimeoutMs });
           sighted = true;
           await this.tapSpec(tap.spec, this.tapTimeoutMs);
         } else {
@@ -1397,7 +1329,7 @@ export class FlowEngine {
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
     await this.tracingDismissal('⚠ tap', () =>
-      tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs, dismissals: this.dismissals }),
+      tapElement(this.adapter, spec, { ...this.acting, timeoutMs }),
     );
     if (!quiet) this.log('tap', describeElementSpec(spec));
   }

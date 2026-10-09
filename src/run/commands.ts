@@ -52,13 +52,6 @@ export type ResolveAdapterFor = (cfg: AveriConfig) => Promise<DeviceAdapter>;
 export const baselineDirFor = (configPath?: string): string =>
   resolve(configDir(projectConfigPath(configPath)), DEFAULT_BASELINE_DIR);
 
-/**
- * The session class, re-exported for the MCP layer: mcp/ makes one session
- * per server and hands it down, and run/ is the layer it delegates to
- * (ARCHITECTURE.md §2) — so mcp/ does not import flow/engine.ts for it.
- */
-export { EngineSession } from '../flow/engine.js';
-
 /** An ensure_state / run_flow call: the project its handler loaded (config and environment), and the engine context (environment name, session — flow/engine.ts#EngineContext). */
 interface EngineCall extends EngineContext {
   project: ProjectConfig;

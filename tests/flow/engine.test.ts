@@ -11,7 +11,8 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, EngineSession, FlowError, idbContainerIdHint, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, idbContainerIdHint, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 
@@ -1400,6 +1401,26 @@ flows:
     fake.launchNote = undefined;
     const quiet = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
     expect(quiet.filter((t) => t.action === '⚠ launch')).toEqual([]);
+  });
+
+  // The order launch_app's reply mirrors (mcp/tool-text.ts#launchText): the
+  // launch, its caveat, then the wipe — each qualifying the line above it.
+  it('a wiping launch with a note: launch, ⚠ launch, ⚠ clearState — in that order', async () => {
+    const cfg = parseConfig(`
+app:
+  ios: { bundleId: md.bank.app }
+flows:
+  cold:
+    steps:
+      - launch: { clearState: true }
+`);
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    fake.platform = 'ios';
+    fake.launchNote = 'the UI tree was still the app labelled "Contacts"';
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'cold' });
+    const at = trace.findIndex((t) => t.action === 'launch');
+    expect(trace.slice(at, at + 3).map((t) => t.action)).toEqual(['launch', '⚠ launch', '⚠ clearState']);
+    expect(trace[at].detail).toBe('md.bank.app (state cleared)');
   });
 });
 
