@@ -1,9 +1,10 @@
-import type { DeviceAdapter, DeviceScreen, Rect, SoftKeyboard, Stroke, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import { clippedEdges, sameRectWithinPixel, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { cannotHide, highestCover, keyboardSideNodes, readSoftKeyboard, type KeyboardRemedy, type SoftKeyboardReading } from '../ui-tree/soft-keyboard.js';
+import { readKeyboard, type KeyboardCover, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
+import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { sleep } from '../util/sleep.js';
-import { keyboardCorroborated, keyboardUnlocated, UNLOCATED_KEYBOARD } from './keyboard.js';
+import { UNLOCATED_KEYBOARD } from './keyboard.js';
 import { frameText } from './keyboard-model.js';
 import { absenceError, describeTarget, findTarget, type Target } from './resolve.js';
 import { judgingScreen, sameStroke, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction, type JudgingScreen } from './swipe.js';
@@ -62,7 +63,7 @@ export interface ScrollUntilResult {
    *   floating Gboard does not read this way, its panel is read from the
    *   window's touchable region and covers as the band does) — so nothing
    *   could be judged against it and the report says so
-   *   (keyboard.ts#keyboardUnlocated). Only on a clean `fully: true` stop.
+   *   (the reading's `unlocated`, ui-tree/keyboard-cover.ts). Only on a clean `fully: true` stop.
    */
   keyboard?: { state: 'shown'; frame: Rect } | { state: 'unlocated' };
   /**
@@ -154,7 +155,7 @@ type Edge = 'top' | 'bottom' | 'left' | 'right';
  * what is under it. `above` undefined: the band starts at or above y 0 and
  * leaves nothing (a full-screen extract-mode IME, unmeasured).
  *
- * `topCover` is the HIGHEST covered rect (`highestCover`) — named so by the
+ * `topCover` is the HIGHEST covered rect (`KeyboardCover.top`) — named so by the
  * code review of round 2 (it was `band`, and callers read `band.y` as the
  * keyboard's top): since 2026-10-08 not always the inset band: with a
  * floating Gboard (measured that day, API 33) it is the panel,
@@ -176,16 +177,16 @@ interface Cover {
 }
 
 /** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
-function coverOf(reading: SoftKeyboardReading | undefined, viewport: DeviceScreen): Cover | undefined {
-  if (reading?.keyboard.state !== 'shown') return undefined;
+function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
+  if (shown === undefined) return undefined;
   // The highest covered rect, not always the inset band (2026-10-08): a
   // floating Gboard's panel mid-screen above its 132-px strip
   // (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md) — so a target
   // behind it is judged under the cover and the stroke starts above it. Full
   // width above its top, as for any band that does not reach the sides.
-  const topCover = highestCover(reading.keyboard);
+  const topCover = shown.top;
   if (topCover.y >= viewport.height) return undefined;
-  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: reading };
+  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: shown.remedy };
 }
 
 /** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the cover it was judged under (none for a whole-screen judgement or a keyboard-side node). */
@@ -199,14 +200,14 @@ interface Judged {
 /**
  * The MOST revealed match, not the first: an id can sit on a container and
  * its child, and reporting the clipped one of the two would invent a defect.
- * Under a cover, a keyboard-side node (`keyboardSideNodes`, the set
- * `partOfKeyboard` answers from, built once per round) is judged against
+ * Under a cover, a keyboard-side node (the round's reading's `ofKeyboard`,
+ * one walk per round) is judged against
  * the whole screen; every other node against the part above the band, or
  * scores 0 when the band leaves none.
  */
-function judge(found: readonly UiNode[], viewport: DeviceScreen, cover?: { cover: Cover; keyboardSide: ReadonlySet<UiNode> }): Judged | undefined {
+function judge(found: readonly UiNode[], viewport: DeviceScreen, cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean }): Judged | undefined {
   const scored = found.map((node): Judged => {
-    if (cover === undefined || cover.keyboardSide.has(node)) {
+    if (cover === undefined || cover.keyboardSide(node)) {
       return { node, visible: visibleFractionInViewport(node.rect, viewport), clipped: clippedEdges(node.rect, viewport) };
     }
     const { above } = cover.cover;
@@ -256,7 +257,7 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
  * and, on Android, what a round's keyboard reading costs: the window query,
  * the touchable-region query too while the keyboard reads shown, and a
  * witness query when the band matters on that read (1 to 3 adb calls;
- * ui-tree/soft-keyboard.ts#readSoftKeyboard has the table); a stop at 0
+ * ui-tree/keyboard-cover.ts has the table); a stop at 0
  * swipes sent no stroke and spends none. A target still
  * moving inside the viewport is read again, up to this many reads a
  * stroke, then reported with `settled: false` and a note saying so: a
@@ -567,7 +568,7 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * screen centre, its start at y ≈ 1776 of 2220 — began on a key and scrolled
  * nothing for 15 s; the same on iOS 27 with the pad up (y ≈ 699 of 874). So
  * every round reads the keyboard the way the tap guard and the pixel poll do
- * — `readSoftKeyboard` on the round's tree (the oracle's `state()` on
+ * — a reading off the round's tree (`readKeyboard`; the oracle's `state()` on
  * Android, one query a round, two with the keyboard up since 2026-10-08 —
  * its window's region, for a floating panel — and three when the band
  * changes the round, the witness below; the WDA band on iOS, no device read) — and
@@ -577,8 +578,8 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * (`swipeVectorAbove`: the whole screen's stroke, its point on or near the
  * keyboard pulled up — since the iOS device check, below), so it starts on
  * the content. The keyboard's own nodes (a key
- * as the target) are judged against the whole screen, as `readSoftKeyboard`
- * reads them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
+ * as the target) are judged against the whole screen, as a reading reads
+ * them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
  * as before — the guard's fail-open rule; an unread tree strokes in the box
  * the last read round's band left (review 2026-10-08), the stop already
  * quoting the read error. Landscape: since 2026-10-08 the judgement, the
@@ -595,8 +596,8 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * The band is APPLIED only when it changes the round — the two judgements
  * differ, or the round ends in a stroke or a failure rather than a clean
  * stop — and only once the input method has not denied it
- * (`keyboardCorroborated`: the guard's veto, its one owner in
- * keyboard-window.ts). Review 2026-10-08: the window state was measured
+ * (the reading's `corroborated`: the guard's veto, its one owner
+ * `witnessDenies` in ui-tree/keyboard-cover.ts). Review 2026-10-08: the window state was measured
  * stale for seconds after a navigating tap, and a phantom band would score
  * an on-screen target 0, send a stroke through the next screen and report
  * a keyboard that is gone. The witness is asked on EVERY round a band
@@ -678,7 +679,7 @@ const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the firs
  * touchable region, `coverOf` above): on a failed stop, and on a
  * `fully: true` stop — where the answer changes what the reader does next —
  * a window reading `hidden` is checked once against the input method
- * (`keyboardUnlocated`); when it says shown, the report says the keyboard
+ * (the reading's `unlocated`); when it says shown, the report says the keyboard
  * could not be placed.
  * Nothing is judged against it — there is no frame — and nothing is
  * pressed. Not on a default clean stop (review 2026-10-08: a witness query
@@ -734,7 +735,7 @@ export async function scrollUntilVisible(
   /** The cover the last round whose tree READ applied — undefined when that round applied none — for the stroke of a round whose tree did not read. */
   let lastReadCover: Cover | undefined;
   /** On a failed or `fully: true` stop only: the `unlocated` row, asked of the stop round's window reading (one witness query, and only when it read hidden). */
-  const unlocatedAt = async (round: SoftKeyboard | undefined): Promise<boolean> => round !== undefined && (await keyboardUnlocated(adapter, round));
+  const unlocatedAt = async (round: KeyboardReading | undefined): Promise<boolean> => round !== undefined && (await round.unlocated());
   /** Spend a confirming read: settle again, send nothing, read again. */
   const settleAgain = async (): Promise<void> => {
     motion.confirming();
@@ -755,21 +756,21 @@ export async function scrollUntilVisible(
     if (lastFound.length > 0) everFound = true;
     // The keyboard this round, off this round's tree (no subject: every match
     // is judged against it, the keyboard's own exempted in `judge`).
-    const reading = tree === undefined ? undefined : await readSoftKeyboard(adapter, tree);
+    const reading = tree === undefined ? undefined : readKeyboard(adapter, tree);
     const viewport = frame.box;
-    const offered = coverOf(reading, viewport);
+    const offered = coverOf(await reading?.cover(), viewport);
     const whole = judgeOver(lastFound, frame.boxes);
     let cover: Cover | undefined;
     let best = whole;
-    if (offered !== undefined && tree !== undefined) {
-      const covered = judge(lastFound, viewport, { cover: offered, keyboardSide: keyboardSideNodes(tree) });
+    if (offered !== undefined && reading !== undefined) {
+      const covered = judge(lastFound, viewport, { cover: offered, keyboardSide: reading.ofKeyboard });
       // Moot: the round stops cleanly either way, on the same judgement — the
       // band changes nothing, and is neither asked about nor reported.
       // Otherwise the witness is asked THIS round, never remembered: a
       // scroll can hide a keyboard (a list that dismisses it on drag) and
       // leave the window state stale-shown behind it (review 2026-10-08).
       const moot = endsClean(whole, fully) && sameJudgement(whole, covered);
-      if (!moot && (await keyboardCorroborated(adapter))) {
+      if (!moot && (await reading.corroborated())) {
         cover = offered;
         best = covered;
       }
@@ -802,7 +803,7 @@ export async function scrollUntilVisible(
         const keyboard: ScrollUntilResult['keyboard'] =
           best.under !== undefined
             ? { state: 'shown', frame: best.under.topCover }
-            : fully && (await unlocatedAt(reading?.keyboard))
+            : fully && (await unlocatedAt(reading))
               ? { state: 'unlocated' }
               : undefined;
         return {
@@ -912,7 +913,7 @@ export async function scrollUntilVisible(
           ? `. The soft keyboard was up over ${frameText(lastCover.topCover)} in ${coveredRounds} of the ${treesRead} rounds read: ` +
             `in those, visibility was judged, and the swipe drawn, in the screen above it — ${hideToJudgeWholeScreen(lastCover.remedy)}`
           : '';
-      const unlocated = (await unlocatedAt(reading?.keyboard))
+      const unlocated = (await unlocatedAt(reading))
         ? `; ${UNLOCATED_KEYBOARD} — the swipes may have landed on it; hide or dock it and scroll again`
         : '';
       const message = `scroll_until ${describe} failed ${cause} — ${why}${turned}${shown}${unlocated}`;

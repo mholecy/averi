@@ -1,11 +1,10 @@
-import type { Point, Rect, SoftKeyboard } from '../adapters/types.js';
+import type { Point, Rect } from '../adapters/types.js';
+import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { readSoftKeyboard } from '../ui-tree/soft-keyboard.js';
 import { inTreeModel } from './keyboard-in-tree.js';
 import {
   confirmHidden,
   lookAgain,
-  keyboardOver,
   withNote,
   type DismissOptions,
   type DismissResult,
@@ -14,7 +13,7 @@ import {
   type KeyboardModel,
   type ResolvedClear,
 } from './keyboard-model.js';
-import { windowCorroborated, windowModel, windowUnlocated } from './keyboard-window.js';
+import { windowModel } from './keyboard-window.js';
 import { describeTarget, refuseOffScreen, resolveSettled, tapScreen, type Resolved, type Target } from './resolve.js';
 
 /**
@@ -33,11 +32,10 @@ export { AfterDismissalTap, KeyboardWithoutDismissal } from './keyboard-in-tree.
 
 /**
  * THE one choice between the two models for ACTING (2026-10-07, the
- * keyboard-model review; the reading half's one switch — the keyboard read
- * for a subject, the guard's looks and the pixel poll's round — is
- * `ui-tree/soft-keyboard.ts#readSoftKeyboard`, one layer down, because the
- * pixel poll reads the keyboard too; each model's `dismiss`, which has no
- * subject, reads its own source): an adapter WITH the oracle gets the
+ * keyboard-model review; the reading half's one switch — every look, round
+ * and dismissal, and the pixel poll's and `scroll_until`'s rounds — is
+ * `ui-tree/keyboard-cover.ts#readKeyboard`, one layer down, because the
+ * pixel poll reads the keyboard too): an adapter WITH the oracle gets the
  * window model, one without the in-tree model. Whether the adapter HAS an
  * oracle carries the platform fact — `KeyboardOracle` (adapters/types.ts)
  * says what providing one asserts — so no platform test is made here
@@ -47,7 +45,7 @@ export { AfterDismissalTap, KeyboardWithoutDismissal } from './keyboard-in-tree.
  * re-implemented the shape below around its own decisions.
  */
 function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
-  return adapter.keyboard === undefined ? inTreeModel(adapter) : windowModel(adapter, adapter.keyboard);
+  return adapter.keyboard === undefined ? inTreeModel(adapter) : windowModel(adapter);
 }
 
 /** The guard's answer when it had nothing to do: the node and its note, without the tree the resolution rode in on. */
@@ -73,14 +71,15 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  * went into the AutoFill bar above its keys.
  *
  * The protocol, the same shape on both models:
- *   resolve → read the keyboard (`readSoftKeyboard`: the oracle's `state()`
- *   when the adapter has one, else the band the tree source marked in the
- *   tree that resolved the target — no device asked; `unknown` when the
- *   target is the keyboard's own UI) → tap point outside it (or hidden, or
- *   unknown): done, the node as resolved — the fail-open rule, below.
- *   Inside it: the model's `guard` — its own re-checks before anything is
- *   done (the window model asks the witness and waits out a stale window
- *   state; the in-tree model takes a second look, the hide delay first, and
+ *   resolve → read the keyboard (`readKeyboard(…).over`: the oracle when the
+ *   adapter has one, else the band the tree source marked in the tree that
+ *   resolved the target — no device asked; `unknown` when the target is the
+ *   keyboard's own UI; covered, the input method's word over it) → tap
+ *   point outside it (or hidden, or unknown): done, the node as resolved —
+ *   the fail-open rule, below. Inside it: the model's `guard` — its own
+ *   re-checks before anything is done (the window model, on a witness that
+ *   DENIED the keyboard, waits out a stale window state; the in-tree model
+ *   takes a second look, the hide delay first, and
  *   picks a configured dismissal), which may hand the node back clear with
  *   a note, refuse with nothing sent, or name the `Hiding`. Then ONE side
  *   effect (`back`, or a tap on the picked element — the model's; never
@@ -96,20 +95,18 @@ const bare = ({ node, note }: Resolved): ResolvedClear => ({ node, note });
  *   untapped). One look after `back`, KEYBOARD_HIDE_CONFIRM_LOOKS after a
  *   dismissal tap — the model's number, its reason beside it.
  *
- * Cost on Android: ONE oracle query per tap when nothing covers the target
- * and the keyboard reads hidden or unknown (what one call costs is measured
- * on AndroidAdapter's keyboardState, the one place the figures are kept);
- * TWO when it reads shown, since 2026-10-08 — the band's window region
- * beside it (`touchable()`, AndroidAdapter's keyboardTouchable has the
- * figures), because a floating Gboard's panel lies outside its 132-px band
- * and a tap there pressed a key (docs/bugs/2026-10-05-android-floating-gboard-
- * keyboard.md; `readSoftKeyboard` reads it, `keyboardOver` tests it). A
- * point under the panel takes the band's path. The second resolve and the
- * second look happen only in the overlap case, and so does the witness query
- * (AndroidAdapter's keyboardWitness has its cost). A `type_pin` keypad taps
- * once per digit, so it asks once per digit — a 6-digit PIN is 6 dumpsys
- * calls (12 with a keyboard up), beside six tree-settle waits of seconds
- * each. On iOS: no device read for the keyboard on any look, ever. The
+ * Cost on Android: what the reading's `over` asks — ONE oracle query per
+ * tap when the keyboard reads hidden or unknown, TWO when it reads shown
+ * (since 2026-10-08 the band's window region beside it, because a floating
+ * Gboard's panel lies outside its 132-px band and a tap there pressed a
+ * key — docs/bugs/2026-10-05-android-floating-gboard-keyboard.md; a point
+ * under the panel takes the band's path), and the witness only in the
+ * overlap case, where the second resolve and the second look happen too;
+ * the totals are on ui-tree/keyboard-cover.ts, the one place they are
+ * counted. A `type_pin` keypad taps once per digit, so it asks once per
+ * digit — a 6-digit PIN is 6 dumpsys calls (12 with a keyboard up), beside
+ * six tree-settle waits of seconds each. On iOS: no device read for the
+ * keyboard on any look, ever. The
  * on-screen rule adds `viewport()` per tap, which the adapter memoizes:
  * one `wm size` / `idb describe` per adapter, re-asked only after a failed
  * read. A raw coordinate tap does not come through here: the caller chose
@@ -144,21 +141,21 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     await refuseOffScreen(adapter, target, r.node, first.tree, screen, sent), r
   );
   const at = tapPoint(first.node);
-  const opening = keyboardOver((await readSoftKeyboard(adapter, first.tree, first.node)).keyboard, at);
+  const opening = await readKeyboard(adapter, first.tree).over(at, first.node);
   // THE guard's one fail-open rule, applied here and wherever a model reads
   // the keyboard again: nothing over the point — hidden, a frame elsewhere —
   // or a state that could not be read means the tap goes ahead as before
   // the question existed. The question exists to make a tap safer and must
   // never be the reason a tap did not happen; a device that is really gone
-  // fails the tap itself, in the tap's own words. Only a COVERING reading
-  // reaches a model.
-  if (opening.over !== 'covering') return bare(first);
+  // fails the tap itself, in the tap's own words. Only a COVERING reading —
+  // the input method standing by it or denying it — reaches a model.
+  if (opening.kind === 'clear' || opening.kind === 'unknown') return bare(first);
 
   // Chosen here, not above: the clear path allocates nothing, and the two
-  // reads of `adapter.keyboard` — readSoftKeyboard's and this — sit together.
+  // reads of `adapter.keyboard` — readKeyboard's and this — sit together.
   const model = keyboardModel(adapter);
   const what = describeTarget(target);
-  const ready = await model.guard({ target, opts, point: at, screen, frame: opening.frame, what, covered: `the soft keyboard covered ${what}` });
+  const ready = await model.guard({ target, opts, point: at, screen, verdict: opening, what, covered: `the soft keyboard covered ${what}` });
   if ('cleared' in ready) return onScreen(ready.cleared);
   const { hiding } = ready;
   await hiding.perform();
@@ -166,7 +163,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     hiding.looks,
     async () => {
       const look = await lookAgain(adapter, target, opts, hiding.failed);
-      return look.reading.over === 'covering' ? { stillUp: { frame: look.reading.frame, point: look.point } } : { gone: withNote(look.resolved, hiding.hidden(look.reading)) };
+      return look.reading.kind === 'covered' ? { stillUp: { frame: look.reading.frame, point: look.point } } : { gone: withNote(look.resolved, hiding.hidden(look.reading)) };
     },
     (seen, looks) => hiding.stillCovering(seen, looks),
   );
@@ -189,41 +186,4 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
  */
 export function dismissKeyboard(adapter: KeyboardAdapter, opts: DismissOptions): Promise<DismissResult> {
   return keyboardModel(adapter).dismiss(opts);
-}
-
-/**
- * Does the input method report a keyboard that `window` — a reading the
- * caller already holds (`readSoftKeyboard`'s) — places nowhere? (2026-10-08,
- * the `unlocated` row, written for a floating Gboard:
- * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md.)
- * Only the window model can say: an adapter without the oracle has no
- * second source, and is never `unlocated`. The rule is the dismissal's own
- * row (keyboard-window.ts#dismissal, `clear · witness shown`); this is how a
- * caller that does not dismiss — `scroll_until`'s stop (scroll.ts) — asks
- * it, at the cost of one witness query, only when the window read hidden,
- * and only on a failed or `fully: true` stop (review 2026-10-08: not on
- * every clean stop, where the answer changes nothing the reader does). The
- * tap guard does NOT ask it: a frameless keyboard gives it no point to test
- * against. The floating Gboard this row was written for was measured the
- * same evening NOT to be frameless on API 33 — a 132-px band plus a panel,
- * which the guard now reads (`panels`, ui-tree/soft-keyboard.ts#panelsBeyond)
- * — so what is left to this row is a window reading hidden beside an IME
- * the input method says is shown (keyboard-window.ts#UNLOCATED_KEYBOARD).
- */
-export function keyboardUnlocated(adapter: Pick<KeyboardAdapter, 'keyboard'>, window: SoftKeyboard): Promise<boolean> {
-  return adapter.keyboard === undefined ? Promise.resolve(false) : windowUnlocated(adapter.keyboard, window);
-}
-
-/**
- * May a `shown` reading change what a caller REPORTS — not what it does to
- * the keyboard? (2026-10-08, review of the keyboard-aware scroll.) The
- * window model's `state()` can be stale for seconds after a navigating tap
- * (keyboard-window.ts#witnessDenies has the measurement), so before
- * `scroll_until` lets a band score a target 0 or shrink its stroke, the
- * witness may veto it — the guard's rule, its one owner. The in-tree model
- * has no second source and its band is read off the very tree being judged:
- * corroborated by construction, no query.
- */
-export function keyboardCorroborated(adapter: Pick<KeyboardAdapter, 'keyboard'>): Promise<boolean> {
-  return adapter.keyboard === undefined ? Promise.resolve(true) : windowCorroborated(adapter.keyboard);
 }

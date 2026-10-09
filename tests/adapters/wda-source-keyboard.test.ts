@@ -5,7 +5,8 @@ import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.
 import { resolveNow } from '../../src/interact/resolve.js';
 import { findAll, isInteractive, tapPoint } from '../../src/ui-tree/selectors.js';
 import { isBareTree } from '../../src/ui-tree/bare-tree.js';
-import { accessoryDismissButton, keyboardInTree, partOfKeyboard } from '../../src/ui-tree/soft-keyboard.js';
+import { readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
+import { accessoryDismissButton, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
 
 /**
  * WDA `GET /source?format=json` of finportal's MyPort (`sk.finportal.myport`)
@@ -46,6 +47,8 @@ const TWOFA_TOOLBAR = parseWdaSource(await fixture('2fa-keyboard-toolbar'));
 const TWOFA_PARKED = parseWdaSource(await fixture('2fa-keyboard-parked'));
 const LOGIN_NONE = parseWdaSource(await fixture('login-no-keyboard'));
 
+/** Is `node` the keyboard's own UI in `tree` — a reading's answer (ui-tree/keyboard-cover.ts#ofKeyboard), off the tree alone. */
+const ofKeyboard = (tree: UiNode, node: UiNode): boolean => readKeyboard({}, tree).ofKeyboard(node);
 const bands = (tree: UiNode): UiNode[] => [...everyNode(tree)].filter((n) => n.role === KEYBOARD_ROLE);
 const only = (tree: UiNode, selector: string): UiNode => {
   const found = findAll(tree, selector);
@@ -126,7 +129,7 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
       const done = accessoryDismissButton(TWOFA_TOOLBAR);
       expect(done).toMatchObject({ role: 'button', label: 'Done', rect: { x: 317, y: 523, width: 64, height: 38 } });
       expect(done).toBe(only(TWOFA_TOOLBAR, 'label:Done')); // the tree's own node, by identity
-      expect(partOfKeyboard(TWOFA_TOOLBAR, done!)).toBe(true);
+      expect(ofKeyboard(TWOFA_TOOLBAR, done!)).toBe(true);
     });
 
     it.each([
@@ -141,14 +144,14 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
       for (const tree of [LOGIN_BAR, LOGIN_NO_BAR]) {
         const returnKey = only(tree, 'id:Done');
         expect(returnKey).toMatchObject({ role: 'button', label: 'done', rect: { x: 300, y: 752, width: 100, height: 54 } });
-        expect(partOfKeyboard(tree, returnKey)).toBe(true);
+        expect(ofKeyboard(tree, returnKey)).toBe(true);
         expect(accessoryDismissButton(tree)).toBeUndefined();
       }
     });
 
     it('2FA parked: the Toolbar is on screen (826–874) but its Window holds no inputView and is not ofKeyboard (the stage A residual) → nothing; with no band there is nothing to dismiss either', () => {
       expect(accessoryDismissButton(TWOFA_PARKED)).toBeUndefined();
-      expect(partOfKeyboard(TWOFA_PARKED, only(TWOFA_PARKED, 'label:Done'))).toBe(false);
+      expect(ofKeyboard(TWOFA_PARKED, only(TWOFA_PARKED, 'label:Done'))).toBe(false);
       expect(keyboardInTree(TWOFA_PARKED)).toEqual({ state: 'unknown' });
     });
   });
@@ -204,10 +207,10 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
     ['K1: dictation', LOGIN_BAR, 'id:dictation', true],
     ['K1: the app\'s submit under the band is NOT the keyboard', LOGIN_BAR, 'id:login_submit', false],
     ['2FA toolbar: the app\'s submit', TWOFA_TOOLBAR, 'id:twofactor_submit', false],
-  ])('partOfKeyboard — %s → %s', (_name, tree, selector, expected) => {
+  ])('ofKeyboard — %s → %s', (_name, tree, selector, expected) => {
     const found = findAll(tree, selector);
     expect(found.length).toBeGreaterThan(0);
-    for (const n of found) expect(partOfKeyboard(tree, n)).toBe(expected);
+    for (const n of found) expect(ofKeyboard(tree, n)).toBe(expected);
   });
 
   it('keeps every node of the dumps but the text echoes (218 / 208 / 167 / 163 / 152)', () => {
@@ -330,8 +333,8 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
     );
     expect(tree.children.map((w) => w.ofKeyboard)).toEqual([undefined, true, true]);
     expect([...everyNode(tree)].filter((n) => n.ofKeyboard === true)).toHaveLength(2); // the roots only, not every key
-    expect(partOfKeyboard(tree, only(tree, 'id:Toolbar'))).toBe(true);
-    expect(partOfKeyboard(tree, only(tree, 'id:submit'))).toBe(false);
+    expect(ofKeyboard(tree, only(tree, 'id:Toolbar'))).toBe(true);
+    expect(ofKeyboard(tree, only(tree, 'id:submit'))).toBe(false);
   });
 
   it('a parked Keyboard\'s Window is marked too (it is still its Window); without any Window the Keyboard or inputView element itself is', () => {
@@ -360,7 +363,7 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
         { x: 0, y: 539, width: 402, height: 335 }, // UIKit's real placeholder, in the input-host Window
       ]);
       expect(tree.children.map((w) => w.ofKeyboard)).toEqual([undefined, true, true]);
-      expect(partOfKeyboard(tree, only(tree, 'id:login_submit'))).toBe(false);
+      expect(ofKeyboard(tree, only(tree, 'id:login_submit'))).toBe(false);
       expect(bands(tree)[0].rect).toEqual({ x: 0, y: 539, width: 402, height: 335 });
     });
 
@@ -379,7 +382,7 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
       const placeholder = () => el('Other', { rawIdentifier: 'inputView', rect: { x: 0, y: 539, width: 402, height: 335 } });
       const first = root(appWindow(submit(), placeholder()), keyboardWindow({}));
       expect(first.children.map((w) => w.ofKeyboard)).toEqual([undefined, true]);
-      expect(partOfKeyboard(first, only(first, 'id:submit'))).toBe(false);
+      expect(ofKeyboard(first, only(first, 'id:submit'))).toBe(false);
       const later = root(appWindow(submit()), el('Window', { children: [placeholder()] }), keyboardWindow({}));
       expect(later.children.map((w) => w.ofKeyboard)).toEqual([undefined, true, true]);
     });

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Rect, UiNode } from '../../src/adapters/types.js';
+import type { KeyboardWitness, Rect, UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { AfterKeyboardDismissal, KeyboardStateDisagreement, dismissKeyboard, resolveClearOfKeyboard, type KeyboardDismissal } from '../../src/interact/keyboard.js';
-import { KEYBOARD_HIDE_DELAY_MS, keyboardOver } from '../../src/interact/keyboard-model.js';
+import { KEYBOARD_HIDE_DELAY_MS } from '../../src/interact/keyboard-model.js';
 import { KEYBOARD_DISAGREEMENT_BUDGET_MS, KEYBOARD_DISAGREEMENT_POLL_MS, dismissal, recheck } from '../../src/interact/keyboard-window.js';
 import { tapElement } from '../../src/interact/tap.js';
+import { readKeyboard, type Covering } from '../../src/ui-tree/keyboard-cover.js';
 import { FAST, FakeAdapter, node, recorded, screen } from '../helpers/fake.js';
 
 // The WINDOW model (interact/keyboard-window.ts: Android, the adapter has the
@@ -605,8 +606,13 @@ describe('fillField — the focus tap goes through the same guard', () => {
   });
 });
 
-describe('the two decisions that carry a rule — recheck (the budget) and dismissal (unknown → back) — pure, row by row (2026-10-05; since 2026-10-07 firstLook and afterBack are rows at their one call site, pinned through the guard above)', () => {
+describe('the two decisions that carry a rule — recheck (the budget) and dismissal (unknown → back) — row by row (2026-10-05; since 2026-10-07 firstLook and afterBack are rows at their one call site, pinned through the guard above; since 2026-10-09 recheck takes the round\'s verdict and dismissal asks a reading)', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
+  /** The round's verdict over a covered point, as a reading gives it for each word of the input method (ui-tree/keyboard-cover.ts#over). */
+  const verdict = (witness: KeyboardWitness): Covering =>
+    witness === 'hidden' ? { kind: 'denied', frame: FRAME } : { kind: 'covered', frame: FRAME, confirmed: witness === 'shown' };
+  /** The window state each row names, as the oracle reports it: shown anywhere is `covering` (no point). */
+  const window = { clear: { state: 'hidden' }, covering: { state: 'shown', frame: FRAME }, unknown: { state: 'unknown' } } as const;
 
   it.each([
     ['witness shown', 'shown', 500, 'back'],
@@ -617,7 +623,7 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
     ['witness hidden · the budget spent', 'hidden', KEYBOARD_DISAGREEMENT_BUDGET_MS, 'refuse'],
     ['witness unknown · the budget spent', 'unknown', KEYBOARD_DISAGREEMENT_BUDGET_MS, 'refuse'],
   ] as const)('recheck (the window still covers the point) — %s → %s', (_name, witness, waitedMs, expected) => {
-    expect(recheck(witness, waitedMs)).toBe(expected);
+    expect(recheck(verdict(witness), waitedMs)).toBe(expected);
   });
 
   it.each([
@@ -628,21 +634,12 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
     ['covering · witness shown', ['covering', 'shown'], 'back'],
     ['covering · witness unknown', ['covering', 'unknown'], 'back'],
     ['covering · witness hidden: the veto, nothing pressed', ['covering', 'hidden'], 'nothing'],
-  ] as const)('dismissal — %s → %s', (_name, args, expected) => {
-    const decided = args.length === 1 ? dismissal(args[0]) : dismissal(args[0], args[1]);
-    expect(decided).toBe(expected);
-  });
-});
-
-describe('the guard\'s window reading — geometry, with the frame when it covers', () => {
-  const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
-  it.each([
-    ['shown, point inside the frame', { state: 'shown', frame: FRAME }, { x: 249, y: 1466 }, { over: 'covering', frame: FRAME }],
-    ['shown, point outside the frame (beside it)', { state: 'shown', frame: FRAME }, { x: 249, y: 1000 }, { over: 'clear' }],
-    ['hidden', { state: 'hidden' }, { x: 249, y: 1466 }, { over: 'clear' }],
-    ['unknown: kept apart, not folded into clear', { state: 'unknown' }, { x: 249, y: 1466 }, { over: 'unknown' }],
-  ] as const)('keyboardOver — %s → %s', (_name, keyboard, point, expected) => {
-    expect(keyboardOver(keyboard, point)).toEqual(expected);
+  ] as const)('dismissal — %s → %s', async (_name, args, expected) => {
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    const oracle = fake.attachKeyboard(window[args[0]], args.length === 1 ? 'shown' : args[1]);
+    expect(await dismissal(readKeyboard(fake))).toBe(expected);
+    expect(oracle.witnessAnswers.queries).toBe(args.length === 1 ? 0 : 1);
+    expect(oracle.touchableAnswers.queries).toBe(0); // no point: the region is never read
   });
 });
 
@@ -809,13 +806,5 @@ describe('tapElement — a target under a FLOATING keyboard\'s panel, above its 
     expect(err).toBeInstanceOf(AfterKeyboardDismissal);
     expect((err as Error).message).toContain('the keyboard frame [359,1269][1040,1912] still contains the tap point (540,1586)');
     expect(fake.tapPoints).toEqual([]);
-  });
-
-  it('keyboardOver tests the band and every panel, and names the rect that holds the point', () => {
-    const floating = { state: 'shown' as const, frame: STRIP, panels: [PANEL] };
-    expect(keyboardOver(floating, { x: 540, y: 1586 })).toEqual({ over: 'covering', frame: PANEL });
-    expect(keyboardOver(floating, { x: 540, y: 2100 })).toEqual({ over: 'covering', frame: STRIP });
-    expect(keyboardOver(floating, { x: 200, y: 1586 })).toEqual({ over: 'clear' }); // beside the panel, above the strip
-    expect(keyboardOver({ state: 'shown', frame: STRIP }, { x: 540, y: 1586 })).toEqual({ over: 'clear' });
   });
 });

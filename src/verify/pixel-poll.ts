@@ -1,9 +1,10 @@
 import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { rectsOverlap, rectText, sameRect } from '../ui-tree/geometry.js';
+import { rectText, sameRect } from '../ui-tree/geometry.js';
+import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
-import { cannotHide, coveringRect, readSoftKeyboard, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -113,7 +114,9 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * a `back` key press, and nothing is pressed here (since 2026-10-08 the
  * `touchable()` read that follows a shown `state()` carries `mInputShown`
  * too, but only as the admission rule for a floating panel —
- * ui-tree/soft-keyboard.ts#panelsBeyond — never as a veto over the band) — a stale
+ * ui-tree/keyboard-cover.ts#panelsBeyond — never as a veto over the band;
+ * the reading's `overlapping`, which this poll asks, never consults the
+ * witness) — a stale
  * `shown` costs covered rounds until the window state catches up (seconds,
  * measured on `KeyboardOracle.witness`), within the 12 s pixel default; under
  * a short explicit timeout it fails closed with the covered wording; never a
@@ -142,9 +145,10 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * marks the band the keyboard draws over with `KEYBOARD_ROLE`
  * (adapters/wda-source.ts#keyboardMarks has the rule and the measurements —
  * the band, not the `Keyboard` element's rect, which stops 17–44 pt short of
- * the drawn area), `ui-tree/soft-keyboard.ts#readSoftKeyboard` — the one
- * switch between the oracle and the tree, shared with the tap guard — reads
- * it, and a band overlapping the element's rect is the same covered miss.
+ * the drawn area), a reading (`ui-tree/keyboard-cover.ts#readKeyboard` —
+ * the one switch between the oracle and the tree, shared with the tap
+ * guard) reads it, and a band overlapping the element's rect is the same
+ * covered miss.
  * No extra read: the tree is the one the round found the element in. An
  * element that IS the keyboard's UI (a key, the toolbar's Done — `ofKeyboard`
  * on its Window) reads as not covered. The remedy sentence differs: with no
@@ -387,31 +391,31 @@ class PixelPollMemory {
  * The soft keyboard's frame when the round's reading says one is shown over
  * the element's rect — any positive-area overlap — else undefined: `hidden`,
  * `unknown`, or a frame elsewhere (header, 2026-10-06). The reading is
- * `readSoftKeyboard`'s (ui-tree/soft-keyboard.ts): the adapter's oracle when
- * it has one, else (2026-10-07) the round's own tree, with the element
- * itself as the subject; the `KeyboardRemedy` (`dismissal` and `advice`)
- * rides along for the remedy sentence. The two rects are in the same
+ * `readKeyboard`'s (ui-tree/keyboard-cover.ts), asked `overlapping` — the
+ * fail-closed geometric question, which never asks the witness: the
+ * adapter's oracle when it has one, else (2026-10-07) the round's own tree,
+ * with the element itself as the subject; the reading's `KeyboardRemedy`
+ * (`dismissal` and `advice`) rides along for the remedy sentence. The two rects are in the same
  * units: on Android both are device pixels, read from the same `[l,t][r,b]`
  * notation by the same `parseBounds` (adapters/android.ts — a uiautomator
  * node's `bounds` and the IME `InsetsSource` entry's `frame=`); on iOS both
  * are points of one WDA tree; and the tree rect reaches this poll unscaled.
  * `state()` never throws (KeyboardOracle's contract), so no catch. Since
  * 2026-10-08 a floating keyboard's panel counts as the band does: the
- * reading carries it (`panels`, read by `readSoftKeyboard` only when the
- * band is up — one more adb call per such round, the figures on
- * AndroidAdapter's keyboardTouchable), and an element under it is the same
- * covered miss, quoting the panel's rect.
+ * reading reads it (`panels`, only when the band is up — one more adb call
+ * per such round, the figures on AndroidAdapter's keyboardTouchable), and an
+ * element under it is the same covered miss, quoting the panel's rect —
+ * the band first, then the panels: the first that overlaps is the frame the
+ * miss quotes.
  */
 async function keyboardOverElement(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
 ): Promise<{ frame: Rect; remedy: KeyboardRemedy } | undefined> {
-  const { keyboard, ...remedy } = await readSoftKeyboard(adapter, tree, element);
-  // The band or, since 2026-10-08, a floating panel beside it (`coveringRect`
-  // over `keyboardRects`): the first that overlaps is the frame the miss quotes.
-  const frame = coveringRect(keyboard, (r) => rectsOverlap(element.rect, r));
-  return frame === undefined ? undefined : { frame, remedy };
+  const keyboard = readKeyboard(adapter, tree);
+  const frame = await keyboard.overlapping(element.rect, element);
+  return frame === undefined ? undefined : { frame, remedy: keyboard.remedy };
 }
 
 /**
