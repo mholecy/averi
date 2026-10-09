@@ -158,7 +158,8 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * the keyboard on its own (`cannotHide`, the one phrase the guard uses) and
  * quotes the adapter's sentence on why and where the dismissal is
  * configured (`DeviceAdapter.keyboardAdvice`) — never `back`. An idb tree
- * carries no band and reads `unknown`: the pre-2026-10-07 behaviour,
+ * marks no band (iOS 27's idb lists the keys and the band, unmarked) and
+ * reads `unknown`: the pre-2026-10-07 behaviour,
  * silently, as the Android residuals above.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's

@@ -310,8 +310,11 @@ export class IosAdapter implements DeviceAdapter {
   // device here and presses no key of its own — a covered target is refused,
   // with the sentence below, unless `app.ios.keyboardDismiss` names a
   // dismissal on screen, which the guard taps first (stage B, 2026-10-07;
-  // the advice's doc). The idb source carries no keyboard, so under it the
-  // guard is as it was. Until 2026-10-04 this class answered `unknown` from
+  // the advice's doc). The idb source marks no node as the keyboard (on
+  // iOS 27 it lists the keys, as plain `button`s, and the band, as an
+  // unmapped `other` — ios-tree-source.ts's IOS_ROLE_MAP has no keyboard
+  // role; docs/bugs/2026-10-09-ios-inert-keyboard-dismiss-note-says-idb-
+  // carries-no-keyboard.md), so under it the guard is as it was. Until 2026-10-04 this class answered `unknown` from
   // two stub methods without running anything.
 
   /**

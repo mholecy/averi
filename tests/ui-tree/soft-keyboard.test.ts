@@ -19,7 +19,7 @@ describe('keyboardInTree — what the tree says about the soft keyboard (2026-10
     expect(reading.frame).not.toBe(band.rect); // nodes are mutated downstream; the frame is quoted after the fact
   });
 
-  it('no keyboard node → unknown, not hidden: an idb tree never carries one and the tree cannot say which source it came from', () => {
+  it('no keyboard node → unknown, not hidden: an idb tree never marks one (iOS 27 lists the keys, unmarked) and the tree cannot say which source it came from', () => {
     expect(keyboardInTree(screen(node({ role: 'button', identifier: 'x' })))).toEqual({ state: 'unknown' });
   });
 
