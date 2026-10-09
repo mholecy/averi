@@ -711,15 +711,16 @@ interface State {
    */
   readonly dropped: Direction | undefined;
   /**
-   * The target's clipping container with room for a stroke (swipe.ts
-   * #strokeRoom, over that read's gesture box and above its cover) at the
-   * last read that found the target; `'none'` when that read found it in
-   * none with room — the stroke then goes over the screen box (P5); undefined
-   * until a read finds the target. Kept across reads that do not find it.
+   * The target's clipping containers, nearest first, each with what is
+   * drawn over it, at the last read that found the target — the candidates
+   * the round's stroke picks its container from (swipe.ts#strokeRoom), judged
+   * for the stroke as drawn, `toward` (D1); none of them with room, or none
+   * at all, is the screen box (P5); undefined until a read finds the
+   * target. Kept across reads that do not find it.
    */
-  readonly targetScroller: StrokeContainer | 'none' | undefined;
-  /** The container the last read that read chose to stroke over, for the stroke of a round whose tree did not read — met again with that round's gesture box, cut by the rects it carries (kept as the keyboard's cover is, `lastReadCover`). */
-  readonly lastWithin: StrokeContainer | undefined;
+  readonly targetContainers: readonly StrokeContainer[] | undefined;
+  /** The candidates the last read that read judged its stroke's container from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry (kept as the keyboard's cover is, `lastReadCover`). */
+  readonly lastCandidates: readonly StrokeContainer[];
   /** The container the last stroke SENT was drawn in, a probe's included — undefined when it went over the gesture box whole — for `touchedOn`. */
   readonly strokeWithin: Rect | undefined;
   /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
@@ -746,20 +747,19 @@ interface StrokeContainer {
 const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.drawOrder.drawnOver(rect)?.map((n) => ({ ...n.rect }));
 
 /**
- * The container a round's stroke toward the target goes over (`round`):
- * with no read this round (`facts` undefined), the last read round's; the
- * screen box (undefined) when the target was last found in no container
- * with room (`'none'`); the target's container, cut by what this read draws
- * over it — or by what it carried, when this read has lost its rect; else
- * the screen's largest scroller, or none.
+ * The containers a round's stroke toward the target may go over, nearest
+ * first (`round` judges their room): with no read this round (`facts`
+ * undefined), the last read round's; once a read found the target, its
+ * containers — each cut by what this read draws over it, or by what it
+ * carried, when this read has lost its rect — none when it was found in
+ * none (the screen box, P5); else the screen's largest scroller, or none.
  */
-function strokeContainer(s: State, facts: TreeFacts | undefined): StrokeContainer | undefined {
-  if (facts === undefined) return s.lastWithin;
-  const target = s.targetScroller;
-  if (target === 'none') return undefined;
-  if (target !== undefined) return { rect: target.rect, over: overIn(facts, target.rect) ?? target.over };
+function strokeCandidates(s: State, facts: TreeFacts | undefined): readonly StrokeContainer[] {
+  if (facts === undefined) return s.lastCandidates;
+  const target = s.targetContainers;
+  if (target !== undefined) return target.map(({ rect, over }) => ({ rect, over: overIn(facts, rect) ?? over }));
   const main = facts.mainScroller;
-  return main === undefined ? undefined : { rect: main, over: overIn(facts, main) ?? [] };
+  return main === undefined ? [] : [{ rect: main, over: overIn(facts, main) ?? [] }];
 }
 
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
@@ -795,8 +795,8 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     lastSent: undefined,
     lastFound: undefined,
     dropped: undefined,
-    targetScroller: undefined,
-    lastWithin: undefined,
+    targetContainers: undefined,
+    lastCandidates: [],
     strokeWithin: undefined,
     prevFingerprint: undefined,
     treeUnmovedStrokes: 0,
@@ -967,7 +967,7 @@ interface Observed {
  * next stroke (review round 2).
  */
 function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
-  const { read, facts, frames, gesture, cover } = now;
+  const { read, facts, frames } = now;
   const { found } = read;
   const { fingerprint, loading } = facts;
   const rects = found.map((n) => ({ ...n.rect }));
@@ -1013,19 +1013,19 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   if (best !== undefined) {
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
-    // The container the strokes go over: room judged as the stroke will be
-    // drawn — over the gesture box, above this round's cover. None with
-    // room is `'none'` (code review of deep/r3-scroll, P5): the last read's
-    // container is not kept — it is stale, and may be another list — and
-    // the screen's largest scroller is not taken either: every ancestor of
-    // the target was just judged on this box, cover and axis, so a largest
-    // scroller WITH room is by construction not one of them, a list that
-    // cannot hold the target. The stroke goes over the screen box. Room
-    // judged clear of what is drawn over each (2026-10-09), as the stroke —
-    // on purpose (code review of fix/r4, P2): the container chosen and the
-    // stroke drawn over it are one strokeRoom judgement, one owner.
-    const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y, (w) => overIn(facts, w));
-    s.targetScroller = room === undefined ? 'none' : { rect: { ...room.within }, over: overIn(facts, room.within) ?? [] };
+    // The containers the strokes may go over: every clipping ancestor of
+    // the target, with what this read draws over each. Their room is judged
+    // in `round`, for the stroke as drawn — `toward`, which a fling past the
+    // target or a dropped target turns against the caller's direction, and
+    // with that round's cover (D1, 2026-10-09: judged here for `rules.direction`, a strip whose lower
+    // half a bar covers had no room going down, and the turned content-up
+    // stroke went over the screen box, touching down off the strip that had
+    // room going up). None with room is the screen box (code review of
+    // deep/r3-scroll, P5): the last read's container is not kept — it is
+    // stale, and may be another list — and the screen's largest scroller is
+    // not taken either: a largest scroller with room that is not one of the
+    // target's ancestors is a list that cannot hold the target.
+    s.targetContainers = facts.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for.
@@ -1292,27 +1292,33 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // none — rather than stroke through the keyboard it last saw.
   const { toward, reach, turn } = nextStroke(s);
   const strokeCover = read === undefined ? s.lastReadCover : cover;
-  // Over the target's scroll container once a read has placed it in one,
-  // else the screen's largest (2026-10-09; swipe.ts#strokeRoom): the
+  // Over the target's scroll containers once a read has placed it in
+  // them, else the screen's largest (2026-10-09; swipe.ts#strokeRoom): the
   // stroke touches down on what scrolls, and its length is that
   // container's 60 %, never the screen's — a 1417-px list is not stroked
-  // 1332 px. The screen box when the last read that found the target found
-  // it in no container with room (`'none'`, P5). A round whose tree did not
-  // read keeps the last read round's.
-  const target = s.targetScroller;
-  const within = strokeContainer(s, now?.facts);
-  s.lastWithin = within;
-  // The latest cut read for the target's container is the one a later read
-  // that has lost that rect falls back to — not the oldest (review round 2).
-  if (within !== undefined && target !== undefined && target !== 'none' && now !== undefined) s.targetScroller = within;
-  // The box, decided once (swipe.ts#strokeRoom): that container met with
-  // the gesture box above the stroke's cover — the keyboard's, or what is
-  // drawn over the container (2026-10-09, the floating tab bar; a round
-  // whose tree did not read keeps the last read round's, as its keyboard)
-  // — or the gesture box whole when it leaves no room, under the keyboard
-  // alone — a stroke toward the target is still worth drawing over the
-  // screen; a probe never comes here.
-  const room = strokeRoom(gesture, within === undefined ? [] : [within.rect], toward, strokeCover?.topCover.y, () => within?.over);
+  // 1332 px. A round whose tree did not read keeps the last read round's
+  // candidates.
+  const candidates = strokeCandidates(s, now?.facts);
+  s.lastCandidates = candidates;
+  // The latest cut read for the target's containers is the one a later read
+  // that has lost a rect falls back to — not the oldest (review round 2).
+  if (s.targetContainers !== undefined && now !== undefined) s.targetContainers = candidates;
+  // The container and the box, decided once, for this stroke's `toward`
+  // (swipe.ts#strokeRoom; D1, 2026-10-09: the container is judged for the
+  // stroke drawn over it, not for the caller's direction): the first
+  // candidate with room, met with the gesture box above the stroke's cover
+  // — the keyboard's, or what is drawn over the container (2026-10-09, the
+  // floating tab bar; a round whose tree did not read keeps the last read
+  // round's, as its keyboard) — or the gesture box whole when none has room
+  // (P5), under the keyboard alone — a stroke toward the target is still
+  // worth drawing over the screen; a probe never comes here. Judged EVERY
+  // round, with that round's gesture box and cover, not once at the read
+  // that found the target: a strip the IME left no room in at that read is
+  // stroked once the IME is gone, the target's nearest container (code
+  // review of fix/r5-stroke). `over` is looked up by the candidate's own
+  // rect object — strokeRoom hands back the one it was given — so nested
+  // containers of equal rects keep their own.
+  const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, strokeCover?.topCover.y, (w) => candidates.find((c) => c.rect === w)?.over);
   const coverTop = room === undefined ? strokeCover?.topCover.y : room.coverTop;
   const box = room?.box ?? gesture;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
@@ -1376,10 +1382,11 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
  * other causes after it (review round 1) — and "content exhausted" alone
  * would send the reader the wrong way: the measured fast fail said so of a
  * list with 34 more rows. The stroke
- * box is cut above what is drawn over a container's lower half
- * (swipe.ts#strokeRoom), so what is left to name is what the cut does not
+ * box is cut above what is drawn over a container's lower half or over
+ * a content-down touch-down (swipe.ts#strokeRoom), so what is left to name is what the cut does not
  * model — a floating header a content-up stroke touches down on, a node
- * beside a sideways stroke's centre. Undefined when the stroke went over
+ * beside a sideways stroke's centre, a node over nearly all of the box that
+ * a cut would leave no room above. Undefined when the stroke went over
  * the gesture box whole (no container to be drawn over: the screen box,
  * P5), when this tree holds no container of the remembered rect (the list
  * moved; the stroke was still cut by the overlays kept with it,

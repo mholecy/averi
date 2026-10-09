@@ -233,8 +233,10 @@ const NOT_DRAWN = {
    * list `0,825 1080x1395` — took the touch-down at y 1857 above its tabs
    * (a Material Surface swallows touches through its whole rect). The tree
    * does not say whether a node takes touches, so a transparent wrapper
-   * reaching over a list counts too: its cost is a shorter stroke box,
-   * never a stroke off the list.
+   * reaching over a list counts too: its cost is a shorter stroke box —
+   * never under half of it, or a third for one over the touch-down
+   * (interact/swipe.ts#overlayTop, TOUCH_DOWN_CUT_FLOOR) — never a stroke
+   * off the list.
    *
    * `target`: `drawnOver`'s rule — the Compose tab-bar host is the measured
    * cover of the rows beneath it (Account Detail, the same note; the bars
