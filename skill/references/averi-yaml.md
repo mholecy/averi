@@ -90,6 +90,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
   - Any other text in the parentheses is the step's own failure. For example, `Timed out … to appear` after the presence check saw the element means it WAS there and the step failed on it. That is a descriptor or app bug, not a missing interstitial.
   - `(last UI tree read failed: …)`: the device could not be read, which is not the same as the element being missing.
   - A soft keyboard failure AFTER averi pressed `back` or tapped a dismissal is still skipped with its own text, because averi cannot know the element is still there. So is one where the element did not resolve again on averi's second look.
+  - An optional `scroll_until` that found its element but could not stop on it (still clipped, covered, or under the status bar when the content ran out) is skipped with its own text too. This is deliberate: only a refused TAP (or a `fill`'s focus tap) on an element that is present fails the flow inside `optional:`.
 - Since 2026-10-08 a `tap:` or `fill:` on an element whose centre is off screen FAILS the flow, and since 2026-10-09 inside `optional:` too. Before, the tap went to a point off the screen and the step passed; the failure surfaced steps later. Add a `scroll_until` before such a step (`fully: true` if the element sits at a screen edge).
 
 ## `dismissKeyboard` on `fill`
