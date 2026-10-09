@@ -6,7 +6,7 @@ import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { belowStatusBand, judgingOf, OPPOSITE, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { belowStatusBand, inStatusBand, judgingOf, OPPOSITE, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -843,23 +843,23 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
  * screen; every other node against the part above the band, or scores 0
  * when the band leaves none — and what is drawn over a node is counted only
  * inside the box it is judged in: a bar under the keyboard covers nothing
- * the round can see.
+ * the round can see. The box comes with its status band, as one judging
+ * screen (`JudgingScreen`'s `box` and `statusBand`).
  */
 function judge(
   found: readonly UiNode[],
-  viewport: DeviceScreen,
+  { box: viewport, statusBand }: Pick<JudgingScreen, 'box' | 'statusBand'>,
   order: DrawOrder | undefined,
   fully: boolean,
-  statusBand: number | undefined,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  const whole: Rect = { x: 0, y: 0, ...viewport };
+  const whole: Rect = viewport;
   // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
-  const screen: Rect = belowStatusBand(whole, { statusBand });
+  const band = { boxes: [whole], statusBand };
+  const screen: Rect = belowStatusBand(whole, band);
   const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
     const centre = tapPoint(node);
-    const centreOnScreen = containsPoint(screen, centre);
-    return { centreOnScreen, ...(!centreOnScreen && containsPoint(whole, centre) && { bandOverCentre: screen.y - whole.y }) };
+    return { centreOnScreen: containsPoint(screen, centre), ...(inStatusBand(centre, band) && { bandOverCentre: screen.y - whole.y }) };
   };
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
     const box: Rect = { x: 0, y: 0, ...frame };
@@ -888,9 +888,9 @@ function judge(
 }
 
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], { boxes, statusBand }: JudgingScreen, order: DrawOrder | undefined, fully: boolean): Judged | undefined {
-  return boxes
-    .map((box) => judge(found, box, order, fully, statusBand))
+function judgeOver(found: readonly UiNode[], frame: JudgingScreen, order: DrawOrder | undefined, fully: boolean): Judged | undefined {
+  return frame.boxes
+    .map((box) => judge(found, { ...frame, box }, order, fully))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
 }
 
@@ -1212,7 +1212,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   let cover: Cover | undefined;
   let best = whole;
   if (offered !== undefined && read !== undefined) {
-    const covered = judge(found, viewport, order, fully, s.frame.statusBand, { cover: offered, keyboardSide: read.ofKeyboard });
+    const covered = judge(found, s.frame, order, fully, { cover: offered, keyboardSide: read.ofKeyboard });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a
