@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { listAndroidDevices, listIosDevices } from '../../src/adapters/discovery.js';
+import { androidUnusable, listAndroidDevices, listIosDevices } from '../../src/adapters/discovery.js';
+import type { Device } from '../../src/adapters/types.js';
 import type { ExecFn, ExecOptions, ExecResult } from '../../src/adapters/exec.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
@@ -43,6 +44,48 @@ emulator-5556          offline transport_id:2
     expect(await listAndroidDevices(fn)).toEqual([
       { id: 'R58M123', platform: 'android', name: 'R58M123', osVersion: 'unknown', state: 'booted' },
     ]);
+  });
+
+  // C5 (2026-10-09): an `unauthorized` line did not match the parser, so a
+  // phone waiting on its RSA prompt vanished from the listing and every tool
+  // said "No booted Android emulator/device found". The line shapes are adb's
+  // long listing as its client source writes it (serial, state, then usb:/
+  // transport_id: — no product/model while unauthorized); NOT measured on a
+  // device in this repo.
+  it('lists an UNAUTHORIZED device as such, and does not ask it for its OS version', async () => {
+    const { fn, calls } = fakeExec({
+      'adb devices -l': 'List of devices attached\nR58M123        unauthorized usb:1-1 transport_id:3\nemulator-5556  unauthorized transport_id:4\n',
+    });
+    expect(await listAndroidDevices(fn)).toEqual([
+      { id: 'R58M123', platform: 'android', name: 'R58M123', osVersion: 'unknown', state: 'unauthorized' },
+      { id: 'emulator-5556', platform: 'android', name: 'emulator-5556', osVersion: 'unknown', state: 'unauthorized' },
+    ]);
+    expect(calls).toEqual(['adb devices -l']);
+  });
+});
+
+describe('androidUnusable — why adb lists a device that cannot be driven', () => {
+  const android = (state: Device['state']): Device => ({ id: 'R58M123', platform: 'android', name: 'R58M123', osVersion: 'unknown', state });
+
+  it('unauthorized: accept the debugging prompt on the device, or re-key the emulator', () => {
+    expect(androidUnusable(android('unauthorized'))).toBe(
+      'is unauthorized: adb sees it, but the device has not accepted this computer\'s debugging key. On a phone, ' +
+        'unlock it and accept the "Allow USB debugging?" prompt; on an emulator, `adb kill-server`, then ' +
+        '`adb devices` to reconnect (restart the emulator if it stays unauthorized).',
+    );
+  });
+
+  it('offline: present but not answering — wait, then restart adb', () => {
+    expect(androidUnusable(android('offline'))).toBe(
+      'is offline: adb sees it but cannot talk to it. An emulator still booting reads offline for a while — wait ' +
+        'until `adb devices` reads `device`; if it stays offline, `adb kill-server && adb start-server`, then ' +
+        'restart the emulator or reconnect the USB cable.',
+    );
+  });
+
+  it('nothing to say about a booted device, nor about iOS (offline there is "shut down")', () => {
+    expect(androidUnusable(android('booted'))).toBeUndefined();
+    expect(androidUnusable({ ...android('offline'), platform: 'ios' })).toBeUndefined();
   });
 });
 

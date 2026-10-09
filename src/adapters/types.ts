@@ -14,7 +14,13 @@ export interface Device {
   platform: Platform;
   name: string;
   osVersion: string;
-  state: 'booted' | 'offline';
+  /**
+   * `unauthorized` is Android only: adb lists the device, but it has not
+   * accepted this computer's debugging key (discovery.ts#androidUnusable
+   * words it). Android's `offline` is a device adb lists but cannot talk to;
+   * iOS's is a simulator that is not booted.
+   */
+  state: 'booted' | 'offline' | 'unauthorized';
 }
 
 /**

@@ -129,6 +129,14 @@ idb, a `uiTree()` that refused) and an `AndroidAdapter` without a serial (adb wi
 only threw for; a first caller (pasting an OTP) would bring it back as an optional
 capability, like `keyboard?`.
 
+Since 2026-10-09 (C5) the Android listing also keeps an `unauthorized` device (state
+`unauthorized`, Android only), and `discovery.ts#androidUnusable` words why an
+`unauthorized` or `offline` Android device cannot be driven and what to do; the
+registry puts it after the device's name in its three refusals (auto-pick,
+`select_device`, a pinned device), which until then said "No booted Android
+emulator/device found", "boot it first" and "is no longer booted". Such a device is
+never picked.
+
 Selector-based tapping is deliberately NOT on this interface: `tapElement(adapter,
 target, opts)` (`interact/tap.ts`, formerly `ui-tree/tap-element.ts`) resolves the target against the normalized
 tree through `interact/`'s one resolution policy and keyboard guard (§8) and calls `tap(x, y)`. Nothing in it is platform-specific, and both adapters
@@ -266,7 +274,7 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 
 | Tool | Purpose |
 |---|---|
-| `list_devices()` | Every device adb reports as `device` or `offline` and every available simulator simctl lists, with boot state (`booted` / `offline`), platform, OS version; `active` marks the current target |
+| `list_devices()` | Every device adb reports as `device`, `offline` or `unauthorized` and every available simulator simctl lists, with boot state (`booted` / `offline` / `unauthorized`, the last Android only), platform, OS version; `active` marks the current target |
 | `select_device(platform, device)` | Pin the device the platform's tools target (default: first booted). A pinned device going offline is an error, never a silent fallback |
 | `install_app(platform, path?)` | Uses `averi.yaml` defaults (what each tool reads of averi.yaml: "Which tools read averi.yaml", below) |
 | `launch_app(platform, appId, clearState?, activity?, intent?)` | Launch by package / bundle id; `clearState` wipes app data first. Android only: `activity` pins the entry point (else `app.android.activity`, else the launcher's — arbitrary on a debug build that bundles LeakCanary), `intent` is `am start` parameters for non-launcher entry points; iOS refuses both |

@@ -24,16 +24,24 @@ import type { Device } from './types.js';
 
 /**
  * `adb devices -l`, then `getprop ro.build.version.release` on each device
- * adb calls `device` (an offline one cannot answer; its version is
- * `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's, the one
- * builder AndroidAdapter's `shell` uses too — every word quoted, even words
- * that need no quoting.
+ * adb calls `device` (an offline or unauthorized one cannot answer; its
+ * version is `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's,
+ * the one builder AndroidAdapter's `shell` uses too — every word quoted, even
+ * words that need no quoting.
+ *
+ * `unauthorized` is listed since 2026-10-09 (C5): until then its line did not
+ * match, so a phone waiting on its "Allow USB debugging?" prompt vanished and
+ * every tool said "No booted Android emulator/device found". Its line shape
+ * (`<serial>  unauthorized [usb:…] transport_id:N`, no model) is adb's client
+ * source, NOT measured on a device. adb's other states (`authorizing`,
+ * `connecting`, `no permissions (…)`, `recovery`, `sideload`, `bootloader`,
+ * …) are still left out — unmeasured, and not asked for.
  */
 export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<Device[]> {
   const { stdout } = await exec('adb', ['devices', '-l']);
   const devices: Device[] = [];
   for (const line of stdout.toString('utf8').split('\n').slice(1)) {
-    const match = line.trim().match(/^(\S+)\s+(device|offline)\b/);
+    const match = line.trim().match(/^(\S+)\s+(device|offline|unauthorized)\b/);
     if (!match) continue;
     const [, id, state] = match;
     const model = line.match(/model:(\S+)/)?.[1] ?? id;
@@ -47,10 +55,34 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
       platform: 'android',
       name: model,
       osVersion,
-      state: state === 'device' ? 'booted' : 'offline',
+      state: state === 'device' ? 'booted' : state === 'offline' ? 'offline' : 'unauthorized',
     });
   }
   return devices;
+}
+
+/**
+ * Why adb lists an Android device that cannot be driven, and what to do — a
+ * reason sentence starting `is …` and ending with a full stop, which the
+ * registry puts after the device's name in each of its three
+ * refusals (auto-pick, select_device, a pinned device), so the remedy is
+ * worded once, beside the listing that read the state. undefined for a
+ * booted device, and on iOS (offline there is a shut-down simulator; the
+ * registry words that).
+ */
+export function androidUnusable(device: Device): string | undefined {
+  if (device.platform !== 'android') return undefined;
+  if (device.state === 'unauthorized') {
+    return 'is unauthorized: adb sees it, but the device has not accepted this computer\'s debugging key. On a ' +
+      'phone, unlock it and accept the "Allow USB debugging?" prompt; on an emulator, `adb kill-server`, then ' +
+      '`adb devices` to reconnect (restart the emulator if it stays unauthorized).';
+  }
+  if (device.state === 'offline') {
+    return 'is offline: adb sees it but cannot talk to it. An emulator still booting reads offline for a while — ' +
+      'wait until `adb devices` reads `device`; if it stays offline, `adb kill-server && adb start-server`, then ' +
+      'restart the emulator or reconnect the USB cable.';
+  }
+  return undefined;
 }
 
 /**
