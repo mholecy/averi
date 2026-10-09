@@ -21,7 +21,7 @@
 
 import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
-import { charactersText } from '../interact/fill-verdict.js';
+import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';

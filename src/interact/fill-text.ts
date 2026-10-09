@@ -13,8 +13,11 @@
  *
  * Why in interact/ rather than mcp/tool-text.ts with the other replies: the
  * flow engine may not import mcp/ (ARCHITECTURE.md §2: `mcp → run → flow →
- * interact`), and both mcp/ and flow/ may import interact/. The reply's
- * grammar has to sit where the flow line's can sit beside it.
+ * interact`), so the two layouts cannot sit together there. flow/ would
+ * satisfy the layering too (mcp/ may import it); interact/ was CHOSEN, beside
+ * the verdict it renders and the facts it comes from — the precedent is
+ * interact/scroll.ts#describeScrollResult, which the MCP tool and the flow
+ * line both print.
  *
  * THE RULE for every renderer here (and any added later, e.g. a JSON
  * reply): branch only on `did` and on whether `sent` / `unverified` are
@@ -81,16 +84,16 @@ export function fillText(v: FillVerdict, as: { reply: string } | { step: string;
   const sent = (open: string, close: string) => (w.sent === undefined ? '' : `${open}${w.sent}${close}`);
   const unverified = w.unverified === undefined ? '' : ` — ${w.unverified}`;
   if ('reply' in as) {
-    const sel = as.reply;
-    const head =
-      v.did === 'filled'
-        ? `Filled ${sel} (${w.typed}${sent(', ', '')})`
-        : v.did === 'typed'
-          ? `Typed ${w.typed} into ${sel}${sent(' (', ')')}${unverified}`
-          : v.did === 'cleared'
-            ? `Cleared ${sel}${sent(' (', ')')}${unverified}`
-            : `Focused ${sel}${unverified}`;
-    return head + (v.note ? ` (${v.note})` : '') + w.caveats.map((c) => `\n⚠ ${c}`).join('');
+    // One row per head verb: a new `did` without its row does not compile
+    // (until review round 1 of 2026-10-09 the last branch was a catch-all,
+    // so a new verb would have rendered silently as "Focused").
+    const head: Record<FillVerdict['did'], () => string> = {
+      filled: () => `Filled ${as.reply} (${w.typed}${sent(', ', '')})`,
+      typed: () => `Typed ${w.typed} into ${as.reply}${sent(' (', ')')}${unverified}`,
+      cleared: () => `Cleared ${as.reply}${sent(' (', ')')}${unverified}`,
+      focused: () => `Focused ${as.reply}${unverified}`,
+    };
+    return head[v.did]() + (v.note ? ` (${v.note})` : '') + w.caveats.map((c) => `\n⚠ ${c}`).join('');
   }
   return {
     caveats: w.caveats.map((c) => ({ action: '⚠ fill', text: `${as.step}: ${c}` })),

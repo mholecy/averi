@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FillResult } from '../../src/interact/fill.js';
-import { caveatText, charactersText, judgeFill, wordingOf, type Caveat, type FillVerdict, type Reason } from '../../src/interact/fill-verdict.js';
+import { charactersText } from '../../src/util/count.js';
+import { caveatText, judgeFill, wordingOf, type Caveat, type FillVerdict, type Reason } from '../../src/interact/fill-verdict.js';
 
 /**
  * The judgement is asserted as CODES — `did`, `sent`, `reasons`, `caveats`

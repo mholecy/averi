@@ -6,7 +6,9 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
-import { caveatText, charactersText, INPUT_ROLE } from './fill-verdict.js';
+import { caveatText } from './fill-verdict.js';
+import { INPUT_ROLE } from './input-role.js';
+import { charactersText } from '../util/count.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;

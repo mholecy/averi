@@ -48,33 +48,17 @@
  *   warning (fill.ts never produces both: a masked-append needs an input
  *   that took the text, a not-input finding a read-back that did not land).
  *
- * The facts' types are imported as types only; fill.ts imports this module
- * by value (`INPUT_ROLE`, `charactersText`, `caveatText` for its mismatch
- * error), so there is no runtime cycle.
+ * The facts' types are imported from fill.ts as types only; fill.ts imports
+ * this module by value for one thing, `caveatText` (its mismatch error), so
+ * there is no runtime cycle. The two values both modules need are leaves of
+ * their own: `INPUT_ROLE` (interact/input-role.ts) and `charactersText`
+ * (util/count.ts) — neither is a judgement.
  */
 
 import { rectText } from '../ui-tree/geometry.js';
-import { countOf } from '../util/count.js';
+import { charactersText, countOf } from '../util/count.js';
 import type { FillResult, LostWhy, NearbyInput } from './fill.js';
-
-/**
- * The normalised role of every text input (adapters/ios-node.ts: TextField,
- * SecureTextField, TextView; adapters/android.ts: EditText,
- * AutoCompleteTextView and the Compose input that dumps as a focusable,
- * long-clickable scroll view). The one role a fill expects to type into.
- * Here rather than in fill.ts (2026-10-09) because the not-an-input caveat
- * names it, and this module takes nothing from fill.ts but types.
- */
-export const INPUT_ROLE = 'textfield';
-
-/**
- * `1 character`, `N characters` — every count fill and type_text print goes
- * through this. Until 2026-10-08 they all said `characters`, and the device
- * checks of docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-
- * cleared.md read `Typed 1 characters` and `(1 characters, cleared 3
- * characters first)` on both platforms.
- */
-export const charactersText = (n: number): string => countOf(n, 'character');
+import { INPUT_ROLE } from './input-role.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
