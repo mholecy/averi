@@ -567,9 +567,11 @@ const NOT_DRAWN = {
    * rows under it, and a bar between the form and the keys (CONTINUE lifted
    * onto the number pad, run2-ios #250, `24,512` above a row at 545) must
    * neither excuse them nor be excused. Nor does a node that holds the
-   * target whole break (r6b-icon's padded control `22,1099 110x110` round
-   * its icon at 1121; in the 69 device dumps only a pinned CONTINUE and the
-   * keyboard's background enclose a later-listed target), nor one ending
+   * target whole break (pinned on a SYNTHETIC tree, no device dump:
+   * r6b-icon's padded control `22,1099 110x110` round its icon at 1121, an
+   * Android shape put in a flat list — tests/ui-tree/draw-order.test.ts; in
+   * the 69 device dumps only a pinned CONTINUE and the keyboard's background
+   * enclose a later-listed target), nor one ending
    * inside the top bar's band (`barLine`; review MEDIUM: Contacts' New
    * Contact lists `Toolbar 0,83 402x48` last, over `add birthday 20,109`
    * scrolled under it) — each a cover candidate in its own right. Bar items
@@ -1007,10 +1009,11 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
  * area whose top lies above the target's — but never a node of the bottom
  * chrome (`bottomChrome`: pinned at the bottom, or idb's keyboard), one that
  * holds the target whole (a later node enclosing it is a cover in its own
- * right — r6b-icon's padded control; in the 69 device dumps only a pinned
- * CONTINUE and the keyboard's background), or one ending inside the top
- * bar's band (`barLine`: a bar listed last — Contacts' `Toolbar 0,83
- * 402x48`, run3-ios #102 — lies over the rows scrolled under it).
+ * right — r6b-icon's padded control, on a synthetic tree, not a device
+ * dump; in the 69 device dumps only a pinned CONTINUE and the keyboard's
+ * background), or one ending inside the top bar's band (`barLine`: a bar
+ * listed last — Contacts' `Toolbar 0,83 402x48`, run3-ios #102 — lies over
+ * the rows scrolled under it).
  * `order.length` when there is none, or when the target is the top bar's
  * (`contentFrom`; never on a tree that is not a flat list, whose
  * `contentFrom` is the walk's length).
