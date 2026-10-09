@@ -197,7 +197,7 @@ interface TreeFacts {
  * holds no state between calls (code review of deep/r3-scroll, S6: until
  * then a WeakMap by tree object saved those walks).
  */
-function factsOf(tree: UiNode, order: DrawOrder = drawOrder(tree)): TreeFacts {
+function factsOf(tree: UiNode, order: DrawOrder): TreeFacts {
   return {
     scrollersOf: scrollersOf(tree),
     mainScroller: largestScroller(tree),
@@ -853,8 +853,8 @@ function judge(
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
     const box: Rect = { x: 0, y: 0, ...frame };
     const seen = order?.exposure(node, box);
-    const centre = tapPoint(node);
-    const centreCover = containsPoint(box, centre) ? seen?.coverAt(centre) : undefined;
+    // The draw order's answer, as the tap's chrome check reads it (resolve.ts#aimClearOfChrome): the cover at the centre inside the frame.
+    const centreCover = seen?.centreCover;
     const visible = visibleFractionInViewport(node.rect, frame);
     return {
       node,
@@ -863,7 +863,7 @@ function judge(
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
       ...(centreCover !== undefined && { centreCover }),
-      centreOnScreen: containsPoint(screen, centre),
+      centreOnScreen: containsPoint(screen, tapPoint(node)),
       shows: seen?.shows ?? visible,
     };
   };
@@ -1204,7 +1204,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // nothing about motion: the comparisons wait for the next one that does.
   const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : s.frame.boxes;
   const gesture = seen.screen?.box;
-  const now: ThisRead | undefined = read === undefined ? undefined : { read, facts: factsOf(read.tree, order), frames: judgedFrames, gesture, cover };
+  const now: ThisRead | undefined =
+    read === undefined || order === undefined ? undefined : { read, facts: factsOf(read.tree, order), frames: judgedFrames, gesture, cover };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.

@@ -14,6 +14,9 @@ import {
   sameRectWithinPixel,
   scrollersOf,
   largestScroller,
+  largestRect,
+  rectCentre,
+  subtract,
 } from '../../src/ui-tree/geometry.js';
 import { type UiNode } from '../../src/adapters/types.js';
 
@@ -389,5 +392,27 @@ describe('largestScroller — the screen\'s own scroll view (2026-10-09)', () =>
     const list = box(737, 1417, true);
     expect(largestScroller(box(0, 2220, false, [carousel, list]))).toEqual(list.rect);
     expect(largestScroller(box(0, 2220, false, [box(300, 300, false)]))).toBeUndefined();
+  });
+});
+
+describe('subtract, largestRect, rectCentre — the cover arithmetic draw-order.ts#exposure asks (code review S3, S5)', () => {
+  const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+
+  it('a rect less a cut inside it: the bands above and below, full width, and the parts beside it between them', () => {
+    expect(subtract(r(0, 0, 100, 100), r(40, 40, 20, 20))).toEqual([r(0, 0, 100, 40), r(0, 60, 100, 40), r(0, 40, 40, 20), r(60, 40, 40, 20)]);
+  });
+
+  it('a cut over its lower part leaves the band above; one sharing no area leaves it whole; one holding it whole leaves nothing', () => {
+    expect(subtract(r(24, 771, 354, 52), r(24, 780, 354, 44))).toEqual([r(24, 771, 354, 9)]);
+    const from = r(0, 0, 10, 10);
+    expect(subtract(from, r(20, 20, 5, 5))).toEqual([from]);
+    expect(subtract(from, r(-5, -5, 30, 30))).toEqual([]);
+  });
+
+  it('largestRect: by area, the first of equals; none for none — rectCentre: rounded as a tap is sent', () => {
+    expect(largestRect([r(0, 0, 10, 2), r(0, 0, 4, 5), r(5, 5, 2, 10)])).toEqual(r(0, 0, 10, 2));
+    expect(largestRect([])).toBeUndefined();
+    expect(rectCentre(r(24, 754, 354, 26))).toEqual({ x: 201, y: 767 });
+    expect(rectCentre(r(0, 0, 3, 3))).toEqual({ x: 2, y: 2 });
   });
 });

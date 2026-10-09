@@ -530,6 +530,42 @@ export function rectWithin(inner: Rect, outer: Rect): boolean {
 }
 
 /**
+ * `from` less `cut`: the pieces of `from` outside `cut`, at most four and
+ * disjoint — the band above the cut and the band below it, full width, and
+ * the parts left and right of it between them. `from` whole when they share
+ * no area. ui-tree/draw-order.ts#exposure cuts a target by its covers with
+ * it (moved here from there by code review S3, 2026-10-09: rect arithmetic,
+ * beside `rectIntersection`, which it is built on).
+ */
+export function subtract(from: Rect, cut: Rect): Rect[] {
+  const shared = rectIntersection(from, cut);
+  if (shared === undefined) return [from];
+  const right = from.x + from.width;
+  const bottom = from.y + from.height;
+  const sharedRight = shared.x + shared.width;
+  const sharedBottom = shared.y + shared.height;
+  const pieces: Rect[] = [
+    { x: from.x, y: from.y, width: from.width, height: shared.y - from.y },
+    { x: from.x, y: sharedBottom, width: from.width, height: bottom - sharedBottom },
+    { x: from.x, y: shared.y, width: shared.x - from.x, height: shared.height },
+    { x: sharedRight, y: shared.y, width: right - sharedRight, height: shared.height },
+  ];
+  return pieces.filter((r) => rectArea(r) > 0);
+}
+
+/** The largest of `rects` by area — the first of equals; undefined for none. */
+export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
+  rects.reduce<Rect | undefined>((best, r) => (best === undefined || rectArea(r) > rectArea(best) ? r : best), undefined);
+
+/**
+ * The centre of a rect as a tap presses it: each coordinate rounded to a
+ * whole unit, as every tap is sent. selectors.ts#tapPoint is it of a node's
+ * rect; draw-order.ts#exposure of the piece a moved tap aims at (code
+ * review S5).
+ */
+export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
+
+/**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
  * the content exhausted is a missing-clearance bug, 'top' is a sticky header

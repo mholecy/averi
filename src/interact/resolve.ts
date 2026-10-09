@@ -527,7 +527,6 @@ export interface Aim {
   moved?: string;
 }
 
-
 /**
  * THE chrome check for a point about to be tapped on a resolved node
  * (2026-10-09; the bug note's owner decision 1): the target's centre, unless
@@ -572,7 +571,7 @@ export async function aimClearOfChrome(
   const centre = tapPoint(node);
   const box = screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect);
   const order = drawOrder(tree);
-  const cover = order.exposure(node, box).coverAt(centre);
+  const cover = order.exposure(node, box).centreCover;
   if (cover === undefined) return { point: centre };
   const top = await keyboardTop();
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };

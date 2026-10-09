@@ -1,9 +1,10 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { containsPoint, rectWithin } from './geometry.js';
+import { containsPoint, largestRect, rectCentre, rectWithin, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 
 /**
- * DRAW ORDER: what a tree says is drawn on top of what. One walk of the
+ * DRAW ORDER: what a tree says is drawn on top of what — and, for a target,
+ * what of it still shows and where a tap on it goes (`exposure`). One walk of the
  * tree in pre-order, read as paint order — a node AFTER another's subtree
  * is drawn later, so over it (later siblings and their descendants over
  * earlier ones, later Windows over earlier: UIKit orders them by level);
@@ -20,7 +21,8 @@ import { isInteractive, tapPoint } from './selectors.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Four questions, one per caller, read from three columns:
+ * Four questions, one per caller, read from three columns of `NOT_DRAWN`
+ * (`drawnOverAt` reads `drawnOver`'s):
  * - `shadowing(node, point)` — the tap guard's dismissal picker
  *   (interact/keyboard-in-tree.ts#pickDismissal): is a configured dismissal
  *   target drawn over at its tap point?
@@ -43,8 +45,11 @@ import { isInteractive, tapPoint } from './selectors.js';
  * they differ the row says why. Only nodes of the tree are covers: what a
  * tree does not list (iOS's status bar, the translucent top bar idb gives
  * as its button and title only, a top bar WDA lists BEFORE the scroll view
- * it is drawn over) is not inferred — the bug note's decision 4. Knows no platform commands; the platform
- * shapes are in the rows, each with the device tree it was measured on.
+ * it is drawn over) is not inferred — the bug note's decision 4. Knows no
+ * platform commands; the platform shapes are in the rows, each with the
+ * device tree it was measured on, and the one mark of a source it reads is
+ * on the tree (`UiNode.flatList`). The rect arithmetic it asks — the
+ * subtraction of a cover from a target included — is geometry.ts's.
  */
 export interface DrawOrder {
   /**
@@ -52,8 +57,9 @@ export interface DrawOrder {
    * after `node`'s subtree in pre-order — its first place in the tree, and
    * none of its own subtree wherever else the same object appears — that
    * draws (`NOT_DRAWN`'s `shadowing` column) and contains the point
-   * (`containsPoint`: right and bottom edges exclusive). Undefined when nothing does, or when `node` is
-   * not in this tree. The keyboard's own nodes are not exempt: a target
+   * (`containsPoint`: right and bottom edges exclusive). Undefined when
+   * nothing does, or when `node` is not in this tree. The keyboard's own
+   * nodes are not exempt: a target
    * under the keyboard is caught first by the band check (with its own
    * reason), and a keyboard-owned node over the point that the band missed
    * is a real cover.
@@ -95,9 +101,9 @@ export interface DrawOrder {
 }
 
 /**
- * The share of a target's area drawn over by nothing — the smallest side,
- * as a fraction of the screen's shorter side, of a piece a tap may be moved
- * to (`Exposure.tapAt`): 24 pt on the 402-pt iPhone 17, 65 px on the
+ * The smallest side a piece of a target that nothing is drawn over may have
+ * for a tap to be moved to it (`Exposure.tapAt`), as a fraction of the
+ * screen's shorter side: 24 pt on the 402-pt iPhone 17, 65 px on the
  * 1080-px Pixel_3a — about a fingertip, Apple's 44-pt target halved. Chosen
  * against the measured strips (docs/bugs/2026-10-08-tap-and-scroll-until-
  * ignore-pinned-app-chrome.md), each of which must be refused: the 9-pt and
@@ -117,9 +123,11 @@ export interface Exposure {
   readonly covers: readonly UiNode[];
   /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
+  /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — `coverAt` of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
+  readonly centreCover?: UiNode;
   /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
-   * `within` under no cover — `moved: false`; else the centre of the largest
+   * `within` under no cover (no `centreCover`) — `moved: false`; else the centre (`rectCentre`) of the largest
    * uncovered piece whose sides are both at least `minPiece` — `moved: true`,
    * with that `piece`; undefined when no piece is that large.
    */
@@ -130,8 +138,13 @@ export interface Exposure {
   coverAt(point: Point): UiNode | undefined;
 }
 
-/** The questions `NOT_DRAWN` answers, by the `DrawOrder` method that asks each (`drawnOverAt` reads `drawnOver`'s, `exposure` the `target` column). */
-type Question = 'shadowing' | 'drawnOver' | 'target';
+/**
+ * The questions of a point and of a container — `NOT_DRAWN`'s columns
+ * judged against what is `Seen` (`draws`); `drawnOverAt` reads
+ * `drawnOver`'s. The third column, `target`, is judged against a target
+ * too (`SeenFor`, `drawsOverTarget`).
+ */
+type Question = 'shadowing' | 'drawnOver';
 
 /** One node in pre-order, with what a row may ask of where it is. */
 interface Placed {
@@ -148,15 +161,15 @@ interface Placed {
   readonly parent: Placed | undefined;
 }
 
-/** What a row is judged against beside the node: the screen's area (`screenOf`), and whether the tree is a flat list (`UiNode.flatList` on its root). */
+/** What a row is judged against beside the node: the screen's area (`screenOf`). */
 interface Seen {
   readonly screen: number;
-  readonly flatList: boolean;
 }
 
-/** What the `target` column is judged against besides: the target, at its first place in the walk. */
+/** What the `target` column is judged against besides: the target, at its first place in the walk, and whether the tree is a flat list (`UiNode.flatList` on its root). */
 interface SeenFor extends Seen {
   readonly target: Placed;
+  readonly flatList: boolean;
 }
 
 /**
@@ -165,9 +178,7 @@ interface SeenFor extends Seen {
  * question without one counts the node as drawing, as far as this row is
  * concerned.
  */
-type Row = {
-  readonly shadowing?: (placed: Placed, seen: Seen) => boolean;
-  readonly drawnOver?: (placed: Placed, seen: Seen) => boolean;
+type Row = { readonly [Q in Question]?: (placed: Placed, seen: Seen) => boolean } & {
   readonly target?: (placed: Placed, seen: SeenFor) => boolean;
 };
 
@@ -219,14 +230,14 @@ const itemless = (n: UiNode): boolean => n.role === 'toolbar' && n.children.ever
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
- * node draws for a question when no row excuses it there. Where the two
- * columns differ, both answers are kept as each caller has been measured
+ * node draws for a question when no row excuses it there. Where the
+ * columns differ, each answer is kept as its caller has been measured
  * against; unifying them is a behaviour change, to be judged per row.
  */
 const NOT_DRAWN = {
   /**
-   * No area: nothing to draw (a zero-width text, a collapsed view). Both
-   * questions; for `shadowing` it is belt and braces — `containsPoint`
+   * No area: nothing to draw (a zero-width text, a collapsed view). Every
+   * question; for `shadowing` it is belt and braces — `containsPoint`
    * already rejects a rect of no area.
    */
   noArea: {
@@ -598,34 +609,13 @@ function screenOf(tree: UiNode): Rect {
 }
 
 /**
- * `from` less `cut`: the pieces of `from` outside `cut`, at most four and
- * disjoint — the band above the cut and the band below it, full width, and
- * the parts left and right of it between them. `from` whole when they share
- * no area.
- */
-function subtract(from: Rect, cut: Rect): Rect[] {
-  const shared = rectIntersection(from, cut);
-  if (shared === undefined) return [from];
-  const right = from.x + from.width;
-  const bottom = from.y + from.height;
-  const sharedRight = shared.x + shared.width;
-  const sharedBottom = shared.y + shared.height;
-  const pieces: Rect[] = [
-    { x: from.x, y: from.y, width: from.width, height: shared.y - from.y },
-    { x: from.x, y: sharedBottom, width: from.width, height: bottom - sharedBottom },
-    { x: from.x, y: shared.y, width: shared.x - from.x, height: shared.height },
-    { x: sharedRight, y: shared.y, width: right - sharedRight, height: shared.height },
-  ];
-  return pieces.filter((r) => rectArea(r) > 0);
-}
-
-/**
  * The draw order of `tree`: one pre-order walk when called; each answer a
  * scan of it. The tree must not change while the answer is in use.
  */
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
-  const seen: Seen = { screen: rectArea(screen), flatList: tree.flatList === true };
+  const seen: Seen = { screen: rectArea(screen) };
+  const flatList = tree.flatList === true;
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
   const walk = (node: UiNode, parent: Placed | undefined, scroller: Placed | undefined): void => {
@@ -637,7 +627,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
   };
   walk(tree, undefined, undefined);
 
-  const draws = (placed: Placed, question: Exclude<Question, 'target'>): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
+  const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
+  const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
   /** Every place of `node` in the walk — the same object may sit at several (`shadowing`'s rule). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
@@ -667,29 +658,30 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0] };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList };
       const covers =
         shown === undefined || about === undefined
           ? []
-          : laterThan(places, (p) => rectIntersection(p.node.rect, shown) !== undefined && !ROWS.some((row) => row.target?.(p, about) === true)).map((p) => p.node);
+          : laterThan(places, (p) => rectIntersection(p.node.rect, shown) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
       const pieces = covers.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.rect)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
-      const largest = pieces.reduce<Rect | undefined>((best, r) => (best === undefined || rectArea(r) > rectArea(best) ? r : best), undefined);
+      const largest = largestRect(pieces);
       const coverAt = (point: Point): UiNode | undefined => covers.filter((c) => containsPoint(c.rect, point)).at(-1);
       const centre = tapPoint(node);
-      const tappable = pieces
-        .filter((r) => r.width >= minPiece && r.height >= minPiece)
-        .reduce<Rect | undefined>((best, r) => (best === undefined || rectArea(r) > rectArea(best) ? r : best), undefined);
+      const onCentre = shown !== undefined && containsPoint(shown, centre);
+      const centreCover = onCentre ? coverAt(centre) : undefined;
+      const tappable = largestRect(pieces.filter((r) => r.width >= minPiece && r.height >= minPiece));
       const tapAt: Exposure['tapAt'] =
-        shown !== undefined && containsPoint(shown, centre) && coverAt(centre) === undefined
+        onCentre && centreCover === undefined
           ? { point: centre, moved: false }
           : tappable === undefined
             ? undefined
-            : { point: { x: Math.round(tappable.x + tappable.width / 2), y: Math.round(tappable.y + tappable.height / 2) }, moved: true, piece: { ...tappable } };
+            : { point: rectCentre(tappable), moved: true, piece: { ...tappable } };
       return {
         shows: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
         covers,
         ...(largest !== undefined && { largest: { ...largest } }),
+        ...(centreCover !== undefined && { centreCover }),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,
