@@ -66,6 +66,23 @@ export class WdaTreeSource implements IosTreeSource {
     return parseWdaSourceValue(payload);
   }
 
+  /**
+   * Not asked: always `undefined`, without a read (2026-10-09). The launch's
+   * foreground wait (ios-foreground.ts) was measured on idb only — idb hands
+   * out the previous app's tree for ~1–2 s after an app switch — and WDA's
+   * sessionless `/source` has not been measured doing the same. Asking here
+   * would also move WebDriverAgent's start (a build on first use, then up to
+   * 60 s for /status — wda.ts) into every `launch_app` of a project whose
+   * next call may never read a tree, and the start alone outlasts the
+   * window this check exists for. The answer is possible — WDA's root IS
+   * the Application, labelled with the display name — so a measured lag
+   * would make this a read of `/source` returning the root's label when its
+   * type is `Application`.
+   */
+  async applicationLabel(): Promise<undefined> {
+    return undefined;
+  }
+
   private released(cause?: unknown): Error {
     return new Error(
       `The WebDriverAgent tree source for simulator ${this.udid} has been released — ` +

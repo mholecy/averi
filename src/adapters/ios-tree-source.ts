@@ -39,6 +39,20 @@ export interface IosTreeSource {
   /** The configured kind this source serves — what the adapter reports as its `treeSourceKind`. */
   readonly kind: IosTreeSourceKind;
   read(): Promise<UiNode>;
+  /**
+   * Which app a fresh read is OF: the label of the payload's `Application`
+   * element — its display name ("Skeleton Internal", "Contacts"), or `' '`
+   * for SpringBoard (2026-10-09). Asked by IosAdapter.launch only
+   * (ios-foreground.ts), never by a reader of the tree: the normalized tree
+   * keeps no element types (idb's Application is a plain `other`), so the
+   * question is answered from the raw payload, by the source that has it.
+   *
+   * `null`: the read has an Application element with no label. `undefined`:
+   * the source does not answer — the read lists no Application, or the
+   * source does not ask (WdaTreeSource, which says why). Throws as `read()`
+   * throws; one device read per call, like `read()`.
+   */
+  applicationLabel(): Promise<string | null | undefined>;
   dispose(): Promise<void>;
 }
 
@@ -236,12 +250,29 @@ export class IdbTreeSource implements IosTreeSource {
   }
 
   async read(): Promise<UiNode> {
+    return (await this.readOnce()).tree;
+  }
+
+  /**
+   * The first `Application` element's AXLabel. idb's flat list starts with
+   * it (measured 2026-10-09 on iOS 27.0: "Skeleton Internal", "Contacts",
+   * SpringBoard's `' '`), but the element is found by type, not by place.
+   * The same read as `read()` — an empty payload throws IdbEmptyTreeError
+   * here too, so the caller can tell idb's launch transient (no tree yet)
+   * from a tree of the wrong app.
+   */
+  async applicationLabel(): Promise<string | null | undefined> {
+    const app = (await this.readOnce()).elements.find((el) => el.type === 'Application');
+    return app === undefined ? undefined : (app.AXLabel ?? null);
+  }
+
+  private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {
     const { stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], { timeoutMs: DESCRIBE_ALL_TIMEOUT_MS });
     const elements = idbElements(stdout.toString('utf8'));
     const tree = idbTree(elements);
     // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.
     if (!tree.children.some((el) => rectArea(el.rect) > 0)) throw new IdbEmptyTreeError(this.udid, elements.map((el) => el.type));
-    return tree;
+    return { elements, tree };
   }
 
   dispose(): Promise<void> {
