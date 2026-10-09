@@ -2092,7 +2092,7 @@ flows:
         {
           action: '✗ fill id:"amount_input"',
           detail: expect.stringMatching(
-            /^failed — optional step not skipped: its value was refused before anything was typed — cannot type U\+000A \("\\n", a control character\): it is a key, not text/,
+            /^failed — optional step not skipped: averi refused its value before anything was typed — cannot type U\+000A \("\\n", a control character\): it is a key, not text/,
           ) as string,
         },
       ]);
@@ -2959,7 +2959,7 @@ ${head}
         };
         const CASES = [
           ['did not land', '"x"', /^optional step not skipped: its field is present, but its value did not land — fill: typed 1 character but the field shows 0/],
-          ['was refused', '"a\\nb"', /^optional step not skipped: its value was refused before anything was typed — cannot type U\+000A/],
+          ['was refused', '"a\\nb"', /^optional step not skipped: averi refused its value before anything was typed — cannot type U\+000A/],
         ] as const;
 
         it.each(CASES)('its value %s: the rung fails, the destructive rung never runs', async (_name, value, message) => {
@@ -2971,7 +2971,7 @@ ${head}
           expect(error.message).toMatch(message);
           expect(fake.launches).toEqual([]);
           expect(error.trace.filter((t) => t.action.startsWith('⚠ reach') || t.action.startsWith('↻') || t.action.startsWith('salvage'))).toEqual([]);
-          expect(failedLines(error)).toEqual([{ action: '✗ fill id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: its /) as string }]);
+          expect(failedLines(error)).toEqual([{ action: '✗ fill id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: (its|averi refused its) /) as string }]);
         });
 
         it.each(CASES)('its value %s after the rung reached the state: the detect probe sees it, the call passes, no escalation', async (_name, value) => {
@@ -2991,7 +2991,7 @@ ${head}
           const cfg = fillLadder(`      - tap: { id: continue }\n      - optional: [ { fill: { id: priority, value: ${value} } } ]`);
           const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
           expect(fake.launches).toEqual([]);
-          expect(trace).toContainEqual({ action: '✗ fill id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: its /) as string });
+          expect(trace).toContainEqual({ action: '✗ fill id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: (its|averi refused its) /) as string });
           expect(trace.slice(-2)).toEqual([
             { action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed — optional step not skipped:.* — state reached anyway$/) as string },
             { action: 'state logged_in', detail: 'reached after login_registered' },

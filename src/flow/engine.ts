@@ -214,13 +214,13 @@ class OptionalNotSkipped extends Error {
  * quotes. A fill that failed on its value (interact/fill.ts#FillValueFailure;
  * 2026-10-09, owner's decision) is the same finding as a refused tap: its
  * text did not land after the focus tap (a half-typed login must not run on),
- * or its value was refused before anything was typed (a broken value, not an
+ * or averi refused its value before anything was typed (a broken value, not an
  * absent field — the field was never even looked for).
  */
 const notSkippedWhy = (e: RefusedOnPresentElement | FillValueFailure): string =>
   !(e instanceof FillValueFailure) ? 'its element is present, but the tap was refused'
   : e.fillValue === 'did-not-land' ? 'its field is present, but its value did not land'
-  : 'its value was refused before anything was typed';
+  : 'averi refused its value before anything was typed';
 
 /** Does an enclosing `optional:` turn `e` into OptionalNotSkipped instead of skipping it? */
 const notSkippable = (e: unknown): e is Error & (RefusedOnPresentElement | FillValueFailure) =>

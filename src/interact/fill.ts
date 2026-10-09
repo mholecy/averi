@@ -417,17 +417,23 @@ export async function fillField(
 /**
  * A fill that failed on its VALUE — the marker the flow engine's `optional:`
  * reads (flow/engine.ts, OptionalNotSkipped; 2026-10-09, owner's decision):
- * - `did-not-land`: every error fillField throws after its focus tap
- *   (FillFailure — a read-back mismatch, a clear that left text twice, a
- *   re-read that failed mid-fill). The field was tapped and may hold partial
- *   text, so the step after it would run on a half-typed form.
+ * - `did-not-land`: the three FillFailures (a read-back mismatch, a clear
+ *   that left text twice, a re-read that failed mid-fill). The field was
+ *   tapped and may hold partial text, so the step after it would run on a
+ *   half-typed form.
  * - `refused`: a value holding a control character (type-text.ts), refused
  *   before anything is sent. A broken value, not an absent field.
  * Neither is skipped by `optional:` — it fails the flow, as a tap refused on
  * a present element does (resolve.ts#RefusedOnPresentElement). The `type:`
  * step's own control-character refusal (typeIntoFocused) is not marked.
  * Errors from the resolution and the keyboard guard before the focus tap
- * (absent field, refusals on a present one) keep their own classes.
+ * (absent field, refusals on a present one) keep their own classes. NOT
+ * marked either, so an `optional:` still skips them — the owner approved
+ * exactly the three `did-not-land` failures and the `refused` one: an error
+ * thrown by the focus tap's `adapter.tap`, or by `adapter.typeText` or
+ * `adapter.clearText` (a device error while typing — the known gap: the
+ * field may hold partial text), and an AmbiguityRefusal from `refetch`'s
+ * resolveNow mid-fill (a second match appearing).
  */
 export class FillValueFailure extends Error {
   readonly fillValue: 'did-not-land' | 'refused';
