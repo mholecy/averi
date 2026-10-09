@@ -45,3 +45,23 @@ describe('assertTypeable shows the refused character as a visible escape', () =>
     }
   });
 });
+
+/**
+ * Round 7 (2026-10-09, F-1.2 of the round-6b device check): a refused U+0007
+ * was told `input text` would turn it into "a newline into ENTER". ENTER is
+ * named for a newline and a return only; any other is a key event.
+ */
+describe('assertTypeable names ENTER only for a newline and a return', () => {
+  it.each([
+    ['\n', 'a newline into ENTER'],
+    ['\r', 'a return into ENTER'],
+  ])('%j: `input text` may turn it into ENTER', (ch, enter) => {
+    expect(refusal(`a${ch}b`)).toContain(`\`input text\` may turn it into a key event (${enter}, which submits the form mid-fill), on iOS`);
+  });
+
+  it.each(['\x07', '\t', '\x1b', '\x7f'])('%j: a key event, and no ENTER', (ch) => {
+    const msg = refusal(`a${ch}b`);
+    expect(msg).toContain('`input text` may send it as a key event, on iOS idb types it as a key press');
+    expect(msg).not.toMatch(/into ENTER|a newline/);
+  });
+});

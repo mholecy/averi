@@ -7,9 +7,9 @@ import type { DeviceAdapter } from '../adapters/types.js';
  *
  * The rule: no C0 control character (U+0000–U+001F — newline, return, tab,
  * escape, form feed, …) and no DEL (U+007F), on either platform. A control
- * character is a KEY, not text: on Android `input text` may turn it into a
- * key event (a newline into ENTER, which submits a form mid-fill — the
- * reason it was refused at all, adb-shell.ts's header); on iOS idb's
+ * character is a KEY, not text: on Android `input text` may send it as a
+ * key event (a newline or a return as ENTER, which submits a form mid-fill —
+ * the reason it was refused at all, adb-shell.ts's header); on iOS idb's
  * `ui text` types through HID, where a newline is the Return key too. The
  * deliberate route is `pressKey('enter')` (the `press_key` tool); there is
  * no tab key.
@@ -48,6 +48,19 @@ function visibleEscape(ch: string): string {
   return `"${SHORT_ESCAPES[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`}"`;
 }
 
+/**
+ * What Android's `input text` may do with the refused character. ENTER is
+ * named for a newline and a return only (round 7, 2026-10-09: a refused
+ * U+0007 was told "a newline into ENTER"); any other is sent as a key event.
+ * adapters/android.ts's defensive assert words it the same way.
+ */
+function androidFate(ch: string): string {
+  if (ch === '\n' || ch === '\r') {
+    return `may turn it into a key event (${ch === '\n' ? 'a newline' : 'a return'} into ENTER, which submits the form mid-fill)`;
+  }
+  return 'may send it as a key event';
+}
+
 /** Throws when `value` holds a character typing cannot deliver as text (see the module doc). */
 export function assertTypeable(value: string): void {
   const match = value.match(CONTROL_CHAR_RE);
@@ -56,7 +69,7 @@ export function assertTypeable(value: string): void {
   const code = `U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
   throw new Error(
     `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
-      '`input text` may turn it into a key event (a newline into ENTER, which submits the form mid-fill), on iOS ' +
+      `\`input text\` ${androidFate(ch)}, on iOS ` +
       'idb types it as a key press. Refused on both platforms before anything was sent. Type the text without it ' +
       "and send the key deliberately — pressKey('enter') (the `press_key` tool, `key: enter`); there is no tab key.",
   );

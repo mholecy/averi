@@ -543,11 +543,17 @@ export class AndroidAdapter implements DeviceAdapter {
     // Each character is one quoted `shell` word; a space is `input text`'s
     // own `%s`; a control character is refused up front — by interact/
     // first (type-text.ts), here again defensively — see adb-shell.ts.
+    // ENTER is named for a newline and a return only; any other is a key
+    // event (worded as interact/type-text.ts's androidFate, round 7).
     const control = text.match(CONTROL_KEY_CHAR_RE);
     if (control !== null) {
+      const ch = control[0];
+      const fate =
+        ch === '\n' || ch === '\r'
+          ? `may turn it into a key event (${ch === '\n' ? 'a newline' : 'a return'} into ENTER, which submits the form mid-fill)`
+          : 'may send it as a key event';
       throw new Error(
-        `typeText cannot type ${JSON.stringify(control[0])} on Android: \`input text\` may turn it into a key ` +
-          `event (a newline into ENTER, which submits the form mid-fill). Type the text without it and send ` +
+        `typeText cannot type ${JSON.stringify(ch)} on Android: \`input text\` ${fate}. Type the text without it and send ` +
           `the key deliberately — pressKey('enter') (the \`press_key\` tool, \`key: enter\`); there is no tab key.`,
       );
     }
