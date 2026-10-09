@@ -807,7 +807,7 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * against it.
  */
 export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | undefined {
-  const screen = rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
+  const screen = screenAreaOf(tree);
   const coversOnlyThroughContent = (n: UiNode) =>
     n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION);
   /** A toolbar with no items: nothing of it is what is seen at the point (the UIKit sheet's two, 2026-10-09 — see above). */
@@ -824,4 +824,70 @@ export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | un
   };
   walk(tree);
   return over;
+}
+
+/** The screen's area as a draw-order question sizes a host against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion). */
+function screenAreaOf(tree: UiNode): number {
+  return rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
+}
+
+/**
+ * The nodes DRAWN OVER a clipping container (2026-10-09, docs/bugs/
+ * 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md), in
+ * pre-order: every node AFTER the container's subtree — later in the tree,
+ * so drawn later (the draw-order rule `shadowing` reads), never an ancestor
+ * or a descendant: its own rows scroll with it — whose rect meets the
+ * container's with area and that DRAWS something. Measured on mp-native's
+ * Account Detail (Compose): the transaction list `0,825 1080x1395` runs to
+ * the screen's bottom under a floating tab bar, whose host — an unlabelled
+ * `container` `66,1840 948x248` — and its tabs `nav.tab_*` (1876–2052)
+ * come after the list; a touch-down at y ≥ ~1840 went to the bar, and the
+ * list never moved. `scroll_until`'s stroke box is cut above them
+ * (interact/swipe.ts#strokeRoom has the rule; scroll-rounds.ts#TreeFacts
+ * asks this) and a stroke that still touched down on one names it.
+ *
+ * "Draws", for a node of ANY role — not `shadowing`'s "content" (a
+ * non-structural role): a Compose tree is all `container`/`other`
+ * (adapters/android.ts maps `android.view.View` so), the bar's host and its
+ * tabs included, so a structural role is no evidence of nothing drawn. Not
+ * counted: a node with no area; a structural LEAF with no label and no
+ * value (a spacer, an empty Box — empty area); a screen-sized HOST with
+ * children (`SCREEN_SIZED_FRACTION`, `shadowing`'s rule — a full-screen
+ * overlay layer draws through its content, which is walked); and the
+ * keyboard's own subtrees (`ofKeyboard`: the keyboard is the round's cover,
+ * read with its witness — never second-guessed here). Counted, so: a
+ * structural container WITH children under the screen's size — the bar's
+ * host, which took the measured touch-down at y 1857 above its tabs (a
+ * Material Surface swallows touches through its whole rect). The tree does
+ * not say whether a node takes touches (the parser keeps no `clickable`),
+ * so a transparent wrapper reaching over a list counts too: its cost is a
+ * shorter stroke box, never a stroke off the list.
+ *
+ * The container is found in the tree by its rect — the outermost clipping
+ * node (`clipsDescendants`) with that rect, whose subtree is then the
+ * largest that is excluded — since the round carries containers as rects
+ * (`scrollersOf`, `largestScroller`); none found (a rect of another read):
+ * none drawn over it. One walk when called; each answer a scan of it.
+ */
+export function drawnOver(tree: UiNode): (within: Rect) => readonly UiNode[] {
+  const screen = screenAreaOf(tree);
+  const draws = (n: UiNode): boolean =>
+    rectArea(n.rect) > 0 &&
+    !(n.children.length > 0 && rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION) &&
+    !(STRUCTURAL_ROLES.has(n.role) && n.children.length === 0 && !n.label && !n.value);
+  // Pre-order, each node with the index just past its subtree; the keyboard's subtrees left out.
+  const order: { node: UiNode; end: number }[] = [];
+  const walk = (n: UiNode): void => {
+    if (n.ofKeyboard === true) return;
+    const at = order.length;
+    order.push({ node: n, end: at + 1 });
+    for (const child of n.children) walk(child);
+    order[at].end = order.length;
+  };
+  walk(tree);
+  return (within) => {
+    const container = order.find(({ node }) => node.clipsDescendants === true && sameRect(node.rect, within));
+    if (container === undefined) return [];
+    return order.slice(container.end).flatMap(({ node }) => (rectIntersection(node.rect, within) !== undefined && draws(node) ? [node] : []));
+  };
 }
