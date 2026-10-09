@@ -4,7 +4,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError } from './resolve.js';
+import { absenceError, underStatusBar } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE } from './swipe.js';
 
@@ -231,11 +231,8 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
-/** `its centre (201,53) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar` — resolve.ts#refuseOffScreen's words for the same point. */
-const statusBarText = (judged: Judged, band: number): string => {
-  const { x, y } = tapPoint(judged.node);
-  return `its centre (${x},${y}) stays under iOS's status bar (the top ${band} pt of the screen), where a tap goes to the status bar`;
-};
+/** `its centre stays under iOS's status bar at (201,53), in the top 62 pt …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
+const statusBarText = (judged: Judged, band: number): string => `its centre stays ${underStatusBar(tapPoint(judged.node), band)}`;
 
 /** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
 const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);

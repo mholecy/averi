@@ -713,14 +713,14 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   it('a header whose centre stays in the band (0,0 402x106 on a screen that does not scroll): the failure names iOS\'s status bar — no clip, no layout defect', async () => {
     const error = (await scrollUntilVisible(still({ x: 0, y: 0, width: 402, height: 106 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
-    expect(error.message).toContain("its centre (201,53) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar");
+    expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
   it('a list already at its bottom end, the target pushed up under the bar (24,10 354x52) by the default direction down: the failure says to try direction "up"', async () => {
     const error = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain(
-      "its centre (201,36) stays under iOS's status bar (the top 62 pt of the screen), where a tap goes to the status bar, and the content is exhausted: " +
+      "its centre stays under iOS's status bar at (201,36), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted: " +
         'swiping down no longer moves it out from under the status bar — try direction: "up".',
     );
     const up = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', { ...FAST, direction: 'up' }).catch((e: unknown) => e)) as Error;

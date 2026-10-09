@@ -487,6 +487,16 @@ const inStatusBand = (point: Point, screen: TapScreen): boolean =>
   screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
+ * iOS's status band as one clause — `under iOS's status bar at (201,6), in
+ * the top 62 pt of the screen, where a tap goes to the status bar` — the
+ * words for a point there, read by the tap's refusal (`refuseOffScreen`) and
+ * by `scroll_until`'s failures (scroll-text.ts), so the two say the one fact
+ * alike (code review of round 6, S5).
+ */
+export const underStatusBar = (at: Point, band: number): string =>
+  `under iOS's status bar at (${at.x},${at.y}), in the top ${band} pt of the screen, where a tap goes to the status bar`;
+
+/**
  * Refuse a tap whose point lies off the screen (OffScreenRefusal), or return
  * the screen it was judged against. The rule every tap on a resolved node
  * shares, applied by keyboard.ts#resolveClearOfKeyboard — behind
@@ -518,8 +528,8 @@ const inStatusBand = (point: Point, screen: TapScreen): boolean =>
  * more — one extra read on a refusal path, accepted.
  *
  * A point on the screen but inside iOS's status band (`onScreen`'s iOS
- * clause, 2026-10-09) is refused in its own words — `under iOS's status
- * bar at (201,6) — the top 62 pt …` — since "off screen" would contradict
+ * clause, 2026-10-09) is refused in its own words (`underStatusBar`) —
+ * since "off screen" would contradict
  * a rect the reader sees on it.
  *
  * `sent`, when the keyboard guard acted before this look — `back was
@@ -546,7 +556,7 @@ export async function refuseOffScreen(
   const judged: TapScreen = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
   const what = describeTarget(target);
   if (inStatusBand(at, judged)) {
-    const band = `under iOS's status bar at (${at.x},${at.y}) — the top ${judged.statusBand} pt of a ${judged.box.width}x${judged.box.height} screen, where a tap goes to the status bar (rect ${rectText(node.rect)}) — scroll_until it first`;
+    const band = `${underStatusBar(at, judged.statusBand ?? 0)} (rect ${rectText(node.rect)}) — scroll_until it first`;
     throw new OffScreenRefusal(sent === undefined ? `${what} is ${band}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${band}`);
   }
   const visible = Math.max(...judged.boxes.map((b) => visibleFractionInViewport(node.rect, b)));

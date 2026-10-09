@@ -1157,7 +1157,7 @@ describe('iOS\'s status band (2026-10-09)', () => {
     const error = await tapElement(fake, PRIORITY, OPTS).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OffScreenRefusal);
     expect((error as Error).message).toBe(
-      `${PRIORITY} is under iOS's status bar at (201,6) — the top 62 pt of a 402x874 screen, where a tap goes to the status bar ` +
+      `${PRIORITY} is under iOS's status bar at (201,6), in the top 62 pt of the screen, where a tap goes to the status bar ` +
         '(rect 24,-20 354x52) — scroll_until it first; nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([]);
