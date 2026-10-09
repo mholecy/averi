@@ -822,7 +822,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
  * its child, and reporting the clipped one of the two would invent a defect.
  * Most revealed by what SHOWS — in the frame and under nothing of the app
  * (`order.exposure`, 2026-10-09) — which is what is in the frame when
- * nothing is drawn over it. Under a cover, a keyboard-side node (the round's
+ * nothing is drawn over it; a match that stops the round first (`better`). Under a cover, a keyboard-side node (the round's
  * reading's `ofKeyboard`, one walk per round) is judged against the whole
  * screen; every other node against the part above the band, or scores 0
  * when the band leaves none — and what is drawn over a node is counted only
@@ -833,6 +833,7 @@ function judge(
   found: readonly UiNode[],
   viewport: DeviceScreen,
   order: DrawOrder | undefined,
+  fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
   const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
@@ -848,7 +849,7 @@ function judge(
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
       ...(centreCover !== undefined && { centreCover }),
-      shows: seen?.visible ?? visible,
+      shows: seen?.shows ?? visible,
     };
   };
   const scored = found.map((node): Judged => {
@@ -857,14 +858,24 @@ function judge(
     if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], shows: 0 };
     return inFrame(node, above, cover.cover);
   });
-  return scored.sort((a, b) => b.shows - a.shows)[0];
+  return scored.sort((a, b) => better(a, b, fully))[0];
 }
 
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], boxes: readonly DeviceScreen[], order: DrawOrder | undefined): Judged | undefined {
+function judgeOver(found: readonly UiNode[], boxes: readonly DeviceScreen[], order: DrawOrder | undefined, fully: boolean): Judged | undefined {
   return boxes
-    .map((box) => judge(found, box, order))
-    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || j.shows > best.shows) ? j : best), undefined);
+    .map((box) => judge(found, box, order, fully))
+    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
+}
+
+/**
+ * The order of two judgements, best first (a comparator): a match that
+ * STOPS the round (`stops`) before one that does not — a match showing
+ * more but with its centre covered must not hide one the next tap would hit
+ * (review round 1) — then the one more of which shows.
+ */
+function better(a: Judged, b: Judged, fully: boolean): number {
+  return Number(stops(b, fully)) - Number(stops(a, fully)) || b.shows - a.shows;
 }
 
 /**
@@ -1132,11 +1143,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // What is drawn over what, once a round (ui-tree/draw-order.ts): the
   // judgement's covers, and the stroke's (`TreeFacts.drawOrder`).
   const order = read === undefined ? undefined : drawOrder(read.tree);
-  const whole = judgeOver(found, s.frame.boxes, order);
+  const whole = judgeOver(found, s.frame.boxes, order, fully);
   let cover: Cover | undefined;
   let best = whole;
   if (offered !== undefined && read !== undefined) {
-    const covered = judge(found, viewport, order, { cover: offered, keyboardSide: read.ofKeyboard });
+    const covered = judge(found, viewport, order, fully, { cover: offered, keyboardSide: read.ofKeyboard });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a

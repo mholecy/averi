@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, nodeText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { judgingScreen, type JudgingScreen } from './swipe.js';
@@ -491,9 +491,6 @@ export interface Aim {
   moved?: string;
 }
 
-/** A cover as a sentence names it — `button "Continue to summary" (24,780 354x44)`: its role, its label quoted (else its id), its rect. The tap's and `scroll_until`'s sentences (scroll-text.ts) share it. */
-export const coverText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
-  `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
 
 /**
  * THE chrome check for a point about to be tapped on a resolved node
@@ -541,7 +538,7 @@ export async function aimClearOfChrome(
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
   const seen = order.exposure(node, within);
-  const under = `under ${coverText(cover)}`;
+  const under = `under ${nodeText(cover)}`;
   if (seen.tapAt !== undefined) {
     const { point } = seen.tapAt;
     if (!seen.tapAt.moved) return { point };

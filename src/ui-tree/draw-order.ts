@@ -112,10 +112,10 @@ export const MIN_TAP_PIECE_FRACTION = 0.06;
 /** What `exposure` found: the target against what is drawn over it inside the judged box. */
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
-  readonly visible: number;
+  readonly shows: number;
   /** The nodes drawn over it inside `within`, in pre-order; empty when none. */
   readonly covers: readonly UiNode[];
-  /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces; the first of equals); undefined when nothing of it shows. */
+  /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
   /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
@@ -169,6 +169,15 @@ type Row = {
   readonly drawnOver?: (placed: Placed, seen: Seen) => boolean;
   readonly target?: (placed: Placed, seen: SeenFor) => boolean;
 };
+
+/**
+ * The `structural` row's wrapper excuse for a target: `node` holds the
+ * target's whole rect, and is the screen's size or holds the target's
+ * nearest scroll view whole.
+ */
+const holdsWhole = (node: UiNode, target: Placed, screen: number): boolean =>
+  rectWithin(target.node.rect, node.rect) &&
+  (rectArea(node.rect) >= screen * SCREEN_SIZED_FRACTION || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
 /** `inner` lies in `outer`'s subtree (or is it). */
 const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
@@ -248,13 +257,19 @@ const NOT_DRAWN = {
    * says nothing about the target's surface; what it carries is walked and
    * judged by itself, as the point question judges every structural node.
    * Not the point question's blanket excuse: a wrapper only PARTLY over the
-   * target is a bar's frame, the case the tab-bar host measured.
+   * target is a bar's frame, the case the tab-bar host measured. And not
+   * every wrapper holding the target (review round 1): the measured host
+   * `66,1840 948x248` holds a small target in a row at y 1845–1875 whole,
+   * above its tabs — the band where the touch-down at 1857 was swallowed.
+   * So the wrapper must also be the screen's size (`SCREEN_SIZED_FRACTION`,
+   * a Window's `Other`) or hold the target's scroll view whole (the form's
+   * frame) — a bar holds neither (`holdsWhole`).
    */
   structural: {
     shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: ({ node }, { target }) =>
-      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || rectWithin(target.node.rect, node.rect)),
+    target: ({ node }, { target, screen }) =>
+      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screen)),
   },
 
   /**
@@ -370,8 +385,8 @@ const NOT_DRAWN = {
   },
 
   /**
-   * ON THE TARGET: a NON-INTERACTIVE SIBLING of the target lying wholly
-   * inside the target's rect. `target` only (2026-10-09): idb's list is FLAT
+   * ON THE TARGET: a NON-INTERACTIVE SIBLING of the target, narrower than
+   * it, whose centre lies on it. `target` only (2026-10-09): idb's list is FLAT
    * (adapters/ios-tree-source.ts#parseIdbDescribeAll), so a field's own
    * floating label comes after the field as its sibling, never as its
    * descendant — measured on mp-native's SWIFT form
@@ -381,11 +396,40 @@ const NOT_DRAWN = {
    * the field. Without this row `scroll_until … fully: true` would never
    * stop on such a field. A sibling, not any node: the label of a bar drawn
    * over a large row (the Compose tab's `Home` text inside the row's rect)
-   * is part of a cover, not of the target. An interactive one (a clear
+   * is part of a cover, not of the target. Its centre on the target, not
+   * its whole rect (review round 1): an outlined field's floating label
+   * straddles the field's top border. Narrower: a full-width sibling over
+   * a row is a sticky section header, a cover. An interactive one (a clear
    * button) still covers, at its own rect.
    */
   onTarget: {
-    target: ({ node, parent }, { target }) => parent !== undefined && parent === target.parent && !isInteractive(node) && rectWithin(node.rect, target.node.rect),
+    target: ({ node, parent }, { target }) =>
+      parent !== undefined &&
+      parent === target.parent &&
+      !isInteractive(node) &&
+      node.rect.width < target.node.rect.width &&
+      containsPoint(target.node.rect, tapPoint(node)),
+  },
+
+  /**
+   * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
+   * child of a scroll view (`scrolls`) and holds nothing but empty frames
+   * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
+   * a UIScrollView's two indicators LAST among its children, after every
+   * row — `Other 'Vertical scroll bar, 2 pages' 369,62 30x456` and
+   * `Other 'Horizontal scroll bar, 1 page' 0,485 402x30`, each labelled and
+   * valued (`0 %`) and holding one bare thumb `Other` (every
+   * wda-source-myport-*.json fixture). As covers they moved or refused taps
+   * on the buttons above the horizontal one and kept `fully: true` from
+   * ever stopping on a full-width row (x 369–399 under the vertical one).
+   * The indicator draws a 3-pt thumb, briefly, while scrolling; its frame is
+   * an accessibility region. Narrow on purpose: a `container` — not
+   * `other`, an unmapped type that may be a control — with no identifier
+   * and no content but frames; a sticky header carries its text.
+   */
+  scrollIndicator: {
+    target: ({ node, parent }) =>
+      parent !== undefined && scrolls(parent.node) && node.role === 'container' && !node.identifier && node.children.length > 0 && node.children.every((c) => [...everyNode(c)].every(emptyFrame)),
   },
 
   /**
@@ -573,7 +617,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
             ? undefined
             : { point: { x: Math.round(tappable.x + tappable.width / 2), y: Math.round(tappable.y + tappable.height / 2) }, moved: true, piece: { ...tappable } };
       return {
-        visible: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
+        shows: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
         covers,
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(tapAt !== undefined && { tapAt }),

@@ -1,9 +1,10 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { isInteractive } from '../../src/ui-tree/selectors.js';
 import { node as uiNode } from '../helpers/fake.js';
 
 /**
@@ -356,9 +357,14 @@ describe('the three questions disagree on purpose, per row', () => {
     expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
   });
 
-  it('structural, holding the target whole: judged through its content for a target — a WDA `Other` wrapper laid after it', () => {
-    const later = uiNode({ role: 'container', rect: card, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+  it('structural, holding the target AND its scroll view whole: judged through its content for a target — a WDA `Other` frame laid after the form', () => {
+    const later = uiNode({ role: 'container', rect: rect(0, 0, 400, 650), children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
     expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [] });
+  });
+
+  it('structural, holding the target whole but not its scroll view nor the screen: a bar\'s host, a cover (review round 1: the Compose host over a small target above its tabs)', () => {
+    const later = uiNode({ role: 'container', rect: card, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
   });
 
   it('screen-sized host: an interactive one covers a point and a target, but is never drawn over a container', () => {
@@ -438,7 +444,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const seen = drawOrder(tree).exposure(row, IPHONE);
       expect(seen.covers.map((n) => n.identifier)).toEqual(['swift_payment.form.continue_button']);
       expect(seen.largest).toEqual(rect(24, 771, 354, 9));
-      expect(seen.visible).toBeCloseTo(9 / 52);
+      expect(seen.shows).toBeCloseTo(9 / 52);
       expect(seen.tapAt).toBeUndefined();
       expect(seen.minPiece).toBe(24); // 0.06 × 402, rounded
       expect(seen.coverAt({ x: 201, y: 797 })?.identifier).toBe('swift_payment.form.continue_button');
@@ -459,7 +465,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     it('scrolled clear of the bar (the manual swipe, row at y 452): nothing over it, the centre tapped as always', () => {
       const row = priority(452);
       const seen = drawOrder(idbForm(row)).exposure(row, IPHONE);
-      expect(seen).toMatchObject({ covers: [], visible: 1, tapAt: { point: { x: 201, y: 478 }, moved: false } });
+      expect(seen).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 201, y: 478 }, moved: false } });
       expect(seen.largest).toEqual(row.rect);
     });
 
@@ -487,14 +493,14 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
 
   it('a cover in the middle of a target: the centre is covered, the largest piece beside it is tapped; a cover holding it whole leaves nothing', () => {
     const target = uiNode({ role: 'button', label: 'Wide', rect: rect(0, 100, 400, 100) });
-    const badge = uiNode({ role: 'image', label: 'badge', rect: rect(150, 80, 100, 140) }); // across it, top to bottom
+    const badge = uiNode({ role: 'button', label: 'badge', rect: rect(150, 80, 100, 140) }); // across it, top to bottom
     const seen = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, badge] })).exposure(target, rect(0, 0, 400, 800));
     expect(seen.largest).toEqual(rect(0, 100, 150, 100)); // of two equal pieces, the first found
     expect(seen.tapAt).toEqual({ point: { x: 75, y: 150 }, moved: true, piece: rect(0, 100, 150, 100) });
-    expect(seen.visible).toBeCloseTo(0.75);
+    expect(seen.shows).toBeCloseTo(0.75);
     const sheet = uiNode({ role: 'image', label: 'sheet', rect: rect(0, 0, 400, 800) });
     const gone = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, sheet] })).exposure(target, rect(0, 0, 400, 800));
-    expect(gone).toMatchObject({ visible: 0, covers: [sheet] });
+    expect(gone).toMatchObject({ shows: 0, covers: [sheet] });
     expect([gone.largest, gone.tapAt]).toEqual([undefined, undefined]);
   });
 
@@ -504,7 +510,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const tree = uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, bar] });
     const above = rect(0, 0, 400, 560); // the screen above a band whose top is at 560
     const seen = drawOrder(tree).exposure(target, above);
-    expect(seen).toMatchObject({ covers: [], visible: 0.6, tapAt: { point: { x: 200, y: 550 }, moved: false } });
+    expect(seen).toMatchObject({ covers: [], shows: 0.6, tapAt: { point: { x: 200, y: 550 }, moved: false } });
     // The bar reaching up past the cut: only its part within counts, and the centre (200,550) is under it — the tap moves up.
     const tall = uiNode({ role: 'button', label: 'Bar', rect: rect(0, 540, 400, 100) });
     const cut = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, tall] })).exposure(target, above);
@@ -513,7 +519,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const lower = rect(0, 0, 400, 540);
     expect(drawOrder(tree).exposure(target, lower).tapAt).toEqual({ point: { x: 200, y: 520 }, moved: true, piece: rect(0, 500, 400, 40) });
     const outside = drawOrder(tree).exposure(target, rect(0, 0, 400, 400));
-    expect(outside).toMatchObject({ visible: 0, covers: [] });
+    expect(outside).toMatchObject({ shows: 0, covers: [] });
     expect(outside.tapAt).toBeUndefined();
   });
 
@@ -521,7 +527,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const stranger = uiNode({ role: 'button', rect: rect(0, 0, 100, 100) });
     expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800) })).exposure(stranger, rect(0, 0, 400, 800))).toMatchObject({
       covers: [],
-      visible: 1,
+      shows: 1,
       tapAt: { point: { x: 50, y: 50 }, moved: false },
     });
   });
@@ -546,6 +552,11 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     expect(seen.minPiece).toBe(65); // 0.06 × 1080, rounded
     expect(seen.tapAt).toEqual({ point: { x: 33, y: 1940 }, moved: true, piece: rect(0, 1840, 66, 200) }); // the 66-px column left of the host
     expect(order.exposure(tab, PIXEL).covers).toEqual([]);
+    // A small target above the tabs, wholly inside the host (review round 1): the host holds it, but neither its list nor
+    // the screen — still a cover, at the band where the touch-down at y 1857 was swallowed.
+    const amount = uiNode({ role: 'text', label: '-12,00 €', rect: rect(800, 1845, 200, 30) });
+    const small = drawOrder(uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(0, 825, 1080, 1395), clipsDescendants: true, children: [amount] }), host] }));
+    expect(small.exposure(amount, PIXEL).covers).toEqual([host]);
   });
 
   it('Android Contacts editor (2026-10-09 05:05 UTC): First name under the top app bar laid after the form — its 38-px strip is refused', () => {
@@ -561,6 +572,51 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
   });
 
   describe('no false cover — the shapes measured clean', () => {
+    it('every WDA fixture (real /source payloads): no interactive or labelled node reads as covered — the scroll indicators WDA lists last in a ScrollView are no cover (review round 1)', async () => {
+      const dir = new URL('../fixtures/', import.meta.url);
+      const covered: string[] = [];
+      let judged = 0;
+      for (const file of (await readdir(dir)).filter((f) => f.startsWith('wda-source'))) {
+        const tree = parseWdaSource(await readFile(new URL(file, dir), 'utf8'));
+        const order = drawOrder(tree);
+        for (const n of everyNode(tree)) {
+          if (n.ofKeyboard === true || n.rect.width * n.rect.height === 0 || !(isInteractive(n) || n.label)) continue;
+          judged++;
+          const seen = order.exposure(n, tree.rect);
+          if (seen.covers.length > 0) covered.push(`${file}: ${n.role} ${n.label} under ${seen.covers.map((c) => c.label).join(', ')}`);
+        }
+      }
+      expect(judged).toBeGreaterThan(200);
+      expect(covered).toEqual([]);
+    });
+
+    it('the myport 2FA screen\'s Späť moved down onto the horizontal scroll indicator (0,485 402x30): still tapped at its centre', async () => {
+      const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-2fa-keyboard-toolbar.json', import.meta.url), 'utf8'));
+      const nodes = [...everyNode(tree)];
+      const indicator = nodes.find((n) => n.label?.startsWith('Horizontal scroll bar'))!;
+      expect(indicator).toMatchObject({ role: 'container', rect: rect(0, 485, 402, 30) });
+      const back = nodes.find((n) => n.label === 'Späť')!;
+      back.rect = { ...back.rect, y: indicator.rect.y - 5 };
+      expect(drawOrder(tree).exposure(back, tree.rect)).toMatchObject({ covers: [], tapAt: { moved: false } });
+    });
+
+    it('the scroll-indicator excuse is narrow: an `other` (an unmapped control) or an identified container of the same shape in the target\'s scroll view still covers', () => {
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 470, 402, 52) });
+      const shaped = (partial: Partial<UiNode>) => uiNode({ role: 'container', label: 'Horizontal scroll bar, 1 page', value: '0 %', rect: rect(0, 485, 402, 30), children: [uiNode({ role: 'container', rect: rect(43, 512, 316, 3) })], ...partial });
+      const tree = (later: UiNode) => uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 500), children: [row, later] })] });
+      expect(drawOrder(tree(shaped({}))).exposure(row, IPHONE).covers).toEqual([]);
+      for (const cover of [shaped({ role: 'other' }), shaped({ identifier: 'pager' })]) expect(drawOrder(tree(cover)).exposure(row, IPHONE).covers).toEqual([cover]);
+    });
+
+    it('an outlined field\'s floating label straddling its top border (a narrower sibling, its centre on the field): drawn on it; a full-width sibling is a header, a cover', () => {
+      const field = uiNode({ role: 'textfield', identifier: 'iban', rect: rect(24, 300, 354, 56) });
+      const label = uiNode({ role: 'text', label: 'IBAN', rect: rect(36, 292, 40, 16) });
+      const header = uiNode({ role: 'text', label: 'Section', rect: rect(24, 290, 354, 20) });
+      const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), field, later] });
+      expect(drawOrder(tree(label)).exposure(field, IPHONE).covers).toEqual([]);
+      expect(drawOrder(tree(header)).exposure(field, IPHONE).covers).toEqual([header]);
+    });
+
     it('a bar button with the form scrolled under the translucent bar (WDA lists the bar first): the scroll view\'s rows are no cover of it', () => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
       const under = uiNode({ role: 'button', label: 'Debit account', rect: rect(16, 60, 370, 52) });

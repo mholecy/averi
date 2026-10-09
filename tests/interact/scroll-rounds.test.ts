@@ -1279,6 +1279,13 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 
+  it('of two matches, one that stops the round wins over one more of which shows but whose centre is under the bar (review round 1)', () => {
+    const big = match({ x: 24, y: 720, width: 200, height: 120 }, 'priority'); // 76 of 120 pt show (63 %), centre (124,780) on the bar
+    const small = match({ x: 230, y: 755, width: 148, height: 40 }, 'priority'); // beside it: 25 of 40 show (62.5 %), centre (304,775) clear
+    const played = play(IPHONE, [{ found: [big, small], over: [CONTINUE] }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+  });
+
   it('without fully, a centre under the keyboard band is not "covered" by a bar there: the frame is the screen above the band — a stop, as before', () => {
     const BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
     const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 560, width: 402, height: 80 } });

@@ -1,10 +1,10 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
-import { frameText, rectText } from '../ui-tree/geometry.js';
+import { frameText, nodeText, rectText } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, coverText } from './resolve.js';
+import { absenceError } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 
 /**
@@ -137,7 +137,7 @@ function underText(j: Judged): string {
   const by = j.centreCover ?? j.covers.at(-1);
   const centre = tapPoint(j.node);
   const at = j.centreCover === undefined ? '' : ` at its centre (${centre.x},${centre.y})`;
-  return `under ${by === undefined ? 'something' : coverText(by)}${at}, drawn over it — ${percent(j.shows)}% of it shows`;
+  return `under ${by === undefined ? 'something' : nodeText(by)}${at}, drawn over it — ${percent(j.shows)}% of it shows`;
 }
 
 /**
@@ -174,7 +174,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   // Partly under something of the app (2026-10-09): a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.
   const covered =
-    r.covered === undefined ? undefined : `PARTLY UNDER ${coverText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
+    r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
   const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
   return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}`;
