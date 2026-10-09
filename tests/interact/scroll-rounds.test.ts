@@ -1069,4 +1069,26 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down', coverTop: 1840, box: LIST, probe: true });
     expect(strokes(played)[0].from.y).toBeLessThan(1840);
   });
+
+  it('a stroke that still touched down on a node drawn over its list (a floating header, which the cut does not model) fails naming it — not "content exhausted" first', () => {
+    // The header's host, and on it — drawn on top, so the one named — its title, under the touch-down.
+    const TITLE = node({ role: 'text', label: 'Account', identifier: 'account.title', rect: { x: 0, y: 1050, width: 1080, height: 100 } });
+    const HEADER = node({ role: 'container', rect: { x: 0, y: 825, width: 1080, height: 400 }, children: [TITLE] });
+    const row = (rest: string): Row => ({ found: [], mainScroller: LIST, over: [HEADER], rest });
+    const played = play({ ...ANDROID, direction: 'up' }, [row('a'), row('a'), row('a')]);
+    expect(strokes(played)[0].from).toEqual({ x: 540, y: 1104 }); // inside the header
+    const error = failureOf(played, 'id:t');
+    expect(error.message).toBe(
+      'scroll_until id:t failed after 2 swipes (the last 2, swiping up, did not change the screen: they touched down at 540,1104 on text "Account" (id account.title) at 0,1050 1080x100, drawn over the list 0,825 1080x1395, which took them — not the list) — element never appeared in the tree',
+    );
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('…and so does the match rule ("did not move it"), with the target in the tree off the frame', () => {
+    const HEADER = node({ role: 'container', label: 'Account', rect: { x: 0, y: 825, width: 1080, height: 400 } });
+    const row: Row = { found: [match({ x: 66, y: -300, width: 948, height: 73 }, 'row')], scroller: LIST, over: [HEADER] };
+    // Read above the frame in the list: the strokes go over the list, content up, touching down in the header.
+    const error = failureOf(play({ ...ANDROID, direction: 'up' }, [row, row, row]), 'id:t');
+    expect(error.message).toMatch(/did not move it: they touched down at 540,1104 on container "Account" at 0,825 1080x400, drawn over the list 0,825 1080x1395, which took them — not the list\)/);
+  });
 });

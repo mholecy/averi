@@ -290,7 +290,7 @@ export function strokeRoom(
  * Not cut, stated: a node drawn over the box's UPPER half (a floating
  * header): the cut models a cover from below only, as the keyboard's
  * does; a content-up stroke touches down at 0.2 of the box and can land on
- * one. A
+ * one — that fast fail names the node (scroll-rounds.ts#touchedOn). A
  * sideways stroke runs along the box's centre line, its touch-down
  * SWIPE_REACH_FRACTION off centre: a node beside the centre on that line
  * is not judged (a carousel under a bar: unmeasured). Pure.
