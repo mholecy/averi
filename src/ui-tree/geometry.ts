@@ -673,6 +673,17 @@ export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
 
 /**
+ * How a sentence says a node is drawn over a target: `under button
+ * "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over
+ * it` — the `at its centre` clause when the cover is the one at the
+ * target's centre. One spelling (code review S6, 2026-10-09) for the tap's
+ * chrome refusal and move (interact/resolve.ts#aimClearOfChrome) and
+ * `scroll_until`'s covered sentences (interact/scroll-text.ts).
+ */
+export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point): string =>
+  `under ${nodeText(cover)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
+
+/**
  * How a sentence quotes the KEYBOARD's frame: `[x,y][x2,y2]`, as dumpsys
  * prints it. Not `rectText` for the keyboard in interact/ (2026-10-08: the
  * two docs each claimed to be the one way) — see the pair's note above.

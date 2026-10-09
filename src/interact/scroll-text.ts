@@ -1,5 +1,5 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
-import { frameText, nodeText, rectText } from '../ui-tree/geometry.js';
+import { drawnOverText, frameText, nodeText, rectText } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -135,9 +135,8 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  */
 function underText(j: Judged): string {
   const by = j.centreCover ?? j.covers.at(-1);
-  const centre = tapPoint(j.node);
-  const at = j.centreCover === undefined ? '' : ` at its centre (${centre.x},${centre.y})`;
-  return `under ${by === undefined ? 'something' : nodeText(by)}${at}, drawn over it — ${percent(j.shows)}% of it shows`;
+  const under = by === undefined ? 'under something, drawn over it' : drawnOverText(by, j.centreCover === undefined ? undefined : tapPoint(j.node));
+  return `${under} — ${percent(j.shows)}% of it shows`;
 }
 
 /**

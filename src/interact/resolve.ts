@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, nodeText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, drawnOverText, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { judgingScreen, type JudgingScreen } from './swipe.js';
@@ -528,6 +528,15 @@ export interface Aim {
 }
 
 /**
+ * The flow trace's line for a tap that `Aim.moved`: `<what> tapped at
+ * (201,767) — its centre …` — beside the clause it completes, so the clause
+ * and its subject are worded in one place (code review S6; the fill's
+ * focus tap says it as `focus tap …`, interact/fill-text.ts#focusTapNote,
+ * and the MCP reply as `Tapped <selector> …`, mcp/tool-text.ts#tapText).
+ */
+export const movedTapText = (what: string, moved: string): string => `${what} tapped ${moved}`;
+
+/**
  * THE chrome check for a point about to be tapped on a resolved node
  * (2026-10-09; the bug note's owner decision 1): the target's centre, unless
  * a node of the tree is drawn over it there — then the centre of the
@@ -577,18 +586,17 @@ export async function aimClearOfChrome(
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
   const seen = order.exposure(node, within);
-  const under = `under ${nodeText(cover)}`;
   if (seen.tapAt !== undefined) {
     const { point } = seen.tapAt;
     if (!seen.tapAt.moved) return { point };
     const { width, height } = seen.tapAt.piece;
-    return { point, moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${under}, drawn over it; tapped the uncovered part ${width}x${height}${above}` };
+    return { point, moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${drawnOverText(cover)}; tapped the uncovered part ${width}x${height}${above}` };
   }
   const shows =
     seen.largest === undefined
       ? `nothing of it shows${above}`
       : `only a ${seen.largest.width}x${seen.largest.height} part of it shows${above}, under the ${seen.minPiece}x${seen.minPiece} a tap may be moved to`;
-  const finding = `${under} at its centre (${centre.x},${centre.y}), drawn over it; ${shows} — scroll_until it first`;
+  const finding = `${drawnOverText(cover, centre)}; ${shows} — scroll_until it first`;
   const what = describeTarget(target);
   throw new CoveredRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }

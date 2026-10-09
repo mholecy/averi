@@ -109,6 +109,19 @@ export function fillReply(fill: FillResult, selector: string): string {
 }
 
 /**
+ * The fill's note: what resolving the field said (`Resolved.note`), then —
+ * when the focus tap went off the field's centre, a node of the app being
+ * drawn over it (interact/resolve.ts#aimClearOfChrome, `Aim.moved`) —
+ * `focus tap <moved>`, after it. Its words here with every fill sentence
+ * (code review S6; until then spelled in fill.ts).
+ */
+export function focusTapNote(resolved: string | undefined, moved: string | undefined): string | undefined {
+  const focus = moved === undefined ? undefined : `focus tap ${moved}`;
+  if (focus === undefined) return resolved;
+  return resolved === undefined ? focus : `${resolved}; ${focus}`;
+}
+
+/**
  * The flow trace of a fill, `step` the element as the flow named it
  * (describeElementSpec), `shown` the value as the engine shows it:
  * - `caveats`: each `⚠ fill  <step>: <caveat>`;

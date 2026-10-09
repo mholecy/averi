@@ -3,7 +3,7 @@ import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
 import { fillField } from '../interact/fill.js';
 import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
-import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolvePresent, type Ambiguity } from '../interact/resolve.js';
+import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, movedTapText, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -1361,7 +1361,7 @@ export class FlowEngine {
     // The tap went off the target's centre, a node of the app being drawn
     // over it (2026-10-09, interact/resolve.ts#aimClearOfChrome): said like
     // the keyboard's line — the author's next step may depend on where.
-    if (result.moved !== undefined) this.log(action, `${what} tapped ${result.moved}`);
+    if (result.moved !== undefined) this.log(action, movedTapText(what, result.moved));
     return result;
   }
 
