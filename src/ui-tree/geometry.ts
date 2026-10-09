@@ -622,19 +622,19 @@ export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
 
 /**
  * Whether `node` lies inside something that scrolls — an ancestor of role
- * `scrollable` (a ScrollView, Table or CollectionView on iOS; Android's
- * scrollers) or one that clips its descendants (`clipsDescendants`) — or
- * undefined when the tree cannot say: a flat list (`UiNode.flatList`, idb)
+ * `scrollable` (a ScrollView, Table or CollectionView) or `webview` (a
+ * WKWebView's page scrolls) — or undefined when the tree cannot say: a flat list (`UiNode.flatList`, idb)
  * has no ancestry, and a node of another tree has none here. The tap's
  * status-bar refusal asks it to say whether `scroll_until` can move the
  * target out from under the bar (interact/resolve.ts#statusBarRemedy, code
- * review of round 6, P1). One walk, stopping at the node.
+ * review of round 6, P1). One walk, stopping at the node. iOS only, as
+ * the band is: `clipsDescendants` (Android's mark) is deliberately not read.
  */
 export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined {
   if (tree.flatList === true) return undefined;
   const walk = (n: UiNode, scrolled: boolean): boolean | undefined => {
     if (n === node) return scrolled;
-    const below = scrolled || n.role === 'scrollable' || n.clipsDescendants === true;
+    const below = scrolled || n.role === 'scrollable' || n.role === 'webview';
     for (const child of n.children) {
       const found = walk(child, below);
       if (found !== undefined) return found;

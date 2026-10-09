@@ -1170,10 +1170,10 @@ describe('iOS\'s status band (2026-10-09)', () => {
    * pinned there; one in a `scrollable` is scrolled out. idb's flat list has none, so it says both (above).
    */
   describe('the remedy says what can move it', () => {
-    const pinnedAt = (inScrollView: boolean) => {
+    const pinnedAt = (inScrollView: boolean | 'webview') => {
       resetLayout();
       const close = node({ role: 'button', label: 'Close', identifier: 'close', rect: { x: 340, y: 14, width: 44, height: 40 } });
-      const content = inScrollView ? node({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [close] }) : close;
+      const content = inScrollView ? node({ role: inScrollView === 'webview' ? 'webview' : 'scrollable', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [close] }) : close;
       const fake = new FakeAdapter({ s: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [content] }) }, 's');
       fake.platform = 'ios';
       fake.keyboard = undefined;
@@ -1197,6 +1197,13 @@ describe('iOS\'s status band (2026-10-09)', () => {
       const error = await tapElement(pinnedAt(true), 'id:close', OPTS).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(OffScreenRefusal);
       expect((error as Error).message).toContain('(rect 340,14 44x40) — it lies in a scroll view — scroll_until it first, to move it out from under the bar; nothing was tapped');
+    });
+
+    it('in a web view (a WKWebView\'s page scrolls): scroll_until it out, never "pinned"', async () => {
+      const error = await tapElement(pinnedAt('webview'), 'id:close', OPTS).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(OffScreenRefusal);
+      expect((error as Error).message).toContain('— it lies in a scroll view — scroll_until it first');
+      expect((error as Error).message).not.toContain('pinned');
     });
   });
 
