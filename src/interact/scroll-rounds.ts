@@ -1230,6 +1230,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
             ? undefined
             : { rect: main, over: overIn(now.facts, main) ?? [] };
   s.lastWithin = within;
+  // The latest cut read for the target's container is the one a later read
+  // that has lost that rect falls back to — not the oldest (review round 2).
+  if (within !== undefined && target !== undefined && target !== 'none' && now !== undefined) s.targetScroller = within;
   // The box, decided once (swipe.ts#strokeRoom): that container met with
   // the gesture box above the stroke's cover — the keyboard's, or what is
   // drawn over the container (2026-10-09, the floating tab bar; a round
@@ -1306,8 +1309,10 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: { within: Rect; 
  * model — a floating header a content-up stroke touches down on, a node
  * beside a sideways stroke's centre. Undefined when the stroke went over
  * the gesture box whole (no container to be drawn over: the screen box,
- * P5) or touched down on nothing drawn over its container. One scan of the
- * tree, at the stop only.
+ * P5), when this tree holds no container of the remembered rect (the list
+ * moved; the stroke was still cut by the overlays kept with it,
+ * `StrokeContainer`), or when it touched down on nothing drawn over its
+ * container. One scan of the tree, at the stop only.
  */
 /** `inner` lies wholly inside `outer`. */
 const rectWithin = (inner: Rect, outer: Rect): boolean =>
