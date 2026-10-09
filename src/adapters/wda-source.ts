@@ -57,8 +57,9 @@ const ROLE_MAP: Record<string, string> = {
   // screen-sized; as `toolbar` it always does — a toolbar on screen is
   // rendered UI, labelled or not. `role:toolbar` now matches it where
   // `role:other` did. Here and not in the shared IOS_ROLE_MAP: the element
-  // was measured through WDA only, and idb's flat AX list, which never
-  // carries the keyboard, has not been seen to carry a Toolbar either.
+  // was measured through WDA only, and idb's flat AX list has not been
+  // seen to carry a Toolbar (it does carry the keyboard on iOS 27 — the
+  // keys as plain buttons, the band as `other` — but nothing marks them).
   Toolbar: 'toolbar',
 };
 

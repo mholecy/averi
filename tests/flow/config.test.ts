@@ -302,11 +302,11 @@ flows:
     });
 
     /** Review round 1: the key under the default tree source cannot act — said once at load time (flow/load.ts), decided here. */
-    describe('inertKeyboardDismissNote — the key set where the tree carries no keyboard', () => {
+    describe('inertKeyboardDismissNote — the key set where the tree marks no keyboard', () => {
       const LIST = '    keyboardDismiss:\n      - accessory: true\n';
       it('treeSource omitted (idb, the default): the note names the default and the fix', () => {
         expect(inertKeyboardDismissNote(parseConfig(ios(LIST)))).toBe(
-          'app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply',
+          'app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply',
         );
       });
       it('treeSource: idb written out: the note, without "(the default)"', () => {

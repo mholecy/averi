@@ -54,11 +54,23 @@ type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
 
 /**
  * `app.ios.keyboardDismiss` set where it cannot act (review round 1): the
- * idb tree carries no keyboard, so under `treeSource: idb` — the default —
- * nothing is ever covered or dismissed and the list is inert. The sentence
- * the loader prints once per config (flow/load.ts), so a project that set
- * the key and forgot the tree source is told at load time rather than by a
- * tap that went into the keys. Pure: config in, sentence or nothing out.
+ * idb tree marks no node as the keyboard — every reader keys on
+ * `KEYBOARD_ROLE` (ui-tree/soft-keyboard.ts), which only the WDA parser
+ * assigns (wda-source.ts#keyboardMarks) and the idb parser never does — so
+ * under `treeSource: idb` — the default — nothing is ever covered or
+ * dismissed and the list is inert. NOT "the idb tree carries no keyboard"
+ * (the sentence until 2026-10-09): on iOS 27 idb lists the keys, as plain
+ * `button`s ('Q' … 'return'), and the band, as an unmapped type read as
+ * `other` (0,590 402×284 on Contacts' "New Contact"; docs/bugs/2026-10-09-
+ * ios-inert-keyboard-dismiss-note-says-idb-carries-no-keyboard.md), so a
+ * reader who checks `ui_snapshot` sees them — the reason is that nothing
+ * marks them, not that they are absent. Marking them under idb is a
+ * separate step. The sentence the loader prints once per config
+ * (flow/load.ts), so a project that set the key and forgot the tree source
+ * is told at load time rather than by a tap that went into the keys (idb
+ * drops a node the keyboard covers fully — the tap waits for it to appear
+ * — but one only partly covered keeps its rect, and its centre can lie
+ * under the keys). Pure: config in, sentence or nothing out.
  */
 export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   const ios = cfg.app.ios;
@@ -67,7 +79,7 @@ export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   if (kind === 'wda') return undefined;
   return (
     `app.ios.keyboardDismiss is set but app.ios.treeSource is ${kind}${ios.treeSource === undefined ? ' (the default)' : ''}: ` +
-    `the ${kind} tree carries no keyboard, so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`
+    `the ${kind} tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`
   );
 }
 
@@ -332,9 +344,11 @@ const configSchema = z
              * KeyboardDismissStrategy). Without it a covered target is
              * refused (stage A) and `fill { dismissKeyboard: true }` leaves
              * the keyboard up with a warning. Read under every tree source,
-             * but inert under `treeSource: idb` — idb's tree carries no
-             * keyboard, so nothing is ever covered or dismissed there (the
-             * loader says so on stderr: inertKeyboardDismissNote).
+             * but inert under `treeSource: idb` — idb's tree marks no node
+             * as the keyboard (on iOS 27 it lists the keys, as plain
+             * buttons, and the band, as `other`), so nothing is ever
+             * covered or dismissed there (the loader says so on stderr:
+             * inertKeyboardDismissNote).
              */
             keyboardDismiss: z.array(keyboardDismissStrategy).min(1).optional(),
           })

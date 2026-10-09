@@ -38,8 +38,9 @@ import { describeTarget, findTarget, onScreen, tapScreen, type Ambiguity, type T
  * dismissal picker, the one tap, the confirming looks and the words — one
  * adapter at the seam `keyboard-model.ts` describes, beside the window
  * model. Chosen by `keyboard.ts#keyboardModel` for an adapter WITHOUT the
- * oracle; the platform label is never read. An idb tree carries no band, so
- * under `treeSource: idb` every look reads `unknown` and the guard is as it
+ * oracle; the platform label is never read. An idb tree marks no band (on
+ * iOS 27 it lists the keys, as plain buttons, and the band, as `other`,
+ * but no node as `KEYBOARD_ROLE`), so under `treeSource: idb` every look reads `unknown` and the guard is as it
  * was before this model existed — fail open.
  */
 
@@ -287,7 +288,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * options (`lookAgain`) and decides on that look; the first look alone
      * never refuses. Its rows:
      *   window clear / unknown                    → proceed
-     *     No band in the tree (none on screen, or a source that carries
+     *     No band in the tree (none on screen, or a source that marks
      *     none — idb), a band elsewhere, or a target that is the keyboard's
      *     own UI (`ofKeyboard`, read as unknown): the guard's fail-open
      *     rule, as everywhere — the node of that look, with the note that
@@ -427,7 +428,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * last is AfterDismissalTap, since the tap had an effect this layer
      * cannot judge); with NO band — none on screen, the keyboard parked by
      * the HID typing the fill just did (the device check: every `fill`
-     * parks it), or an idb tree, which never carries one — nothing is
+     * parks it), or an idb tree, which never marks one — nothing is
      * pressed and nothing is tapped. Under `treeSource: idb` the step is
      * therefore a no-op: the tree cannot see the keyboard, and the only
      * blind key submits. Better a keyboard left up, which the NEXT step's
