@@ -932,7 +932,7 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(down.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: UNDER });
   });
 
-  it('a read that finds the target in no container with room drops the last read\'s container — stale, maybe another list — and strokes as for a target not placed in one: over the largest scroller, or the screen box (code review of deep/r3-scroll, P5)', () => {
+  it('a read that finds the target in no container with room drops the last read\'s container — stale, maybe another list — and strokes over the screen box (code review of deep/r3-scroll, P5)', () => {
     const OTHER: Rect = { x: 0, y: 300, width: 1080, height: 300 };
     const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
     const played = play({ ...ANDROID, maxSwipes: 2 }, [
@@ -941,6 +941,17 @@ describe('round — the flush check across nested clipping containers, and a pro
       { found: [match({ x: 66, y: 1650, width: 948, height: 73 }, 'row')], scroller: UNDER, cover: UP_IME },
     ]);
     expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [st.box] : []))).toEqual([OTHER, SCREEN_1080]); // not OTHER again
+  });
+
+  it('…over the screen box, never the screen\'s largest scroller: with the target in none of them, a larger list WITH room is not its list (verification round of deep/r3-scroll)', () => {
+    const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
+    const PAGE: Rect = { x: 0, y: 100, width: 1080, height: 1200 }; // a sibling, larger, wholly above the IME
+    const row = (y: number, extra: Row = {}): Row => ({ found: [match({ x: 66, y, width: 948, height: 73 }, 'row')], scroller: UNDER, mainScroller: PAGE, ...extra });
+    const played = play({ ...ANDROID, maxSwipes: 2 }, [row(2300), row(1700, { cover: UP_IME }), row(1650, { cover: UP_IME })]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [[st.box, st.coverTop]] : []))).toEqual([
+      [UNDER, undefined], // placed in UNDER, no keyboard
+      [SCREEN_1080, 1398], // UNDER has no room above the IME: the screen box — not PAGE
+    ]);
   });
 
   it('a lone strip under a band the moot rule left unasked: no room even over the whole screen — `room` at once, the witness NOT asked (room is judged first without the band, so the ask order is as before deep/r3-scroll)', () => {
