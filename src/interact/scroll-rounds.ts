@@ -95,7 +95,7 @@ export interface RoundSeen {
  * only as answers to an `ask`, and a reading is never held across rounds
  * (the keyboard-cover.ts doc's rule) — the driver builds one per round.
  */
-export interface RoundRead {
+interface RoundRead {
   /** Every match of the target, in tree order (resolve.ts#findTarget). */
   found: readonly UiNode[];
   /** `judgingScreen` over this tree — the tap's screen too; undefined when there is no box at all, and then the round keeps the last frame. */
@@ -159,7 +159,7 @@ export interface Cover {
 }
 
 /** One match as judged: how much of it is in the frame, the frame's edges it extends past, and the cover it was judged under (none for a whole-screen judgement or a keyboard-side node). */
-export interface Judged {
+interface Judged {
   node: UiNode;
   visible: number;
   clipped: Edge[];
@@ -270,9 +270,11 @@ const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: '
 /** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
 type Since = 'start' | 'stroke' | 'settle';
 
-/** The reducer's state — what the caller holds between rounds. Opaque but for the swipe count; the fields are `State`'s. */
+declare const opaque: unique symbol;
+
+/** The reducer's state — what the caller holds between rounds and hands back. Opaque: only `round` reads it (the fields are `State`'s). */
 export interface Rounds {
-  readonly swipes: number;
+  readonly [opaque]: 'scroll-rounds';
 }
 
 /**
@@ -280,8 +282,9 @@ export interface Rounds {
  * writer (`round`). Until 2026-10-09 the motion half was the `Motion` class
  * and the rest the loop's `let`s.
  */
-interface State extends Rounds {
+interface State {
   readonly rules: RoundRules;
+  readonly swipes: number;
   /** A `stop` was returned: no further round. */
   readonly done: boolean;
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
@@ -375,7 +378,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     turns: 0,
     inFrameAfter: undefined,
   };
-  return state;
+  return state as unknown as Rounds;
 }
 
 /** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
@@ -582,13 +585,13 @@ function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean
  * module doc has the protocol, the order and the bound). Pure.
  */
 export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: RoundStep } {
-  const input = state as State;
+  const input = state as unknown as State;
   if (input.done) throw new Error('scroll round after the scroll stopped');
   if (input.owesDrawn !== (seen.drawn !== undefined)) {
     throw new Error(input.owesDrawn ? 'scroll round after a stroke without the stroke drawn' : 'scroll round with a stroke drawn but none asked for');
   }
   const s: Mutable<State> = { ...input, owesDrawn: false };
-  const ask = (what: 'witness' | 'unlocated') => ({ state: input, step: { do: 'ask', what } as const });
+  const ask = (what: 'witness' | 'unlocated') => ({ state, step: { do: 'ask', what } as const });
   const { fully } = s.rules;
   const current = s.since;
   if (seen.drawn !== undefined) s.lastDrawn = seen.drawn;
@@ -713,19 +716,19 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   s.since = 'stroke';
   s.swipes++;
   s.owesDrawn = true;
-  return { state: s, step: { do: 'stroke', toward, reach, ...(strokeCover !== undefined && { coverTop: strokeCover.topCover.y }) } };
+  return { state: s as unknown as Rounds, step: { do: 'stroke', toward, reach, ...(strokeCover !== undefined && { coverTop: strokeCover.topCover.y }) } };
 }
 
 /** Spend a confirming read: the next read follows a settle, not a stroke. */
 function confirm(s: Mutable<State>): { state: Rounds; step: RoundStep } {
   s.confirmReads++;
   s.since = 'settle';
-  return { state: s, step: { do: 'confirm' } };
+  return { state: s as unknown as Rounds, step: { do: 'confirm' } };
 }
 
 function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step: RoundStep } {
   s.done = true;
-  return { state: s, step: { do: 'stop', outcome } };
+  return { state: s as unknown as Rounds, step: { do: 'stop', outcome } };
 }
 
 /**

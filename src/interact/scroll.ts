@@ -234,6 +234,10 @@ export async function scrollUntilVisible(
     let reading: KeyboardReading | undefined;
     let seen: RoundSeen;
     if (tree === undefined) {
+      // `?? new Error(…)` is unreachable: readTreeOrError sets `error` whenever
+      // `tree` is not, but TreeRead's type cannot say so. Its wording is a
+      // plain Error's, not the absence one's (ElementNotFoundError): a read
+      // that returned nothing is a miss, as every failed read is.
       seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0 };
     } else {
       const screen = await judgingScreen(adapter, read);

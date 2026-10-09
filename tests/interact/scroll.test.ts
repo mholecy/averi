@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+
+/** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
+const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
+vi.mock('../../src/util/sleep.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/util/sleep.js')>();
+  return {
+    sleep: async (ms: number) => {
+      pauses.onSleep?.(ms);
+      return real.sleep(ms);
+    },
+  };
+});
 
 /**
  * `scroll_until` at the DRIVER (interact/scroll.ts#scrollUntilVisible), on a
@@ -160,6 +172,32 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.keys).toEqual([]);
   });
 
+  it('a round whose tree did not read strokes in the box the last read round\'s band left: its touch-down above the IME, the band\'s stroke point for point', async () => {
+    const { fake } = androidForm({ startY: 2900 });
+    const real = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (reads++ === 1) throw new Error('uiautomator dump returned no XML');
+      return real();
+    };
+    await scrollUntilVisible(fake, 'id:priority_select', FAST);
+    expect(fake.swipes[1]).toEqual({ from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } }); // round 1, unread: round 0's band, not the whole screen's 1776
+  });
+
+  it('a witness that answers after the deadline counts against it: the clock is read again after the witness, so the stop it decides is reported unsettled, not confirmed past the deadline', async () => {
+    const { fake } = androidForm({ startY: 1960 }); // under the IME → one stroke above it → 1360–1433, clipped at the band
+    const keyboard = fake.attachedKeyboard;
+    const witness = keyboard.witness.bind(keyboard);
+    let asked = 0;
+    keyboard.witness = async () => {
+      if (asked++ === 1) await new Promise((r) => setTimeout(r, 150)); // the stop round's witness outlives the 100 ms budget
+      return witness();
+    };
+    const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, timeoutMs: 100 });
+    expect(result).toMatchObject({ swipes: 1, clipped: ['bottom'], keyboard: { state: 'shown', frame: IME }, settled: false });
+    expect(keyboard.windowAnswers.queries).toBe(2); // the stroke's round and the stop's: no confirming read
+  });
+
   it('a band whose top lies at the screen\'s bottom edge covers nothing on it: judged as no keyboard, not asked about', async () => {
     const offscreen = { state: 'shown', frame: { x: 0, y: 2220, width: 1080, height: 100 } } as const;
     const { fake } = androidForm({ startY: 2100, window: offscreen });
@@ -312,6 +350,22 @@ describe('scrollUntilVisible — after the device check', () => {
     const result = await scrollUntilVisible(fake, 'id:row', { fully: true, settleMs: 1, timeoutMs: 30 });
     expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
     expect(fake.reads).toBe(2);
+  });
+
+  it('every stroke and every confirming read is followed by the settle pause before the next read', async () => {
+    const fake = wdaForm(681, () => [300, 300]);
+    const events: string[] = [];
+    const read = fake.uiTree.bind(fake);
+    const swipe = fake.swipe.bind(fake);
+    fake.uiTree = async () => (events.push('read'), read());
+    fake.swipe = async (from, to) => (events.push('swipe'), swipe(from, to));
+    pauses.onSleep = (ms) => events.push(`sleep:${ms}`);
+    try {
+      expect(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, settleMs: 7 })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    } finally {
+      pauses.onSleep = undefined;
+    }
+    expect(events).toEqual(['read', 'swipe', 'sleep:7', 'read', 'sleep:7', 'read']); // the stroke's round, the stop at 300, its confirmation
   });
 });
 

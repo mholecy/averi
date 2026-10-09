@@ -3,7 +3,7 @@ import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
-import type { JudgingScreen } from '../../src/interact/swipe.js';
+import type { Direction, JudgingScreen } from '../../src/interact/swipe.js';
 import { node } from './fake.js';
 
 /**
@@ -34,14 +34,27 @@ export interface Row {
   corroborated?: boolean;
   /** The answer to `ask unlocated` (the reading's `unlocated()`); default false. */
   unlocated?: boolean;
-  /** The stroke the previous step drew, when it was a stroke; default DRAWN — the same stroke every time. */
+  /** The stroke the previous step drew, when it was a stroke; default `drawnFor` that step — the same points exactly when the step is the same. */
   drawn?: Stroke;
   /** ms since the scroll began; default 0. */
   elapsedMs?: number;
 }
 
-/** The stroke a row hands back when it names none — every stroke the same one. */
-export const DRAWN: Stroke = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } };
+/** One point per direction, for `drawnFor`. */
+const DIR: Record<Direction, number> = { up: 1, down: 2, left: 3, right: 4 };
+
+/**
+ * The stroke a row hands back when it names none: points built from the
+ * step's own shape — its cover cut, its reach, its direction — so two strokes
+ * are the same stroke (swipe.ts#sameStroke) exactly when the driver's would
+ * be: on one screen the driver's points are a function of those three and
+ * nothing else (review round 1 of the deepening: a constant made every
+ * stroke "the same", an identity the driver cannot produce).
+ */
+export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => ({
+  from: { x: 0, y: step.coverTop ?? -1 },
+  to: { x: step.reach, y: DIR[step.toward] },
+});
 
 type Step = Exclude<RoundStep, { do: 'ask' }>;
 export type Ask = 'witness' | 'unlocated';
@@ -60,7 +73,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
   let state = startRounds(rules, rules.screen);
   const rounds: Played['rounds'] = [];
   let outcome: ScrollOutcome | undefined;
-  let stroked = false;
+  let stroked: Extract<RoundStep, { do: 'stroke' }> | undefined;
   rows.forEach((row, i) => {
     if (outcome !== undefined) throw new Error(`play: row ${i} after the stop`);
     const seen: RoundSeen = {
@@ -69,7 +82,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
           ? { error: new Error(row.error) }
           : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
-      ...(stroked && { drawn: row.drawn ?? DRAWN }),
+      ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };
     const asks: Ask[] = [];
     let next = round(state, seen);
@@ -82,7 +95,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
     state = next.state;
     const step: Step = next.step;
     rounds.push({ asks, step });
-    stroked = step.do === 'stroke';
+    stroked = step.do === 'stroke' ? step : undefined;
     if (step.do === 'stop') outcome = step.outcome;
   });
   return { rounds, steps: rounds.map((r) => r.step), asks: rounds.flatMap((r) => r.asks), outcome };

@@ -190,7 +190,8 @@ export interface ScreenBox {
    * off-screen tap refusal and its reviews) — read through `judgingScreen`,
    * the one owner both judges share: the tap's on-screen rule
    * (interact/resolve.ts#onScreen) and `scroll_until`'s stop
-   * (interact/scroll.ts), so the scroll and the tap after it agree on the
+   * (interact/scroll-rounds.ts#judgeOver, over the frame interact/scroll.ts
+   * reads each round), so the scroll and the tap after it agree on the
    * screen by construction. A swipe does not read it: a stroke over the
    * wrong box lands off-centre, a judgement over it is a false refusal or a
    * false "visible".

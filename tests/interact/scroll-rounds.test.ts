@@ -4,7 +4,7 @@ import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
-import { coverOver, DRAWN, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, type Row } from '../helpers/rounds.js';
+import { coverOver, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, type Row } from '../helpers/rounds.js';
 
 /**
  * `scroll_until`'s round as observation tables (2026-10-09, the
@@ -34,6 +34,8 @@ const IOS_BAND: Rect = { x: 0, y: 589, width: 402, height: 285 };
 /** The measured WDA pad on the iPhone 17: `role:keyboard 0 572 402 302`. */
 const WDA_BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
 const UP_IME = coverOver(IME);
+/** Any stroke, for the protocol's hand-back. */
+const STROKE: Stroke = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } };
 
 /** scrollingFake's target: 100 wide, `height` tall, at y. */
 const button = (y: number, height = 40) => match({ x: 0, y, width: 100, height }, 'submit_button');
@@ -58,10 +60,10 @@ describe('round — the protocol', () => {
   it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
     const state = startRounds(ANDROID, ANDROID.screen);
     const off = { read: { found: [formRow(2900)], ofKeyboard: () => false }, elapsedMs: 0 };
-    expect(() => round(state, { ...off, drawn: DRAWN })).toThrow('none asked for');
+    expect(() => round(state, { ...off, drawn: STROKE })).toThrow('none asked for');
     const stroked = round(state, off).state;
     expect(() => round(stroked, off)).toThrow('without the stroke drawn');
-    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0, drawn: DRAWN });
+    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0, drawn: STROKE });
     expect(stopped.step.do).toBe('confirm');
     const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0 });
     expect(done.step.do).toBe('stop');
@@ -421,6 +423,11 @@ describe('round — after the device check', () => {
   it('a stop reached at the deadline is reported unconfirmed — no confirming read past it', () => {
     const played = play({ ...FULLY, timeoutMs: 30 }, [wdaRow(681), { ...wdaRow(300), elapsedMs: 60 }]); // the deadline passed during the stroke
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
+    // AT the deadline is past it: a confirming read is spent only while elapsed < timeoutMs.
+    const atIt = play({ ...FULLY, timeoutMs: 30 }, [wdaRow(681), { ...wdaRow(300), elapsedMs: 30 }]);
+    expect(resultOf(atIt)).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
+    const before = play({ ...FULLY, timeoutMs: 30 }, [wdaRow(681), { ...wdaRow(300), elapsedMs: 29 }, { ...wdaRow(300), elapsedMs: 29 }]);
+    expect(before.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
   });
 
   it('a confirming read that fails is read again, not answered with a stroke away from the stop', () => {
@@ -492,19 +499,15 @@ describe('round — after the device check', () => {
     expect(failureOf(played, 'id:submit_button').message).toMatch(/^scroll_until id:submit_button failed after 3 swipes \(the last 2/);
   });
 
-  /** A whole-screen content-down stroke on the 1080x2220 screen, and the one drawn above the IME (scroll.test.ts pins both). */
-  const WHOLE: Stroke = { from: { x: 540, y: 1776 }, to: { x: 540, y: 444 } };
-  const ABOVE: Stroke = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } };
-
   it('two unmoved strokes count only when they are the SAME stroke: a whole-screen stroke on an IME still coming up, then one drawn above it, is two attempts, not exhaustion', () => {
     // Round 0: the stale window denied, so a whole-screen stroke; the first two strokes are not taken.
     const played = play({ ...ANDROID, maxSwipes: 6 }, [
       { found: [formRow(2900)], cover: UP_IME, corroborated: false },
-      { found: [formRow(2900)], cover: UP_IME, drawn: WHOLE },
-      { found: [formRow(2900)], cover: UP_IME, drawn: ABOVE },
-      { found: [formRow(2300)], cover: UP_IME, drawn: ABOVE },
-      { found: [formRow(1700)], cover: UP_IME, drawn: ABOVE },
-      { found: [formRow(1100)], cover: UP_IME, drawn: ABOVE },
+      { found: [formRow(2900)], cover: UP_IME },
+      { found: [formRow(2900)], cover: UP_IME },
+      { found: [formRow(2300)], cover: UP_IME },
+      { found: [formRow(1700)], cover: UP_IME },
+      { found: [formRow(1100)], cover: UP_IME },
       { found: [formRow(1100)], cover: UP_IME },
     ]);
     expect(strokeCovers(played).slice(0, 2)).toEqual([undefined, 1398]);
@@ -513,7 +516,7 @@ describe('round — after the device check', () => {
 
   it('fully: true, clipped: the two unmoved strokes must be the SAME stroke — one above the IME, then one whole-screen once the window reads hidden, are two attempts', () => {
     const wide = (row: Row): Row => ({ ...row, found: [match({ x: 900, y: 1360, width: 300, height: 73 }, 'row')] }); // clipped at the right edge whatever the keyboard
-    const played = play({ ...ANDROID, fully: true }, [wide({ cover: UP_IME }), wide({ drawn: ABOVE }), wide({ drawn: WHOLE }), wide({ drawn: WHOLE })]); // no stroke is taken
+    const played = play({ ...ANDROID, fully: true }, [wide({ cover: UP_IME }), wide({}), wide({}), wide({})]); // no stroke is taken
     expect(strokeCovers(played)).toEqual([1398, undefined, undefined]);
     expect(failureOf(played, 'id:row').message).toMatch(/^scroll_until id:row failed after 3 swipes — element is in the viewport but CLIPPED at right/);
   });

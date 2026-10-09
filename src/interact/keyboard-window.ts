@@ -455,7 +455,7 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
           // records in adapters/android.ts: this string names MCP tools
           // (ui_snapshot, press_key) and speaks of "a flow", vocabulary of the
           // two layers ABOVE interact. Kept, as in verify/capture.ts and
-          // interact/scroll.ts: the reader's next move differs per surface, and
+          // interact/scroll-text.ts#hideToJudgeWholeScreen: the reader's next move differs per surface, and
           // one message with two honest halves beats two translation sites that
           // must agree. Only words cross the layer, no import.
           stillCovering: ({ frame: still, point }) =>
