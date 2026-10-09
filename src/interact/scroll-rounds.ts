@@ -344,7 +344,20 @@ export interface Judged {
  */
 export type ScrollOutcome =
   | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush }
-  | { kind: 'stuck'; swipes: number; short: InFrameShort; lastStroke: Direction; viewport: Rect }
+  | {
+      kind: 'stuck';
+      swipes: number;
+      short: InFrameShort;
+      /** The way the strokes no longer move it. */
+      lastStroke: Direction;
+      viewport: Rect;
+      /**
+       * The other way (`round`'s stuck turn): `unmoved` — one stroke back moved
+       * it neither; `stroked` — swiped earlier in the scroll (a turn), so not
+       * tried again; `untried` — no swipe or time was left to try it.
+       */
+      otherWay: 'unmoved' | 'stroked' | 'untried';
+    }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
   | {
       kind: 'bound';
@@ -690,7 +703,8 @@ interface State {
   readonly seenShort: boolean;
   /**
    * The last read that READ found the target beyond the far edge, after an
-   * earlier read saw it short of it: the next stroke turns. Kept across a
+   * earlier read saw it short of it — or, on any read, in the frame at that
+   * edge (`observe`'s `atFarEdge`, 2026-10-09): the next stroke turns. Kept across a
    * read that failed — that round strokes as the last read round decided,
    * as it keeps that round's stroke box (`lastReadCover`); cleared by a read
    * that does not find the target — whether to turn then is `dropped`'s
@@ -723,6 +737,17 @@ interface State {
    * beyond the edge it left through.
    */
   readonly dropped: Direction | undefined;
+  /** The directions the scroll's course strokes were drawn toward (a probe's aside) — whether the other way was ever tried, for the stuck turn. */
+  readonly strokedToward: readonly Direction[];
+  /**
+   * The stuck turn (2026-10-09, review of the at-the-far-edge turn): the
+   * direction the target was stuck in when, the other way never stroked,
+   * ONE stroke was drawn back instead of failing — set once, never cleared;
+   * once only, as after it both ways were stroked (`strokedToward`). `backPending`: that stroke is the last sent and
+   * no read that read has answered it yet.
+   */
+  readonly stuckOn: Direction | undefined;
+  readonly backPending: boolean;
   /**
    * The target's clipping containers, nearest first, each with what is
    * drawn over it, at the last read that found the target — the candidates
@@ -808,6 +833,9 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     lastSent: undefined,
     lastFound: undefined,
     dropped: undefined,
+    strokedToward: [],
+    stuckOn: undefined,
+    backPending: false,
     targetContainers: undefined,
     lastCandidates: [],
     strokeWithin: undefined,
@@ -995,6 +1023,44 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
   }
 }
 
+/**
+ * `cover`, drawn over the target, lies over its FAR side for a scroll
+ * toward `direction` — the side `beyondFarEdge` reads against the frame:
+ * over its far edge and short of its near one (for content below, a bar
+ * over its top and not its bottom), so the strokes push it further under;
+ * a cover over both edges (a sheet over the whole row), or over neither (a
+ * badge inside it), is no side's — turning back could not uncover it. And
+ * only a cover in `frame`'s FAR HALF (its centre past the frame's middle
+ * toward the far edge — above it, for content below): the edge test alone
+ * does not say where the cover sits, and a row coming in from below whose
+ * top is under a bottom bar (CONTINUE at 780, the row at 785; a snackbar;
+ * a floating tab bar or a FAB) has the bar over its far edge too — it was
+ * turned away from the bar it was about to clear, and bounced for five
+ * strokes where one stopped it (review of the first cut, 2026-10-09). A
+ * pinned bar sits at the edge it is pinned to, so the half it lies in is
+ * that edge's. A cover centred exactly on the middle lies in neither far
+ * half: not turned for, either way.
+ */
+function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect): boolean {
+  const top = cover.y <= rect.y;
+  const bottom = cover.y + cover.height >= rect.y + rect.height;
+  const left = cover.x <= rect.x;
+  const right = cover.x + cover.width >= rect.x + rect.width;
+  // Twice the centre against twice the middle: whole numbers, no rounding at the boundary.
+  const vertical = 2 * cover.y + cover.height - (2 * frame.y + frame.height);
+  const sideways = 2 * cover.x + cover.width - (2 * frame.x + frame.width);
+  switch (direction) {
+    case 'down':
+      return vertical < 0 && top && !bottom;
+    case 'up':
+      return vertical > 0 && bottom && !top;
+    case 'right':
+      return sideways < 0 && left && !right;
+    case 'left':
+      return sideways > 0 && right && !left;
+  }
+}
+
 /** The same set of rects, each within a pixel — every match where it was. Empty sets say nothing. */
 function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
   if (a.length === 0 || a.length !== b.length) return false;
@@ -1098,7 +1164,21 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for.
     const beyond = frames.every((f) => beyondFarEdge(best.node.rect, s.rules.direction, f));
-    s.carriedPast = beyond && s.seenShort;
+    // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
+    // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
+    // band.md): across it — clipped there, or its centre in iOS's status
+    // band, which the frames are cut below — or under something of the app
+    // drawn over its far side. Read so before any read saw it short, it
+    // was never carried past, so `seenShort` alone never turned it: the
+    // strokes pushed it on out through that edge — and at the end of the
+    // content no stroke moves it, so they never did: measured, a row
+    // resting at y 20 swiped down six times to maxSwipes, one at -20
+    // "content exhausted … a layout defect" after two, and from -20
+    // `direction: "up"` flung it to 771 under CONTINUE and swiped up six
+    // times more. The target is right there: the strokes turn at once.
+    const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
+    const atFarEdge = best.visible > 0 && (beyond || best.covers.some((c) => overFar(c.rect)));
+    s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyond) s.seenShort = true;
     if (best.visible > 0) s.inFrameAfter = s.swipes;
   }
@@ -1125,10 +1205,11 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * (`observe`; measured 613 → -357 in one swipe, then five more swipes DOWN
  * into exhausted content). Then the other way, to bring it back; a stroke
  * that throws it back past the near edge leaves it short again, and the
- * next stroke goes the caller's way. A target read beyond the far edge
- * before any read saw it short of it — above the screen on round 0 of a
- * scroll down, and every round after while it stays there — is the
- * caller's direction to honour, as it always was. That needs the target to
+ * next stroke goes the caller's way. A target read wholly beyond the far
+ * edge before any read saw it short of it — above the screen on round 0 of
+ * a scroll down, and every round after while it stays there — is the
+ * caller's direction to honour, as it always was; one any of which lies in
+ * the frame is not (`atFarEdge`, below). That needs the target to
  * STAY in the tree once off the frame; a lazy list (Android
  * RecyclerView/LazyColumn, iOS List/UITableView under WDA) drops it, and
  * on Android its bounds never pass the list's edge anyway. Since
@@ -1160,17 +1241,32 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * shorter strokes (and spends more of `maxSwipes`) if the target then
  * turns out to be further away than one move.
  *
- * A known cost, accepted (code review P7, 2026-10-09): the strokes follow
- * the caller's direction, not where a cover lies. A target in the frame
- * under a cover at the TOP of the screen (a node of the app drawn over it
- * there, `stops`) is stroked on toward the content below, carried further
- * under or past the top edge, and only then turned back — extra strokes,
- * never a wrong stop.
+ * A target IN the frame at the far edge turns the strokes too (2026-10-09,
+ * `observe`'s `atFarEdge`): across that edge, its centre in iOS's status
+ * band past it, or under a cover over its far side — on the first read as
+ * on any. Until that date such a target was stroked on the caller's way,
+ * and the comment here called it "a known cost, accepted (code review P7)
+ * … extra strokes, never a wrong stop": the strokes were to carry it past
+ * the edge, and the turn to follow. At the end of the content no stroke
+ * carries it anywhere, so the turn never came — measured, `maxSwipes`, or
+ * "content exhausted … a layout defect" for a row one stroke back would
+ * have revealed. A target short at the NEAR edge (a pinned bar over a row
+ * coming in from below) is stroked on the caller's way. A cover counts
+ * only in the frame's far half (`overFarSide`). One stuck in the frame,
+ * the other way never stroked, gets one stroke back before the layout
+ * defect is declared (`round`'s stuck turn).
  */
 function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean } {
-  const toward = s.dropped ?? (s.carriedPast ? OPPOSITE[s.rules.direction] : s.rules.direction);
-  // A turn: drawn the other way from the last stroke sent — the one test the reach and the turn count share.
-  const turn = s.strokesSent > 0 && toward !== s.lastStroke;
+  const back = s.backPending && s.stuckOn !== undefined ? OPPOSITE[s.stuckOn] : undefined;
+  const toward = s.dropped ?? back ?? (s.carriedPast ? OPPOSITE[s.rules.direction] : s.rules.direction);
+  // A turn: drawn the other way from the last stroke sent — the one test the
+  // reach and the turn count share. The FIRST stroke is one too when it is
+  // drawn back from a target read at the far edge in the frame (`observe`):
+  // the target is within one move, so it gets a turn's reach — the measured
+  // 262-pt stroke that brings a row at y 20 to 563. Not one drawn back after
+  // a probe dropped the target (`dropped`): no stroke of the scroll's course
+  // went the other way.
+  const turn = toward !== s.lastStroke && (s.strokesSent > 0 || s.dropped === undefined);
   return { toward, reach: 0.5 ** (turn ? s.turns + 1 : s.turns), turn };
 }
 
@@ -1248,6 +1344,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const probed = s.probe;
   if (read !== undefined) s.probe = undefined;
 
+  // The stroke back (`stuckOn`) is answered by the first read that reads
+  // after it; a round whose tree did not read strokes as the last read
+  // round decided — back.
+  const answersBack = now !== undefined && s.backPending;
+  if (now !== undefined) s.backPending = false;
   if (best !== undefined && best.visible > 0 && observed !== undefined && now !== undefined) {
     if (stops(best, fully)) {
       // The probe moved nothing: the match is where it was sent from — the
@@ -1319,7 +1420,32 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     }
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
-    if (observed.stuck) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best, fully), lastStroke: s.lastStroke, viewport });
+    // The stuck turn (2026-10-09, review of the at-the-far-edge turn): the
+    // far-edge reading (`observe`'s `atFarEdge`) turns a target short at the
+    // edge the strokes push it out through, but not one whose shortfall no
+    // edge test sees — measured shape: from -20, `direction: "up"` flung the
+    // row to 776, its top under CONTINUE (24,780 354x44) and its bottom
+    // (828) below the bar's (824), so no side of it was the bar's, and two
+    // unmoved strokes up read "content exhausted … a layout defect" where
+    // one stroke back revealed it. So a target stuck IN the frame, the other
+    // way never stroked, gets ONE stroke the other way (a turn, the reach
+    // halved) before the defect is declared; when that stroke moves it
+    // neither, the defect stands at once — the content was already
+    // exhausted the stuck way, and one unmoved stroke back says the rest.
+    // Cost: one stroke on every real defect (a row under a pinned bar at
+    // the end of the content), and the stroke may move the row the wrong
+    // way — after which the strokes go the caller's way again, and a second
+    // stuck is declared as before. Not when that stroke would pass the
+    // bound: the stuck sentence beats "maxSwipes".
+    const backUnmoved = answersBack && observed.bestUnmoved;
+    const stuckOn = backUnmoved ? s.stuckOn : observed.stuck ? s.lastStroke : undefined;
+    if (stuckOn !== undefined) {
+      const otherWay = backUnmoved ? 'unmoved' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
+      const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
+      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best, fully), lastStroke: stuckOn, viewport, otherWay });
+      s.stuckOn = stuckOn;
+      s.backPending = true;
+    }
   }
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
@@ -1402,6 +1528,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const box = room?.box ?? gesture;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
   if (turn) s.turns++;
+  if (!s.strokedToward.includes(toward)) s.strokedToward = [...s.strokedToward, toward];
   s.strokesSent++;
   s.lastStroke = toward;
   s.lastSent = toward;
