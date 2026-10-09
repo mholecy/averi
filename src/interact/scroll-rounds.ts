@@ -1,5 +1,5 @@
 import type { DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { clippedEdges, sameRectWithinPixel, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { clippedEdges, rectArea, sameRectWithinPixel, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
@@ -50,9 +50,11 @@ import { sameStroke, type Direction, type JudgingScreen } from './swipe.js';
  * then — when the reading offers a cover and the band is not moot — the
  * witness (`ask witness`), the covered judgement replacing the whole one
  * only when it stood by the band; motion observed (a read that read only);
- * the stop verdict (settled / confirm / unsettled, then `ask unlocated` on a
- * `fully: true` stop with no cover under it); stuck; the confirming read
- * that did not read; covered (nothing above the band); the bound (exhausted,
+ * the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
+ * stop flush with its clipping scroll container, the probe — `ask witness`
+ * first for a band the moot rule left unasked — PROBE_REACH; then `ask
+ * unlocated` on a `fully: true` stop with no cover under it); stuck; the
+ * confirming read, or the read after a probe, that did not read; covered (nothing above the band); the bound (exhausted,
  * maxSwipes, deadline — and `ask unlocated` of a round that read); the
  * stroke. The witness comes before the deadline is consulted, so a witness
  * that waits out its 2 s counts against the scroll's budget: the driver
@@ -104,6 +106,14 @@ interface RoundRead {
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`: is this node the keyboard's own UI (judged against the whole screen, never under the band)? */
   ofKeyboard: (node: UiNode) => boolean;
+  /**
+   * The rect of the match's nearest ancestor that CLIPS it
+   * (ui-tree/geometry.ts#scrollerOf over this round's tree) — Android's
+   * scroll container, to whose edge uiautomator has already cut the
+   * match's bounds; undefined when it has none (every node of an iOS
+   * tree). For the `fully: true` stop's flush check (PROBE_REACH).
+   */
+  scrollerOf: (node: UiNode) => Rect | undefined;
 }
 
 /** What to do next. */
@@ -117,9 +127,13 @@ export type RoundStep =
    * by `reach` (swipe.ts#shortenStroke; 1 until the first turn, halved by
    * each), over the round's box — kept clear of a cover whose top edge is
    * `coverTop` when set (swipe.ts#swipeVectorAbove) — and hand it back as
-   * the next round's `drawn`.
+   * the next round's `drawn`. `within`, when set: draw it over that rect
+   * (the target's scroll container, met with the box — swipe.ts
+   * #scrollStroke) rather than the whole box, so it touches down on the
+   * content that scrolls. `probe`: the stroke is the flush check's
+   * (PROBE_REACH), not a step toward the target.
    */
-  | { do: 'stroke'; toward: Direction; reach: number; coverTop?: number }
+  | { do: 'stroke'; toward: Direction; reach: number; coverTop?: number; within?: Rect; probe?: true }
   /** The scroll is over. */
   | { do: 'stop'; outcome: ScrollOutcome };
 
@@ -173,7 +187,8 @@ interface Judged {
  * too, through resolve.ts#absenceError):
  * - `visible`: the stop. `settled` false when no confirming read found the
  *   target still (the reply says so); `unlocated` only on a `fully: true`
- *   stop judged with no cover under it.
+ *   stop judged with no cover under it; `flush` only on a `fully: true`
+ *   stop whose edge lies on its clipping container's (PROBE_REACH).
  * - `stuck`: `fully: true`, the judged match in the frame but clipped, and
  *   UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
  *   layout defect, or the keyboard's edge when it is the bottom clip.
@@ -184,7 +199,7 @@ interface Judged {
  *   `unlocated` row of the last round's reading.
  */
 export type ScrollOutcome =
-  | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean }
+  | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush }
   | { kind: 'stuck'; swipes: number; judged: Judged; lastStroke: Direction; viewport: Rect }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
   | {
@@ -199,6 +214,18 @@ export type ScrollOutcome =
       unlocated: boolean;
       evidence: WaitEvidence;
     };
+
+/**
+ * A `fully: true` stop whose edge along the scroll lies on its scroll
+ * container's edge (PROBE_REACH): `checked` when a probe toward that edge
+ * moved nothing — nothing of it is cut there — and false when no swipe or
+ * time was left to probe, so it may be.
+ */
+export interface Flush {
+  edge: Edge;
+  container: Rect;
+  checked: boolean;
+}
 
 /** Which bound ended the scroll: the same stroke twice moved nothing (with the direction last swiped), `maxSwipes`, or the deadline. */
 export type BoundBy = { of: 'exhausted'; lastStroke: Direction } | { of: 'maxSwipes' } | { of: 'timeout'; timeoutMs: number };
@@ -261,6 +288,74 @@ export const SETTLE_CONFIRM_READS = 3;
  * reports. For both, only strokes count: a confirming read sent none.
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
+
+/**
+ * The flush check's probe (2026-10-09, docs/bugs/2026-10-09-android-scroll-
+ * until-fully-trusts-bounds-clipped-to-scroll-container.md): the reach of
+ * the one short stroke a `fully: true` stop is answered with when the
+ * judged match's edge along the scroll lies exactly — within a pixel — on
+ * its scroll container's edge (`flushEdge`). On Android that is where
+ * uiautomator cuts a node's bounds: a row half behind a pinned bar, or half
+ * past the fold of a list with no chrome, or half below the display in an
+ * edge-to-edge scroller (the display clips too), reads SHORTER, inside the
+ * container, with no edge past the viewport — measured: the SWIFT form's
+ * Fees row read `{y:242, height:92}` of 143 against a container starting at
+ * 242, and was "fully visible after 0 swipes". The cut is not in the tree,
+ * so it is asked of the device: a stroke TOWARD revealing that edge (content
+ * that lies up, for a top edge — the finger moves down), drawn inside the
+ * container. Moves nothing: the content is at its end that way, nothing
+ * lies beyond the edge, the stop is accepted as it stood (the first row of
+ * a list at rest is flush with its container's top and is not cut). Moves
+ * it: the round judges the new read like any other, and a stop flush again
+ * after it is a new candidate with a probe of its own.
+ *
+ * Toward the edge, never the caller's way (verified on the triage repro):
+ * a row cut at the top with the default direction down stroked "down" is
+ * stroked further out — and a lazy list drops it ("gone"). Along the
+ * scroll's axis only (the caller's direction's): a vertical list's cell
+ * flush with the left edge of its container is the ordinary grid layout,
+ * and a sideways stroke there could turn a page of a pager around it. Not
+ * when BOTH edges on the axis are flush — the match fills its container,
+ * and one probe cannot tell which side, if either, is cut (accepted,
+ * stated: such a match is reported as before). One probe per candidate stop:
+ * a probe after which the match is where it was settles it.
+ *
+ * A quarter of the stroke — over the container, 15 % of its side
+ * (swipe.ts#SWIPE_REACH_FRACTION, 60 % of the side, × 0.25): 260 px of the
+ * SWIFT form's 1736-px container, more than the 51 px its Fees row was cut
+ * by and than a 143-px row; a cut larger than that is left flush again and
+ * probed again. Short so it cannot carry the row out of a container of any
+ * ordinary height.
+ *
+ * Cost, stated: one stroke (it spends one of `maxSwipes` and counts in the
+ * reply's swipes), one settle and one tree read — plus, on Android, what a
+ * round's keyboard reading costs (ui-tree/keyboard-cover.ts) — on every
+ * `fully: true` stop flush with a clipping container, legitimate ones
+ * included (a first row at rest). iOS has no clipping container
+ * (types.ts#UiNode.clipsDescendants), so it never probes. At the bound —
+ * no swipe or time left — the stop is reported with `flush.checked` false
+ * and a sentence saying it may be cut.
+ */
+export const PROBE_REACH = 0.25;
+
+/** The direction a probe strokes toward to reveal a flush edge: content beyond the top lies up, and so on. */
+const REVEALS: Record<Edge, Direction> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
+
+/**
+ * The judged match's edge that lies on its container's edge, along the
+ * scroll's axis (`direction`'s), within a pixel — undefined when none does,
+ * when both do (it fills the container: PROBE_REACH), or when the
+ * container has no area.
+ */
+function flushEdge(rect: Rect, container: Rect, direction: Direction): Edge | undefined {
+  if (rectArea(container) === 0) return undefined;
+  const on = (a: number, b: number) => Math.abs(a - b) <= 1;
+  const [low, high]: [Edge, Edge] = direction === 'up' || direction === 'down' ? ['top', 'bottom'] : ['left', 'right'];
+  const atLow = low === 'top' ? on(rect.y, container.y) : on(rect.x, container.x);
+  const atHigh =
+    high === 'bottom' ? on(rect.y + rect.height, container.y + container.height) : on(rect.x + rect.width, container.x + container.width);
+  return atLow === atHigh ? undefined : atLow ? low : high;
+}
 
 /** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
 const OPPOSITE: Record<Direction, Direction> = { up: 'down', down: 'up', left: 'right', right: 'left' };
@@ -345,6 +440,8 @@ interface State {
   readonly turns: number;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   readonly inFrameAfter: number | undefined;
+  /** The probe in flight (PROBE_REACH): the judged match's rect and edge when it was sent. Cleared by the next read that reads. */
+  readonly probe: { rect: Rect; edge: Edge } | undefined;
 }
 
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
@@ -375,6 +472,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     lastStroke: rules.direction,
     turns: 0,
     inFrameAfter: undefined,
+    probe: undefined,
   };
   return state as unknown as Rounds;
 }
@@ -638,15 +736,43 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // nothing about motion: the comparisons wait for the next one that does.
   const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : s.frame.boxes;
   const observed = read === undefined ? undefined : observe(s, current, found, best, judgedFrames);
+  // The probe this read answers (PROBE_REACH) — kept across a read that did
+  // not read, which is read again below rather than stroked away from.
+  const probed = s.probe;
+  if (read !== undefined) s.probe = undefined;
 
-  if (best !== undefined && best.visible > 0 && observed !== undefined) {
+  if (best !== undefined && best.visible > 0 && observed !== undefined && read !== undefined) {
     if (!fully || best.clipped.length === 0) {
+      // The probe moved nothing: the match is where it was sent from — the
+      // stop holds (it held still through a stroke), and nothing lies
+      // beyond its flush edge.
+      const probeHeld = probed !== undefined && sameRectWithinPixel(probed.rect, best.node.rect);
       // A stop after a stroke is reported only once a read finds the target
       // where the last one did (SETTLE_CONFIRM_READS): a fling can carry it
       // on, or out of the frame, after the settle read caught it inside. A
       // stop at 0 swipes was not stroked: reported at once.
-      const settled = s.swipes === 0 || (current === 'settle' && observed.bestUnmoved);
+      const settled = s.swipes === 0 || probeHeld || (current === 'settle' && observed.bestUnmoved);
       if (!settled && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+      // `fully: true`, an edge flush with the clipping container: possibly
+      // cut there — probe once toward it, or say it could not be checked.
+      let flush: Flush | undefined;
+      const container = fully ? read.scrollerOf(best.node) : undefined;
+      const edge = container === undefined ? undefined : flushEdge(best.node.rect, container, s.rules.direction);
+      if (container !== undefined && edge !== undefined) {
+        if (probeHeld) flush = { edge, container, checked: true };
+        else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
+          // Clear of a keyboard as any stroke is — and one the moot rule
+          // never asked about (the stop was clean either way) is asked
+          // about now: the probe touches down on the container's lower
+          // part for a bottom edge, which may be under the band.
+          let probeCover = cover;
+          if (probeCover === undefined && offered !== undefined) {
+            if (seen.corroborated === undefined) return ask('witness');
+            if (seen.corroborated) probeCover = offered;
+          }
+          return probe(s, edge, best.node.rect, container, probeCover);
+        } else flush = { edge, container, checked: false };
+      }
       // The `unlocated` row on a `fully: true` stop only — where the answer
       // changes what the reader does next — and only with no cover under
       // the judgement: a band THIS stop was judged under is what it reports.
@@ -655,14 +781,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         if (seen.unlocated === undefined) return ask('unlocated');
         unlocated = seen.unlocated;
       }
-      return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated });
+      return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }) });
     }
     // fully: true and still clipped — only a swipe that MOVES it can help.
     if (observed.stuck) return stop(s, { kind: 'stuck', swipes: s.swipes, judged: best, lastStroke: s.lastStroke, viewport });
   }
-  // A confirming read that did not read: read again, within the same
-  // budget, rather than stroke away from a stop the last read saw.
-  if (current === 'settle' && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+  // A confirming read that did not read, or the read after a probe: read
+  // again, within the same budget, rather than stroke away from a stop the
+  // last read saw.
+  if ((current === 'settle' || s.probe !== undefined) && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
   const evidence: WaitEvidence = { sighted: s.everFound, treesRead: s.treesRead, readError };
   // A keyboard that leaves nothing above it: nothing but its own UI can be
   // judged, and no stroke can start on the content — fail now, naming it,
@@ -715,6 +842,25 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   s.swipes++;
   s.owesDrawn = true;
   return { state: s as unknown as Rounds, step: { do: 'stroke', toward, reach, ...(strokeCover !== undefined && { coverTop: strokeCover.topCover.y }) } };
+}
+
+/**
+ * Send the flush check's probe (PROBE_REACH): toward revealing `edge`, over
+ * the container, clear of this round's cover. A swipe like any other for
+ * the count and the bound, but not a step of the scroll's course: the turn
+ * (`lastStroke`, `turns`, `strokesSent`) is left as it was, so a probe the
+ * other way from the caller's direction is not a turn and halves no reach.
+ */
+function probe(s: Mutable<State>, edge: Edge, rect: Rect, container: Rect, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
+  s.probe = { rect: { ...rect }, edge };
+  s.confirmReads = 0;
+  s.since = 'stroke';
+  s.swipes++;
+  s.owesDrawn = true;
+  return {
+    state: s as unknown as Rounds,
+    step: { do: 'stroke', toward: REVEALS[edge], reach: PROBE_REACH, ...(cover !== undefined && { coverTop: cover.topCover.y }), within: { ...container }, probe: true },
+  };
 }
 
 /** Spend a confirming read: the next read follows a settle, not a stroke. */

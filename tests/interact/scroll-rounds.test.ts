@@ -51,7 +51,7 @@ const reads = (ys: readonly number[], at: (y: number) => UiNode, extra: Row = {}
 describe('round — the protocol', () => {
   it('an ask leaves the state as it came in, and the same seen with the answer goes on', () => {
     const state = startRounds({ ...ANDROID, fully: true }, ANDROID.screen);
-    const seen = { read: { found: [formRow(1906)], cover: UP_IME, ofKeyboard: () => false }, elapsedMs: 0 };
+    const seen = { read: { found: [formRow(1906)], cover: UP_IME, ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0 };
     const asked = round(state, seen);
     expect(asked).toEqual({ state, step: { do: 'ask', what: 'witness' } });
     expect(round(state, { ...seen, corroborated: true }).step).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
@@ -59,13 +59,13 @@ describe('round — the protocol', () => {
 
   it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
     const state = startRounds(ANDROID, ANDROID.screen);
-    const off = { read: { found: [formRow(2900)], ofKeyboard: () => false }, elapsedMs: 0 };
+    const off = { read: { found: [formRow(2900)], ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0 };
     expect(() => round(state, { ...off, drawn: STROKE })).toThrow('none asked for');
     const stroked = round(state, off).state;
     expect(() => round(stroked, off)).toThrow('without the stroke drawn');
-    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0, drawn: STROKE });
+    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0, drawn: STROKE });
     expect(stopped.step.do).toBe('confirm');
-    const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false }, elapsedMs: 0 });
+    const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0 });
     expect(done.step.do).toBe('stop');
     expect(() => round(done.state, off)).toThrow('after the scroll stopped');
   });
@@ -583,5 +583,121 @@ describe('round — the round bound (code review of round 2, 2026-10-08)', () =>
     expect(played.steps).toHaveLength(1 + (1 + SETTLE_CONFIRM_READS) * 6);
     expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(6);
     expect(failureOf(played, 'id:t').message).toContain('failed after 6 swipes (maxSwipes)');
+  });
+});
+
+describe('round — a fully: true stop flush with its clipping scroll container (Android, docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md)', () => {
+  /** The SWIFT form's scroll container, `[0,242][1080,1978]`: the top bar above 242, the pinned CONTINUE bar from 1979. */
+  const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
+  const FULLY_ANDROID: Rules = { ...ANDROID, fully: true };
+  /** A form row at `y`, `height` tall (143 uncut), x 66 948 wide, its container FORM. */
+  const formRead = (y: number, height = 143, extra: Row = {}): Row => ({ found: [match({ x: 66, y, width: 948, height }, 'fees')], scroller: FORM, ...extra });
+  const probeOf = (played: ReturnType<typeof play>) => played.steps.filter((s) => s.do === 'stroke' && s.probe === true);
+
+  it('the measured Fees row, cut by the top bar to {y:242, height:92}, with the DEFAULT direction down: probed TOWARD the top edge (content up), inside the container — never stroked away', () => {
+    // At rest the row starts 51 px above 242; the probe moves the content down 260 px: the row reads whole at 451.
+    const played = play(FULLY_ANDROID, [formRead(242, 92), formRead(451), formRead(451)]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'up', reach: 0.25, within: FORM, probe: true });
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] }); // no flush left: the row is whole
+  });
+
+  it('the measured Priority row, cut by CONTINUE to {y:1846, height:132}: probed toward the bottom edge (content down)', () => {
+    const played = play(FULLY_ANDROID, [formRead(1846, 132), formRead(1586), formRead(1586)]);
+    expect(probeOf(played)).toEqual([{ do: 'stroke', toward: 'down', reach: 0.25, within: FORM, probe: true }]);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('a row at the fold of a list with no chrome (Settings, list [0,737][1080,2154]): flush with the bottom, probed, revealed', () => {
+    const LIST: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
+    const row = (y: number, height = 198): Row => ({ found: [match({ x: 0, y, width: 1080, height }, 'modes')], scroller: LIST });
+    const played = play(FULLY_ANDROID, [row(2053, 101), row(1800), row(1800)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(resultOf(played).clipped).toEqual([]);
+  });
+
+  it('edge-to-edge: a row half below the display in a full-screen scroller reads flush with 2220 — the display clips too — and is probed', () => {
+    const SCREEN_SCROLLER: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+    const row = (y: number, height = 143): Row => ({ found: [match({ x: 66, y, width: 948, height })], scroller: SCREEN_SCROLLER });
+    const played = play(FULLY_ANDROID, [row(2140, 80), row(1880), row(1880)]);
+    expect(probeOf(played)).toHaveLength(1);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('the first row of a list at rest is flush with its container\'s top and NOT cut: the probe moves nothing and the stop is accepted — one extra stroke, the stated cost, said in the reply', () => {
+    const played = play(FULLY_ANDROID, [formRead(242), formRead(242)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']); // no confirming read: it held still through the probe
+    const result = resultOf(played);
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], flush: { edge: 'top', container: FORM, checked: true } });
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 1 swipe; its top edge lies on its scroll container's (0,242 1080x1736), and a probe swipe toward it moved nothing — nothing of it is cut there",
+    );
+  });
+
+  it('one probe per candidate stop: a probe that moves the row to a NEW flush stop (cut by more than the probe reveals) probes again; the one after which it holds is accepted', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 20), formRead(242, 60), formRead(242, 60), formRead(242, 100), formRead(242, 100)]);
+    // probe; moved (20 → 60): confirm; held: a new candidate, probe; moved: …
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'confirm', 'stroke']);
+    expect(probeOf(played)).toHaveLength(3);
+  });
+
+  it('no swipe left to probe with: reported fully visible with flush unchecked, and the reply says it may be cut', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 0 }, [formRead(242, 92)]);
+    const result = resultOf(played);
+    expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: false });
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 0 swipes; but its top edge lies on its scroll container's (0,242 1080x1736), where Android cuts a node's bounds to the container, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it",
+    );
+    const late = play({ ...FULLY_ANDROID, timeoutMs: 10 }, [{ ...formRead(242, 92), elapsedMs: 10 }]);
+    expect(resultOf(late).flush?.checked).toBe(false);
+  });
+
+  it.each([
+    ['no clipping container (every iOS node; an Android node with no scrollable ancestor)', { found: [match({ x: 66, y: 242, width: 948, height: 92 })] }],
+    ['flush with BOTH edges along the scroll: it fills the container, one probe cannot tell', formRead(242, 1736)],
+    ['flush across the scroll only (a grid cell at the left edge of a vertical list)', { found: [match({ x: 0, y: 500, width: 300, height: 143 })], scroller: FORM }],
+    ['inside the container by more than a pixel', formRead(244, 90)],
+  ] as const)('no probe: %s', (_, row) => {
+    const played = play(FULLY_ANDROID, [row as Row]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    expect(resultOf(played).flush).toBeUndefined();
+  });
+
+  it('within a pixel counts as flush (a rounding in the tree source)', () => {
+    expect(probeOf(play(FULLY_ANDROID, [formRead(243, 92), formRead(243, 92)]))).toHaveLength(1);
+  });
+
+  it('only on fully: true — the default stop is not the flush check\'s business (intersection is its bar)', () => {
+    expect(play(ANDROID, [formRead(242, 92)]).steps.map((s) => s.do)).toEqual(['stop']);
+  });
+
+  it('a probe the other way from the caller\'s direction is not a turn: the stroke after it has the full reach, and no turn is counted', () => {
+    // The probe toward the top; the row is gone after it (moved off), so the scroll strokes on the caller's way.
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 2 }, [formRead(242, 92), { found: [], scroller: FORM }, { found: [] }]);
+    const strokes = played.steps.filter((s) => s.do === 'stroke');
+    expect(strokes.map((s) => [s.toward, s.reach, s.probe === true])).toEqual([
+      ['up', 0.25, true],
+      ['down', 1, false],
+    ]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', turns: 0 });
+  });
+
+  it('a read after the probe that fails is read again — not answered with a stroke the caller\'s way', () => {
+    const played = play(FULLY_ANDROID, [formRead(242), { error: 'uiautomator dump returned no XML' }, formRead(242)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+    expect(resultOf(played).flush).toEqual({ edge: 'top', container: FORM, checked: true });
+  });
+
+  it('a keyboard band the moot rule never asked about is asked about before the probe, and the probe keeps clear of it', () => {
+    // A container that resizes for the IME: [0,242][1080,1398]; the row flush with its bottom is clean whole-screen and above the band — moot.
+    const RESIZED: Rect = { x: 0, y: 242, width: 1080, height: 1156 };
+    const row: Row = { found: [match({ x: 66, y: 1300, width: 948, height: 98 })], scroller: RESIZED, cover: UP_IME };
+    const played = play(FULLY_ANDROID, [row, { ...row, found: [match({ x: 66, y: 1100, width: 948, height: 143 })] }, { ...row, found: [match({ x: 66, y: 1100, width: 948, height: 143 })] }]);
+    expect(played.rounds[0].asks).toEqual(['witness']);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, coverTop: 1398, within: RESIZED, probe: true });
+    // Denied: the probe is drawn over the container whole.
+    const denied = play(FULLY_ANDROID, [{ ...row, corroborated: false }, row]);
+    expect(denied.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, within: RESIZED, probe: true });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { MIN_STROKE_FRACTION, sameStroke, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -323,5 +323,27 @@ describe('sameStroke — the same touch-down and lift-off, point for point (code
     expect(sameStroke(s, { ...s, from: { x: 540, y: 1117 } })).toBe(false);
     expect(sameStroke(s, { ...s, to: { x: 539, y: 280 } })).toBe(false);
     expect(sameStroke(s, { ...s, to: { x: 540, y: 699 } })).toBe(false);
+  });
+});
+
+describe('scrollStroke — the scroll step\'s stroke, over the target\'s scroll container when it names one (2026-10-09)', () => {
+  const BOX = { x: 0, y: 0, width: 1080, height: 2220 };
+  const SETTINGS = { x: 0, y: 737, width: 1080, height: 1417 };
+  it('without `within`: the box\'s stroke, as before (swipeVector, swipeVectorAbove, shortenStroke)', () => {
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1 })).toEqual(swipeVector(BOX, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398 })).toEqual(swipeVectorAbove(BOX, 1398, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 0.5 })).toEqual(shortenStroke(swipeVector(BOX, 'down', 'content'), 0.5, 2220));
+  });
+  it('with `within`: over the container, so a content-up stroke touches down inside the list (1021), not on the header above it (444)', () => {
+    expect(scrollStroke(BOX, { toward: 'up', reach: 1 }).from.y).toBe(444);
+    expect(scrollStroke(BOX, { toward: 'up', reach: 1, within: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1871 } });
+    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: SETTINGS })).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } });
+  });
+  it('met with the box (a container reaching past the screen), clear of a cover inside it, and the box whole when the two do not meet or the cover starts above the container', () => {
+    const tall = { x: 0, y: 242, width: 1080, height: 5000 };
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: tall })).toEqual(swipeVector({ x: 0, y: 242, width: 1080, height: 1978 }, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 1398, within: SETTINGS })).toEqual(swipeVectorAbove(SETTINGS, 1398, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, within: { x: 0, y: 3000, width: 1080, height: 100 } })).toEqual(swipeVector(BOX, 'down', 'content'));
+    expect(scrollStroke(BOX, { toward: 'down', reach: 1, coverTop: 700, within: SETTINGS })).toEqual(swipeVectorAbove(BOX, 700, 'down', 'content'));
   });
 });

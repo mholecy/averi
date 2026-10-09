@@ -3,6 +3,7 @@ import { type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type Ui
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
+import { LazyList } from '../helpers/lazy-list.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -425,5 +426,67 @@ describe('scrollUntilVisible — the round bound (code review of round 2, 2026-1
     expect((error as Error).message).toContain('failed after 6 swipes (maxSwipes)');
     expect(fake.swipes).toHaveLength(6);
     expect(reads).toBe(25);
+  });
+});
+
+describe('scrollUntilVisible — a fully: true stop flush with its clipping scroll container (Android, 2026-10-09)', () => {
+  /** The SWIFT form: container [0,242][1080,1978] between the top bar and CONTINUE, 143-px rows; Fees third. */
+  const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
+  const formLabels = ['Beneficiary', 'Amount', 'Fees', 'Priority', 'Reference', 'Note', 'IBAN', 'BIC', 'Bank', 'Address', 'City', 'Country', 'Purpose', 'Charges', 'Date'];
+  /** Settings home: list [0,737][1080,2154], 198-px rows, a header above it. */
+  const SETTINGS: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
+  const settingsLabels = ['Network', 'Devices', 'Apps', 'Notifications', 'Battery', 'Storage', 'Sound', 'Modes', 'Display', 'Wallpaper', 'Accessibility', 'Security'];
+
+  it('the measured Fees row cut by the top bar (read {y:242, height:92}) is not "fully visible after 0 swipes": a probe toward its top, drawn inside the form, reveals it whole', async () => {
+    const fake = new LazyList(formLabels, 143, FORM, { offset: 2 * 143 + 51 }); // Fees 51 px under the bar
+    const result = await scrollUntilVisible(fake, 'text:"Fees"', { ...FAST, fully: true });
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    const [probe] = fake.swipes;
+    expect(probe.to.y).toBeGreaterThan(probe.from.y); // the finger moves DOWN — content up, toward the cut — though the caller's direction is down
+    expect(probe.from.y).toBeGreaterThanOrEqual(242); // touched down on the form, not the bar
+    expect(probe).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 850 } }); // a quarter of the form's 1042-px stroke
+    expect(fake.rowRect('Fees')).toEqual({ x: 0, y: 452, width: 1080, height: 143 });
+  });
+
+  it('a row at the fold of Settings\' list (no chrome below it, read 31 px of 198): probed toward the bottom and revealed', async () => {
+    const fake = new LazyList(settingsLabels, 198, SETTINGS); // Modes at 2123, cut at 2154
+    const result = await scrollUntilVisible(fake, 'text:"Modes"', { ...FAST, fully: true });
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(fake.swipes[0].to.y).toBeLessThan(fake.swipes[0].from.y);
+  });
+
+  it('a row cut by Settings\' header, at the top of the content: the probe touches down INSIDE the list (the screen box\'s would land on the header at y 444 and move nothing), reveals it, and the second probe — at the content\'s start — moves nothing and is accepted', async () => {
+    const fake = new LazyList(settingsLabels, 198, SETTINGS, { offset: 100 }); // Network at 637, read 737–835
+    const result = await scrollUntilVisible(fake, 'text:"Network"', { ...FAST, fully: true });
+    expect(fake.swipes.map((s) => s.from.y)).toEqual([1021, 1021]);
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], flush: { edge: 'top', container: SETTINGS, checked: true } });
+    expect(fake.rowRect('Network').height).toBe(198);
+  });
+
+  it('the first row at rest: one probe that moves nothing — the stated cost — then "fully visible after 1 swipe", saying why', async () => {
+    const fake = new LazyList(formLabels, 143, FORM);
+    const result = await scrollUntilVisible(fake, 'text:"Beneficiary"', { ...FAST, fully: true });
+    expect(fake.swipes).toHaveLength(1);
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 1 swipe; its top edge lies on its scroll container's (0,242 1080x1736), and a probe swipe toward it moved nothing — nothing of it is cut there",
+    );
+  });
+
+  it('the parser marks the container: a scrollable="true" Compose View (role container) clips — the SWIFT dump, end to end through parseUiautomatorXml', async () => {
+    const { parseUiautomatorXml } = await import('../../src/adapters/android.js');
+    const tree = parseUiautomatorXml(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="swift_payment.form.top_bar" bounds="[0,0][1080,242]" />
+  <node class="android.view.View" scrollable="true" bounds="[0,242][1080,1978]">
+    <node class="android.view.View" resource-id="swift_payment.form.fees_select" bounds="[66,242][1014,334]" />
+  </node>
+  <node class="android.widget.Button" resource-id="swift_payment.form.continue_button" text="CONTINUE" bounds="[66,1979][1014,2111]" />
+</node>
+</hierarchy>`);
+    const fake = new FakeAdapter({ s: tree }, 's');
+    // The fake's tree never moves: the probe moves nothing, and the stop is accepted as checked — what matters is that it was probed at all.
+    const result = await scrollUntilVisible(fake, 'id:swift_payment.form.fees_select', { ...FAST, fully: true });
+    expect(fake.swipes).toHaveLength(1);
+    expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: true });
   });
 });

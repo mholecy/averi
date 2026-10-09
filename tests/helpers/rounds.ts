@@ -30,6 +30,8 @@ export interface Row {
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`; default: no node is the keyboard's. */
   ofKeyboard?: (node: UiNode) => boolean;
+  /** Every match's clipping scroll container (geometry.ts#scrollerOf); default none — an iOS tree, or a match with no clipping ancestor. */
+  scroller?: Rect;
   /** The answer to `ask witness` (the reading's `corroborated()`); default true. */
   corroborated?: boolean;
   /** The answer to `ask unlocated` (the reading's `unlocated()`); default false. */
@@ -80,7 +82,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       read:
         row.error !== undefined
           ? { error: new Error(row.error) }
-          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
+          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollerOf: () => row.scroller, ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };

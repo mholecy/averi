@@ -1,11 +1,12 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { scrollerOf } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
-import { judgingScreen, screenBox, shortenStroke, swipeVector, swipeVectorAbove, type Direction } from './swipe.js';
+import { judgingScreen, screenBox, scrollStroke, type Direction } from './swipe.js';
 
 export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
 
@@ -185,6 +186,17 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   not move is the defect it reports). For both, only strokes count: a
  *   confirming read sent none.
  *
+ * Android's clipped bounds (2026-10-09, docs/bugs/2026-10-09-android-
+ * scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md):
+ * uiautomator cuts each node's bounds to its scroll container, so a row
+ * half behind a pinned bar read whole and `fully: true` said "fully visible
+ * after 0 swipes". Each round hands the reducer every match's nearest
+ * clipping ancestor (ui-tree/geometry.ts#scrollerOf, over the
+ * `clipsDescendants` the parser sets), and a `fully: true` stop flush with
+ * it is answered with one short probe toward that edge, drawn over the
+ * container (scroll-rounds.ts#PROBE_REACH has the rule and its cost;
+ * swipe.ts#scrollStroke the box). Only the box comes from here.
+ *
  * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
  * method says shown, the window state gives it no area: one still coming
  * up? not measured. Not the floating keyboard any more: measured on API 33,
@@ -242,7 +254,10 @@ export async function scrollUntilVisible(
       const found = findTarget(tree, target);
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
-      seen = { read: { found, ofKeyboard: reading.ofKeyboard, ...(screen !== undefined && { screen }), ...(cover !== undefined && { cover }) }, elapsedMs: 0 };
+      seen = {
+        read: { found, ofKeyboard: reading.ofKeyboard, scrollerOf: scrollerOf(tree), ...(screen !== undefined && { screen }), ...(cover !== undefined && { cover }) },
+        elapsedMs: 0,
+      };
     }
     if (drawn !== undefined) seen.drawn = drawn;
     drawn = undefined;
@@ -278,11 +293,11 @@ export async function scrollUntilVisible(
       // box above it alone touched down in the app's top bar for a
       // content-up scroll. The round says which cover (`coverTop`): this
       // round's, or — on a round whose tree did not read — the last read
-      // round's.
-      const { toward, reach, coverTop } = step;
+      // round's. `within` (the flush check's probe, 2026-10-09): over the
+      // target's scroll container, so it touches down on what scrolls
+      // (swipe.ts#scrollStroke has the measured why).
       const { box } = await screenBox(adapter, read);
-      const vector = coverTop === undefined ? swipeVector(box, toward, 'content') : swipeVectorAbove(box, coverTop, toward, 'content');
-      drawn = shortenStroke(vector, reach, toward === 'up' || toward === 'down' ? box.height : box.width);
+      drawn = scrollStroke(box, step);
       await adapter.swipe(drawn.from, drawn.to);
     }
     await sleep(settleMs);

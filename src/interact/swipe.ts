@@ -159,6 +159,41 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
 }
 
 /**
+ * The stroke `scroll_until` draws for one of its `stroke` steps
+ * (interact/scroll-rounds.ts#RoundStep) over the gesture `box`: toward
+ * `toward` (where the content lies), clear of a cover whose top edge is
+ * `coverTop` (`swipeVectorAbove`), its reach scaled by `reach`
+ * (`shortenStroke`, along the side of the box it is drawn in) — and, since
+ * 2026-10-09, drawn over `within` met with `box` when the step names one:
+ * the target's scroll container, so the touch-down lands on the content
+ * that scrolls and the stroke's length is the container's, not the
+ * screen's. Measured why (docs/bugs/2026-10-09-android-scroll-until-fully-
+ * trusts-bounds-clipped-to-scroll-container.md, the triage of it): Settings'
+ * list is [0,737][1080,2154]; the screen box's content-up stroke touches
+ * down at y 444, in the header above the list, and a probe drawn there
+ * moves nothing — which the flush check would take for "nothing beyond the
+ * edge". Falls back to `box` when the two do not overlap, or when the cover
+ * starts at or above the container's top (nothing of it is left to touch).
+ * Pure; the driver's one call (interact/scroll.ts).
+ */
+export function scrollStroke(box: Rect, step: { toward: Direction; reach: number; coverTop?: number; within?: Rect }): Stroke {
+  const { toward, reach, coverTop, within } = step;
+  const met = within === undefined ? undefined : meet(box, within);
+  const over = met !== undefined && (coverTop === undefined || coverTop > met.y) ? met : box;
+  const vector = coverTop === undefined ? swipeVector(over, toward, 'content') : swipeVectorAbove(over, coverTop, toward, 'content');
+  return shortenStroke(vector, reach, toward === 'up' || toward === 'down' ? over.height : over.width);
+}
+
+/** The rect two rects share, or undefined when they share no area. */
+function meet(a: Rect, b: Rect): Rect | undefined {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const width = Math.min(a.x + a.width, b.x + b.width) - x;
+  const height = Math.min(a.y + a.height, b.y + b.height) - y;
+  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
+}
+
+/**
  * The same stroke: the same touch-down and the same lift-off, point for
  * point. For `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#
  * UNMOVED_STROKES_EXHAUST) — until the code review of round 2
