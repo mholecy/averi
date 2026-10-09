@@ -410,6 +410,30 @@ describe('ensure_state and run_flow — the flow tools', () => {
     const fresh = await second.call('run_flow', { platform: 'android', flow: 'wipe', configPath });
     expect(counts(fresh.text)).toEqual([1]);
   });
+
+  // 2026-10-09: launch_app wipes as a flow's launch step does, and until then
+  // it neither said so nor counted — a direct wipe was invisible to the
+  // session's count. Now the one launch (flow/launch.ts) does both for both.
+  it('launch_app { clearState: true } is counted in the same session and replies with the flow\'s ⚠ clearState line', async () => {
+    const configPath = await file('averi.yaml', VALID_CONFIG + '  wipe:\n    steps:\n      - launch: { clearState: true }\n');
+    const { call } = await connect();
+    const direct = await call('launch_app', { platform: 'android', appId: 'md.bank.app', clearState: true, configPath });
+    expect(direct.isError).toBe(false);
+    expect(direct.text).toBe(
+      'Launched md.bank.app/.MainActivity on android (state cleared)\n' +
+        '⚠ clearState: app state wiped (data container deleted) — anything the app persisted, ' +
+        'a device registration included, is gone (1 this session)',
+    );
+    const flow = await call('run_flow', { platform: 'android', flow: 'wipe', configPath });
+    expect(flow.text).toContain('(2 this session)');
+    const again = await call('launch_app', { platform: 'ios', appId: 'md.bank.app', clearState: true, configPath });
+    expect(again.text).toMatch(/\(3 this session\)$/);
+    // No wipe, no line, no count.
+    const warm = await call('launch_app', { platform: 'android', appId: 'md.bank.app', clearState: false, configPath });
+    expect(warm.text).toBe('Launched md.bank.app/.MainActivity on android');
+    const last = await call('run_flow', { platform: 'android', flow: 'wipe', configPath });
+    expect(last.text).toContain('(4 this session)');
+  });
 });
 
 describe('install_app — which build', () => {

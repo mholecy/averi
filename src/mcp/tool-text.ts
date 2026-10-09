@@ -23,6 +23,7 @@ import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
+import { launchedLine, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
 
@@ -50,27 +51,24 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
   (swipe.note !== undefined ? `\n⚠ ${swipe.note}` : '');
 
 /**
- * `Launched <appId>[/<Activity>] on <platform>[ (state cleared)]`. The
- * activity is shown by its last path segment — a fully-qualified
- * `pkg/pkg.MainActivity` reads as `pkg.MainActivity` — and is whichever one
- * the launch actually used, so a fallback to averi.yaml's is visible in the
- * response. Moved out of the handler 2026-10-03: wording, not delegation.
+ * `Launched <appId>[/<Activity>] on <platform>[ (state cleared)]` — after
+ * `Launched`, the launch's own line (flow/launch.ts#launchedLine, shared with
+ * the flow's `launch` trace line: the activity whichever one the launch
+ * actually used, so a fallback to averi.yaml's is visible). Moved out of the
+ * handler 2026-10-03: wording, not delegation.
  *
- * And on its own line below, `⚠ <note>` when the launch said one
- * (LaunchOutcome.note, 2026-10-09 — today iOS's foreground wait, when the
- * tree was not seen to be the launched app's: adapters/ios-foreground.ts),
- * laid out as swipeText lays out its note. The flow's `⚠ launch` trace line
- * carries the same words (flow/launch.ts).
+ * And on their own lines below, as swipeText lays out its note: `⚠ <note>`
+ * when the launch said one (LaunchOutcome.note, 2026-10-09 — today iOS's
+ * foreground wait, adapters/ios-foreground.ts), then `⚠ clearState: <…>`
+ * when it wiped (since 2026-10-09, with the session's count) — the flow's
+ * `⚠ launch` and `⚠ clearState` trace lines, in the same words and order.
+ * The `clearState:` label is kept because the flow line reads exactly so;
+ * the note's `launch:` is not, the reply's first line already saying it.
  */
-export const launchText = (launch: {
-  appId: string;
-  platform: Platform;
-  activity?: string;
-  clearState?: boolean;
-  note?: string;
-}): string =>
-  `Launched ${launch.appId}${launch.activity === undefined ? '' : `/${launch.activity.split('/').pop()}`} on ${launch.platform}${launch.clearState ? ' (state cleared)' : ''}` +
-  (launch.note !== undefined ? `\n⚠ ${launch.note}` : '');
+export const launchText = (platform: Platform, launched: Launched): string =>
+  `Launched ${launchedLine(launched, platform)}` +
+  (launched.note !== undefined ? `\n⚠ ${launched.note}` : '') +
+  (launched.wiped !== undefined ? `\n⚠ clearState: ${launched.wiped}` : '');
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

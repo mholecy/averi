@@ -31,33 +31,26 @@ describe('swipe response line', () => {
 });
 
 describe('launch_app response line', () => {
-  it('names the app and the platform; nothing else when there is no activity and no wipe', () => {
-    expect(launchText({ appId: 'md.bank.app', platform: 'ios' })).toBe('Launched md.bank.app on ios');
-    expect(launchText({ appId: 'md.bank.app', platform: 'android', clearState: false })).toBe('Launched md.bank.app on android');
-  });
-
-  it('shows the activity that was used, by its last path segment', () => {
-    expect(launchText({ appId: 'md.bank.app', platform: 'android', activity: '.MainActivity' })).toBe(
-      'Launched md.bank.app/.MainActivity on android',
-    );
-    expect(launchText({ appId: 'md.bank.app', platform: 'android', activity: 'md.bank.app/md.bank.ui.MainActivity' })).toBe(
-      'Launched md.bank.app/md.bank.ui.MainActivity on android',
-    );
-  });
-
-  it('says when the state was cleared', () => {
-    expect(launchText({ appId: 'md.bank.app', platform: 'android', activity: '.MainActivity', clearState: true })).toBe(
-      'Launched md.bank.app/.MainActivity on android (state cleared)',
-    );
+  // The app's own wording (the activity's last segment) is the launch's —
+  // tests/flow/launch.test.ts; what is pinned here is the reply's layout.
+  it('names the app and the platform; nothing else without a note or a wipe', () => {
+    expect(launchText('ios', { app: 'md.bank.app' })).toBe('Launched md.bank.app on ios');
+    expect(launchText('android', { app: 'md.bank.app/.MainActivity' })).toBe('Launched md.bank.app/.MainActivity on android');
   });
 
   // 2026-10-09: the launch's caveat (LaunchOutcome.note — iOS's foreground
-  // wait giving up) on its own ⚠ line, as swipeText lays out its note.
-  it('puts the launch\'s note on a ⚠ line of its own, after everything else; no note, no line', () => {
-    expect(launchText({ appId: 'com.apple.MobileAddressBook', platform: 'ios', clearState: true, note: 'the tree was still another app' })).toBe(
-      'Launched com.apple.MobileAddressBook on ios (state cleared)\n⚠ the tree was still another app',
+  // wait giving up) on its own ⚠ line, as swipeText lays out its note; the
+  // wipe's sentence under it, labelled as the flow's trace line is.
+  it("says (state cleared) after the platform, and puts the note, then the wipe, each on a ⚠ line of its own — the flow's order", () => {
+    expect(
+      launchText('ios', { app: 'com.apple.MobileAddressBook', note: 'the tree was still another app', wiped: 'app state wiped (1 this session)' }),
+    ).toBe(
+      'Launched com.apple.MobileAddressBook on ios (state cleared)\n⚠ the tree was still another app\n⚠ clearState: app state wiped (1 this session)',
     );
-    expect(launchText({ appId: 'md.bank.app', platform: 'ios', note: undefined })).toBe('Launched md.bank.app on ios');
+    expect(launchText('android', { app: 'md.bank.app/.MainActivity', wiped: 'app state wiped (2 this session)' })).toBe(
+      'Launched md.bank.app/.MainActivity on android (state cleared)\n⚠ clearState: app state wiped (2 this session)',
+    );
+    expect(launchText('ios', { app: 'md.bank.app', note: undefined, wiped: undefined })).toBe('Launched md.bank.app on ios');
   });
 });
 

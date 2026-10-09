@@ -11,7 +11,7 @@ import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, sc
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
 import { launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
-import { resolveLaunchActivity } from '../flow/config.js';
+import { EngineSession, launchApp } from '../flow/launch.js';
 import { appBuildPath } from '../flow/load.js';
 import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
 import { TOOL_CONFIG } from './config-policy.js';
@@ -22,7 +22,6 @@ import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run/commands.js';
-import { EngineSession } from '../flow/launch.js';
 import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
@@ -69,8 +68,9 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * mcp/config-policy.ts#TOOL_CONFIG (since 2026-10-08; until then each
  * handler chose one of four loaders by hand, and `assert` ran two of them), and the
  * answers asked of that loaded config (which build to install, which iOS
- * tree source and dismissals, which activity — flow/); one call into an
- * adapter method, interact/ or run/, handed the loaded config rather than a
+ * tree source and dismissals — flow/); one call into an adapter method,
+ * interact/, run/ or flow/launch.ts (launch_app's, which resolves the
+ * activity itself since 2026-10-09), handed the loaded config rather than a
  * path to read again; and the response — text through tool-text.ts or the
  * callee (a fill's through interact/fill-text.ts, shared with the flow line), wrapped by `text`/`image` below. The sequences once written out
  * here (ensure_state, run_flow, assert, the contract file read) are below
@@ -185,8 +185,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   // The session's state that outlives one engine run — the clearState count
   // (flow/launch.ts#EngineSession). One per server: the server IS the
   // session. Every tool that runs the engine (ensure_state, run_flow, verify)
-  // hands it down; until 2026-10-07 it was a module global in the engine,
-  // shared by every server in the process.
+  // hands it down, and launch_app, which wipes through the same launch
+  // (since 2026-10-09); until 2026-10-07 it was a module global in the
+  // engine, shared by every server in the process.
   const session = new EngineSession();
 
   registerTool(
@@ -248,7 +249,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'launch_app',
     {
       description:
-        'Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login). ' +
+        'Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login); the reply then carries a ' +
+        '⚠ clearState line counting the wipes this server session has made, flow launches included. ' +
         'Android: activity pins the entry point — without it (and without app.android.activity in ' +
         'averi.yaml) the launcher activity is picked arbitrarily, which opens LeakCanary instead of the ' +
         'app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND); an intent ' +
@@ -274,9 +276,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, appId, clearState, activity: named, intent, configPath: cp }) => {
       const entry = { platform: p, appId, activity: named, intent };
       const { cfg } = await loadForCall(TOOL_CONFIG.launch_app(entry), cp);
-      const activity = resolveLaunchActivity(cfg, entry);
-      const { note } = await (await registry.get(p)).launch(appId, { clearState, activity, intent });
-      return text(launchText({ appId, platform: p, activity, clearState, note }));
+      return text(launchText(p, await launchApp(await registry.get(p), cfg, session, { appId, activity: named, intent, clearState })));
     },
   );
 
