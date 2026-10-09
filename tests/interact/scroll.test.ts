@@ -548,6 +548,18 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
     expect(result.flush?.checked).toBe(true); // the static fake moves nothing: accepted, after a stroke that could have moved it
   });
 
+  it.fails('a probe whose container has room on the screen but not above the IME is not drawn over the whole screen: no swipe, reported unchecked (`room`) — not "nothing of it is cut there" after a stroke that touched down off the list', async () => {
+    const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 1340, width: 948, height: 50 } });
+    const under = node({ role: 'container', identifier: 'list', rect: { x: 0, y: 1340, width: 1080, height: 800 }, clipsDescendants: true, children: [row] });
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [under] }) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+    const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
+    expect(fake.swipes).toEqual([]);
+    expect(result.flush).toEqual({ edge: 'top', container: under.rect, checked: false, why: 'room' });
+  });
+
   it('a list still loading its next page (a spinner below the last row) is not called exhausted after two strokes — the scroll runs to its bound', async () => {
     const SETTINGS: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
     const rows = Array.from({ length: 20 }, (_, i) => `row_${i}`);
