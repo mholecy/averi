@@ -6,8 +6,11 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
-import { CLASSIC_VIEWS, COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE } from '../helpers/android-dumps.js';
+import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node as uiNode } from '../helpers/fake.js';
+
+const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
 /**
  * The draw-order module's interface (ui-tree/draw-order.ts): its three
@@ -411,13 +414,13 @@ describe('the three questions disagree on purpose, per row', () => {
     expect(ask(elsewhere)).toEqual({ shadowing: elsewhere, drawnOver: [elsewhere], target: [elsewhere] });
   });
 
-  it('own control: an unlabelled interactive SIBLING holding a non-interactive target whole and filling their wrapper (a Compose Button\'s clickable over its label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
+  it('own control: an unlabelled interactive SIBLING holding a non-interactive target whole and spanning their wrapper\'s width (a Compose Button\'s clickable over its label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
     const target = uiNode({ role: 'text', label: 'title', rect: rect(150, 280, 100, 40) });
     const control = uiNode({ role: 'button', rect: rect(140, 272, 120, 56) });
     const wrapper = uiNode({ role: 'container', rect: rect(140, 270, 120, 60), children: [target, control] });
     const order = drawOrder(uiNode({ role: 'application', rect: SCREEN, children: [uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: [wrapper] })] }));
     expect({ shadowing: order.shadowing(target, P), drawnOver: order.drawnOver(LIST), target: order.exposure(target, SCREEN).covers }).toEqual({ shadowing: control, drawnOver: [], target: [] });
-    // The same control laid in the list beside the target: the list is no wrapper of it (it fills 3 % of it) — a cover.
+    // The same control laid in the list beside the target: it does not span the list's width — a cover.
     const pinned = uiNode({ role: 'button', rect: rect(140, 270, 120, 60) });
     expect(ask(pinned, true)).toEqual({ shadowing: pinned, drawnOver: [], target: [pinned] });
     // After the list, holding the target: no sibling — a bar's button, a cover.
@@ -755,13 +758,55 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
  * `tap text:"LOGIN"` refused, `scroll_until` calling it a layout defect, `fully: true` never stopping on a row).
  */
 describe('exposure — a Compose label\'s own control, a row\'s own content (2026-10-09)', () => {
-  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const PIXEL = rect(0, 0, 1080, 2220);
   const parse = (xml: string) => {
     const tree = parseUiautomatorXml(xml);
     const find = (p: (n: UiNode) => boolean) => [...everyNode(tree)].find(p)!;
     return { tree, find, order: drawOrder(tree) };
   };
+  /** The round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json), by screen. */
+  const snapshots = async (): Promise<Record<string, UiNode>> =>
+    (JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+  /** Every text in `tree` with a later `button` sibling holding it whole — the shape the bug note measured. */
+  const labelled = (tree: UiNode): UiNode[] =>
+    [...everyNode(tree)].flatMap((parent) =>
+      parent.children.filter((n, i) => n.role === 'text' && parent.children.slice(i + 1).some((b) => b.role === 'button' && b.rect.x <= n.rect.x && b.rect.y <= n.rect.y && b.rect.x + b.rect.width >= n.rect.x + n.rect.width && b.rect.y + b.rect.height >= n.rect.y + n.rect.height)),
+    );
+
+  it('the round-5 ui_snapshots: every text under its own control — LOGIN, PAY / PAY ME / SCAN QR, Contacts\' "No thanks", Save, "Add phone" (cut to 96 px), "Add fields" (to 76), the rows cut at the tab bar — shows whole, its centre tapped', async () => {
+    const seen: string[] = [];
+    for (const [screen, tree] of Object.entries(await snapshots())) {
+      const order = drawOrder(tree);
+      for (const text of labelled(tree)) {
+        const exposure = order.exposure(text, PIXEL);
+        seen.push(`${screen} ${text.label}`);
+        expect({ screen, label: text.label, covers: exposure.covers, moved: exposure.tapAt?.moved }).toEqual({ screen, label: text.label, covers: [], moved: false });
+      }
+    }
+    expect(seen.length).toBe(91);
+    for (const label of ['LOGIN', 'PAY', 'PAY ME', 'SCAN QR', 'No thanks', 'Sync device and SIM contacts', 'Save', 'Add phone', 'Add fields']) expect(seen.some((s) => s.endsWith(` ${label}`))).toBe(true);
+  });
+
+  it('…the measured shapes in them: the control spans its wrapper\'s width, inset only vertically by a share that varies; a row\'s button stays whole where the row\'s container is cut', async () => {
+    const { contactsCreateStaged, contactsCreate, accountDetail } = await snapshots();
+    const wrapperOf = (tree: UiNode, label: string) => [...everyNode(tree)].find((p) => p.children.some((c) => c.label === label))!;
+    const shape = (tree: UiNode, label: string) => {
+      const wrapper = wrapperOf(tree, label);
+      return { wrapper: wrapper.rect, button: wrapper.children.find((c) => c.role === 'button' && c.rect.x === wrapper.rect.x)!.rect };
+    };
+    expect(shape(contactsCreateStaged, 'Add fields')).toEqual({ wrapper: rect(132, 2067, 312, 132), button: rect(132, 2078, 312, 76) });
+    expect(shape(contactsCreate, 'Add phone')).toEqual({ wrapper: rect(105, 2047, 261, 132), button: rect(105, 2058, 261, 96) });
+    const cut = [...everyNode(accountDetail)].filter((n) => n.identifier === 'transactions.list.row_29' || n.identifier === 'transactions.list.row_30');
+    expect(cut.map((row) => [row.rect, row.children.at(-1)!.rect])).toEqual([
+      [rect(66, 1784, 948, 56), rect(66, 1784, 948, 143)],
+      [rect(66, 2088, 948, 99), rect(66, 2044, 948, 143)],
+    ]);
+    // The label nodes of the rows wholly in the list, clear of the tab bar: no cover — the avatar's text is their own.
+    const order = drawOrder(accountDetail);
+    const rows = [...everyNode(accountDetail)].filter((n) => n.role === 'other' && n.label?.startsWith('Loan repayment') && n.rect.y >= 401 && n.rect.y + n.rect.height <= 1840);
+    expect(rows).toHaveLength(5);
+    for (const row of rows) expect(order.exposure(row, PIXEL).covers).toEqual([]);
+  });
 
   it.each([
     ['LOGIN', COMPOSE.login, rect(44, 1402, 992, 121), { x: 540, y: 1463 }],
@@ -769,7 +814,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     ['DISCARD', COMPOSE.discard, rect(638, 1192, 276, 121), { x: 776, y: 1253 }],
     ['KEEP EDITING', COMPOSE.discard, rect(262, 1192, 376, 121), { x: 450, y: 1253 }],
     ['No thanks', COMPOSE.noThanks, rect(44, 1967, 992, 110), { x: 541, y: 2023 }],
-  ])('%s: the unlabelled clickable `button` after the text, in its wrapper and holding it whole, is its own control — no cover; its centre is tapped', (label, xml, button, centre) => {
+  ])('through the parser — %s: the unlabelled clickable `button` after the text, spanning its wrapper\'s width and holding it, is its own control — no cover; its centre is tapped', (label, xml, button, centre) => {
     const { find, order } = parse(xml);
     const text = find((n) => n.label === label);
     expect(find((n) => n.role === 'button' && n.rect.x === button.x && n.rect.y === button.y)).toMatchObject({ label: null, rect: button });
@@ -779,7 +824,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     expect(seen.coverAt(centre)).toBeUndefined();
   });
 
-  it('Account Detail: the avatar\'s text `LR`, in the avatar\'s wrapper and wholly inside the row\'s label node, is the row\'s own content — the label node shows whole; the floating tab bar\'s host still covers the row beneath it', () => {
+  it('Account Detail through the parser: the avatar\'s text `LR`, in the avatar\'s wrapper and wholly inside the row\'s label node, is the row\'s own content — the label node shows whole; the floating tab bar\'s host still covers the row beneath it', () => {
     const { find, order } = parse(COMPOSE.accountDetail);
     const label = find((n) => n.label === 'Loan repayment, 17.12.2025, +493.00 EUR');
     expect(label).toMatchObject({ role: 'other', rect: rect(66, 951, 948, 143) });
@@ -788,51 +833,75 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     const lower = find((n) => n.label === 'Card payment, 15.12.2025, -12.00 EUR');
     const seen = order.exposure(lower, PIXEL);
     expect(seen.covers[0]).toBe(host);
-    expect(seen.covers).not.toContain(find((n) => n.label === 'LR' && n.rect.y === 1878));
+    expect(seen.covers).not.toContain(find((n) => n.label === 'CP'));
     expect(seen.shows).toBeCloseTo(10 / 143);
+  });
+
+  it('WDA (wda-source-myport-login-keyboard.json): `login_support`, a childless RN view, has its sibling `login_support_email` drawn on it — and that sibling\'s text `podpora@finportal.sk` is its own content too, no cover (a cover at dd50327)', async () => {
+    const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-keyboard.json', import.meta.url), 'utf8'));
+    const nodes = [...everyNode(tree)];
+    const support = nodes.find((n) => n.identifier === 'login_support')!;
+    const email = nodes.find((n) => n.identifier === 'login_support_email')!;
+    expect([support.children, email.children.map((c) => [c.role, c.label])]).toEqual([[], [['text', 'podpora@finportal.sk']]]);
+    expect(drawOrder(tree).exposure(support, tree.rect).covers).toEqual([]);
   });
 
   describe('what stays a cover', () => {
     const TEXT = rect(481, 1438, 118, 49);
     const text = () => uiNode({ role: 'text', label: 'LOGIN', rect: TEXT });
-    const button = (r = rect(44, 1402, 992, 121)) => uiNode({ role: 'button', rect: r });
+    const button = (r = rect(44, 1402, 992, 121), partial: Partial<UiNode> = {}) => uiNode({ role: 'button', rect: r, ...partial });
     const WRAPPER = rect(44, 1397, 992, 132);
     /** The label and `later` in `parent`'s rect, on a Compose screen. */
     const inParent = (target: UiNode, later: UiNode, parent = WRAPPER) =>
       uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: parent, children: [target, later] })] })] });
+    const coversOf = (target: UiNode, later: UiNode, parent = WRAPPER) => drawOrder(inParent(target, later, parent)).exposure(target, PIXEL).covers;
 
     it('an interactive target is no label: a later button holding a button whole in their wrapper covers it', () => {
       const target = uiNode({ role: 'button', label: 'Inner', rect: TEXT });
       const later = button();
-      expect(drawOrder(inParent(target, later)).exposure(target, PIXEL).covers).toEqual([later]);
+      expect(coversOf(target, later)).toEqual([later]);
     });
 
-    it('a scrim or backdrop: a clickable sibling in a SCREEN-SIZED parent (an RN transparent Modal\'s Pressable, a dismiss region) holding the text covers it', () => {
+    it('a scrim or backdrop: a clickable sibling in a SCREEN-SIZED parent (an RN transparent Modal\'s Pressable), or screen-sized itself in a full-width sheet (a dismiss region), covers the text it holds', () => {
       const target = text();
       const scrim = button(PIXEL);
-      expect(drawOrder(inParent(target, scrim, PIXEL)).exposure(target, PIXEL).covers).toEqual([scrim]);
-      // Just under the screen's size, still holding the label: a dialog's own clickable over its text is its control, the
-      // scrim reaching past the dialog is not.
-      const sheet = rect(0, 400, 1080, 1820);
-      const past = button(rect(0, 0, 1080, 2220));
-      expect(drawOrder(inParent(target, past, sheet)).exposure(target, PIXEL).covers).toEqual([past]);
+      expect(coversOf(target, scrim, PIXEL)).toEqual([scrim]);
+      // Spanning a screen-sized layout's width, not screen-sized itself: the layout is no wrapper of it.
+      const band = button(rect(0, 1300, 1080, 300));
+      expect(coversOf(target, band, PIXEL)).toEqual([band]);
+      // Screen-sized itself, spanning a sheet's width and reaching past it.
+      const past = button(PIXEL);
+      expect(coversOf(target, past, rect(0, 400, 1080, 1820))).toEqual([past]);
     });
 
-    it('a clickable sibling reaching outside the wrapper, one not holding the text whole (a clear button), or one in another parent (the pinned CONTINUE bar) covers it', () => {
+    it('the control spans its wrapper\'s WIDTH, as measured: one inset by a pixel on either side or shifted by one, one spanning only the height, one not holding the label whole (a clear button), one that says something (a label, a value) covers it; one reaching past the wrapper vertically (a row cut at the list\'s edge) does not', () => {
       const target = text();
-      const wide = button(rect(44, 1300, 992, 300));
-      expect(drawOrder(inParent(target, wide)).exposure(target, PIXEL).covers).toEqual([wide]);
-      const clear = button(rect(560, 1440, 60, 45));
-      expect(drawOrder(inParent(target, clear)).exposure(target, PIXEL).covers).toEqual([clear]);
+      for (const r of [rect(45, 1402, 991, 121), rect(44, 1402, 991, 121), rect(45, 1402, 992, 121), rect(400, 1397, 300, 132), rect(560, 1440, 60, 45)]) {
+        const later = button(r);
+        expect(coversOf(target, later)).toEqual([later]);
+      }
+      for (const said of [button(undefined, { label: 'LOG IN' }), button(undefined, { value: 'on' })]) expect(coversOf(target, said)).toEqual([said]);
+      expect(coversOf(target, button(rect(44, 1300, 992, 300)))).toEqual([]);
+      // Spanning the width but missing the label's bottom: a cover.
+      const low = uiNode({ role: 'text', label: 'LOGIN', rect: rect(481, 1500, 118, 25) });
+      const upper = button(rect(44, 1397, 992, 110));
+      expect(coversOf(low, upper)).toEqual([upper]);
+    });
+
+    it('a control of ANOTHER parent covers: the pinned CONTINUE bar after the list, a bar in a sheet beside the label\'s wrapper, an unlabelled Surface spanning a wrapper of its own', () => {
+      const target = text();
       const bar = button(rect(44, 1400, 992, 132));
       const tree = uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(0, 0, 1080, 1500), clipsDescendants: true, children: [uiNode({ role: 'container', rect: WRAPPER, children: [target] })] }), bar] });
       expect(drawOrder(tree).exposure(target, PIXEL).covers).toEqual([bar]);
-      // …even when that other parent is small and holds both: a sheet's bar laid over a row's label in the sheet.
       const sheet = uiNode({ role: 'container', rect: rect(0, 1200, 1080, 600), children: [uiNode({ role: 'container', rect: WRAPPER, children: [target] }), bar] });
       expect(drawOrder(uiNode({ role: 'container', rect: PIXEL, children: [sheet] })).exposure(target, PIXEL).covers).toEqual([bar]);
+      const surface = button(rect(44, 1392, 992, 136));
+      const own = uiNode({ role: 'container', rect: rect(44, 1390, 992, 140), children: [surface] });
+      const beside = uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(0, 1200, 1080, 600), children: [uiNode({ role: 'container', rect: WRAPPER, children: [target] }), own] })] });
+      expect(drawOrder(beside).exposure(target, PIXEL).covers).toEqual([own, surface]);
     });
 
-    it('a classic View\'s pinned CTA in the SAME layout as a text (review of fix/r6): LOG IN over "Forgot password?" with the keyboard up, CONTINUE over the terms, a sheet\'s PAY over its fee — each fills a sliver of the layout and carries its own label: a cover', () => {
+    it('a classic View\'s pinned CTA in the SAME layout as a text (review of fix/r6, synthetic): LOG IN over "Forgot password?" with the keyboard up, CONTINUE over the terms, a sheet\'s PAY over its fee — inset from the layout\'s sides and labelled: a cover', () => {
       const cases: [string, string, string][] = [
         ['Forgot password?', 'LOG IN', CLASSIC_VIEWS.loginImeUp],
         ['By continuing you accept the terms', 'CONTINUE', CLASSIC_VIEWS.terms],
@@ -844,47 +913,31 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
         expect(seen.covers.map((n) => n.label)).toEqual([cta]);
         expect(seen.tapAt).toBeUndefined();
       }
+      // Unlabelled, LOG IN still covers: it does not span its layout's width.
+      const { find, order } = parse(CLASSIC_VIEWS.loginImeUp);
+      const login = find((n) => n.label === 'LOG IN');
+      login.label = null;
+      expect(order.exposure(find((n) => n.label === 'Forgot password?'), PIXEL).covers).toEqual([login]);
     });
 
-    it('the wrapper is the control\'s own only when the control fills it (OWN_CONTROL_FILL, 0.85) and says nothing itself: a labelled or valued control, or one filling 0.84 of the wrapper, covers; 0.86 does not — unless it misses part of the label, or fills a wrapper of its own beside the label\'s', () => {
-      // A 992x100 wrapper; the label 481,1400 118x49 inside it; the control 992 wide, h tall, from the wrapper's top.
-      const label = uiNode({ role: 'text', label: 'LOGIN', rect: rect(481, 1400, 118, 49) });
-      const filling = (h: number, partial: Partial<UiNode> = {}) => uiNode({ role: 'button', rect: rect(44, 1397, 992, h), ...partial });
-      const covers = (later: UiNode) => drawOrder(inParent(label, later, rect(44, 1397, 992, 100))).exposure(label, PIXEL).covers;
-      expect(covers(filling(86))).toEqual([]);
-      const thin = filling(84);
-      expect(covers(thin)).toEqual([thin]);
-      for (const said of [filling(100, { label: 'LOG IN' }), filling(100, { value: 'on' })]) expect(covers(said)).toEqual([said]);
-      // Filling the wrapper but not holding the label whole (the label below its bottom edge): a cover.
-      const low = uiNode({ role: 'text', label: 'LOGIN', rect: rect(481, 1470, 118, 25) });
-      const upper = filling(86);
-      expect(drawOrder(inParent(low, upper, rect(44, 1397, 992, 100))).exposure(low, PIXEL).covers).toEqual([upper]);
-      // Filling ITS OWN wrapper, a sibling of the label's (an unlabelled clickable Surface pinned as a bar over the label): a cover.
-      const surface = uiNode({ role: 'button', rect: rect(44, 1392, 992, 136) });
-      const bar = uiNode({ role: 'container', rect: rect(44, 1390, 992, 140), children: [surface] });
-      const tree = uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(0, 1200, 1080, 600), children: [uiNode({ role: 'container', rect: WRAPPER, children: [text()] }), bar] })] });
-      const target = [...everyNode(tree)].find((n) => n.label === 'LOGIN')!;
-      expect(drawOrder(tree).exposure(target, PIXEL).covers).toEqual([bar, surface]);
-    });
-
-    it('a non-interactive node of the wrapper\'s size holding the label — an opaque card, a loading view — covers it', () => {
+    it('a non-interactive node of the wrapper\'s width holding the label — an opaque card, a loading view — covers it', () => {
       const target = text();
       for (const role of ['image', 'progress', 'other']) {
         const card = uiNode({ role, rect: rect(44, 1402, 992, 121), ...(role === 'other' && { label: 'Loading' }) });
-        expect(drawOrder(inParent(target, card)).exposure(target, PIXEL).covers).toEqual([card]);
+        expect(coversOf(target, card)).toEqual([card]);
       }
     });
 
-    it('in idb\'s flat list every node is a sibling, of the 0×0 root that holds nothing: a later button holding the text, its top at the text\'s, covers it', () => {
+    it('in idb\'s flat list every node is a sibling, of the 0×0 root that no control spans: a later button holding the text, its top at the text\'s, covers it', () => {
       const target = text();
       const later = button(rect(44, 1438, 992, 121));
       expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: PIXEL }), target, later] })).exposure(target, PIXEL).covers).toEqual([later]);
     });
 
-    it('a row\'s own content is narrow: in the avatar\'s wrapper, an interactive node, a text reaching outside the label node, and any text under a full-width sibling (a header) cover it', () => {
+    it('a row\'s own content is narrow: in the avatar\'s wrapper, an interactive node, a text reaching outside the label node, and any text under a full-width sibling (a header) cover it; so does content two wrappers down', () => {
       const label = uiNode({ role: 'other', label: 'Loan repayment', rect: rect(66, 951, 948, 143) });
       const rowOf = (sibling: UiNode) => uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(66, 951, 948, 143), children: [label, sibling] })] });
-      const avatar = (inner: UiNode) => uiNode({ role: 'container', rect: rect(116, 980, 88, 88), children: [inner] });
+      const avatar = (inner: UiNode) => uiNode({ role: 'container', rect: rect(116, 979, 88, 88), children: [inner] });
       const own = uiNode({ role: 'text', label: 'LR', rect: rect(136, 999, 48, 49) });
       expect(drawOrder(rowOf(avatar(own))).exposure(label, PIXEL).covers).toEqual([]);
       const badge = uiNode({ role: 'button', label: 'Edit', rect: rect(136, 999, 48, 49) });
@@ -893,12 +946,11 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       expect(drawOrder(rowOf(avatar(out))).exposure(label, PIXEL).covers).toEqual([out]);
       const header = uiNode({ role: 'container', label: 'December', rect: rect(66, 940, 948, 60), children: [uiNode({ role: 'text', label: 'December', rect: rect(100, 951, 300, 40) })] });
       expect(drawOrder(rowOf(header)).exposure(label, PIXEL).covers).toEqual([header, header.children[0]]);
-      // One wrapper down, as measured — two is not the target's: the avatar's text inside a frame of the avatar covers.
       const deep = uiNode({ role: 'text', label: 'LR', rect: rect(136, 999, 48, 49) });
       expect(drawOrder(rowOf(avatar(uiNode({ role: 'container', rect: rect(126, 990, 68, 68), children: [deep] })))).exposure(label, PIXEL).covers).toEqual([deep]);
     });
 
-    it('…and only of a CHILDLESS target: the list holding the rows, with the tab bar\'s host drawn on it as its sibling, still has the tab and its text over it', () => {
+    it('…and only of a CHILDLESS target: the list holding the rows, with the tab bar\'s host drawn on it as its sibling, still has the tab and its label over it', () => {
       const tree = parseUiautomatorXml(COMPOSE.accountDetail);
       const list = [...everyNode(tree)].find((n) => n.clipsDescendants === true)!;
       const covers = drawOrder(tree).exposure(list, PIXEL).covers;

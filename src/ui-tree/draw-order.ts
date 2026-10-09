@@ -226,15 +226,21 @@ const repeats = (node: UiNode, target: UiNode): boolean => {
   return [node.label, node.value].some((t) => t !== null && own.includes(t));
 };
 
+/** `placed` is a sibling of `target`: both have the same parent. */
+const siblingOf = (placed: Placed, target: Placed): placed is Placed & { readonly parent: Placed } => placed.parent !== undefined && placed.parent === target.parent;
+
 /** The `onTarget` row's sibling: see the row. */
-const drawnOn = ({ node, parent }: Placed, { target, flatList }: SeenFor): boolean =>
-  parent !== undefined &&
-  parent === target.parent &&
-  !isInteractive(node) &&
-  (!flatList || repeats(node, target.node)) &&
-  node.rect.width < target.node.rect.width &&
-  node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
-  containsPoint(target.node.rect, tapPoint(node));
+const drawnOn = (placed: Placed, { target, flatList }: SeenFor): boolean => {
+  const { node } = placed;
+  return (
+    siblingOf(placed, target) &&
+    !isInteractive(node) &&
+    (!flatList || repeats(node, target.node)) &&
+    node.rect.width < target.node.rect.width &&
+    node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
+    containsPoint(target.node.rect, tapPoint(node))
+  );
+};
 
 /**
  * The `onTarget` row's nested content: a non-interactive node lying wholly
@@ -247,23 +253,6 @@ const ownContent = ({ node, parent }: Placed, about: SeenFor): boolean =>
   !isInteractive(node) &&
   rectWithin(node.rect, about.target.node.rect) &&
   drawnOn(parent, about);
-
-/**
- * The least share of its parent's area a control must fill to be the
- * parent's own (`ownControl`): the parent is then the control's wrapper,
- * not a layout that also holds other things. Measured (2026-10-09, docs/
- * bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-
- * button.md): a Compose `Button`'s clickable fills 992x121 of its
- * 992x132 wrapper — 0.917 (LOGIN, SIGN IN; DISCARD's 276x121 of 276x132
- * the same) — and a list row's `button` IS the row (1.0). The classic-View
- * shapes it must refuse lie far below: a bottom-pinned LOG IN `1000x130`
- * in its 1080x1090 ConstraintLayout (0.11), a sheet's PAY `1000x130` in
- * its 1080x1054 sheet (0.11).
- * 0.85 leaves the measured wrappers' padding room (a 0.917 fill is ~11 px
- * of a 132-px wrapper's height; 0.85 allows ~20) while no layout holding a
- * label beside a control comes near it.
- */
-const OWN_CONTROL_FILL = 0.85;
 
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
 const itemless = (n: UiNode): boolean => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
@@ -533,9 +522,11 @@ const NOT_DRAWN = {
    * RecyclerView and a TextView, a Scaffold whose bottom bar is a bare
    * Text, `fully` asked of the list): same shape, same answer as before.
    *
-   * And what such a sibling holds (2026-10-09, `ownControl`'s note): a
+   * And what such a sibling holds (`ownContent`; 2026-10-09, docs/bugs/
+   * 2026-10-09-android-compose-button-text-refused-as-under-its-own-
+   * button.md): a
    * NON-INTERACTIVE node lying WHOLLY inside a CHILDLESS target, whose
-   * parent is a sibling drawn on it (`ownContent`) — one wrapper down, the
+   * parent is a sibling drawn on it — one wrapper down, the
    * measured depth; deeper still covers.
    * Childless: a leaf whose content is listed beside it (Compose's merged
    * label node, an RN view under WDA) has no other; a target with children
@@ -563,55 +554,66 @@ const NOT_DRAWN = {
 
   /**
    * THE TARGET'S OWN CONTROL: an INTERACTIVE node with no label and no
-   * value, in a NON-INTERACTIVE target's parent, that holds the target's
-   * rect whole and lies within that parent, filling at least
-   * OWN_CONTROL_FILL of it — the parent is the control's own wrapper — the
-   * parent not the screen's size (`screenSized`). `target` only
-   * (2026-10-09, docs/bugs/2026-10-09-android-compose-button-text-refused-
-   * as-under-its-own-button.md — a regression of this column's first
-   * round): a Compose `Button` reaches uiautomator as a wrapper holding its
-   * label text and, AFTER it, an unlabelled clickable `button` of about the
-   * wrapper's rect — mp-native's `container 44,1397 992x132` → `text
-   * 'LOGIN' 481,1438 118x49`, `button 44,1402 992x121`; SIGN IN, DISCARD
-   * (in `swift_payment.form.discard_button`), Google Contacts' "No thanks"
-   * the same (tests/helpers/android-dumps.ts#COMPOSE). That button read as
-   * drawn over the text: `tap text:"LOGIN"` was refused, `scroll_until`
-   * called the screen a layout defect, and an `optional:` tap skipped. A
-   * tap at the label's centre lands on the button — what the caller means.
+   * value, a sibling of a NON-INTERACTIVE target, that holds the target's
+   * rect whole and SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
+   * exactly — the parent not the screen's size (`screenSized`), nor the
+   * control. `target` only (2026-10-09, docs/bugs/2026-10-09-android-
+   * compose-button-text-refused-as-under-its-own-button.md — a regression of
+   * this column's first round): a Compose `Button` reaches uiautomator as a
+   * wrapper holding its label text and, AFTER it, an unlabelled clickable
+   * `button` — mp-native's `container 44,1397 992x132` → `text 'LOGIN'
+   * 481,1438 118x49`, `button 44,1402 992x121`. That button read as drawn
+   * over the text: `tap text:"LOGIN"` was refused, `scroll_until` called
+   * the screen a layout defect, and an `optional:` tap skipped. A tap at
+   * the label's centre lands on the button — what the caller means.
    *
-   * What still covers: a control that is not its parent's wrapper — a
-   * pinned CTA in the SAME parent as a text (review of fix/r6: a classic
-   * View's bottom-pinned `Button "LOG IN"` riding up over `"Forgot
-   * password?"` in the login ConstraintLayout with the keyboard up, a
-   * `Button "CONTINUE"` over the terms text, a sheet's PAY over its fee
-   * text) fills a sliver of its layout,
-   * and carries its own label; a non-interactive node holding the label (an
-   * opaque card, a loading view); an interactive TARGET under a later
-   * control (a button over a button); a control in a screen-sized parent or
-   * reaching outside its parent — a scrim, an RN transparent Modal's
-   * backdrop, a dismiss region; one that does not hold the label whole (a
-   * field's clear button); one in another parent. idb's flat list never
-   * meets this row: every node's parent is its 0×0 root, which holds
-   * nothing. Residual, stated: an unlabelled interactive node filling a
-   * small wrapper it shares with a label is read as the label's control,
-   * and the tap is sent to it — geometry cannot tell it from a Compose
-   * Button. So: a Compose `clickable(role = Role.Button)` overlay laid
-   * over a text in a Box of its size (a card's tap target, a disabled-state
-   * scrim cut to the card), and an unlabelled `ImageButton` filling a
-   * thumbnail's FrameLayout over its caption text — both excused.
+   * Why the full width (the round-5 ui_snapshots, tests/fixtures/android-
+   * ui-snapshot-compose.json): in every measured case the control has its
+   * wrapper's x and width, and is inset only vertically — Compose's
+   * minimum-touch-target padding, by a share that varies: LOGIN and PAY
+   * 121 of 132 px, PAY ME and SCAN QR 113, Google Contacts' "No thanks",
+   * "Sync device and SIM contacts", "Save", "Add phone" 110, "Add phone"
+   * cut by the screen's bottom 96, "Add fields" 76 (an area share from 0.58
+   * to 0.92, so no area threshold fits). A list row's `button` IS the row,
+   * and stays whole where uiautomator cuts the row's container at the
+   * list's edge or the floating tab bar's (`66,1784 948x56` holding a
+   * `button 66,1784 948x143`), so the control is not held to lie within its
+   * parent. Only the width was measured; a control spanning its wrapper's
+   * height instead (a tall narrow one) is not excused.
+   *
+   * What still covers: a pinned CTA in the SAME parent as a text (review of
+   * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over
+   * "Forgot password?" in its 1080-wide ConstraintLayout with the keyboard
+   * up, `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"`
+   * over its fee) — inset from its layout's sides, and labelled; a
+   * non-interactive node holding the label (an opaque card, a loading
+   * view); an interactive TARGET under a later control (a button over a
+   * button); a control in a screen-sized parent, or screen-sized itself —
+   * a scrim, an RN transparent Modal's backdrop, a dismiss region; one that
+   * does not hold the label whole (a field's clear button); one in another
+   * parent. idb's flat list never meets this row: every node's parent is
+   * its 0×0 root, which no control spans. Residual, stated: an unlabelled
+   * interactive node spanning the width of a wrapper it shares with a
+   * label is read as the label's control, and the tap is sent to it —
+   * geometry cannot tell it from a Compose Button. So: a Compose
+   * `clickable(role = Role.Button)` overlay laid over a text in a Box of
+   * its width (a card's tap target, a disabled-state scrim cut to the
+   * card), an unlabelled `ImageButton` filling a thumbnail's FrameLayout
+   * over its caption text, an unlabelled full-width bar button pinned over
+   * a text in the bar's own layout — all excused.
    */
   ownControl: {
-    target: ({ node, parent }, { target, screen }) =>
-      parent !== undefined &&
-      parent === target.parent &&
-      isInteractive(node) &&
-      !node.label &&
-      !node.value &&
+    target: (placed, { target, screen }) =>
+      siblingOf(placed, target) &&
+      isInteractive(placed.node) &&
+      !placed.node.label &&
+      !placed.node.value &&
       !isInteractive(target.node) &&
-      rectWithin(target.node.rect, node.rect) &&
-      rectWithin(node.rect, parent.node.rect) &&
-      rectArea(node.rect) >= OWN_CONTROL_FILL * rectArea(parent.node.rect) &&
-      !screenSized(parent.node, screen),
+      rectWithin(target.node.rect, placed.node.rect) &&
+      placed.node.rect.x === placed.parent.node.rect.x &&
+      placed.node.rect.width === placed.parent.node.rect.width &&
+      !screenSized(placed.parent.node, screen) &&
+      rectArea(placed.node.rect) < screen * SCREEN_SIZED_FRACTION,
   },
 
   /**
