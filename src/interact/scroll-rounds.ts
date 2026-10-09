@@ -4,7 +4,7 @@ import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { judgingOf, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox } from './swipe.js';
+import { judgingOf, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -945,8 +945,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // the target was just judged on this box, cover and axis, so a largest
     // scroller WITH room is by construction not one of them, a list that
     // cannot hold the target. The stroke goes over the screen box. Room
-    // judged clear of what is drawn over each (2026-10-09), as the stroke.
-    const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y, facts.drawnOver);
+    // judged clear of what is drawn over each (2026-10-09), as the stroke —
+    // on purpose (code review of fix/r4, P2): the container chosen and the
+    // stroke drawn over it are one strokeRoom judgement, one owner.
+    const room = strokeRoom(gesture, facts.scrollersOf(best.node), s.rules.direction, cover?.topCover.y, (w) => overIn(facts, w));
     s.targetScroller = room === undefined ? 'none' : { rect: { ...room.within }, over: overIn(facts, room.within) ?? [] };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
@@ -1121,7 +1123,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         // — so it takes a device reporting 0×0 throughout, and a tree whose
         // window stood in on an earlier round (else the frame is 0×0 and no
         // stop is ever visible) but not on this one.
-        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop, now.facts.drawnOver);
+        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop, (w) => overIn(now.facts, w));
         if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
         else if (roomOver() === undefined) flush = { edge, container, ...noRoom };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
@@ -1240,8 +1242,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // — or the gesture box whole when it leaves no room, under the keyboard
   // alone — a stroke toward the target is still worth drawing over the
   // screen; a probe never comes here.
-  const over = (within?.over ?? []).map((rect) => ({ rect }));
-  const room = strokeRoom(gesture, within === undefined ? [] : [within.rect], toward, strokeCover?.topCover.y, () => over);
+  const room = strokeRoom(gesture, within === undefined ? [] : [within.rect], toward, strokeCover?.topCover.y, () => within?.over);
   const coverTop = room === undefined ? strokeCover?.topCover.y : room.coverTop;
   const box = room?.box ?? gesture;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
@@ -1269,7 +1270,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
  * (`lastStroke`, `turns`, `strokesSent`) is left as it was, so a probe the
  * other way from the caller's direction is not a turn and halves no reach.
  */
-function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: { within: Rect; box: Rect; coverTop?: number }, maxTravel: number): { state: Rounds; step: RoundStep } {
+function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxTravel: number): { state: Rounds; step: RoundStep } {
   const { box, coverTop } = room;
   s.probe = { rect: { ...rect }, edge };
   s.strokeWithin = { ...room.within };

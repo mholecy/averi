@@ -218,9 +218,24 @@ export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRAC
  */
 export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?: number): Rect | undefined {
   const met = rectIntersection(box, within);
-  if (met === undefined) return undefined;
+  return met === undefined ? undefined : roomIn(met, toward, coverTop);
+}
+
+/** `met` — a container already met with the gesture box — when it is at least MIN_STROKE_BOX along the stroke above `coverTop`; `strokeBox`'s rule, for `strokeRoom`, which has met them once already. */
+function roomIn(met: Rect, toward: Direction, coverTop?: number): Rect | undefined {
   const side = toward === 'up' || toward === 'down' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
   return side >= MIN_STROKE_BOX ? met : undefined;
+}
+
+/**
+ * What `strokeRoom` decides: the candidate container (`within`, as the tree
+ * gives it), the box the stroke is drawn in, and the top edge of what
+ * covers that box's lower part, when something does.
+ */
+export interface StrokeRoom {
+  within: Rect;
+  box: Rect;
+  coverTop?: number;
 }
 
 /**
@@ -242,8 +257,9 @@ export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?:
  * above the keyboard, falling back to the screen; one judgement now, the
  * keyboard in it. No gesture `box` at all (screenBox threw): no room.
  *
- * `over` gives the nodes drawn over a candidate (ui-tree/geometry.ts
- * #drawnOver, through scroll-rounds.ts#TreeFacts) — the floating tab bar
+ * `over` gives the rects drawn over a candidate (ui-tree/geometry.ts
+ * #drawnOver, through scroll-rounds.ts#TreeFacts, or as a remembered
+ * container carries them, scroll-rounds.ts#StrokeContainer) — the floating tab bar
  * of 2026-10-09 (docs/bugs/2026-10-09-android-scroll-stroke-touches-down-
  * on-floating-tab-bar.md): the list `0,825 1080x1395` ran under the bar's
  * host `66,1840 948x248`, the content-down stroke over it touched down at
@@ -257,14 +273,15 @@ export function strokeRoom(
   candidates: readonly Rect[],
   toward: Direction,
   coverTop?: number,
-  over?: (within: Rect) => readonly { rect: Rect }[] | undefined,
-): { within: Rect; box: Rect; coverTop?: number } | undefined {
+  over?: (within: Rect) => readonly Rect[] | undefined,
+): StrokeRoom | undefined {
   if (box === undefined) return undefined;
   for (const within of candidates) {
     const met = rectIntersection(box, within);
-    const drawn = met === undefined ? undefined : overlayTop(met, over?.(within) ?? [], toward, coverTop);
+    if (met === undefined) continue;
+    const drawn = overlayTop(met, over?.(within) ?? [], toward, coverTop);
     const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
-    const room = strokeBox(box, within, toward, top);
+    const room = roomIn(met, toward, top);
     if (room !== undefined) return { within, box: room, ...(top !== undefined && { coverTop: top }) };
   }
   return undefined;
@@ -311,12 +328,11 @@ export function strokeRoom(
  * still reported checked (a residual: the probe's stop is not the fast
  * fail). Pure.
  */
-function overlayTop(box: Rect, over: readonly { rect: Rect }[], toward: Direction, coverTop?: number): number | undefined {
+function overlayTop(box: Rect, over: readonly Rect[], toward: Direction, coverTop?: number): number | undefined {
   if (toward !== 'down') return undefined;
   const cx = Math.round(box.x + box.width / 2);
   const bottom = Math.min(box.y + box.height, coverTop ?? Number.POSITIVE_INFINITY);
   const tops = over
-    .map(({ rect }) => rect)
     .filter((r) => r.x <= cx && cx < r.x + r.width && r.y > (box.y + bottom) / 2 && r.y < bottom)
     .map((r) => r.y);
   return tops.length === 0 ? undefined : Math.min(...tops);
