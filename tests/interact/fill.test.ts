@@ -1051,8 +1051,13 @@ describe('fillField — the mismatch error says what differs, without content (2
 
 /**
  * The review of fix/r3-fill (2026-10-09) probed the hint-aware clear and the
- * mismatch wording with shapes the first round missed (its probes A–J; the
- * letters are kept in the test names). Each is pinned here.
+ * mismatch wording with shapes the first round missed (its probes A–K; the
+ * letters are kept in the test names). Since the fill-clear deepening
+ * (2026-10-09) the clear's RULES behind A, E, I, J, K and the third round
+ * are rows of tests/interact/fill-clear.test.ts (clearStep, one reading at a
+ * time) and the mismatch's kinds rows of fill-verdict.test.ts
+ * (differenceOf); what stays here for those is the driver's part — the
+ * device calls in their order and count, and the facts it hands on.
  */
 describe('fillField — the review probes of the hint-aware clear (2026-10-09)', () => {
   it('A: a MASKED field the deletes and the typing never reach (the focus tap missed) fails as clear-twice — bullets are no hint', async () => {
@@ -1164,7 +1169,7 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow('fill: typed 6 characters but the field shows 6 (content withheld from this error)');
   });
 
-  it('I: deletes that land LATE (after the first read) are not "unchanged": one more read after the poll cadence, then a verified clear', async () => {
+  it('I: an unchanged reading after the deletes costs one poll cadence and one tree read more — then the late deletes are seen', async () => {
     const fake = formFake('abc');
     let pending = 0;
     let readsSince = 0;
@@ -1174,24 +1179,30 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       readsSince = 0;
     };
     const real = fake.uiTree.bind(fake);
+    let reads = 0;
     fake.uiTree = async (...a: Parameters<FakeAdapter['uiTree']>) => {
+      reads++;
       if (pending > 0 && ++readsSince === 2 && fake.focused) {
         fake.focused.value = (fake.focused.value ?? '').slice(0, -pending) || null; // lands now, a read late
         pending = 0;
       }
       return real(...a);
     };
+    sleeps.length = 0;
     const result = await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([3]);
-    expect(fillReply(result, 'id:amount_input')).toBe('Filled id:amount_input (0 characters, cleared 3 characters first)');
+    expect(sleeps).toEqual([FAST.pollMs, DEFAULT_FOCUS_DELAY_MS, FAST.pollMs]); // the settle pause, the focus delay, the re-read's cadence
+    expect(reads).toBe(5); // settle (2), post-focus (1), after the deletes (1), the re-read (1)
+    expect(result).toMatchObject({ cleared: 3, readBack: { kind: 'nothing-typed' } });
+    expect(result.clearUnchanged).toBeUndefined();
   });
 
   it('J: clear + value on an EMPTY hinted field (the headline device case): nothing claimed deleted — the deletes went into an empty field', async () => {
     const { fake } = hintedField('');
     const result = await fillField(fake, { id: 'last_name' }, 'Probe', { ...FAST, clear: true });
-    expect(fake.deletes).toEqual([9]);
-    expect(result).toMatchObject({ cleared: 0, clearUnchanged: { shows: 9, deletes: 9 }, readBack: { kind: 'landed' } });
-    expect(fillReply(result, 'id:last_name')).toBe('Filled id:last_name (5 characters)'); // not "cleared 9 characters first"
+    expect(fake.deletes).toEqual([9]); // one round, then the re-read — no second round into the empty field
+    expect(fake.typed).toEqual(['Probe']);
+    expect(result).toMatchObject({ cleared: 0, clearUnchanged: { shows: 9, deletes: 9 }, readBack: { kind: 'landed' } }); // judged: "Filled … (5 characters)", fill-verdict.test.ts
   });
 
   it('E: a short first round, then the hint (not a shortening of what was left): one more round, and the unchanged rule decides', async () => {
