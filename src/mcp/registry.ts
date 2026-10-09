@@ -153,8 +153,11 @@ export class AdapterRegistry {
     this.assertOpen();
     const binding = this.bindings.get(platform);
     if (binding) {
-      const listed = (await this.probe(platform)).find((d) => d.id === binding.deviceId);
-      const stillBooted = listed?.state === 'booted';
+      // Every entry with the serial: cheap phones can share one, and any
+      // booted entry keeps the binding, as before the C5 refusals.
+      const matches = (await this.probe(platform)).filter((d) => d.id === binding.deviceId);
+      const stillBooted = matches.some((d) => d.state === 'booted');
+      const listed = matches[0];
       // A select() may have rebound the platform while we awaited the probe.
       // Acting on the CAPTURED binding would re-cache the evicted (already
       // disposed) device's adapter — start over against the current binding.

@@ -168,6 +168,46 @@ describe('AdapterRegistry', () => {
       await expect(registry.get('android')).rejects.toThrow(/^Selected android device "emulator-5556" is offline: /);
     });
 
+    it('a select() landing during an unbound probe that saw only an unauthorized phone wins over the refusal', async () => {
+      // The user accepts the prompt and selects the phone while get() waits on
+      // a listing taken before: get() must honour the binding, not throw.
+      let release!: () => void;
+      const gate = new Promise<void>((r) => { release = r; });
+      let first = true;
+      const bound: string[] = [];
+      const registry = new AdapterRegistry({
+        factory: (_p, id) => { bound.push(id); return new FakeAdapter({}, 'none'); },
+        discovery: async () => {
+          if (!first) return [device('R58M123')];
+          first = false;
+          const stale = [device('R58M123', 'unauthorized')];
+          await gate;
+          return stale;
+        },
+      });
+      const racing = registry.get('android');
+      await registry.select('android', 'R58M123');
+      release();
+      await expect(racing).resolves.toBeInstanceOf(FakeAdapter);
+      expect(bound).toEqual(['R58M123']);
+    });
+
+    it('a pinned device listed twice (a shared serial) stays usable while one entry is booted', async () => {
+      const { registry, devices } = makeRegistry([device('0123456789ABCDEF')]);
+      await registry.select('android', '0123456789ABCDEF');
+      devices.unshift(device('0123456789ABCDEF', 'unauthorized'));
+      await expect(registry.get('android')).resolves.toBeInstanceOf(FakeAdapter);
+    });
+
+    it('iOS keeps its wording on the pinned path: a shut-down simulator is "no longer booted"', async () => {
+      const { registry, devices } = makeRegistry([device('sim', 'booted', 'ios')]);
+      await registry.select('ios', 'sim');
+      devices[0] = device('sim', 'offline', 'ios');
+      await expect(registry.get('ios')).rejects.toThrow(
+        'Selected ios device "sim" is no longer booted — reboot it or select_device another one',
+      );
+    });
+
     it('iOS keeps its wording: a shut-down simulator is "boot it first"', async () => {
       const { registry } = makeRegistry([device('sim', 'offline', 'ios')]);
       await expect(registry.select('ios', 'sim')).rejects.toThrow('Device "sim" is offline — boot it first');

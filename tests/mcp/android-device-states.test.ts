@@ -11,7 +11,8 @@ import { createAveriServer } from '../../src/mcp/tools.js';
  * emulator/device found (adb devices)"). Through the real chain short of a
  * process: the client, createAveriServer, the AdapterRegistry, and
  * discovery.ts's `adb devices -l` parser over a fake exec. No adapter may be
- * built — the factory throws — and nothing but `adb devices -l` is run.
+ * built — the factory throws — and nothing but `adb devices -l` succeeds:
+ * list_devices' iOS discovery reaches the fake too, and its xcrun calls throw.
  */
 const closers: (() => Promise<void>)[] = [];
 afterEach(async () => {

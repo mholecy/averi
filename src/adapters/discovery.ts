@@ -63,7 +63,8 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
 
 /**
  * Why adb lists an Android device that cannot be driven, and what to do — a
- * predicate the registry puts after the device's name in each of its three
+ * reason sentence starting `is …` and ending with a full stop, which the
+ * registry puts after the device's name in each of its three
  * refusals (auto-pick, select_device, a pinned device), so the remedy is
  * worded once, beside the listing that read the state. undefined for a
  * booted device, and on iOS (offline there is a shut-down simulator; the

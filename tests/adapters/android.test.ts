@@ -264,6 +264,8 @@ describe('AndroidAdapter interactions', () => {
       );
     });
 
+    // Pins only that the answered branch is UNCHANGED (node's message, from an
+    // empty stderr) — not an endorsement of the wording; real adb writes `error: …`.
     it('get-state that ANSWERED with a failure (exit 1) is still quoted as what adb says', async () => {
       const fn: ExecFn = async (cmd, args) => {
         const full = [cmd, ...args].join(' ');
