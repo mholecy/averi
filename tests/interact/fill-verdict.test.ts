@@ -107,8 +107,9 @@ describe('judgeFill — what the facts mean', () => {
   // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: the
   // clear stopped on deletes that changed nothing — a hint, or a deaf field.
   it('clear-unchanged: a reason only when the read-back did not land; a clear alone is then `cleared` in deletes', () => {
-    const stuck = { clearUnchanged: { shows: 9 } };
-    expect(judgeFill(fact({ typed: 0, readBack: nothingTyped, cleared: 9, ...stuck }))).toEqual({
+    const stuck = { clearUnchanged: { shows: 9, deletes: 9 } };
+    // The first round was the unchanged one: nothing seen deleted (cleared 0), 9 deletes sent.
+    expect(judgeFill(fact({ typed: 0, readBack: nothingTyped, cleared: 0, ...stuck }))).toEqual({
       did: 'cleared',
       typed: 0,
       sent: { what: 'deletes', n: 9 },
@@ -117,6 +118,12 @@ describe('judgeFill — what the facts mean', () => {
     });
     // With a value whose exact read-back landed, the field shows the value: the clear did its job.
     expect(judgeFill(fact({ typed: 5, readBack: landed, cleared: 1, ...stuck }))).toMatchObject({ did: 'filled', sent: { what: 'characters', n: 1 }, reasons: [] });
+    // Probe J (review of this branch): the unchanged round was the first, so no characters are claimed of a verified fill.
+    expect(judgeFill(fact({ typed: 5, readBack: landed, cleared: 0, ...stuck }))).toEqual({ did: 'filled', typed: 5, reasons: [], caveats: [] });
+    // A clear alone over several rounds counts every delete sent, not the first round's.
+    expect(judgeFill(fact({ typed: 0, readBack: nothingTyped, cleared: 5, clearUnchanged: { shows: 9, deletes: 14 } })).sent).toEqual({ what: 'deletes', n: 14 });
+    // An unchanged clear on a no-value read-back is not "gave no length": it gave one, and deleted it.
+    expect(judgeFill(fact({ typed: 5, readBack: { kind: 'no-value' }, cleared: 0, ...stuck })).reasons.map((r) => r.code)).toEqual(['no-value', 'clear-unchanged']);
     // After the read-back's own reason, as the other clear reasons.
     expect(judgeFill(fact({ typed: 5, readBack: { kind: 'lost', why: 'unmatched' }, cleared: 1, ...stuck })).reasons).toEqual([
       { code: 'lost', why: 'unmatched' },
@@ -125,17 +132,19 @@ describe('judgeFill — what the facts mean', () => {
   });
 
   it('the invariants hold over every read-back, clear and length combination', () => {
-    const readBacks: FillResult['readBack'][] = [landed, { kind: 'no-value' }, { kind: 'not-taken' }, { kind: 'lost', why: 'unmatched' }, nothingTyped];
+    const readBacks: FillResult['readBack'][] = [landed, { kind: 'no-value' }, { kind: 'not-taken' }, { kind: 'lost', why: 'unmatched' }, nothingTyped, { kind: 'placeholder' }];
     const clears: FillResult['cleared'][] = [undefined, 0, 3, 'unmeasured'];
     for (const readBack of readBacks)
       for (const cleared of clears)
         for (const typed of [0, 1, 5])
-          for (const clearUnchanged of typeof cleared === 'number' && cleared > 0 ? [undefined, { shows: 9 }] : [undefined]) {
+          for (const clearUnchanged of typeof cleared === 'number' ? [undefined, { shows: 9, deletes: 12 }] : [undefined]) {
             const v = judgeFill(fact({ typed, readBack, cleared, clearUnchanged }));
             expect(v.did === 'filled').toBe(v.reasons.length === 0);
             if (v.did !== 'filled') expect(v.did === 'typed').toBe(typed > 0);
             if (v.did !== 'filled' && typed === 0) expect(v.did === 'cleared').toBe(v.sent !== undefined);
-            expect(v.sent !== undefined).toBe(typeof cleared === 'number' && cleared > 0);
+            const characters = typeof cleared === 'number' ? cleared : 0;
+            const deletes = clearUnchanged?.deletes ?? characters;
+            expect(v.sent !== undefined).toBe(typed === 0 && v.did !== 'filled' ? deletes > 0 : characters > 0);
             if (v.sent !== undefined) expect(v.sent.what === 'deletes').toBe(v.did === 'cleared');
             if (readBack.kind === 'landed') expect(v.reasons).toEqual([]);
             expect(v.reasons.filter((r) => r.code.startsWith('clear-')).length).toBeLessThanOrEqual(1);

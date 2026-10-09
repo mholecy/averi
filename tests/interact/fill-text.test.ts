@@ -137,7 +137,7 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
   it('a clear alone whose deletes changed nothing: "Cleared … (N deletes sent)" and the hint-or-deaf-field reason, on both media', () => {
     const tail =
       'NOT verified: the field still shows 15 characters that the deletes did not change — its hint or placeholder (shown while empty), or a field that ignores deletes';
-    expect(both('id:open_search_view_edit_text', fact({ typed: 0, readBack: { kind: 'nothing-typed' }, cleared: 15, clearUnchanged: { shows: 15 } }))).toEqual({
+    expect(both('id:open_search_view_edit_text', fact({ typed: 0, readBack: { kind: 'nothing-typed' }, cleared: 15, clearUnchanged: { shows: 15, deletes: 15 } }))).toEqual({
       reply: `Cleared id:open_search_view_edit_text (15 deletes sent) — ${tail}`,
       flow: [['⚠ fill', `id:open_search_view_edit_text =  (15 deletes sent) — ${tail}`]],
     });
@@ -269,8 +269,9 @@ describe('fillFailureText — every error a fill throws', () => {
       'fill: could not re-read id:"amount_input" after focusing it — adb: device offline. The field was tapped and may hold partial text; ' +
         'check the device is still online (adb devices / xcrun simctl list), then retry with clear: true so the field is reset',
     );
-    expect(fillFailureText({ code: 'clear-twice', left: 1 })).toBe('fill: field still shows 1 character after clearing twice');
-    expect(fillFailureText({ code: 'clear-twice', left: 4 })).toBe('fill: field still shows 4 characters after clearing twice');
+    expect(fillFailureText({ code: 'clear-twice', left: 1, rounds: 2 })).toBe('fill: field still shows 1 character after clearing twice');
+    expect(fillFailureText({ code: 'clear-twice', left: 4, rounds: 2 })).toBe('fill: field still shows 4 characters after clearing twice');
+    expect(fillFailureText({ code: 'clear-twice', left: 9, rounds: 3 })).toBe('fill: field still shows 9 characters after clearing 3 times');
   });
 
   it('a mismatch: the two lengths, then what differs — masked, case, same length, or the lengths alone', () => {
@@ -282,9 +283,10 @@ describe('fillFailureText — every error a fill throws', () => {
     );
     expect(mismatch({ kind: 'case', positions: 2 })).toMatch(/for letter case, 2 characters differing:/);
     expect(mismatch({ kind: 'same-length', positions: 1 })).toBe(
-      'fill: typed 5 characters but the field shows 5 — same length, 1 character differing: ' +
+      'fill: typed 5 characters but the field shows 5 — as many characters as were typed, 1 differing: ' +
         'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
     );
+    expect(mismatch({ kind: 'unchanged' }, 5, 4)).toBe('fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it (content withheld from this error)');
     expect(mismatch({ kind: 'length' }, 1, 4)).toBe('fill: typed 1 character but the field shows 4 (content withheld from this error)');
   });
 

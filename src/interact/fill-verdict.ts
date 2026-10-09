@@ -36,14 +36,16 @@
  *   verified head, and an unverified fill always says why.
  * - Unverified: `did` is `'typed'` ⇔ `typed > 0`; with `typed === 0` it is
  *   `'cleared'` ⇔ a delete went out (`sent` present), else `'focused'`.
- * - `sent` is present ⇔ the clear sent at least one delete (`cleared` a
- *   number > 0); it counts `deletes` ⇔ `did === 'cleared'` (nothing typed
+ * - `sent` is present ⇔ there is something true to say: characters the
+ *   clear was seen to delete (`cleared` > 0), or — for a clear alone that
+ *   is not verified — deletes that went out (`clearUnchanged.deletes`, all
+ *   rounds, else `cleared`); it counts `deletes` ⇔ `did === 'cleared'` (nothing typed
  *   after it and nothing seen empty, so "cleared … first" would claim both a
  *   result and a sequel that never came — code review of round 2,
  *   2026-10-08), `characters` otherwise.
  * - `reasons` order is render order: the read-back's reason (`no-value`,
- *   `not-taken`, `lost`) first, then the clear's (`clear-unmeasured`,
- *   `clear-no-length`, `clear-unchanged` — at most one), never when the
+ *   `not-taken`, `lost`, `placeholder`) first, then the clear's
+ *   (`clear-unmeasured`, `clear-unchanged`, `clear-no-length` — at most one), never when the
  *   read-back `landed` — with clear, `landed` is "the field shows exactly
  *   the value", which is what the clear was for. A clear ALONE (nothing
  *   typed, read-back `nothing-typed`) that stopped on unchanged deletes is
@@ -73,6 +75,8 @@ import type { FillResult, LostWhy, NearbyInput } from './fill-facts.js';
  *   the input, so its length is not the field's (`cleared: 'unmeasured'`).
  * - `clear-no-length`: the clear sent no delete because the node gave no
  *   length at all (`cleared: 0` on a `no-value` read-back).
+ * - `placeholder`: the field shows exactly its named placeholder — empty,
+ *   or holding that very text (ReadBack `placeholder`).
  * - `clear-unchanged`: the clear's last deletes left the field showing the
  *   same `shows` characters (`clearUnchanged`) — its hint or placeholder
  *   on an empty field, or a field ignoring deletes; nothing saw it empty.
@@ -82,6 +86,7 @@ export type Reason =
   | { code: 'not-taken'; role: string }
   | { code: 'lost'; why: LostWhy }
   | { code: 'clear-unmeasured'; role: string }
+  | { code: 'placeholder' }
   | { code: 'clear-no-length' }
   | { code: 'clear-unchanged'; shows: number };
 
@@ -133,14 +138,26 @@ export function judgeFill(r: FillResult): FillVerdict {
   if (readBack.kind === 'no-value') reasons.push({ code: 'no-value', role });
   if (readBack.kind === 'not-taken') reasons.push({ code: 'not-taken', role });
   if (readBack.kind === 'lost') reasons.push({ code: 'lost', why: readBack.why });
+  if (readBack.kind === 'placeholder') reasons.push({ code: 'placeholder' });
   if (readBack.kind !== 'landed') {
     if (cleared === 'unmeasured') reasons.push({ code: 'clear-unmeasured', role });
-    else if (cleared === 0 && readBack.kind === 'no-value') reasons.push({ code: 'clear-no-length' });
     else if (r.clearUnchanged !== undefined) reasons.push({ code: 'clear-unchanged', shows: r.clearUnchanged.shows });
+    else if (cleared === 0 && readBack.kind === 'no-value') reasons.push({ code: 'clear-no-length' });
   }
   const verified = reasons.length === 0;
+  // Characters: what the clear was SEEN to delete (`cleared`). Deletes:
+  // what went out, all rounds — said only of a clear alone nobody saw land,
+  // where the deletes are all there is to report.
+  const characters = typeof cleared === 'number' ? cleared : 0;
+  const deletes = r.clearUnchanged?.deletes ?? characters;
   const sent: Sent | undefined =
-    typeof cleared === 'number' && cleared > 0 ? { what: typed === 0 && !verified ? 'deletes' : 'characters', n: cleared } : undefined;
+    typed === 0 && !verified
+      ? deletes > 0
+        ? { what: 'deletes', n: deletes }
+        : undefined
+      : characters > 0
+        ? { what: 'characters', n: characters }
+        : undefined;
   const caveats: Caveat[] = [];
   if (r.notInput !== undefined) caveats.push({ code: 'not-input', role, typed: readBack.kind !== 'nothing-typed', input: r.notInput.input });
   if (r.maskedAppend !== undefined) caveats.push({ code: 'masked-append', held: r.maskedAppend.held });

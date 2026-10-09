@@ -191,6 +191,8 @@ const REASON_SENTENCE: SentenceTable<Reason> = {
   lost: (r) => `the field could not be found again${LOST_WHY_TEXT[r.why]}`,
   'clear-unmeasured': (r) => `clear sent no delete — a role ${r.role} node's length is not the field's`,
   'clear-no-length': () => 'clear sent no delete — the node gave no length to delete',
+  // The placeholder's own text is never said: it may be the typed value.
+  placeholder: () => "the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
   // Both causes named: the tree cannot tell an empty field showing its hint
   // from a field that ignores deletes (FillResult.clearUnchanged).
   'clear-unchanged': (r) =>
@@ -236,7 +238,7 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
     `fill: could not re-read ${target} after focusing it — ${cause}. ` +
     'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
     'xcrun simctl list), then retry with clear: true so the field is reset',
-  'clear-twice': ({ left }) => `fill: field still shows ${charactersText(left)} after clearing twice`,
+  'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
   mismatch: ({ typed, shows, differs, notInput }) =>
     `fill: typed ${charactersText(typed)} but the field shows ${shows}` +
     DIFFERENCE_TEXT[differs.kind](differs as never) +
@@ -258,7 +260,8 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     ` — the typed text is there but for letter case, ${countOf(positions, 'character')} differing: ` +
     'the app transformed the input (auto-capitalisation?); content withheld from this error',
   'same-length': ({ positions }) =>
-    ` — same length, ${countOf(positions, 'character')} differing: ` +
+    ` — as many characters as were typed, ${positions} differing: ` +
     'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+  unchanged: () => ' — the field did not change: the typing did not reach it (content withheld from this error)',
   length: () => ' (content withheld from this error)',
 };

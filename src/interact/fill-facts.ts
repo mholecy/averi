@@ -80,9 +80,15 @@ export interface FillResult {
    * EditText and every iOS field reporting a placeholder, after the field
    * had in fact emptied. With a value typed after it, the exact read-back
    * decides (a field that ignores deletes fails there); judgeFill makes it
-   * a reason only when the read-back did not land.
+   * a reason only when the read-back did not land. `deletes`: every delete
+   * the clear sent, all rounds — the unchanged one included, which deleted
+   * nothing anyone saw (so when it was the FIRST round, `cleared` is 0:
+   * review of this branch, probe J — "cleared 9 characters first" of an
+   * empty hinted field). Never set on a MASKED reading: bullets are no
+   * hint, and an unchanged masked field fails as clear-twice (fill.ts,
+   * `isHint`).
    */
-  clearUnchanged?: { shows: number };
+  clearUnchanged?: { shows: number; deletes: number };
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
@@ -138,13 +144,21 @@ export type LostWhy = 'screen-changed' | 'unmatched';
  *   7 characters deleted and then held the typed text was said to "expose
  *   no value": the refusal was right, the reason blamed the node.
  * - `nothing-typed`: the value was empty — a focus (and clear) alone.
+ * - `placeholder` (2026-10-09): the field's last reading is EXACTLY its
+ *   named placeholder (UiNode.placeholder) and nothing shows more — the
+ *   value typed was that very text, or a clear alone found the field
+ *   showing it and deleted nothing. Empty, or holding the text: the tree
+ *   cannot tell (review of this branch, probes B and C), so it is not
+ *   verified. A clear that deleted INTO the placeholder saw the field
+ *   empty, and is `nothing-typed`.
  */
 export type ReadBack =
   | { kind: 'landed' }
   | { kind: 'no-value' }
   | { kind: 'not-taken' }
   | { kind: 'lost'; why: LostWhy }
-  | { kind: 'nothing-typed' };
+  | { kind: 'nothing-typed' }
+  | { kind: 'placeholder' };
 
 
 /**
@@ -156,9 +170,11 @@ export type ReadBack =
  * - `reread-failed`: the tree could not be read mid-fill — a dead device,
  *   not a screen settling (fill.ts, `refetch`); `target` is the selector as
  *   the caller wrote it, `cause` the adapter's message.
- * - `clear-twice`: two delete rounds each CHANGED the field and neither
- *   emptied it — deletes landing short; `left` what it still shows. (A round
- *   that changes nothing is not this: FillResult.clearUnchanged.)
+ * - `clear-twice`: the delete rounds each CHANGED the field and none emptied
+ *   it — deletes landing short — or a MASKED field the deletes did not
+ *   change; `left` what it still shows, `rounds` how many were sent (2, or
+ *   3 when a round's reading was not a shortening of the one before). An
+ *   unchanged non-masked round is not this: FillResult.clearUnchanged.
  * - `mismatch`: the read-back showed text that is not the typed value
  *   (`typed`, `shows`: the two lengths), after the clear-fill's one retry;
  *   `differs` says what can be said of the difference without content;
@@ -167,7 +183,7 @@ export type ReadBack =
  */
 export type FillFailure =
   | { code: 'reread-failed'; target: string; cause: string }
-  | { code: 'clear-twice'; left: number }
+  | { code: 'clear-twice'; left: number; rounds: number }
   | { code: 'mismatch'; typed: number; shows: number; differs: Difference; notInput?: { role: string; input: NearbyInput | 'none' | 'unread' } };
 
 /**
@@ -185,7 +201,12 @@ export type FillFailure =
  * - `same-length`: the field shows as many characters as were typed, and
  *   `positions` of them differ by more than case — autocorrect, smart
  *   punctuation, a mask.
- * - `length`: neither — the lengths are all that can be said.
+ * - `unchanged`: the field shows exactly what it showed when typing began
+ *   — the typing did not reach it (a focus tap that missed, a field that
+ *   ignores input; review of this branch, probes D and D2 were told "the
+ *   app transformed the input").
+ * - `length`: none of these — the lengths are all that can be said (also
+ *   a partly masked reading, `•••••t`, whose content is not comparable).
  * Still a FAILURE in every case: a field that shows `Hello` for `hello` does
  * not hold the value asked for (a case-sensitive login, a code), and a
  * case-insensitive pass would hide exactly that.
@@ -194,4 +215,5 @@ export type Difference =
   | { kind: 'masked'; held?: number }
   | { kind: 'case'; positions: number }
   | { kind: 'same-length'; positions: number }
+  | { kind: 'unchanged' }
   | { kind: 'length' };
