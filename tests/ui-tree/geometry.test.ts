@@ -7,6 +7,7 @@ import {
   inferScreenSize,
   intersectsViewport,
   rectArea,
+  rectIntersection,
   rectsOverlap,
   sameRect,
   sameRectWithinPixel,
@@ -291,6 +292,23 @@ describe('rectsOverlap — positive-area overlap only (the pixel poll\'s soft-ke
     expect(rectsOverlap(card, { x: 1014, y: 1979, width: 66, height: 132 })).toBe(false); // flush with the right edge
     expect(rectsOverlap(card, { x: 1014, y: 2111, width: 10, height: 10 })).toBe(false); // corner only
     expect(rectsOverlap(card, { x: 100, y: 2000, width: 0, height: 50 })).toBe(false); // zero-area, inside
+  });
+});
+
+describe('rectIntersection — the rect two rects share (moved here from swipe.ts, 2026-10-09)', () => {
+  const list = { x: 0, y: 200, width: 1080, height: 1800 };
+  it('the shared rect, in either order; containment gives the inner rect', () => {
+    const carousel = { x: -100, y: 1900, width: 1300, height: 400 }; // cut by the list's bottom and both sides
+    expect(rectIntersection(list, carousel)).toEqual({ x: 0, y: 1900, width: 1080, height: 100 });
+    expect(rectIntersection(carousel, list)).toEqual({ x: 0, y: 1900, width: 1080, height: 100 });
+    const row = { x: 20, y: 300, width: 500, height: 80 };
+    expect(rectIntersection(list, row)).toEqual(row);
+  });
+  it('undefined for disjoint, edge-touching and corner-touching rects — no area shared', () => {
+    expect(rectIntersection(list, { x: 0, y: 2100, width: 1080, height: 50 })).toBeUndefined();
+    expect(rectIntersection(list, { x: 0, y: 2000, width: 1080, height: 50 })).toBeUndefined(); // flush with the bottom edge
+    expect(rectIntersection(list, { x: 1080, y: 200, width: 10, height: 10 })).toBeUndefined(); // flush with the right edge
+    expect(rectIntersection(list, { x: 1080, y: 2000, width: 10, height: 10 })).toBeUndefined(); // corner only
   });
 });
 

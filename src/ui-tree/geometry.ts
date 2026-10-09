@@ -520,6 +520,22 @@ export function containsPoint(rect: Rect, point: Point): boolean {
 }
 
 /**
+ * The rect two rects share, or undefined when they share no area (an edge
+ * or a corner in common is none) — `rectsOverlap`'s question answered with
+ * the shared rect itself. The box a scroll stroke is drawn in is the
+ * gesture box met with a clipping container (interact/swipe.ts#strokeBox);
+ * it was a private `meet` there until the code review of round 3
+ * (2026-10-09) — rect arithmetic lives here.
+ */
+export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const width = Math.min(a.x + a.width, b.x + b.width) - x;
+  const height = Math.min(a.y + a.height, b.y + b.height) - y;
+  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
+}
+
+/**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
  * the content exhausted is a missing-clearance bug, 'top' is a sticky header

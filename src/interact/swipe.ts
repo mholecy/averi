@@ -1,5 +1,5 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Rect, type Stroke } from '../adapters/types.js';
-import { inferScreenSize, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
+import { inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -213,7 +213,7 @@ export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRAC
  * scroll-rounds.ts, which picks the clipping ancestor to name.
  */
 export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?: number): Rect | undefined {
-  const met = meet(box, within);
+  const met = rectIntersection(box, within);
   if (met === undefined) return undefined;
   const side = toward === 'up' || toward === 'down' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
   return side >= MIN_STROKE_BOX ? met : undefined;
@@ -237,17 +237,7 @@ export const MIN_DRAG_MS = 300;
  */
 export function dragMs(stroke: Stroke, speed: number, screen: { width: number; height: number }): number {
   const pxPerSecond = speed * Math.max(screen.width, screen.height);
-  const length = Math.hypot(stroke.to.x - stroke.from.x, stroke.to.y - stroke.from.y);
-  return Math.max(MIN_DRAG_MS, Math.ceil((length / pxPerSecond) * 1000));
-}
-
-/** The rect two rects share, or undefined when they share no area. */
-function meet(a: Rect, b: Rect): Rect | undefined {
-  const x = Math.max(a.x, b.x);
-  const y = Math.max(a.y, b.y);
-  const width = Math.min(a.x + a.width, b.x + b.width) - x;
-  const height = Math.min(a.y + a.height, b.y + b.height) - y;
-  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
+  return Math.max(MIN_DRAG_MS, Math.ceil((strokeLength(stroke) / pxPerSecond) * 1000));
 }
 
 /**
