@@ -46,6 +46,12 @@ export interface Row {
    * nothing read as one unchanged screen, as on a device.
    */
   rest?: string;
+  /**
+   * Nodes drawn OVER the rest of the screen — put last in the tree, after
+   * the containers (a floating tab bar's host and its tabs,
+   * geometry.ts#drawnOver); default none.
+   */
+  over?: readonly UiNode[];
   /** The tree shows a progress node (read-tree.ts#showsProgress); default false. */
   loading?: boolean;
   /** The answer to `ask witness` (the reading's `corroborated()`); default true. */
@@ -77,7 +83,8 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
 /**
  * The tree a row read: the screen, the matches inside their clipping
  * containers (outermost first, each `clipsDescendants`), `mainScroller`
- * beside them, a progress node when `loading`, and `rest`. The round
+ * beside them, the nodes drawn `over` them, a progress node when `loading`,
+ * and `rest`. The round
  * derives every tree fact from it (scroll-rounds.ts#TreeFacts) as it does
  * from a device's — the row says what is ON the screen, never what the
  * round should conclude. A match nested in another match (an id on a
@@ -95,6 +102,7 @@ export function treeOf(row: Row, screen: DeviceScreen): UiNode {
     children: [
       ...(row.mainScroller !== undefined ? [node({ role: 'container', identifier: 'main_scroller', rect: { ...row.mainScroller }, clipsDescendants: true })] : []),
       ...inScrollers,
+      ...(row.over ?? []),
       ...(row.loading === true ? [node({ role: 'progress', rect: { x: 500, y: 100, width: 80, height: 80 } })] : []),
       ...(row.rest !== undefined ? [node({ role: 'text', label: row.rest })] : []),
     ],

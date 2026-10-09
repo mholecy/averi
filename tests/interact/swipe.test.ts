@@ -381,7 +381,28 @@ describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one own
     const under = { x: 0, y: 1340, width: 1080, height: 800 };
     expect(strokeRoom(BOX, [under], 'up')).toEqual({ within: under, box: under });
     expect(strokeRoom(BOX, [under], 'up', 1398)).toBeUndefined();
-    expect(strokeRoom(BOX, [under, SETTINGS], 'up', 1398)).toEqual({ within: SETTINGS, box: SETTINGS });
+    expect(strokeRoom(BOX, [under, SETTINGS], 'up', 1398)).toEqual({ within: SETTINGS, box: SETTINGS, coverTop: 1398 }); // the cover the stroke keeps clear of, handed back with the box
+  });
+  it('strokeRoom cuts the box above a node DRAWN OVER the container\'s lower half on the stroke\'s line (2026-10-09, the floating tab bar): its top is the box\'s cover, as a keyboard\'s is — the lower of the two never wins', () => {
+    // Measured, mp-native Account Detail: the list 0,825 1080x1395 runs under the bar's host 66,1840 948x248.
+    const list = { x: 0, y: 825, width: 1080, height: 1395 };
+    const bar = { rect: { x: 66, y: 1840, width: 948, height: 248 } };
+    const over = (within: { y: number }) => (within.y === list.y ? [bar] : []);
+    expect(strokeRoom(BOX, [list], 'down', undefined, over)).toEqual({ within: list, box: list, coverTop: 1840 });
+    // The touch-down clears the bar: y 1638, not the 1942 that landed on it (and 1800 was measured to scroll).
+    expect(scrollStroke({ toward: 'down', reach: 1, box: list, coverTop: 1840 })).toEqual({ from: { x: 540, y: 1638 }, to: { x: 540, y: 1028 } });
+    expect(scrollStroke({ toward: 'down', reach: 1, box: list })).toEqual({ from: { x: 540, y: 1942 }, to: { x: 540, y: 1104 } });
+    // With a keyboard: the higher of the two tops.
+    expect(strokeRoom(BOX, [list], 'down', 1398, over)?.coverTop).toBe(1398);
+    expect(strokeRoom(BOX, [list], 'down', 2000, over)?.coverTop).toBe(1840);
+    // Not on the stroke's line (x 540): a FAB in the corner takes no touch-down — no cut.
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ rect: { x: 880, y: 1900, width: 160, height: 160 } }])).toEqual({ within: list, box: list });
+    // In the upper half (a floating header): not this rule's (a bottom cover only) — no cut.
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [{ rect: { x: 0, y: 825, width: 1080, height: 200 } }])).toEqual({ within: list, box: list });
+    // Below the box (the met box ends at the screen's bottom): nothing to cut.
+    expect(strokeRoom({ x: 0, y: 0, width: 1080, height: 1800 }, [list], 'down', undefined, over)).toEqual({ within: list, box: { ...list, height: 975 } });
+    // The highest of several, and the next candidate judged with its own.
+    expect(strokeRoom(BOX, [list], 'down', undefined, () => [bar, { rect: { x: 0, y: 1700, width: 1080, height: 100 } }])?.coverTop).toBe(1700);
   });
   it('maxTravel caps the finger\'s travel, the touch-down kept, never under twice TOUCH_SLOP', () => {
     const list = { x: 0, y: 242, width: 1080, height: 1736 };

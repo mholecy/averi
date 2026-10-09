@@ -4,7 +4,7 @@ import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
-import { coverOver, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Row } from '../helpers/rounds.js';
+import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Row } from '../helpers/rounds.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
@@ -1004,5 +1004,69 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, [spinning, spinning, spinning, spinning, spinning]).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
     const still: Row = { found: [], rest: 'same' };
     expect(failureOf(play({ ...FULLY_ANDROID, maxSwipes: 4 }, [still, still, still]), 'id:row').message).toMatch(/did not change the screen: content exhausted, still loading, or the swipes were not taken/);
+  });
+});
+
+describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md)', () => {
+  const FULLY_ANDROID: Rules = { ...ANDROID, fully: true };
+  /** Measured, mp-native Account Detail: the transaction list, CLIP, running under the bar to the screen's bottom. */
+  const LIST: Rect = { x: 0, y: 825, width: 1080, height: 1395 };
+  /** The tab `name`, `i`-th of the bar's four (`nav.tab_*`, 1876–2052). */
+  const tab = (name: string, i: number): UiNode =>
+    node({ role: 'container', identifier: `nav.tab_${name}`, rect: { x: 66 + 237 * i, y: 1876, width: 237, height: 176 }, children: [node({ role: 'text', label: name, rect: { x: 66 + 237 * i + 40, y: 1990, width: 157, height: 40 } })] });
+  /** The bar's host — an unlabelled container, 66,1840 948x248, drawn after the list — and its tabs. */
+  const BAR = node({ role: 'container', rect: { x: 66, y: 1840, width: 948, height: 248 }, children: ['home', 'accounts', 'cards', 'more'].map(tab) });
+  const strokes = (played: ReturnType<typeof play>) => played.steps.flatMap((st) => (st.do === 'stroke' ? [drawnFor(st)] : []));
+
+  it('measured: row_36 not read yet, the list under a floating tab bar — the stroke over the list is cut above the bar\'s host and touches down at y 1638, not on the bar at 1942', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 2 }, [
+      { found: [], mainScroller: LIST, over: [BAR], rest: 'a' },
+      { found: [], mainScroller: LIST, over: [BAR], rest: 'b' },
+      { found: [], mainScroller: LIST, over: [BAR], rest: 'c' },
+    ]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1840, box: LIST });
+    expect(strokes(played)).toEqual([
+      { from: { x: 540, y: 1638 }, to: { x: 540, y: 1028 } },
+      { from: { x: 540, y: 1638 }, to: { x: 540, y: 1028 } },
+    ]);
+    // The second measured shape: the page scrolled, the list 0,401 1080x1753, the bar still shown.
+    const scrolled = play({ ...FULLY_ANDROID, maxSwipes: 1 }, [
+      { found: [], mainScroller: { x: 0, y: 401, width: 1080, height: 1753 }, over: [BAR], rest: 'a' },
+      { found: [], rest: 'b' },
+    ]);
+    expect(strokes(scrolled)[0].from).toEqual({ x: 540, y: 1553 }); // the shim's 1857 was on the bar
+  });
+
+  it('the target\'s own container too — and a round whose tree did not read keeps the cut, as it keeps the keyboard\'s', () => {
+    const row = (y: number): Row => ({ found: [match({ x: 66, y, width: 948, height: 73 }, 'row')], scroller: LIST, over: [BAR] });
+    const played = play({ ...ANDROID, maxSwipes: 2 }, [row(2400), { error: 'uiautomator dump returned no XML' }, row(2300)]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [[st.box, st.coverTop]] : []))).toEqual([
+      [LIST, 1840],
+      [LIST, 1840],
+    ]);
+  });
+
+  it('the list\'s own rows are not drawn over it: a row in its lower half cuts nothing', () => {
+    const inside = play({ ...FULLY_ANDROID, maxSwipes: 1 }, [{ found: [match({ x: 66, y: 2150, width: 948, height: 73 }, 'row')], scroller: LIST }, { found: [] }]);
+    expect(inside.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: LIST });
+  });
+
+  it('the target\'s container is chosen by its room clear of what is drawn over it: a 150-px strip whose lower half a bar covers has none, so the list around it is stroked — never the screen box', () => {
+    const STRIP: Rect = { x: 0, y: 1750, width: 1080, height: 150 };
+    const LOW_BAR = node({ role: 'other', label: 'bar', rect: { x: 0, y: 1826, width: 1080, height: 200 } }); // leaves 76 px of the strip, under MIN_STROKE_BOX
+    const row: Row = { found: [match({ x: 66, y: 2400, width: 948, height: 73 }, 'row')], scrollers: [STRIP, LIST], over: [LOW_BAR] }; // a nested list's row, below the fold
+    const played = play({ ...ANDROID, maxSwipes: 1 }, [row, { ...row, found: [] }]);
+    expect(played.steps[0]).toMatchObject({ do: 'stroke', box: LIST });
+  });
+
+  it('with the IME up, the higher of the two tops cuts — the keyboard\'s', () => {
+    const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: LIST, over: [BAR], cover: UP_IME, rest: 'a' }, { found: [], rest: 'b' }]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398, box: LIST });
+  });
+
+  it('the fully: true probe toward the bottom edge keeps clear of the bar too — its room judged by the same rule', () => {
+    const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 2120, width: 948, height: 100 }, 'row')], scroller: LIST, over: [BAR] }, { found: [match({ x: 66, y: 2120, width: 948, height: 100 }, 'row')], scroller: LIST, over: [BAR] }]);
+    expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down', coverTop: 1840, box: LIST, probe: true });
+    expect(strokes(played)[0].from.y).toBeLessThan(1840);
   });
 });
