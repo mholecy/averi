@@ -439,6 +439,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'the only interactive match preferred and reported; several interactive matches are refused with the list (never typed into the first); ' +
         'a field whose centre lies off the screen is refused, nothing tapped or typed — scroll_until it first. ' +
         'If the UI tree cannot be re-read after typing, the call FAILS rather than reporting a fill it could not re-read. Without selector: types into whatever is focused. ' +
+        'An EMPTY field\'s hint or placeholder, which the tree reports as its value, is not content: clear stops once its deletes change nothing, then types — a clear alone (empty text) then reads "Cleared … — NOT verified: the field still shows N characters that the deletes did not change" (a hint, or a field ignoring deletes). ' +
+        'A text the app transforms (auto-capitalisation, autocorrect, a mask) FAILS the read-back; the error says whether only letter case differs, or how many characters of a same-length reading do — never the text. ' +
         'The focus tap is guarded like tap: a field under the soft keyboard is hidden-then-refocused on Android, and on iOS (treeSource: wda) hidden by the first on-screen entry of averi.yaml app.ios.keyboardDismiss then refocused, or refused with none (nothing typed). The keyboard is NOT dismissed after typing here (a flow\'s fill: has dismissKeyboard for that).',
       inputSchema: {
         platform,
