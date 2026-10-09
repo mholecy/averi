@@ -39,9 +39,9 @@ export interface DrawOrder {
   /**
    * The node drawn over `point` on top of `node`, if any: the LAST node
    * after `node`'s subtree in pre-order — its first place in the tree, and
-   * none of its own subtree wherever else the same object appears — that draws (`NOT_DRAWN`'s
-   * `shadowing` column) and contains the point (`containsPoint`: right and
-   * bottom edges exclusive). Undefined when nothing does, or when `node` is
+   * none of its own subtree wherever else the same object appears — that
+   * draws (`NOT_DRAWN`'s `shadowing` column) and contains the point
+   * (`containsPoint`: right and bottom edges exclusive). Undefined when nothing does, or when `node` is
    * not in this tree. The keyboard's own nodes are not exempt: a target
    * under the keyboard is caught first by the band check (with its own
    * reason), and a keyboard-owned node over the point that the band missed
