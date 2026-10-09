@@ -172,6 +172,30 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(fake.keys).toEqual([]);
   });
 
+  /**
+   * The round's witness rules are observation tables in scroll-rounds.test.ts
+   * (as `asks`); these are the same scenarios at the DRIVER, counted as the
+   * fake oracle saw them — the queries a device would answer, which is what
+   * the keyboard reading's cost table promises (ui-tree/keyboard-cover.ts).
+   * They stood here as single assertions until the scroll-rounds deepening
+   * (2026-10-09) moved them to the pure table; code review P2 put the
+   * device-side count back beside it. `[window, touchable, witness]`.
+   */
+  it.each([
+    ['a band that changes nothing (a clean stop clear above it): no witness', { startY: 500 }, [], {}, [1, 1, 0]],
+    ['a STALE window vetoed on a fully: true stop: asked once, nothing stroked', { startY: 1906, witness: 'hidden' }, [], { fully: true }, [1, 1, 1]],
+    ['a vetoed band every round: asked again on each round it matters, never kept', { startY: 2900, witness: 'hidden', keyboardTop: undefined }, [], {}, [4, 4, 4]],
+    ['a denial, then a real keyboard: asked again, confirmed', { startY: 2506, keyboardTop: undefined }, ['hidden', 'shown'], { fully: true }, [4, 4, 2]],
+    ['a keyboard the scroll hides, the window left stale-shown: asked again, denied, and again at the confirming read', { startY: 2900, keyboardTop: undefined }, ['shown', 'hidden'], { fully: true }, [4, 4, 4]],
+    ['the `unlocated` row on a DEFAULT clean stop: not asked', { startY: 500, window: { state: 'hidden' } as SoftKeyboard, witness: 'shown' as const }, [], {}, [1, 0, 0]],
+  ] as const)('Android device queries at the driver — %s', async (_name, form, witnessQueue, opts, counts) => {
+    const { fake } = androidForm(form);
+    if (witnessQueue.length > 0) fake.attachedKeyboard.witnessAnswers.queue = [...witnessQueue];
+    await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, ...opts });
+    const k = fake.attachedKeyboard;
+    expect([k.windowAnswers.queries, k.touchableAnswers.queries, k.witnessAnswers.queries]).toEqual(counts);
+  });
+
   it('a round whose tree did not read strokes in the box the last read round\'s band left: its touch-down above the IME, the band\'s stroke point for point', async () => {
     const { fake } = androidForm({ startY: 2900 });
     const real = fake.uiTree.bind(fake);
