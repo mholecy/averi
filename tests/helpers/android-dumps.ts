@@ -144,12 +144,17 @@ export const CLASSIC_VIEWS = {
       <node class="android.widget.TextView" text="By continuing you accept the terms" bounds="[100,1990][980,2040]"/>
       <node class="android.widget.Button" text="CONTINUE" bounds="[40,1960][1040,2090]"/>
     </node></node></hierarchy>`,
-  /** A BottomSheetDialog (its own window, not screen-sized): a sticky `Button "PAY"` over the fee text. */
-  sheet: `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,1100][1080,2220]">
+  /**
+   * A BottomSheetDialog over a 1080x2220 screen: the dialog's window `0,1100 1080x1120` and the sheet `0,1100
+   * 1080x1054` (47 % of the screen, so no screen-sized host), a sticky `Button "PAY" 40,1980 1000x130` (0.11 of the
+   * sheet) over the fee text.
+   */
+  sheet: `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.widget.FrameLayout" bounds="[0,1100][1080,2220]">
       <node class="android.widget.LinearLayout" resource-id="app:id/sheet" bounds="[0,1100][1080,2154]">
       <node class="android.widget.TextView" text="Fee: 2.00 EUR" bounds="[60,2000][500,2050]"/>
       <node class="android.widget.Button" text="PAY" bounds="[40,1980][1040,2110]"/>
-    </node></node></hierarchy>`,
+    </node></node></node></hierarchy>`,
 } as const;
 
 /** One Account Detail row whose top is `y` (143 px tall), as `COMPOSE.accountDetail` lists it; its label node reads `what, amount`. */

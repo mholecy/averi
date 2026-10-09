@@ -257,7 +257,8 @@ const ownContent = ({ node, parent }: Placed, about: SeenFor): boolean =>
  * 992x132 wrapper — 0.917 (LOGIN, SIGN IN; DISCARD's 276x121 of 276x132
  * the same) — and a list row's `button` IS the row (1.0). The classic-View
  * shapes it must refuse lie far below: a bottom-pinned LOG IN `1000x130`
- * in its 1080x1090 ConstraintLayout (0.11), a sheet's PAY in its sheet.
+ * in its 1080x1090 ConstraintLayout (0.11), a sheet's PAY `1000x130` in
+ * its 1080x1054 sheet (0.11).
  * 0.85 leaves the measured wrappers' padding room (a 0.917 fill is ~11 px
  * of a 132-px wrapper's height; 0.85 allows ~20) while no layout holding a
  * label beside a control comes near it.
@@ -582,7 +583,8 @@ const NOT_DRAWN = {
    * pinned CTA in the SAME parent as a text (review of fix/r6: a classic
    * View's bottom-pinned `Button "LOG IN"` riding up over `"Forgot
    * password?"` in the login ConstraintLayout with the keyboard up, a
-   * `Button "CONTINUE"` over the terms text) fills a sliver of its layout,
+   * `Button "CONTINUE"` over the terms text, a sheet's PAY over its fee
+   * text) fills a sliver of its layout,
    * and carries its own label; a non-interactive node holding the label (an
    * opaque card, a loading view); an interactive TARGET under a later
    * control (a button over a button); a control in a screen-sized parent or
@@ -590,9 +592,13 @@ const NOT_DRAWN = {
    * backdrop, a dismiss region; one that does not hold the label whole (a
    * field's clear button); one in another parent. idb's flat list never
    * meets this row: every node's parent is its 0×0 root, which holds
-   * nothing. Residual, stated: an unlabelled clickable overlay filling a
-   * small wrapper it shares with a label — a disabled-state scrim cut to a
-   * card — is read as the label's control, and the tap is sent to it.
+   * nothing. Residual, stated: an unlabelled interactive node filling a
+   * small wrapper it shares with a label is read as the label's control,
+   * and the tap is sent to it — geometry cannot tell it from a Compose
+   * Button. So: a Compose `clickable(role = Role.Button)` overlay laid
+   * over a text in a Box of its size (a card's tap target, a disabled-state
+   * scrim cut to the card), and an unlabelled `ImageButton` filling a
+   * thumbnail's FrameLayout over its caption text — both excused.
    */
   ownControl: {
     target: ({ node, parent }, { target, screen }) =>
