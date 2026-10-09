@@ -47,10 +47,11 @@ export interface IosTreeSource {
    * keeps no element types (idb's Application is a plain `other`), so the
    * question is answered from the raw payload, by the source that has it.
    *
-   * `null`: the read has an Application element with no label. `undefined`:
-   * the source does not answer — the read lists no Application, or the
-   * source does not ask (WdaTreeSource, which says why). Throws as `read()`
-   * throws; one device read per call, like `read()`.
+   * `null`: the read cannot say — it lists no Application element, or one
+   * with no label (both unmeasured; the launch's wait says it could not
+   * check). `undefined`: the source does not ask (WdaTreeSource, which says
+   * why), and reads nothing. Throws as `read()` throws; one device read per
+   * call, like `read()`.
    */
   applicationLabel(): Promise<string | null | undefined>;
   dispose(): Promise<void>;
@@ -261,9 +262,9 @@ export class IdbTreeSource implements IosTreeSource {
    * here too, so the caller can tell idb's launch transient (no tree yet)
    * from a tree of the wrong app.
    */
-  async applicationLabel(): Promise<string | null | undefined> {
+  async applicationLabel(): Promise<string | null> {
     const app = (await this.readOnce()).elements.find((el) => el.type === 'Application');
-    return app === undefined ? undefined : (app.AXLabel ?? null);
+    return app?.AXLabel ?? null;
   }
 
   private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {

@@ -30,15 +30,19 @@ import { sleep } from '../util/sleep.js';
  * of them, for at most FOREGROUND_WAIT_MS, and then goes on — with a note
  * naming what it read when it never matched.
  *
- * Fail open, everywhere. The check only ever DELAYS a launch, never fails
- * it, and stops at once without a word when it cannot tell: no names for
- * the bundle (appinfo failed or listed none), a read with no Application
- * (or a source that does not ask — WDA, wda-tree-source.ts), an Application
- * with no label. A read error other than idb's empty tree ends it too, with a
- * note — the device was not read, so nothing was confirmed, and the readers
- * after the launch meet the same error in their own words. idb's empty tree
- * (IdbEmptyTreeError — no tree yet, measured 0.4 s after a launch) is a poll
- * miss: the window this exists for is right behind it.
+ * Fail open: the check only ever DELAYS a launch, never fails it. But it
+ * is never SILENT when it could not check (review 2026-10-09): a check
+ * that quietly switched itself off — a drift in appinfo's unmeasured
+ * format, a tree shape not yet seen — would leave this P0 open on every
+ * launch with nothing to say so. So the wait stops at once WITH a note
+ * when it cannot tell: the bundle's names could not be read (appinfo
+ * failed, or listed neither name), the read lists no Application or one
+ * with no label (`null` — unmeasured shapes), or a read error other than
+ * idb's empty tree (the device was not read; the readers after the launch
+ * meet the same error in their own words). Only a source that does not ask
+ * (`undefined` — WDA, wda-tree-source.ts, by decision) stays silent. idb's
+ * empty tree (IdbEmptyTreeError — no tree yet, measured 0.4 s after a
+ * launch) is a poll miss: the window this exists for is right behind it.
  *
  * The note's honesty. A label that never matches is either the previous app
  * (or SpringBoard) still in idb's tree, or THIS app under a name its Info.plist
@@ -52,12 +56,20 @@ import { sleep } from '../util/sleep.js';
  * the first launch of a bundle per adapter one `simctl appinfo` (cached,
  * IosAdapter; under a 10 s budget, its duration unmeasured). A warm launch
  * that lands in the stale window waits it out — about a second, measured; a
- * cold launch waits out SpringBoard's tree — up to about 2 s, measured 2026-10-08 —
- * time the caller's next read would otherwise have spent judging the wrong
- * tree. One that never matches pays the whole bound: at most
- * FOREGROUND_WAIT_MS plus the read in flight when it ends (no read is
- * STARTED after the deadline; one already started is idb's, under its own
- * 15 s budget, ios-tree-source.ts).
+ * cold launch waits out SpringBoard's tree — up to about 2 s, measured
+ * 2026-10-08 — time the caller's next read would otherwise have spent
+ * judging the wrong tree.
+ *
+ * The worst cases. One that never matches pays the whole bound: the
+ * FOREGROUND_WAIT_MS window, which starts when the names have arrived (so a
+ * slow first appinfo — up to its 10 s budget — is added to it, not taken
+ * from it), plus the read in flight when it ends: no read is STARTED at or
+ * after the deadline, but one already started is idb's, under its own 15 s
+ * budget (ios-tree-source.ts) — so a launch on a hung idb now takes up to
+ * 15 s before its "could not check" note. And nothing is cached about a
+ * never-matching app: a localized display name costs the full window and a
+ * note on EVERY launch — N windows for an ensure_state ladder with N launch
+ * rungs.
  *
  * Not for `openDeepLink`: a link may legitimately bring ANOTHER app forward
  * (a universal link handed to Safari, a link the app routes elsewhere), and
@@ -86,27 +98,65 @@ export const FOREGROUND_POLL_MS = 200;
  * The names an app's Application element may carry, from `xcrun simctl
  * appinfo <udid> <bundle>`: CFBundleDisplayName, then CFBundleName — the
  * home-screen name falls back to the latter when the former is absent, and
- * accepting both costs nothing. The output is an old-style (OpenStep) plist,
- * top-level keys one per line:
+ * accepting both costs nothing. The output is an old-style (OpenStep) plist:
  *
- *     CFBundleDisplayName = "Skeleton Internal";
- *     CFBundleName = Skeleton;
+ *     {
+ *         CFBundleDisplayName = "Skeleton Internal";
+ *         CFBundleName = Skeleton;
+ *         Extensions = { …; CFBundleName = WidgetExt; … };
+ *     }
  *
- * — quoted when the value has spaces or punctuation, bare otherwise; inside
- * quotes `\"`, `\\`, `\n`, `\t` and `\Uxxxx` (non-ASCII) escapes are decoded.
- * Parsed here rather than through `plutil` to keep the lookup one exec. An
- * output with neither key (an app not installed: appinfo prints no such
- * dictionary) gives `[]`.
+ * Only TOP-LEVEL keys count (topLevelEntries): a nested dictionary — an
+ * extension's, a group container map — may carry the same keys for
+ * something else. Values are quoted when they have spaces or punctuation,
+ * bare otherwise; inside quotes `\"`, `\\`, `\n`, `\t` and `\Uxxxx`
+ * (non-ASCII) escapes are decoded. An octal escape (`\341`, a raw byte) is
+ * NOT decoded — not seen in simctl's output; a name carrying one would not
+ * match, and the wait's note says so. Parsed here rather than through
+ * `plutil` to keep the lookup one exec. Neither key → `[]`.
  */
 export function appInfoNames(stdout: string): string[] {
+  const entries = topLevelEntries(stdout);
   const names: string[] = [];
   for (const key of ['CFBundleDisplayName', 'CFBundleName']) {
-    const m = new RegExp(`^\\s*${key}\\s*=\\s*("(?:[^"\\\\]|\\\\.)*"|[^;"]*);\\s*$`, 'm').exec(stdout);
-    if (m === null) continue;
-    const name = unquote(m[1].trim()).trim();
+    const value = entries.get(key);
+    if (value === undefined || value.startsWith('{') || value.startsWith('(')) continue;
+    const name = unquote(value).trim();
     if (name !== '' && !names.includes(name)) names.push(name);
   }
   return names;
+}
+
+/**
+ * `key = value;` statements of the outermost dictionary, raw values. A
+ * character walk that tracks quotes (a `;` or brace inside a string is
+ * text) and brace depth (a nested dictionary's statements are not the
+ * top level's; its closing `};` ends the statement that holds it).
+ */
+function topLevelEntries(text: string): Map<string, string> {
+  const entries = new Map<string, string>();
+  let depth = 0;
+  let inQuote = false;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuote) {
+      if (c === '\\') i++;
+      else if (c === '"') inQuote = false;
+      continue;
+    }
+    if (c === '"') inQuote = true;
+    else if (c === '{') {
+      depth++;
+      if (depth === 1) start = i + 1;
+    } else if (c === '}') depth--;
+    else if (c === ';' && depth === 1) {
+      const m = /^\s*("(?:[^"\\]|\\.)*"|[^\s=]+)\s*=\s*([\s\S]*?)\s*$/.exec(text.slice(start, i));
+      if (m !== null && !entries.has(unquote(m[1]))) entries.set(unquote(m[1]), m[2]);
+      start = i + 1;
+    }
+  }
+  return entries;
 }
 
 function unquote(value: string): string {
@@ -122,39 +172,57 @@ export interface ForegroundCheck {
   bundleId: string;
   /** IosTreeSource.applicationLabel — one device read per call. */
   label(): Promise<string | null | undefined>;
-  /** appInfoNames for the bundle, or undefined when they could not be read. Called at most once per wait. */
-  names(): Promise<readonly string[] | undefined>;
+  /**
+   * The bundle's names (appInfoNames), never empty; THROWS when they could
+   * not be read — the error's first line is what the note quotes. Called at
+   * most once per wait.
+   */
+  names(): Promise<readonly string[]>;
 }
 
 /**
  * Read until the Application label is one of the bundle's names (see the
  * module comment), and return the note to show when the wait ended without
- * confirming that — or undefined when it confirmed it or could not tell.
+ * confirming that — or undefined when it confirmed it, or the source does
+ * not ask.
  */
 export async function awaitForeground(check: ForegroundCheck): Promise<string | undefined> {
-  const deadline = Date.now() + FOREGROUND_WAIT_MS;
+  let deadline = Date.now() + FOREGROUND_WAIT_MS;
   let names: readonly string[] | undefined;
   /** The last label that was not a match — what the note names. */
   let stale: string | undefined;
   for (;;) {
     let label: string | null | undefined;
+    let empty = false;
     try {
       label = await check.label();
     } catch (e) {
       // A device that was not read: idb's empty tree is the launch's own
       // transient (read on); anything else is not this check's to diagnose.
-      if (!(e instanceof IdbEmptyTreeError)) return unchecked(check.bundleId, e);
-      if (Date.now() >= deadline) return stale !== undefined ? notInFront(check.bundleId, stale, names ?? []) : emptyThroughout(check.bundleId);
-      await sleep(FOREGROUND_POLL_MS);
-      continue;
+      if (!(e instanceof IdbEmptyTreeError)) return unchecked(check.bundleId, errorMessage(e).split('\n')[0]);
+      empty = true;
     }
-    // A read that cannot say whose tree it is: nothing to wait for.
-    if (label === undefined || label === null || label === '') return undefined;
-    names ??= await check.names();
-    if (names === undefined || names.length === 0) return undefined;
-    if (names.includes(label.trim())) return undefined;
-    stale = label;
-    if (Date.now() >= deadline) return notInFront(check.bundleId, stale, names);
+    if (!empty) {
+      // The source does not ask (WDA): by decision, nothing to wait for and nothing to say.
+      if (label === undefined) return undefined;
+      if (label === null || label === '') return unchecked(check.bundleId, "the tree's Application element has no label, or there is none");
+      if (names === undefined) {
+        const asked = Date.now();
+        try {
+          names = await check.names();
+        } catch (e) {
+          return unchecked(check.bundleId, errorMessage(e).split('\n')[0]);
+        }
+        // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
+        deadline += Date.now() - asked;
+      }
+      if (names.includes(label)) return undefined;
+      stale = label;
+    }
+    // Pause only if the read after it would START before the deadline.
+    if (Date.now() + FOREGROUND_POLL_MS >= deadline) {
+      return stale !== undefined ? notInFront(check.bundleId, stale, names ?? []) : emptyThroughout(check.bundleId);
+    }
     await sleep(FOREGROUND_POLL_MS);
   }
 }
@@ -190,9 +258,9 @@ function emptyThroughout(bundleId: string): string {
   );
 }
 
-function unchecked(bundleId: string, e: unknown): string {
+function unchecked(bundleId: string, why: string): string {
   return (
-    `could not check that ${bundleId} is in front (${errorMessage(e).split('\n')[0]}) — for a moment after a ` +
+    `could not check that ${bundleId} is in front (${why}) — for a moment after a ` +
     "launch iOS can hand idb the previous app's tree; compare with screenshot before trusting a read"
   );
 }

@@ -241,9 +241,9 @@ describe('IdbTreeSource.applicationLabel — which app a read is of', () => {
     expect(await label([BUTTON, { type: 'Application', AXLabel: 'Contacts', frame: F }]).answer).toBe('Contacts');
   });
 
-  it('an Application with no label is null; a list with no Application is undefined', async () => {
+  it("an Application with no label is null, and so is a list with no Application — the read cannot say", async () => {
     expect(await label([{ type: 'Application', frame: F }, BUTTON]).answer).toBeNull();
-    expect(await label([BUTTON]).answer).toBeUndefined();
+    expect(await label([BUTTON]).answer).toBeNull();
   });
 
   it("an empty payload throws IdbEmptyTreeError, as read() does — idb's launch transient is no tree, not a tree of the wrong app", async () => {

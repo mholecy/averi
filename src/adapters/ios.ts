@@ -175,24 +175,22 @@ export class IosAdapter implements DeviceAdapter {
   private readonly appNamesCache = new Map<string, readonly string[]>();
 
   /**
-   * The bundle's display names, from `simctl appinfo` — or undefined when the
-   * call fails or lists neither name (then the foreground wait does not run:
-   * fail open). Only a lookup that found names is cached, so a failed one is
+   * The bundle's display names, from `simctl appinfo` — THROWS when the
+   * call fails or lists neither name, and the foreground wait then says it
+   * could not check, quoting the first line (review 2026-10-09: appinfo's
+   * format is unmeasured, and a drift must not switch the check off
+   * unseen). Only a lookup that found names is cached, so a failed one is
    * asked again on the next launch. 10 s, not simctl's 30 s default: the
    * lookup is an aid to the launch, not part of it, and a simulator that
    * cannot answer it in 10 s fails the reads that follow anyway (the same
    * reasoning as the defaults writes below).
    */
-  private async appNames(bundleId: string): Promise<readonly string[] | undefined> {
+  private async appNames(bundleId: string): Promise<readonly string[]> {
     const cached = this.appNamesCache.get(bundleId);
     if (cached !== undefined) return cached;
-    let names: string[];
-    try {
-      names = appInfoNames((await this.simctl(['appinfo', this.udid, bundleId], 10_000)).stdout.toString('utf8'));
-    } catch {
-      return undefined;
-    }
-    if (names.length === 0) return undefined;
+    const { stdout } = await this.simctl(['appinfo', this.udid, bundleId], 10_000);
+    const names = appInfoNames(stdout.toString('utf8'));
+    if (names.length === 0) throw new Error('simctl appinfo listed neither CFBundleDisplayName nor CFBundleName');
     this.appNamesCache.set(bundleId, names);
     return names;
   }
