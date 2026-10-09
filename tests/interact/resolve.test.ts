@@ -25,7 +25,8 @@ import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { parseUiautomatorXml } from '../../src/adapters/android.js';
-import { CLASSIC_VIEWS, COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE } from '../helpers/android-dumps.js';
+import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
@@ -703,6 +704,43 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     const under = await tapElement(fake, 'label:"Card payment, 15.12.2025, -12.00 EUR"', OPTS).catch((e: unknown) => e);
     expect(under).toBeInstanceOf(CoveredRefusal);
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  /** A fake on one screen of the round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json); its taps recorded by point (the snapshot's Compose nodes carry no ids for the fake to hit). */
+  const snapshot = async (screen: string) => {
+    const { screens } = JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+    const fake = new FakeAdapter({ s: screens[screen] }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    fake.tap = async (x, y) => {
+      fake.tapPoints.push({ x, y });
+    };
+    return fake;
+  };
+
+  it.each([
+    ['loggedOut', 'LOGIN', { x: 540, y: 1463 }],
+    ['accountDetailTop', 'PAY', { x: 541, y: 716 }],
+    ['accountDetailTop', 'PAY ME', { x: 224, y: 716 }],
+    ['accountDetailTop', 'SCAN QR', { x: 857, y: 716 }],
+    ['accountDetail', 'PAY', { x: 541, y: 292 }],
+    ['contactsSyncPromo', 'No thanks', { x: 541, y: 2023 }],
+    ['contactsSyncPromo', 'Sync device and SIM contacts', { x: 540, y: 1891 }],
+    ['contactsCreateStaged', 'Save', { x: 828, y: 155 }],
+    ['contactsCreateStaged', 'Add phone', { x: 236, y: 968 }],
+    ['contactsCreateStaged', 'Add fields', { x: 288, y: 2130 }],
+    ['contactsCreate', 'Add phone', { x: 236, y: 2114 }],
+  ])('the real %s snapshot: tap text:"%s" lands on the text\'s centre, and scroll_until stops on it after 0 swipes', async (screen, label, centre) => {
+    const fake = await snapshot(screen);
+    expect(await scrollUntilVisible(fake, `text:"${label}"`, { maxSwipes: 2, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await tapElement(fake, `text:"${label}"`, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect([fake.tapPoints, fake.swipes]).toEqual([[centre], []]);
+  });
+
+  it('the real Account Detail snapshot: a row\'s label node clear of the tab bar is fully visible after 0 swipes; the row cut at the tab bar\'s top is tapped at its title\'s centre', async () => {
+    const fake = await snapshot('accountDetail');
+    expect(await scrollUntilVisible(fake, 'label:"Loan repayment, 04.01.2026, +91.00 EUR"', { maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await tapElement(fake, 'text:"+493"', OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect([fake.tapPoints, fake.swipes]).toEqual([[{ x: 782, y: 1836 }], []]);
   });
 
   it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE keeps the layout-defect diagnosis', async () => {
