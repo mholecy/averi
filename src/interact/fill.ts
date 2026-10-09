@@ -107,7 +107,11 @@ function screenSignature(tree: UiNode): string {
  * input is droppable end to end (Compose async state, IME queues), so "the
  * call returned" is not "the text landed":
  * - clear: the field must actually be empty; a second pass uses the length
- *   the field still reports.
+ *   the field still reports. A reading equal to the field's named
+ *   placeholder is empty, and a delete round that leaves the reading
+ *   UNCHANGED stops the clear (an empty field showing its hint, or one
+ *   ignoring deletes — 2026-10-09, see the loop): the read-back decides
+ *   when a value follows, and a clear alone is reported not verified.
  * - type with clear: the field must show exactly the value; the retry may
  *   safely wipe and retype (the content is ours).
  * - type without clear: the typed value must appear IN the field (contiguous
@@ -196,10 +200,24 @@ export async function fillField(
   await adapter.tap(point.x, point.y);
   await sleep(DEFAULT_FOCUS_DELAY_MS); // focus + keyboard — a constant, not an option: tests mock util/sleep
 
+  // What the field HOLDS, as opposed to what it SHOWS: a reading exactly
+  // equal to the placeholder the tree source names (UiNode.placeholder — WDA's
+  // placeholderValue, a dump's hint) is an empty field. Every source reports
+  // an empty field's placeholder as its value (measured 2026-10-09, both
+  // platforms: docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-
+  // content.md), and the clear below counted it as content to delete. The
+  // node's own placeholder is the field's: refetch finds the same field.
+  // Exact equality, and a known cost: a field that really holds the text of
+  // its own placeholder reads as empty here — the tree cannot tell the two
+  // apart. Where the source names no placeholder (idb, the API 33 dump), the
+  // clear's unchanged-reading rule below is what catches a hint.
+  const placeholder = node.placeholder;
+  const held = (shown: string | null | undefined): string => (shown === undefined || shown === null || shown === placeholder ? '' : shown);
+
   let current: UiNode | undefined = node;
-  let preLen = node.value?.length ?? 0; // what the field holds when typing starts (see `landed`)
+  let preText = held(node.value); // what the field holds when typing starts (see `landed`)
   let maskedAppend: FillResult['maskedAppend'];
-  if (value !== '' && !clear && (preLen === 0 || isMaskedValue(current?.value ?? ''))) {
+  if (value !== '' && !clear && (preText === '' || isMaskedValue(preText))) {
     // The pre-tap read is stale for exactly the fields the length rule cares
     // about: Android autofill POPULATES a password field on focus, and a
     // re-entry screen CLEARS one on focus (review 2026-09-18 measured both as
@@ -211,16 +229,32 @@ export async function fillField(
     const focused = await refetch();
     if (focused !== undefined) {
       current = focused;
-      preLen = focused.value?.length ?? 0;
+      preText = held(focused.value);
     }
-    if (preLen > 0 && isMaskedValue(current?.value ?? '')) {
+    if (isMaskedValue(preText)) {
       // The length rule cannot see content: a password typed onto an
       // autofilled one reads as a perfect append (finportal 2026-09-17:
       // backend `invalid_grant`). Say so where the trace is read.
-      maskedAppend = { held: preLen };
+      maskedAppend = { held: preText.length };
     }
   }
+  // What a MASKED read-back must add the typed length to (see `landed`): the
+  // bullets the field held before typing — and only bullets. A masked
+  // field's content reads as bullets on both platforms (2026-09-17), so a
+  // plain reading before typing was not its content: an Android password
+  // EditText that dumps its hint as `text` while empty (the API 33 rule
+  // measured 2026-10-09 on plain EditTexts; on a password field it is
+  // inferred, not yet seen on a device). Counted as held, that hint made
+  // `typed 6 but the field shows 6 (masked field — compared by length; it
+  // held 8 after focus)` of a fill that landed. The cost: a field showing
+  // its password in plain text before typing (a "show password" toggle)
+  // and masked after is checked against the typed length alone. Not fixed
+  // by this: a hinted password field that the source names no placeholder
+  // for reads non-empty before the tap, so the post-focus re-read above is
+  // skipped and an autofill on focus goes unseen (no masked-append warning).
+  const maskedHeld = isMaskedValue(preText) ? preText.length : 0;
   let cleared: FillResult['cleared'];
+  let clearUnchanged: FillResult['clearUnchanged'];
   // Why the clear's read after a delete found no field (review 2026-10-08,
   // m-1): the loop then stops without calling the field empty, and a clear
   // alone (nothing typed, so no read-back) reports it as `lost`.
@@ -247,7 +281,8 @@ export async function fillField(
       if (focused !== undefined) current = focused;
     }
     for (let attempt = 0; ; attempt++) {
-      const existing = current?.value?.length ?? 0;
+      const before = current?.value;
+      const existing = held(before).length;
       cleared ??= existing; // the first pass's count: what the field held when the clear began
       if (existing === 0) break;
       await adapter.clearText(existing);
@@ -260,8 +295,38 @@ export async function fillField(
         clearLost = lostOnLastRead;
         break;
       }
-      const left = current?.value?.length ?? 0;
+      const left = held(current.value).length;
       if (left === 0) break;
+      if (current.value === before) {
+        // The deletes changed NOTHING: the field shows what it showed before
+        // them. An empty field showing its hint or placeholder reads exactly
+        // so — the stock Android EditText (API 33 dumps the hint as `text`)
+        // and iOS fields (idb AXValue, WDA value) whose source names no
+        // placeholder, measured 2026-10-09 (bug note above): the loop sent
+        // up to twice the hint's length in deletes into an EMPTY field and
+        // threw `field still shows 9 characters after clearing twice`, so
+        // `clear: true` never typed its value and a clear alone failed after
+        // it had succeeded. A field that IGNORES deletes (read-only, an IME
+        // that drops them) reads exactly the same; the tree cannot tell the
+        // two apart, so the loop stops here and leaves the verdict to what
+        // follows:
+        // - with a value, the typing and its EXACT read-back: on an empty
+        //   field it lands; a field that ignores deletes shows its old text
+        //   plus the value, the retry's wipe is ignored too, and the fill
+        //   fails — after the value was typed (twice) into it, where it used
+        //   to fail before typing. That is the price of this rule.
+        // - alone, `clearUnchanged`: the clear is reported NOT verified (it
+        //   was a failure until now, and a verified "Filled" would claim an
+        //   empty field nobody saw), the reason naming both causes.
+        // The usual cost on a field that held text: one round deletes it,
+        // the hint appears (a CHANGED reading), a second round sends the
+        // hint's length in deletes into the empty field and finds it
+        // unchanged — measured as 1 + 9 deletes on the Contacts editor.
+        // Where the source names the placeholder, `held` stops after the
+        // first round.
+        clearUnchanged = { shows: left };
+        break;
+      }
       if (attempt >= 1) {
         throw new Error(`fill: field still shows ${charactersText(left)} after clearing twice`);
       }
@@ -317,10 +382,14 @@ export async function fillField(
       (isMaskedValue(observed)
         ? clear
           ? observed.length === value.length
-          : observed.length >= preLen + value.length
+          : observed.length >= maskedHeld + value.length
         : clear
           ? observed === value
-          : observed.includes(value));
+          : // A placeholder is not content: on an empty field showing
+            // `Search`, nothing typed must not pass for a typed `ear`.
+            // Raw equality first: a value equal to the placeholder is the
+            // one reading that cannot be told from it (see `held`).
+            observed === value || held(observed).includes(value));
     let observed = await pollValue(refetch, landed, pollMs);
     // undefined: the node withholds its text — nothing to compare. Since
     // 2026-10-08 that is SAID (readBack 'no-value'), never passed as landed;
@@ -334,7 +403,10 @@ export async function fillField(
       readBack = { kind: 'not-taken' };
     } else if (observed !== undefined && !landed(observed)) {
       if (clear) {
-        await adapter.clearText(observed.length);
+        // What the field holds: a field showing only its placeholder (the
+        // typing never landed) gets no deletes.
+        const wipe = held(observed).length;
+        if (wipe > 0) await adapter.clearText(wipe);
         await adapter.typeText(value);
         observed = await pollValue(refetch, landed, pollMs);
       }
@@ -343,7 +415,7 @@ export async function fillField(
         throw new Error(
           `fill: typed ${charactersText(value.length)} but the field shows ${observed.length} ` +
             (isMaskedValue(observed)
-              ? `(masked field — compared by length${clear ? '' : `; it held ${preLen} after focus`})`
+              ? `(masked field — compared by length${clear ? '' : `; it held ${maskedHeld} after focus`})`
               : '(content withheld from this error)') +
             (wrong === undefined ? '' : `; ${caveatText({ code: 'not-input', role: node.role, typed: true, input: wrong.input })}`),
         );
@@ -360,6 +432,7 @@ export async function fillField(
     role: node.role,
     typed: value.length,
     cleared,
+    clearUnchanged,
     readBack,
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };

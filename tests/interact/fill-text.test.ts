@@ -131,6 +131,18 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     });
   });
 
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: a
+  // clear alone that stopped on deletes that changed nothing — the field was
+  // never seen empty, and was failed until 2026-10-09.
+  it('a clear alone whose deletes changed nothing: "Cleared … (N deletes sent)" and the hint-or-deaf-field reason, on both media', () => {
+    const tail =
+      'NOT verified: the field still shows 15 characters that the deletes did not change — its hint or placeholder (shown while empty), or a field that ignores deletes';
+    expect(both('id:open_search_view_edit_text', fact({ typed: 0, readBack: { kind: 'nothing-typed' }, cleared: 15, clearUnchanged: { shows: 15 } }))).toEqual({
+      reply: `Cleared id:open_search_view_edit_text (15 deletes sent) — ${tail}`,
+      flow: [['⚠ fill', `id:open_search_view_edit_text =  (15 deletes sent) — ${tail}`]],
+    });
+  });
+
   it('focused: nothing typed, no delete sent, not verified — never "Cleared", never "Typed 0 characters"', () => {
     // M-1 (review 2026-10-08): a clear ALONE on a label was "Filled … (0 characters)".
     expect(both('text:"IBAN*"', fact({ typed: 0, role: 'text', readBack: { kind: 'nothing-typed' }, cleared: 'unmeasured' }))).toEqual({
@@ -200,6 +212,10 @@ describe('wordingOf — every sentence', () => {
     );
     expect(unverified({ code: 'no-value', role: 'textfield' }, { code: 'clear-no-length' })).toBe(
       'NOT verified: the matched node exposes no value (role textfield); clear sent no delete — the node gave no length to delete',
+    );
+    expect(unverified({ code: 'lost', why: 'unmatched' }, { code: 'clear-unchanged', shows: 1 })).toBe(
+      'NOT verified: the field could not be found again (the selector no longer matches it); ' +
+        'the field still shows 1 character that the deletes did not change — its hint or placeholder (shown while empty), or a field that ignores deletes',
     );
   });
 

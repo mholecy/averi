@@ -67,6 +67,21 @@ export interface FillResult {
    * read as an empty field).
    */
   cleared?: number | 'unmeasured';
+  /**
+   * With `clear` only: the clear STOPPED because a round of deletes left the
+   * field's reading exactly as it was, `shows` characters long — the field
+   * was not seen empty. Either the field IS empty and shows its hint or
+   * placeholder as its value (every tree source does, measured 2026-10-09:
+   * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md),
+   * or it ignores deletes (read-only, an IME that drops them); the tree
+   * cannot tell the two apart. Until 2026-10-09 the loop threw `field still
+   * shows N characters after clearing twice` here — on every hinted stock
+   * EditText and every iOS field reporting a placeholder, after the field
+   * had in fact emptied. With a value typed after it, the exact read-back
+   * decides (a field that ignores deletes fails there); judgeFill makes it
+   * a reason only when the read-back did not land.
+   */
+  clearUnchanged?: { shows: number };
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**

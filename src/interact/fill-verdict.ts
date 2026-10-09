@@ -43,9 +43,11 @@
  *   2026-10-08), `characters` otherwise.
  * - `reasons` order is render order: the read-back's reason (`no-value`,
  *   `not-taken`, `lost`) first, then the clear's (`clear-unmeasured`,
- *   `clear-no-length`), the latter two never when the read-back `landed` —
- *   with clear, `landed` is "the field shows exactly the value", which is
- *   what the clear was for.
+ *   `clear-no-length`, `clear-unchanged` — at most one), never when the
+ *   read-back `landed` — with clear, `landed` is "the field shows exactly
+ *   the value", which is what the clear was for. A clear ALONE (nothing
+ *   typed, read-back `nothing-typed`) that stopped on unchanged deletes is
+ *   therefore unverified: `cleared` in deletes, its reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
  *   warning (fill.ts never produces both: a masked-append needs an input
  *   that took the text, a not-input finding a read-back that did not land).
@@ -71,13 +73,17 @@ import type { FillResult, LostWhy, NearbyInput } from './fill-facts.js';
  *   the input, so its length is not the field's (`cleared: 'unmeasured'`).
  * - `clear-no-length`: the clear sent no delete because the node gave no
  *   length at all (`cleared: 0` on a `no-value` read-back).
+ * - `clear-unchanged`: the clear's last deletes left the field showing the
+ *   same `shows` characters (`clearUnchanged`) — its hint or placeholder
+ *   on an empty field, or a field ignoring deletes; nothing saw it empty.
  */
 export type Reason =
   | { code: 'no-value'; role: string }
   | { code: 'not-taken'; role: string }
   | { code: 'lost'; why: LostWhy }
   | { code: 'clear-unmeasured'; role: string }
-  | { code: 'clear-no-length' };
+  | { code: 'clear-no-length' }
+  | { code: 'clear-unchanged'; shows: number };
 
 /** What the clear SENT — never what was asked (2026-10-08) — and in which unit it is said (see the module header's invariants). */
 export interface Sent {
@@ -130,6 +136,7 @@ export function judgeFill(r: FillResult): FillVerdict {
   if (readBack.kind !== 'landed') {
     if (cleared === 'unmeasured') reasons.push({ code: 'clear-unmeasured', role });
     else if (cleared === 0 && readBack.kind === 'no-value') reasons.push({ code: 'clear-no-length' });
+    else if (r.clearUnchanged !== undefined) reasons.push({ code: 'clear-unchanged', shows: r.clearUnchanged.shows });
   }
   const verified = reasons.length === 0;
   const sent: Sent | undefined =

@@ -190,6 +190,11 @@ const REASON_SENTENCE: SentenceTable<Reason> = {
   lost: (r) => `the field could not be found again${LOST_WHY_TEXT[r.why]}`,
   'clear-unmeasured': (r) => `clear sent no delete — a role ${r.role} node's length is not the field's`,
   'clear-no-length': () => 'clear sent no delete — the node gave no length to delete',
+  // Both causes named: the tree cannot tell an empty field showing its hint
+  // from a field that ignores deletes (FillResult.clearUnchanged).
+  'clear-unchanged': (r) =>
+    `the field still shows ${charactersText(r.shows)} that the deletes did not change — ` +
+    'its hint or placeholder (shown while empty), or a field that ignores deletes',
 };
 
 /** ` (why)` for a `lost` read-back, chosen per reason (review 2026-10-08, n-3: it read as "the selector no longer matches it" whatever the reason). */

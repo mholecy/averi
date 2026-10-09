@@ -104,19 +104,42 @@ describe('judgeFill — what the facts mean', () => {
     ).toEqual(['not-input', 'masked-append']);
   });
 
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: the
+  // clear stopped on deletes that changed nothing — a hint, or a deaf field.
+  it('clear-unchanged: a reason only when the read-back did not land; a clear alone is then `cleared` in deletes', () => {
+    const stuck = { clearUnchanged: { shows: 9 } };
+    expect(judgeFill(fact({ typed: 0, readBack: nothingTyped, cleared: 9, ...stuck }))).toEqual({
+      did: 'cleared',
+      typed: 0,
+      sent: { what: 'deletes', n: 9 },
+      reasons: [{ code: 'clear-unchanged', shows: 9 }],
+      caveats: [],
+    });
+    // With a value whose exact read-back landed, the field shows the value: the clear did its job.
+    expect(judgeFill(fact({ typed: 5, readBack: landed, cleared: 1, ...stuck }))).toMatchObject({ did: 'filled', sent: { what: 'characters', n: 1 }, reasons: [] });
+    // After the read-back's own reason, as the other clear reasons.
+    expect(judgeFill(fact({ typed: 5, readBack: { kind: 'lost', why: 'unmatched' }, cleared: 1, ...stuck })).reasons).toEqual([
+      { code: 'lost', why: 'unmatched' },
+      { code: 'clear-unchanged', shows: 9 },
+    ]);
+  });
+
   it('the invariants hold over every read-back, clear and length combination', () => {
     const readBacks: FillResult['readBack'][] = [landed, { kind: 'no-value' }, { kind: 'not-taken' }, { kind: 'lost', why: 'unmatched' }, nothingTyped];
     const clears: FillResult['cleared'][] = [undefined, 0, 3, 'unmeasured'];
     for (const readBack of readBacks)
       for (const cleared of clears)
-        for (const typed of [0, 1, 5]) {
-          const v = judgeFill(fact({ typed, readBack, cleared }));
-          expect(v.did === 'filled').toBe(v.reasons.length === 0);
-          if (v.did !== 'filled') expect(v.did === 'typed').toBe(typed > 0);
-          if (v.did !== 'filled' && typed === 0) expect(v.did === 'cleared').toBe(v.sent !== undefined);
-          expect(v.sent !== undefined).toBe(typeof cleared === 'number' && cleared > 0);
-          if (v.sent !== undefined) expect(v.sent.what === 'deletes').toBe(v.did === 'cleared');
-          if (readBack.kind === 'landed') expect(v.reasons).toEqual([]);
-        }
+        for (const typed of [0, 1, 5])
+          for (const clearUnchanged of typeof cleared === 'number' && cleared > 0 ? [undefined, { shows: 9 }] : [undefined]) {
+            const v = judgeFill(fact({ typed, readBack, cleared, clearUnchanged }));
+            expect(v.did === 'filled').toBe(v.reasons.length === 0);
+            if (v.did !== 'filled') expect(v.did === 'typed').toBe(typed > 0);
+            if (v.did !== 'filled' && typed === 0) expect(v.did === 'cleared').toBe(v.sent !== undefined);
+            expect(v.sent !== undefined).toBe(typeof cleared === 'number' && cleared > 0);
+            if (v.sent !== undefined) expect(v.sent.what === 'deletes').toBe(v.did === 'cleared');
+            if (readBack.kind === 'landed') expect(v.reasons).toEqual([]);
+            expect(v.reasons.filter((r) => r.code.startsWith('clear-')).length).toBeLessThanOrEqual(1);
+            if (clearUnchanged !== undefined && readBack.kind !== 'landed') expect(v.reasons.at(-1)).toEqual({ code: 'clear-unchanged', shows: 9 });
+          }
   });
 });
