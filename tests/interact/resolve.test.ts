@@ -575,6 +575,22 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
   });
 
+  it('idb, a modal listed before the content it is drawn over (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-…, a round-6 regression): the chooser\'s rows and the value-date picker are tapped at their centres; scroll_until stops on the picker uncovered', async () => {
+    const screens = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')).screens;
+    const fake = new FakeAdapter({ chooser: parseIdbDescribeAll(JSON.stringify(screens.chooser)), picker: parseIdbDescribeAll(JSON.stringify(screens.valueDatePicker)) }, 'chooser');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    for (const id of ['row_own', 'row_swift']) {
+      expect(await tapElement(fake, `id:accounts.detail.payment_type_sheet.${id}`, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    }
+    fake.current = 'picker';
+    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.value_date_picker', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    await tapElement(fake, 'id:swift_payment.form.value_date_picker', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 423 }, { x: 201, y: 479 }, { x: 205, y: 479 }]);
+    // …and on the same screen the pinned CONTINUE, listed last, still covers what lies under it.
+    await expect(tapElement(fake, 'text:"Payee\u2019s name"', OPTS)).rejects.toThrow(`text:"Payee\u2019s name" is under ${CONTINUE} at its centre (94,827)`);
+  });
+
   it('idb, a label 3 pt below the pinned CONTINUE (round-6 device check H-1, which pressed CONTINUE): refused, nothing tapped — the bar reaches the screen\'s bottom', async () => {
     const elements = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')).positions.pos1;
     const tree = parseIdbDescribeAll(JSON.stringify(elements));

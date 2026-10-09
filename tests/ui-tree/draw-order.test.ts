@@ -18,6 +18,7 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
  */
 
 /** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
+const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
 
 describe('shadowing — the later node drawn over a point (the dismissal picker\'s cover test)', () => {
@@ -717,9 +718,10 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 300, 402, 60) });
       const bar = uiNode({ role: 'button', label: 'Pinned', rect: rect(0, 320, 402, 60) });
       expect(drawOrder(flat(back, row, bar)).exposure(row, IPHONE).covers).toEqual([bar]);
-      // A sheet starting ABOVE a content target is a cover again (the interim rule\'s stated miss).
+      // A sheet listed last that starts ABOVE a content target: the reading-order break — no cover of it, the stated
+      // residual the owner accepted (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-…); over the bar it still is.
       const sheet = uiNode({ role: 'button', label: 'Sheet', rect: rect(0, 200, 402, 400) });
-      expect(drawOrder(flat(back, row, sheet)).exposure(row, IPHONE).covers).toEqual([sheet]);
+      expect(drawOrder(flat(back, row, sheet)).exposure(row, IPHONE).covers).toEqual([]);
       // A node of the bar lying on another (a badge on BackButton) starts the content — the stated miss: no cover of it.
       const badge = uiNode({ role: 'image', label: 'Badge', rect: rect(40, 70, 30, 20) });
       expect(drawOrder(flat(back, badge, row)).exposure(back, IPHONE).covers).toEqual([]);
@@ -820,6 +822,73 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const seen = drawOrder(tree).exposure(row, IPHONE);
         expect(seen.centreCover?.identifier).toBe('swift_payment.form.continue_button');
         expect(seen.tapAt).toBeUndefined(); // 4 pt show above the bar
+      });
+    });
+
+    describe('the reading-order break (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md): later nodes from the first one starting above a content target are no cover of it', () => {
+      const screenOf = (name: string) => parseIdbDescribeAll(JSON.stringify(MODAL.screens[name]));
+
+      it('the payment-type chooser, listed before the transaction list it is drawn over: row_own and row_swift are uncovered, tapped at their centres', () => {
+        const tree = screenOf('chooser');
+        const order = drawOrder(tree);
+        for (const [id, centre] of [['row_own', { x: 201, y: 423 }], ['row_swift', { x: 201, y: 479 }]] as const) {
+          const row = tree.children.find((n) => n.identifier === `accounts.detail.payment_type_sheet.${id}`)!;
+          expect(order.exposure(row, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: centre, moved: false } });
+        }
+      });
+
+      it('…where the break falls: for row_own at filter_icon (358 < 397) — date_header_0 (399) and row_0 (435), listed before it, would cover; for row_swift at once', () => {
+        const tree = screenOf('chooser');
+        const own = tree.children.find((n) => n.identifier === 'accounts.detail.payment_type_sheet.row_own')!;
+        const icon = tree.children.find((n) => n.identifier === 'transactions.list.filter_icon')!;
+        icon.rect = { ...icon.rect, y: 400 }; // no longer above row_own: the list behind reads as drawn over it
+        expect(drawOrder(tree).exposure(own, IPHONE).covers.map((n) => n.identifier)).toEqual(['transactions.list.filter_icon', 'transactions.list.date_header_0', 'transactions.list.row_0']);
+      });
+
+      it('the SWIFT form\'s value-date picker, listed after the title and before every row: uncovered, its centre tapped', () => {
+        const tree = screenOf('valueDatePicker');
+        const picker = tree.children.find((n) => n.identifier === 'swift_payment.form.value_date_picker')!;
+        expect(drawOrder(tree).exposure(picker, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 205, y: 479 }, moved: false } });
+      });
+
+      const app = uiNode({ role: 'other', label: 'app', rect: IPHONE });
+      const flat = (...children: UiNode[]) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [app, ...children] });
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(24, 400, 354, 52) });
+      const footer = uiNode({ role: 'text', label: 'Total 100 EUR', rect: rect(40, 420, 200, 20) }); // starts below Row's top: before the break
+
+      it('before the break nothing changes, and a node of no area never breaks: a text after a 0×0 node still covers', () => {
+        const above = uiNode({ role: 'text', label: 'Above', rect: rect(24, 300, 354, 20) });
+        expect(drawOrder(flat(row, footer)).exposure(row, IPHONE).covers).toEqual([footer]);
+        expect(drawOrder(flat(row, above, footer)).exposure(row, IPHONE).covers).toEqual([]);
+        expect(drawOrder(flat(row, uiNode({ role: 'textfield', rect: rect(0, 0, 0, 0) }), footer)).exposure(row, IPHONE).covers).toEqual([footer]);
+        // Its top AT the target\'s is no break.
+        expect(drawOrder(flat(row, uiNode({ role: 'text', label: 'Level', rect: rect(380, 400, 20, 10) }), footer)).exposure(row, IPHONE).covers).toEqual([footer]);
+      });
+
+      it('a node pinned at the bottom never breaks and is never past a break: CONTINUE over a label under it, after a field above it, covers it', () => {
+        const label = uiNode({ role: 'text', label: 'Street', rect: rect(42, 807, 186, 20) });
+        const field = uiNode({ role: 'textfield', identifier: 'f', rect: rect(42, 600, 318, 20) }); // starts above: the break
+        const bar = uiNode({ role: 'button', label: 'Go', rect: rect(24, 780, 354, 44) });
+        expect(drawOrder(flat(label, field, bar)).exposure(label, IPHONE).covers).toEqual([bar]);
+        // Nor does it break for what follows it: a badge listed after the bar, on the label, still covers it.
+        const badge = uiNode({ role: 'text', label: '2', rect: rect(100, 810, 20, 12) });
+        expect(drawOrder(flat(label, bar, badge)).exposure(label, IPHONE).covers).toEqual([bar, badge]);
+        // A row cut by the screen\'s bottom (ending at 880, past 874) is not pinned: it starts above the label, so it breaks.
+        const cut = uiNode({ role: 'button', label: 'Cut', rect: rect(24, 800, 354, 80) });
+        expect(drawOrder(flat(label, cut)).exposure(label, IPHONE).covers).toEqual([]);
+      });
+
+      it('the bar\'s items never break: a menu listed after the content, reaching past the band, still covers BackButton', () => {
+        const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+        const menu = uiNode({ role: 'button', label: 'Menu', rect: rect(16, 72, 370, 400) });
+        expect(drawOrder(flat(back, row, uiNode({ role: 'text', label: 'Above', rect: rect(24, 50, 100, 10) }), menu)).exposure(back, IPHONE).covers).toEqual([menu]);
+      });
+
+      it('a tree that is not a flat list has no break: the same shapes judged as before', () => {
+        const above = uiNode({ role: 'text', label: 'Above', rect: rect(24, 300, 354, 20) });
+        const cover = uiNode({ role: 'button', label: 'Cover', rect: rect(24, 410, 354, 40) });
+        expect(drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [row, above, cover] })).exposure(row, IPHONE).covers).toEqual([cover]);
+        expect(drawOrder(flat(row, above, cover)).exposure(row, IPHONE).covers).toEqual([]);
       });
     });
 

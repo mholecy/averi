@@ -184,6 +184,10 @@ interface SeenFor extends Seen {
   readonly contentFrom: number;
   /** The bottom of the top bar's band (`FLAT_LIST_TOP_BAR_FRACTION` of the screen): content ending above it may lie under the bar. */
   readonly barLine: number;
+  /** The walk index of the reading-order break after a flat list's CONTENT target (`readingBreak`): the later nodes from it on are no cover of it. The walk's length when there is none, the target is the top bar's, or the tree is not a flat list. */
+  readonly readingBreak: number;
+  /** The nodes pinned at a flat list's bottom (`bottomPinned`): never past the break. */
+  readonly pinned: ReadonlySet<Placed>;
 }
 
 /**
@@ -478,8 +482,9 @@ const NOT_DRAWN = {
    * floating label, a textfield, a helper line with its top at 75, 80 or 82,
    * inside Back's 70–98 — all three false. Here the bar's items are listed
    * before the content, and content listed after them is no cover of them,
-   * wherever its top lies; between content nodes nothing changes — the
-   * pinned CONTINUE, listed after the rows, still covers `priority_select`.
+   * wherever its top lies; between content nodes this row changes nothing —
+   * the pinned CONTINUE, listed after the rows, still covers
+   * `priority_select` (content over content is `flatListReadingOrder`'s).
    * Only content that ENDS inside the bar's band (`barLine`,
    * `FLAT_LIST_TOP_BAR_FRACTION`) is excused — a row scrolled under the bar
    * lies in it (the measured IBAN at 75–95, `will_remain` at 80–95), while a
@@ -495,13 +500,67 @@ const NOT_DRAWN = {
    * "clear": the tap may press it). A node of the bar listed after
    * the first content node (`firstContent`'s misses) still meets content as
    * content: a row scrolled under it reads as cover — a false refusal, the
-   * safe direction. Improved on the interim rule: a sheet laid over a
-   * target it starts above is a cover again — a content target always, a
-   * bar item whenever the sheet reaches past the band. WDA's nested tree and
-   * Android's never meet this row: neither is marked.
+   * safe direction. Improved on the interim rule: a sheet laid over a bar
+   * item it starts above is a cover again whenever it reaches past the band
+   * (over a CONTENT target listed before it, it is not — the reading-order
+   * break, `flatListReadingOrder`). WDA's nested tree and Android's never
+   * meet this row: neither is marked.
    */
   flatListChrome: {
     target: ({ node, at }, { target, contentFrom, barLine }) => target.at < contentFrom && at >= contentFrom && node.rect.y + node.rect.height <= barLine,
+  },
+
+  /**
+   * CONTENT LISTED PAST A READING-ORDER BREAK, IN A FLAT LIST: under idb
+   * (`UiNode.flatList`), a node at or after the first node listed after a
+   * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
+   * where idb resumes listing another container in reading order
+   * (`readingBreak`) — unless it is pinned at the list's bottom
+   * (`bottomPinned`). `target` only: the owner's decision of 2026-10-09 on
+   * docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-
+   * covered-by-the-content-behind-it.md, a regression of `flatListChrome`.
+   *
+   * Measured (tests/fixtures/idb-modal-listed-before-content.json): idb
+   * lists mp-native's payment-type chooser — a card drawn over the dimmed
+   * Account Detail, with no node of its own for the card or the backdrop —
+   * in the MIDDLE of the screen's content: after the action buttons, its
+   * rows `row_own 45,397 312x52` and `row_swift 45,453 312x52`, then the
+   * transaction list it is drawn over (`filter_icon 348,358`,
+   * `date_header_0 0,399`, `row_0 24,435`, …). Read as draw order, the list
+   * behind covered the chooser, and `tap` refused `row_swift` "under button
+   * 'Loan repayment…'". idb lists in reading order WITHIN a container, so
+   * a node starting above the target is the next container's: for
+   * `row_own` the break is `filter_icon` (358 < 397), for `row_swift` it
+   * comes at once, for the SWIFT form's value-date picker
+   * (`56,291 298x375`, listed after the title, before every row) the
+   * debit row at 150 breaks it. Round 5's interim rule (a later node
+   * covers only when its top lies at or below the target's) was not
+   * enough: `date_header_0`'s top 399 lies below `row_own`'s 397. Between
+   * the target and the break nothing changes: the pinned CONTINUE, listed
+   * last after `priority_select`, still covers it, as a node listed after
+   * a row and starting at or below it covers it (a footer's text in a
+   * row). Nodes of no area never break (idb lists a 0×0 field).
+   *
+   * Pinned at the bottom (`bottomPinned`) is no break and never past one:
+   * CONTINUE starts above a label lying under it (`42,807`) and covers it
+   * down to the screen's bottom. Bar items are `flatListChrome`'s and
+   * never break: a menu listed after the content that reaches past the
+   * band still covers them.
+   *
+   * Residuals, stated (accepted by the owner): a menu, sheet or popover
+   * listed after the content that starts ABOVE a content target is no
+   * cover of it — nor is anything listed after such a node (a false
+   * "clear": the tap may press the menu). So is what follows a node that
+   * starts above the target for another reason: a floating label listed
+   * after its field and above it (`IBAN 42,359` after the field at
+   * `42,380`) ends the field's covers — only a pinned bottom bar still
+   * counts after it. Conversely a pinned bottom bar of the content behind
+   * a modal still covers the modal's rows where it reaches them (a false
+   * refusal, the safe direction). WDA's nested tree and Android's never
+   * meet this row: neither is marked.
+   */
+  flatListReadingOrder: {
+    target: (placed, { readingBreak, pinned }) => placed.at >= readingBreak && !pinned.has(placed),
   },
 
   /**
@@ -844,6 +903,20 @@ function bottomPinned(order: readonly Placed[], screen: Rect): ReadonlySet<Place
   return pinned;
 }
 
+/**
+ * The reading-order break after a flat list's CONTENT target
+ * (`flatListReadingOrder`): the walk index of the first node after it with
+ * area, not pinned at the bottom (`pinned`), whose top lies above the
+ * target's. `order.length` when there is none, or when the target is the
+ * top bar's (`contentFrom`; never on a tree that is not a flat list, whose
+ * `contentFrom` is the walk's length).
+ */
+function readingBreak(order: readonly Placed[], target: Placed, contentFrom: number, pinned: ReadonlySet<Placed>): number {
+  if (target.at < contentFrom) return order.length;
+  const top = target.node.rect.y;
+  return order.slice(target.end).find((p) => rectArea(p.node.rect) > 0 && !pinned.has(p) && p.node.rect.y < top)?.at ?? order.length;
+}
+
 /** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). */
 function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
@@ -922,7 +995,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, pinned), pinned };
       const over =
         shown === undefined || about === undefined
           ? []
