@@ -20,10 +20,12 @@ import { countOf } from '../util/count.js';
  * per-node normalization that wda-source.ts also had. Two real adapters
  * behind one small interface is what makes this a seam and not a flag.
  *
- * The interface is deliberately two methods. `read()` returns a fresh
- * normalized tree per call (the layers above mutate nodes — field-error
+ * The interface is deliberately small: three methods. `read()` returns a
+ * fresh normalized tree per call (the layers above mutate nodes — field-error
  * pairing writes `error` — so no source may hand out a cached graph).
- * `dispose()` releases whatever the source started; it is awaited by the
+ * `applicationLabel()` answers the one question the normalized tree cannot —
+ * which app a read is of — for IosAdapter.launch alone (2026-10-09; its doc
+ * below). `dispose()` releases whatever the source started; it is awaited by the
  * process shutdown, so it resolves when the resource is gone, not when the
  * release was queued (the WDA source stops its WebDriverAgent and waits for
  * the port to go quiet). Both sources are bound to ONE concrete simulator at
