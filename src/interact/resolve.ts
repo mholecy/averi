@@ -134,7 +134,8 @@ export class AmbiguityRefusal extends Error {}
  * logged "skipped step (not present)", and every new failure-after-finding
  * needed one more `instanceof` there. Now an optional step is "(not
  * present)" exactly when this is what it threw, and anything else is
- * skipped with its own headline — save a PresentElementRefusal (since
+ * skipped with its own headline — save an error carrying the
+ * RefusedOnPresentElement marker (`isRefusedOnPresentElement`, since
  * 2026-10-09), which fails the flow.
  *
  * Deliberately narrow:
