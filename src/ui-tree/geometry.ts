@@ -670,8 +670,9 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * a button, a card smaller than the screen). Not exempt, whatever their
  * size: an interactive node (a full-screen `button` backdrop — an RN
  * transparent Modal's Pressable — takes the tap) and a childless one (a
- * full-screen image or text draws itself; a childless `toolbar` is the one
- * exception since 2026-10-09 — ITEMLESS TOOLBAR below). The measured
+ * full-screen image or text draws itself; a `toolbar` with no item —
+ * childless, or holding only empty frames — is the one exception since
+ * 2026-10-09: ITEMLESS TOOLBAR below). The measured
  * refusals above are kept. Accepted trade-off: a full-screen non-interactive host with nothing
  * of its own at the point (a host whose content sits elsewhere — a
  * full-screen `scrollable` or `webview`, such as an RN ScrollView in a
@@ -755,30 +756,42 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  *
  * An ITEMLESS TOOLBAR is not a cover, whatever its size (2026-10-09,
  * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-
- * dismissal.md): a `toolbar` with NO children. Measured
- * under WDA on the stock Contacts "New Contact" sheet (UIKit, iPhone 17,
- * iOS 27): after the title `text 'New Contact' 149 89 104 22` in
- * pre-order come the form's `scrollable 0 62 402 812` (with children,
- * excused above) and two childless `toolbar 'Toolbar'`s, `0 83 402 48`
- * and `0 62 402 812`; EACH alone contained the title's point (201,100) and
- * refused the configured title dismissal as "covered by toolbar", while
- * the screenshot shows the title with nothing over it — every
- * keyboard-covered tap on that sheet failed. Extending the host rule to
- * childless screen-sized frames would not have fixed it: the 48-pt one is
- * a bar's size, not a host's. The rule is the role's: a toolbar's surface
- * is its ITEMS (WDA lists a bar button, a title, a Done as its
- * descendants, as the accessory bar's), so one listing none is judged to
- * draw nothing at the point (on the measured sheet nothing of either was
- * visible over the title). Narrow on purpose: only
- * `toolbar` (a childless `image`, `text`, `scrollable` or `webview` still
- * draws itself, and a childless screen-sized one still covers), only
- * childless (a toolbar with any child, at any size under the screen,
- * covers as itself — the input-accessory bar measured 2026-10-07 has its
- * Done, and the keyboard's band contains that slot anyway); `toolbar` is
- * not an interactive role (ui-tree/selectors.ts), so no control is
- * excused; a keyboard-owned itemless toolbar (none measured) is excused
- * like any other, the band — which contains the accessory slot — still
- * catching a point there. Earlier passes it cannot reopen: the measured covers
+ * dismissal.md): a `toolbar` none of whose descendants could be an item —
+ * every one an EMPTY FRAME, a wrapper role (STRUCTURAL_ROLES: `container`,
+ * `other`) with no label, value or identifier; it may have none at all.
+ * Measured under WDA on the stock Contacts "New Contact" sheet (UIKit,
+ * iPhone 17, iOS 27): after the title `text 'New Contact' 149 89 104 22`
+ * in pre-order come the form's `scrollable 0 62 402 812` (with children,
+ * excused above) and two `toolbar 'Toolbar'`s, `0 83 402 48` and
+ * `0 62 402 812`, each holding ONE empty `Other` (→ `container`) of its own
+ * rect — no label, value, identifier or children (raw `/source` at
+ * 347e70d); EACH alone contained the title's point (201,100) and refused
+ * the configured title dismissal as "covered by toolbar", while the
+ * screenshot shows the title with nothing over it — every keyboard-covered
+ * tap on that sheet failed. The rule's first version (`ae23890`) asked for
+ * NO children, after the note's first reading of that tree; the empty
+ * child was in the capture all along, the rule never applied on the
+ * device, and the unit test passed on a shape no device gave (corrected
+ * the same day, at the 347e70d device check). So "itemless" is judged by
+ * content, not by child count. Extending the host rule to screen-sized
+ * frames would not have fixed it: the 48-pt one is a bar's size, not a
+ * host's. The rule is the role's: a toolbar's surface is its ITEMS (WDA
+ * lists a bar button, a title, a Done as its descendants, as the
+ * accessory bar's), so one listing none is judged to draw nothing at the
+ * point (on the measured sheet nothing of either was visible over the
+ * title). Narrow on purpose: only `toolbar` (a childless `image`, `text`,
+ * `scrollable` or `webview` still draws itself, and a childless
+ * screen-sized one still covers); only an EMPTY frame is not an item — a
+ * descendant with a label, a value or an identifier (a frame WDA named,
+ * possibly a custom item), or of any other role (an unlabelled button or
+ * icon, a text) is one, at any depth, and the toolbar then covers as
+ * itself at any size under the screen (the input-accessory bar measured
+ * 2026-10-07 has its Done, and the keyboard's band contains that slot
+ * anyway); `toolbar` is not an interactive role (ui-tree/selectors.ts),
+ * and neither is a wrapper role, so no control is excused; a
+ * keyboard-owned itemless toolbar (none measured) is excused like any
+ * other, the band — which contains the accessory slot — still catching a
+ * point there. Earlier passes it cannot reopen: the measured covers
  * this function exists for — an alert's or a sheet's text, a navigation
  * bar's label, a keyboard-owned key or band, a full-screen backdrop
  * `button` — are none of them an itemless toolbar, and the round-2 pin "a
@@ -794,13 +807,18 @@ const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
  * touched, and said so; the silent pass of the trade-offs above needs a
  * tap that hides the keyboard, which a bar with no items is not known to
  * do. The one SILENT WRONG ACTION this loosening opens (review 2026-10-09):
- * a bar whose item WDA does not list — a custom view that is not an
- * accessibility element, or one hidden from accessibility — reads as
- * childless, and "childless" is then false evidence: the dismissal tap can
- * TRIGGER that item (Save, Cancel, a sheet's close), and if the keyboard
- * goes with it the guard reports `hidden by tapping <title>` and taps the
- * target on a screen it did not mean to change. Rare — the unlisted item
- * must sit exactly at the dismissal target's centre — but not caught.
+ * a bar whose item WDA does not list as content — a custom view that is
+ * not an accessibility element, or one hidden from accessibility, listed
+ * not at all or only as an empty frame — reads as itemless, and
+ * "itemless" is then false evidence: the dismissal tap can TRIGGER that
+ * item (Save, Cancel, a sheet's close), and if the keyboard goes with it
+ * the guard reports `hidden by tapping <title>` and taps the target on a
+ * screen it did not mean to change. Rare — the unlisted item must sit
+ * exactly at the dismissal target's centre — but not caught; judging by
+ * content widens it by one case (an item WDA lists only as an empty frame,
+ * which the child-count rule would have kept as a cover — on the measured
+ * sheet, the one shape seen, that frame is the bar's own size, not an
+ * item's).
  * Platform scope: the `toolbar` role is assigned only by the WDA parser
  * (adapters/wda-source.ts, `Toolbar: 'toolbar'`); a future idb or Android
  * mapping to `toolbar` would inherit this excuse and must be judged
@@ -810,8 +828,10 @@ export function shadowing(tree: UiNode, node: UiNode, point: Point): UiNode | un
   const screen = rectArea(tree.rect) > 0 ? rectArea(tree.rect) : Math.max(0, ...[...everyNode(tree)].map((n) => rectArea(n.rect)));
   const coversOnlyThroughContent = (n: UiNode) =>
     n.children.length > 0 && !isInteractive(n) && (CONTENT_FRAMED_ROLES.has(n.role) || rectArea(n.rect) >= screen * SCREEN_SIZED_FRACTION);
+  /** A descendant that cannot be an item: a wrapper with nothing of its own (see above). */
+  const emptyFrame = (n: UiNode) => STRUCTURAL_ROLES.has(n.role) && !n.label && !n.value && !n.identifier;
   /** A toolbar with no items: nothing of it is what is seen at the point (the UIKit sheet's two, 2026-10-09 — see above). */
-  const itemlessToolbar = (n: UiNode) => n.role === 'toolbar' && n.children.length === 0;
+  const itemlessToolbar = (n: UiNode) => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
   let after = false;
   let over: UiNode | undefined;
   const walk = (n: UiNode): void => {

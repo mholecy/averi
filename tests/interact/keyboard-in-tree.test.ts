@@ -77,8 +77,10 @@ function swiftFormFake(toolbar: boolean): FakeAdapter {
  * The Contacts "New Contact" sheet under WDA (UIKit, iPhone 17, iOS 27, measured 2026-10-09 05:30 UTC,
  * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md), in pre-order: the title
  * `text 'New Contact' 149 89 104 22` inside `container id:"New Contact" 0 78 402 54`, the form's `scrollable 0 62 402 812`
- * with its rows (`add pronouns` at y 692 — centre (223,703), under the keyboard), then the two CHILDLESS
- * `toolbar 'Toolbar'`s `0 83 402 48` and `0 62 402 812` (`bar` / `sheet` say which are there), then the band `0 573 402 301`.
+ * with its rows (`add pronouns` at y 692 — centre (223,703), under the keyboard), then the two `toolbar 'Toolbar'`s
+ * `0 83 402 48` and `0 62 402 812` (`bar` / `sheet` say which are there), each holding ONE empty `container` of its own rect
+ * (the raw `/source` at 347e70d — the first version of this fake built them childless, after the note's since-corrected
+ * premise, and passed while the device still refused), then the band `0 573 402 301`.
  * Until 2026-10-09 either toolbar alone refused the title dismissal as "covered by toolbar". The fake's hit test lands
  * on the identified title container; a tap there hides the keyboard (assumed — not tried on the device).
  */
@@ -95,7 +97,7 @@ function contactsSheetFake({ bar, sheet }: { bar: boolean; sheet: boolean }): Fa
       node({ role: 'text', label: 'add pronouns', identifier: 'pronouns', rect: { x: 40, y: 692, width: 366, height: 22 } }),
     ],
   });
-  const toolbar = (rect: Rect) => node({ role: 'toolbar', label: 'Toolbar', rect });
+  const toolbar = (rect: Rect) => node({ role: 'toolbar', label: 'Toolbar', rect, children: [node({ role: 'container', rect })] });
   const fake = new FakeAdapter(
     {
       sheet: node({
@@ -471,7 +473,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         }
       });
 
-      it('the Contacts sheet (2026-10-09): its two CHILDLESS toolbars after the title — 402×48 and 402×812, each alone, and both — are not covers; the title is tapped, then the row', async () => {
+      it('the Contacts sheet (2026-10-09): its two itemless toolbars (one empty frame each) after the title — 402×48 and 402×812, each alone, and both — are not covers; the title is tapped, then the row', async () => {
         for (const shape of [{ bar: true, sheet: true }, { bar: true, sheet: false }, { bar: false, sheet: true }]) {
           const fake = contactsSheetFake(shape);
           const result = await tapElement(fake, 'role:text text:"add pronouns"', { ...FAST, dismissals: [CONTACTS_TITLE_TAP] });
@@ -869,7 +871,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     }
   });
 
-  it('the Contacts sheet (2026-10-09), the keyboard left up by a fill: its two childless toolbars are not covers — the title is tapped and the result says so', async () => {
+  it('the Contacts sheet (2026-10-09), the keyboard left up by a fill: its two itemless toolbars are not covers — the title is tapped and the result says so', async () => {
     const fake = contactsSheetFake({ bar: true, sheet: true });
     const events = recorded(fake);
     expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [CONTACTS_TITLE_TAP] })).toEqual({ hiddenBy: 'tapping role:"text" text:"New Contact"' });

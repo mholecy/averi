@@ -388,14 +388,18 @@ describe('shadowing — the later content node drawn over a point (the dismissal
     expect(shadowing(app(tall, title, toolbar()), title, at)).toBeUndefined();
     // An inset host (402×820, 94 % of the screen: a status-bar inset) is still a host.
     expect(shadowing(app(title, toolbar({ x: 0, y: 54, width: 402, height: 820 })), title, { x: 200, y: 84 })).toBeUndefined();
-    // Just under SCREEN_SIZED_FRACTION (0.9) it covers as itself: 402×786 is 89.9 %.
-    const under = toolbar({ x: 0, y: 0, width: 402, height: 786 });
+    // Just under SCREEN_SIZED_FRACTION (0.9) it covers as itself: 402×786 is 89.9 % — given an item (elsewhere), since an
+    // itemless toolbar covers at no size (2026-10-09, below).
+    const underRect = { x: 0, y: 0, width: 402, height: 786 };
+    const under = uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: underRect, children: [uiNode({ role: 'container', rect: underRect, children: [home] })] });
     expect(shadowing(app(title, under), title, at)).toBe(under);
   });
 
   it('the host rule\'s edge: exactly SCREEN_SIZED_FRACTION of the root is a host; a root with no rect falls back to the largest rect', () => {
     const target = text({ label: 'title' });
-    const host = (height: number) => uiNode({ role: 'toolbar', rect: { x: 0, y: 0, width: 400, height }, children: [uiNode({ role: 'container', rect: { x: 0, y: 0, width: 400, height } })] });
+    // Each host holds one item away from the point: an itemless toolbar covers at no size (2026-10-09), and this pins the size rule.
+    const item = () => uiNode({ role: 'button', label: 'Done', rect: { x: 300, y: 650, width: 80, height: 40 } });
+    const host = (height: number) => uiNode({ role: 'toolbar', rect: { x: 0, y: 0, width: 400, height }, children: [uiNode({ role: 'container', rect: { x: 0, y: 0, width: 400, height }, children: [item()] })] });
     expect(shadowing(screen(target, host(720)), target, P)).toBeUndefined(); // 288000 = 0.9 × 320000
     const below = host(719);
     expect(shadowing(screen(target, below), target, P)).toBe(below);
@@ -425,8 +429,10 @@ describe('shadowing — the later content node drawn over a point (the dismissal
    * The Contacts "New Contact" sheet under WDA (UIKit, iPhone 17, iOS 27, 2026-10-09 05:30 UTC,
    * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md), in pre-order after the title
    * `text 'New Contact' 149 89 104 22` (inside `container id:"New Contact" 0 78 402 54`): the form's `scrollable 0 62 402 812`
-   * WITH children, then two CHILDLESS `toolbar 'Toolbar'`s, `0 83 402 48` and `0 62 402 812`; then the keyboard's band
-   * `0 573 402 301`. Each toolbar alone contained the title's point (201,100) and refused the dismissal as covered.
+   * WITH children, then two `toolbar 'Toolbar'`s, `0 83 402 48` and `0 62 402 812`, EACH holding one empty `Other` →
+   * `container` of its own rect (no label, value, identifier or children — the raw `/source` at 347e70d, the note's
+   * Correction: the first fix built them childless and never held on the device); then the keyboard's band `0 573 402 301`.
+   * Each toolbar alone contained the title's point (201,100) and refused the dismissal as covered.
    */
   describe('an itemless toolbar covers nothing, whatever its size (the Contacts sheet, 2026-10-09)', () => {
     const full = { x: 0, y: 0, width: 402, height: 874 };
@@ -436,7 +442,9 @@ describe('shadowing — the later content node drawn over a point (the dismissal
     const title = uiNode({ role: 'text', label: 'New Contact', rect: { x: 149, y: 89, width: 104, height: 22 } });
     const titleBox = uiNode({ role: 'container', identifier: 'New Contact', rect: { x: 0, y: 78, width: 402, height: 54 }, children: [title] });
     const form = uiNode({ role: 'scrollable', rect: SHEET, children: [uiNode({ role: 'textfield', identifier: 'First name', rect: { x: 20, y: 300, width: 360, height: 44 } })] });
-    const toolbar = (rect: UiNode['rect'], children: UiNode[] = []) => uiNode({ role: 'toolbar', label: 'Toolbar', rect, children });
+    /** The measured shape by default: one empty same-rect frame. */
+    const frame = (rect: UiNode['rect'], children: UiNode[] = []) => uiNode({ role: 'container', rect, children });
+    const toolbar = (rect: UiNode['rect'], children: UiNode[] = [frame(rect)]) => uiNode({ role: 'toolbar', label: 'Toolbar', rect, children });
     const band = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: { x: 0, y: 573, width: 402, height: 301 } });
     const app = (...after: UiNode[]) => uiNode({ role: 'application', rect: full, children: [uiNode({ role: 'other', rect: full, children: [titleBox, form, ...after] }), band] });
 
@@ -444,6 +452,26 @@ describe('shadowing — the later content node drawn over a point (the dismissal
       expect(shadowing(app(toolbar(BAR), toolbar(SHEET)), title, at)).toBeUndefined();
       expect(shadowing(app(toolbar(BAR)), title, at)).toBeUndefined(); // the 48-pt one: a bar's size, which no screen-sized host rule would excuse
       expect(shadowing(app(toolbar(SHEET)), title, at)).toBeUndefined();
+    });
+
+    it('itemless is judged by content, not by child count: no child, or empty frames nested any depth, list no item', () => {
+      expect(shadowing(app(toolbar(BAR, [])), title, at)).toBeUndefined();
+      expect(shadowing(app(toolbar(BAR, [frame(BAR, [uiNode({ role: 'other', rect: BAR }), frame(BAR)])])), title, at)).toBeUndefined();
+    });
+
+    it('a descendant that could be an item — labelled, valued, identified, or of any non-frame role, at any depth — and the toolbar covers as itself', () => {
+      const elsewhere = { x: 300, y: 90, width: 80, height: 34 };
+      const items = [
+        uiNode({ role: 'container', label: 'Draft', rect: elsewhere }),
+        uiNode({ role: 'other', value: '1', rect: elsewhere }),
+        uiNode({ role: 'container', identifier: 'save', rect: elsewhere }),
+        uiNode({ role: 'button', rect: elsewhere }), // an unlabelled control
+        uiNode({ role: 'image', rect: elsewhere }), // an unlabelled icon
+      ];
+      for (const item of items) {
+        const nested = toolbar(BAR, [frame(BAR, [frame(BAR, [item])])]);
+        expect(shadowing(app(nested), title, at)).toBe(nested);
+      }
     });
 
     it('a toolbar with ANY item still covers as itself, at the bar\'s size — its item elsewhere, as the input-accessory bar\'s Done', () => {
