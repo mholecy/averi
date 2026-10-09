@@ -120,3 +120,151 @@ Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93
 - Under `treeSource: wda` a fill by the container id (`fill: { id: swift_payment.form.amount_input … }`, a `container`) prints
   both `⚠` lines (not a textfield; NOT verified, no value) although `3.10` landed — correct by the rules, noted for
   mp-native's config.
+
+## Device check (2026-10-09 Android, re-run at 610660f)
+
+Measured 05:08–05:16 UTC, emulator-5554 (Pixel_3a AVD, Android 13), averi = mobile-verify `fix/keyboard-aware-scroll` @
+`610660f` (`dist/`, stdio). The mp-native SWIFT form (amount, IBAN) was NOT reachable (bank app logged out, PIN login not
+permitted to this session); stock fixtures instead: Settings search (`id:open_search_view_edit_text`) and the Contacts editor.
+
+- Holds — verified fill by id: `Filled id:open_search_view_edit_text (4 characters)`; singular: `Filled
+  id:open_search_view_edit_text (1 character)`; `Typed 1 character into text:"Last name" — NOT verified: …` (no "1 characters").
+- Holds — `lost` wording: a selector by the field's hint text stops matching once text replaces it → `Typed 5 characters into
+  text:"Last name" — NOT verified: the field could not be found again (the selector no longer matches it)` (the text landed;
+  the editor has no ids, so no identity fallback).
+- Holds — non-input warning in a flow (scratch config, `fill { text: "Company", value: "Acme", dismissKeyboard: true }`, the
+  floating label over the empty Company input): `⚠ fill: text:"Company": the matched node is role text, not a textfield — …
+  the input overlapping it is textfield at 132,405 816x176 — select the input itself …` + `⚠ fill: text:"Company" = Acme — NOT
+  verified: the matched node exposes no value (role text)`; "Acme" landed in the input.
+- **Not reached — the clear-alone wording** (`Cleared <sel> (N deletes sent)` / `Focused <sel> — NOT verified`): on every
+  stock EditText the clear throws first, because uiautomator reports an empty field's HINT as its text — `fill: field still
+  shows 9 characters after clearing twice` (Contacts `Last name`) / `… 15 characters …` (Settings search), in the MCP reply
+  and as the flow line `✗ fill text:"Last name": failed — fill: field still shows 9 characters after clearing twice` (the two
+  agree). Filed: [2026-10-09-android-clear-reads-edittext-hint-as-content.md](2026-10-09-android-clear-reads-edittext-hint-as-content.md).
+- Not measured: the reformatting `value:` selector (mp-native amount field only).
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
+`SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
+`scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
+"That's an error"; logging in again was not permitted to this session. Fixtures instead: the bank app's account-detail screen
+(search field + error state), the stock Contacts "New Contact" sheet (UIKit form, ~4 pages) and Settings (SwiftUI list).
+Software keyboard raised by toggling `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen`
+to false and switching apps (`launch_app` bank → `launch_app` Contacts) — a toggle plus focus change alone did not raise it
+after a `fill` this time; both prefs restored to 1 at the end. Strokes recorded with an `idb` PATH shim logging every `idb ui
+swipe|tap|text` the server sent.
+
+**Holds where measured; the `screen-changed` reason and the reformatting amount were not reachable** (no SWIFT form). One
+pre-existing failure shared with Android and one new wording bug, below.
+
+- Holds — verified fills, both sources: idb `type_text id:"First name" "Ann"` → `Filled id:"First name" (3 characters)` (2.1 s);
+  WDA `id:"Last name" "Q"` → `Filled id:"Last name" (1 character)` (11.9 s), `id:"Company" "Acme"` → `Filled id:"Company" (4
+  characters)` (12.5 s); bank search field under WDA (role `other` there), flow `fill: … value: "Loan"` → `fill:
+  id:"accounts.detail.search_field" = Loan` (it showed `Loan`). Singular `1 character` everywhere.
+- Holds — `lost` wording (idb, bank search field, no `clear`): `type_text { selector: 'role:textfield value:"Search"', text: "G" }`
+  → `Typed 1 character into role:textfield value:"Search" — NOT verified: the field could not be found again (the selector no
+  longer matches it)`; again from `value:"G"` + `a` → same sentence; the field read `G`, then `Ga`. Right by the rules: without
+  `clear` nothing was read before typing, so identity is not asked and the reason is `unmatched`, not a blame on the node.
+  The `(the screen changed while typing)` reason was not reproduced (needs a clear on a field whose screen gains an id while
+  typing — the SWIFT IBAN case).
+- Holds — clear alone, verified (WDA, Contacts `Notes`, a textfield that exposes no placeholder): `type_text { selector:
+  "role:textfield label:Notes", text: "", clear: true }` → `Filled role:textfield label:Notes (0 characters, cleared 5
+  characters first)` (19.4 s); field empty after.
+- Holds — clear alone on a non-input (idb, the `text 'Notes'` label): `Focused role:text text:Notes — NOT verified: clear sent no
+  delete — a role text node's length is not the field's` + `⚠ the matched node is role text, not a textfield — nothing was
+  deleted, and the focus is wherever the tap left it; no textfield is on the screen`.
+- Not reached: `Cleared <sel> (N deletes sent) — NOT verified` (needs a clear whose read loses the field).
+- **Fails (pre-existing, same as Android) — `clear: true` on an empty iOS field with a placeholder**: idb AND WDA report the
+  placeholder as the value (`textfield id:Company value 'Company'`, bank `textfield accounts.detail.search_field value
+  'Search'`). WDA `type_text id:"First name" "Ann" clear` on `Zed` → `fill: field still shows 10 characters after clearing
+  twice` (18.0 s); idb the same on `Ann` → same (2.9 s); idb bank `type_text id:accounts.detail.search_field "Gas" clear` on
+  `Loan` → `fill: field still shows 6 characters after clearing twice`; flow `fill { id: Company, value: "Acme", clear: true }` on
+  the EMPTY field → `✗ fill id:"Company": failed — fill: field still shows 7 characters after clearing twice`. Each time the
+  field was left empty and the value never typed. (The same search field under WDA, role `other`, cleared and filled `Gas`
+  fine.) Recorded as the iOS section of
+  [2026-10-09-android-clear-reads-edittext-hint-as-content.md](2026-10-09-android-clear-reads-edittext-hint-as-content.md).
+- **New — mismatch error with equal counts**: WDA `type_text { selector: "role:textfield label:Notes", text: "hello" }` → after
+  35.8 s `fill: typed 5 characters but the field shows 5 (content withheld from this error)`; the field read `Hello`
+  (auto-capitalised). Filed: [2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md](2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md).
+- Not measured: the reformatting amount with a `value:` selector (mp-native SWIFT amount field only).
+- Cost note: WDA fills on the Contacts sheet took 11.9–19.4 s against idb's 2–3 s for the same field (3.5–4 s a WDA read).
+
+## Device check (2026-10-09 iOS bank form, re-run at 610660f)
+
+Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
+form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
+loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
+untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
+`HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
+`id:swift_payment.form.amount_input` → WDA `role:keyboard` `0 572 402 302`; prefs restored to 1 at the end. Strokes and taps
+recorded with an `idb` PATH shim.
+
+**Holds; the `screen-changed` reason is reached — and here it is triggered by the field's own clear button, not by a screen
+change.** idb unless stated.
+
+- Verified fills: `type_text { selector: 'role:textfield value:"XX12345"', text: "DE89370400440532013000", clear: true }` →
+  `Filled role:textfield value:"XX12345" (22 characters, cleared 7 characters first)` (idb 06:03:06, 3.0 s; WDA 06:04:57, 10.7 s).
+  Amount: idb `value:"4.2"` + clear + `5.5` → `Filled … (3 characters, cleared 3 characters first)` (06:05:42).
+- Reformatting amount with a `value:` selector (blurred `5,50`, raw while focused): idb `role:textfield value:"5,50"` + clear +
+  `1000` → `Filled role:textfield value:"5,50" (4 characters, cleared 4 characters first)` (06:06:27; field `1000`, `1 000,00` after
+  blur); WDA `value~"000,00"` + clear + `3.10` → `Filled … (4 characters, cleared 8 characters first)` (06:06:33). Verified through
+  the identity fallback (the field's rect `42,312 194x20` did not move).
+- `(the screen changed while typing)` — reached, 4 times, each time the text landed:
+  ```
+  06:02:16 type_text { selector: 'text:"Value*"', text: "12.5" }   → Typed 4 characters into text:"Value*" — NOT verified: the
+           field could not be found again (the screen changed while typing)  + ⚠ role text, input at 42,296 194x20
+  06:02:20 type_text { selector: 'role:textfield value:"12.5"', text: "7.25", clear: true }
+           → Typed 4 characters into role:textfield value:"12.5" (cleared 4 characters first) — NOT verified: … (the screen changed while typing)
+  06:02:26 (blurred) value:"7,25" + clear + "1000"  → same sentence
+  06:04:15 (WDA) value:"3.10" + clear + "4.20"      → same sentence (10.5 s)
+  ```
+  Mechanism (raw `idb ui describe-all`): every field that holds text shows a clear button, `Button 'icon-cross-circle'` with the
+  form's SHARED id `TextFieldWithComponentStyle`. In these four calls the amount was the only filled field, so the clear removed
+  the pair `button:TextFieldWithComponentStyle` from `screenSignature` and the typing brought it back; with the IBAN also filled
+  (its own clear button keeps the pair in the set) the very same calls verified (the bullets above). By the rule this is right
+  (an identified node appeared, refusing is the safe direction), but the screen did not change — the field grew its own
+  accessory; the sentence will mislead a reader on any form with per-field clear buttons. (Also, from empty, the textfield's
+  rect moves as the floating label settles, `42,289 232x20` → `42,296 194x20`, so identity would miss anyway on a first fill.)
+  Possible direction: leave out of the signature nodes inside/overlapping the chosen field's container, or nodes that share the
+  chosen field's id.
+- Clear alone: `Cleared role:textfield value:"DE89370400440532013000" (22 deletes sent) — NOT verified: the field could not be
+  found again (the selector no longer matches it)` (06:03:20) and `Cleared role:textfield value~"000,00" (4 deletes sent) — NOT
+  verified: …` (06:03:41); both fields were empty after. Unverified because the emptied field's rect changes (IBAN `42,402 280x20`
+  → `42,357 318x20`: the label drops back into it), so no twin — on this form a clear alone cannot be verified.
+- Non-input label: idb `text:"IBAN*"` + `XX12345` → `NOT verified: the matched node exposes no value (role text)` + ⚠ naming the
+  input at `42,402 280x20`; WDA (06:04:29, 16.8 s) → `NOT verified: the matched node's value does not show the typed text (role
+  text) — it is not the field` + the same ⚠. Text landed in IBAN both times.
+- Flow `fill: { id: swift_payment.form.amount_input, value: "3.10", clear: true, dismissKeyboard: true }` (WDA, 06:03:53, empty
+  field): the two container ⚠ lines as at e9e6509 (`clear sent no delete — a role container node's length is not the field's`);
+  `3.10` landed.
+- The placeholder-as-value clear failure ([2026-10-09-android-clear-reads-edittext-hint-as-content.md](2026-10-09-android-clear-reads-edittext-hint-as-content.md))
+  does NOT hit this form: all 12 empty SwiftUI textfields read `value: null` under idb AND WDA, and every clear above ended
+  without `field still shows N characters`.
+
+## Device check (2026-10-09 Android bank form, re-run at 610660f)
+
+Measured 05:58–06:03 UTC, mp-native SWIFT form (logged in by the owner), emulator-5554, averi = mobile-verify
+`fix/keyboard-aware-scroll` `dist/` from `610660f` (stdio). Read-backs confirmed with `ui_snapshot` after each call.
+
+- **Holds — verified fills:** amount `12.50` → `Filled id:swift_payment.form.amount_input (5 characters)`; IBAN
+  `DE89370400440532013000` → `Filled id:swift_payment.form.iban_input (22 characters)` (15.5 s); value in the tree after.
+- **Holds — `clear: true` re-fill:** IBAN → `AT611904300234573201` → `Filled … (20 characters, cleared 22 characters first)`;
+  amount `12.50` → `1000` → `Filled … (4 characters, cleared 5 characters first)` (shows `1,000.00` once blurred).
+- **Clear alone (empty text):** on the filled IBAN → `Filled id:swift_payment.form.iban_input (0 characters, cleared 20
+  characters first)` (field empty after: verified, the read-back decided). On the EMPTY BIC → `Filled
+  id:swift_payment.form.bic_input (0 characters)` (6.9 s, no delete sent, field read empty). The `Cleared … (N deletes sent)`
+  / `Focused … — NOT verified` heads did not arise: both read-backs found the field.
+- **`value:` selector after the reformat — the documented consequence did not arise here:** `type_text { selector:
+  'role:textfield value:"1,000.00"', text: "250", clear: true }` → `Filled role:textfield value:"1,000.00" (3 characters,
+  cleared 8 characters first)`; the field read `250` while focused (the app reformats on blur, to `250.00`), so the identity
+  fallback found it and the exact compare passed. A field that reformats WHILE typing was not available on this form.
+- **Holds — flow line = MCP reply** (scratch config, `run_flow`): `fill: id:"swift_payment.form.iban_input" =
+  AT611904300234573201 (cleared 22 characters first)`; clear of the empty BIC `fill: id:"swift_payment.form.bic_input" = `
+  (nothing else); clear of the filled IBAN `fill: … =  (cleared 20 characters first)`. Same counts as the MCP replies.
+- The hint bug ([2026-10-09-android-clear-reads-edittext-hint-as-content.md](2026-10-09-android-clear-reads-edittext-hint-as-content.md))
+  did not hit: the empty Compose fields read `text=None` (no placeholder exposed).

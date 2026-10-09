@@ -661,3 +661,18 @@ back to `1`, and the dumps are identical. (averi itself re-enables `com.apple.Ac
 `ApplicationAccessibilityEnabled` before each launch, simulator-wide and not restored, by design and as stated on its
 stderr.) Afterwards ports 8100–8110 and 8199 were quiet, with no xcodebuild, WebDriverAgent or server of this run left. The
 only averi server alive was another session's (pid 84616, cwd finportal), and it was not touched.
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+iPhone 17 simulator iOS 27.0, averi @ `610660f` (`dist/`, stdio), 05:30–05:41 UTC. Tap guard, `treeSource: wda`:
+- Hidden then tapped: mp-native account detail, keyboard `0 573 402 301` up on the search field, `keyboardDismiss: [tap: {
+  role: text, text: "That's an error" }]` → `tap id:nav.tab_transactions` → `Tapped id:nav.tab_transactions (the soft keyboard
+  covered id:nav.tab_transactions; hidden by tapping text:"That's an error" role:"text" before tapping)` (4.4 s); the server
+  sent `idb ui tap 201 330` then `160 787`; keyboard gone, Transactions tab open.
+- Refused, nothing sent: Contacts sheet, the configured title judged covered by a childless `Toolbar` → `… none of the
+  configured dismissals is usable on this screen (tap text:"New Contact" role:"text": covered by toolbar "Toolbar"). Nothing
+  was tapped …` (13.3 s; no `idb ui tap` in the shim log). Details in the 2026-10-09 section of
+  [2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md](2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md).
+- Setup note: raising the keyboard needed an app switch this time (`launch_app` another app, then back) after the prefs
+  toggle; toggle + focus change between fields did not raise it after a `fill` (4 tries).
+- Pixel assert over a covered element: not measured (could not raise the keyboard again over a covered row before time ran out).

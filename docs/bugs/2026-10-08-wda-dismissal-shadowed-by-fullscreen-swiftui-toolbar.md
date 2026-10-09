@@ -124,3 +124,81 @@ the post-fill dismiss path apparently does not hit this refusal; only the tap gu
 
 Fix direction: treat a `scrollable` (and other containers with children) like a host — cover only through its content at
 the point, not its own frame — at least when it is not interactive by itself; or judge cover only by leaf/content nodes.
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
+`SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
+`scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
+"That's an error"; logging in again was not permitted to this session. Fixtures instead: the bank app's account-detail screen
+(search field + error state), the stock Contacts "New Contact" sheet (UIKit form, ~4 pages) and Settings (SwiftUI list).
+Software keyboard raised by toggling `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen`
+to false and switching apps (`launch_app` bank → `launch_app` Contacts) — a toggle plus focus change alone did not raise it
+after a `fill` this time; both prefs restored to 1 at the end. Strokes recorded with an `idb` PATH shim logging every `idb ui
+swipe|tap|text` the server sent.
+
+**Partly measured — holds for the screen-sized toolbar host; the form's `scrollable` shape (the e9e6509 failure) could not be
+re-run** (the SWIFT form did not load).
+
+- Holds — bank app, account detail (SwiftUI), `treeSource: wda`, scratch config `keyboardDismiss: [tap: { role: text, text:
+  "That's an error" }]`, keyboard up on `accounts.detail.search_field` (`role:keyboard` `0 573 402 301`). WDA pre-order: the
+  error text `138 318 126 24`, then `toolbar 'Toolbar' 0 0 402 874` with one child (`container 0 0 402 874`), then the tab bar
+  under the keyboard:
+  ```
+  05:41:03  tap { selector: "id:nav.tab_transactions", configPath: <scratch> }                                    (4.4 s)
+  → Tapped id:nav.tab_transactions (the soft keyboard covered id:nav.tab_transactions; hidden by tapping
+    text:"That's an error" role:"text" before tapping)
+  ```
+  idb shim: `ui tap 201 330` (the text) then `ui tap 160 787` (the tab); `role:keyboard` → 0 matches after; the Transactions
+  tab opened. The screen-sized host with children is excused as designed.
+- A refusal still happens (no silent pass) — stock Contacts "New Contact" sheet (UIKit), `keyboardDismiss: [tap: { role: text,
+  text: "New Contact" }]`, keyboard `0 573 402 301`, target `role:text text:"add pronouns"` at y 714 under it:
+  ```
+  05:30:31  tap { selector: 'role:text text:"add pronouns"', configPath: <scratch> }                              (13.3 s)
+  → The soft keyboard covers role:text text:"add pronouns": the band it draws over [0,573][402,874] contains the tap point
+    (223,703) on two looks 300ms apart; … none of the configured dismissals is usable on this screen (tap text:"New Contact"
+    role:"text": covered by toolbar "Toolbar"). Nothing was tapped: …
+  ```
+  WDA tree after the title `text 'New Contact' 149 89 104 22` (inside `container id:"New Contact" 0 78 402 54`): the form's
+  `scrollable 0 62 402 812` WITH children (excused now — it does not appear in the reply), then two CHILDLESS toolbars,
+  `toolbar 'Toolbar' 0 83 402 48` and `toolbar 'Toolbar' 0 62 402 812` (93 % of the screen; no children, so no host).
+  Either covers (201,100). The screenshot shows the title drawn and nothing over it, so as a statement about the pixels the
+  refusal is false (the safe direction, as the Status accepts for `toolbar` under the screen size); a childless screen-sized
+  `Toolbar` is a shape the host rule does not excuse. Whether a title tap would even hide the keyboard in a UIKit sheet is
+  not known (not tried — no other neutral element there).
+- Not measured: the post-fill `dismissKeyboard` path with the pad up — every `fill` types through `idb ui text` (HID), after
+  which iOS parks the software keyboard (`role:keyboard` 0 matches right after each fill, bank and Contacts), so the flow's
+  dismissal has nothing to hide; `fill: { id: accounts.detail.search_field, value: "Loan", dismissKeyboard: true }` →
+  `fill: id:"accounts.detail.search_field" = Loan` / `done`, no ⚠.
+
+## Device check (2026-10-09 iOS bank form, re-run at 610660f)
+
+Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
+form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
+loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
+untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
+`HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
+`id:swift_payment.form.amount_input` → WDA `role:keyboard` `0 572 402 302`; prefs restored to 1 at the end. Strokes and taps
+recorded with an `idb` PATH shim.
+
+**Holds** — the e9e6509 repro, on the real form (pad up after the focus tap, `priority_select` at y 681 under the band):
+
+```
+05:58:43  tap { selector: "id:swift_payment.form.priority_select", configPath: <scratch wda> }                (11.7 s)
+→ Tapped id:swift_payment.form.priority_select (the soft keyboard covered id:swift_payment.form.priority_select; hidden by
+  tapping id:"swift_payment.form.title" before tapping)
+```
+
+idb shim: `ui tap 201 84` (the title) then `ui tap 201 707` (the row); `role:keyboard` → 0 matches after; the priority sheet
+opened (`priority_sheet.row_0/1` at y 456/502). The form's `scrollable 0 0 402 512` no longer shadows the title.
+
+- Post-fill dismissal still not measurable: the flow `fill: { id: swift_payment.form.amount_input, value: "3.10", clear: true,
+  dismissKeyboard: true }` (06:03:53) typed via `idb ui text 3.10`, which parks the pad, so nothing was left to hide (no ⚠ about
+  a dismissal; the two known container ⚠ lines as at e9e6509).
+- Odd, once: the very first WDA `tap id:swift_payment.form.amount_input` after the form opened (05:58:07) failed `Timed out after
+  5000ms waiting for element … to hold still (found, but never at the same position in two consecutive reads)`; three reads
+  right after gave the same rect `24 273 354 52`, and the retry at 05:58:31 tapped (3.1 s). Not reproduced.

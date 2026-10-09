@@ -154,3 +154,56 @@ What this says for the fix (`touchable region` minus the inset band = covered):
   (`0,948,2220,1080`) in portrait. Read it only when the IME is shown (`ITYPE_IME visible=true` / `mInputShown=true`),
   never as evidence on its own.
 - `mIsImeShowing` does not appear in `dumpsys input_method` on this image (grep matched nothing).
+
+## Device check (2026-10-09 Android, re-run at 610660f)
+
+Measured 05:10–05:13 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio). The mp-native SEPA form was not reachable (bank app logged out,
+PIN login not permitted to this session): fixture = Google Contacts "Create contact" editor. Gboard → grid → Floating, with
+`First name` focused, then docked again the same way. Taps/keys recorded with an `adb` shim on the server's PATH.
+
+Floating, 05:10:50 (identical to the 2026-10-08 fixture):
+```
+touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))
+InsetsSource type=ITYPE_IME frame=[0,2088][1080,2220] visibleFrame=[0,2088][1080,2220] visible=true
+mGivenContentInsets=[0,2022][0,0]   mInputShown=true
+```
+
+- (a) **Holds** — guarded tap under the panel: `tap { selector: 'text:"+1"' }` (phone textfield 132,1647 816x176, centre
+  (540,1735) inside the panel) → `Tapped text:"+1" (the soft keyboard covered text:"+1"; hidden before tapping)` (9.5 s);
+  sent `keyevent 4` then `input tap 540 1735` — one back, one look, one tap; afterwards `+1` `focused="true"`, `First name`
+  still empty (no key pressed). Before the fix the same shape typed `d` into the IBAN.
+- (b) **Holds** — `scroll_until { selector: 'text:"Mobile"', fully: true }` (row 1845–2021, behind the panel) → `fully visible
+  after 1 swipe`, stroke `540 1016 → 540 254` (inside the box above the panel top 1269), row at y 641 after; screenshot shows
+  it above the panel, panel still floating.
+- (c) **Holds** — pixel poll on an element under the panel: `assert … text:"Add birthday" color #D3E3F1` (467,1390 234x55) →
+  `FAIL … the soft keyboard covers the element (element 467,1390 234x55, keyboard 359,1269 681x643) — dismiss it … failing
+  closed, color unchecked` (9.1 s, timeout 8000). An element BESIDE the panel (`text:"Notes"` 176,1763 118x66, x < 359) was
+  measured normally: `PASS … sampled #E8EFF6 … dE00 0.49` — the pixel poll uses the panel rect, not the full-width cut.
+- (d) `server-stderr.log`: **no** `averi: the soft keyboard window's touchable region …` notice in the whole run (the region
+  held the band exactly every time; no refusal case arose).
+- (e) **Holds** — docked (05:12, after toggling Floating off: `SkRegion((0,1398,1080,2220))`, band `[0,1398]`): `tap
+  text:"First name"` with its centre (540,1341) clear of the keyboard → `Tapped text:"First name"`, one `input tap 540 1341`,
+  no back; `tap text:"Last name"` with its centre (540,1429) under the band → `… (the soft keyboard covered text:"Last name";
+  hidden before tapping)`, `keyevent 4` + `input tap 540 1429`, Last name focused.
+- Flow dismissal (docked, scratch config): `fill { text: "Company", value: "Acme", dismissKeyboard: true }` → typed into the
+  Company input, one `keyevent 4`, IME `visible=false` after, editor still open (not popped).
+- Gboard restored to docked (touchable region = band) at 05:12.
+
+## Device check (2026-10-09 Android bank form, re-run at 610660f)
+
+Measured 06:03–06:05 UTC on the original fixture: the mp-native SWIFT form (`com.finshape.skeleton.dev`, logged in by the
+owner), emulator-5554, averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` from `610660f` (stdio), `adb` shim logging
+input. IBAN focused (text keyboard), Gboard → grid → Floating at 06:04:01:
+`touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))`, `ITYPE_IME frame=[0,2088][1080,2220]`.
+
+- **Holds — the original symptom is gone.** `tap { selector: "id:swift_payment.form.value_date_select" }` (rect 66,1472
+  948x143, centre (540,1544) on the panel's `d` key) → `Tapped id:swift_payment.form.value_date_select (the soft keyboard
+  covered id:swift_payment.form.value_date_select; hidden before tapping)` (9.5 s); sent `keyevent 4` then `input tap 540
+  1544`; the value-date picker opened (screenshot), IBAN still empty — no `d` typed. Cancelled.
+- **Holds** — IBAN refocused (panel floating again, same region), `scroll_until { selector:
+  "id:swift_payment.form.fees_select", fully: true }` (rect y 1659–1802, behind the panel) → `fully visible after 1 swipe`
+  (7.3 s), stroke `input swipe 540 1016 540 254 300` (0.8 / 0.2 of the panel top 1269); row at y 431 after, screenshot shows it
+  clear of the panel.
+- `server-stderr.log`: the server wrote nothing to stderr in the whole run (file never created) — no refusal notice.
+- Gboard restored to docked at 06:05:09 (`SkRegion((0,1398,1080,2220))`).

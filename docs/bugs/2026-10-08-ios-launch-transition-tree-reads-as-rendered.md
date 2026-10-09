@@ -171,3 +171,50 @@ Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93
   `17.07.2026` date headers, `+602,00 EUR` rows), the Transactions tab and a transaction detail (`Booking date,
   17.07.2026`) all returned their trees with no ⚠. (With the app up, idb lists no status-bar nodes at all.)
 - Not measured: landscape (no Simulator.app window to rotate — the simulator runs headless here).
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
+`SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
+`scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
+"That's an error"; logging in again was not permitted to this session. Fixtures instead: the bank app's account-detail screen
+(search field + error state), the stock Contacts "New Contact" sheet (UIKit form, ~4 pages) and Settings (SwiftUI list).
+Software keyboard raised by toggling `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen`
+to false and switching apps (`launch_app` bank → `launch_app` Contacts) — a toggle plus focus change alone did not raise it
+after a `fill` this time; both prefs restored to 1 at the end. Strokes recorded with an `idb` PATH shim logging every `idb ui
+swipe|tap|text` the server sent.
+
+**Not re-measured.** The P0 repro needs `terminate_app` + `launch_app` on the registered bank app, which lands on PIN login;
+this session was not permitted to log in again, so the app was never terminated (it kept pid 78966 throughout). `launch_app`
+of the running app (bringing it back from Contacts/Settings) cannot reach the SpringBoard launch tree.
+
+Neighbouring finding from those app switches, filed separately because the tree is NOT bare: for ~1 s after `launch_app`
+brings a backgrounded app to the front, idb returns the PREVIOUS app's full tree, and an `absent:` assert passes on it
+(3 of 3) — [2026-10-09-ios-launch-app-reads-previous-apps-tree.md](2026-10-09-ios-launch-app-reads-previous-apps-tree.md).
+
+## Device check (2026-10-09 iOS bank form, re-run at 610660f)
+
+Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
+form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
+loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
+untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
+`HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
+`id:swift_payment.form.amount_input` → WDA `role:keyboard` `0 572 402 302`; prefs restored to 1 at the end. Strokes and taps
+recorded with an `idb` PATH shim.
+
+**Holds again** (default idb, 6 cold relaunches of the registered app, which then lands on PIN login):
+
+- `terminate_app` → `launch_app` → `ui_snapshot` at once, 3 of 3 (05:57:07–05:57:10): `⚠ The tree is bare: 6 nodes …` (status bar
+  only, clock `07:57`) once, `… bare: 7 nodes …` (status bar + `button 'Skeleton Internal'`) twice.
+- `assert [{ element: { text: "Enter your PIN to log in" }, absent: true, timeout: T }]` right after `launch_app`: T=500 →
+  `FAIL … could not verify within 0.5 s (the last UI tree read was bare, 6 nodes …)`; T=1500 → same, `bare, 2 nodes`; T=6000 →
+  `FAIL … is absent — still visible after 6 s`. No false PASS.
+- Then `assert` PIN present + `Welcome` absent → PASS, and `login_pin_ios_here` (no `requires:`) logged in (7.8 s); tab bar present.
+- The previous-app variant ([2026-10-09-ios-launch-app-reads-previous-apps-tree.md](2026-10-09-ios-launch-app-reads-previous-apps-tree.md))
+  did not occur: no app switch was made this session (every launch was cold, after a terminate).
+- Side note: the first `screenshot` on the PIN screen (05:56:4x) returned `⚠ frame: the screen did not settle: 6 captures, each
+  different from the last …`; the screen looked static (PIN keypad).

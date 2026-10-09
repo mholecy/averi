@@ -47,3 +47,13 @@ not "late": it would never have appeared. The flow was fixed on the config side 
 A SwiftUI view whose identifier is set on a container (`VStack { … }.accessibilityElement(children: .contain)
 .accessibilityIdentifier("x")`), averi iOS with the default idb tree source, a flow step `wait: { element: { id: x } }`.
 It times out at the configured timeout with only "Timed out … waiting for element".
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+iPhone 17 simulator iOS 27.0, averi @ `610660f`, 05:45 UTC, default idb, scratch flow `wait: { element: { id:
+accounts.detail.container }, timeout: 3s }` on mp-native's account detail (WDA lists that id as a `container`). **Holds:**
+`Timed out after 3000ms waiting for element id:"accounts.detail.container"` + `(no tree read contained
+id:"accounts.detail.container". iOS treeSource: idb never exposes an identifier set on a container — SwiftUI
+.accessibilityElement(children: .contain), React Native testID on a non-interactive view. If the screen is showing, set
+app.ios.treeSource: wda in averi.yaml, or wait on a button/row id idb does show)`, and the flow line `✗ wait
+id:"accounts.detail.container": failed — …`.

@@ -1,0 +1,75 @@
+# BUG: fill says "NOT verified … (the screen changed while typing)" when only the field's own clear button appeared — and on the same form a clear alone can never be verified
+
+**Measured 2026-10-09 06:02–06:06 UTC**, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt),
+averi = mobile-verify `fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`),
+default `treeSource: idb` and a scratch `treeSource: wda`, mp-native SWIFT form (SwiftUI, logged in). Noted earlier in
+[2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md](2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md)
+("Device check (2026-10-09 iOS bank form …)"); filed on its own here.
+
+## Observed (measured)
+
+### 1. The `screen-changed` reason, with no screen change
+
+Each time the text landed in the field (checked by `ui_snapshot` / screenshot):
+
+```
+06:02:16 type_text { selector: 'text:"Value*"', text: "12.5" }
+         → Typed 4 characters into text:"Value*" — NOT verified: the field could not be found again (the screen changed while typing)
+           + ⚠ role text, input at 42,296 194x20
+06:02:20 type_text { selector: 'role:textfield value:"12.5"', text: "7.25", clear: true }
+         → Typed 4 characters into role:textfield value:"12.5" (cleared 4 characters first) — NOT verified: … (the screen changed while typing)
+06:02:26 (blurred) value:"7,25" + clear + "1000"   → same sentence
+06:04:15 (WDA) value:"3.10" + clear + "4.20"       → same sentence (10.5 s)
+```
+
+Mechanism (raw `idb ui describe-all`): every field that holds text shows a clear button, `Button 'icon-cross-circle'`, and
+all of them share the form-wide id `TextFieldWithComponentStyle`. In the four calls the amount was the only filled field:
+the clear removed the last `button:TextFieldWithComponentStyle`, typing brought it back, and the pre/post signature differed.
+With the IBAN also filled (its own clear button keeps the pair in the set), the very same calls returned `Filled …` verified.
+
+### 2. A clear alone is never verified on this form
+
+```
+06:03:20 → Cleared role:textfield value:"DE89370400440532013000" (22 deletes sent) — NOT verified: the field could not be found again (the selector no longer matches it)
+06:03:41 → Cleared role:textfield value~"000,00" (4 deletes sent) — NOT verified: …
+```
+
+Both fields were empty afterwards. The emptied field's rect moves because the floating label drops back into it (IBAN
+`42,402 280x20` → `42,357 318x20`; amount from empty `42,289 232x20` → `42,296 194x20` once a value is in), so the identity
+fallback finds no twin. The `value:` selector cannot match an empty field, so nothing can.
+
+## Why (read from the source)
+
+`src/interact/fill.ts#screenSignature` (l. 285–296) is the set of `role:identifier` pairs of every identified node. The
+read-back (l. 380–390) refuses the identity fallback when that set changed since typing started, and records
+`lostOnLastRead = 'screen-changed'`, rendered at l. 214 as `(the screen changed while typing)`. A node that appears or
+disappears as a direct effect of the field gaining or losing text (an accessory of the field itself) changes the set
+exactly like a new screen would. The fallback's `sameField` (role, id, rect) needs an unchanged rect, which a floating-label
+field does not keep across empty ↔ filled.
+
+## Why it matters
+
+- Refusing is the safe direction, but the sentence sends the reader to look for a navigation that did not happen. Per-field
+  clear buttons are a common text-field pattern (`UITextField.clearButtonMode`, design-system fields).
+- Whether a fill verifies depends on whether ANOTHER field holds text: the same call is `Filled` or `NOT verified` depending
+  on unrelated form state. That is hard to reason about in a flow.
+- A clear alone (`clear: true`, empty text) is unverifiable on any floating-label field, so a flow cannot assert a reset by fill.
+
+## Possible fix directions (owner's choice)
+
+- Leave out of `screenSignature` the nodes inside, or overlapping, the matched field's container, or nodes sharing an id
+  with a sibling of the field (a repeated id is an accessory, not a screen).
+- Compare multisets of pairs only when a pair appears that was never seen on this screen before typing (a clear button that
+  was present on another field is not new).
+- For the clear alone: allow `sameField` to match by role + identifier + x/width-overlap when the field's id is unique on
+  the screen, so a rect that only moved vertically within its container still matches.
+- If refused anyway, name it more exactly: `(an identified node appeared or disappeared while typing: button:TextFieldWithComponentStyle)`.
+
+## Repro
+
+1. iOS, a SwiftUI form whose text fields show a clear button with a shared accessibility id once they hold text, and a
+   floating label (mp-native SWIFT form: Account Detail → PAY → SWIFT).
+2. With every other field empty: `type_text { selector: 'role:textfield value:"12.5"', text: "7.25", clear: true }` →
+   `NOT verified … (the screen changed while typing)`, though `7.25` is in the field.
+3. Fill the IBAN, repeat step 2 → `Filled … (4 characters, cleared 4 characters first)`.
+4. `type_text { selector: 'role:textfield value:"<iban>"', text: "", clear: true }` → `Cleared … (22 deletes sent) — NOT verified`.

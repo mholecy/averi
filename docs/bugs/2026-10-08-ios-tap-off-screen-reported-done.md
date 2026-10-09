@@ -91,3 +91,51 @@ Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93
   [2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md](2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md).
 - No visible element was wrongly refused in ~45 portrait taps (idb and WDA). Landscape not measured (headless simulator,
   no rotation available).
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
+`SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
+`scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
+"That's an error"; logging in again was not permitted to this session. Fixtures instead: the bank app's account-detail screen
+(search field + error state), the stock Contacts "New Contact" sheet (UIKit form, ~4 pages) and Settings (SwiftUI list).
+Software keyboard raised by toggling `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen`
+to false and switching apps (`launch_app` bank → `launch_app` Contacts) — a toggle plus focus change alone did not raise it
+after a `fill` this time; both prefs restored to 1 at the end. Strokes recorded with an `idb` PATH shim logging every `idb ui
+swipe|tap|text` the server sent.
+
+**Holds** (on Contacts — the SWIFT `Payee’s street` repro was not reachable):
+
+- idb, Contacts sheet at the top: `tap { selector: 'role:button label:"add to list"' }` → `role:button label:"add to list" is off
+  screen at (201,1656) on a 402x874 screen (rect 20,1630 362x51) — scroll_until it first; nothing was tapped` (1.2 s; idb shim:
+  no tap sent).
+- WDA: `type_text { selector: "role:textfield label:Notes", text: "x" }` → `role:textfield label:Notes is off screen at
+  (201,1424) on a 402x874 screen (rect 36,1412 330x23) — scroll_until it first; nothing was tapped` (7.7 s; nothing typed).
+  Then `scroll_until … fully: true` → `fully visible after 1 swipe` (17.5 s; Notes at y 536), and `type_text` on it focused
+  and typed (the field then read `Hello`; the case change is a separate wording bug, see the fill note's 2026-10-09 section).
+- No visible element was wrongly refused in ~40 portrait taps (bank, Contacts, Settings; idb and WDA).
+
+## Device check (2026-10-09 iOS bank form, re-run at 610660f)
+
+Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
+form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
+loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
+untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
+`HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
+`id:swift_payment.form.amount_input` → WDA `role:keyboard` `0 572 402 302`; prefs restored to 1 at the end. Strokes and taps
+recorded with an `idb` PATH shim.
+
+**Holds** on the SWIFT repro (default idb, form at its top, no keyboard):
+
+```
+06:06:58  tap { selector: 'text:"Payee’s street"' }
+→ text:"Payee’s street" is off screen at (94,985) on a 402x874 screen (rect 42,975 103x20) — scroll_until it first; nothing was
+  tapped                                                                                               (1.2 s; no idb tap sent)
+06:06:59  scroll_until { selector: 'text:"Payee’s street"', fully: true }  → fully visible after 1 swipe (3.0 s; swipe 699 → 175)
+06:07:03  tap { selector: 'text:"Payee’s street"' }                        → Tapped (idb tap 94 194)
+06:07:04  type_text { text: "Hauptstrasse 1" }                              → field read `Hauptstrasse 1` at 42,191
+```

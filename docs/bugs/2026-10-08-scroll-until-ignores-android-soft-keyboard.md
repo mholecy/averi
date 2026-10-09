@@ -254,3 +254,137 @@ a stroke of fixed fraction over a 572-pt box was enough to fling this form ~2 sc
 `scroll_until priority_select fully maxSwipes 2` → `failed after 2 swipes (maxSwipes) — element never appeared in the tree`;
 `tap id:swift_payment.form.priority_select` → `Timed out after 5000ms waiting for element … to appear`. The server's
 startup warning still says "the idb tree carries no keyboard", which is not true on iOS 27 (keys + band are listed).
+
+## Device check (2026-10-09 Android, re-run at 610660f)
+
+Measured 05:03–05:18 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio). **The mp-native SWIFT form was NOT reachable**: the bank app
+had been logged out for inactivity and the PIN login was not permitted to this session, so every check below ran on stock
+apps (Google Contacts "Create contact" editor, Settings). Strokes were recorded with an `adb` shim on the server's PATH.
+
+- Holds — content-up stroke over the docked IME starts clear of the keyboard and not higher than without one:
+  `scroll_until { selector: 'text:"First name"', direction: "up", fully: true }` (band `[0,1398]`) → `fully visible after 1
+  swipe`, stroke `input swipe 540 444 540 1118 300`; with Gboard's band grown to `[0,1285]` the strokes were `444 → 1029`
+  (0.8 × 1285). Content-down unchanged: `1118 → 280` (band 1398), `1029 → 257` (band 1285).
+- Holds — clipped wording: `scroll_until text:"Last name"` (y 1317–1477, band 1398) → `visible after 0 swipes — CLIPPED at
+  bottom, 51% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. A rect assert or screenshot on this
+  element will measure the CLIPPED box`.
+- Holds — floating panel cut: see the Gboard note's 2026-10-09 section (`scroll_until text:"Mobile" fully` → 1 swipe, stroke
+  `1016 → 254` = 0.8/0.2 of the panel top 1269).
+- Holds — counts: "after 1 swipe", "after 2 swipes", "after 3 swipes".
+- **Fails (new note)** — on this RecyclerView form the `fully: true` scroll to that clipped `Last name` flung it off the top
+  in one stroke; the list dropped it from the tree; four more strokes went down into the end of the form and the call timed
+  out at 15 s (`… element was in the viewport before the first swipe but did not stay — it is no longer in the tree …`). The
+  same with no keyboard on Settings (`text:"Display"` never reached, 5 strokes). And a row wholly under the IME at round 0 was
+  reported as `element never appeared in the tree`. Filed:
+  [2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md](2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md).
+- Not measurable on these fixtures: `my_note_input`'s "the last 2 … did not move it" failure (Contacts and Settings resize
+  for the IME and uiautomator leaves rows under it out of the tree, so no target stays in the tree wholly under the keyboard),
+  `settled: false` (not seen), the `fees_select` clipped-bounds limitation (mp-native only). The uiautomator clipping shows
+  in another form on Settings: rows read with NEGATIVE heights right after a fling (`Accessibility … 306 -251`).
+- Pinned top bar (Android): see [2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md](2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md) —
+  the content-up `fully: true` stop certified `First name` at y 118–278, behind the Contacts top bar.
+
+## Device check (2026-10-09 iOS, re-run at 610660f)
+
+Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
+`SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
+`scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
+"That's an error"; logging in again was not permitted to this session. Fixtures instead: the bank app's account-detail screen
+(search field + error state), the stock Contacts "New Contact" sheet (UIKit form, ~4 pages) and Settings (SwiftUI list).
+Software keyboard raised by toggling `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen`
+to false and switching apps (`launch_app` bank → `launch_app` Contacts) — a toggle plus focus change alone did not raise it
+after a `fill` this time; both prefs restored to 1 at the end. Strokes recorded with an `idb` PATH shim logging every `idb ui
+swipe|tap|text` the server sent.
+
+**Partly measured: the strokes hold; the fling/turn path (the e9e6509 failures on the SwiftUI form) was not exercised** — no
+stock fixture reproduced an overshoot, and the stock UIKit form hides the keyboard on drag.
+
+Strokes as sent (idb shim), WDA, Contacts "New Contact" form:
+
+| call (UTC) | keyboard | stroke sent | result |
+|---|---|---|---|
+| 05:36:28 `scroll_until role:text text:"add birthday"` fully | up, `0 573 402 301` | `swipe 201 459 → 201 115` (content-down, box above the pad) | `fully visible after 1 swipe` (16.6 s); row 1036 → 213, read 1 s later at 213 |
+| 05:37:28 `scroll_until id:"First name"` up, fully | up | `swipe 201 175 → 201 459` (content-up, touch-down clear of the top bar) | `fully visible after 1 swipe` (15.5 s); First name -522 → 147 |
+| 05:38:01 `scroll_until role:text text:"add date"` fully | down | `swipe 201 699 → 201 175` | `fully visible after 1 swipe` (16.4 s); at 242 a second later |
+
+- Holds — content-up with the keyboard up now starts at **y 175** (was 114 at e9e6509, in the top bar) and moves the form
+  (669 pt in one stroke). The content-down stroke is unchanged, 459 → 115 (the note's 458 → 114, rounded the other way).
+- Contacts dismissed the keyboard during each drag (`role:keyboard` 0 matches after both keyboard-up calls); the replies
+  said nothing about a keyboard, consistent with the band being gone by the stop read. So the halved stroke (175 → 317), a
+  turn, `settled: false` and the turn count in a failure were not seen.
+- Settings (SwiftUI list, keyboard down, WDA): `privacyAndSecurity` (lazy, not in the first tree) → `fully visible after 1
+  swipe` (6.1 s, `699 → 175`), landed at y 403 and stayed; `general` up → `after 1 swipe` (5.7 s, `175 → 699`), y 293. No
+  overshoot on either fixture (Contacts' UIKit form decelerates short of a screen; the SwiftUI form's ~730–800 pt fling was
+  the case).
+- Cost: on the Contacts sheet (≈320 nodes) one WDA read takes 3.5–4.5 s, so a 1-swipe `scroll_until` (the stop plus the
+  confirming read) took 15.5–17.5 s; the same call on Settings (≈170 nodes) 5.7–6.1 s, and the bank screen reads in 0.5 s.
+- Counts: `after 1 swipe`, `after 0 swipes` everywhere (singular/plural right).
+- idb (`treeSource: idb`, unchanged by design): the server still prints, for a config that sets `keyboardDismiss` under idb,
+  `app.ios.keyboardDismiss is set but app.ios.treeSource is idb: the idb tree carries no keyboard, so no tap is ever refused or
+  hidden and the list is inert — set treeSource: wda for it to apply` (05:28 and 05:35 UTC) — while the same idb tree listed
+  the keys as `button 'Q' 5 597 39 54` … `button 'return'` and the band `other 0 590 402 284` (Contacts, 05:26; the bank
+  app's keys at 05:40). The sentence is still not true on iOS 27 (the conclusion — nothing is refused — is).
+
+## Device check (2026-10-09 iOS bank form, re-run at 610660f)
+
+Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
+form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
+loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
+untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
+`HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
+`id:swift_payment.form.amount_input` → WDA `role:keyboard` `0 572 402 302`; prefs restored to 1 at the end. Strokes and taps
+recorded with an `idb` PATH shim.
+
+**Holds (WDA, pad up)** — the fling past the target is now answered by a turn with a halved stroke and a confirmed stop;
+content-up from y 175 moves the form. No `settled: false` seen.
+
+| call (UTC) | strokes sent (idb shim) | reply | rows ~1 s later (WDA) |
+|---|---|---|---|
+| 05:59:16 `scroll_until priority_select` fully | `458 → 114`, then `175 → 317` (turned, halved) | `fully visible after 2 swipes` (10.6 s) | priority `y 190`, fees 122, keyboard `0 572 402 302`; same at 05:59:37 |
+| 05:59:48 `scroll_until debit_select` up, fully | `175 → 458` | `fully visible after 1 swipe` (7.4 s) | debit -341 → `150` (≈ 491 pt) |
+| 06:00:11 `scroll_until fees_select` fully | `458 → 114`, `175 → 317` | `fully visible after 2 swipes` (9.1 s) | fees `y 122`, priority 190 |
+| 06:00:24 debit up | `175 → 458` | `after 1 swipe` (7.6 s) | debit `150` |
+| 06:00:35 priority | `458 → 114`, `175 → 317` | `after 2 swipes` (10.6 s) | priority `y 230` |
+| 06:00:49 debit up | `175 → 458` | `after 1 swipe` (7.4 s) | debit `150` |
+| 06:01:01 priority | `458 → 114`, `175 → 317` | `after 2 swipes` (10.6 s) | priority `y 234` |
+
+Every stop lies inside the 0–572 box above the pad and below the top bar (≈ y 116); a screenshot at 05:59:4x shows Fees and
+Priority under the title, the pad up. Round 1 (e9e6509) reported the same calls "after 1 swipe" with the row at -48 / -121 / -133
+and fees at -357. The halved content-up stroke (`175 → 317`) was the turn after each down fling; the full content-up stroke moved
+the form ~491 pt (content top reached). The reply does not mention the turn (fine — the count is right).
+
+- Not seen: `settled: false`, a turn count in a failure (no failure occurred), "the last 2 … did not move it".
+
+## Device check (2026-10-09 Android bank form, re-run at 610660f)
+
+Measured 05:58–06:05 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), mp-native SWIFT form
+(`com.finshape.skeleton.dev`, logged in by the owner; Account Detail → PAY → SWIFT payment), averi = mobile-verify
+`fix/keyboard-aware-scroll`, `dist/` built 06:59 local from `610660f` (stdio). Strokes from an `adb` shim on the server's PATH.
+IME up after `type_text` into the amount (`ITYPE_IME frame=[0,1398][1080,2220] visible=true`, `mInputShown=true` throughout).
+
+- **Holds** — `priority_select` (y 1749, under the IME) `fully: true` → `fully visible after 1 swipe` (7.4 s), stroke
+  `input swipe 540 1118 540 280 300`, row at y 378 after.
+- **Holds** — `fees_select` down (from the top, y 1562) → `fully visible after 1 swipe` (7.3 s), stroke `1118 → 280`.
+- **Holds, 2 swipes not 1** — `debit_select` `direction: "up"` from the bottom of the form → `fully visible after 2 swipes`
+  (10.1 s), strokes `input swipe 540 444 540 1118 300` ×2 (the new content-up touch-down, 444 → 1118). Geometry, not a
+  defect: the form had to come back 1371 px (priority 1749 → 378) and this stroke moved it ≈ 674 px with no fling; at
+  `e9e6509` the stroke was 280 → 1118. `iban_input` up likewise took 2 swipes.
+- **Holds** — `my_note_input` (wholly under the IME at the end of the non-resizing form) `fully: true` → fails in 10.5 s
+  (was 15.9 s), 3 strokes (the first moved the form to its end, the last 2 did not):
+  ```
+  scroll_until id:swift_payment.form.my_note_input failed after 3 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 4 of the 4 rounds read: … hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again
+  ```
+- Not seen: `settled: false` (every stop confirmed; no "still moving").
+- **The clipped-bounds limitation still shows, and also after a swipe and at the bottom edge.** (1) `fees_select` read
+  `{y:242, height:92}` under the top bar → `fully visible after 0 swipes` (screenshot: the `Fees*` label cut by the bar).
+  (2) The `fees_select` down scroll above stopped with the row at `{y:242, height:103}` — 40 px behind the top bar — and said
+  `fully visible after 1 swipe`. (3) Keyboard down: `priority_select` `{y:1846, height:133}` (container ends at 1978, the
+  pinned CONTINUE bar at 1979–2111) → `fully visible after 0 swipes`; screenshot shows its lower edge cut by the bar. uiautomator
+  clips each node to its scrollable (`bounds="[0,242][1080,1978]"`), so a `fully: true` stop against either edge of a Compose
+  scroll container is not proof. A height check against siblings is not available from the tree; the scrollable's own bounds
+  are (both cuts sit exactly on them).

@@ -1,0 +1,105 @@
+# BUG: `scroll_until` on Android cannot stop on a row of a fast-flinging lazy list (RecyclerView) — one 300 ms stroke carries the row across the viewport between two reads, the list drops it from the tree, and the loop swipes on the same way until the 15 s timeout ("never appeared in the tree")
+
+**Measured 2026-10-09 05:03–05:18 UTC** on emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi =
+mobile-verify `fix/keyboard-aware-scroll` @ `610660f` built from source (`dist/`, stdio). Strokes recorded with an `adb`
+shim on the server's PATH that logs every `input` call. Fixtures: stock Settings home and the Google Contacts "Create
+contact" editor. Not a regression of the round-2 branches (the no-keyboard stroke is unchanged, 1776 → 444, 300 ms); the
+`Motion` turn documents that a lazy list defeats it ("Needs the target to STAY in the tree") — this note measures what that
+costs on two ordinary screens.
+
+## Observed (measured)
+
+### 1. No keyboard: Settings home, a row two rows below the fold is never reached
+
+Settings home list (`recycler_view`, 0,737 1080x1417) with `Display` the next row below the fold (a slow manual swipe later
+showed it at y 2003). One averi stroke (`input swipe 540 1776 540 444 300`) moves this list ≈ 2190 px — more than the list's
+1417-px height: before it `Display` at y 2003; after it `Accessibility` (two rows later) at y 297, `Display` gone from the tree.
+
+```
+05:17:03 scroll_until { selector: 'text:"Display"', fully: true }
+→ [isError] scroll_until text:"Display" failed after 15000ms (timeout) — element never appeared in the tree        (16.4 s, 5 strokes 1776→444)
+05:17:20 scroll_until { selector: 'text:"Accessibility"', fully: true }
+→ [isError] … failed after 15000ms (timeout) — element never appeared in the tree                                   (16.1 s, 5 strokes)
+05:17:3x scroll_until { selector: 'text:"Network & internet"', direction: "up", fully: true }  → fully visible after 2 swipes
+```
+
+Both rows passed through the viewport during the strokes; no read ever caught them.
+
+### 2. With the docked IME: Contacts editor, a row clipped by the keyboard is flung off the top
+
+`Last name` at y 1317–1477 against the IME band at 1398 (`First name` focused):
+
+```
+05:06:34 scroll_until { selector: 'text:"Last name"' }
+→ Element text:"Last name" visible after 0 swipes — CLIPPED at bottom, 51% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. …
+05:06:3x scroll_until { selector: 'text:"Last name"', fully: true }                                                   (16.4 s)
+→ [isError] scroll_until text:"Last name" failed after 15000ms (timeout) — element was in the viewport before the first swipe but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away). The soft keyboard was up over [0,1285][1080,2220] in 6 of the 6 rounds read: …
+strokes: 540 1118 → 540 280 (band 1398), then 4 × 540 1029 → 540 257 (Gboard's band grew to 1285)
+```
+
+After the first stroke the editor sat at its END (`Add address`, `Add to label`, `Notes`, `Add fields`, `Saving to Device
+only`); four more strokes went DOWN into exhausted content. The failure text is right; the four strokes and ≈ 12 s are wasted:
+the target was last seen clipped at the bottom edge with the caller's direction down, so it can only have left over the top.
+
+### 3. Wording: a row wholly under the keyboard at round 0 is said to have "never appeared in the tree"
+
+Same editor, first call of the session, `Last name` read at y 1409–1569, wholly under the 1398 band (in the tree, `ui_snapshot`
+05:03:08):
+
+```
+05:03:50 scroll_until { selector: 'text:"Last name"', fully: true }
+→ [isError] scroll_until text:"Last name" failed after 15000ms (timeout) — element never appeared in the tree. The soft keyboard was up over [0,1285][1080,2220] in 6 of the 6 rounds read: …
+```
+
+It was in the tree before the first stroke (under the keyboard, `visible = 0`, so `inFrameAfter` stayed unset); the first
+stroke flung it out. "never appeared in the tree" is false and hides the fling.
+
+Side observation in the read right after a fling (05:18, Settings): nodes with NEGATIVE heights — `Accessibility … 198 297
+306 -251`, `Security 198 297 197 -9`, `About emulated device 198 2187 560 -33` — uiautomator's clipped bounds with bottom < top,
+passed through as-is by `ui_snapshot`.
+
+## Why (read from the source)
+
+`src/interact/scroll.ts#Motion`: `carriedPast` (the turn) needs a read that FINDS the target beyond the far edge; a read that
+does not find it clears it ("a lazy list dropped it: nothing to turn for"), and `nextStroke` then strokes toward the caller's
+direction. `exhausted` needs the target in the tree (`offFrame` over found nodes), so content exhausted with the target gone
+runs to the deadline. The Android stroke is `input swipe … 300` (`adapters/android.ts#swipe`, default 300 ms), a fling on
+RecyclerView. The "never appeared" branch is chosen when no read had the target in the frame, even if a read had it in the tree.
+
+## Why it matters
+
+`scroll_until` is "the portable way to reach content below the fold"; a Settings-style RecyclerView row one screen down cannot
+be reached at all, and the error says the element does not exist. In flows this reads as a missing element, not as a scroll
+that overshot.
+
+## Possible fix directions (owner's choice)
+
+- Make the stroke not fling: a slower `input swipe` (e.g. ≥ 800–1000 ms for the same distance; measured here: a 1500 ms
+  500-px swipe moved the list 485 px (`Network & internet` 794 → 309)) or an explicit hold at the end (`input motionevent DOWN/MOVE…/UP` with a pause
+  before UP), so one stroke moves the content by about its own length.
+- Remember the last side the target was seen on (in the tree, any rect): when a stroke drops it, turn with half the reach as
+  for `carriedPast`, instead of honouring the caller's direction.
+- Fail fast: two identical strokes after which the WHOLE tree is unchanged (not only the target's matches) is exhausted
+  content too, target or not.
+- Say "was in the tree (under the soft keyboard / off the frame) before the first swipe, then left it" instead of "never appeared".
+
+## Repro
+
+1. emulator, `adb shell am start -n com.android.settings/.Settings`, list at the top.
+2. `scroll_until { platform: android, selector: 'text:"Display"', fully: true }` → 15 s timeout, "never appeared in the tree".
+3. `swipe { fromX: 540, fromY: 1700, toX: 540, toY: 1200, durationMs: 1500 }` → `Display` is on screen.
+
+## Device check (2026-10-09 Android bank app, re-run at 610660f)
+
+06:05–06:07 UTC, mp-native Account Detail transaction list (Compose lazy list, `transactions.list.row_N`, rows unmounted off
+screen), emulator-5554, keyboard down, averi `dist/` from `610660f`.
+
+- **Reproduces upward.** From the end of the list (rows 28–36 on screen), `scroll_until { selector:
+  "id:transactions.list.row_20", direction: "up", fully: true }` → `failed after 15000ms (timeout) — element never appeared in
+  the tree` (15.9 s), 5 strokes `input swipe 540 444 540 1776 300`; the list ended at the top (row_0 at y 1112) — row_20 was
+  carried past between reads.
+- Down: `scroll_until row_12 fully` from the top → `fully visible after 1 swipe` (it happened to land in view). One manual
+  stroke of the same shape (1776 → 444, 300 ms) moved the list ≈ 2300 px (row_0 1112 → row_8 at 482), about 9 rows, more
+  than a viewport.
+- `scroll_until row_40` (the list ends at row_36) → 5 strokes, `never appeared in the tree` at 15 s — correct outcome, but
+  the same timeout shape: no "content exhausted" fast-fail for a target that is not in the tree.

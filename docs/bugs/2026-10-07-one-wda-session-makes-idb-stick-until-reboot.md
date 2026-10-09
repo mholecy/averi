@@ -161,3 +161,12 @@ stuck signature was the same as before (lone 0×0 `Application`, `launchctl` exi
 | I5 running stuck process | error text as shipped; hand key write does **not** cure a running process; **`launch_app` does not either (same pid): new defect** |
 | I6 write cost | median 0.273 s, p90 0.282 s per key; ≈+0.55 s per launch |
 | I7 deep link | **PASS** after the system "Open" prompt |
+
+## Watched (2026-10-09 iOS, averi @ 610660f)
+
+05:22–05:46 UTC, iPhone 17 iOS 27.0: idb and WDA reads interleaved all session (two WDA sessions — the server was restarted
+once at 05:34, which also ended its `xcodebuild` runner), with `launch_app` of Contacts, Settings and the bank app in between
+(the server printed `set com.apple.Accessibility AutomationEnabled and ApplicationAccessibilityEnabled to true … before every
+launch`). **idb never stuck**: every idb read returned the app's tree, and a plain `idb ui describe-all` after the server
+stopped returned the bank app's `Application 'Skeleton Internal'`. No cold launch was done (the bank app was never terminated),
+so the measured trigger (a launch after a WDA session) was exercised only as foregrounding launches.
