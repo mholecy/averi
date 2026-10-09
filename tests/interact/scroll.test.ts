@@ -188,12 +188,20 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     const { fake } = androidForm({ startY: 1960 }); // under the IME → one stroke above it → 1360–1433, clipped at the band
     const keyboard = fake.attachedKeyboard;
     const witness = keyboard.witness.bind(keyboard);
+    // The scroll's clock, stepped by hand: it stands still but for the stop round's witness, which takes 150 ms of a 100 ms budget.
+    let now = 1_000_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
     let asked = 0;
     keyboard.witness = async () => {
-      if (asked++ === 1) await new Promise((r) => setTimeout(r, 150)); // the stop round's witness outlives the 100 ms budget
+      if (asked++ === 1) now += 150;
       return witness();
     };
-    const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, timeoutMs: 100 });
+    let result;
+    try {
+      result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, timeoutMs: 100 });
+    } finally {
+      clock.mockRestore();
+    }
     expect(result).toMatchObject({ swipes: 1, clipped: ['bottom'], keyboard: { state: 'shown', frame: IME }, settled: false });
     expect(keyboard.windowAnswers.queries).toBe(2); // the stroke's round and the stop's: no confirming read
   });
