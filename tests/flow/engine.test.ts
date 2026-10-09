@@ -1990,9 +1990,8 @@ flows:
 
   it('a failure swallowed by `optional` — even through a `branch` — logs `skipped`, never ✗', async () => {
     const fake = formFake('9.99');
-    fake.typeText = async (text: string) => {
-      fake.typed.push(text);
-    };
+    // A wait's timeout, not a fill that did not land: since 2026-10-09 that
+    // one fails the flow (the table below). This test is about the branch in between.
     const c = parseConfig(`
 app: { android: { package: md.bank.app } }
 flows:
@@ -2002,14 +2001,11 @@ flows:
           - branch:
               - when: { element: { id: amount_input } }
                 do:
-                  - fill: { id: amount_input, value: "12.34" }
+                  - wait: { element: { id: nope }, timeout: 20ms }
 `);
     const trace = await FlowEngine.run(c, fake, FAST, { flow: 'f' });
     expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
-    // The field WAS found and tapped: until 2026-10-08 this pinned "skipped
-    // step (not present)", the engine's guess. Which reason the skip quotes
-    // is the table's below; this test is about the branch in between.
-    expect(trace).toContainEqual({ action: 'optional', detail: expect.stringMatching(/^skipped step \(fill: typed /) });
+    expect(trace).toContainEqual({ action: 'optional', detail: expect.stringMatching(/^skipped step \(Timed out after 20ms /) });
   });
 
   /**
@@ -2040,24 +2036,74 @@ flows:
       expect(fake.typed).toEqual([]);
     });
 
-    it('a fill whose field is FOUND but the text does not land: skipped with the fill\'s headline, not (not present)', async () => {
+    // Until 2026-10-09 both were skipped with the fill's headline. Owner's
+    // decision: a fill that failed on its VALUE fails the flow, like a tap
+    // refused on a present element — a half-typed login must not run on.
+    const notSkipped = async (fake: FakeAdapter, inner: string) => {
+      const error = (await FlowEngine.run(optionalFlow(`${inner}\n      - tap: { id: submit_button }`), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.trace.some((t) => t.action === 'optional')).toBe(false);
+      return error;
+    };
+
+    it('a fill whose field is FOUND but the text does not land: fails the flow — one ✗ saying its value did not land, no skip line', async () => {
       const fake = formFake('9.99');
       fake.typeText = async (text: string) => {
         fake.typed.push(text);
       };
-      expect(await skipOf(fake, 'fill: { id: amount_input, value: "12.34" }')).toEqual([
-        // The field never changed: since 2026-10-09 the headline says so.
-        'skipped step (fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error))',
+      const error = await notSkipped(fake, 'fill: { id: amount_input, value: "12.34" }');
+      expect(error.trace.slice(1)).toEqual([
+        {
+          action: '✗ fill id:"amount_input"',
+          detail:
+            'failed — optional step not skipped: its field is present, but its value did not land — ' +
+            'fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
+        },
       ]);
-      expect(fake.taps).toEqual(['amount_input']);
+      expect(fake.taps).toEqual(['amount_input']); // never the step after it
     });
 
-    it('a fill REFUSED for a control character (nothing tapped): skipped with the refusal, not (not present)', async () => {
+    it('a fill whose clear leaves text twice: fails the flow — its value did not land', async () => {
+      const fake = formFake('9.99');
+      fake.clearText = async (count: number) => {
+        fake.deletes.push(count);
+        if (fake.focused) fake.focused.value = (fake.focused.value ?? '').slice(0, -1); // one character per round
+      };
+      const error = await notSkipped(fake, 'fill: { id: amount_input, value: "1", clear: true }');
+      expect(error.message).toMatch(/^optional step not skipped: its field is present, but its value did not land — fill: field still shows /);
+      expect(fake.typed).toEqual([]);
+    });
+
+    it('a fill whose re-read fails after the focus tap: fails the flow — its value did not land', async () => {
+      const fake = formFake('');
+      const real = fake.uiTree.bind(fake);
+      fake.uiTree = async () => {
+        if (fake.taps.length > 0) throw new Error('device offline');
+        return real();
+      };
+      const error = await notSkipped(fake, 'fill: { id: amount_input, value: "1" }');
+      expect(error.message).toMatch(/^optional step not skipped: its field is present, but its value did not land — fill: could not re-read id:"amount_input" after focusing it — device offline/);
+    });
+
+    it('a fill REFUSED for a control character (nothing tapped): fails the flow — its value was refused', async () => {
       const fake = formFake();
-      const [detail] = await skipOf(fake, 'fill: { id: amount_input, value: "1\\n2" }');
-      expect(detail).toMatch(/^skipped step \(cannot type U\+000A \("\\n", a control character\): it is a key, not text/);
+      const error = await notSkipped(fake, 'fill: { id: amount_input, value: "1\\n2" }');
+      expect(error.trace.filter((t) => t.action.startsWith('✗'))).toEqual([
+        {
+          action: '✗ fill id:"amount_input"',
+          detail: expect.stringMatching(
+            /^failed — optional step not skipped: averi refused its value before anything was typed — cannot type U\+000A \("\\n", a control character\): it is a key, not text/,
+          ) as string,
+        },
+      ]);
       expect(fake.taps).toEqual([]);
       expect(fake.typed).toEqual([]);
+    });
+
+    it('a type: holding a control character inside optional: is still skipped with its refusal (only a fill is marked)', async () => {
+      const fake = formFake();
+      const [detail] = await skipOf(fake, 'type: { value: "1\\n2" }');
+      expect(detail).toMatch(/^skipped step \(cannot type U\+000A/);
     });
 
     it('a wait that times out is skipped with its own timeout, which names what it waited for', async () => {
@@ -2880,6 +2926,86 @@ flows:
           { action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed — optional step not skipped:.* — state reached anyway$/) as string },
           { action: 'state logged_in', detail: 'reached after login_registered' },
         ]);
+      });
+
+      // 2026-10-09, owner's decision: a fill that failed on its VALUE inside
+      // `optional:` is the same terminal finding — no escalation, no salvage,
+      // and the ladder's detect probe still runs first.
+      describe('an optional fill whose value did not land, or was refused: terminal the same way', () => {
+        const fillLadder = (head: string) =>
+          parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  logged_in:
+    detect: { element: { id: dashboard_root } }
+    reach: [login_registered, login]
+flows:
+  login_registered:
+    steps:
+${head}
+      - wait: { element: { id: dashboard_root }, timeout: 50ms }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+        // The field shows "" and typing never reaches it: a read-back mismatch.
+        const dropsTyping = (fake: FakeAdapter) => {
+          const field = fake.live().children?.find((c) => c.identifier === 'priority');
+          if (field) field.value = '';
+          fake.typeText = async (text: string) => {
+            fake.typed.push(text);
+          };
+          return fake;
+        };
+        const CASES = [
+          ['did not land', '"x"', /^optional step not skipped: its field is present, but its value did not land — fill: typed 1 character but the field shows 0/],
+          ['was refused', '"a\\nb"', /^optional step not skipped: averi refused its value before anything was typed — cannot type U\+000A/],
+        ] as const;
+
+        it.each(CASES)('its value %s: the rung fails, the destructive rung never runs', async (_name, value, message) => {
+          const fake = dropsTyping(ladderFake(700));
+          const error = (await FlowEngine.run(fillLadder(`      - optional: [ { fill: { id: priority, value: ${value} } } ]`), fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch(
+            (e: unknown) => e,
+          )) as FlowError;
+          expect(error).toBeInstanceOf(FlowError);
+          expect(error.message).toMatch(message);
+          expect(fake.launches).toEqual([]);
+          expect(error.trace.filter((t) => t.action.startsWith('⚠ reach') || t.action.startsWith('↻') || t.action.startsWith('salvage'))).toEqual([]);
+          expect(failedLines(error)).toEqual([{ action: '✗ fill id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: (its|averi refused its) /) as string }]);
+        });
+
+        it.each(CASES)('its value %s after the rung reached the state: the detect probe sees it, the call passes, no escalation', async (_name, value) => {
+          const full = { x: 0, y: 0, width: 402, height: 874 };
+          const home = node({
+            role: 'container',
+            rect: full,
+            children: [
+              node({ identifier: 'dashboard_root', rect: { x: 0, y: 0, width: 402, height: 40 } }),
+              node({ role: 'textfield', identifier: 'priority', value: '', rect: { x: 24, y: 100, width: 354, height: 52 } }),
+            ],
+          });
+          const fake = dropsTyping(form(100, { home }));
+          fake.onTap = (id, self) => {
+            if (id === 'continue') self.current = 'home';
+          };
+          const cfg = fillLadder(`      - tap: { id: continue }\n      - optional: [ { fill: { id: priority, value: ${value} } } ]`);
+          const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
+          expect(fake.launches).toEqual([]);
+          expect(trace).toContainEqual({ action: '✗ fill id:"priority"', detail: expect.stringMatching(/^failed — optional step not skipped: (its|averi refused its) /) as string });
+          expect(trace.slice(-2)).toEqual([
+            { action: '⚠ reach login_registered', detail: expect.stringMatching(/^failed — optional step not skipped:.* — state reached anyway$/) as string },
+            { action: 'state logged_in', detail: 'reached after login_registered' },
+          ]);
+        });
+
+        it('an optional fill on an ABSENT field is still skipped (not present), and the ladder escalates as before', async () => {
+          const fake = ladderFake(700);
+          const trace = await FlowEngine.run(fillLadder('      - optional: [ { fill: { id: nope, value: "x" } } ]'), fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch(
+            (e: unknown) => (e as FlowError).trace,
+          );
+          expect(trace).toContainEqual({ action: 'optional', detail: 'skipped step (not present)' });
+          expect(fake.launches).toEqual([{ appId: 'md.bank.app', clearState: true, activity: undefined, intent: undefined }]);
+        });
       });
     });
   });

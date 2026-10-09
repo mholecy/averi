@@ -4,7 +4,7 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { belowStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
+import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -472,7 +472,7 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * - On iOS, never in the status band at the top of a portrait box
  *   (adapters/ios-status-band.ts, reported with the device's screen, 2026-10-09: a tap at (201,6) went to the
  *   status bar, which scrolled the form to its top): that band is off the
- *   screen for a tap (`inStatusBand` words the refusal).
+ *   screen for a tap (swipe.ts#inStatusBand words the refusal).
  *
  * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
  * a 402-wide screen is judged at 402, off it: that is where the tap would go.
@@ -481,10 +481,6 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
   if (screen === undefined) return rectArea(tree.rect) === 0 || containsPoint(tree.rect, point);
   return screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 }
-
-/** The point lies on the screen but in its status band (`onScreen`'s iOS clause) — in a box, and in no box less the band. */
-const inStatusBand = (point: Point, screen: TapScreen): boolean =>
-  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
  * iOS's status band as one clause — `under iOS's status bar at (201,6), in
@@ -495,6 +491,9 @@ const inStatusBand = (point: Point, screen: TapScreen): boolean =>
  */
 export const underStatusBar = (at: Point, band: number): string =>
   `under iOS's status bar at (${at.x},${at.y}), in the top ${band} pt of the screen, where a tap goes to the status bar`;
+
+/** The diagnosis of a target no scroll moves out from under iOS's status bar, in the tap's refusal (`statusBarRemedy`) and in `scroll_until`'s failure (scroll-text.ts) alike. */
+export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a layout that ignores the safe area?)';
 
 /**
  * What to do about a target whose centre lies under iOS's status bar, said
@@ -508,7 +507,7 @@ export const underStatusBar = (at: Point, band: number): string =>
  * an `optional:` step (flow/engine.ts).
  */
 export function statusBarRemedy(scrolls: boolean | undefined): string {
-  const pinned = 'no scroll moves it out: it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else';
+  const pinned = `no scroll moves it out: ${PINNED_UNDER_STATUS_BAR} — fix the layout, or tap something else`;
   if (scrolls === true) return 'it lies in a scroll view — scroll_until it first, to move it out from under the bar';
   if (scrolls === false) return `it lies in no scroll view, so ${pinned}`;
   return `if it lies in a scroll view, scroll_until it first, to move it out from under the bar; if not, ${pinned}`;

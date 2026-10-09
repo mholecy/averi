@@ -5,8 +5,8 @@
     "button-text-refused-as-under-its-own-button.md. Whole screens, unedited; each key names its screen:",
     "loggedOut: mp-native inactivity \"Logged out\": LOGIN.",
     "contactsSyncPromo: Google Contacts sync promo sheet: \"Sync device and SIM contacts\", \"No thanks\".",
-    "contactsCreateStaged: Google Contacts \"Create contact\", fields staged: Save, \"Add phone\", the \"Add \u2026\" rows, \"Add fields\" cut by the form's bottom edge.",
-    "contactsCreate: Google Contacts \"Create contact\" at rest: Save, \"Add phone\" cut by the form's bottom edge (button 96 of 110 px).",
+    "contactsCreateStaged: Google Contacts \"Create contact\", fields staged: Save, \"Add phone\", the \"Add \u2026\" rows, \"Add fields\" cut by the form's bottom edge; the icon buttons Cancel, More options, Delete (label node 66x66 under a button padded 11 px on all four sides of its 132x132 wrapper).",
+    "contactsCreate: Google Contacts \"Create contact\" at rest: Save, \"Add phone\" cut by the form's bottom edge (button 96 of 110 px); the icon buttons Cancel, More options (twice), Delete.",
     "accountDetail: mp-native Account Detail, list scrolled: row_29 cut at the tab bar's top (container 66,1784 948x56, its button 948x143), row_30 below the bar (66,2088 948x99, button 66,2044 948x143).",
     "accountDetailFully: mp-native Account Detail during a `fully: true` scroll.",
     "accountDetailTop: mp-native Account Detail at the top: the account card, PAY ME / PAY / SCAN QR."
