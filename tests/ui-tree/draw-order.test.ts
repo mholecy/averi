@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
@@ -330,45 +331,265 @@ describe('drawnOverAt — the node drawn over a container at a touch-down (the e
 });
 
 /**
- * Where the two questions read `NOT_DRAWN` differently, each kept as its caller has been measured against:
- * one node, the same tree, two answers. Unifying a row is a behaviour change, judged per row.
+ * Where the three questions read `NOT_DRAWN` differently, each kept as its caller has been measured against:
+ * one node, the same tree, three answers. Unifying a row is a behaviour change, judged per row.
  */
-describe('the two questions disagree on purpose, per row', () => {
+describe('the three questions disagree on purpose, per row', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const SCREEN = rect(0, 0, 400, 800);
   const LIST = rect(0, 0, 400, 600);
   const P = { x: 200, y: 300 };
-  /** A clipping list holding the point's target, then `later` drawn after it. */
-  const ask = (later: UiNode) => {
+  /** A clipping list holding the point's target, then `later` drawn after it — after the list, or `beside` the target inside it. */
+  const ask = (later: UiNode, beside = false) => {
     const target = uiNode({ role: 'text', label: 'title', rect: rect(150, 280, 100, 40) });
-    const tree = uiNode({ role: 'application', rect: SCREEN, children: [uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: [target] }), later] });
+    const list = uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: beside ? [target, later] : [target] });
+    const tree = uiNode({ role: 'application', rect: SCREEN, children: beside ? [list] : [list, later] });
     const order = drawOrder(tree);
-    return { shadowing: order.shadowing(target, P), drawnOver: order.drawnOver(LIST) };
+    return { shadowing: order.shadowing(target, P), drawnOver: order.drawnOver(LIST), target: order.exposure(target, SCREEN).covers };
   };
   const card = rect(100, 250, 200, 100);
+  /** Overlaps the target (150,280 100x40) without holding it whole. */
+  const strip = rect(100, 300, 200, 50);
 
-  it('structural: an unlabelled `container` with children is no cover at a point, but is drawn over a container (the Compose tab-bar host)', () => {
+  it('structural: an unlabelled `container` with children is no cover at a point, but is drawn over a container (the Compose tab-bar host) and over a target it does not hold whole', () => {
+    const later = uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
+  });
+
+  it('structural, holding the target whole: judged through its content for a target — a WDA `Other` wrapper laid after it', () => {
     const later = uiNode({ role: 'container', rect: card, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
-    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [] });
   });
 
-  it('screen-sized host: an interactive one covers a point, but is never drawn over a container', () => {
+  it('screen-sized host: an interactive one covers a point and a target, but is never drawn over a container', () => {
     const later = uiNode({ role: 'button', label: 'Close', rect: SCREEN, children: [uiNode({ role: 'text', label: 'x', rect: rect(0, 700, 10, 10) })] });
-    expect(ask(later)).toEqual({ shadowing: later, drawnOver: [] });
+    expect(ask(later)).toEqual({ shadowing: later, drawnOver: [], target: [later] });
   });
 
-  it('content-framed: a `scrollable` with children covers a point only through them, but is drawn over a container', () => {
+  it('content-framed: a `scrollable` with children covers a point or a target only through them, but is drawn over a container', () => {
     const later = uiNode({ role: 'scrollable', rect: card, children: [uiNode({ role: 'text', label: 'row', rect: rect(0, 700, 10, 10) })] });
-    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [] });
   });
 
-  it('itemless toolbar: no cover at a point, but drawn over a container', () => {
+  it('scrolled content: a later scroll view\'s row over the target covers a point and is drawn over a container, but is no cover of a target outside that scroll view', () => {
+    const row = uiNode({ role: 'text', label: 'row', rect: strip });
+    const later = uiNode({ role: 'scrollable', rect: card, children: [row] });
+    expect(ask(later)).toEqual({ shadowing: row, drawnOver: [later, row], target: [] });
+  });
+
+  it('itemless toolbar: no cover at a point or of a target, but drawn over a container', () => {
     const later = uiNode({ role: 'toolbar', rect: card, children: [uiNode({ role: 'container', rect: card })] });
-    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [] });
   });
 
-  it('keyboard: its own nodes cover a point, but are left out of what is drawn over a container', () => {
+  it('keyboard: its own nodes cover a point, but are left out of what is drawn over a container and over a target', () => {
     const later = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: card });
-    expect(ask(later)).toEqual({ shadowing: later, drawnOver: [] });
+    expect(ask(later)).toEqual({ shadowing: later, drawnOver: [], target: [] });
+  });
+
+  it('on the target: a non-interactive SIBLING lying wholly inside the target is drawn on it (idb\'s floating label) — a cover at a point, not of the target; drawn over the list it is not, being in it', () => {
+    const label = () => uiNode({ role: 'text', label: 'IBAN', rect: rect(160, 285, 50, 20) });
+    const sibling = label();
+    expect(ask(sibling, true)).toEqual({ shadowing: sibling, drawnOver: [], target: [] });
+    const button = uiNode({ role: 'button', label: 'clear', rect: rect(160, 285, 50, 20) });
+    expect(ask(button, true)).toEqual({ shadowing: button, drawnOver: [], target: [button] });
+    // Not a sibling — after the list, inside the target's rect: a cover's part, so a cover.
+    const elsewhere = label();
+    expect(ask(elsewhere)).toEqual({ shadowing: elsewhere, drawnOver: [elsewhere], target: [elsewhere] });
+  });
+});
+
+/**
+ * `exposure(node, within)` — what of a tap or scroll target shows inside the box its caller judges in (the screen, cut
+ * above a witnessed keyboard), and where a tap on it should go (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-
+ * app-chrome.md). Each case is a measured shape from that note's device checks, abridged.
+ */
+describe('exposure — what of a target shows, and where a tap on it goes', () => {
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const IPHONE = rect(0, 0, 402, 874);
+  const PIXEL = rect(0, 0, 1080, 2220);
+  /** The CONTINUE bar, measured at `24,780 354x44` (both tree sources). */
+  const CONTINUE = rect(24, 780, 354, 44);
+  const continueButton = () => uiNode({ role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: CONTINUE });
+  const priority = (y: number) => uiNode({ role: 'button', identifier: 'swift_payment.form.priority_select', rect: rect(24, y, 354, 52) });
+  /** idb's FLAT list under a 0×0 root (adapters/ios-tree-source.ts#parseIdbDescribeAll): the Application first, CONTINUE last. */
+  const idbForm = (...rows: UiNode[]) =>
+    uiNode({
+      role: 'container',
+      rect: rect(0, 0, 0, 0),
+      children: [
+        uiNode({ role: 'other', label: 'mp-native', rect: IPHONE }),
+        uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) }),
+        uiNode({ role: 'text', label: 'SWIFT PAYMENT', identifier: 'swift_payment.form.title', rect: rect(136, 74, 130, 20) }),
+        ...rows,
+        continueButton(),
+      ],
+    });
+
+  describe('mp-native SWIFT form, idb (2026-10-09 06:07 UTC): priority_select under the CONTINUE bar', () => {
+    it('at rest, y 771: only its top 9 pt show — under the minimum, so no tap point; CONTINUE is the cover at its centre (201,797)', () => {
+      const row = priority(771);
+      const tree = idbForm(row);
+      const seen = drawOrder(tree).exposure(row, IPHONE);
+      expect(seen.covers.map((n) => n.identifier)).toEqual(['swift_payment.form.continue_button']);
+      expect(seen.largest).toEqual(rect(24, 771, 354, 9));
+      expect(seen.visible).toBeCloseTo(9 / 52);
+      expect(seen.tapAt).toBeUndefined();
+      expect(seen.minPiece).toBe(24); // 0.06 × 402, rounded
+      expect(seen.coverAt({ x: 201, y: 797 })?.identifier).toBe('swift_payment.form.continue_button');
+    });
+
+    it('at y 763 a 17-pt strip shows — still under 24, refused; at y 754 a 26-pt strip, the centre (201,780) on the bar — the tap moves to the strip', () => {
+      const at763 = priority(763);
+      expect(drawOrder(idbForm(at763)).exposure(at763, IPHONE).tapAt).toBeUndefined();
+      const at754 = priority(754);
+      const seen = drawOrder(idbForm(at754)).exposure(at754, IPHONE);
+      expect(seen.largest).toEqual(rect(24, 754, 354, 26));
+      expect(seen.tapAt).toEqual({ point: { x: 201, y: 767 }, moved: true });
+      // One point higher the centre (201,779) is clear of the bar: tapped where it always was.
+      const at753 = priority(753);
+      expect(drawOrder(idbForm(at753)).exposure(at753, IPHONE).tapAt).toEqual({ point: { x: 201, y: 779 }, moved: false });
+    });
+
+    it('scrolled clear of the bar (the manual swipe, row at y 452): nothing over it, the centre tapped as always', () => {
+      const row = priority(452);
+      const seen = drawOrder(idbForm(row)).exposure(row, IPHONE);
+      expect(seen).toMatchObject({ covers: [], visible: 1, tapAt: { point: { x: 201, y: 478 }, moved: false } });
+      expect(seen.largest).toEqual(row.rect);
+    });
+
+    it('the shape through the idb parser (tests/fixtures/idb-swift-form-continue.json): the same answer', async () => {
+      const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
+      const row = [...everyNode(tree)].find((n) => n.identifier === 'swift_payment.form.priority_select')!;
+      const seen = drawOrder(tree).exposure(row, IPHONE);
+      expect(seen.covers.map((n) => n.label)).toEqual(['Continue to summary']);
+      expect(seen.tapAt).toBeUndefined();
+    });
+  });
+
+  it('mp-native SWIFT form, WDA: the bar after the form\'s scroll view in a full-screen container, the toolbar host after it — CONTINUE alone covers', () => {
+    const row = priority(771);
+    const form = uiNode({ role: 'scrollable', rect: rect(0, 116, 402, 664), children: [priority(150), row] });
+    const toolbar = uiNode({ role: 'toolbar', label: 'Toolbar', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] });
+    const bar = continueButton();
+    const tree = uiNode({
+      role: 'application',
+      rect: IPHONE,
+      children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'text', label: 'SWIFT PAYMENT', rect: rect(135, 73, 131, 22) }), uiNode({ role: 'container', rect: IPHONE, children: [form, bar] }), toolbar] })],
+    });
+    expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([bar]);
+  });
+
+  it('a cover in the middle of a target: the centre is covered, the largest piece beside it is tapped; a cover holding it whole leaves nothing', () => {
+    const target = uiNode({ role: 'button', label: 'Wide', rect: rect(0, 100, 400, 100) });
+    const badge = uiNode({ role: 'image', label: 'badge', rect: rect(150, 80, 100, 140) }); // across it, top to bottom
+    const seen = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, badge] })).exposure(target, rect(0, 0, 400, 800));
+    expect(seen.largest).toEqual(rect(0, 100, 150, 100)); // of two equal pieces, the first found
+    expect(seen.tapAt).toEqual({ point: { x: 75, y: 150 }, moved: true });
+    expect(seen.visible).toBeCloseTo(0.75);
+    const sheet = uiNode({ role: 'image', label: 'sheet', rect: rect(0, 0, 400, 800) });
+    const gone = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, sheet] })).exposure(target, rect(0, 0, 400, 800));
+    expect(gone).toMatchObject({ visible: 0, covers: [sheet] });
+    expect([gone.largest, gone.tapAt]).toEqual([undefined, undefined]);
+  });
+
+  it('`within` cuts both ways: what lies outside it neither shows nor covers — a node under the keyboard band, a bar below the cut', () => {
+    const target = uiNode({ role: 'button', label: 'Row', rect: rect(0, 500, 400, 100) });
+    const bar = uiNode({ role: 'button', label: 'Bar', rect: rect(0, 580, 400, 60) });
+    const tree = uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, bar] });
+    const above = rect(0, 0, 400, 560); // the screen above a band whose top is at 560
+    const seen = drawOrder(tree).exposure(target, above);
+    expect(seen).toMatchObject({ covers: [], visible: 0.6, tapAt: { point: { x: 200, y: 550 }, moved: false } });
+    // The bar reaching up past the cut: only its part within counts, and the centre (200,550) is under it — the tap moves up.
+    const tall = uiNode({ role: 'button', label: 'Bar', rect: rect(0, 540, 400, 100) });
+    const cut = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, tall] })).exposure(target, above);
+    expect(cut).toMatchObject({ covers: [tall], largest: rect(0, 500, 400, 40), tapAt: { point: { x: 200, y: 520 }, moved: true } });
+    const outside = drawOrder(tree).exposure(target, rect(0, 0, 400, 400));
+    expect(outside).toMatchObject({ visible: 0, covers: [] });
+    expect(outside.tapAt).toBeUndefined();
+  });
+
+  it('a node not in this tree: nothing is known over it — its part within shows, its centre is its tap point', () => {
+    const stranger = uiNode({ role: 'button', rect: rect(0, 0, 100, 100) });
+    expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800) })).exposure(stranger, rect(0, 0, 400, 800))).toMatchObject({
+      covers: [],
+      visible: 1,
+      tapAt: { point: { x: 50, y: 50 }, moved: false },
+    });
+  });
+
+  it('coverAt names the cover drawn on top at a point — the last in pre-order that contains it — and nothing off the covers', () => {
+    const target = uiNode({ role: 'button', label: 'Row', rect: rect(0, 500, 400, 100) });
+    const host = uiNode({ role: 'container', rect: rect(0, 540, 400, 100), children: [uiNode({ role: 'button', label: 'Home', rect: rect(0, 560, 100, 80) })] });
+    const seen = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, host] })).exposure(target, rect(0, 0, 400, 800));
+    expect(seen.coverAt({ x: 50, y: 580 })?.label).toBe('Home');
+    expect(seen.coverAt({ x: 200, y: 580 })).toBe(host);
+    expect(seen.coverAt({ x: 200, y: 520 })).toBeUndefined();
+  });
+
+  it('Compose Account Detail (2026-10-09): a row under the floating tab bar\'s host — host and tabs cover it; the tab itself has nothing over it', () => {
+    const row = uiNode({ role: 'container', identifier: 'transactions.list.row_3', rect: rect(0, 1840, 1080, 200) });
+    const list = uiNode({ role: 'container', rect: rect(0, 825, 1080, 1395), clipsDescendants: true, children: [row] });
+    const tab = uiNode({ role: 'container', identifier: 'nav.tab_home', rect: rect(66, 1876, 237, 176), children: [uiNode({ role: 'other', label: 'Home', rect: rect(100, 1990, 160, 40) })] });
+    const host = uiNode({ role: 'container', rect: rect(66, 1840, 948, 248), children: [tab] });
+    const order = drawOrder(uiNode({ role: 'container', rect: PIXEL, children: [list, host] }));
+    const seen = order.exposure(row, PIXEL);
+    expect(seen.covers).toEqual([host, tab, tab.children[0]]);
+    expect(seen.minPiece).toBe(65); // 0.06 × 1080, rounded
+    expect(seen.tapAt).toEqual({ point: { x: 33, y: 1940 }, moved: true }); // the 66-px column left of the host
+    expect(order.exposure(tab, PIXEL).covers).toEqual([]);
+  });
+
+  it('Android Contacts editor (2026-10-09 05:05 UTC): First name under the top app bar laid after the form — its 38-px strip is refused', () => {
+    const firstName = uiNode({ role: 'textfield', label: 'First name', rect: rect(132, 118, 816, 160) });
+    const form = uiNode({ role: 'container', rect: rect(0, 66, 1080, 2154), clipsDescendants: true, children: [firstName] });
+    const save = uiNode({ role: 'button', label: 'Save', rect: rect(830, 100, 200, 120) });
+    const bar = uiNode({ role: 'container', rect: rect(0, 66, 1080, 174), children: [uiNode({ role: 'text', label: 'Create contact', rect: rect(200, 120, 400, 60) }), save] });
+    const order = drawOrder(uiNode({ role: 'container', rect: PIXEL, children: [form, bar] }));
+    const seen = order.exposure(firstName, PIXEL);
+    expect(seen.largest).toEqual(rect(132, 240, 816, 38));
+    expect(seen.tapAt).toBeUndefined();
+    expect(seen.coverAt({ x: 540, y: 198 })).toBe(bar);
+  });
+
+  describe('no false cover — the shapes measured clean', () => {
+    it('a bar button with the form scrolled under the translucent bar (WDA lists the bar first): the scroll view\'s rows are no cover of it', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const under = uiNode({ role: 'button', label: 'Debit account', rect: rect(16, 60, 370, 52) });
+      const form = uiNode({ role: 'scrollable', rect: IPHONE, children: [under] });
+      const seen = drawOrder(uiNode({ role: 'application', rect: IPHONE, children: [back, form] })).exposure(back, IPHONE);
+      expect(seen).toMatchObject({ covers: [], tapAt: { point: { x: 44, y: 84 }, moved: false } });
+    });
+
+    it('a row under a sticky header of ITS OWN scroll view still has the header over it', () => {
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 100, 402, 52) });
+      const header = uiNode({ role: 'text', label: 'Section', rect: rect(0, 90, 402, 30) });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [row, header] })] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([header]);
+    });
+
+    it('the Contacts "New Contact" sheet under WDA: a field, and the Cancel button — the itemless toolbars, the form and the keyboard cover neither', () => {
+      const SHEET = rect(0, 62, 402, 812);
+      const BAR = rect(0, 83, 402, 48);
+      const cancel = uiNode({ role: 'button', label: 'Cancel', rect: rect(16, 89, 60, 34) });
+      const field = uiNode({ role: 'textfield', identifier: 'First name', rect: rect(20, 300, 360, 44) });
+      const form = uiNode({ role: 'scrollable', rect: SHEET, children: [field, uiNode({ role: 'textfield', identifier: 'Last name', rect: rect(20, 344, 360, 44) })] });
+      const toolbar = (r: UiNode['rect']) => uiNode({ role: 'toolbar', label: 'Toolbar', rect: r, children: [uiNode({ role: 'container', rect: r })] });
+      const band = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: rect(0, 573, 402, 301) });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [cancel, form, toolbar(BAR), toolbar(SHEET)] }), band] });
+      for (const target of [cancel, field]) expect(drawOrder(tree).exposure(target, IPHONE).covers).toEqual([]);
+    });
+
+    it('the SwiftUI pushed screen: the full-screen toolbar host after a row covers nothing, its item away from the row neither', () => {
+      const row = uiNode({ role: 'button', label: 'Wi-Fi', rect: rect(16, 200, 370, 52) });
+      const host = uiNode({ role: 'toolbar', label: 'Toolbar', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'button', label: 'Done', rect: rect(300, 60, 80, 40) })] })] });
+      expect(drawOrder(uiNode({ role: 'application', rect: IPHONE, children: [row, host] })).exposure(row, IPHONE).covers).toEqual([]);
+    });
+
+    it('idb\'s floating label lying on its empty field (the measured TextFieldWithComponentStyle): drawn on it, not over it', () => {
+      const input = uiNode({ role: 'textfield', identifier: 'TextFieldWithComponentStyle', rect: rect(26, 366, 350, 30) });
+      const label = uiNode({ role: 'text', identifier: 'TextFieldWithComponentStyle', label: 'IBAN', rect: rect(42, 372, 120, 18) });
+      expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), input, label] })).exposure(input, IPHONE).covers).toEqual([]);
+    });
   });
 });
