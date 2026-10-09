@@ -25,8 +25,8 @@
  * - words — `wordingOf` / `caveatText` here, over two exhaustive tables
  *   (`REASON_SENTENCE`, `CAVEAT_SENTENCE`, plus `SENT_SENTENCE`): a new code
  *   without its sentence does not compile. Layout — where those words sit in
- *   a reply or a trace line — is the renderers' (mcp/tool-text.ts#fillText,
- *   flow/engine.ts#runFill), which branch on `did` and on whether `sent` and
+ *   a reply or a trace line — is interact/fill-text.ts's, the one renderer
+ *   of both media, which branches on `did` and on whether `sent` and
  *   `unverified` are there, never on a reason code.
  *
  * The verdict's invariants (pinned in tests/interact/fill-verdict.test.ts):

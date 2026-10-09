@@ -4,20 +4,24 @@
  * They are here rather than inline in server.ts because server.ts connects a
  * transport at module load and cannot be imported by a test — and these lines
  * carry information the agent acts on: the resolution note (which of several
- * nodes was tapped) and the fill warning (a masked field that already held
- * text). A regression that dropped either would otherwise be invisible to
- * every test in the repo (review 2026-10-03).
+ * nodes was tapped) and, until 2026-10-09, the fill's warnings. A regression
+ * that dropped either would otherwise be invisible to every test in the repo
+ * (review 2026-10-03).
  *
  * 2026-10-03, later the same day: the reason above no longer holds — the
  * handlers moved to mcp/tools.ts, which is importable and tested through an
  * in-memory transport. The functions stay here anyway: they are pure, and
- * tool-text.test.ts pins every wording variant (note, warning, cleared, unverified, not an input)
- * without building a server, a registry or a fake device to provoke each one.
+ * tool-text.test.ts pins every wording variant without building a server, a
+ * registry or a fake device to provoke each one.
+ *
+ * The type_text reply WITH a selector (a fill) is not here since 2026-10-09:
+ * it is interact/fill-text.ts#fillText, beside the flow's fill line it must
+ * agree with — the flow engine may not import this layer.
  */
 
 import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
-import { charactersText, wordingOf, type FillVerdict } from '../interact/fill-verdict.js';
+import { charactersText } from '../interact/fill-verdict.js';
 import type { Direction } from '../interact/swipe.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
@@ -25,36 +29,6 @@ import { formatSeconds } from '../util/duration.js';
 /** `Tapped <selector>`, with the resolution note in parentheses when there was one. */
 export const tapText = (selector: string, note: string | undefined): string =>
   `Tapped ${selector}${note ? ` (${note})` : ''}`;
-
-/**
- * What a fill did, from its verdict (interact/fill-verdict.ts#judgeFill) —
- * the words are fill-verdict.ts's (`wordingOf`), shared with the flow line;
- * only the layout is here, and it branches on `did` alone:
- * - `filled` (read back and landed, or nothing to type):
- *   `Filled <selector> (N characters[, cleared M characters first])[ (note)]`
- * - `typed` (not verified, something typed): `Typed N characters into
- *   <selector>[ (cleared M characters first)] — NOT verified: <reasons>[ (note)]`
- *   — a different verb, so "Filled" never stands for a fill nobody saw.
- * - `cleared` (a clear alone, deletes sent, not seen to land):
- *   `Cleared <selector> (N deletes sent) — NOT verified: …`
- * - `focused` (nothing typed, nothing deleted, not verified):
- *   `Focused <selector> — NOT verified: …` — the focus tap is all that was
- *   done.
- * Then each caveat (the not-an-input finding, the masked-append warning)
- * on its own `⚠` line, so it is not lost inside the parentheses.
- */
-export const fillText = (selector: string, v: FillVerdict): string => {
-  const w = wordingOf(v);
-  const head =
-    v.did === 'filled'
-      ? `Filled ${selector} (${w.typed}${w.sent === undefined ? '' : `, ${w.sent}`})`
-      : v.did === 'typed'
-        ? `Typed ${w.typed} into ${selector}${w.sent === undefined ? '' : ` (${w.sent})`} — ${w.unverified}`
-        : v.did === 'cleared'
-          ? `Cleared ${selector} (${w.sent}) — ${w.unverified}`
-          : `Focused ${selector} — ${w.unverified}`;
-  return head + (v.note ? ` (${v.note})` : '') + w.caveats.map((c) => `\n⚠ ${c}`).join('');
-};
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field

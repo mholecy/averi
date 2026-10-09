@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillText as renderFill, launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
-import { judgeFill } from '../../src/interact/fill-verdict.js';
-import type { FillResult } from '../../src/interact/fill.js';
-
-const fillText = (selector: string, { length, ...f }: { length: number } & Omit<FillResult, 'typed'>) => renderFill(selector, judgeFill({ ...f, typed: length }));
+import { launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
 import { el, node, screen } from '../helpers/fake.js';
 
 describe('tap and type_text response lines', () => {
@@ -14,105 +10,11 @@ describe('tap and type_text response lines', () => {
     );
   });
 
-  const landed = { role: 'textfield', readBack: { kind: 'landed' } } as const;
-
-  it('fillText names the selector, the length, the characters it cleared, the note, and the ⚠ warning on its own line', () => {
-    expect(fillText('id:amount', { length: 4, ...landed })).toBe('Filled id:amount (4 characters)');
-    expect(fillText('id:amount', { length: 4, ...landed, cleared: 7 })).toBe('Filled id:amount (4 characters, cleared 7 characters first)');
-    expect(fillText('id:amount', { length: 4, ...landed, cleared: 1 })).toBe('Filled id:amount (4 characters, cleared 1 character first)');
-    expect(fillText('id:pw', { length: 16, ...landed, note: '2 matches; picked the only interactive one (textfield)' })).toBe(
-      'Filled id:pw (16 characters) (2 matches; picked the only interactive one (textfield))',
-    );
-    expect(
-      fillText('id:pw', {
-        length: 16,
-        ...landed,
-        maskedAppend: { held: 20 },
-      }),
-    ).toBe(
-      'Filled id:pw (16 characters)\n⚠ masked field already held 20 characters and clear is not set — typing APPENDS; pass clear: true to replace',
-    );
-  });
-
-  // docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md:
-  // the reply printed the REQUESTED clear and passed an unreadable read-back.
-  it('a clear that sent no delete is not "cleared": an empty field says nothing, a node with no value or no length of its own says so', () => {
-    expect(fillText('id:amount', { length: 4, ...landed, cleared: 0 })).toBe('Filled id:amount (4 characters)');
-    expect(fillText('id:pw', { length: 6, role: 'textfield', readBack: { kind: 'no-value' }, cleared: 0 })).toBe(
-      'Typed 6 characters into id:pw — NOT verified: the matched node exposes no value (role textfield); ' +
-        'clear sent no delete — the node gave no length to delete',
-    );
-    expect(fillText('text:"IBAN*"', { length: 22, role: 'text', readBack: { kind: 'no-value' }, cleared: 'unmeasured' })).toBe(
-      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text); ' +
-        "clear sent no delete — a role text node's length is not the field's",
-    );
-    // M-1 (review 2026-10-08): a clear ALONE on a label was "Filled … (0 characters)".
-    expect(fillText('text:"IBAN*"', { length: 0, role: 'text', readBack: { kind: 'nothing-typed' }, cleared: 'unmeasured' })).toBe(
-      'Focused text:"IBAN*" — NOT verified: clear sent no delete — a role text node\'s length is not the field\'s',
-    );
-    // A clear whose read-back LANDED needs no caveat: the field shows exactly the value.
-    expect(fillText('id:search', { length: 4, role: 'other', readBack: { kind: 'landed' }, cleared: 'unmeasured' })).toBe('Filled id:search (4 characters)');
-    expect(fillText('id:title', { length: 1, role: 'text', readBack: { kind: 'not-taken' } })).toBe(
-      "Typed 1 character into id:title — NOT verified: the matched node's value does not show the typed text (role text) — it is not the field",
-    );
-  });
-
-  // Device checks of docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md (re-run at e9e6509).
-  it('one character is `1 character`, typed or cleared, verified or not', () => {
-    expect(fillText('role:textfield value:"1.5"', { length: 1, ...landed, cleared: 3 })).toBe('Filled role:textfield value:"1.5" (1 character, cleared 3 characters first)');
-    expect(fillText('id:bic', { length: 1, role: 'scrollable', readBack: { kind: 'no-value' } })).toBe(
-      'Typed 1 character into id:bic — NOT verified: the matched node exposes no value (role scrollable)',
-    );
+  // The type_text reply WITH a selector is interact/fill-text.ts's since
+  // 2026-10-09, pinned beside the flow line in tests/interact/fill-text.test.ts.
+  it('typedText (no selector: nothing read back) counts characters, singular for one', () => {
     expect(typedText(1)).toBe('Typed 1 character');
     expect(typedText(22)).toBe('Typed 22 characters');
-  });
-
-  it('a field the read-back could not find again is said as not found, not as a node with no value — and a textfield gets no ⚠', () => {
-    expect(fillText('role:textfield value:"XX12345"', { length: 22, role: 'textfield', readBack: { kind: 'lost', why: 'screen-changed' }, cleared: 7 })).toBe(
-      'Typed 22 characters into role:textfield value:"XX12345" (cleared 7 characters first) — ' +
-        'NOT verified: the field could not be found again (the screen changed while typing)',
-    );
-    expect(fillText('role:textfield value:"XX"', { length: 3, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' } })).toBe(
-      'Typed 3 characters into role:textfield value:"XX" — NOT verified: the field could not be found again (the selector no longer matches it)',
-    );
-    // m-1 (review 2026-10-08, bundle C round 1): a clear alone whose read after the delete lost the field.
-    expect(fillText('role:textfield value:"XX12345"', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 7 })).toBe(
-      'Cleared role:textfield value:"XX12345" (7 deletes sent) — ' +
-        'NOT verified: the field could not be found again (the selector no longer matches it)',
-    );
-  });
-
-  it('an unverified fill is "Typed … into", never "Filled", and the not-an-input finding gets its own ⚠ line naming the input', () => {
-    expect(
-      fillText('text:"IBAN*"', {
-        length: 22,
-        role: 'text',
-        readBack: { kind: 'no-value' },
-        notInput: { input: { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 343, width: 350, height: 56 }, overlaps: true } },
-      }),
-    ).toBe(
-      'Typed 22 characters into text:"IBAN*" — NOT verified: the matched node exposes no value (role text)\n' +
-        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; ' +
-        'the input overlapping it is textfield id:"TextFieldWithComponentStyle" at 26,343 350x56 — ' +
-        'select the input itself (role:textfield with its id:, or its current value: when inputs share an id)',
-    );
-    expect(fillText('text:"Hi"', { length: 2, role: 'text', readBack: { kind: 'no-value' }, notInput: { input: 'none' } })).toBe(
-      'Typed 2 characters into text:"Hi" — NOT verified: the matched node exposes no value (role text)\n' +
-        '⚠ the matched node is role text, not a textfield — typing goes wherever the focus tap left the focus; no textfield is on the screen',
-    );
-    // A VERIFIED clear alone keeps its head: what was deleted, seen gone.
-    expect(fillText('id:amount', { length: 0, ...landed, readBack: { kind: 'nothing-typed' }, cleared: 4 })).toBe('Filled id:amount (0 characters, cleared 4 characters first)');
-    expect(fillText('role:textfield value:"X"', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 1 })).toBe(
-      'Cleared role:textfield value:"X" (1 delete sent) — NOT verified: the field could not be found again (the selector no longer matches it)',
-    );
-    // No delete sent is never "Cleared", whatever else is unverified (not produced by fillField today: a lost clear has deleted).
-    expect(fillText('id:x', { length: 0, role: 'textfield', readBack: { kind: 'lost', why: 'unmatched' }, cleared: 0 })).toBe(
-      'Focused id:x — NOT verified: the field could not be found again (the selector no longer matches it)',
-    );
-    expect(fillText('text:"Hi"', { length: 0, role: 'text', readBack: { kind: 'nothing-typed' }, notInput: { input: 'unread' } })).toBe(
-      'Filled text:"Hi" (0 characters)\n' +
-        '⚠ the matched node is role text, not a textfield — nothing was deleted, and the focus is wherever the tap left it; the screen could not be read again to name the input',
-    );
   });
 });
 
