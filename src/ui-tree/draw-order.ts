@@ -274,15 +274,16 @@ const spansWidth = (control: Rect, parent: Rect): boolean => control.x === paren
  * The `ownControl` row's icon button: `control` lies in `parent` PADDED
  * evenly on all four sides — every inset at least a pixel, the four within
  * a pixel of each other (a centred placement's rounding), none more than
- * half the control's shorter side (Compose pads a control of at least 24 dp
- * to its 48-dp touch target) — and centred on the target, to a pixel.
+ * half the control's shorter side, to a pixel (Compose pads a control of at
+ * least 24 dp to its 48-dp touch target: 63 px in 126 at 2.625 px/dp,
+ * insets 32 and 31) — and centred on the target, to a pixel.
  */
 const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
   const insets = [control.x - parent.x, parent.x + parent.width - control.x - control.width, control.y - parent.y, parent.y + parent.height - control.y - control.height];
   const least = Math.min(...insets);
   const most = Math.max(...insets);
   const [c, t] = [rectCentre(control), rectCentre(target)];
-  return least >= 1 && most - least <= 1 && 2 * most <= Math.min(control.width, control.height) && Math.abs(c.x - t.x) <= 1 && Math.abs(c.y - t.y) <= 1;
+  return least >= 1 && most - least <= 1 && 2 * most <= Math.min(control.width, control.height) + 1 && Math.abs(c.x - t.x) <= 1 && Math.abs(c.y - t.y) <= 1;
 };
 
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
@@ -637,11 +638,15 @@ const NOT_DRAWN = {
    * and `tap label:"Cancel"` was refused. `paddedOn` asks that shape and no
    * more: every inset at least a pixel, the four within a pixel of each
    * other — a centred placement rounds an odd margin (105 px in 126 at
-   * 2.625 px/dp: 11 and 10) — none over half the control's shorter side
-   * (Compose pads a control of at least 24 dp), and the label's centre
-   * within a pixel of the control's. Not excused: a control padded
-   * differently per axis (a 40×24-dp one: 4 dp and 12 dp; not measured),
-   * nor one spanning its wrapper's height only (a tall narrow one).
+   * 2.625 px/dp: 11 and 10) — none over half the control's shorter side,
+   * to a pixel (Compose pads a control of at least 24 dp: 63 px in 126,
+   * insets 32 and 31), and the label's centre within a pixel of the
+   * control's. Not excused: a control padded differently per axis (a
+   * 40×24-dp one: 4 dp and 12 dp; not measured); an icon button CUT by a
+   * list's or scroll view's edge, whose insets are then uneven (`button
+   * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, as
+   * at round 6, the safe direction; nor one spanning its wrapper's height
+   * only (a tall narrow one).
    *
    * What still covers: a pinned CTA in the SAME parent as a text (review of
    * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over

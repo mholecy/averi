@@ -1062,6 +1062,8 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       it('padded evenly, or within a pixel (a centred placement rounded — 126 px around 105 at 2.625 dp/px, insets 11 and 10): no cover', () => {
         expect(coversOf(icon(), button(rect(22, 99, 110, 110)), ICON_WRAPPER)).toEqual([]);
         expect(coversOf(icon(rect(43, 120, 63, 63)), button(rect(22, 99, 105, 105)), rect(11, 88, 126, 126))).toEqual([]);
+        // A 24-dp control padded to 48 dp at 2.625 px/dp: 63 px in 126, insets 32 and 31 — 2×32 is the side plus the rounding's pixel.
+        expect(coversOf(icon(rect(51, 128, 47, 47)), button(rect(43, 120, 63, 63)), rect(11, 88, 126, 126))).toEqual([]);
       });
 
       it('a cover: a control flush with a side (insets 0 and 1), insets differing by two, an inset over half the control\'s side, a label off the control\'s centre on either axis, a control that says something', () => {
@@ -1071,12 +1073,21 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
         }
         const wide = button(rect(55, 132, 44, 44));
         expect(coversOf(icon(rect(66, 143, 22, 22)), wide, ICON_WRAPPER)).toEqual([wide]);
-        for (const r of [rect(24, 101, 40, 40), rect(57, 101, 40, 40), rect(24, 134, 40, 40)]) {
+        // The SHORTER side bounds it: insets of 30 around a 110×40 control (2×30 over 40, under 110).
+        const flat = button(rect(41, 118, 110, 40));
+        expect(coversOf(icon(rect(86, 128, 20, 20)), flat, rect(11, 88, 170, 100))).toEqual([flat]);
+        // Off by 2 px on either axis is off centre too (centre (77,154) → (79,154), (77,156)).
+        for (const r of [rect(24, 101, 40, 40), rect(57, 101, 40, 40), rect(24, 134, 40, 40), rect(59, 134, 40, 40), rect(57, 136, 40, 40)]) {
           const later = button(rect(22, 99, 110, 110));
           expect(coversOf(icon(r), later, ICON_WRAPPER)).toEqual([later]);
         }
         const said = button(rect(22, 99, 110, 110), { label: 'Close' });
         expect(coversOf(icon(), said, ICON_WRAPPER)).toEqual([said]);
+      });
+
+      it('residual, stated: an icon button CUT by a list\'s or scroll view\'s edge — insets 11, 11, 11, 41 — is still refused', () => {
+        const cut = button(rect(22, 99, 110, 80));
+        expect(coversOf(icon(rect(44, 121, 66, 56)), cut, ICON_WRAPPER)).toEqual([cut]);
       });
 
       it('a centred dialog-like overlay in a screen-sized parent, padded evenly, still covers', () => {
