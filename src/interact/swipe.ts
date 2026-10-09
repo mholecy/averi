@@ -262,7 +262,7 @@ export function strokeRoom(
   if (box === undefined) return undefined;
   for (const within of candidates) {
     const met = rectIntersection(box, within);
-    const drawn = met === undefined ? undefined : overlayTop(met, over?.(within) ?? [], toward);
+    const drawn = met === undefined ? undefined : overlayTop(met, over?.(within) ?? [], toward, coverTop);
     const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
     const room = strokeBox(box, within, toward, top);
     if (room !== undefined) return { within, box: room, ...(top !== undefined && { coverTop: top }) };
@@ -274,7 +274,13 @@ export function strokeRoom(
  * The top edge of the highest of `over` — nodes drawn over a stroke
  * container — that the container's stroke box `box` must be cut above
  * for a stroke toward `toward` (2026-10-09, the floating tab bar:
- * `strokeRoom`), or undefined. Only a CONTENT-DOWN stroke is cut: it
+ * `strokeRoom`), or undefined. `box` is judged as the stroke is drawn:
+ * above a keyboard whose top edge is `coverTop`, when one is up (code
+ * review of fix/r4, P3 — the list `0,825 1080x1395` under a keyboard at
+ * 1300 with a bar `0,1150 1080x150` sitting on it: the bar's top is above
+ * the LIST's centre, 1522, so the cut stayed 1300 and the touch-down, 1206,
+ * landed on the bar; above the keyboard the box is 825–1300 and the bar
+ * lies in its lower half). Only a CONTENT-DOWN stroke is cut: it
  * touches down at 0.8 of the box, in its lower half, and the touch-down is
  * all that matters (a gesture belongs to the view the finger first
  * touches, `swipeVectorAbove`); a content-up stroke touches down at 0.2
@@ -305,12 +311,13 @@ export function strokeRoom(
  * still reported checked (a residual: the probe's stop is not the fast
  * fail). Pure.
  */
-function overlayTop(box: Rect, over: readonly { rect: Rect }[], toward: Direction): number | undefined {
+function overlayTop(box: Rect, over: readonly { rect: Rect }[], toward: Direction, coverTop?: number): number | undefined {
   if (toward !== 'down') return undefined;
   const cx = Math.round(box.x + box.width / 2);
+  const bottom = Math.min(box.y + box.height, coverTop ?? Number.POSITIVE_INFINITY);
   const tops = over
     .map(({ rect }) => rect)
-    .filter((r) => r.x <= cx && cx < r.x + r.width && r.y > box.y + box.height / 2 && r.y < box.y + box.height)
+    .filter((r) => r.x <= cx && cx < r.x + r.width && r.y > (box.y + bottom) / 2 && r.y < bottom)
     .map((r) => r.y);
   return tops.length === 0 ? undefined : Math.min(...tops);
 }

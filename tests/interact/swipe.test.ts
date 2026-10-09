@@ -407,6 +407,16 @@ describe('strokeBox, strokeRoom and the travel cap — the stroke box\'s one own
     // The highest of several, and the next candidate judged with its own.
     expect(strokeRoom(BOX, [list], 'down', undefined, () => [bar, { rect: { x: 0, y: 1700, width: 1080, height: 100 } }])?.coverTop).toBe(1700);
   });
+  it('the lower half the cut looks in is the box\'s ABOVE the keyboard (code review of fix/r4, P3): a bar sitting on the keyboard, in the uncovered box\'s lower half, is cut for', () => {
+    const list = { x: 0, y: 825, width: 1080, height: 1395 };
+    const onKeyboard = () => [{ rect: { x: 0, y: 1150, width: 1080, height: 150 } }];
+    // Above the list's centre (1522), below the uncovered box's (825..1300 → 1062): until then the cut stayed 1300 and the touch-down, 1206, was on the bar.
+    expect(strokeRoom(BOX, [list], 'down', 1300, onKeyboard)).toEqual({ within: list, box: list, coverTop: 1150 });
+    expect(scrollStroke({ toward: 'down', reach: 1, box: list, coverTop: 1300 }).from).toEqual({ x: 540, y: 1206 });
+    expect(scrollStroke({ toward: 'down', reach: 1, box: list, coverTop: 1150 }).from.y).toBeLessThan(1150);
+    // Without the keyboard the same bar lies in the list's upper half: not cut, as before.
+    expect(strokeRoom(BOX, [list], 'down', undefined, onKeyboard)).toEqual({ within: list, box: list });
+  });
   it('maxTravel caps the finger\'s travel, the touch-down kept, never under twice TOUCH_SLOP', () => {
     const list = { x: 0, y: 242, width: 1080, height: 1736 };
     expect(scrollStroke({ toward: 'up', reach: 0.25, box: list, maxTravel: 177 })).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 766 } });

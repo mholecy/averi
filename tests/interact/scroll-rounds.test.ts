@@ -1064,6 +1064,14 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398, box: LIST });
   });
 
+  it('a bar sitting on the keyboard is cut for — the lower half judged on the list above the keyboard, not the whole list (code review of fix/r4, P3)', () => {
+    const ON_KEYBOARD = node({ role: 'other', label: 'bar', rect: { x: 0, y: 1150, width: 1080, height: 150 } });
+    const KEYBOARD = coverOver({ x: 0, y: 1300, width: 1080, height: 920 });
+    const played = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: LIST, over: [ON_KEYBOARD], cover: KEYBOARD, rest: 'a' }, { found: [], rest: 'b' }]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1150, box: LIST });
+    expect(strokes(played)[0].from.y).toBeLessThan(1150); // until then 1206, on the bar
+  });
+
   it('the fully: true probe toward the bottom edge keeps clear of the bar too — its room judged by the same rule', () => {
     const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 2120, width: 948, height: 100 }, 'row')], scroller: LIST, over: [BAR] }, { found: [match({ x: 66, y: 2120, width: 948, height: 100 }, 'row')], scroller: LIST, over: [BAR] }]);
     expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down', coverTop: 1840, box: LIST, probe: true });
