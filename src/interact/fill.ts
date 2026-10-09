@@ -1,5 +1,5 @@
 import { everyNode, rectArea, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
-import { isMaskedValue } from '../ui-tree/masked-value.js';
+import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -497,9 +497,9 @@ export async function fillField(
                 ? { kind: 'masked', held: clear ? undefined : maskedHeld }
                 : // Partly masked (Android's show-the-last-character password
                   // field, `•••••t`): its content is not comparable either;
-                  // the lengths are all that may be said. • and ● only — `*`
-                  // and `·` are ordinary text too.
-                  /[\u2022\u25CF]/.test(observed)
+                  // the lengths are all that may be said (hasBullet: • and ●
+                  // only — `*` and `·` are ordinary text too).
+                  hasBullet(observed)
                   ? { kind: 'length' }
                   : differenceOf(held(observed), value, clear === true, clear ? '' : held(shownBeforeTyping)),
           notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
