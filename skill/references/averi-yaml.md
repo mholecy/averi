@@ -71,7 +71,7 @@ The recovery pass never re-runs a destructive flow, one whose `requires:` chain 
 | `assert` | a LIST of element asserts: `assert: [ { element: { id: x }, text: "…" } ]` | A failure fails the flow, with the diff in the trace. |
 | `wait` | `{ element: … }` or `{ state: … }`, `timeout:` | |
 | `branch` | list of `{ when: <condition>, do: [steps] }` | The first matching arm runs. With no matching arm the step times out and fails, so cover every outcome. |
-| `optional` | `[steps]` | A failing step is skipped (see below). |
+| `optional` | `[steps]` | A step whose element is absent, or that fails another way, is skipped. A tap refused on a present element is not (see below). |
 
 For platforms that need different steps, a step can be `{ android: <step>, ios: <step> }`. Either side may be left out, and the step is then skipped on that platform.
 
@@ -79,12 +79,17 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
 
 - An optional `tap` gives its element ~1.5 s to appear, then skips. Add `timeout:` to widen that window for interstitials that wait on the network. The full window is spent on every run where the interstitial never shows, so prefer a gate state (see SKILL.md) when the alternative screen is detectable.
 - A config refusal (an undeclared or empty credential, an unset `${VAR}`, a PIN with no digits) fails the flow even inside `optional:`.
+- An optional step is skipped only when its element is absent. A tap (or a `fill`'s focus tap) on an element that IS on screen but that averi refuses to tap fails the flow even inside `optional:`, because the interstitial the step was written for is there. Refused means one of:
+  - the element's centre is off screen, or under another node drawn over it with too little of the element showing;
+  - a soft keyboard covers it and averi sent nothing: on iOS no usable `keyboardDismiss` entry, on Android the window state and the input method disagree about the keyboard.
+
+  The `✗` line reads `optional step not skipped: its element is present, but the tap was refused — …`. Inside a `reach:` ladder averi then checks `detect` once more: if the rung already reached the state, the call passes. Otherwise the ladder stops there and does NOT escalate to the next rung, even when a later rung might have cleared the screen, because that rung may be the destructive one. Fix the step (`scroll_until` the element first, configure a dismissal, or hide the keyboard in an earlier step) or the screen.
 - How to read the trace line of a skipped step:
   - `skipped … (not present)`: the element was never found on a readable screen.
   - Any other text in the parentheses is the step's own failure. For example, `Timed out … to appear` after the presence check saw the element means it WAS there and the step failed on it. That is a descriptor or app bug, not a missing interstitial.
   - `(last UI tree read failed: …)`: the device could not be read, which is not the same as the element being missing.
-  - `(… is off screen at (x,y) …)`: the element is in the tree but its centre is outside the screen (iOS keeps content below the fold in the tree). Nothing was tapped. Put a `scroll_until` before the step if the element should be reached.
-- Since 2026-10-08 a `tap:` or `fill:` on an element whose centre is off screen FAILS the flow, outside `optional:` too. Before, the tap went to a point off the screen and the step passed; the failure surfaced steps later. Add a `scroll_until` before such a step (`fully: true` if the element sits at a screen edge).
+  - A soft keyboard failure AFTER averi pressed `back` or tapped a dismissal is still skipped with its own text, because averi cannot know the element is still there. So is one where the element did not resolve again on averi's second look.
+- Since 2026-10-08 a `tap:` or `fill:` on an element whose centre is off screen FAILS the flow, and since 2026-10-09 inside `optional:` too. Before, the tap went to a point off the screen and the step passed; the failure surfaced steps later. Add a `scroll_until` before such a step (`fully: true` if the element sits at a screen edge).
 
 ## `dismissKeyboard` on `fill`
 

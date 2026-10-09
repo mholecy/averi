@@ -13,7 +13,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { resolveSettled } from './resolve.js';
+import { resolveSettled, type RefusedOnPresentElement } from './resolve.js';
 
 /**
  * The WINDOW model (Android): the soft keyboard is a window of its own,
@@ -88,7 +88,9 @@ export class AfterKeyboardDismissal extends KeyboardGuardError {
  * refusal, because acting on either guess is the harm this guard exists to
  * prevent.
  */
-export class KeyboardStateDisagreement extends KeyboardGuardError {
+export class KeyboardStateDisagreement extends KeyboardGuardError implements RefusedOnPresentElement {
+  /** Nothing sent, the target resolved: a refusal on a present element (resolve.ts#RefusedOnPresentElement) — an `optional:` does not skip it. */
+  readonly refusedOnPresentElement = true;
   constructor(message: string, traceLine: string) {
     super(message, traceLine);
     this.name = 'KeyboardStateDisagreement';

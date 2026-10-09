@@ -134,7 +134,8 @@ export class AmbiguityRefusal extends Error {}
  * logged "skipped step (not present)", and every new failure-after-finding
  * needed one more `instanceof` there. Now an optional step is "(not
  * present)" exactly when this is what it threw, and anything else is
- * skipped with its own headline.
+ * skipped with its own headline — save a PresentElementRefusal (since
+ * 2026-10-09), which fails the flow.
  *
  * Deliberately narrow:
  * - A wait whose LAST read failed does not throw it — neither one that read
@@ -361,6 +362,51 @@ export async function resolvePresent(
 // ─── On screen ───────────────────────────────────────────────────────────────
 
 /**
+ * The typed marker for "the target was FOUND, and this module refused to tap
+ * it" (2026-10-09): the element resolved — it is in the tree, on the screen
+ * the author meant — on every look the refusal rests on, and a rule of this
+ * module, not its absence, is why nothing was tapped. Carried by:
+ * - PresentElementRefusal's subclasses, the tap rules on a resolved node:
+ *   OffScreenRefusal and CoveredRefusal (behind `tapElement` and
+ *   `fillField`'s focus tap). These may follow the keyboard guard's own
+ *   `back` or dismissal tap — the target was resolved again after it, and
+ *   it is still there.
+ * - The keyboard guard's refusals that sent NOTHING with the target resolved
+ *   on both looks: KeyboardStateDisagreement (keyboard-window.ts) and
+ *   KeyboardWithoutDismissal (keyboard-in-tree.ts) — but not the latter when
+ *   its second look did not resolve the target again (its flag is false).
+ *
+ * Its one reader is the flow engine's `optional:` block
+ * (docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md,
+ * item 3): an optional step is skipped only when its element is absent, and
+ * one refused on a present element FAILS the flow — the interstitial is
+ * there, and skipping it ran the flow on into the ladder's destructive rung
+ * (on iOS the same with the keyboard up over LOGIN and no dismissal).
+ *
+ * Deliberately NOT carried by:
+ * - AmbiguityRefusal: a selector finding, and a flow resolves with `'first'`
+ *   (flow/engine.ts, FLOW_AMBIGUITY), so a flow never sees it.
+ * - AfterKeyboardDismissal and AfterDismissalTap: thrown after a `back` or a
+ *   dismissal tap whose effect is unknown (back may have navigated, the
+ *   target may not have come back) — whether the element is still there is
+ *   not known. An `optional:` skips them with their headline.
+ * - ElementNotFoundError, of course, and a zero-area-only match, which is
+ *   one (nothing ACTIONABLE was ever there).
+ */
+export interface RefusedOnPresentElement {
+  readonly refusedOnPresentElement: boolean;
+}
+
+/** Does `e` carry the marker (RefusedOnPresentElement) — a tap refused on an element that was there? */
+export const isRefusedOnPresentElement = (e: unknown): e is Error & RefusedOnPresentElement =>
+  e instanceof Error && (e as Partial<RefusedOnPresentElement>).refusedOnPresentElement === true;
+
+/** The base of the tap rules' refusals on a resolved node — each carries the marker (RefusedOnPresentElement). */
+export class PresentElementRefusal extends Error implements RefusedOnPresentElement {
+  readonly refusedOnPresentElement = true;
+}
+
+/**
  * The target resolved and settled, but the point a tap on it would press —
  * its centre, `tapPoint` — lies outside the screen (2026-10-08,
  * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md). Measured on
@@ -371,12 +417,13 @@ export async function resolvePresent(
  *
  * A class of its own, like AmbiguityRefusal, because it is neither of the
  * wait's failures: the element WAS found (never ElementNotFoundError — an
- * `optional:` tap of it is skipped with this headline, not "(not present)"),
- * and nothing is moving. The remedy is in the message: scroll it in first.
- * When the keyboard guard had already sent something (a `back`, a dismissal
- * tap), the HEADLINE says what — the one line an `optional:` skip quotes.
+ * `optional:` tap of it is not skipped since 2026-10-09: it fails the flow,
+ * see PresentElementRefusal), and nothing is moving. The remedy is in the
+ * message: scroll it in first. When the keyboard guard had already sent
+ * something (a `back`, a dismissal tap), the HEADLINE says what — the one
+ * line the step's ✗ quotes.
  */
-export class OffScreenRefusal extends Error {}
+export class OffScreenRefusal extends PresentElementRefusal {}
 
 /** The screen a tap point is judged against: `swipe.ts#judgingScreen` — the box a reply quotes and the boxes that count. */
 export type TapScreen = JudgingScreen;
@@ -512,13 +559,13 @@ export async function refuseOffScreen(
  * enabled one would have submitted the payment form. Nothing is tapped.
  *
  * A class of its own, like OffScreenRefusal and for its reasons: the element
- * WAS found (an `optional:` tap of it is skipped with this headline, not
- * "(not present)"), nothing is moving, and the remedy is in the message —
+ * WAS found (an `optional:` tap of it fails the flow, never skipped — see
+ * PresentElementRefusal), nothing is moving, and the remedy is in the message —
  * `scroll_until` it, which since the same date keeps scrolling until the
  * centre is clear (interact/scroll-rounds.ts#stops). When the keyboard guard
  * had already sent something, the HEADLINE says what.
  */
-export class CoveredRefusal extends Error {}
+export class CoveredRefusal extends PresentElementRefusal {}
 
 /** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
 export interface Aim {
