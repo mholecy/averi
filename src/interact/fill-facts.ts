@@ -203,8 +203,9 @@ export type FillFailure =
  *   punctuation, a mask.
  * - `unchanged`: the field shows exactly what it showed when typing began
  *   — the typing did not reach it (a focus tap that missed, a field that
- *   ignores input; review of this branch, probes D and D2 were told "the
- *   app transformed the input").
+ *   ignores input), or the field refused it (already at its maxLength).
+ *   Review of this branch: probes D and D2 were told "the app transformed
+ *   the input".
  * - `length`: none of these — the lengths are all that can be said (also
  *   a partly masked reading, `•••••t`, whose content is not comparable).
  * Still a FAILURE in every case: a field that shows `Hello` for `hello` does

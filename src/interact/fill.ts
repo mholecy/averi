@@ -259,6 +259,8 @@ export async function fillField(
   const maskedHeld = isMaskedValue(preText) ? preText.length : 0;
   let cleared: FillResult['cleared'];
   let clearUnchanged: FillResult['clearUnchanged'];
+  // The clear ended on the placeholder, which may be held text (see the loop).
+  let placeholderLeft = false;
   // Why the clear's read after a delete found no field (review 2026-10-08,
   // m-1): the loop then stops without calling the field empty, and a clear
   // alone (nothing typed, so no read-back) reports it as `lost`.
@@ -318,7 +320,20 @@ export async function fillField(
         }
       }
       const left = held(current.value).length;
-      if (left === 0) break;
+      if (left === 0) {
+        // Deleted INTO the placeholder: proof of an empty field only when
+        // the reading before the deletes did not START with the placeholder's
+        // text. Deletes go from the end, so what they leave is a prefix of
+        // what was there; a placeholder that is not a prefix of it can only
+        // be the field showing empty. One that is (`Companyabc` with 3 of 10
+        // deletes landing leaves `Company`) may be text the deletes did not
+        // reach (review round 2, probe K: "Filled … cleared 10 characters
+        // first" of a field still holding `Company`). Then a clear alone is
+        // the `placeholder` read-back, not verified; with a value, the exact
+        // read-back decides (typing onto held text shows more than the value).
+        placeholderLeft = placeholder !== undefined && current.value === placeholder && (before ?? '').startsWith(placeholder);
+        break;
+      }
       if (isHint(before, current.value)) {
         // The deletes changed NOTHING: the field shows what it showed before
         // them. An empty field showing its hint or placeholder reads exactly
@@ -375,12 +390,19 @@ export async function fillField(
   const shownBeforeTyping = current?.value ?? null;
   await startTyping(value);
   // A clear alone that found the field showing exactly its named
-  // placeholder and so deleted nothing: empty, or holding that very text —
-  // the tree cannot tell (review of this branch, probe C). Not verified. A
-  // field that was cleared INTO its placeholder (deletes changed it) was
-  // seen to empty, and is.
+  // placeholder and so deleted nothing, or whose deletes ended on it from a
+  // reading that started with it (`placeholderLeft`): empty, or holding
+  // that very text — the tree cannot tell (review of this branch, probes C
+  // and K). Not verified. A field cleared INTO its placeholder from a
+  // reading that did not start with it was seen to empty, and is.
   const showsOnlyPlaceholder =
-    value === '' && clear === true && isInput && cleared === 0 && clearUnchanged === undefined && placeholder !== undefined && current?.value === placeholder;
+    value === '' &&
+    clear === true &&
+    isInput &&
+    (cleared === 0 || placeholderLeft) &&
+    clearUnchanged === undefined &&
+    placeholder !== undefined &&
+    current?.value === placeholder;
   let readBack: ReadBack =
     value === '' && clearLost !== undefined
       ? { kind: 'lost', why: clearLost }

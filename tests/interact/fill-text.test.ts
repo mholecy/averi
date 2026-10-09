@@ -286,7 +286,7 @@ describe('fillFailureText — every error a fill throws', () => {
       'fill: typed 5 characters but the field shows 5 — as many characters as were typed, 1 differing: ' +
         'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
     );
-    expect(mismatch({ kind: 'unchanged' }, 5, 4)).toBe('fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it (content withheld from this error)');
+    expect(mismatch({ kind: 'unchanged' }, 5, 4)).toBe('fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)');
     expect(mismatch({ kind: 'length' }, 1, 4)).toBe('fill: typed 1 character but the field shows 4 (content withheld from this error)');
   });
 

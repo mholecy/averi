@@ -165,7 +165,7 @@ describe('fillField — focus, clear, type, verify', () => {
     // The field still shows what it showed before typing: since 2026-10-09
     // the error says so instead of leaving two bare lengths.
     await expect(fillField(fake, { id: 'amount_input' }, '12.34', FAST)).rejects.toThrow(
-      'fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it (content withheld from this error)',
+      'fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
     );
     expect(fake.deletes).toEqual([]); // clear stays opt-in even during verification
   });
@@ -1083,11 +1083,47 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     );
   });
 
+  // Review round 2, probe K: deletes go from the end, so a reading that
+  // STARTED with the placeholder's text can end on it with text left.
+  it('K: a clear alone that ends on the placeholder from a reading that started with it is NOT verified — `Company` may be held text', async () => {
+    const { fake, real } = hintedField('Companyabc', { hint: 'Company', named: true });
+    const origClear = fake.clearText.bind(fake);
+    fake.clearText = async (n: number) => {
+      await origClear(3); // 3 of the 10 deletes land
+      fake.deletes.splice(-1, 1, n);
+    };
+    const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([10]);
+    expect(real()).toBe('Company'); // held, not the placeholder
+    expect(result).toMatchObject({ cleared: 10, readBack: { kind: 'placeholder' } });
+    expect(fillReply(result, 'id:last_name')).toBe(
+      "Cleared id:last_name (10 deletes sent) — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
+    );
+  });
+
+  it('K, with a value: the exact read-back sees the held text under the typing, and the retry wipes it', async () => {
+    const { fake, real } = hintedField('Companyabc', { hint: 'Company', named: true });
+    const origClear = fake.clearText.bind(fake);
+    let short = 1;
+    fake.clearText = async (n: number) => {
+      if (short-- > 0) {
+        await origClear(3);
+        fake.deletes.splice(-1, 1, n);
+        return;
+      }
+      return origClear(n);
+    };
+    const result = await fillField(fake, { id: 'last_name' }, 'Acme', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([10, 11]); // the retry wipes `CompanyAcme`
+    expect(real()).toBe('Acme');
+    expect(result.readBack).toEqual({ kind: 'landed' });
+  });
+
   it('D: no clear, the typing dropped on a field showing only its named placeholder: "did not change", never "transformed"', async () => {
     const { fake } = hintedField('', { hint: 'Search', named: true });
     fake.typeText = async (t: string) => void fake.typed.push(t);
     await expect(fillField(fake, { id: 'last_name' }, 'search', FAST)).rejects.toThrow(
-      'fill: typed 6 characters but the field shows 6 — the field did not change: the typing did not reach it (content withheld from this error)',
+      'fill: typed 6 characters but the field shows 6 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
     );
   });
 
@@ -1106,7 +1142,7 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     const fake = formFake('Hello');
     fake.typeText = async (t: string) => void fake.typed.push(t);
     await expect(fillField(fake, { id: 'amount_input' }, 'hello', FAST)).rejects.toThrow(
-      'fill: typed 5 characters but the field shows 5 — the field did not change: the typing did not reach it (content withheld from this error)',
+      'fill: typed 5 characters but the field shows 5 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
     );
   });
 

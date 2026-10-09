@@ -262,6 +262,6 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
   'same-length': ({ positions }) =>
     ` — as many characters as were typed, ${positions} differing: ` +
     'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
-  unchanged: () => ' — the field did not change: the typing did not reach it (content withheld from this error)',
+  unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
   length: () => ' (content withheld from this error)',
 };
