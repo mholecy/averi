@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FillResult } from '../../src/interact/fill-facts.js';
+import type { FillFailure, FillResult } from '../../src/interact/fill-facts.js';
 import type { Caveat, FillVerdict, Reason } from '../../src/interact/fill-verdict.js';
-import { caveatText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
+import { caveatText, fillFailureText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
 import { charactersText } from '../../src/util/count.js';
 
 /**
@@ -131,6 +131,18 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     });
   });
 
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: a
+  // clear alone that stopped on deletes that changed nothing — the field was
+  // never seen empty, and was failed until 2026-10-09.
+  it('a clear alone whose deletes changed nothing: "Cleared … (N deletes sent)" and the hint-or-deaf-field reason, on both media', () => {
+    const tail =
+      'NOT verified: the field still shows 15 characters that the deletes did not change — its hint or placeholder (shown while empty), or a field that ignores deletes';
+    expect(both('id:open_search_view_edit_text', fact({ typed: 0, readBack: { kind: 'nothing-typed' }, cleared: 15, clearUnchanged: { shows: 15, deletes: 15 } }))).toEqual({
+      reply: `Cleared id:open_search_view_edit_text (15 deletes sent) — ${tail}`,
+      flow: [['⚠ fill', `id:open_search_view_edit_text =  (15 deletes sent) — ${tail}`]],
+    });
+  });
+
   it('focused: nothing typed, no delete sent, not verified — never "Cleared", never "Typed 0 characters"', () => {
     // M-1 (review 2026-10-08): a clear ALONE on a label was "Filled … (0 characters)".
     expect(both('text:"IBAN*"', fact({ typed: 0, role: 'text', readBack: { kind: 'nothing-typed' }, cleared: 'unmeasured' }))).toEqual({
@@ -201,6 +213,10 @@ describe('wordingOf — every sentence', () => {
     expect(unverified({ code: 'no-value', role: 'textfield' }, { code: 'clear-no-length' })).toBe(
       'NOT verified: the matched node exposes no value (role textfield); clear sent no delete — the node gave no length to delete',
     );
+    expect(unverified({ code: 'lost', why: 'unmatched' }, { code: 'clear-unchanged', shows: 1 })).toBe(
+      'NOT verified: the field could not be found again (the selector no longer matches it); ' +
+        'the field still shows 1 character that the deletes did not change — its hint or placeholder (shown while empty), or a field that ignores deletes',
+    );
   });
 
   it('what was sent, and the typed length — singular for one', () => {
@@ -236,5 +252,48 @@ describe('wordingOf — every sentence', () => {
       notInput('none'),
       'masked field already held 2 characters and clear is not set — typing APPENDS; pass clear: true to replace',
     ]);
+  });
+});
+
+/**
+ * The errors fillField throws, worded here since 2026-10-09 (they were inline
+ * in fill.ts). Every row takes lengths and counts only; the end-to-end shapes
+ * through a fake device are fill.test.ts's.
+ */
+describe('fillFailureText — every error a fill throws', () => {
+  const mismatch = (differs: Extract<FillFailure, { code: 'mismatch' }>['differs'], typed = 5, shows = 5) =>
+    fillFailureText({ code: 'mismatch', typed, shows, differs });
+
+  it('the device that went away, and the deletes that kept landing short — the wording they always had', () => {
+    expect(fillFailureText({ code: 'reread-failed', target: 'id:"amount_input"', cause: 'adb: device offline' })).toBe(
+      'fill: could not re-read id:"amount_input" after focusing it — adb: device offline. The field was tapped and may hold partial text; ' +
+        'check the device is still online (adb devices / xcrun simctl list), then retry with clear: true so the field is reset',
+    );
+    expect(fillFailureText({ code: 'clear-twice', left: 1, rounds: 2 })).toBe('fill: field still shows 1 character after clearing twice');
+    expect(fillFailureText({ code: 'clear-twice', left: 4, rounds: 2 })).toBe('fill: field still shows 4 characters after clearing twice');
+    expect(fillFailureText({ code: 'clear-twice', left: 9, rounds: 3 })).toBe('fill: field still shows 9 characters after clearing 3 times');
+  });
+
+  it('a mismatch: the two lengths, then what differs — masked, case, same length, or the lengths alone', () => {
+    expect(mismatch({ kind: 'masked' }, 6, 5)).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length)');
+    expect(mismatch({ kind: 'masked', held: 0 }, 6, 5)).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length; it held 0 after focus)');
+    expect(mismatch({ kind: 'case', positions: 1 })).toBe(
+      'fill: typed 5 characters but the field shows 5 — the typed text is there but for letter case, 1 character differing: ' +
+        'the app transformed the input (auto-capitalisation?); content withheld from this error',
+    );
+    expect(mismatch({ kind: 'case', positions: 2 })).toMatch(/for letter case, 2 characters differing:/);
+    expect(mismatch({ kind: 'same-length', positions: 1 })).toBe(
+      'fill: typed 5 characters but the field shows 5 — as many characters as were typed, 1 differing: ' +
+        'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+    );
+    expect(mismatch({ kind: 'unchanged' }, 5, 4)).toBe('fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)');
+    expect(mismatch({ kind: 'length' }, 1, 4)).toBe('fill: typed 1 character but the field shows 4 (content withheld from this error)');
+  });
+
+  it('a mismatch on a node that is not an input names the input in the caveat\'s own words', () => {
+    const input = { identifier: 'name', rect: { x: 0, y: 20, width: 100, height: 10 }, overlaps: false };
+    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, notInput: { role: 'text', input } })).toBe(
+      `fill: typed 3 characters but the field shows 4 (content withheld from this error); ${caveatText({ code: 'not-input', role: 'text', typed: true, input })}`,
+    );
   });
 });

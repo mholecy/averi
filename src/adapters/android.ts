@@ -902,6 +902,8 @@ interface RawNode {
   class?: string;
   'resource-id'?: string;
   text?: string;
+  /** Not in the API 33 dump (measured 2026-10-09); read when a newer one carries it — see normalizeNode. */
+  hint?: string;
   'content-desc'?: string;
   focusable?: string;
   'long-clickable'?: string;
@@ -940,7 +942,7 @@ function normalizeNode(raw: RawNode): UiNode {
     raw.focusable === 'true' &&
     raw['long-clickable'] === 'true';
   const isTextInput = className.endsWith('EditText') || composeTextInput;
-  return {
+  const node: UiNode = {
     role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),
     label: contentDesc ?? text,
     // resource-id is "com.example.app:id/login_button" — selectors use the short name
@@ -949,6 +951,19 @@ function normalizeNode(raw: RawNode): UiNode {
     rect: parseBounds(raw.bounds),
     children: rawChildren.map(normalizeNode),
   };
+  // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
+  // .getText() returns the hint while isShowingHintText() — and the API 33
+  // dump has no attribute that says so (measured 2026-10-09, Pixel_3a AVD,
+  // Android 13: the Contacts editor's `text="Last name"`, the Settings
+  // search's `text="Search settings"`, both empty; docs/bugs/
+  // 2026-10-09-android-clear-reads-edittext-hint-as-content.md). A dump that
+  // DOES name the hint (newer uiautomator builds, the uiautomator2 server's
+  // `hint`) hands it to fill as the node's placeholder (UiNode), read
+  // opportunistically: no captured dump carries it yet. Compose placeholders
+  // are not dumped as text at all (measured the same day), so need none.
+  const hint = isTextInput ? emptyToNull(raw.hint) : null;
+  if (hint !== null) node.placeholder = hint;
+  return node;
 }
 
 function parseBounds(bounds: string | undefined): Rect {

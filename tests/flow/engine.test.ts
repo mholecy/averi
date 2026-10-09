@@ -2013,7 +2013,8 @@ flows:
         fake.typed.push(text);
       };
       expect(await skipOf(fake, 'fill: { id: amount_input, value: "12.34" }')).toEqual([
-        'skipped step (fill: typed 5 characters but the field shows 4 (content withheld from this error))',
+        // The field never changed: since 2026-10-09 the headline says so.
+        'skipped step (fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error))',
       ]);
       expect(fake.taps).toEqual(['amount_input']);
     });

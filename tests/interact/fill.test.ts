@@ -3,7 +3,7 @@ import type { UiNode } from '../../src/adapters/types.js';
 import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
 import type { ReadBack } from '../../src/interact/fill-facts.js';
 import { judgeFill } from '../../src/interact/fill-verdict.js';
-import { wordingOf } from '../../src/interact/fill-text.js';
+import { fillReply, wordingOf } from '../../src/interact/fill-text.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
@@ -108,7 +108,7 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['4', '12.34']);
   });
 
-  it('re-clears once when the first clear leaves content behind, and fails after the second', async () => {
+  it('re-clears once when the first clear leaves content behind, and fails after the second if the deletes keep landing short', async () => {
     const fake = formFake('2.50');
     let swallow = 1;
     const origClear = fake.clearText.bind(fake);
@@ -120,14 +120,41 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.deletes).toEqual([2, 2]); // first pass left "2.", second cleared the remainder
     expect(fake.typed).toEqual(['7']);
 
+    // Every round CHANGES the field (one delete of each lands), and none
+    // empties it: deletes are being dropped — still the clear-twice failure,
+    // before anything is typed.
+    const leaky = formFake('2.50');
+    const leakyClear = leaky.clearText.bind(leaky);
+    leaky.clearText = async (count: number) => {
+      await leakyClear(1);
+      leaky.deletes.splice(-1, 1, count); // record what was SENT
+    };
+    await expect(fillField(leaky, { id: 'amount_input' }, '7', { ...FAST, clear: true })).rejects.toThrow(
+      'fill: field still shows 2 characters after clearing twice',
+    );
+    expect(leaky.deletes).toEqual([4, 3]);
+    expect(leaky.typed).toEqual([]);
+  });
+
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md.
+  // Until 2026-10-09 this field threw `field still shows 4 characters after
+  // clearing twice` before typing. A field whose deletes change NOTHING is
+  // indistinguishable, in the tree, from an EMPTY field showing its hint or
+  // placeholder as its value — which every tree source reports, and which
+  // that throw failed on every hinted stock EditText. So the clear stops on
+  // the unchanged round and the exact read-back decides: a field that truly
+  // ignores deletes still fails, but only after the value was typed into it
+  // (twice: the mismatch retry's wipe is ignored as well).
+  it('a field whose deletes change nothing (indistinguishable from an empty hinted field): one round, then typed, and the exact read-back fails it', async () => {
     const stubborn = formFake('2.50');
     stubborn.clearText = async (count: number) => {
       stubborn.deletes.push(count); // nothing ever leaves the field
     };
     await expect(fillField(stubborn, { id: 'amount_input' }, '7', { ...FAST, clear: true })).rejects.toThrow(
-      'fill: field still shows 4 characters after clearing twice',
+      'fill: typed 1 character but the field shows 6 (content withheld from this error)',
     );
-    expect(stubborn.typed).toEqual([]);
+    expect(stubborn.deletes).toEqual([4, 5]); // the unchanged round, then the retry's wipe of "2.507"
+    expect(stubborn.typed).toEqual(['7', '7']);
   });
 
   it('fill WITHOUT clear never wipes the field when verification mismatches — it fails instead, lengths only', async () => {
@@ -135,8 +162,10 @@ describe('fillField — focus, clear, type, verify', () => {
     fake.typeText = async (text: string) => {
       fake.typed.push(text); // drop everything: value never changes
     };
+    // The field still shows what it showed before typing: since 2026-10-09
+    // the error says so instead of leaving two bare lengths.
     await expect(fillField(fake, { id: 'amount_input' }, '12.34', FAST)).rejects.toThrow(
-      'fill: typed 5 characters but the field shows 4 (content withheld from this error)',
+      'fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
     );
     expect(fake.deletes).toEqual([]); // clear stays opt-in even during verification
   });
@@ -607,11 +636,11 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
 
   it('counts are singular for one: `1 character` in the clear-twice error', async () => {
     resetLayout();
-    const fake = new FakeAdapter({ s: screen(el({ role: 'textfield', identifier: 'pin', value: 'xy' })) }, 's');
+    const fake = new FakeAdapter({ s: screen(el({ role: 'textfield', identifier: 'pin', value: 'xyz' })) }, 's');
     fake.clearText = async (count: number) => {
       fake.deletes.push(count);
       const f = fake.live().children[0];
-      f.value = 'x'; // one character never goes
+      f.value = (f.value ?? '').slice(0, -1); // one delete per round lands: "xy", then "x"
     };
     await expect(fillField(fake, 'id:pin', '', { ...FAST, clear: true })).rejects.toThrow('fill: field still shows 1 character after clearing twice');
   });
@@ -764,5 +793,433 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const fake = formFake('2.50');
     const result = await fillField(fake, { id: 'amount_input' }, '7', { ...FAST, clear: true });
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined, maskedAppend: undefined, role: 'textfield', typed: 1, cleared: 4, readBack: { kind: 'landed' }, notInput: undefined });
+  });
+});
+
+/**
+ * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: every
+ * tree source reports an EMPTY field's hint or placeholder AS its value —
+ * uiautomator's `text` on API 33 (`text="Last name"`, the Contacts editor),
+ * idb's AXValue and WDA's `value` (`value 'Company'`, the iOS Contacts sheet),
+ * all measured 2026-10-09 — and `clear: true` threw `field still shows 9
+ * characters after clearing twice` on each, after the field had emptied.
+ *
+ * `hintedField` plays that widget: the field holds `content`, and the tree
+ * shows `hint` whenever it holds nothing. `placeholder` set: the source also
+ * NAMES the placeholder (WDA's placeholderValue, a dump's `hint` attribute);
+ * unset: it does not (idb, the API 33 dump) — the measured shape.
+ */
+function hintedField(content: string, { hint = 'Last name', named = false } = {}) {
+  resetLayout();
+  const field = el({ role: 'textfield', identifier: 'last_name', value: content || hint, ...(named ? { placeholder: hint } : {}) });
+  const fake = new FakeAdapter({ form: screen(field) }, 'form');
+  let real = content;
+  const show = () => {
+    if (fake.focused) fake.focused.value = real === '' ? hint : real;
+  };
+  fake.typeText = async (t: string) => {
+    fake.typed.push(t);
+    real += t;
+    show();
+  };
+  fake.clearText = async (n: number) => {
+    fake.deletes.push(n);
+    real = real.slice(0, Math.max(0, real.length - n));
+    show();
+  };
+  return { fake, real: () => real };
+}
+
+describe('fillField — a field that shows its hint or placeholder as its value (2026-10-09)', () => {
+  describe('the source names no placeholder (API 33 dump, idb): the unchanged delete round', () => {
+    it('clear + value on a field holding "Q": one round deletes it, the next finds the hint unchanged, the value is typed and lands', async () => {
+      const { fake, real } = hintedField('Q');
+      const result = await fillField(fake, { id: 'last_name' }, 'Probe', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([1, 9]); // "Q", then the hint's length into the empty field — measured as 1 + 9 DEL
+      expect(fake.typed).toEqual(['Probe']);
+      expect(real()).toBe('Probe');
+      expect(result).toMatchObject({ cleared: 1, clearUnchanged: { shows: 9, deletes: 10 }, readBack: { kind: 'landed' } });
+      expect(fillReply(result, 'id:last_name')).toBe('Filled id:last_name (5 characters, cleared 1 character first)'); // landed: the clear did its job
+    });
+
+    it('a clear ALONE on the EMPTY field: no throw — a clear that sent its deletes, NOT verified, naming hint and deaf field alike', async () => {
+      const { fake, real } = hintedField('');
+      const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([9]); // one round, unchanged — not 2 × 9 and a throw
+      expect(real()).toBe('');
+      // Nothing was SEEN deleted (the first round changed nothing): cleared 0; the deletes that went out are counted apart.
+      expect(result).toMatchObject({ cleared: 0, clearUnchanged: { shows: 9, deletes: 9 }, readBack: { kind: 'nothing-typed' } });
+      expect(judgeFill(result)).toMatchObject({ did: 'cleared', sent: { what: 'deletes', n: 9 }, reasons: [{ code: 'clear-unchanged', shows: 9 }] });
+      expect(fillReply(result, 'id:last_name')).toBe(
+        'Cleared id:last_name (9 deletes sent) — NOT verified: the field still shows 9 characters that the deletes did not change — ' +
+          'its hint or placeholder (shown while empty), or a field that ignores deletes',
+      );
+    });
+
+    it('a clear ALONE on a field holding "Probe": deleted, then the hint unchanged — same unverified clear', async () => {
+      const { fake, real } = hintedField('Probe');
+      const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([5, 9]);
+      expect(real()).toBe('');
+      expect(result).toMatchObject({ cleared: 5, clearUnchanged: { shows: 9, deletes: 14 } });
+      expect(fillReply(result, 'id:last_name')).toMatch(/^Cleared id:last_name \(14 deletes sent\) — NOT verified: the field still shows 9 characters/); // every round, not the first's 5
+    });
+
+    it('an emptied field is not "unchanged": a clear that empties in one round carries no clearUnchanged', async () => {
+      const fake = formFake('2.50');
+      const result = await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+      expect(result.clearUnchanged).toBeUndefined();
+      expect(judgeFill(result).did).toBe('filled');
+    });
+  });
+
+  describe('the source names the placeholder (WDA placeholderValue, a dump hint): a value equal to it is empty', () => {
+    it('clear + value on the EMPTY field: no delete at all, typed, landed', async () => {
+      const { fake, real } = hintedField('', { hint: 'Company', named: true });
+      const result = await fillField(fake, { id: 'last_name' }, 'Acme', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([]); // `Company` was never content
+      expect(real()).toBe('Acme');
+      expect(result).toMatchObject({ cleared: 0, readBack: { kind: 'landed' } });
+      expect(result.clearUnchanged).toBeUndefined();
+    });
+
+    it('clear + value on a field holding "Zed": one round, stopped by the placeholder, no deletes into the empty field', async () => {
+      const { fake, real } = hintedField('Zed', { hint: 'First name', named: true });
+      await fillField(fake, { id: 'last_name' }, 'Ann', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([3]);
+      expect(real()).toBe('Ann');
+    });
+
+    // Review of this branch, probe C: a field that shows exactly its
+    // placeholder may be empty or may HOLD that very text; a clear alone that
+    // deleted nothing never saw which. Not verified — never "Filled".
+    it('a clear ALONE on a field showing only its placeholder: nothing deleted, and NOT verified — empty, or holding that text', async () => {
+      const { fake } = hintedField('', { hint: 'Company', named: true });
+      const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([]);
+      expect(result).toMatchObject({ cleared: 0, readBack: { kind: 'placeholder' } });
+      expect(fillReply(result, 'id:last_name')).toBe(
+        "Focused id:last_name — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
+      );
+    });
+
+    it('a clear ALONE that deleted INTO the placeholder saw the field empty: verified', async () => {
+      const { fake } = hintedField('Zed', { hint: 'Company', named: true });
+      const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([3]);
+      expect(fillReply(result, 'id:last_name')).toBe('Filled id:last_name (0 characters, cleared 3 characters first)');
+    });
+
+    it('without clear, a placeholder is not content: nothing typed does not pass for a substring of it; a value EQUAL to it is not verified', async () => {
+      const { fake } = hintedField('', { hint: 'Search', named: true });
+      fake.typeText = async (t: string) => {
+        fake.typed.push(t); // the typing never lands: the field still shows `Search`
+      };
+      await expect(fillField(fake, { id: 'last_name' }, 'ear', FAST)).rejects.toThrow(/^fill: typed 3 characters but the field shows 6/);
+      // The one reading the tree cannot tell apart: the value IS the placeholder's text (probe B's shape, without clear).
+      const same = hintedField('', { hint: 'Search', named: true });
+      await expect(fillField(same.fake, { id: 'last_name' }, 'Search', FAST)).resolves.toMatchObject({ readBack: { kind: 'placeholder' } });
+    });
+
+    it('the clear-fill retry wipes what the field HOLDS: a field showing only its placeholder gets no deletes', async () => {
+      const { fake, real } = hintedField('', { hint: 'Company', named: true });
+      const origType = fake.typeText.bind(fake);
+      let drop = 1;
+      fake.typeText = async (t: string) => {
+        if (drop-- > 0) return void fake.typed.push(t); // the first typing is dropped whole
+        return origType(t);
+      };
+      await fillField(fake, { id: 'last_name' }, 'Acme', { ...FAST, clear: true });
+      expect(fake.deletes).toEqual([]);
+      expect(fake.typed).toEqual(['Acme', 'Acme']);
+      expect(real()).toBe('Acme');
+    });
+  });
+
+  describe('a masked field whose hint read as text before typing (inferred from the plain EditText, not seen on a device)', () => {
+    const hintedPassword = (drop = 0) => {
+      resetLayout();
+      const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'pw', value: 'Password' })) }, 'form');
+      let n = 0;
+      fake.typeText = async (t: string) => {
+        fake.typed.push(t);
+        n += t.length - drop;
+        if (fake.focused) fake.focused.value = '•'.repeat(n);
+      };
+      return fake;
+    };
+
+    it('the hint is not held bullets: a fill that landed passes (it read `typed 6 but the field shows 6 … it held 8 after focus`)', async () => {
+      await expect(fillField(hintedPassword(), { id: 'pw' }, 'secret', FAST)).resolves.toMatchObject({ readBack: { kind: 'landed' }, maskedAppend: undefined });
+    });
+
+    it('a NAMED placeholder is an empty field before the tap, so the post-focus re-read runs and sees an autofill on focus', async () => {
+      resetLayout();
+      const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'pw', value: 'Password', placeholder: 'Password' })) }, 'form');
+      const origTap = fake.tap.bind(fake);
+      fake.tap = async (x: number, y: number) => {
+        await origTap(x, y);
+        if (fake.focused) fake.focused.value = '•'.repeat(8); // autofill on focus (Android, measured 2026-09-18)
+      };
+      appendBullets(fake);
+      await expect(fillField(fake, { id: 'pw' }, 'secret', FAST)).resolves.toMatchObject({ readBack: { kind: 'landed' }, maskedAppend: { held: 8 } });
+    });
+
+    it('a dropped keystroke still fails, counted from nothing held', async () => {
+      await expect(fillField(hintedPassword(1), { id: 'pw' }, 'secret', FAST)).rejects.toThrow(
+        'fill: typed 6 characters but the field shows 5 (masked field — compared by length; it held 0 after focus)',
+      );
+    });
+  });
+});
+
+/**
+ * docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md:
+ * UIKit's sentence auto-capitalisation turned a typed `hello` into `Hello`
+ * (iOS 27.0, Contacts Notes, measured 2026-10-09) and the error read `typed 5
+ * characters but the field shows 5 (content withheld from this error)`. Still
+ * a failure — the field does not hold the value asked for — but the message
+ * says what differs, in counts, never in content.
+ */
+describe('fillField — the mismatch error says what differs, without content (2026-10-09)', () => {
+  /** A Notes-like field: `transform` is the app's hand on the whole text after each change. */
+  const transforming = (held: string | null, transform: (s: string) => string) => {
+    resetLayout();
+    const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'notes', value: held })) }, 'form');
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t);
+      if (fake.focused) fake.focused.value = transform((fake.focused.value ?? '') + t);
+    };
+    return fake;
+  };
+  const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const failureOf = async (p: Promise<unknown>) => ((await p.catch((e: unknown) => e)) as Error).message;
+
+  it('auto-capitalised, no clear: equal lengths, and the error says only the case differs, at how many characters — no content', async () => {
+    const message = await failureOf(fillField(transforming(null, capitalise), { id: 'notes' }, 'hello', FAST));
+    expect(message).toBe(
+      'fill: typed 5 characters but the field shows 5 — the typed text is there but for letter case, 1 character differing: ' +
+        'the app transformed the input (auto-capitalisation?); content withheld from this error',
+    );
+    expect(message).not.toMatch(/hello/i);
+  });
+
+  it('with clear: the same, after the retry (which the app transforms again)', async () => {
+    const fake = transforming('old', capitalise);
+    const message = await failureOf(fillField(fake, { id: 'notes' }, 'hello world', { ...FAST, clear: true }));
+    expect(fake.typed).toEqual(['hello world', 'hello world']);
+    expect(message).toMatch(/^fill: typed 11 characters but the field shows 11 — the typed text is there but for letter case, 1 character differing:/);
+  });
+
+  it('no clear onto held text: the typed text is found in the field but for case, however long the field', async () => {
+    const message = await failureOf(fillField(transforming('Note: ', (s) => s.toUpperCase()), { id: 'notes' }, 'hi there', FAST));
+    expect(message).toMatch(/^fill: typed 8 characters but the field shows 14 — the typed text is there but for letter case, 7 characters differing:/);
+  });
+
+  it('no clear: of several runs that match but for case, the closest one is counted', async () => {
+    const fake = transforming('HELLO ', (s) => s.replace(/hello$/, 'Hello'));
+    const message = await failureOf(fillField(fake, { id: 'notes' }, 'hello', FAST));
+    expect(message).toMatch(/^fill: typed 5 characters but the field shows 11 — the typed text is there but for letter case, 1 character differing:/); // not the 5 of `HELLO`
+  });
+
+  it('with clear the field must EQUAL the value: a longer field holding it but for case is a length difference, not a case one', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => `Re: ${capitalise(s)}`), { id: 'notes' }, 'hello', { ...FAST, clear: true }));
+    expect(message).toBe('fill: typed 5 characters but the field shows 9 (content withheld from this error)');
+  });
+
+  it('a masked field with clear says it compared by length, and names no held count (the clear emptied it)', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'pw', value: '••••' })) }, 'form');
+    appendBullets(fake, 1);
+    const message = await failureOf(fillField(fake, { id: 'pw' }, 'secret', { ...FAST, clear: true }));
+    expect(message).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length)');
+  });
+
+  it('same length, more than case (autocorrect `teh` → `the`): how many characters differ', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => s.replace('teh', 'the')), { id: 'notes' }, 'teh', FAST));
+    expect(message).toBe(
+      'fill: typed 3 characters but the field shows 3 — as many characters as were typed, 2 differing: ' +
+        'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+    );
+  });
+
+  it('a length difference says the lengths alone, as before (a mask that inserts a space)', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{4})(\d)/, '$1 $2')), { id: 'notes' }, '12345', FAST));
+    expect(message).toBe('fill: typed 5 characters but the field shows 6 (content withheld from this error)');
+  });
+});
+
+/**
+ * The review of fix/r3-fill (2026-10-09) probed the hint-aware clear and the
+ * mismatch wording with shapes the first round missed (its probes A–J; the
+ * letters are kept in the test names). Each is pinned here.
+ */
+describe('fillField — the review probes of the hint-aware clear (2026-10-09)', () => {
+  it('A: a MASKED field the deletes and the typing never reach (the focus tap missed) fails as clear-twice — bullets are no hint', async () => {
+    // Stopping on the unchanged bullets let the typing go nowhere too, and the
+    // masked read-back (by length: 8 bullets for an 8-character value)
+    // reported "Filled" with the OLD password in place — the finportal
+    // `invalid_grant` class.
+    resetLayout();
+    const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'pw', value: '••••••••' })) }, 'form');
+    fake.onTap = (_id, self) => {
+      self.focused = undefined; // the tap focused nothing
+    };
+    await expect(fillField(fake, { id: 'pw' }, 'newpass1', { ...FAST, clear: true })).rejects.toThrow('fill: field still shows 8 characters after clearing twice');
+    expect(fake.deletes).toEqual([8, 8]);
+    expect(fake.typed).toEqual([]);
+  });
+
+  it('B: clear + a value EQUAL to the named placeholder, the typing dropped: the field shows the placeholder — NOT verified', async () => {
+    const { fake, real } = hintedField('Zed', { hint: 'Company', named: true });
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t); // dropped: the empty field keeps showing `Company`
+    };
+    const result = await fillField(fake, { id: 'last_name' }, 'Company', { ...FAST, clear: true });
+    expect(real()).toBe('');
+    expect(result).toMatchObject({ cleared: 3, readBack: { kind: 'placeholder' } });
+    expect(fillReply(result, 'id:last_name')).toBe(
+      "Typed 7 characters into id:last_name (cleared 3 characters first) — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
+    );
+  });
+
+  // Review round 2, probe K: deletes go from the end, so a reading that
+  // STARTED with the placeholder's text can end on it with text left.
+  it('K: a clear alone that ends on the placeholder from a reading that started with it is NOT verified — `Company` may be held text', async () => {
+    const { fake, real } = hintedField('Companyabc', { hint: 'Company', named: true });
+    const origClear = fake.clearText.bind(fake);
+    fake.clearText = async (n: number) => {
+      await origClear(3); // 3 of the 10 deletes land
+      fake.deletes.splice(-1, 1, n);
+    };
+    const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([10]);
+    expect(real()).toBe('Company'); // held, not the placeholder
+    expect(result).toMatchObject({ cleared: 10, readBack: { kind: 'placeholder' } });
+    expect(fillReply(result, 'id:last_name')).toBe(
+      "Cleared id:last_name (10 deletes sent) — NOT verified: the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
+    );
+  });
+
+  it('K, with a value: the exact read-back sees the held text under the typing, and the retry wipes it', async () => {
+    const { fake, real } = hintedField('Companyabc', { hint: 'Company', named: true });
+    const origClear = fake.clearText.bind(fake);
+    let short = 1;
+    fake.clearText = async (n: number) => {
+      if (short-- > 0) {
+        await origClear(3);
+        fake.deletes.splice(-1, 1, n);
+        return;
+      }
+      return origClear(n);
+    };
+    const result = await fillField(fake, { id: 'last_name' }, 'Acme', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([10, 11]); // the retry wipes `CompanyAcme`
+    expect(real()).toBe('Acme');
+    expect(result.readBack).toEqual({ kind: 'landed' });
+  });
+
+  it('D: no clear, the typing dropped on a field showing only its named placeholder: "did not change", never "transformed"', async () => {
+    const { fake } = hintedField('', { hint: 'Search', named: true });
+    fake.typeText = async (t: string) => void fake.typed.push(t);
+    await expect(fillField(fake, { id: 'last_name' }, 'search', FAST)).rejects.toThrow(
+      'fill: typed 6 characters but the field shows 6 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
+    );
+  });
+
+  it('a field that falls back to its named placeholder is never "the typed text but for case": the placeholder holds no text', async () => {
+    const { fake } = hintedField('Zed', { hint: 'Company', named: true });
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t);
+      if (fake.focused) fake.focused.value = 'Company'; // the app rejected the input and emptied the field
+    };
+    await expect(fillField(fake, { id: 'last_name' }, 'company', FAST)).rejects.toThrow(
+      'fill: typed 7 characters but the field shows 7 (content withheld from this error)',
+    );
+  });
+
+  it('D2: no clear, the typing dropped on a field holding text that matches the value but for case: "did not change"', async () => {
+    const fake = formFake('Hello');
+    fake.typeText = async (t: string) => void fake.typed.push(t);
+    await expect(fillField(fake, { id: 'amount_input' }, 'hello', FAST)).rejects.toThrow(
+      'fill: typed 5 characters but the field shows 5 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
+    );
+  });
+
+  it('without clear only the text typed is compared: held `HELLo` is not read as a case-transformed `hello`', async () => {
+    const fake = formFake('HELLo');
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (t: string) => origType(t.replace('hello', 'hxllo')); // autocorrect
+    await expect(fillField(fake, { id: 'amount_input' }, 'hello', FAST)).rejects.toThrow(
+      'fill: typed 5 characters but the field shows 10 — as many characters as were typed, 1 differing: ',
+    );
+  });
+
+  it('a partly masked read-back (`•••••t`, show-the-last-character) is said by its lengths only', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t);
+      if (fake.focused) fake.focused.value = '•'.repeat(t.length - 1) + t.slice(-1);
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow('fill: typed 6 characters but the field shows 6 (content withheld from this error)');
+  });
+
+  it('I: deletes that land LATE (after the first read) are not "unchanged": one more read after the poll cadence, then a verified clear', async () => {
+    const fake = formFake('abc');
+    let pending = 0;
+    let readsSince = 0;
+    fake.clearText = async (n: number) => {
+      fake.deletes.push(n);
+      pending = n;
+      readsSince = 0;
+    };
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async (...a: Parameters<FakeAdapter['uiTree']>) => {
+      if (pending > 0 && ++readsSince === 2 && fake.focused) {
+        fake.focused.value = (fake.focused.value ?? '').slice(0, -pending) || null; // lands now, a read late
+        pending = 0;
+      }
+      return real(...a);
+    };
+    const result = await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([3]);
+    expect(fillReply(result, 'id:amount_input')).toBe('Filled id:amount_input (0 characters, cleared 3 characters first)');
+  });
+
+  it('J: clear + value on an EMPTY hinted field (the headline device case): nothing claimed deleted — the deletes went into an empty field', async () => {
+    const { fake } = hintedField('');
+    const result = await fillField(fake, { id: 'last_name' }, 'Probe', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([9]);
+    expect(result).toMatchObject({ cleared: 0, clearUnchanged: { shows: 9, deletes: 9 }, readBack: { kind: 'landed' } });
+    expect(fillReply(result, 'id:last_name')).toBe('Filled id:last_name (5 characters)'); // not "cleared 9 characters first"
+  });
+
+  it('E: a short first round, then the hint (not a shortening of what was left): one more round, and the unchanged rule decides', async () => {
+    const { fake, real } = hintedField('Probe!');
+    const origClear = fake.clearText.bind(fake);
+    let short = 1;
+    fake.clearText = async (n: number) => {
+      if (short-- > 0) {
+        await origClear(3); // half the deletes land: `Pro`
+        fake.deletes.splice(-1, 1, n);
+        return;
+      }
+      return origClear(n);
+    };
+    const result = await fillField(fake, { id: 'last_name' }, 'Ann', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([6, 3, 9]); // it threw `still shows 9 characters after clearing twice` on the empty field
+    expect(real()).toBe('Ann');
+    expect(result).toMatchObject({ cleared: 6, readBack: { kind: 'landed' } });
+  });
+
+  it('a third round that still changes the field without emptying it fails, and says how many rounds', async () => {
+    const fake = formFake('abc');
+    const readings = ['Hint A', 'Hint B', 'Hint C'];
+    fake.clearText = async (n: number) => {
+      fake.deletes.push(n);
+      if (fake.focused) fake.focused.value = readings.shift() ?? null;
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true })).rejects.toThrow('fill: field still shows 6 characters after clearing 3 times');
+    expect(fake.deletes).toEqual([3, 6, 6]);
   });
 });

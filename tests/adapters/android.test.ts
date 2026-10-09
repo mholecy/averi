@@ -81,6 +81,40 @@ describe('parseUiautomatorXml', () => {
   });
 });
 
+describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: the
+  // API 33 dump of an EMPTY EditText carries its hint as `text` and no `hint`
+  // attribute (the first node below is that measured shape). A dump that
+  // names the hint gets it as the node's placeholder — on text inputs only.
+  const xml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="app" content-desc="" bounds="[0,0][1080,2220]">
+    <node index="0" text="Last name" resource-id="" class="android.widget.EditText" package="com.google.android.contacts" content-desc="" focused="true" bounds="[132,1223][948,1383]"/>
+    <node index="1" text="Search settings" hint="Search settings" resource-id="com.android.settings:id/open_search_view_edit_text" class="android.widget.EditText" package="com.android.settings" content-desc="" bounds="[0,0][1080,150]"/>
+    <node index="2" text="wifi" hint="Search settings" resource-id="app:id/filled" class="android.widget.EditText" package="app" content-desc="" bounds="[0,200][1080,350]"/>
+    <node index="3" text="Hello" hint="ignored" resource-id="app:id/label" class="android.widget.TextView" package="app" content-desc="" bounds="[0,400][1080,450]"/>
+    <node index="4" text="x" hint="" resource-id="app:id/blank_hint" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,550]"/>
+  </node>
+</hierarchy>`;
+  const [measured, hinted, filled, textView, blankHint] = parseUiautomatorXml(xml).children;
+
+  it('the measured API 33 shape: the hint is the value, and nothing says so', () => {
+    expect(measured).toMatchObject({ role: 'textfield', value: 'Last name' });
+    expect(measured).not.toHaveProperty('placeholder');
+  });
+
+  it('a dump\'s `hint` attribute rides beside the value on a text input, the value as dumped', () => {
+    expect(hinted).toMatchObject({ role: 'textfield', identifier: 'open_search_view_edit_text', value: 'Search settings', placeholder: 'Search settings' });
+    expect(filled).toMatchObject({ value: 'wifi', placeholder: 'Search settings' });
+  });
+
+  it('not on a non-input, and not when the attribute is empty', () => {
+    expect(textView).toMatchObject({ role: 'text', label: 'Hello' });
+    expect(textView).not.toHaveProperty('placeholder');
+    expect(blankHint).not.toHaveProperty('placeholder');
+  });
+});
+
 describe('AndroidAdapter interactions', () => {
   it('uiTree strips the trailing uiautomator status line', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });

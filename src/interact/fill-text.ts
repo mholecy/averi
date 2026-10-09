@@ -28,8 +28,9 @@
  * interact/scroll-text.ts, every sentence scroll_until says (its
  * `describeScrollResult` the MCP tool and the flow line both print), over
  * the typed outcome interact/scroll-rounds.ts judged. fill.ts imports this
- * module for one sentence, `caveatText` (its mismatch error names the input
- * in the same words); nothing here imports fill.ts.
+ * module for the words of the errors it throws, `fillFailureText` over the
+ * facts of the failure (fill-facts.ts#FillFailure; the mismatch error
+ * names the input in the caveat's own words); nothing here imports fill.ts.
  *
  * THE RULE for every layout here (`fillReply`, `fillStepText`, and any
  * added later, e.g. a JSON reply): take the facts, judge them first
@@ -51,7 +52,7 @@
 
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
-import type { FillResult, LostWhy } from './fill-facts.js';
+import type { Difference, FillFailure, FillResult, LostWhy } from './fill-facts.js';
 import { judgeFill, type Caveat, type FillVerdict, type Reason, type Sent } from './fill-verdict.js';
 import { INPUT_ROLE } from './input-role.js';
 
@@ -167,7 +168,7 @@ export function wordingOf(v: FillVerdict): FillWording {
   };
 }
 
-/** One caveat's sentence. Exported for fill.ts's mismatch error, which names the input the caller probably meant in the same words. */
+/** One caveat's sentence. */
 export function caveatText(c: Caveat): string {
   return (CAVEAT_SENTENCE[c.code] as (c: Caveat) => string)(c);
 }
@@ -190,6 +191,13 @@ const REASON_SENTENCE: SentenceTable<Reason> = {
   lost: (r) => `the field could not be found again${LOST_WHY_TEXT[r.why]}`,
   'clear-unmeasured': (r) => `clear sent no delete — a role ${r.role} node's length is not the field's`,
   'clear-no-length': () => 'clear sent no delete — the node gave no length to delete',
+  // The placeholder's own text is never said: it may be the typed value.
+  placeholder: () => "the field shows exactly its placeholder's text — empty, or holding that very text; the tree cannot tell which",
+  // Both causes named: the tree cannot tell an empty field showing its hint
+  // from a field that ignores deletes (FillResult.clearUnchanged).
+  'clear-unchanged': (r) =>
+    `the field still shows ${charactersText(r.shows)} that the deletes did not change — ` +
+    'its hint or placeholder (shown while empty), or a field that ignores deletes',
 };
 
 /** ` (why)` for a `lost` read-back, chosen per reason (review 2026-10-08, n-3: it read as "the selector no longer matches it" whatever the reason). */
@@ -214,4 +222,46 @@ const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
     );
   },
   'masked-append': ({ held }) => `masked field already held ${charactersText(held)} and clear is not set — typing APPENDS; pass clear: true to replace`,
+};
+
+/**
+ * The message of an error fillField throws — every one of them, worded here
+ * with the rest (fill-facts.ts#FillFailure). Lengths and counts only: no
+ * row is handed the typed value or the field's text.
+ */
+export function fillFailureText(f: FillFailure): string {
+  return (FAILURE_SENTENCE[f.code] as (f: FillFailure) => string)(f);
+}
+
+const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
+  'reread-failed': ({ target, cause }) =>
+    `fill: could not re-read ${target} after focusing it — ${cause}. ` +
+    'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
+    'xcrun simctl list), then retry with clear: true so the field is reset',
+  'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
+  mismatch: ({ typed, shows, differs, notInput }) =>
+    `fill: typed ${charactersText(typed)} but the field shows ${shows}` +
+    DIFFERENCE_TEXT[differs.kind](differs as never) +
+    (notInput === undefined ? '' : `; ${caveatText({ code: 'not-input', role: notInput.role, typed: true, input: notInput.input })}`),
+};
+
+/**
+ * What the mismatch error adds after the two lengths. Until 2026-10-09 a
+ * same-length mismatch read `typed 5 characters but the field shows 5
+ * (content withheld from this error)` — equal counts and no hint of what
+ * differs, which reads as a bug in the comparison
+ * (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-
+ * transforms-text.md). It names the kind of difference and a count, never
+ * which characters or where.
+ */
+const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { kind: K }>) => string } = {
+  masked: ({ held }) => ` (masked field — compared by length${held === undefined ? '' : `; it held ${held} after focus`})`,
+  case: ({ positions }) =>
+    ` — the typed text is there but for letter case, ${countOf(positions, 'character')} differing: ` +
+    'the app transformed the input (auto-capitalisation?); content withheld from this error',
+  'same-length': ({ positions }) =>
+    ` — as many characters as were typed, ${positions} differing: ` +
+    'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+  unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
+  length: () => ' (content withheld from this error)',
 };

@@ -2,8 +2,9 @@
  * What a fill MEASURED — the facts interact/fill.ts#fillField returns, and
  * nothing else: no I/O, no judgement, no sentence. A leaf, so that the
  * three modules that read them each import it and none imports another for
- * its types — fill.ts measures (and imports fill-text.ts for one sentence,
- * its mismatch error's), fill-verdict.ts judges, fill-text.ts says. Until
+ * its types — fill.ts measures (and imports fill-text.ts for the words of
+ * the errors it throws, `fillFailureText` over a `FillFailure` here),
+ * fill-verdict.ts judges, fill-text.ts says. Until
  * 2026-10-09 these types lived in fill.ts, which imported fill-verdict.ts
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the
@@ -67,6 +68,27 @@ export interface FillResult {
    * read as an empty field).
    */
   cleared?: number | 'unmeasured';
+  /**
+   * With `clear` only: the clear STOPPED because a round of deletes left the
+   * field's reading exactly as it was, `shows` characters long — the field
+   * was not seen empty. Either the field IS empty and shows its hint or
+   * placeholder as its value (every tree source does, measured 2026-10-09:
+   * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md),
+   * or it ignores deletes (read-only, an IME that drops them); the tree
+   * cannot tell the two apart. Until 2026-10-09 the loop threw `field still
+   * shows N characters after clearing twice` here — on every hinted stock
+   * EditText and every iOS field reporting a placeholder, after the field
+   * had in fact emptied. With a value typed after it, the exact read-back
+   * decides (a field that ignores deletes fails there); judgeFill makes it
+   * a reason only when the read-back did not land. `deletes`: every delete
+   * the clear sent, all rounds — the unchanged one included, which deleted
+   * nothing anyone saw (so when it was the FIRST round, `cleared` is 0:
+   * review of this branch, probe J — "cleared 9 characters first" of an
+   * empty hinted field). Never set on a MASKED reading: bullets are no
+   * hint, and an unchanged masked field fails as clear-twice (fill.ts,
+   * `isHint`).
+   */
+  clearUnchanged?: { shows: number; deletes: number };
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
@@ -122,11 +144,77 @@ export type LostWhy = 'screen-changed' | 'unmatched';
  *   7 characters deleted and then held the typed text was said to "expose
  *   no value": the refusal was right, the reason blamed the node.
  * - `nothing-typed`: the value was empty — a focus (and clear) alone.
+ * - `placeholder` (2026-10-09): the field's last reading is EXACTLY its
+ *   named placeholder (UiNode.placeholder) and nothing shows more — the
+ *   value typed was that very text, or a clear alone found the field
+ *   showing it and deleted nothing. Empty, or holding the text: the tree
+ *   cannot tell (review of this branch, probes B and C), so it is not
+ *   verified. A clear that deleted INTO the placeholder saw the field
+ *   empty, and is `nothing-typed`.
  */
 export type ReadBack =
   | { kind: 'landed' }
   | { kind: 'no-value' }
   | { kind: 'not-taken' }
   | { kind: 'lost'; why: LostWhy }
-  | { kind: 'nothing-typed' };
+  | { kind: 'nothing-typed' }
+  | { kind: 'placeholder' };
 
+
+/**
+ * Why a fill THREW, as facts — the three failures fillField raises, worded
+ * by interact/fill-text.ts#fillFailureText like every other fill sentence
+ * (until 2026-10-09 they were template strings inline in fill.ts, the last
+ * fill sentences outside fill-text.ts). Lengths and counts only, never
+ * content: a value may be a credential.
+ * - `reread-failed`: the tree could not be read mid-fill — a dead device,
+ *   not a screen settling (fill.ts, `refetch`); `target` is the selector as
+ *   the caller wrote it, `cause` the adapter's message.
+ * - `clear-twice`: the delete rounds each CHANGED the field and none emptied
+ *   it — deletes landing short — or a MASKED field the deletes did not
+ *   change; `left` what it still shows, `rounds` how many were sent (2, or
+ *   3 when a round's reading was not a shortening of the one before). An
+ *   unchanged non-masked round is not this: FillResult.clearUnchanged.
+ * - `mismatch`: the read-back showed text that is not the typed value
+ *   (`typed`, `shows`: the two lengths), after the clear-fill's one retry;
+ *   `differs` says what can be said of the difference without content;
+ *   `notInput` when the matched node is not an input (the nearest input,
+ *   as FillResult.notInput).
+ */
+export type FillFailure =
+  | { code: 'reread-failed'; target: string; cause: string }
+  | { code: 'clear-twice'; left: number; rounds: number }
+  | { code: 'mismatch'; typed: number; shows: number; differs: Difference; notInput?: { role: string; input: NearbyInput | 'none' | 'unread' } };
+
+/**
+ * What differs between the typed value and a read-back that did not match
+ * it, measured by fill.ts without carrying either string:
+ * - `masked`: the field shows bullets, compared by length only; `held` the
+ *   bullets it held after focus, without `clear` (undefined with it).
+ * - `case`: the typed text IS there but for letter case — at `positions`
+ *   characters (with clear the whole field; without, the best-matching run
+ *   of it). UIKit's sentence auto-capitalisation turning `hello` into
+ *   `Hello` is the measured case (2026-10-09, iOS Contacts Notes:
+ *   docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-
+ *   transforms-text.md), which read `typed 5 characters but the field shows
+ *   5` and nothing else.
+ * - `same-length`: the field shows as many characters as were typed, and
+ *   `positions` of them differ by more than case — autocorrect, smart
+ *   punctuation, a mask.
+ * - `unchanged`: the field shows exactly what it showed when typing began
+ *   — the typing did not reach it (a focus tap that missed, a field that
+ *   ignores input), or the field refused it (already at its maxLength).
+ *   Review of this branch: probes D and D2 were told "the app transformed
+ *   the input".
+ * - `length`: none of these — the lengths are all that can be said (also
+ *   a partly masked reading, `•••••t`, whose content is not comparable).
+ * Still a FAILURE in every case: a field that shows `Hello` for `hello` does
+ * not hold the value asked for (a case-sensitive login, a code), and a
+ * case-insensitive pass would hide exactly that.
+ */
+export type Difference =
+  | { kind: 'masked'; held?: number }
+  | { kind: 'case'; positions: number }
+  | { kind: 'same-length'; positions: number }
+  | { kind: 'unchanged' }
+  | { kind: 'length' };
