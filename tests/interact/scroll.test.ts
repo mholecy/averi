@@ -721,10 +721,11 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     const error = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain(
       "its centre stays under iOS's status bar at (201,36), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted: " +
-        'swiping down no longer moves it out from under the status bar — try direction: "up".',
+        'swiping down no longer moves it out from under the status bar — try direction: "up"; ' +
+        'if no direction moves it, it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.',
     );
     const up = (await scrollUntilVisible(still({ x: 24, y: 10, width: 354, height: 52 }), 'id:hero', { ...FAST, direction: 'up' }).catch((e: unknown) => e)) as Error;
-    expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down".');
+    expect(up.message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down"; if no direction moves it');
   });
 
   it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {
