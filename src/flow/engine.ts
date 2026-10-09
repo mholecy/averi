@@ -1099,7 +1099,7 @@ export class FlowEngine {
     // judged above a docked keyboard is not ⚠ on its own: the judgement
     // already excluded it, and the line says so.
     this.log(
-      result.clipped.length > 0 || result.keyboard?.state === 'unlocated' ? '⚠ scroll_until' : 'scroll_until',
+      result.clipped.length > 0 || result.covered !== undefined || result.keyboard?.state === 'unlocated' ? '⚠ scroll_until' : 'scroll_until',
       `${describeElementSpec(element)} ${describeScrollResult(result)}`,
     );
   }

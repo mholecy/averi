@@ -491,8 +491,8 @@ export interface Aim {
   moved?: string;
 }
 
-/** A cover as a sentence names it: its role, its label quoted (else its id), its rect. */
-const coverText = (n: UiNode): string =>
+/** A cover as a sentence names it — `button "Continue to summary" (24,780 354x44)`: its role, its label quoted (else its id), its rect. The tap's and `scroll_until`'s sentences (scroll-text.ts) share it. */
+export const coverText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
 
 /**

@@ -1726,6 +1726,18 @@ flows:
     expect(row?.action).toBe('⚠ scroll_until');
   });
 
+  it('a stop with part of the element under a bar the app draws over it is marked ⚠ and says so (2026-10-09)', async () => {
+    // 60 px tall at y 1900, its centre (50,1930) clear of a bar at 1940–2000 laid after it: a plain stop, its bottom covered.
+    const fake = scrollingFake(1900, 600, 60);
+    fake.live().children.push(node({ role: 'button', label: 'Continue', identifier: 'continue', rect: { x: 0, y: 1940, width: 1000, height: 60 } }));
+    const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
+    const row = trace.find((t) => t.action.endsWith('scroll_until'));
+    expect(row).toEqual({
+      action: '⚠ scroll_until',
+      detail: 'id:"submit_button" visible after 0 swipes — PARTLY UNDER button "Continue" (0,1940 1000x60), drawn over it — 67% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too',
+    });
+  });
+
   it('fully: true keeps swiping past a clipped stop until the element is entirely inside', async () => {
     const fake = scrollingFake(2580);
     const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });

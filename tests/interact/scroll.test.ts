@@ -64,6 +64,15 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
     expect(describeScrollResult(result)).toBe('fully visible after 0 swipes');
   });
 
+  it('a target under a pinned bar laid after it is not "fully visible": the driver swipes it out from under the bar (2026-10-09, the SWIFT form\'s CONTINUE)', async () => {
+    // y 1960, 40 tall, under a bar at 1950–2000 drawn after the form: one swipe (600 up) clears it.
+    const fake = scrollingFake(1960);
+    fake.live().children.push(node({ role: 'button', label: 'Continue', identifier: 'continue', rect: { x: 0, y: 1950, width: 1000, height: 50 } }));
+    const result = await scrollUntilVisible(fake, { id: 'submit_button' }, { ...FAST, fully: true });
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(fake.swipes).toHaveLength(1);
+  });
+
   it('reports the CLIPPED fraction and edges instead of a bare "visible" (the 2026-08-27 finding)', async () => {
     // 40px tall, stopping at y=1980 → half of it below the fold.
     const result = await scrollUntilVisible(scrollingFake(2580), { id: 'submit_button' }, FAST);

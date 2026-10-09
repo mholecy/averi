@@ -1,10 +1,11 @@
-import type { DeviceScreen, Rect } from '../adapters/types.js';
+import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { frameText, rectText } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
+import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError } from './resolve.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { absenceError, coverText } from './resolve.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 
 /**
  * Every sentence `scroll_until` says (2026-10-09, the scroll-rounds
@@ -77,6 +78,16 @@ export interface ScrollUntilResult {
    * may be cut. Absent otherwise.
    */
   flush?: Flush;
+  /**
+   * Set on a stop with something of the app drawn over part of the element
+   * (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-
+   * app-chrome.md) — only without `fully: true`, which does not stop so:
+   * its CENTRE is clear (the stop's own rule, scroll-rounds.ts#stops, so a
+   * tap on it lands), but `by` — the one over it drawn on top — hides part
+   * of it, and only `shows` of its area is seen. The reply says so, as it
+   * says a clip.
+   */
+  covered?: { by: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; shows: number };
 }
 
 /**
@@ -101,6 +112,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
   const { judged } = o;
   const keyboard: ScrollUntilResult['keyboard'] =
     judged.under !== undefined ? { state: 'shown', frame: judged.under.topCover } : o.unlocated ? { state: 'unlocated' } : undefined;
+  const by = judged.covers.at(-1);
   return {
     swipes: o.swipes,
     visible: judged.visible,
@@ -108,7 +120,24 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(keyboard !== undefined && { keyboard }),
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
+    ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: judged.shows } }),
   };
+}
+
+/** A share of an element, as a sentence quotes it: never rounded up to a reassuring 100 % — something is missing. */
+const percent = (fraction: number): number => Math.min(Math.round(fraction * 100), 99);
+
+/**
+ * What of the app is drawn over a judged match, for a failure: `under
+ * <cover> at its centre (x,y), drawn over it — N% of it shows` — the cover
+ * over its centre when there is one (the point the next tap presses), else
+ * the topmost of its covers.
+ */
+function underText(j: Judged): string {
+  const by = j.centreCover ?? j.covers.at(-1);
+  const centre = tapPoint(j.node);
+  const at = j.centreCover === undefined ? '' : ` at its centre (${centre.x},${centre.y})`;
+  return `under ${by === undefined ? 'something' : coverText(by)}${at}, drawn over it — ${percent(j.shows)}% of it shows`;
 }
 
 /**
@@ -121,7 +150,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
 function describeClip(edges: readonly string[], visible: number, topCover?: Rect): string {
   // Never round a clipped element up to a reassuring 100%: the whole point of
   // the line is that something is missing.
-  const pct = Math.min(Math.round(visible * 100), 99);
+  const pct = percent(visible);
   const where = topCover === undefined ? 'the viewport' : `the viewport above the soft keyboard over ${frameText(topCover)}`;
   return `CLIPPED at ${edges.join('/')}, ${pct}% of it is in ${where}`;
 }
@@ -137,15 +166,18 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   // clean `fully: true` stop (scroll-rounds.ts#round).
   const topCover = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
   const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
-  if (r.clipped.length === 0) {
+  if (r.clipped.length === 0 && r.covered === undefined) {
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
     return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}`;
   }
-  return (
-    `visible after ${n} — ${describeClip(r.clipped, r.visible, topCover)}` +
-    `. A rect assert or screenshot on this element will measure the CLIPPED box${moving}`
-  );
+  // Partly under something of the app (2026-10-09): a plain stop, its centre
+  // clear — said like a clip, and with what a measurement would take in.
+  const covered =
+    r.covered === undefined ? undefined : `PARTLY UNDER ${coverText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
+  const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
+  const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
+  return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}`;
 }
 
 /**
@@ -221,6 +253,17 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // does not resize for it keeps its last rows under it. Said as such,
       // with how to hide it; the layout-defect wording only when the
       // keyboard is not the edge in question.
+      // Not clipped, so under something of the app (2026-10-09,
+      // scroll-rounds.ts#stops) that stays over it at the end of the
+      // content: no clearance for a pinned bar.
+      if (judged.clipped.length === 0) {
+        return new Error(
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
+            `swiping ${o.lastStroke} no longer moves it. The app draws that over it at the end of the content — a layout defect ` +
+            `(no clearance for a pinned bar?), not a scroll that needs more swipes. ` +
+            `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+        );
+      }
       if (judged.under !== undefined && judged.clipped.includes('bottom')) {
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
@@ -306,6 +349,10 @@ function shortText(short: Shortfall): string {
     case 'clipped': {
       const { judged } = short;
       return `element reached the viewport but stayed ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)} (last rect ${JSON.stringify(judged.node.rect)})`;
+    }
+    case 'covered': {
+      const { judged } = short;
+      return `element reached the viewport but stayed ${underText(judged)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'absent':
       return 'element never appeared in the tree';

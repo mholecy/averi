@@ -58,6 +58,11 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * a scroll container with no clearance for the floating bottom-nav bar can
  * never fully reveal its last row, however far it scrolls. Default stays
  * `false`: the stop condition is unchanged, only the REPORT gains the truth.
+ * Since 2026-10-09 both bars also count what the app draws over the element
+ * (scroll-rounds.ts#stops, docs/bugs/2026-10-08-tap-and-scroll-until-
+ * ignore-pinned-app-chrome.md): `fully: true` with nothing drawn over any of
+ * it, the default with nothing drawn over its centre — the point the next
+ * tap presses.
  *
  * Every match is judged, not only the actionable one: an id can sit on a
  * container and its child, and the MOST revealed of the two is the honest

@@ -1145,3 +1145,90 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     expect(error.message).toMatch(/did not move it: they touched down at 540,1104 on container "Account" at 0,825 1080x400, drawn over the list 0,825 1080x1395, which may have taken them \(else: content exhausted\)\)/);
   });
 });
+
+/**
+ * A target under the app's own chrome (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md):
+ * a node drawn over it in the tree (ui-tree/draw-order.ts#exposure) is not visible. Measured on mp-native's SWIFT form
+ * (iPhone 17, both tree sources): `priority_select` at `24,771 354x52`, its centre on the CONTINUE bar `24,780 354x44`, was
+ * "fully visible after 0 swipes". Owner decisions: `fully: true` — a target partly under chrome is not fully visible, keep
+ * scrolling, and fail naming the cover when that cannot help; without `fully` — keep scrolling until its centre is
+ * clear, so the next tap agrees.
+ */
+describe('round — a target under the app\'s chrome (2026-10-09)', () => {
+  const CONTINUE_RECT: Rect = { x: 24, y: 780, width: 354, height: 44 };
+  const CONTINUE = node({ role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: CONTINUE_RECT });
+  /** A read of the form with `priority_select` at y, the bar drawn over the rest of the screen. */
+  const form = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [CONTINUE] });
+  const COVER = 'button "Continue to summary" (24,780 354x44)';
+
+  it('fully: true — the measured rest position is not fully visible: the scroll goes on, and stops once nothing is drawn over the row', () => {
+    const played = play({ ...IPHONE, fully: true }, [form(771), form(500), form(500)]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('fully: true — a row whose centre is clear but whose bottom is still under the bar is not fully visible either', () => {
+    const played = play({ ...IPHONE, fully: true }, [form(740), form(400), form(400)]);
+    expect(played.steps[0].do).toBe('stroke');
+  });
+
+  it('without fully — the centre decides: on the bar (771, 754), the scroll goes on; clear of it (740, its bottom still under the bar), it stops', () => {
+    const played = play(IPHONE, [form(771), form(754), form(740), form(740)]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stroke', 'confirm', 'stop']);
+    const result = resultOf(played);
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], covered: { by: { role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: CONTINUE_RECT }, shows: 40 / 52 } });
+    // Never "fully visible": the reply says what is over it, as it says a clip.
+    expect(describeScrollResult(result)).toBe(
+      `visible after 2 swipes — PARTLY UNDER ${COVER}, drawn over it — 77% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too`,
+    );
+    // At rest with its centre clear, no swipe at all — as before.
+    expect(play(IPHONE, [form(740)]).steps.map((st) => st.do)).toEqual(['stop']);
+  });
+
+  it('a row no swipe moves from under the bar (the end of the content): stuck, naming the bar — fully or not', () => {
+    for (const fully of [true, false]) {
+      const played = play({ ...IPHONE, fully }, [form(771), form(771), form(771)]);
+      expect(played.outcome?.kind).toBe('stuck');
+      expect(failureOf(played, 'id:priority').message).toBe(
+        `scroll_until id:priority failed after 2 swipes — element is in the viewport but under ${COVER} at its centre (201,797), drawn over it — 17% of it shows — ` +
+          'and the content is exhausted: swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect ' +
+          '(no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {"x":24,"y":771,"width":354,"height":52} in a 402x874 viewport',
+      );
+    }
+  });
+
+  it('fully: true, the centre clear and only an edge under the bar: stuck names the bar without a centre', () => {
+    const played = play({ ...IPHONE, fully: true }, [form(740), form(740), form(740)]);
+    expect(failureOf(played, 'id:priority').message).toContain(`element is in the viewport but under ${COVER}, drawn over it — 77% of it shows — and the content is exhausted`);
+  });
+
+  it('the bound (maxSwipes, timeout) with the row under the bar names the bar as what it was short of', () => {
+    const moving = [form(771), form(772), form(773)];
+    expect(failureOf(play({ ...IPHONE, maxSwipes: 2 }, moving), 'id:priority').message).toBe(
+      `scroll_until id:priority failed after 2 swipes (maxSwipes) — element reached the viewport but stayed under ${COVER} at its centre (201,799), drawn over it — 15% of it shows (last rect {"x":24,"y":773,"width":354,"height":52})`,
+    );
+    const late = play({ ...IPHONE, fully: true }, [form(771), { ...form(772), elapsedMs: 2_000 }]);
+    expect(failureOf(late, 'id:priority').message).toBe(
+      `scroll_until id:priority failed after 2000ms (timeout) — element reached the viewport but stayed under ${COVER} at its centre (201,798), drawn over it — 15% of it shows (last rect {"x":24,"y":772,"width":354,"height":52})`,
+    );
+  });
+
+  it('of two matches, the one more of which shows is judged: a duplicate under the bar does not hold a stop the other makes', () => {
+    const played = play({ ...IPHONE, fully: true }, [{ found: [match({ x: 24, y: 771, width: 354, height: 52 }, 'priority'), match({ x: 24, y: 300, width: 354, height: 52 }, 'priority')], over: [CONTINUE] }]);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
+  it('a plain stop both clipped and partly under a bar says both, the clip first', () => {
+    const by = { role: 'button', label: 'Continue to summary', identifier: null, rect: CONTINUE_RECT };
+    expect(describeScrollResult({ swipes: 1, visible: 0.5, clipped: ['bottom'], covered: { by, shows: 0.3 } })).toBe(
+      `visible after 1 swipe — CLIPPED at bottom, 50% of it is in the viewport; PARTLY UNDER ${COVER}, drawn over it — 30% of it shows, its centre clear. ` +
+        'A rect assert or screenshot on this element will measure the CLIPPED box',
+    );
+  });
+
+  it('a bar under the soft keyboard is no cover: the round judges above the band, and what is drawn below it does not count', () => {
+    const BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
+    const played = play({ ...IPHONE, fully: true }, [{ ...form(400), cover: coverOver(BAND, NO_BACK) }]);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+});
