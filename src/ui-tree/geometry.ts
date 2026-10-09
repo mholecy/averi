@@ -538,29 +538,33 @@ export function clippedEdges(
 }
 
 /**
- * Each node's nearest ancestor that CLIPS it — the nearest node marked
- * `clipsDescendants` above it (adapters/types.ts#UiNode.clipsDescendants:
- * Android's `scrollable="true"`, whose descendants' bounds uiautomator has
- * already cut to it) — as that ancestor's rect; `undefined` for a node with
- * none, which is every node of an iOS tree (2026-10-09). One walk of the
- * tree when called; the answer is a lookup by node identity, so it is
- * asked of nodes of THIS tree (a node of another read answers undefined).
- * `scroll_until` hands the round each match's (interact/scroll.ts), to tell
- * a `fully: true` stop whose edge sits exactly on its scroll container's —
- * possibly cut there — from one inside it (interact/scroll-rounds.ts
- * #PROBE_REACH). Nearest, not outermost: a row in a list nested in a
- * scrolling page is cut by the list first. Cost: one pre-order walk and a
- * Map entry per clipped node.
+ * Each node's ancestors that CLIP it — every node marked `clipsDescendants`
+ * above it (adapters/types.ts#UiNode.clipsDescendants: Android's
+ * `scrollable="true"`, whose descendants' bounds uiautomator has already
+ * cut to it), NEAREST FIRST, as their rects; empty for a node with none,
+ * which is every node of an iOS tree (2026-10-09). One walk of the tree
+ * when called; the answer is a lookup by node identity, so it is asked of
+ * nodes of THIS tree (a node of another read answers empty). `scroll_until`
+ * hands the round each match's (interact/scroll.ts), to tell a `fully:
+ * true` stop whose edge sits exactly on a clipping ancestor's — possibly
+ * cut there — from one inside them all (interact/scroll-rounds.ts
+ * #PROBE_REACH), and to pick the box its strokes are drawn in. The whole
+ * chain, not the nearest alone (code review of fix/r3-scroll, 2026-10-09):
+ * a card that fills a horizontal carousel's height is flush with BOTH of
+ * the carousel's edges — one probe cannot tell — while the carousel itself
+ * is cut by the vertical list around it, and the card's rect with it; the
+ * cut is on the outer edge, and the outer list is the one to stroke. Cost:
+ * one pre-order walk and an array per clipped node, shared along a branch.
  */
-export function scrollerOf(tree: UiNode): (node: UiNode) => Rect | undefined {
-  const nearest = new Map<UiNode, Rect>();
-  const walk = (n: UiNode, scroller: Rect | undefined): void => {
-    if (scroller !== undefined) nearest.set(n, scroller);
-    const below = n.clipsDescendants === true ? n.rect : scroller;
+export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
+  const chains = new Map<UiNode, readonly Rect[]>();
+  const walk = (n: UiNode, chain: readonly Rect[]): void => {
+    if (chain.length > 0) chains.set(n, chain);
+    const below = n.clipsDescendants === true ? [n.rect, ...chain] : chain;
     for (const child of n.children) walk(child, below);
   };
-  walk(tree, undefined);
-  return (node) => nearest.get(node);
+  walk(tree, []);
+  return (node) => chains.get(node) ?? [];
 }
 
 /**

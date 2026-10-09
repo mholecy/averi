@@ -444,8 +444,9 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
     const [probe] = fake.swipes;
     expect(probe.to.y).toBeGreaterThan(probe.from.y); // the finger moves DOWN — content up, toward the cut — though the caller's direction is down
     expect(probe.from.y).toBeGreaterThanOrEqual(242); // touched down on the form, not the bar
-    expect(probe).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 850 } }); // a quarter of the form's 1042-px stroke
-    expect(fake.rowRect('Fees')).toEqual({ x: 0, y: 452, width: 1080, height: 143 });
+    // A quarter of the form's 1042-px stroke, 261 px, capped at 0.08 of the 2220-px side (PROBE_MAX_TRAVEL_FRACTION): 177.
+    expect(probe).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 766 } });
+    expect(fake.rowRect('Fees')).toEqual({ x: 0, y: 368, width: 1080, height: 143 });
   });
 
   it('a row at the fold of Settings\' list (no chrome below it, read 31 px of 198): probed toward the bottom and revealed', async () => {
@@ -517,7 +518,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
     const error = await scrollUntilVisible(fake, 'text:"row_40"', { fully: true, maxSwipes: 6, timeoutMs: 15_000, settleMs: 1 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect((error as Error).message).toBe(
-      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, or the swipes were not taken) — element never appeared in the tree',
+      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
     );
   });
 
@@ -526,5 +527,37 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
     await scrollUntilVisible(fake, 'text:"Display"', { maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(fake.swipes.every((st) => st.durationMs === undefined)).toBe(true);
+  });
+});
+
+describe('scrollUntilVisible — nested clipping containers and a loading list (code review of fix/r3-scroll, 2026-10-09)', () => {
+  const LIST: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
+  /** A list holding a horizontal carousel cut by the list's bottom to `strip` px, a card in it flush with its bottom. */
+  function carouselTree(strip: number): UiNode {
+    const card = node({ role: 'button', identifier: 'card', rect: { x: 40, y: 1978 - strip + 4, width: 600, height: strip - 4 } });
+    const carousel = node({ role: 'scrollable', identifier: 'carousel', rect: { x: 0, y: 1978 - strip, width: 1080, height: strip }, clipsDescendants: true, children: [card] });
+    const list = node({ role: 'container', identifier: 'list', rect: { ...LIST }, clipsDescendants: true, children: [carousel] });
+    return node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [list] });
+  }
+
+  it.each([30, 78])('a card in a carousel cut to a %i-px strip: the probe is drawn over the list, a real stroke (177 px), never an 18-px tap on the card', async (strip) => {
+    const fake = new FakeAdapter({ s: carouselTree(strip) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    const result = await scrollUntilVisible(fake, 'id:card', { ...FAST, fully: true });
+    expect(fake.swipes).toEqual([{ from: { x: 540, y: 1631 }, to: { x: 540, y: 1454 } }]); // the list's lower touch-down, finger up 177
+    expect(result.flush?.checked).toBe(true); // the static fake moves nothing: accepted, after a stroke that could have moved it
+  });
+
+  it('a list still loading its next page (a spinner below the last row) is not called exhausted after two strokes — the scroll runs to its bound', async () => {
+    const SETTINGS: Rect = { x: 0, y: 737, width: 1080, height: 1417 };
+    const rows = Array.from({ length: 20 }, (_, i) => `row_${i}`);
+    const fake = new LazyList(rows, 198, SETTINGS, { offset: 10_000 });
+    const read = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      const tree = await read();
+      return { ...tree, children: [...tree.children, node({ role: 'progress', rect: { x: 500, y: 2100, width: 80, height: 80 } })] };
+    };
+    const error = await scrollUntilVisible(fake, 'text:"row_40"', { maxSwipes: 4, timeoutMs: 5_000, settleMs: 1 }).catch((e: unknown) => e);
+    expect((error as Error).message).toContain('failed after 4 swipes (maxSwipes)');
   });
 });

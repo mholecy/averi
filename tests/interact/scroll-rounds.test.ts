@@ -51,7 +51,7 @@ const reads = (ys: readonly number[], at: (y: number) => UiNode, extra: Row = {}
 describe('round — the protocol', () => {
   it('an ask leaves the state as it came in, and the same seen with the answer goes on', () => {
     const state = startRounds({ ...ANDROID, fully: true }, ANDROID.screen);
-    const seen = { read: { found: [formRow(1906)], cover: UP_IME, ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0 };
+    const seen = { read: { found: [formRow(1906)], cover: UP_IME, ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0 };
     const asked = round(state, seen);
     expect(asked).toEqual({ state, step: { do: 'ask', what: 'witness' } });
     expect(round(state, { ...seen, corroborated: true }).step).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
@@ -59,13 +59,13 @@ describe('round — the protocol', () => {
 
   it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
     const state = startRounds(ANDROID, ANDROID.screen);
-    const off = { read: { found: [formRow(2900)], ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0 };
+    const off = { read: { found: [formRow(2900)], ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0 };
     expect(() => round(state, { ...off, drawn: STROKE })).toThrow('none asked for');
     const stroked = round(state, off).state;
     expect(() => round(stroked, off)).toThrow('without the stroke drawn');
-    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0, drawn: STROKE });
+    const stopped = round(stroked, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0, drawn: STROKE });
     expect(stopped.step.do).toBe('confirm');
-    const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollerOf: () => undefined }, elapsedMs: 0 });
+    const done = round(stopped.state, { read: { found: [formRow(500)], ofKeyboard: () => false, scrollersOf: () => [] }, elapsedMs: 0 });
     expect(done.step.do).toBe('stop');
     expect(() => round(done.state, off)).toThrow('after the scroll stopped');
   });
@@ -484,7 +484,8 @@ describe('round — after the device check', () => {
   });
 
   it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', () => {
-    const field = lastField({ x: 66, y: 1769, width: 948, height: 0 });
+    // An unchanged tree too (code review: without a fingerprint the whole-tree rule could not fire here, so it did not prove the match rule's).
+    const field: Row = { ...lastField({ x: 66, y: 1769, width: 948, height: 0 }), fingerprint: 'f' };
     expect(failureOf(play(ANDROID, [field, field, field, field, field]), 'id:my_note_input').message).toMatch(/failed after 4 swipes \(maxSwipes\)/);
   });
 
@@ -603,14 +604,14 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   it('the measured Fees row, cut by the top bar to {y:242, height:92}, with the DEFAULT direction down: probed TOWARD the top edge (content up), inside the container — never stroked away', () => {
     // At rest the row starts 51 px above 242; the probe moves the content down 260 px: the row reads whole at 451.
     const played = play(FULLY_ANDROID, [formRead(242, 92), formRead(451), formRead(451)]);
-    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'up', reach: 0.25, within: FORM, probe: true });
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'up', reach: 0.25, within: FORM, probe: true, maxTravel: 177 });
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] }); // no flush left: the row is whole
   });
 
   it('the measured Priority row, cut by CONTINUE to {y:1846, height:132}: probed toward the bottom edge (content down)', () => {
     const played = play(FULLY_ANDROID, [formRead(1846, 132), formRead(1586), formRead(1586)]);
-    expect(probeOf(played)).toEqual([{ do: 'stroke', toward: 'down', reach: 0.25, within: FORM, probe: true }]);
+    expect(probeOf(played)).toEqual([{ do: 'stroke', toward: 'down', reach: 0.25, within: FORM, probe: true, maxTravel: 177 }]);
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
   });
 
@@ -701,10 +702,10 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     const row: Row = { found: [match({ x: 66, y: 1300, width: 948, height: 98 })], scroller: RESIZED, cover: UP_IME };
     const played = play(FULLY_ANDROID, [row, { ...row, found: [match({ x: 66, y: 1100, width: 948, height: 143 })] }, { ...row, found: [match({ x: 66, y: 1100, width: 948, height: 143 })] }]);
     expect(played.rounds[0].asks).toEqual(['witness']);
-    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, coverTop: 1398, within: RESIZED, probe: true });
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, coverTop: 1398, within: RESIZED, probe: true, maxTravel: 177 });
     // Denied: the probe is drawn over the container whole.
     const denied = play(FULLY_ANDROID, [{ ...row, corroborated: false }, row]);
-    expect(denied.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, within: RESIZED, probe: true });
+    expect(denied.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, within: RESIZED, probe: true, maxTravel: 177 });
   });
 });
 
@@ -774,7 +775,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
     expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
     const error = failureOf(played, 'id:transactions.list.row_40');
     expect(error.message).toBe(
-      'scroll_until id:transactions.list.row_40 failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, or the swipes were not taken) — element never appeared in the tree',
+      'scroll_until id:transactions.list.row_40 failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
     );
     expect(error).toBeInstanceOf(ElementNotFoundError);
   });
@@ -796,5 +797,81 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
   it('a target IN the tree off the frame keeps the match rule\'s words ("did not move it"), whatever the tree', () => {
     const row = (fingerprint: string): Row => ({ found: [formRow(2900)], fingerprint });
     expect(failureOf(play(ANDROID, [row('a'), row('a'), row('a')]), 'id:t').message).toMatch(/the last 2, swiping down, did not move it/);
+  });
+});
+
+describe('round — the flush check across nested clipping containers, and a probe that may have been a tap (code review of fix/r3-scroll, 2026-10-09)', () => {
+  const FULLY_ANDROID: Rules = { ...ANDROID, fully: true };
+  /** The vertical list, `[0,242][1080,1978]`. */
+  const LIST: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
+  /** A horizontal carousel 400 px tall whose top is `strip` px above the list's bottom: read cut to the strip. */
+  const carousel = (strip: number): Rect => ({ x: 0, y: 1978 - strip, width: 1080, height: strip });
+  /** A card in it, x 40 600 wide, read from `top` to the strip's bottom. */
+  const card = (top: number): UiNode => match({ x: 40, y: top, width: 600, height: 1978 - top }, 'card');
+
+  it.each([30, 78])('a card cut with its carousel to a %i-px strip by the list\'s bottom: probed toward the bottom, over the LIST — the strip has no room for a stroke (it would be a tap on the card)', (strip) => {
+    // The card shorter than the carousel: flush with the carousel's bottom only — the nearest ancestor flush on one edge.
+    const row: Row = { found: [card(1978 - strip + 4)], scrollers: [carousel(strip), LIST] };
+    const played = play(FULLY_ANDROID, [row, row]);
+    expect(played.steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, within: LIST, probe: true, maxTravel: 177 });
+    expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: carousel(strip), checked: true });
+  });
+
+  it('a card that FILLS its carousel\'s height (flush with both its edges), the carousel cut by the list to 78 of 400 px: probed against the list it is cut by — not "fully visible after 0 swipes"', () => {
+    const row: Row = { found: [card(1900)], scrollers: [carousel(78), LIST] };
+    const played = play(FULLY_ANDROID, [row, row]);
+    expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down', within: LIST, probe: true });
+    expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: LIST, checked: true });
+  });
+
+  it('the strokes toward the target too are drawn over its first clipping ancestor with room for one: the list, not the carousel strip it was read in', () => {
+    // Read in the strip but not judged in the frame (no area left of it): the scroll strokes on.
+    const row: Row = { found: [match({ x: 40, y: 1978, width: 600, height: 0 }, 'card')], scrollers: [carousel(30), LIST] };
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 1 }, [row, row]).steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 1, within: LIST });
+  });
+
+  it('exempt only when flush with BOTH edges of every clipping ancestor (it fills them all)', () => {
+    const row: Row = { found: [card(1900)], scrollers: [carousel(78), carousel(78)] };
+    expect(play(FULLY_ANDROID, [row]).steps.map((st) => st.do)).toEqual(['stop']);
+  });
+
+  it('no ancestor with room for a stroke: the probe names none, and is drawn over the screen box', () => {
+    const row: Row = { found: [card(1950)], scrollers: [carousel(30)] };
+    expect(play(FULLY_ANDROID, [row, row]).steps[0]).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, probe: true, maxTravel: 177 });
+  });
+
+  it('a probe drawn shorter than twice TOUCH_SLOP (a tap?) that moved nothing is reported NOT checked — never "nothing of it is cut there"', () => {
+    const LIST_TOP = formLikeRow(242);
+    const tap = { from: { x: 540, y: 1972 }, to: { x: 540, y: 1954 } }; // 18 px — the review's reproduction
+    const played = play(FULLY_ANDROID, [LIST_TOP, { ...LIST_TOP, drawn: tap }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stop']);
+    const result = resultOf(played);
+    expect(result.flush).toEqual({ edge: 'top', container: LIST, checked: false });
+    expect(describeScrollResult(result)).toMatch(/no swipe or time was left to check it|it may be cut there/);
+  });
+
+  /** A row at `y` in LIST. */
+  function formLikeRow(y: number): Row {
+    return { found: [match({ x: 66, y, width: 948, height: 143 }, 'row')], scroller: LIST };
+  }
+
+  it('the probe\'s travel is capped at 0.08 of the screen\'s long side (pull-to-refresh: PROBE_MAX_TRAVEL_FRACTION) — 204 on a 1600x2560 tablet', () => {
+    const TABLET: Rules = { ...FULLY_ANDROID, screen: { width: 1600, height: 2560 } };
+    expect(play(TABLET, [formLikeRow(242), formLikeRow(242)]).steps[0]).toMatchObject({ probe: true, maxTravel: 204 });
+  });
+
+  it('a probe toward the top that drops the target from the tree: the next stroke goes back DOWN — the way the probe moved the content is what it left by — though the caller\'s direction is up', () => {
+    const played = play({ ...FULLY_ANDROID, direction: 'up', maxSwipes: 2 }, [formLikeRow(242), { found: [], scroller: LIST }, { found: [] }]);
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [[st.toward, st.probe === true]] : []))).toEqual([
+      ['up', true],
+      ['down', false],
+    ]);
+  });
+
+  it('a list still loading its next page — a spinner, the tree otherwise unchanged — is not called exhausted; the sentence names loading among the causes when no spinner shows', () => {
+    const spinning: Row = { found: [], fingerprint: 'same', loading: true };
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 4 }, [spinning, spinning, spinning, spinning, spinning]).outcome).toMatchObject({ by: { of: 'maxSwipes' } });
+    const still: Row = { found: [], fingerprint: 'same' };
+    expect(failureOf(play({ ...FULLY_ANDROID, maxSwipes: 4 }, [still, still, still]), 'id:row').message).toMatch(/did not change the screen: content exhausted, still loading, or the swipes were not taken/);
   });
 });

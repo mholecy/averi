@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { dragMs, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, MIN_DRAG_MS, MIN_STROKE_BOX, strokeBox, MIN_STROKE_FRACTION, sameStroke, screenBox, scrollStroke, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -357,5 +357,24 @@ describe('dragMs — a stroke\'s duration at the adapter\'s drag speed (2026-10-
   });
   it(`never under MIN_DRAG_MS (${MIN_DRAG_MS}, Android's own default): a probe or a halved stroke is not sent faster than before`, () => {
     expect(dragMs({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } }, 0.45, PIXEL_3A)).toBe(300);
+  });
+});
+
+describe('strokeBox and the travel cap — no stroke that is a tap (code review of fix/r3-scroll, 2026-10-09)', () => {
+  const BOX = { x: 0, y: 0, width: 1080, height: 2220 };
+  it(`a box under MIN_STROKE_BOX (${MIN_STROKE_BOX}) along the stroke is no stroke box — 60 % of it is under twice TOUCH_SLOP — and scrollStroke falls back to the screen`, () => {
+    expect(MIN_STROKE_BOX).toBe(80);
+    const strip = { x: 0, y: 1948, width: 1080, height: 30 };
+    expect(strokeBox(BOX, strip, 'down')).toBeUndefined();
+    expect(strokeBox(BOX, { ...strip, y: 1898, height: 80 }, 'down')).toEqual({ ...strip, y: 1898, height: 80 });
+    expect(strokeBox(BOX, strip, 'left')).toEqual(strip); // 1080 wide: room for a sideways stroke
+    expect(scrollStroke(BOX, { toward: 'down', reach: 0.25, within: strip })).toEqual(scrollStroke(BOX, { toward: 'down', reach: 0.25 }));
+    // Above a keyboard, only the part above it counts.
+    expect(strokeBox(BOX, { x: 0, y: 1300, width: 1080, height: 600 }, 'down', 1350)).toBeUndefined();
+  });
+  it('maxTravel caps the finger\'s travel, the touch-down kept, never under twice TOUCH_SLOP', () => {
+    const list = { x: 0, y: 242, width: 1080, height: 1736 };
+    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: list, maxTravel: 177 })).toEqual({ from: { x: 540, y: 589 }, to: { x: 540, y: 766 } });
+    expect(scrollStroke(BOX, { toward: 'up', reach: 0.25, within: list, maxTravel: 10 }).to.y).toBe(589 + 52); // the 3 %-of-side floor, 52 px
   });
 });

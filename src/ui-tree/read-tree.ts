@@ -314,3 +314,18 @@ export function treeFingerprint(tree: UiNode): string {
   }
   return h.toString(16).padStart(8, '0');
 }
+
+/**
+ * The tree shows a progress indicator: a `progress` node with area —
+ * Android's ProgressBar (adapters/android.ts's role map), which a Compose
+ * CircularProgressIndicator / LinearProgressIndicator also dumps as (its
+ * progress-range semantics give the node that class name). A spinner keeps
+ * a fixed rect and no text, so `treeFingerprint` reads a loading screen as
+ * unchanged; `scroll_until` asks this so a list still loading its next
+ * page is not called exhausted (code review of fix/r3-scroll, 2026-10-09).
+ * One walk.
+ */
+export function showsProgress(tree: UiNode): boolean {
+  for (const n of everyNode(tree)) if (n.role === 'progress' && n.rect.width > 0 && n.rect.height > 0) return true;
+  return false;
+}

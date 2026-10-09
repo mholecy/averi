@@ -30,12 +30,16 @@ export interface Row {
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`; default: no node is the keyboard's. */
   ofKeyboard?: (node: UiNode) => boolean;
-  /** Every match's clipping scroll container (geometry.ts#scrollerOf); default none — an iOS tree, or a match with no clipping ancestor. */
+  /** Every match's nearest clipping scroll container — shorthand for `scrollers: [scroller]`. */
   scroller?: Rect;
+  /** Every match's clipping ancestors, nearest first (geometry.ts#scrollersOf); default none — an iOS tree, or a match with no clipping ancestor. */
+  scrollers?: readonly Rect[];
   /** The tree's largest clipping container (geometry.ts#largestScroller); default none. */
   mainScroller?: Rect;
   /** The whole tree's fingerprint (read-tree.ts#treeFingerprint); default none — the whole-tree exhaustion never fires. */
   fingerprint?: string;
+  /** The tree shows a progress node (read-tree.ts#showsProgress); default false. */
+  loading?: boolean;
   /** The answer to `ask witness` (the reading's `corroborated()`); default true. */
   corroborated?: boolean;
   /** The answer to `ask unlocated` (the reading's `unlocated()`); default false. */
@@ -51,15 +55,20 @@ const DIR: Record<Direction, number> = { up: 1, down: 2, left: 3, right: 4 };
 
 /**
  * The stroke a row hands back when it names none: points built from the
- * step's own shape — its cover cut, its reach, its direction — so two strokes
- * are the same stroke (swipe.ts#sameStroke) exactly when the driver's would
- * be: on one screen the driver's points are a function of those three and
- * nothing else (review round 1 of the deepening: a constant made every
- * stroke "the same", an identity the driver cannot produce).
+ * step's own shape — its cover cut, its reach, its direction, its box and
+ * travel cap — so two strokes are the same stroke (swipe.ts#sameStroke)
+ * exactly when the driver's would be: on one screen the driver's points are
+ * a function of those and nothing else (review round 1 of the deepening: a
+ * constant made every stroke "the same", an identity the driver cannot
+ * produce). Always longer than twice TOUCH_SLOP, as the driver's are on a
+ * real screen: a row that means a shorter one hands it in `drawn`.
  */
 export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => ({
   from: { x: 0, y: step.coverTop ?? -1 },
-  to: { x: step.reach, y: DIR[step.toward] },
+  to: {
+    x: Math.round(step.reach * 1000) + (step.maxTravel ?? 0) + (step.within === undefined ? 0 : step.within.y * 10_000 + step.within.height * 100_000_000),
+    y: DIR[step.toward] * 1000,
+  },
 });
 
 type Step = Exclude<RoundStep, { do: 'ask' }>;
@@ -86,7 +95,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       read:
         row.error !== undefined
           ? { error: new Error(row.error) }
-          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollerOf: () => row.scroller, ...(row.mainScroller && { mainScroller: row.mainScroller }), ...(row.fingerprint !== undefined && { fingerprint: row.fingerprint }), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
+          : { found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), scrollersOf: () => row.scrollers ?? (row.scroller !== undefined ? [row.scroller] : []), ...(row.mainScroller && { mainScroller: row.mainScroller }), ...(row.fingerprint !== undefined && { fingerprint: row.fingerprint }), ...(row.loading === true && { loading: true }), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };

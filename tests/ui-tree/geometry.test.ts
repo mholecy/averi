@@ -10,7 +10,7 @@ import {
   rectsOverlap,
   sameRect,
   sameRectWithinPixel,
-  scrollerOf,
+  scrollersOf,
   largestScroller,
   shadowing,
 } from '../../src/ui-tree/geometry.js';
@@ -468,23 +468,23 @@ describe('rect equality — one owner, two questions (code review of round 2, 20
   });
 });
 
-describe('scrollerOf — each node\'s nearest clipping ancestor (2026-10-09)', () => {
+describe('scrollersOf — each node\'s clipping ancestors, nearest first (2026-10-09)', () => {
   const rect = (y: number, height: number) => ({ x: 0, y, width: 1080, height });
   const leaf = (y: number) => ({ role: 'text', label: 'r', identifier: null, value: null, rect: rect(y, 100), children: [] });
-  it('the nearest marked ancestor\'s rect — an inner list before the page around it; none above the outermost, none for the scroller itself', () => {
+  it('the marked ancestors\' rects, the nearest first — an inner list before the page around it; none for the outermost scroller or a node outside', () => {
     const inInner = leaf(600);
     const inOuter = leaf(300);
     const inner = { role: 'scrollable', label: null, identifier: 'inner', value: null, rect: rect(500, 400), children: [inInner], clipsDescendants: true as const };
     const outer = { role: 'container', label: null, identifier: 'page', value: null, rect: rect(242, 1736), children: [inOuter, inner], clipsDescendants: true as const };
     const bare = leaf(2000);
     const root = { role: 'container', label: null, identifier: null, value: null, rect: rect(0, 2220), children: [outer, bare] };
-    const of = scrollerOf(root);
-    expect(of(inInner)).toEqual(rect(500, 400));
-    expect(of(inOuter)).toEqual(rect(242, 1736));
-    expect(of(inner)).toEqual(rect(242, 1736));
-    expect(of(outer)).toBeUndefined();
-    expect(of(bare)).toBeUndefined();
-    expect(of(leaf(600))).toBeUndefined(); // a node of another read
+    const of = scrollersOf(root);
+    expect(of(inInner)).toEqual([rect(500, 400), rect(242, 1736)]);
+    expect(of(inOuter)).toEqual([rect(242, 1736)]);
+    expect(of(inner)).toEqual([rect(242, 1736)]);
+    expect(of(outer)).toEqual([]);
+    expect(of(bare)).toEqual([]);
+    expect(of(leaf(600))).toEqual([]); // a node of another read
   });
 });
 

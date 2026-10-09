@@ -1,6 +1,6 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { readTreeOrError, treeFingerprint } from '../ui-tree/read-tree.js';
-import { largestScroller, scrollerOf } from '../ui-tree/geometry.js';
+import { readTreeOrError, showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
+import { largestScroller, scrollersOf } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
@@ -203,10 +203,10 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * uiautomator cuts each node's bounds to its scroll container, so a row
  * half behind a pinned bar read whole and `fully: true` said "fully visible
  * after 0 swipes". Each round hands the reducer every match's nearest
- * clipping ancestor (ui-tree/geometry.ts#scrollerOf, over the
+ * clipping ancestors (ui-tree/geometry.ts#scrollersOf, over the
  * `clipsDescendants` the parser sets), and a `fully: true` stop flush with
- * it is answered with one short probe toward that edge, drawn over the
- * container (scroll-rounds.ts#PROBE_REACH has the rule and its cost;
+ * one of them is answered with one short probe toward that edge, drawn over
+ * a container with room for it (scroll-rounds.ts#PROBE_REACH has the rule and its cost;
  * swipe.ts#scrollStroke the box). Only the box comes from here.
  *
  * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
@@ -271,8 +271,9 @@ export async function scrollUntilVisible(
         read: {
           found,
           ofKeyboard: reading.ofKeyboard,
-          scrollerOf: scrollerOf(tree),
+          scrollersOf: scrollersOf(tree),
           fingerprint: treeFingerprint(tree),
+          loading: showsProgress(tree),
           ...(mainScroller !== undefined && { mainScroller }),
           ...(screen !== undefined && { screen }),
           ...(cover !== undefined && { cover }),

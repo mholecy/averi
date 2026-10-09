@@ -172,16 +172,51 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
  * list is [0,737][1080,2154]; the screen box's content-up stroke touches
  * down at y 444, in the header above the list, and a probe drawn there
  * moves nothing — which the flush check would take for "nothing beyond the
- * edge". Falls back to `box` when the two do not overlap, or when the cover
- * starts at or above the container's top (nothing of it is left to touch).
- * Pure; the driver's one call (interact/scroll.ts).
+ * edge". Falls back to `box` when `within` is no stroke box (`strokeBox`:
+ * the two do not overlap, or what they share — above the cover — is under
+ * MIN_STROKE_BOX along the stroke). `maxTravel`, when set, caps the
+ * finger's travel (the probe's, scroll-rounds.ts#PROBE_MAX_TRAVEL_FRACTION),
+ * never below `shortenStroke`'s floors. Pure; the driver's one call
+ * (interact/scroll.ts).
  */
-export function scrollStroke(box: Rect, step: { toward: Direction; reach: number; coverTop?: number; within?: Rect }): Stroke {
-  const { toward, reach, coverTop, within } = step;
-  const met = within === undefined ? undefined : meet(box, within);
-  const over = met !== undefined && (coverTop === undefined || coverTop > met.y) ? met : box;
+export function scrollStroke(box: Rect, step: { toward: Direction; reach: number; coverTop?: number; within?: Rect; maxTravel?: number }): Stroke {
+  const { toward, reach, coverTop, within, maxTravel } = step;
+  const over = (within === undefined ? undefined : strokeBox(box, within, toward, coverTop)) ?? box;
+  const side = toward === 'up' || toward === 'down' ? over.height : over.width;
   const vector = coverTop === undefined ? swipeVector(over, toward, 'content') : swipeVectorAbove(over, coverTop, toward, 'content');
-  return shortenStroke(vector, reach, toward === 'up' || toward === 'down' ? over.height : over.width);
+  const stroke = shortenStroke(vector, reach, side);
+  const travel = strokeLength(stroke);
+  return maxTravel === undefined || travel <= maxTravel ? stroke : shortenStroke(stroke, maxTravel / travel, side);
+}
+
+/** How far a stroke's finger travels, touch-down to lift-off. */
+export const strokeLength = ({ from, to }: Stroke): number => Math.hypot(to.x - from.x, to.y - from.y);
+
+/**
+ * The smallest side, along the stroke, of a box a scroll stroke may be
+ * drawn in: `swipeVector` strokes over SWIPE_REACH_FRACTION of the side
+ * either way of the centre (60 % of it), so under this the full stroke is
+ * shorter than twice TOUCH_SLOP — and `shortenStroke` never lengthens, so
+ * its floor would not hold: the "stroke" is a tap (code review of
+ * fix/r3-scroll, 2026-10-09: a carousel cut by the list's bottom to a 30-px
+ * strip gave a probe (540,1972)→(540,1954), 18 px, a tap on the card, and
+ * "moved nothing" was then reported as checked). 80.
+ */
+export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRACTION));
+
+/**
+ * The box a scroll stroke toward `toward` is drawn in over `within` (a
+ * clipping container): `within` met with the gesture `box`, when what they
+ * share — above `coverTop`, for a vertical stroke under a keyboard — is at
+ * least MIN_STROKE_BOX along the stroke; undefined otherwise (the caller
+ * falls back to a larger box). Pure; read by `scrollStroke` and by
+ * scroll-rounds.ts, which picks the clipping ancestor to name.
+ */
+export function strokeBox(box: Rect, within: Rect, toward: Direction, coverTop?: number): Rect | undefined {
+  const met = meet(box, within);
+  if (met === undefined) return undefined;
+  const side = toward === 'up' || toward === 'down' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
+  return side >= MIN_STROKE_BOX ? met : undefined;
 }
 
 /**

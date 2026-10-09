@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, treeFingerprint } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, showsProgress, treeFingerprint } from '../../src/ui-tree/read-tree.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -316,5 +316,14 @@ describe('treeFingerprint — the whole tree, as 8 hex digits (2026-10-09)', () 
     for (const other of [root(leaf('a', 0), leaf('b', 11)), root(leaf('a', 0), leaf('c', 10)), root(leaf('a', 0)), root(leaf('a', 0), leaf('b', 10), leaf('c', 20))]) {
       expect(treeFingerprint(other)).not.toBe(f);
     }
+  });
+});
+
+describe('showsProgress — a progress node with area (2026-10-09)', () => {
+  const n = (role: string, height: number, children: UiNode[] = []): UiNode => ({ role, label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 80, height }, children });
+  it('true for a ProgressBar / Compose indicator anywhere in the tree; false for none, or one with no area', () => {
+    expect(showsProgress(n('container', 100, [n('text', 10), n('container', 50, [n('progress', 80)])]))).toBe(true);
+    expect(showsProgress(n('container', 100, [n('text', 10)]))).toBe(false);
+    expect(showsProgress(n('container', 100, [n('progress', 0)]))).toBe(false);
   });
 });

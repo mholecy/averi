@@ -3,7 +3,7 @@ import { clippedEdges, rectArea, sameRectWithinPixel, visibleFractionInViewport 
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { sameStroke, type Direction, type JudgingScreen } from './swipe.js';
+import { sameStroke, strokeBox, strokeLength, TOUCH_SLOP, type Direction, type JudgingScreen } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -51,12 +51,12 @@ import { sameStroke, type Direction, type JudgingScreen } from './swipe.js';
  * witness (`ask witness`), the covered judgement replacing the whole one
  * only when it stood by the band; motion observed (a read that read only);
  * the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
- * stop flush with its clipping scroll container, the probe — `ask witness`
+ * stop flush with a clipping scroll container, the probe — `ask witness`
  * first for a band the moot rule left unasked — PROBE_REACH; then `ask
  * unlocated` on a `fully: true` stop with no cover under it); stuck; the
- * confirming read, or the read after a probe, that did not read; covered (nothing above the band); the bound (exhausted,
- * maxSwipes, deadline — and `ask unlocated` of a round that read); the
- * stroke. The witness comes before the deadline is consulted, so a witness
+ * confirming read, or the read after a probe, that did not read; covered
+ * (nothing above the band); the bound (exhausted, maxSwipes, deadline —
+ * and `ask unlocated` of a round that read); the stroke. The witness comes before the deadline is consulted, so a witness
  * that waits out its 2 s counts against the scroll's budget: the driver
  * stamps `elapsedMs` afresh on every call, re-entry included.
  *
@@ -107,13 +107,14 @@ interface RoundRead {
   /** The reading's `ofKeyboard`: is this node the keyboard's own UI (judged against the whole screen, never under the band)? */
   ofKeyboard: (node: UiNode) => boolean;
   /**
-   * The rect of the match's nearest ancestor that CLIPS it
-   * (ui-tree/geometry.ts#scrollerOf over this round's tree) — Android's
-   * scroll container, to whose edge uiautomator has already cut the
-   * match's bounds; undefined when it has none (every node of an iOS
-   * tree). For the `fully: true` stop's flush check (PROBE_REACH).
+   * The rects of the match's ancestors that CLIP it, nearest first
+   * (ui-tree/geometry.ts#scrollersOf over this round's tree) — Android's
+   * scroll containers, to whose edges uiautomator has already cut the
+   * match's bounds; empty when it has none (every node of an iOS tree).
+   * For the `fully: true` stop's flush check (PROBE_REACH) and the box the
+   * strokes are drawn in (`strokeWithin`).
    */
-  scrollerOf: (node: UiNode) => Rect | undefined;
+  scrollersOf: (node: UiNode) => readonly Rect[];
   /**
    * The largest clipping container in this round's tree
    * (ui-tree/geometry.ts#largestScroller) — the screen's own scroll view,
@@ -128,6 +129,13 @@ interface RoundRead {
    * (UNMOVED_STROKES_EXHAUST). Undefined: that rule never fires.
    */
   fingerprint?: string;
+  /**
+   * The tree shows a progress indicator (ui-tree/read-tree.ts#showsProgress:
+   * a `progress` node with area — Android's ProgressBar, which a Compose
+   * progress indicator also dumps as) — the screen may be loading, so an
+   * unchanged fingerprint does not say the content is exhausted.
+   */
+  loading?: boolean;
 }
 
 /** What to do next. */
@@ -145,9 +153,10 @@ export type RoundStep =
    * (the target's scroll container, met with the box — swipe.ts
    * #scrollStroke) rather than the whole box, so it touches down on the
    * content that scrolls. `probe`: the stroke is the flush check's
-   * (PROBE_REACH), not a step toward the target.
+   * (PROBE_REACH), not a step toward the target; `maxTravel` caps its
+   * finger travel (PROBE_MAX_TRAVEL_FRACTION).
    */
-  | { do: 'stroke'; toward: Direction; reach: number; coverTop?: number; within?: Rect; probe?: true }
+  | { do: 'stroke'; toward: Direction; reach: number; coverTop?: number; within?: Rect; probe?: true; maxTravel?: number }
   /** The scroll is over. */
   | { do: 'stop'; outcome: ScrollOutcome };
 
@@ -318,9 +327,16 @@ export const SETTLE_CONFIRM_READS = 3;
  * row_40` on a list ending at row_36 swiped 5 times to the 15 s timeout,
  * "never appeared". Now it fails after the two, in the same words, the
  * cause saying the screen did not change. The whole tree, not "no match
- * moved" — there is no match to watch; a screen that changes on its own (a
- * clock, an animation) never reads unchanged and runs to the bound as
- * before, the safe way.
+ * moved" — there is no match to watch. A screen whose TREE changes on its
+ * own (a ticking label) never reads unchanged and runs to the bound as
+ * before. A spinner does not change the tree — a ProgressBar or a Compose
+ * indicator dumps a fixed rect and no text — so a list still loading its
+ * next page would read exhausted (code review of fix/r3-scroll: "failed
+ * after 2 swipes" where the bound used to wait): a round whose tree shows a
+ * progress node (`RoundRead.loading`) does not count as unchanged, and the
+ * sentence names loading among the causes. Residual: content that loads
+ * with no indicator in the tree (a shimmer drawn as plain views, a
+ * silent fetch) can still be called exhausted after the two strokes.
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
 
@@ -356,11 +372,32 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * a probe after which the match is where it was settles it.
  *
  * A quarter of the stroke — over the container, 15 % of its side
- * (swipe.ts#SWIPE_REACH_FRACTION, 60 % of the side, × 0.25): 260 px of the
- * SWIFT form's 1736-px container, more than the 51 px its Fees row was cut
- * by and than a 143-px row; a cut larger than that is left flush again and
- * probed again. Short so it cannot carry the row out of a container of any
- * ordinary height.
+ * (swipe.ts#SWIPE_REACH_FRACTION, 60 % of the side, × 0.25) — and never
+ * more than PROBE_MAX_TRAVEL_FRACTION of the screen's long side: 178 px on
+ * the Pixel_3a, more than the 51 px the SWIFT form's Fees row was cut by; a
+ * cut larger than that is left flush again and probed again. Short so it
+ * cannot carry the row out of a container of any ordinary height.
+ *
+ * Every clipping ancestor, not the nearest alone (code review, 2026-10-09):
+ * the match is flush with one of them on one edge — a card that fills a
+ * carousel's height is flush with both of the carousel's edges, but the
+ * carousel is cut by the list around it, and the card with it, on the
+ * list's edge — and the probe answers the nearest ancestor flush on ONE
+ * edge. Exempt only when no ancestor is. The probe is drawn over that
+ * ancestor, or an outer one, whichever is the first with room for a stroke
+ * (`strokeWithin`) — a carousel cut to a 30-px strip has none, and a
+ * stroke there is a tap on the card. A probe drawn shorter than twice
+ * TOUCH_SLOP anyway (a tiny screen) never reports `checked`: it may have
+ * been a tap that moved nothing.
+ *
+ * Residuals, stated (code review): Android's View bounds are cut to every
+ * ancestor, not only scrollers, and Compose also subtracts what an overlay
+ * sibling covers — a row cut by a pinned bar drawn over the list reads cut
+ * at the bar's edge, not flush with any scroller, so it is not probed (that
+ * is the pinned-chrome bug, docs/bugs/2026-10-08-tap-and-scroll-until-
+ * ignore-pinned-app-chrome.md, out of scope); a RecyclerView with padding
+ * and clipToPadding draws a row cut at its padding edge while the row's
+ * rect runs to the view's edge — not flush, not probed.
  *
  * Cost, stated: one stroke (it spends one of `maxSwipes` and counts in the
  * reply's swipes), one settle and one tree read — plus, on Android, what a
@@ -372,6 +409,23 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * and a sentence saying it may be cut.
  */
 export const PROBE_REACH = 0.25;
+
+/**
+ * The cap on the probe's finger travel, as a fraction of the screen's long
+ * side (code review of fix/r3-scroll, 2026-10-09): a probe toward a TOP
+ * edge drags the content down, and at the top of a list that is the
+ * pull-to-refresh gesture — SwipeRefreshLayout starts a refresh once the
+ * finger has pulled 128 dp past the slop (its 64-dp spinner target at a
+ * drag rate of 0.5), Compose's pullRefresh at its 80-dp threshold, likewise
+ * halved, 160 dp. 15 % of a tablet's 2350-px container is 353 px — 176 dp
+ * at density 2, a reload of the app's data for a first row at rest. The
+ * density is not read (it would be one more adb call per scroll); a screen's
+ * long side runs to about 1400 dp on the largest tablets, so 0.08 of it is
+ * at most ≈ 112 dp, under both thresholds, on any density: 178 px (65 dp)
+ * on the Pixel_3a, 205 px (102 dp) on a 2560-px tablet at density 2. Cost:
+ * a cut deeper than the probe moves the row takes another probe.
+ */
+export const PROBE_MAX_TRAVEL_FRACTION = 0.08;
 
 /** The direction a probe strokes toward to reveal a flush edge: content beyond the top lies up, and so on. */
 const REVEALS: Record<Edge, Direction> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
@@ -390,6 +444,26 @@ function flushEdge(rect: Rect, container: Rect, direction: Direction): Edge | un
   const atHigh =
     high === 'bottom' ? on(rect.y + rect.height, container.y + container.height) : on(rect.x + rect.width, container.x + container.width);
   return atLow === atHigh ? undefined : atLow ? low : high;
+}
+
+/** The nearest of `chain` (clipping ancestors, nearest first) the match is flush with on ONE edge along the scroll, its edge and its index — undefined when none is. */
+function flushWith(rect: Rect, chain: readonly Rect[], direction: Direction): { edge: Edge; at: number } | undefined {
+  for (const [at, container] of chain.entries()) {
+    const edge = flushEdge(rect, container, direction);
+    if (edge !== undefined) return { edge, at };
+  }
+  return undefined;
+}
+
+/**
+ * The box a stroke along `direction`'s axis is drawn in: the first of
+ * `chain` from `from` outward that leaves room for one over the screen
+ * `box` (swipe.ts#strokeBox, MIN_STROKE_BOX) — a horizontal carousel cut to
+ * a strip by the list around it gives way to the list — as that ancestor's
+ * rect; undefined when none does (the stroke goes over the box).
+ */
+function strokeWithin(chain: readonly Rect[], from: number, direction: Direction, box: Rect): Rect | undefined {
+  return chain.slice(from).find((c) => strokeBox(box, c, direction) !== undefined);
 }
 
 /** The direction the content lies the other way — the stroke that brings back a target a fling carried past the viewport. */
@@ -492,7 +566,7 @@ interface State {
    * beyond the edge it left through.
    */
   readonly dropped: Direction | undefined;
-  /** The stroke box: the target's clipping container at the last read that found it in one (`RoundRead.scrollerOf`). */
+  /** The stroke box: the target's clipping container with room for a stroke (`strokeWithin`) at the last read that found it in one. */
   readonly targetScroller: Rect | undefined;
   /** The stroke box the last read that read chose (`within`), for the stroke of a round whose tree did not read. */
   readonly lastWithin: Rect | undefined;
@@ -674,7 +748,7 @@ function observe(s: Mutable<State>, current: Since, read: RoundRead, best: Judge
   if (current === 'stroke') {
     // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST,
     // 2026-10-09): the same streak rule, over the fingerprint.
-    const treeUnmoved = fingerprint !== undefined && s.prevFingerprint === fingerprint;
+    const treeUnmoved = fingerprint !== undefined && s.prevFingerprint === fingerprint && read.loading !== true;
     const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
     s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
     // Every match, not only the judged one, for "exhausted" (review round
@@ -712,7 +786,7 @@ function observe(s: Mutable<State>, current: Since, read: RoundRead, best: Judge
   if (best !== undefined) {
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
-    const scroller = read.scrollerOf(best.node);
+    const scroller = strokeWithin(read.scrollersOf(best.node), 0, s.rules.direction, s.frame.box);
     if (scroller !== undefined) s.targetScroller = { ...scroller };
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
@@ -858,6 +932,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // stop holds (it held still through a stroke), and nothing lies
       // beyond its flush edge.
       const probeHeld = probed !== undefined && sameRectWithinPixel(probed.rect, best.node.rect);
+      // …and was a stroke: one drawn shorter than twice the slop may have
+      // been a tap, and a tap moves nothing whatever lies beyond the edge.
+      const probeStroked = probeHeld && s.lastDrawn !== undefined && strokeLength(s.lastDrawn) >= 2 * TOUCH_SLOP;
       // A stop after a stroke is reported only once a read finds the target
       // where the last one did (SETTLE_CONFIRM_READS): a fling can carry it
       // on, or out of the frame, after the settle read caught it inside. A
@@ -867,10 +944,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // `fully: true`, an edge flush with the clipping container: possibly
       // cut there — probe once toward it, or say it could not be checked.
       let flush: Flush | undefined;
-      const container = fully ? read.scrollerOf(best.node) : undefined;
-      const edge = container === undefined ? undefined : flushEdge(best.node.rect, container, s.rules.direction);
-      if (container !== undefined && edge !== undefined) {
-        if (probeHeld) flush = { edge, container, checked: true };
+      const chain = fully ? read.scrollersOf(best.node) : [];
+      const flushed = flushWith(best.node.rect, chain, s.rules.direction);
+      if (flushed !== undefined) {
+        const { edge, at } = flushed;
+        const container = chain[at];
+        if (probeHeld) flush = { edge, container, checked: probeStroked };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
           // Clear of a keyboard as any stroke is — and one the moot rule
           // never asked about (the stop was clean either way) is asked
@@ -881,7 +960,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
             if (seen.corroborated === undefined) return ask('witness');
             if (seen.corroborated) probeCover = offered;
           }
-          return probe(s, edge, best.node.rect, container, probeCover);
+          const within = strokeWithin(chain, at, REVEALS[edge], s.frame.box);
+          const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
+          return probe(s, edge, best.node.rect, within, maxTravel, probeCover);
         } else flush = { edge, container, checked: false };
       }
       // The `unlocated` row on a `fully: true` stop only — where the answer
@@ -969,12 +1050,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
 /**
  * Send the flush check's probe (PROBE_REACH): toward revealing `edge`, over
- * the container, clear of this round's cover. A swipe like any other for
+ * `within` (`strokeWithin`; the box when undefined), its travel capped at
+ * `maxTravel` (PROBE_MAX_TRAVEL_FRACTION), clear of this round's cover. A swipe like any other for
  * the count and the bound, but not a step of the scroll's course: the turn
  * (`lastStroke`, `turns`, `strokesSent`) is left as it was, so a probe the
  * other way from the caller's direction is not a turn and halves no reach.
  */
-function probe(s: Mutable<State>, edge: Edge, rect: Rect, container: Rect, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
+function probe(s: Mutable<State>, edge: Edge, rect: Rect, within: Rect | undefined, maxTravel: number, cover: Cover | undefined): { state: Rounds; step: RoundStep } {
   s.probe = { rect: { ...rect }, edge };
   s.lastSent = REVEALS[edge];
   s.confirmReads = 0;
@@ -983,7 +1065,15 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, container: Rect, cover
   s.owesDrawn = true;
   return {
     state: s as unknown as Rounds,
-    step: { do: 'stroke', toward: REVEALS[edge], reach: PROBE_REACH, ...(cover !== undefined && { coverTop: cover.topCover.y }), within: { ...container }, probe: true },
+    step: {
+      do: 'stroke',
+      toward: REVEALS[edge],
+      reach: PROBE_REACH,
+      ...(cover !== undefined && { coverTop: cover.topCover.y }),
+      ...(within !== undefined && { within: { ...within } }),
+      probe: true,
+      maxTravel,
+    },
   };
 }
 

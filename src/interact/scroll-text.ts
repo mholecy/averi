@@ -258,7 +258,7 @@ function boundText(by: BoundBy, swipes: number): string {
       // `tree` (2026-10-09): there is no match to watch, so the sentence
       // says what was watched — the whole screen.
       return by.unchanged === 'tree'
-        ? `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not change the screen: content exhausted, or the swipes were not taken)`
+        ? `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not change the screen: content exhausted, still loading, or the swipes were not taken)`
         : `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, did not move it: content exhausted, or the swipes were not taken)`;
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
