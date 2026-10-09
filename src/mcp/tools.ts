@@ -7,6 +7,7 @@ import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
+import type { DismissOptions } from '../interact/keyboard.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
@@ -111,6 +112,17 @@ const environment = z
  * the guard, pass the settings they already hold.
  */
 const treeOpts = (settings: IosToolSettings): AdapterOpts => ({ treeSource: settings.treeSource });
+
+/**
+ * How the tools act on an element (tap and type_text with a selector): an
+ * ambiguous selector is REFUSED — an agent exploring through the tools has
+ * not seen the tree it would be guessing in (interact/resolve.ts, Ambiguity;
+ * a flow step picks the first, flow/engine.ts#FLOW_AMBIGUITY) — and the
+ * call's dismissals go to the keyboard guard. Given once, as treeOpts is
+ * (2026-10-09; the two handlers spelled it out until then); a fill adds its
+ * `clear`.
+ */
+const guardOpts = (settings: IosToolSettings): DismissOptions => ({ ambiguous: 'refuse', dismissals: settings.dismissals });
 
 const text = (value: unknown) => ({
   content: [
@@ -374,7 +386,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const settings = iosToolSettings((await loadForCall(TOOL_CONFIG.tap(p), cp)).cfg, p);
       const adapter = await registry.get(p, treeOpts(settings));
       if (selector !== undefined) {
-        const { note } = await tapElement(adapter, selector, { ambiguous: 'refuse', dismissals: settings.dismissals });
+        const { note } = await tapElement(adapter, selector, guardOpts(settings));
         return text(tapText(selector, note));
       }
       if (x === undefined || y === undefined) {
@@ -461,7 +473,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         await typeIntoFocused(adapter, value);
         return text(typedText(value.length));
       }
-      const fill = await fillField(adapter, selector, value, { ambiguous: 'refuse', clear, dismissals: settings.dismissals });
+      const fill = await fillField(adapter, selector, value, { ...guardOpts(settings), clear });
       return text(fillReply(fill, selector));
     },
   );

@@ -6,7 +6,7 @@ import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolvePresent, type Ambiguity } from '../interact/resolve.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { swipeScreen } from '../interact/swipe.js';
-import { dismissKeyboard, KeyboardGuardError, type DismissResult, type KeyboardDismissal } from '../interact/keyboard.js';
+import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
@@ -217,8 +217,8 @@ type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
  * are written against a known app by someone who can see its tree, and a
  * step that must not guess can say `role:` — whereas an agent exploring
  * through the MCP tools cannot, so those refuse (interact/resolve.ts,
- * Ambiguity). One constant so the policy is stated once and the three sites
- * cannot drift.
+ * Ambiguity — mcp/tools.ts#guardOpts). Stated once, in the engine's
+ * `acting`, which every site that acts on an element is handed.
  */
 const FLOW_AMBIGUITY: Ambiguity = 'first';
 
@@ -376,14 +376,16 @@ export class FlowEngine {
   private readonly pinKeyDelayMs: number;
   private readonly credentials: Credentials;
   /**
+   * How this engine acts on an element, given once (2026-10-09; until then
+   * each call site spelled it out): FLOW_AMBIGUITY, the poll interval, and
    * `app.ios.keyboardDismiss` in interact/'s vocabulary (flow/config.ts#
-   * keyboardDismissals), converted once here and handed to every tap and
-   * fill — and to the post-fill dismissal — as `GuardOptions.dismissals`.
-   * The engine never branches on the platform for it: interact/ reads the
-   * list only where the adapter has no keyboard oracle, so on Android it is
-   * carried and never read.
+   * keyboardDismissals), converted once here. Every tap, fill, presence probe
+   * and post-fill dismissal gets it; a site adds only what is its own (a
+   * timeout, a clear). The engine never branches on the platform for the
+   * dismissals: interact/ reads the list only where the adapter has no
+   * keyboard oracle, so on Android it is carried and never read.
    */
-  private readonly dismissals: readonly KeyboardDismissal[] | undefined;
+  private readonly acting: Omit<GuardOptions, 'timeoutMs'>;
 
   private constructor(
     private readonly cfg: AveriConfig,
@@ -404,7 +406,7 @@ export class FlowEngine {
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
-    this.dismissals = keyboardDismissals(cfg);
+    this.acting = { ambiguous: FLOW_AMBIGUITY, pollMs: this.pollMs, dismissals: keyboardDismissals(cfg) };
     this.session = opts.session;
   }
 
@@ -1104,11 +1106,9 @@ export class FlowEngine {
     const { value, secret } = this.resolveValue(rawValue);
     const filled = await this.tracingDismissal('⚠ fill', () =>
       fillField(this.adapter, spec, value, {
-        ambiguous: FLOW_AMBIGUITY,
+        ...this.acting,
         clear,
         timeoutMs: this.tapTimeoutMs,
-        pollMs: this.pollMs,
-        dismissals: this.dismissals,
         // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
         // tests mock util/sleep instead of threading a test-only option here.
       }),
@@ -1141,7 +1141,7 @@ export class FlowEngine {
     let closed: DismissResult = {};
     if (closeKeyboard) {
       closed = await this.tracingGuardFailure('⚠ fill', () =>
-        dismissKeyboard(this.adapter, { dismissals: this.dismissals, ambiguous: FLOW_AMBIGUITY }),
+        dismissKeyboard(this.adapter, this.acting),
       );
     }
     if (closed.warning !== undefined) this.log('⚠ fill', `${describeElementSpec(spec)}: ${closed.warning}`);
@@ -1260,11 +1260,7 @@ export class FlowEngine {
           // Presence = "something actionable is in the tree": the same policy
           // the committed tap will apply, one-shot per round (resolvePresent),
           // so a ghost zero-area node cannot commit a tap that then cannot land.
-          await resolvePresent(this.adapter, tap.spec, {
-            ambiguous: FLOW_AMBIGUITY,
-            timeoutMs: tap.timeoutMs ?? this.optionalTimeoutMs,
-            pollMs: this.pollMs,
-          });
+          await resolvePresent(this.adapter, tap.spec, { ...this.acting, timeoutMs: tap.timeoutMs ?? this.optionalTimeoutMs });
           sighted = true;
           await this.tapSpec(tap.spec, this.tapTimeoutMs);
         } else {
@@ -1330,7 +1326,7 @@ export class FlowEngine {
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
     await this.tracingDismissal('⚠ tap', () =>
-      tapElement(this.adapter, spec, { ambiguous: FLOW_AMBIGUITY, timeoutMs, pollMs: this.pollMs, dismissals: this.dismissals }),
+      tapElement(this.adapter, spec, { ...this.acting, timeoutMs }),
     );
     if (!quiet) this.log('tap', describeElementSpec(spec));
   }
