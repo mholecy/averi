@@ -35,7 +35,7 @@ const IOS_BAND: Rect = { x: 0, y: 589, width: 402, height: 285 };
 /** The measured WDA pad on the iPhone 17: `role:keyboard 0 572 402 302`. */
 const WDA_BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
 const UP_IME = coverOver(IME);
-/** The gesture boxes `play` hands the rounds by default: the screens as built. */
+/** The gesture boxes `play` hands the rounds by default (`Row.screen`): the screens as built. */
 const SCREEN_1080: Rect = { x: 0, y: 0, ...ANDROID.screen };
 const IPHONE_BOX: Rect = { x: 0, y: 0, ...IPHONE.screen };
 /** Any stroke, for the protocol's hand-back. */

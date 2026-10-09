@@ -3,7 +3,7 @@ import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
-import { scrollStroke, type JudgingScreen } from '../../src/interact/swipe.js';
+import { scrollStroke, type ScreenBox } from '../../src/interact/swipe.js';
 import { node } from './fake.js';
 
 /**
@@ -27,8 +27,8 @@ export interface Row {
   found?: readonly UiNode[];
   /** The read failed with this message. */
   error?: string;
-  /** `judgingScreen`'s answer; absent, the round keeps the last frame (the device as built until one is given). */
-  screen?: JudgingScreen;
+  /** swipe.ts#screenBox's answer this round (`RoundSeen.screen`: the gesture box, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box] }`. */
+  screen?: ScreenBox;
   /** The reading's `cover()`: absent for a keyboard hidden or unknown. */
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`; default: no node is the keyboard's. */
@@ -52,8 +52,6 @@ export interface Row {
   corroborated?: boolean;
   /** The answer to `ask unlocated` (the reading's `unlocated()`); default false. */
   unlocated?: boolean;
-  /** swipe.ts#screenBox's box this round (`RoundSeen.gesture`); default `screen`'s box, else the device as built — as the driver's is on a screen held as built. */
-  gesture?: Rect;
   /** The stroke the previous step drew, when it was a stroke; default `drawnFor` that step — the driver's points for it. */
   drawn?: Stroke;
   /** ms since the scroll began; default 0. */
@@ -120,6 +118,8 @@ export interface Played {
 /** Play `rows` through `round` from `startRounds(rules, screen)`. Throws when a stop comes before the last row — a table with rows nobody reads is a wrong table. */
 export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonly Row[]): Played {
   let state = startRounds(rules, rules.screen);
+  const box: Rect = { x: 0, y: 0, ...rules.screen };
+  const asBuilt: ScreenBox = { box, boxes: [box] };
   const rounds: Played['rounds'] = [];
   let outcome: ScrollOutcome | undefined;
   let stroked: Extract<RoundStep, { do: 'stroke' }> | undefined;
@@ -129,9 +129,9 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       read:
         row.error !== undefined
           ? { error: new Error(row.error) }
-          : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.screen && { screen: row.screen }), ...(row.cover && { cover: row.cover }) },
+          : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
-      gesture: row.gesture ?? row.screen?.box ?? { x: 0, y: 0, ...rules.screen },
+      screen: row.screen ?? asBuilt,
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };
     const asks: Ask[] = [];

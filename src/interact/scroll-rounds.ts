@@ -4,7 +4,7 @@ import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen } from './swipe.js';
+import { judgingOf, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -42,7 +42,7 @@ import { sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type 
  *   the step describes and hand it back, as sent, in the next round's
  *   `drawn` — the "same stroke twice" identity is the points as sent
  *   (swipe.ts#scrollStroke of the step, whose `box` this module decides
- *   over the driver's gesture box — RoundSeen.gesture). `drawn` is
+ *   over the driver's gesture box — RoundSeen.screen). `drawn` is
  *   required on the round after a `stroke` and refused on any other; `round`
  *   throws on either breach, and on any call after `stop`.
  * - `stop`: the scroll is over; `outcome` says how (interact/scroll-text.ts
@@ -83,14 +83,18 @@ export interface RoundSeen {
   /** This round's tree read: what it held, or the error that stood in for it (a miss, not a failure — read-tree.ts#readTreeOrError). */
   read: RoundRead | { error: Error };
   /**
-   * The box this round's stroke would be drawn in — swipe.ts#screenBox's
-   * `box`, read this round (the device as built on a round whose tree did
-   * not read) — over which the round judges a container's room
-   * (swipe.ts#strokeRoom) and which a stroke step's `box` is cut from.
-   * Absent when there is none (screenBox threw): no container has room, and
-   * a stroke step carries no box — the driver throws why.
+   * This round's swipe.ts#screenBox — ONE read gives both boxes the round
+   * uses, so they can never come from different reads: its `box`, the
+   * GESTURE box the stroke is drawn in, over which the round judges a
+   * container's room (swipe.ts#strokeRoom) and from which a stroke step's
+   * `box` is cut; and, on a round whose tree read, its `boxes`, the frame
+   * the round judges in (`judgingOf` — the tap's screen too). On a round
+   * whose tree did not read it is the device as built and only its `box`
+   * is used: the frame stays the last one. Absent when there is none
+   * (screenBox threw): the frame stays, no container has room, and a stroke
+   * step carries no box — the driver throws why.
    */
-  gesture?: Rect;
+  screen?: ScreenBox;
   /** The stroke the previous `stroke` step drew, as sent. Required after `stroke`, refused otherwise. */
   drawn?: Stroke;
   /** The answer to `ask witness`: the round's keyboard reading's `corroborated()`. */
@@ -120,12 +124,15 @@ export interface RoundSeen {
  * them; there is nothing left to forget.
  */
 interface RoundRead {
-  /** This round's tree, as read (in-process data: the round stays pure). */
+  /**
+   * This round's tree, as read (in-process data: the round stays pure).
+   * Never mutated once handed in — by the driver, a test or the round:
+   * its facts are cached by the tree object (`factsOf`), so a tree changed
+   * in place would be read with the facts of what it was.
+   */
   tree: UiNode;
   /** Every match of the target, in tree order (resolve.ts#findTarget) — nodes OF `tree`: their clipping ancestors are looked up by identity. */
   found: readonly UiNode[];
-  /** `judgingScreen` over this tree — the tap's screen too; undefined when there is no box at all, and then the round keeps the last frame. */
-  screen?: JudgingScreen;
   /** The reading's `cover()`: everything a shown keyboard covers; undefined when hidden or unknown. */
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`: is this node the keyboard's own UI (judged against the whole screen, never under the band)? */
@@ -196,7 +203,7 @@ export type RoundStep =
    * when set (swipe.ts#swipeVectorAbove) — and hand it back as the next
    * round's `drawn`; swipe.ts#scrollStroke turns the step into points and
    * judges nothing. `box` is DECIDED here (swipe.ts#strokeRoom, over the
-   * round's `gesture`, the keyboard included): the target's scroll
+   * round's gesture box, `RoundSeen.screen`, the keyboard included): the target's scroll
    * container met with the screen, so the stroke touches down on the
    * content that scrolls — or the gesture box whole when no container is
    * known or none has room; absent only when the round had no gesture box.
@@ -960,7 +967,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const readError = 'error' in seen.read ? seen.read.error : undefined;
   if (read !== undefined) {
     s.treesRead++;
-    s.frame = read.screen ?? s.frame;
+    if (seen.screen !== undefined) s.frame = judgingOf(seen.screen);
   }
   const found = read?.found ?? [];
   if (found.length > 0) s.everFound = true;
@@ -999,7 +1006,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
   const judgedFrames: Rect[] = cover?.above !== undefined ? [{ x: viewport.x, y: viewport.y, ...cover.above }] : s.frame.boxes;
-  const { gesture } = seen;
+  const gesture = seen.screen?.box;
   const observed = read === undefined ? undefined : observe(s, current, read, best, judgedFrames, gesture, cover);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
@@ -1031,6 +1038,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         const { edge, at } = flushed;
         const container = chain[at];
         const room = { checked: false, why: 'room' } as const;
+        // With no gesture box (`RoundSeen.screen` absent) nothing has room
+        // and the stop says `room` — the wrong reason (it is "no screen
+        // box"), accepted as unreachable in practice: screenBox throws only
+        // when the device's size is unusable AND the tree has no window, and
+        // adapters/viewport-memo.ts keeps a successful size for the session
+        // — so it takes a device reporting 0×0 throughout, and a tree whose
+        // window stood in on an earlier round (else the frame is 0×0 and no
+        // stop is ever visible) but not on this one.
         const roomOver = (coverTop?: number) => (gesture === undefined ? undefined : strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop));
         if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
         else if (roomOver() === undefined) flush = { edge, container, ...room };

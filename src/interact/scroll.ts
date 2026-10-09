@@ -5,7 +5,7 @@ import { sleep } from '../util/sleep.js';
 import { describeTarget, findTarget, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
-import { dragMs, judgingOf, screenBox, scrollStroke, type Direction, type ScreenBox } from './swipe.js';
+import { dragMs, screenBox, scrollStroke, type Direction, type ScreenBox } from './swipe.js';
 
 export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
 
@@ -247,9 +247,9 @@ export async function scrollUntilVisible(
     // A failed read is a miss, not a failure — see readTreeOrError.
     const read = await readTreeOrError(adapter);
     const { tree } = read;
-    // The round's screen box (swipe.ts#screenBox), read once: the frame the
-    // round judges in (`judgingOf`, the tap's own reader — on a read tree)
-    // and the gesture box it decides the stroke's box over (`gesture`).
+    // The round's screen box (swipe.ts#screenBox), read once and handed to
+    // the round whole (`RoundSeen.screen`): the frame it judges in and the
+    // gesture box it decides the stroke's box over.
     // Oriented by this round's tree; after a failed read, the device box
     // as built (its note is not reported here, the stop already quotes the
     // read error); the device size is memoized. When there is none it does
@@ -289,13 +289,12 @@ export async function scrollUntilVisible(
           tree,
           found,
           ofKeyboard: reading.ofKeyboard,
-          ...(screen !== undefined && { screen: judgingOf(screen) }),
           ...(cover !== undefined && { cover }),
         },
         elapsedMs: 0,
       };
     }
-    if (screen !== undefined) seen.gesture = screen.box;
+    if (screen !== undefined) seen.screen = screen;
     if (drawn !== undefined) seen.drawn = drawn;
     drawn = undefined;
     // The clock is stamped on every call, re-entry included: a witness that
@@ -316,7 +315,7 @@ export async function scrollUntilVisible(
     }
     if (step.do === 'stroke') {
       // The stroke's box is the round's (`step.box`, swipe.ts#strokeRoom over
-      // this round's `gesture`): the target's scroll container met with the
+      // this round's screen box): the target's scroll container met with the
       // screen box and kept above the keyboard, or the screen box whole —
       // decided once, there; here it only becomes points (scrollStroke, which
       // judges nothing). No box: this round had no screen box to stroke in.
