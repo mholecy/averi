@@ -97,7 +97,10 @@ export interface DrawOrder {
    * covers are the nodes after `node`'s subtree in pre-order (its first
    * place in the tree, as `shadowing`) that draw for a target
    * (`NOT_DRAWN`'s `target` column) and share area with the part of `node`
-   * inside `within`. A node not in this tree has no covers.
+   * inside `within` — a cover's rect, or, for a node pinned at the bottom of
+   * idb's flat list, that rect run down to the screen's bottom edge
+   * (`bottomPinned`, `pinnedReach`: the pinned bar's background and hit
+   * area, which idb lists as no node). A node not in this tree has no covers.
    */
   exposure(node: UiNode, within: Rect): Exposure;
 }
@@ -137,7 +140,7 @@ export interface Exposure {
   readonly tapAt?: { readonly point: Point; readonly moved: false } | { readonly point: Point; readonly moved: true; readonly piece: Rect };
   /** MIN_TAP_PIECE_FRACTION of this tree's screen's shorter side, rounded — the piece size `tapAt` needs. */
   readonly minPiece: number;
-  /** The cover drawn on top at `point` — the last of `covers` that contains it — or undefined. */
+  /** The cover drawn on top at `point` — the last of `covers` whose rect (a pinned node's reach, `exposure`) contains it — or undefined. */
   coverAt(point: Point): UiNode | undefined;
 }
 
@@ -805,6 +808,42 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
   return order.length;
 }
 
+/**
+ * The bottom of the screen a flat list's pinned bar lies in (`bottomPinned`),
+ * as a fraction of the screen's height: 6 %, 52 pt of the 874-pt iPhone 17.
+ * Measured (round-6 device check, H-1): the SWIFT form's pinned CONTINUE
+ * `24,780 354x44` ends at 824, 50 pt above the screen's bottom — the home
+ * indicator's safe area and the bar's margin; the floating tab bar idb lists
+ * on Account Detail (`37,755 82x64`, bottom 819, 55 pt) lies outside it.
+ */
+export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
+
+/**
+ * The nodes of a flat list PINNED AT ITS BOTTOM (the `exposure` question's
+ * reach, `pinnedReach`): an interactive node whose bottom lies on
+ * the screen and inside its bottom band (`FLAT_LIST_BOTTOM_BAR_FRACTION`) —
+ * so content: a node of the top bar (`firstContent`) lies wholly in the top
+ * 20 % — and below which
+ * nothing listed after it starts — not a row in the middle of a list that
+ * runs on past the screen (Account Detail's `row_4 24,817 354x52` under the
+ * payment-type chooser, followed by `date_header_5` at 876). Measured: the
+ * SWIFT form's CONTINUE, listed last at every position. Empty on a tree
+ * that is not a flat list.
+ */
+function bottomPinned(order: readonly Placed[], screen: Rect): ReadonlySet<Placed> {
+  const bottom = screen.y + screen.height;
+  const line = bottom - screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
+  const pinned = new Set<Placed>();
+  for (const placed of order) {
+    const r = placed.node.rect;
+    const end = r.y + r.height;
+    if (!isInteractive(placed.node) || end > bottom || end < line) continue;
+    if (order.slice(placed.end).some(({ node }) => rectArea(node.rect) > 0 && node.rect.y >= end)) continue;
+    pinned.add(placed);
+  }
+  return pinned;
+}
+
 /** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). */
 function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
@@ -831,6 +870,26 @@ export function drawOrder(tree: UiNode): DrawOrder {
   walk(tree, undefined, undefined);
   const barLine = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
+  const pinned = flatList ? bottomPinned(order, screen) : new Set<Placed>();
+  /**
+   * Where a cover of a target presses (`exposure`): its rect — or, for a
+   * node pinned at a flat list's bottom (`bottomPinned`), its rect run down
+   * to the screen's bottom edge across its own x-range. Measured (round-6
+   * device check, H-1, `run8-ios/img-147-0.png`): with the SWIFT form's
+   * `Payee’s bank street & no.` label at `42,817 186x20`, 3 pt below
+   * CONTINUE's frame `24,780 354x44`, a tap at (135,827) opened SUMMARY —
+   * CONTINUE's hit area reaches below its accessibility frame, and the bar's
+   * opaque background, which idb lists as no node, hides the form from
+   * CONTINUE's top down to the screen's bottom. Its x-range, not the screen's
+   * width: the tap that pressed it lay inside it, and the screenshot cannot
+   * say more (the form's rows span CONTINUE's 24–378 exactly); a narrow
+   * button at the bottom (a floating action button) run across the screen
+   * would hide its neighbours.
+   */
+  const pinnedReach = (placed: Placed): Rect => {
+    const r = placed.node.rect;
+    return pinned.has(placed) ? { ...r, height: Math.max(r.height, screen.y + screen.height - r.y) } : r;
+  };
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
@@ -864,14 +923,15 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
       const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine };
-      const covers =
+      const over =
         shown === undefined || about === undefined
           ? []
-          : laterThan(places, (p) => rectIntersection(p.node.rect, shown) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
-      const pieces = covers.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.rect)), shown === undefined ? [] : [shown]);
+          : laterThan(places, (p) => rectIntersection(pinnedReach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: pinnedReach(p) }));
+      const covers = over.map((c) => c.node);
+      const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
       const largest = largestRect(pieces);
-      const coverAt = (point: Point): UiNode | undefined => covers.filter((c) => containsPoint(c.rect, point)).at(-1);
+      const coverAt = (point: Point): UiNode | undefined => over.filter((c) => containsPoint(c.reach, point)).at(-1)?.node;
       const centre = tapPoint(node);
       const onCentre = shown !== undefined && containsPoint(shown, centre);
       const centreCover = onCentre ? coverAt(centre) : undefined;

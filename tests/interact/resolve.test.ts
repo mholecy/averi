@@ -575,6 +575,19 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toThrow(`${PRIORITY} is under ${CONTINUE} at its centre (201,797)`);
   });
 
+  it('idb, a label 3 pt below the pinned CONTINUE (round-6 device check H-1, which pressed CONTINUE): refused, nothing tapped — the bar reaches the screen\'s bottom', async () => {
+    const elements = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')).positions.pos1;
+    const tree = parseIdbDescribeAll(JSON.stringify(elements));
+    tree.children.find((n) => n.label === 'Payee\u2019s bank street & no.*')!.rect = { x: 42, y: 817, width: 186, height: 20 };
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'text:"Payee\u2019s bank street & no.*"', OPTS)).rejects.toThrow(
+      `text:"Payee\u2019s bank street & no.*" is under ${CONTINUE} at its centre (135,827), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped`,
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
   it('idb, a row scrolled up under the top bar (code review P1, repro C — since device check C3-3 the chrome-before-content rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
     const debit = tree.children.find((n) => n.identifier === 'swift_payment.form.debit_select')!;
