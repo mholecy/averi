@@ -49,8 +49,9 @@ import { isInteractive, tapPoint } from './selectors.js';
  * cover but off the screen, cut out of `within` by the caller
  * (interact/swipe.ts#belowStatusBand). Knows no
  * platform commands; the platform shapes are in the rows, each with the
- * device tree it was measured on, and the one mark of a source it reads is
- * on the tree (`UiNode.flatList`). The rect arithmetic it asks — the
+ * device tree it was measured on, and the marks of a source it reads are
+ * on the tree's root (`UiNode.flatList`, `UiNode.paddedTouchTargets`). The
+ * rect arithmetic it asks — the
  * subtraction of a cover from a target included — is geometry.ts's.
  */
 export interface DrawOrder {
@@ -196,6 +197,8 @@ interface SeenFor extends Seen {
   readonly readingBreak: number;
   /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`) and idb's keyboard (`keyboardOf`): never past the break. */
   readonly bottomChrome: ReadonlySet<Placed>;
+  /** The tree's source lists a control's touch target as its wrapper (`UiNode.paddedTouchTargets` on its root): `ownControl`'s padded shape is asked only then. */
+  readonly paddedTouchTargets: boolean;
 }
 
 /**
@@ -733,7 +736,16 @@ const NOT_DRAWN = {
    * list's or scroll view's edge, whose insets are then uneven (`button
    * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, as
    * at round 6, the safe direction; nor one spanning its wrapper's height
-   * only (a tall narrow one).
+   * only (a tall narrow one). And only on a tree whose source lists a
+   * control's touch target as its wrapper (`UiNode.paddedTouchTargets`,
+   * uiautomator's root; code review of round 6b, P2): the shape was
+   * measured there alone. No other mark tells uiautomator's tree from
+   * WDA's — `clipsDescendants` is a node's, absent on an Android screen with
+   * no scroller, and `ofKeyboard` comes only with a keyboard — so the source
+   * marks its root, as idb's does `flatList`. Under WDA and idb an
+   * unlabelled button padded evenly over a centred text stays a cover (a
+   * false refusal, the safe direction). The width shape (`spansWidth`) is
+   * asked of every tree, as at round 6.
    *
    * What still covers: a pinned CTA in the SAME parent as a text (review of
    * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over "Forgot
@@ -761,19 +773,19 @@ const NOT_DRAWN = {
    * `absoluteFill` and `accessibilityRole="button"`, no label) inside a
    * safe-area container `0,59 402x781`, 0.894 of the screen and so not
    * screen-sized: the backdrop spans the container's width and holds the
-   * sheet's texts — all excused; and an unlabelled clickable overlay laid
-   * with an even margin over a centred text in its card (the margin at most
-   * half the overlay's side).
+   * sheet's texts — all excused; and, on uiautomator's tree, an unlabelled
+   * clickable overlay laid with an even margin over a centred text in its
+   * card (the margin at most half the overlay's side).
    */
   ownControl: {
-    target: (placed, { target, screenArea }) =>
+    target: (placed, { target, screenArea, paddedTouchTargets }) =>
       siblingOf(placed, target) &&
       isInteractive(placed.node) &&
       !placed.node.label &&
       !placed.node.value &&
       !isInteractive(target.node) &&
       rectWithin(target.node.rect, placed.node.rect) &&
-      (spansWidth(placed.node.rect, placed.parent.node.rect) || paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect)) &&
+      (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect))) &&
       !screenSized(placed.parent.node, screenArea) &&
       !fillsScreen(placed.node.rect, screenArea),
   },
@@ -1050,6 +1062,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
   const seen: Seen = { screenArea: rectArea(screen) };
   const flatList = tree.flatList === true;
+  const paddedTouchTargets = tree.paddedTouchTargets === true;
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
   const walk = (node: UiNode, parent: Placed | undefined, scroller: Placed | undefined): void => {
@@ -1120,7 +1133,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets };
       const over =
         shown === undefined || about === undefined
           ? []

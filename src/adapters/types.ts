@@ -329,6 +329,22 @@ export interface UiNode {
    * Android trees.
    */
   flatList?: true;
+  /**
+   * Set on the ROOT of a tree whose source lists a control's minimum TOUCH
+   * TARGET as a wrapper of its own around it (code review of round 6b, P2,
+   * 2026-10-09): uiautomator's (adapters/android.ts#parseUiautomatorXml) —
+   * Compose pads a control smaller than 48 dp to a 48-dp touch target, and
+   * Google Contacts' Cancel reaches the dump as `container 11,88 132x132` →
+   * the label node `other 'Cancel' 44,121 66x66`, `button 22,99 110x110`
+   * (a 40-dp IconButton at 2.75 px/dp). Read by ui-tree/draw-order.ts,
+   * whose `ownControl` row takes a control PADDED evenly in such a wrapper
+   * and centred on the label for the label's own (`paddedOn`) only where
+   * the shape was measured. A mark of the source, like `flatList`: ui-tree
+   * knows no platform. Absent on WDA and idb trees — no wrapper of that
+   * shape was seen there, and an unlabelled button laid with an even margin
+   * over a centred text (a card's overlay) stays its cover.
+   */
+  paddedTouchTargets?: true;
 }
 
 /**
