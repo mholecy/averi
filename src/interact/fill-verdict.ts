@@ -72,8 +72,8 @@ import { heldText, type Difference, type FillResult, type LostWhy, type NearbyIn
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
- * - `no-value`: the field was found and exposed no value on the last read;
- *   nothing was compared (ReadBack `no-value`).
+ * - `no-value`: the node was found, is not an input, and exposed no value
+ *   on the last read; nothing was compared (ReadBack `no-value`).
  * - `not-taken`: the node is not an input and its value never showed the
  *   text — not the field (ReadBack `not-taken`).
  * - `lost`: the field itself was not found again, `why` says how; said as

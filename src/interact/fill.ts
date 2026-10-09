@@ -114,10 +114,12 @@ function screenSignature(tree: UiNode): string {
  * - type without clear: the typed value must appear IN the field (contiguous
  *   insert at the cursor); no destructive retry — clear stays opt-in, so a
  *   mismatch throws instead of corrupting content the field came with.
- * A node that never exposes text is NOT verified, and the result says so
- * (`readBack: 'no-value'`) — until 2026-10-08 it passed as landed, and a
- * floating-label `text` node on iOS idb was reported filled with nothing
- * typed. Fields that expose BULLETS verify by length (see `landed`). A
+ * A non-input node that never exposes text is NOT verified, and the result
+ * says so (`readBack: 'no-value'`) — until 2026-10-08 it passed as landed,
+ * and a floating-label `text` node on iOS idb was reported filled with
+ * nothing typed. An INPUT with no value is an empty field (UiNode.value):
+ * a fill whose text it dropped entirely is a mismatch, `shows 0`
+ * (2026-10-09). Fields that expose BULLETS verify by length (see `landed`). A
  * matched node that is not an input (INPUT_ROLE) is warned about, with the
  * nearest input named — not refused (see `notInput` below).
  * An EMPTY value is the focus tap and the optional clear alone: nothing is
@@ -196,6 +198,15 @@ export async function fillField(
     return { lost: lostOnLastRead };
   };
   const refetchNode = async (): Promise<UiNode | undefined> => (await refetch()).node;
+  // What the read-back compares: the field's text. An input's null value is
+  // EMPTY (types.ts#UiNode.value — both parsers map "" to null), so a field
+  // that dropped every typed character reads "" and fails as a mismatch
+  // (`shows 0`), never as `no-value` (2026-10-09, docs/bugs/2026-10-09-
+  // android-fill-into-a-field-that-drops-everything-reads-exposes-no-
+  // value.md: an Android digits-only field fed `abc` passed `optional:`).
+  // On any other role null is withheld text. undefined: no node read.
+  const valueOf = (n: UiNode | undefined): string | undefined => (n === undefined ? undefined : (n.value ?? (isInput ? '' : undefined)));
+  const refetchValue = async (): Promise<string | undefined> => valueOf(await refetchNode());
   const startTyping = async (text: string): Promise<void> => {
     screenBeforeTyping ??= lastTree === undefined ? null : screenSignature(lastTree);
     await adapter.typeText(text);
@@ -293,7 +304,9 @@ export async function fillField(
 
   // What the field showed when typing began — the read-back's mismatch error
   // says "did not change" when it still shows exactly this.
-  const shownBeforeTyping = current?.value ?? null;
+  // An input's null is "" here too (valueOf), so a field that stays empty
+  // reads "did not change".
+  const shownBeforeTyping = valueOf(current) ?? null;
   await startTyping(value);
   // Nothing typed: the clear's lost field is the read-back's (nothing saw it
   // empty); a clear that ended on its placeholder is reported as a fact
@@ -354,8 +367,9 @@ export async function fillField(
             // Raw equality first: a value equal to the placeholder is the
             // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
             observed === value || heldText(observed, placeholder).includes(value));
-    let observed = await pollValue(refetchNode, landed, pollMs);
-    // undefined: the node withholds its text — nothing to compare. Since
+    let observed = await pollValue(refetchValue, landed, pollMs);
+    // undefined: the node withholds its text (a non-input: an input's null
+    // is "", see valueOf) — nothing to compare. Since
     // 2026-10-08 that is SAID (readBack 'no-value'), never passed as landed;
     // and when the last read did not find the field at all, that is said
     // as such (readBack 'lost', iOS device check the same day) — the node
@@ -372,7 +386,7 @@ export async function fillField(
         const wipe = heldText(observed, placeholder).length;
         if (wipe > 0) await adapter.clearText(wipe);
         await adapter.typeText(value);
-        observed = await pollValue(refetchNode, landed, pollMs);
+        observed = await pollValue(refetchValue, landed, pollMs);
       }
       if (observed !== undefined && !landed(observed)) {
         const wrong = await notInput();
@@ -466,15 +480,17 @@ function failure(f: FillFailure): Error {
  * that pass.
  */
 async function pollValue(
-  refetch: () => Promise<UiNode | undefined>,
+  read: () => Promise<string | undefined>,
   ok: (observed: string) => boolean,
   pollMs: number,
 ): Promise<string | undefined> {
   let observed: string | undefined;
   for (let i = 0; i < 5; i++) {
-    observed = (await refetch())?.value ?? undefined;
+    observed = await read();
     if (observed !== undefined && ok(observed)) return observed;
-    if (observed === undefined && i >= 1) return undefined; // field exposes no text — stop waiting
+    // No text (a non-input withholding it) or no field — stop waiting. An
+    // empty input reads "" and keeps the five rounds: its text may be late.
+    if (observed === undefined && i >= 1) return undefined;
     await sleep(pollMs);
   }
   return observed;

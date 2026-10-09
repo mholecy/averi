@@ -225,7 +225,16 @@ export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, keyboard (KEYBOARD_ROLE), ...
   label: string | null; // visible text / content description
   identifier: string | null; // resource-id / accessibilityIdentifier
-  value: string | null; // current value (text field contents, toggle state)
+  /**
+   * Current value (text field contents, toggle state). A `textfield`'s null
+   * value means EMPTY: both parsers map an empty or absent value to null
+   * (android.ts and ios-node.ts, `emptyToNull` — an empty Compose field
+   * dumps no `text` at all), so on an input null is "", never "withheld" (2026-10-09,
+   * docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
+   * reads-exposes-no-value.md; interact/fill.ts reads it so). On any other
+   * role null is "no value exposed".
+   */
+  value: string | null;
   /** Validation message associated with an input, when the platform exposes one. */
   error?: string;
   rect: Rect;

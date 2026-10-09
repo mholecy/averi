@@ -100,7 +100,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
     - a soft keyboard covers it and averi sent nothing: on iOS no usable `keyboardDismiss` entry, on Android the window state and the input method disagree about the keyboard.
 
     The `✗` line reads `optional step not skipped: its element is present, but the tap was refused — …`.
-  - A `fill` whose text did not land: the read-back shows something else (`fill: typed N characters but the field shows M …`), the clear left text twice (`fill: field still shows … after clearing twice`), or the field could not be read again after the focus tap (`fill: could not re-read …`). The field was tapped and may hold partial text, and a half-typed form must not run on. The `✗` line reads `optional step not skipped: its field is present, but its value did not land — …`.
+  - A `fill` whose text did not land: the read-back shows something else (`fill: typed N characters but the field shows M …` — `shows 0` for a field that dropped every character, an empty field reading no value), the clear left text twice (`fill: field still shows … after clearing twice`), or the field could not be read again after the focus tap (`fill: could not re-read …`). The field was tapped and may hold partial text, and a half-typed form must not run on. The `✗` line reads `optional step not skipped: its field is present, but its value did not land — …`.
 
     This is an exception, kept on purpose: a dead device or an `adb` error during an optional fill's read-back fails the flow; elsewhere it is skipped.
   - A `fill` whose value holds a control character (`cannot type U+000A …`). The `✗` line reads `optional step not skipped: averi refused its value before anything was typed — …`.
