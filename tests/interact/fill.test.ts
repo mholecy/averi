@@ -955,3 +955,79 @@ describe('fillField — a field that shows its hint or placeholder as its value 
     });
   });
 });
+
+/**
+ * docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md:
+ * UIKit's sentence auto-capitalisation turned a typed `hello` into `Hello`
+ * (iOS 27.0, Contacts Notes, measured 2026-10-09) and the error read `typed 5
+ * characters but the field shows 5 (content withheld from this error)`. Still
+ * a failure — the field does not hold the value asked for — but the message
+ * says what differs, in counts, never in content.
+ */
+describe('fillField — the mismatch error says what differs, without content (2026-10-09)', () => {
+  /** A Notes-like field: `transform` is the app's hand on the whole text after each change. */
+  const transforming = (held: string | null, transform: (s: string) => string) => {
+    resetLayout();
+    const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'notes', value: held })) }, 'form');
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t);
+      if (fake.focused) fake.focused.value = transform((fake.focused.value ?? '') + t);
+    };
+    return fake;
+  };
+  const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const failureOf = async (p: Promise<unknown>) => ((await p.catch((e: unknown) => e)) as Error).message;
+
+  it('auto-capitalised, no clear: equal lengths, and the error says only the case differs, at how many characters — no content', async () => {
+    const message = await failureOf(fillField(transforming(null, capitalise), { id: 'notes' }, 'hello', FAST));
+    expect(message).toBe(
+      'fill: typed 5 characters but the field shows 5 — the typed text is there but for letter case, 1 character differing: ' +
+        'the app transformed the input (auto-capitalisation?); content withheld from this error',
+    );
+    expect(message).not.toMatch(/hello/i);
+  });
+
+  it('with clear: the same, after the retry (which the app transforms again)', async () => {
+    const fake = transforming('old', capitalise);
+    const message = await failureOf(fillField(fake, { id: 'notes' }, 'hello world', { ...FAST, clear: true }));
+    expect(fake.typed).toEqual(['hello world', 'hello world']);
+    expect(message).toMatch(/^fill: typed 11 characters but the field shows 11 — the typed text is there but for letter case, 1 character differing:/);
+  });
+
+  it('no clear onto held text: the typed text is found in the field but for case, however long the field', async () => {
+    const message = await failureOf(fillField(transforming('Note: ', (s) => s.toUpperCase()), { id: 'notes' }, 'hi there', FAST));
+    expect(message).toMatch(/^fill: typed 8 characters but the field shows 14 — the typed text is there but for letter case, 7 characters differing:/);
+  });
+
+  it('no clear: of several runs that match but for case, the closest one is counted', async () => {
+    const fake = transforming('HELLO ', (s) => s.replace(/hello$/, 'Hello'));
+    const message = await failureOf(fillField(fake, { id: 'notes' }, 'hello', FAST));
+    expect(message).toMatch(/^fill: typed 5 characters but the field shows 11 — the typed text is there but for letter case, 1 character differing:/); // not the 5 of `HELLO`
+  });
+
+  it('with clear the field must EQUAL the value: a longer field holding it but for case is a length difference, not a case one', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => `Re: ${capitalise(s)}`), { id: 'notes' }, 'hello', { ...FAST, clear: true }));
+    expect(message).toBe('fill: typed 5 characters but the field shows 9 (content withheld from this error)');
+  });
+
+  it('a masked field with clear says it compared by length, and names no held count (the clear emptied it)', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'pw', value: '••••' })) }, 'form');
+    appendBullets(fake, 1);
+    const message = await failureOf(fillField(fake, { id: 'pw' }, 'secret', { ...FAST, clear: true }));
+    expect(message).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length)');
+  });
+
+  it('same length, more than case (autocorrect `teh` → `the`): how many characters differ', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => s.replace('teh', 'the')), { id: 'notes' }, 'teh', FAST));
+    expect(message).toBe(
+      'fill: typed 3 characters but the field shows 3 — same length, 2 characters differing: ' +
+        'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+    );
+  });
+
+  it('a length difference says the lengths alone, as before (a mask that inserts a space)', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{4})(\d)/, '$1 $2')), { id: 'notes' }, '12345', FAST));
+    expect(message).toBe('fill: typed 5 characters but the field shows 6 (content withheld from this error)');
+  });
+});

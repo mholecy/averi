@@ -55,7 +55,7 @@
  * Its only import is the facts' types, from interact/fill-facts.ts (a
  * leaf): it imports neither fill.ts, which measures, nor fill-text.ts, which
  * reads the verdict — the graph is fill.ts → fill-facts.ts ← fill-verdict.ts
- * ← fill-text.ts, and fill.ts → fill-text.ts for its mismatch error's words.
+ * ← fill-text.ts, and fill.ts → fill-text.ts for its errors' words.
  */
 
 import type { FillResult, LostWhy, NearbyInput } from './fill-facts.js';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FillResult } from '../../src/interact/fill-facts.js';
+import type { FillFailure, FillResult } from '../../src/interact/fill-facts.js';
 import type { Caveat, FillVerdict, Reason } from '../../src/interact/fill-verdict.js';
-import { caveatText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
+import { caveatText, fillFailureText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
 import { charactersText } from '../../src/util/count.js';
 
 /**
@@ -252,5 +252,46 @@ describe('wordingOf — every sentence', () => {
       notInput('none'),
       'masked field already held 2 characters and clear is not set — typing APPENDS; pass clear: true to replace',
     ]);
+  });
+});
+
+/**
+ * The errors fillField throws, worded here since 2026-10-09 (they were inline
+ * in fill.ts). Every row takes lengths and counts only; the end-to-end shapes
+ * through a fake device are fill.test.ts's.
+ */
+describe('fillFailureText — every error a fill throws', () => {
+  const mismatch = (differs: Extract<FillFailure, { code: 'mismatch' }>['differs'], typed = 5, shows = 5) =>
+    fillFailureText({ code: 'mismatch', typed, shows, differs });
+
+  it('the device that went away, and the deletes that kept landing short — the wording they always had', () => {
+    expect(fillFailureText({ code: 'reread-failed', target: 'id:"amount_input"', cause: 'adb: device offline' })).toBe(
+      'fill: could not re-read id:"amount_input" after focusing it — adb: device offline. The field was tapped and may hold partial text; ' +
+        'check the device is still online (adb devices / xcrun simctl list), then retry with clear: true so the field is reset',
+    );
+    expect(fillFailureText({ code: 'clear-twice', left: 1 })).toBe('fill: field still shows 1 character after clearing twice');
+    expect(fillFailureText({ code: 'clear-twice', left: 4 })).toBe('fill: field still shows 4 characters after clearing twice');
+  });
+
+  it('a mismatch: the two lengths, then what differs — masked, case, same length, or the lengths alone', () => {
+    expect(mismatch({ kind: 'masked' }, 6, 5)).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length)');
+    expect(mismatch({ kind: 'masked', held: 0 }, 6, 5)).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length; it held 0 after focus)');
+    expect(mismatch({ kind: 'case', positions: 1 })).toBe(
+      'fill: typed 5 characters but the field shows 5 — the typed text is there but for letter case, 1 character differing: ' +
+        'the app transformed the input (auto-capitalisation?); content withheld from this error',
+    );
+    expect(mismatch({ kind: 'case', positions: 2 })).toMatch(/for letter case, 2 characters differing:/);
+    expect(mismatch({ kind: 'same-length', positions: 1 })).toBe(
+      'fill: typed 5 characters but the field shows 5 — same length, 1 character differing: ' +
+        'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+    );
+    expect(mismatch({ kind: 'length' }, 1, 4)).toBe('fill: typed 1 character but the field shows 4 (content withheld from this error)');
+  });
+
+  it('a mismatch on a node that is not an input names the input in the caveat\'s own words', () => {
+    const input = { identifier: 'name', rect: { x: 0, y: 20, width: 100, height: 10 }, overlaps: false };
+    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, notInput: { role: 'text', input } })).toBe(
+      `fill: typed 3 characters but the field shows 4 (content withheld from this error); ${caveatText({ code: 'not-input', role: 'text', typed: true, input })}`,
+    );
   });
 });

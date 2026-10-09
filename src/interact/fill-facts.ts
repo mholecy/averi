@@ -2,8 +2,9 @@
  * What a fill MEASURED — the facts interact/fill.ts#fillField returns, and
  * nothing else: no I/O, no judgement, no sentence. A leaf, so that the
  * three modules that read them each import it and none imports another for
- * its types — fill.ts measures (and imports fill-text.ts for one sentence,
- * its mismatch error's), fill-verdict.ts judges, fill-text.ts says. Until
+ * its types — fill.ts measures (and imports fill-text.ts for the words of
+ * the errors it throws, `fillFailureText` over a `FillFailure` here),
+ * fill-verdict.ts judges, fill-text.ts says. Until
  * 2026-10-09 these types lived in fill.ts, which imported fill-verdict.ts
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the
@@ -145,3 +146,52 @@ export type ReadBack =
   | { kind: 'lost'; why: LostWhy }
   | { kind: 'nothing-typed' };
 
+
+/**
+ * Why a fill THREW, as facts — the three failures fillField raises, worded
+ * by interact/fill-text.ts#fillFailureText like every other fill sentence
+ * (until 2026-10-09 they were template strings inline in fill.ts, the last
+ * fill sentences outside fill-text.ts). Lengths and counts only, never
+ * content: a value may be a credential.
+ * - `reread-failed`: the tree could not be read mid-fill — a dead device,
+ *   not a screen settling (fill.ts, `refetch`); `target` is the selector as
+ *   the caller wrote it, `cause` the adapter's message.
+ * - `clear-twice`: two delete rounds each CHANGED the field and neither
+ *   emptied it — deletes landing short; `left` what it still shows. (A round
+ *   that changes nothing is not this: FillResult.clearUnchanged.)
+ * - `mismatch`: the read-back showed text that is not the typed value
+ *   (`typed`, `shows`: the two lengths), after the clear-fill's one retry;
+ *   `differs` says what can be said of the difference without content;
+ *   `notInput` when the matched node is not an input (the nearest input,
+ *   as FillResult.notInput).
+ */
+export type FillFailure =
+  | { code: 'reread-failed'; target: string; cause: string }
+  | { code: 'clear-twice'; left: number }
+  | { code: 'mismatch'; typed: number; shows: number; differs: Difference; notInput?: { role: string; input: NearbyInput | 'none' | 'unread' } };
+
+/**
+ * What differs between the typed value and a read-back that did not match
+ * it, measured by fill.ts without carrying either string:
+ * - `masked`: the field shows bullets, compared by length only; `held` the
+ *   bullets it held after focus, without `clear` (undefined with it).
+ * - `case`: the typed text IS there but for letter case — at `positions`
+ *   characters (with clear the whole field; without, the best-matching run
+ *   of it). UIKit's sentence auto-capitalisation turning `hello` into
+ *   `Hello` is the measured case (2026-10-09, iOS Contacts Notes:
+ *   docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-
+ *   transforms-text.md), which read `typed 5 characters but the field shows
+ *   5` and nothing else.
+ * - `same-length`: the field shows as many characters as were typed, and
+ *   `positions` of them differ by more than case — autocorrect, smart
+ *   punctuation, a mask.
+ * - `length`: neither — the lengths are all that can be said.
+ * Still a FAILURE in every case: a field that shows `Hello` for `hello` does
+ * not hold the value asked for (a case-sensitive login, a code), and a
+ * case-insensitive pass would hide exactly that.
+ */
+export type Difference =
+  | { kind: 'masked'; held?: number }
+  | { kind: 'case'; positions: number }
+  | { kind: 'same-length'; positions: number }
+  | { kind: 'length' };

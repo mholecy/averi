@@ -6,10 +6,9 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
-import { caveatText } from './fill-text.js';
-import type { FillResult, LostWhy, NearbyInput, ReadBack } from './fill-facts.js';
+import { fillFailureText } from './fill-text.js';
+import type { Difference, FillFailure, FillResult, LostWhy, NearbyInput, ReadBack } from './fill-facts.js';
 import { INPUT_ROLE } from './input-role.js';
-import { charactersText } from '../util/count.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -177,11 +176,7 @@ export async function fillField(
     try {
       tree = await adapter.uiTree();
     } catch (e) {
-      throw new Error(
-        `fill: could not re-read ${describeTarget(target)} after focusing it — ${errorMessage(e)}. ` +
-          'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
-          'xcrun simctl list), then retry with clear: true so the field is reset',
-      );
+      throw failure({ code: 'reread-failed', target: describeTarget(target), cause: errorMessage(e) });
     }
     lastTree = tree;
     lostOnLastRead = undefined;
@@ -328,7 +323,7 @@ export async function fillField(
         break;
       }
       if (attempt >= 1) {
-        throw new Error(`fill: field still shows ${charactersText(left)} after clearing twice`);
+        throw failure({ code: 'clear-twice', left });
       }
     }
   }
@@ -412,13 +407,13 @@ export async function fillField(
       }
       if (observed !== undefined && !landed(observed)) {
         const wrong = await notInput();
-        throw new Error(
-          `fill: typed ${charactersText(value.length)} but the field shows ${observed.length} ` +
-            (isMaskedValue(observed)
-              ? `(masked field — compared by length${clear ? '' : `; it held ${maskedHeld} after focus`})`
-              : '(content withheld from this error)') +
-            (wrong === undefined ? '' : `; ${caveatText({ code: 'not-input', role: node.role, typed: true, input: wrong.input })}`),
-        );
+        throw failure({
+          code: 'mismatch',
+          typed: value.length,
+          shows: observed.length,
+          differs: isMaskedValue(observed) ? { kind: 'masked', held: clear ? undefined : maskedHeld } : differenceOf(observed, value, clear === true),
+          notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
+        });
       }
     }
     if (readBack.kind !== 'not-taken') {
@@ -438,7 +433,59 @@ export async function fillField(
   };
 }
 
-/** Poll the field until its exposed value satisfies `ok`; returns the last observation. */
+/** A fill's error: its words are fill-text.ts's, like every fill sentence. */
+function failure(f: FillFailure): Error {
+  return new Error(fillFailureText(f));
+}
+
+/**
+ * What can be said of a non-masked read-back that missed the value, without
+ * carrying either string (fill-facts.ts#Difference): with `clear` the field
+ * must EQUAL the value, so the two are compared whole; without, it must
+ * CONTAIN it, so every run of the field as long as the value is compared
+ * and the closest one counts. Only position-for-position: an inserted or
+ * dropped character is a length difference (`length`), as before.
+ * Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for
+ * the measured auto-capitalisation; a case pair whose forms differ in length
+ * (`ß`/`SS`) reads as a plain difference, never as a pass.
+ */
+function differenceOf(observed: string, value: string, clear: boolean): Difference {
+  let caseOnly: number | undefined; // fewest case-only differing characters over the runs compared
+  const starts = clear ? (observed.length === value.length ? [0] : []) : Array.from({ length: Math.max(0, observed.length - value.length + 1) }, (_, i) => i);
+  for (const at of starts) {
+    let differ = 0;
+    let caseAlone = true;
+    for (let i = 0; i < value.length && caseAlone; i++) {
+      const a = observed[at + i];
+      const b = value[i];
+      if (a === b) continue;
+      differ++;
+      caseAlone = a.toLowerCase() === b.toLowerCase() || a.toUpperCase() === b.toUpperCase();
+    }
+    if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
+  }
+  if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
+  if (observed.length !== value.length) return { kind: 'length' };
+  let differ = 0;
+  for (let i = 0; i < value.length; i++) if (observed[i] !== value[i]) differ++;
+  return { kind: 'same-length', positions: differ };
+}
+
+/**
+ * Poll the field until its exposed value satisfies `ok`; returns the last observation.
+ *
+ * It does NOT stop early on a stable mismatch (considered 2026-10-09: the
+ * auto-capitalised fill in docs/bugs/2026-10-09-fill-mismatch-error-says-
+ * equal-counts-when-app-transforms-text.md ran its whole budget, 36 s on a
+ * WDA tree that reads in ~4 s). Two equal reads 400 ms apart are what a field
+ * still waiting on its input looks like too: the reason this poll exists is
+ * synthetic input arriving late (Compose async state, an IME queue on a
+ * loaded emulator — 3 of 11 characters measured landed at first, 2026-08-05),
+ * and a stop on "unchanged" would fail exactly those fills, or with clear
+ * wipe and retype them. The cost of a transformed value is paid on a fill
+ * that fails anyway; the price of stopping early would be paid by ones
+ * that pass.
+ */
 async function pollValue(
   refetch: () => Promise<UiNode | undefined>,
   ok: (observed: string) => boolean,
