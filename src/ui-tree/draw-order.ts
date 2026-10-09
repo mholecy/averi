@@ -535,9 +535,10 @@ const NOT_DRAWN = {
    * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
    * where idb resumes listing another container in reading order
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
-   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target` only: the owner's decision of 2026-10-09 on
-   * docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-
-   * covered-by-the-content-behind-it.md, a regression of `flatListChrome`.
+   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target`
+   * only: the owner's decision of 2026-10-09 on docs/bugs/2026-10-09-ios-
+   * idb-modal-listed-before-content-reads-covered-by-the-content-behind-
+   * it.md, a regression of `flatListChrome`.
    *
    * Measured (tests/fixtures/idb-modal-listed-before-content.json): idb
    * lists mp-native's payment-type chooser — a card drawn over the dimmed
@@ -678,20 +679,21 @@ const NOT_DRAWN = {
   },
 
   /**
-   * THE TARGET'S OWN CONTROL: an INTERACTIVE node with no label and no
-   * value, a sibling of a NON-INTERACTIVE target, that holds the target's
-   * rect whole and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and
-   * width exactly (`spansWidth`) — or is PADDED in it on all four sides,
-   * evenly and centred on the target (`paddedOn`); the parent not the
-   * screen's size (`screenSized`), nor the control. `target` only (2026-10-09, docs/bugs/2026-10-09-android-
-   * compose-button-text-refused-as-under-its-own-button.md — a regression of
-   * this column's first round): a Compose `Button` reaches uiautomator as a
-   * wrapper holding its label text and, AFTER it, an unlabelled clickable
-   * `button` — mp-native's `container 44,1397 992x132` → `text 'LOGIN'
-   * 481,1438 118x49`, `button 44,1402 992x121`. That button read as drawn
-   * over the text: `tap text:"LOGIN"` was refused, `scroll_until` called
-   * the screen a layout defect, and an `optional:` tap skipped. A tap at
-   * the label's centre lands on the button — what the caller means.
+   * THE TARGET'S OWN CONTROL: an INTERACTIVE node with no label and no value,
+   * a sibling of a NON-INTERACTIVE target, that holds the target's rect whole
+   * and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
+   * exactly (`spansWidth`) — or is PADDED in it on all four sides, evenly and
+   * centred on the target (`paddedOn`); the parent not the screen's size
+   * (`screenSized`), nor the control. `target` only (2026-10-09,
+   * docs/bugs/2026-10-09-android-compose-button-text-refused-
+   * as-under-its-own-button.md — a regression of this column's first round):
+   * a Compose `Button` reaches uiautomator as a wrapper holding its label
+   * text and, AFTER it, an unlabelled clickable `button` — mp-native's
+   * `container 44,1397 992x132` → `text 'LOGIN' 481,1438 118x49`, `button
+   * 44,1402 992x121`. That button read as drawn over the text: `tap
+   * text:"LOGIN"` was refused, `scroll_until` called the screen a layout
+   * defect, and an `optional:` tap skipped. A tap at the label's centre lands
+   * on the button — what the caller means.
    *
    * The two shapes are the round-5 ui_snapshots' (tests/fixtures/android-
    * ui-snapshot-compose.json; every node there under a later unlabelled
@@ -726,36 +728,34 @@ const NOT_DRAWN = {
    * only (a tall narrow one).
    *
    * What still covers: a pinned CTA in the SAME parent as a text (review of
-   * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over
-   * "Forgot password?" in its 1080-wide ConstraintLayout with the keyboard
-   * up, `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"`
-   * over its fee) — labelled, inset from its layout's sides and not evenly
-   * on all four (LOG IN: 40, 40, 940, 20); a
-   * non-interactive node holding the label (an opaque card, a loading
-   * view); an interactive TARGET under a later control (a button over a
-   * button); a control in a screen-sized parent, or screen-sized itself
-   * (`screenSized`: at least SCREEN_SIZED_FRACTION, 0.9, of the screen) —
-   * a scrim, an RN transparent Modal's backdrop, a dismiss region, ONLY
-   * when it or its parent is that large (see the residual); one that
-   * does not hold the label whole (a field's clear button); one in another
-   * parent. idb's flat list never meets this row: every node's parent is
-   * its 0×0 root, which no control spans or lies in. Residual, stated: an
+   * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over "Forgot
+   * password?" in its 1080-wide ConstraintLayout with the keyboard up,
+   * `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"` over
+   * its fee) — labelled, inset from its layout's sides and not evenly on all
+   * four (LOG IN: 40, 40, 940, 20); a non-interactive node holding the label
+   * (an opaque card, a loading view); an interactive TARGET under a later
+   * control (a button over a button); a control in a screen-sized parent, or
+   * screen-sized itself (`screenSized`: at least SCREEN_SIZED_FRACTION, 0.9,
+   * of the screen) — a scrim, an RN transparent Modal's backdrop, a dismiss
+   * region, ONLY when it or its parent is that large (see the residual); one
+   * that does not hold the label whole (a field's clear button); one in
+   * another parent. idb's flat list never meets this row: every node's parent
+   * is its 0×0 root, which no control spans or lies in. Residual, stated: an
    * unlabelled interactive node spanning the width of a wrapper it shares
-   * with a label, or padded evenly in it and centred on the label, is read
-   * as the label's control, and the tap is sent to it — geometry cannot
-   * tell it from a Compose Button. So: a Compose
-   * `clickable(role = Role.Button)` overlay laid over a text in a Box of
-   * its width (a card's tap target, a disabled-state scrim cut to the
-   * card), an unlabelled `ImageButton` filling a thumbnail's FrameLayout
-   * over its caption text, an unlabelled full-width bar button pinned over
-   * a text in the bar's own layout, and — under WDA — a React Native
-   * in-tree dismiss backdrop (a `Pressable` with `absoluteFill` and
-   * `accessibilityRole="button"`, no label) inside a safe-area container
-   * `0,59 402x781`, 0.894 of the screen and so not screen-sized: the
-   * backdrop spans the container's width and holds the sheet's texts — all
-   * excused; and an unlabelled clickable overlay laid with an even margin
-   * over a centred text in its card (the margin at most half the overlay's
-   * side).
+   * with a label, or padded evenly in it and centred on the label, is read as
+   * the label's control, and the tap is sent to it — geometry cannot tell it
+   * from a Compose Button. So: a Compose `clickable(role = Role.Button)`
+   * overlay laid over a text in a Box of its width (a card's tap target, a
+   * disabled-state scrim cut to the card), an unlabelled `ImageButton`
+   * filling a thumbnail's FrameLayout over its caption text, an unlabelled
+   * full-width bar button pinned over a text in the bar's own layout, and —
+   * under WDA — a React Native in-tree dismiss backdrop (a `Pressable` with
+   * `absoluteFill` and `accessibilityRole="button"`, no label) inside a
+   * safe-area container `0,59 402x781`, 0.894 of the screen and so not
+   * screen-sized: the backdrop spans the container's width and holds the
+   * sheet's texts — all excused; and an unlabelled clickable overlay laid
+   * with an even margin over a centred text in its card (the margin at most
+   * half the overlay's side).
    */
   ownControl: {
     target: (placed, { target, screenArea }) =>
@@ -934,21 +934,20 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
 export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 
 /**
- * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): idb
- * marks no keyboard node, so its keys — plain `button`s listed LAST — are
- * the only covers of the rows under it. Its background is a screen-wide,
- * unlabelled structural node ending at the screen's bottom and starting
- * below the top bar's band (so never the screen's size), listed right
- * after the keys; the
+ * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): idb marks
+ * no keyboard node, so its keys — plain `button`s listed LAST — are the only
+ * covers of the rows under it. Its background is a screen-wide, unlabelled
+ * structural node ending at the screen's bottom and starting below the top
+ * bar's band (so never the screen's size), listed right after the keys; the
  * keyboard is that node and the run of nodes listed beside it (before and
  * after, in the list's order) lying wholly inside it. Measured on all four
- * keyboard dumps of the round-2 to round-8 device checks: run2-ios #250
- * (the SWIFT form's number pad, `other 0,589 402x285` after `1`…`Delete`),
+ * keyboard dumps of the round-2 to round-8 device checks: run2-ios #250 (the
+ * SWIFT form's number pad, `other 0,589 402x285` after `1`…`Delete`),
  * run3-ios #45 and #51 and run8-ios #233 (`other 0,590 402x284` after the
  * QWERTY keys, `Dictate 325,805 68x69` after it). Shape, not labels: key
- * labels follow the language and the layout. The app's own PIN pad
- * (run5-ios #81) has no such background, and is content. Undefined when no
- * node has that shape (the last one listed is taken).
+ * labels follow the language and the layout. The app's own PIN pad (run5-ios
+ * #81) has no such background, and is content. Undefined when no node has
+ * that shape (the last one listed is taken).
  */
 function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
   const bottom = screen.y + screen.height;
