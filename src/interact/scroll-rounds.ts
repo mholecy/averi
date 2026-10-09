@@ -1133,6 +1133,13 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * oscillation back. The cost: a scroll that turned once early keeps the
  * shorter strokes (and spends more of `maxSwipes`) if the target then
  * turns out to be further away than one move.
+ *
+ * A known cost, accepted (code review P7, 2026-10-09): the strokes follow
+ * the caller's direction, not where a cover lies. A target in the frame
+ * under a cover at the TOP of the screen (a node of the app drawn over it
+ * there, `stops`) is stroked on toward the content below, carried further
+ * under or past the top edge, and only then turned back — extra strokes,
+ * never a wrong stop.
  */
 function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean } {
   const toward = s.dropped ?? (s.carriedPast ? OPPOSITE[s.rules.direction] : s.rules.direction);
