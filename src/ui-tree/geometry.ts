@@ -522,6 +522,16 @@ export function containsPoint(rect: Rect, point: Point): boolean {
 }
 
 /**
+ * Does `inner` lie wholly inside `outer` — edges included. The rect-in-rect
+ * companion of `containsPoint`; scroll-rounds.ts#touchedOn asks it so that a
+ * wrapper whose rect holds the whole stroke container is not named as what
+ * the stroke touched down on (review round 1 of fix/r4-stroke, 2026-10-09).
+ */
+export function rectWithin(inner: Rect, outer: Rect): boolean {
+  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
+}
+
+/**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
  * the content exhausted is a missing-clearance bug, 'top' is a sticky header

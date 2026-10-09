@@ -9,6 +9,7 @@ import {
   rectArea,
   rectIntersection,
   rectsOverlap,
+  rectWithin,
   sameRect,
   sameRectWithinPixel,
   scrollersOf,
@@ -310,6 +311,19 @@ describe('rectIntersection — the rect two rects share (moved here from swipe.t
     expect(rectIntersection(list, { x: 0, y: 2000, width: 1080, height: 50 })).toBeUndefined(); // flush with the bottom edge
     expect(rectIntersection(list, { x: 1080, y: 200, width: 10, height: 10 })).toBeUndefined(); // flush with the right edge
     expect(rectIntersection(list, { x: 1080, y: 2000, width: 10, height: 10 })).toBeUndefined(); // corner only
+  });
+});
+
+describe('rectWithin — rect-in-rect, edges included (touchedOn\'s wrapper rule, here since the code review of fix/r4)', () => {
+  const list = { x: 0, y: 825, width: 1080, height: 1395 };
+  it('a rect equal to or inside the outer one is within it; one past any edge is not', () => {
+    expect(rectWithin(list, list)).toBe(true);
+    expect(rectWithin({ x: 66, y: 1840, width: 948, height: 248 }, list)).toBe(true);
+    expect(rectWithin(list, { x: 66, y: 1840, width: 948, height: 248 })).toBe(false);
+    expect(rectWithin({ ...list, x: -1 }, list)).toBe(false);
+    expect(rectWithin({ ...list, y: 824 }, list)).toBe(false);
+    expect(rectWithin({ ...list, width: 1081 }, list)).toBe(false);
+    expect(rectWithin({ ...list, height: 1396 }, list)).toBe(false);
   });
 });
 

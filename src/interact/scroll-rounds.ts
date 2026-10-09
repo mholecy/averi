@@ -1,5 +1,5 @@
 import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { clippedEdges, containsPoint, drawnOver, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { clippedEdges, containsPoint, drawnOver, largestScroller, rectArea, rectWithin, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -1314,10 +1314,6 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: { within: Rect; 
  * `StrokeContainer`), or when it touched down on nothing drawn over its
  * container. One scan of the tree, at the stop only.
  */
-/** `inner` lies wholly inside `outer`. */
-const rectWithin = (inner: Rect, outer: Rect): boolean =>
-  inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
-
 function touchedOn(s: State, facts: TreeFacts): TouchedOn | undefined {
   const { strokeWithin: container, lastDrawn } = s;
   if (container === undefined || lastDrawn === undefined) return undefined;
