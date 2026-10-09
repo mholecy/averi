@@ -105,3 +105,22 @@ Probe cap on this screen: 0.08 × 2220 = 178 px.
   [2026-10-08-scroll-until-ignores-android-soft-keyboard.md](2026-10-08-scroll-until-ignores-android-soft-keyboard.md). 48 px is exactly
   2 × TOUCH_SLOP; it moved nothing here, which is right for a row that is not cut (the row read `0,825 1080x170` before and after; the keyboard-down screenshot of 11:28 shows it whole — none was taken on this IME-up run),
   but a 48-px probe on a CUT row was not tried, so whether it is long enough to reveal a cut is unmeasured. Search field still empty after.
+
+## Device check (2026-10-09 Android, re-run at 86eb42d)
+
+Measured 12:56–12:59 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked), averi = mobile-verify `fix/round-3` @
+`86eb42d` (`dist/` built 12:50 UTC, HTTP daemon port 47821, cwd mp-native). mp-native Account Detail and SWIFT form (container
+`0,242 1080x1736`; the pinned CONTINUE bar `66,1979 948x132` lies BELOW it, not over it). Rows placed by slow manual drags with the real
+`adb`. Round-4 handoff items 1.5 (round-3 e) and §5 (SWIFT form).
+
+- **Holds — carousel `fills`.** List at the top, bar shown. 12:56:28 `scroll_until { selector: "id:accounts.detail.header", fully: true }` →
+  `Element id:accounts.detail.header fully visible after 0 swipes; but it fills its scroll container (0,275 1080x330) exactly — its top and bottom edges lie on the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot`
+  (2.1 s), verbatim as at 347e70d; no stroke. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-25-0.png`.
+- **Holds — top-edge probe with the tab bar shown.** 12:56:31 `scroll_until { selector: "id:transactions.list.filter_panel", fully: true }`
+  → `Element id:transactions.list.filter_panel fully visible after 1 swipe; its top edge lies on its scroll container's (0,825 1080x1395), and a probe swipe toward it moved nothing — nothing of it is cut there`
+  (4.8 s). Probe `input swipe 540 1104 540 1281 300` — identical to 347e70d (a finger-down probe is content-up, never cut by the bar).
+- **Holds (§5) — Fees probe on the SWIFT form.** Keyboard down, `fees_select` read `66,242 948x121` (cut by the top bar). 12:59:42
+  `scroll_until { selector: "id:swift_payment.form.fees_select", fully: true }` → `Element id:swift_payment.form.fees_select fully visible
+  after 1 swipe` (8.0 s). Shim: one probe `input swipe 540 589 540 766 300` — finger DOWN, 177 px ≤ 178, inside the container, the same
+  stroke as 347e70d. Row after `66,351 948x143`; screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-52-0.png` shows `Fees*` and its value whole. The overlay cut did not
+  fire (the CONTINUE bar is not over the container).

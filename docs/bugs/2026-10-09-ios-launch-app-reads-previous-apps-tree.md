@@ -199,3 +199,70 @@ appAlive: true
 ```
 
 (The PASS is right here: the terminate had closed the "New Contact" sheet; Contacts showed its list.)
+
+## Device check (2026-10-09 iOS, re-run at 86eb42d)
+
+Measured 12:53–13:21 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, server restarted 12:53:13, cwd `/Users/mholecy/Finshape/mp-native`),
+default `treeSource: idb`, scratch configs `run6-ios/cfg-contacts-idb` (`launch_contacts`: `- launch: {}` + absent `id:"New Contact"`),
+`idb` PATH shim; raw `idb ui describe-all` reads beside averi's. Run folder: `scratchpad/averi-repo/run6-ios`. The give-up note's
+own items (3.1, 3.2, 3.4) are in
+[2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md](2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md).
+
+**a3 previous app's tree never read — Holds, 3/3 + 2/2.** Each launch with the other app in front, no `⚠` line:
+
+```
+13:00:57 launch_app com.apple.MobileAddressBook → Launched com.apple.MobileAddressBook on ios                 (2.0 s)
+         assert [{ element: { text: "John Appleseed" }, absent: true, timeout: 500 }]
+         → 1/1 asserts FAILED / FAIL  element text:"John Appleseed" is absent — still visible after 0.5 s / appAlive: true (1.3 s)
+13:01:04 same → (2.0 s), assert FAILED the same way (1.2 s)
+13:01:12 same → (2.0 s), assert FAILED the same way (1.2 s)
+13:01:22 launch_app com.finshape.dbosbanking → Launched com.finshape.dbosbanking on ios                       (1.1 s)
+         assert [{ element: { id: "accounts.detail.search_field" }, absent: true, timeout: 500 }]
+         → 1/1 asserts FAILED / FAIL  element id:"accounts.detail.search_field" is absent — still visible after 0.5 s   (1.3 s)
+13:01:29 same → (1.1 s), assert FAILED the same way (1.2 s)
+```
+
+(Contacts showed its list, so the Contacts-side absent check used the `John Appleseed` row instead of round 3's open sheet.)
+Launch times match 347e70d (Contacts 1.9–2.1 s, bank 1.0–1.2 s). Cold Contacts launches: 12:57:31 3.4 s, 13:10:27 3.4 s, 13:10:46 3.6 s,
+13:20:27 3.6 s, no `⚠`.
+
+**a5 localized display name — Holds (no failure); the third branch fires.** Originals recorded first (`run6-ios/lang-before.txt`):
+`AppleLanguages ("en-US", "sk-US")`, `AppleLocale en_US@rg=skzzzz`; the global domain exported (`run6-ios/global-before.plist`).
+Set `AppleLanguages (de-DE, en-US, sk-US)`, bank app brought to front through averi, Contacts terminated:
+
+```
+13:09:46 launch_app com.apple.MobileAddressBook                                                             (4.2 s)
+→ Launched com.apple.MobileAddressBook on ios
+  ⚠ 3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Kontakte" — iOS can
+  hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app (an absent
+  check passes on it). Treat the tree as the previous app's until a read is labelled "Contacts": after an app switch idb was
+  measured serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is still labelled
+  "Kontakte" while the screenshot shows com.apple.MobileAddressBook is that label its on-screen name (a localized display name
+  its Info.plist does not carry), and this note can be ignored. The screenshot alone cannot tell them apart: it shows the
+  launched app before idb's tree does
+```
+
+The "can be ignored" licence on the screenshot alone is gone; the owner branch did not fire ("Kontakte" is no name averi holds).
+Raw reads: `Application 'Kontakte'` (pid 55033, 18 nodes) at 13:09:50 and again at 13:10:08 (22 s after the launch) — so the
+note's own 20 s test, applied, resolves it as the localized name. Screenshot `run6-ios/img-31-0.png`: Contacts titled
+"Kontakte", search "Suchen". The launch did not fail. Restored `AppleLanguages (en-US, sk-US)`; the exported global domain
+compared **identical** (`cmp`) to the one before; Contacts terminate + launch (13:10:27, 3.4 s, no `⚠`) → `Application 'Contacts'` at 13:10:31. The bank app showed Account Detail, logged in (`run6-ios/img-37-0.png`).
+
+**Flow `launch:` ⚠ trace — Holds.** Language still German, bank in front (13:10:12):
+
+```
+run_flow { flow: launch_contacts, configPath: <scratch naming Contacts> }                                    (4.3 s)
+flow launch_contacts: start
+launch: com.apple.MobileAddressBook
+⚠ launch: 3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Kontakte" — …
+  Treat the tree as the previous app's until a read is labelled "Contacts": … Only if a read 20 s or more after the launch is
+  still labelled "Kontakte" … this note can be ignored. The screenshot alone cannot tell them apart: it shows the launched app
+  before idb's tree does
+assert PASS: element id:"New Contact" is absent
+flow launch_contacts: done
+appAlive: true
+```
+
+The new text reaches the flow trace verbatim (the line elided above is identical to the `launch_app` reply). The PASS is right:
+Contacts showed its list.
