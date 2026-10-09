@@ -896,6 +896,8 @@ interface RawNode {
   'content-desc'?: string;
   focusable?: string;
   'long-clickable'?: string;
+  /** "true" on a node that scrolls now — its descendants' bounds are clipped to it (types.ts#UiNode.clipsDescendants). */
+  scrollable?: string;
   bounds?: string;
   node?: RawNode | RawNode[];
 }
@@ -939,6 +941,10 @@ function normalizeNode(raw: RawNode): UiNode {
     value: isTextInput ? text : null,
     rect: parseBounds(raw.bounds),
     children: rawChildren.map(normalizeNode),
+    // The one fact the role cannot carry: uiautomator has already cut every
+    // descendant's bounds to this node (types.ts#UiNode.clipsDescendants —
+    // why a flag and not a `scrollable` role for a Compose scroller).
+    ...(raw.scrollable === 'true' && { clipsDescendants: true as const }),
   };
 }
 

@@ -212,6 +212,38 @@ export interface UiNode {
    * Absent everywhere on Android and on an idb tree.
    */
   ofKeyboard?: true;
+  /**
+   * Set on a node whose DESCENDANTS' rects the tree source has already
+   * intersected with this node's own rect (2026-10-09,
+   * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-
+   * to-scroll-container.md): Android only, on every node uiautomator dumps
+   * with `scrollable="true"` — a RecyclerView or ScrollView, and a Compose
+   * scroller, which dumps as a plain `android.view.View` (role `container`)
+   * and is told apart by this attribute alone. uiautomator reports each
+   * node's bounds clipped to its scroll container (and the display), so a
+   * row half behind a pinned bar reads shorter, with an edge exactly on the
+   * container's edge — measured on the SWIFT form, container
+   * `[0,242][1080,1978]`, a 143-px row read `{y:242, height:92}` — and
+   * nothing in the rect says the rest exists. Read by
+   * ui-tree/geometry.ts#scrollerOf, which hands `scroll_until` each match's
+   * nearest such ancestor so a `fully: true` stop flush with it is checked
+   * before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
+   *
+   * A flag, not a role (decided 2026-10-09): mapping a Compose scroller to
+   * `scrollable` would change three things this fix does not want to touch —
+   * ui-tree/bare-tree.ts counts any non-structural role as content, so a
+   * Compose screen whose only node is an empty scroller would stop reading
+   * bare (the unsafe direction for `absent:`, verdict.ts); `role:container`
+   * and `role:scrollable` selectors written against today's trees would
+   * change what they match; and geometry.ts#shadowing's
+   * CONTENT_FRAMED_ROLES would start excusing those frames. Absent on iOS:
+   * WDA and idb report a node's frame unclipped — a row under the top bar
+   * reads at y -48, past the frame (interact/scroll-rounds.ts#beyondFarEdge
+   * is built on that) — so there is nothing to mark. Absent too on an
+   * Android node that cannot scroll now (`scrollable="false"`: a list whose
+   * content fits), whose children are not cut by it.
+   */
+  clipsDescendants?: true;
 }
 
 /**

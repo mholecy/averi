@@ -79,6 +79,22 @@ describe('parseUiautomatorXml', () => {
     });
     expect(t.children[1]).toMatchObject({ role: 'scrollable', value: null });
   });
+
+  it('marks a node uiautomator dumps scrollable="true" as clipping its descendants — a Compose scroller keeps its role (container), only the flag says it scrolls; scrollable="false" and absent are not marked', () => {
+    // 2026-10-09, docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md: the SWIFT form's scroller.
+    const t = parseUiautomatorXml(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" scrollable="true" bounds="[0,242][1080,1978]">
+    <node class="android.view.View" resource-id="app:id/fees_select" bounds="[66,242][1014,334]" />
+  </node>
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="false" bounds="[0,1979][1080,2111]"><node class="android.widget.TextView" text="x" bounds="[0,1979][100,2000]" /></node>
+</node>
+</hierarchy>`);
+    expect(t.children[0]).toMatchObject({ role: 'container', clipsDescendants: true });
+    expect(t.children[0].children[0].clipsDescendants).toBeUndefined();
+    expect(t.children[1].clipsDescendants).toBeUndefined();
+    expect('clipsDescendants' in t).toBe(false); // absent, not false: ui_snapshot prints the tree as JSON
+  });
 });
 
 describe('AndroidAdapter interactions', () => {
