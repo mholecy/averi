@@ -730,6 +730,12 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     ['contactsCreateStaged', 'Add phone', { x: 236, y: 968 }],
     ['contactsCreateStaged', 'Add fields', { x: 288, y: 2130 }],
     ['contactsCreate', 'Add phone', { x: 236, y: 2114 }],
+    // The ICON buttons: the label node under a control padded on all four sides (refused at 2f98900).
+    ['contactsCreateStaged', 'Cancel', { x: 77, y: 154 }],
+    ['contactsCreateStaged', 'More options', { x: 1003, y: 154 }],
+    ['contactsCreateStaged', 'Delete', { x: 1014, y: 830 }],
+    ['contactsCreate', 'Cancel', { x: 77, y: 154 }],
+    ['contactsCreate', 'Delete', { x: 1014, y: 1976 }],
   ])('the real %s snapshot: tap text:"%s" lands on the text\'s centre, and scroll_until stops on it after 0 swipes', async (screen, label, centre) => {
     const fake = await snapshot(screen);
     expect(await scrollUntilVisible(fake, `text:"${label}"`, { maxSwipes: 2, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
