@@ -1,4 +1,4 @@
-import { everyNode, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, largestRect, rectCentre, rectWithin, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 
@@ -96,12 +96,17 @@ export interface DrawOrder {
    * no keyboard node, and its band is read with the input method's word,
    * ui-tree/keyboard-cover.ts — so the caller cuts it out of `within`). The
    * covers are the nodes after `node`'s subtree in pre-order (its first
-   * place in the tree, as `shadowing`) that draw for a target
-   * (`NOT_DRAWN`'s `target` column) and share area with the part of `node`
-   * inside `within` — a cover's rect, or, for a node pinned at the bottom of
-   * idb's flat list, that rect run down to the screen's bottom edge
-   * (`bottomPinned`, `pinnedReach`: the pinned bar's background and hit
-   * area, which idb lists as no node). A node not in this tree has no covers.
+   * place in the tree, as `shadowing`) — and, in idb's flat list, a
+   * floating tab bar's items listed before it, when it lies outside the bar
+   * (`tabBarsOf`: idb lists the bar first; a nested tree's order is its draw
+   * order) — that draw for a
+   * target (`NOT_DRAWN`'s `target` column) and share area with the part of
+   * `node` inside `within` — a cover's rect, or, for a node pinned at the
+   * bottom of idb's flat list, that rect run down to the screen's bottom
+   * edge (`bottomPinned`, `pinnedReach`: the pinned bar's background and hit
+   * area, which idb lists as no node), and, for a tab bar's item, raised
+   * above it by the bar's lift (its surface, no node of any tree). A node
+   * not in this tree has no covers.
    */
   exposure(node: UiNode, within: Rect): Exposure;
 }
@@ -125,12 +130,13 @@ export const MIN_TAP_PIECE_FRACTION = 0.06;
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
   readonly shows: number;
-  /** The nodes drawn over it inside `within`, in pre-order; empty when none. */
+  /** The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before it among them, `tabBarsOf`); empty when none. */
   readonly covers: readonly UiNode[];
   /**
    * Where each of `covers` presses, in the same order: its rect, or — for a
    * node pinned at a flat list's bottom (`bottomPinned`) — its reach
-   * (`pinnedReach`). The rects `shows`, `largest` and `coverAt` are judged
+   * (`pinnedReach`), raised by its bar's lift for a floating tab bar's item
+   * (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`). The rects `shows`, `largest` and `coverAt` are judged
    * against, so a caller asking where a cover lies over the target (scroll-
    * rounds.ts#overFarSide) asks of the same rect.
    */
@@ -195,7 +201,7 @@ interface SeenFor extends Seen {
   readonly barLine: number;
   /** The walk index of the reading-order break after a flat list's CONTENT target (`readingBreak`): the later nodes from it on are no cover of it. The walk's length when there is none, the target is the top bar's, or the tree is not a flat list. */
   readonly readingBreak: number;
-  /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`) and idb's keyboard (`keyboardOf`): never past the break. */
+  /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) and a floating tab bar's items (`tabBarsOf`): never past the break. */
   readonly bottomChrome: ReadonlySet<Placed>;
   /** The tree's source lists a control's touch target as its wrapper (`UiNode.paddedTouchTargets` on its root): `ownControl`'s padded shape is asked only then. */
   readonly paddedTouchTargets: boolean;
@@ -245,6 +251,9 @@ const screenSized = (n: UiNode, screenArea: number): boolean => n.children.lengt
 
 /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
+
+/** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
+const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));
 
 /**
  * `node` repeats `target` (the `onTarget` row, in a flat list): it carries
@@ -304,8 +313,28 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
   return least >= 1 && most - least <= 1 && 2 * most <= Math.min(control.width, control.height) + 1 && Math.abs(c.x - t.x) <= 1 && Math.abs(c.y - t.y) <= 1;
 };
 
+/**
+ * How far a label may overhang the text input it lies in and still be read
+ * as that field's (`fieldOf`, the `ownControl` row), on every side, in the
+ * tree's units: 2 — the owner's decision of round 7, "up to 1–2 pt";
+ * measured, the SWIFT form's `Payee’s name` `42,446 103x22` over its
+ * `textfield 42,447 318x20`, 1 pt above and below. In pixels on Android, so
+ * there a third of that — stricter, the safe direction.
+ */
+export const LABEL_OVERHANG = 2;
+
+/**
+ * The `ownControl` row's text input: `control` is one (`INPUT_ROLE`),
+ * holds `target`'s centre, and holds its rect whole once grown by
+ * `LABEL_OVERHANG` on every side.
+ */
+const fieldOf = (control: UiNode, target: Rect): boolean =>
+  control.role === INPUT_ROLE &&
+  containsPoint(control.rect, rectCentre(target)) &&
+  rectWithin(target, { x: control.rect.x - LABEL_OVERHANG, y: control.rect.y - LABEL_OVERHANG, width: control.rect.width + 2 * LABEL_OVERHANG, height: control.rect.height + 2 * LABEL_OVERHANG });
+
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
-const itemless = (n: UiNode): boolean => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
+const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
@@ -366,12 +395,31 @@ const NOT_DRAWN = {
    * So the wrapper must also be the screen's size (`SCREEN_SIZED_FRACTION`,
    * a Window's `Other`) or hold the target's scroll view whole (the form's
    * frame) — a bar holds neither (`holdsWhole`).
+   * And, since round 7 (docs/bugs/2026-10-09-ios-wda-cell-background-and-
+   * textfield-scroll-bar-read-as-covers.md), an unlabelled, unvalued one
+   * and with no identifier, whose every descendant is an EMPTY FRAME
+   * (`framesOnly`), as `itemlessToolbar` judges a toolbar: it carries
+   * nothing drawable. Measured under WDA on Settings › General › Language &
+   * Region (iOS 27): a grouped cell `container LOCALE 'Region, Slovakia'
+   * 20,411 362x54` lists its button's wrapper, then its background —
+   * `container 20,411 362x54` → `container 20,411 362x54`, nothing else —
+   * then a separator and the chevron; the background, the cell's size and
+   * neither the screen's nor holding its scroll view, refused `tap
+   * text:"Region"` and `id:LOCALE`, and `scroll_until` swiped to maxSwipes
+   * with the row on screen. The Compose tab-bar host still covers: its
+   * tabs carry identifiers and labels. Residual, stated: an opaque wrapper
+   * whose only content is empty frames (a card's background drawn by a
+   * bare `Other` over a row it was laid after), or an icon WDA gives as
+   * nested empty frames (an RN SVG: the myport login's flag icons, whose
+   * unlabelled frames no longer cover the switcher they lie in), reads as
+   * drawing nothing — a false "clear"; WDA gives such a node no trait that
+   * tells it from the cell's background.
    */
   structural: {
     shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
     target: ({ node }, { target, screenArea }) =>
-      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea)),
+      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
   },
 
   /**
@@ -546,7 +594,8 @@ const NOT_DRAWN = {
    * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
    * where idb resumes listing another container in reading order
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
-   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target`
+   * its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) or a
+   * floating tab bar's item (`tabBarsOf`, round 7). `target`
    * only: the owner's decision of 2026-10-09 on docs/bugs/2026-10-09-ios-
    * idb-modal-listed-before-content-reads-covered-by-the-content-behind-
    * it.md, a regression of `flatListChrome`.
@@ -694,7 +743,9 @@ const NOT_DRAWN = {
    * a sibling of a NON-INTERACTIVE target, that holds the target's rect whole
    * and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
    * exactly (`spansWidth`) — or is PADDED in it on all four sides, evenly and
-   * centred on the target (`paddedOn`); the parent not the screen's size
+   * centred on the target (`paddedOn`); or a TEXT INPUT holding the target's
+   * centre, the target overhanging it by at most `LABEL_OVERHANG`
+   * (`fieldOf`, below); the parent not the screen's size
    * (`screenSized`), nor the control. `target` only (2026-10-09,
    * docs/bugs/2026-10-09-android-compose-button-text-refused-
    * as-under-its-own-button.md — a regression of this column's first round):
@@ -759,8 +810,8 @@ const NOT_DRAWN = {
    * of the screen) — a scrim, an RN transparent Modal's backdrop, a dismiss
    * region, ONLY when it or its parent is that large (see the residual); one
    * that does not hold the label whole (a field's clear button); one in
-   * another parent. idb's flat list never meets this row: every node's parent
-   * is its 0×0 root, which no control spans or lies in. Residual, stated: an
+   * another parent. idb's flat list meets only the text-input shape: every
+   * node's parent is its 0×0 root, which no control spans or lies in. Residual, stated: an
    * unlabelled interactive node spanning the width of a wrapper it shares
    * with a label, or padded evenly in it and centred on the label, is read as
    * the label's control, and the tap is sent to it — geometry cannot tell it
@@ -776,6 +827,27 @@ const NOT_DRAWN = {
    * sheet's texts — all excused; and, on uiautomator's tree, an unlabelled
    * clickable overlay laid with an even margin over a centred text in its
    * card (the margin at most half the overlay's side).
+   *
+   * And a THIRD shape, the text input over its own label (round 7, the
+   * owner's decision; docs/bugs/2026-10-09-ios-wda-cell-background-and-
+   * textfield-scroll-bar-read-as-covers.md): an unlabelled, unvalued text
+   * input that holds the label's centre, the label overhanging it by at
+   * most `LABEL_OVERHANG` on any side (`fieldOf`) — neither spanning its
+   * parent nor padded in it. Measured under WDA on the SWIFT form: `container
+   * swift_payment.form.payee_name_input 24,431 354x52` → `text 'Payee’s
+   * name' 42,446 103x22`, then `textfield 42,447 318x20` — the label 1 pt
+   * taller than the field above and below, so not held whole, and the field
+   * inset 18 pt from its wrapper; it refused `tap text:"Payee’s name"`, the
+   * natural selector for an unlabelled field, on every such row of the form,
+   * while a tap at the label's centre lands in the field. A row of this
+   * table, not one of its own: it is the same judgement — the label's
+   * control laid after it, taking the tap the caller means — whose
+   * geometry is per shape. Still covers: a label overhanging further, or
+   * whose centre lies off the field (a floating label above its outline); a
+   * labelled or valued field (one holding typed text: the label it lies on
+   * is then not its placeholder — a residual, stated: a placeholder label
+   * WDA keeps listing over a filled field is refused); any other control
+   * of that shape (a button).
    */
   ownControl: {
     target: (placed, { target, screenArea, paddedTouchTargets }) =>
@@ -784,15 +856,17 @@ const NOT_DRAWN = {
       !placed.node.label &&
       !placed.node.value &&
       !isInteractive(target.node) &&
-      rectWithin(target.node.rect, placed.node.rect) &&
-      (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect))) &&
+      ((rectWithin(target.node.rect, placed.node.rect) &&
+        (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect)))) ||
+        fieldOf(placed.node, target.node.rect)) &&
       !screenSized(placed.parent.node, screenArea) &&
       !fillsScreen(placed.node.rect, screenArea),
   },
 
   /**
    * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
-   * child of a scroll view (`scrolls`) and holds nothing but empty frames
+   * child of a scroll view (`scrolls`) or of a text input
+   * (`INPUT_ROLE`) and holds nothing but empty frames
    * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
    * a UIScrollView's two indicators LAST among its children, after every
    * row — `Other 'Vertical scroll bar, 2 pages' 369,62 30x456` and
@@ -805,10 +879,26 @@ const NOT_DRAWN = {
    * an accessibility region. Narrow on purpose: a `container` — not
    * `other`, an unmapped type that may be a control — with no identifier
    * and no content but frames; a sticky header carries its text.
+   *
+   * A text input's too (round 7, docs/bugs/2026-10-09-ios-wda-cell-
+   * background-and-textfield-scroll-bar-read-as-covers.md): a UITextField
+   * scrolls its text, and WDA lists its indicator as its child — the SWIFT
+   * form's `textfield 42,447 318x20` → `Other 'Horizontal scroll bar, 1
+   * page' 42,454 318x10` → a bare thumb `45,461 309x3` — which refused `tap
+   * text:"Payee’s name"`, the field's placeholder label beside it, and
+   * named the bar over every such label of the form. Matched by its shape
+   * and its parent's role, never by its label: WDA's label follows the
+   * device's language. A labelled `container` of that shape under any other
+   * interactive parent (a button) still covers.
    */
   scrollIndicator: {
     target: ({ node, parent }) =>
-      parent !== undefined && scrolls(parent.node) && node.role === 'container' && !node.identifier && node.children.length > 0 && node.children.every((c) => [...everyNode(c)].every(emptyFrame)),
+      parent !== undefined &&
+      (scrolls(parent.node) || parent.node.role === INPUT_ROLE) &&
+      node.role === 'container' &&
+      !node.identifier &&
+      node.children.length > 0 &&
+      framesOnly(node),
   },
 
   /**
@@ -1027,10 +1117,107 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
 }
 
 /**
+ * A FLOATING TAB BAR's reach ABOVE its items, as a fraction of their height
+ * (`tabBarsOf`, `exposure`): 0.2 — the owner's decision (round 7, docs/bugs/
+ * 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-
+ * tap.md), unit-free, so the same in points and in pixels. Measured on
+ * mp-native's Account Detail (iPhone 17, idb and WDA alike): the bar's pill
+ * starts ≈12 pt above its 64-pt items (`run9-ios/img-374-0.png`, 743 against
+ * 755) and is no node of either tree; 0.2 × 64, rounded, is 13.
+ */
+export const TAB_BAR_REACH_FRACTION = 0.2;
+
+/** The share of the screen's width a tab bar's items together span (`tabBarsOf`): 60 % — mp-native's four 82-pt items, 328 of 402 pt (82 %). */
+export const TAB_BAR_WIDTH_FRACTION = 0.6;
+
+/**
+ * The bottom of the screen a tab bar's items end in (`tabBarsOf`), as a
+ * fraction of its height: 10 %, 87 pt of the 874-pt iPhone 17 — mp-native's
+ * items end at 819, 55 pt above the bottom, outside the pinned bar's
+ * `FLAT_LIST_BOTTOM_BAR_FRACTION`.
+ */
+export const TAB_BAR_BOTTOM_FRACTION = 0.1;
+
+/** The fewest items a tab bar has (`tabBarsOf`). */
+const TAB_BAR_MIN_ITEMS = 3;
+
+/** A floating tab bar (`tabBarsOf`): its items, the box they span, and how far above them it reaches. */
+interface TabBar {
+  readonly items: ReadonlySet<Placed>;
+  /** The items' bounding box: a target lying wholly in it is the bar's own (a tab, its label), and the bar is no cover of it. */
+  readonly rect: Rect;
+  /** `TAB_BAR_REACH_FRACTION` of the items' height, rounded: how far above them its surface reaches. */
+  readonly lift: number;
+}
+
+/**
+ * The FLOATING TAB BARS of a tree, read by their shape, asked of every tree
+ * (the owner's decision, round 7): at least `TAB_BAR_MIN_ITEMS` INTERACTIVE
+ * siblings of one rect's y and height, no two overlapping, together
+ * spanning `TAB_BAR_WIDTH_FRACTION` of the screen's width, ending on the
+ * screen and inside its bottom `TAB_BAR_BOTTOM_FRACTION`; the keyboard's
+ * nodes (`Placed.inKeyboard`, and idb's keys, `keyboardOf`) are none — a
+ * row of keys has the same shape. Such a bar floats over what lies outside
+ * it, and its surface reaches `TAB_BAR_REACH_FRACTION` of its items' height
+ * above them (`exposure`) — in idb's flat list whatever the bar's place in
+ * the list, since idb lists it in reading order, FIRST; in a nested tree
+ * (WDA, uiautomator) only over what is listed before it, since that order
+ * IS the draw order: an action sheet listed after the bar is drawn over it,
+ * and its Cancel `8,782 386x57` is tapped at its centre (review of
+ * fix/r7-covers: order-blind, the bar moved it to a 29x37 piece).
+ * Measured (docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-
+ * buttons-takes-a-rows-tap.md): idb lists mp-native's four tab items
+ * `37,755 82x64` … `283,755 82x64` FIRST, then the content; WDA the row,
+ * then the four buttons; neither lists the pill the bar draws from ≈743
+ * down, over `transactions.list.row_3 24,721 354x52` — its centre (201,747)
+ * read clear, and the tap pressed the Cards item. Not on Android's Compose
+ * bar: its items reach uiautomator as `container`s, no interactive role, and
+ * its host covers the rows beneath it as a structural node with children
+ * (`NOT_DRAWN.structural`), listed after the list. Residuals, stated: a
+ * bottom row of an app's own grid of buttons (a PIN pad's last row) that
+ * has the shape reads as a bar — what lies within the reach above it, the
+ * row of keys above included, reads as under it (a false refusal, the safe
+ * direction; the centre of a key of the row above lies clear of it), and so
+ * does a row of three equal content buttons scrolled into the bottom 10 %
+ * over what lies just above it; a classic, non-floating UITabBar, its items
+ * filling the bar, has the shape too — a row at `0,770 402x30` just above it
+ * is refused (both the safe direction); in idb's flat list, a sheet
+ * drawn over the bar has the bar's items over its rows where they reach them
+ * (a false refusal); a tab bar of two items, or of items of unequal height,
+ * is not seen.
+ */
+function tabBarsOf(order: readonly Placed[], screen: Rect, keys: ReadonlySet<Placed>): readonly TabBar[] {
+  const bottom = screen.y + screen.height;
+  const rows = new Map<string, Placed[]>();
+  for (const placed of order) {
+    const r = placed.node.rect;
+    if (placed.parent === undefined || !isInteractive(placed.node) || !(rectArea(r) > 0) || placed.inKeyboard || keys.has(placed)) continue;
+    const key = `${placed.parent.at} ${r.y} ${r.height}`;
+    rows.set(key, [...(rows.get(key) ?? []), placed]);
+  }
+  return [...rows.values()].flatMap((items) => {
+    const rects = items.map(({ node }) => node.rect);
+    const { y, height } = rects[0];
+    const end = y + height;
+    const shaped =
+      items.length >= TAB_BAR_MIN_ITEMS &&
+      end <= bottom &&
+      end >= bottom - screen.height * TAB_BAR_BOTTOM_FRACTION &&
+      rects.reduce((sum, r) => sum + r.width, 0) >= screen.width * TAB_BAR_WIDTH_FRACTION &&
+      rects.every((a, i) => rects.slice(i + 1).every((b) => rectIntersection(a, b) === undefined));
+    if (!shaped) return [];
+    const left = Math.min(...rects.map((r) => r.x));
+    const right = Math.max(...rects.map((r) => r.x + r.width));
+    return [{ items: new Set(items), rect: { x: left, y, width: right - left, height }, lift: Math.round(height * TAB_BAR_REACH_FRACTION) }];
+  });
+}
+
+/**
  * The reading-order break after a flat list's CONTENT target
  * (`flatListReadingOrder`): the walk index of the first node after it with
  * area whose top lies above the target's — but never a node of the bottom
- * chrome (`bottomChrome`: pinned at the bottom, or idb's keyboard), one that
+ * chrome (`bottomChrome`: pinned at the bottom, idb's keyboard, or a
+ * floating tab bar's item), one that
  * holds the target whole (a later node enclosing it is a cover in its own
  * right — r6b-icon's padded control, on a synthetic tree, not a device
  * dump; in the 69 device dumps only a pinned CONTINUE and the keyboard's
@@ -1081,8 +1268,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
   const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
-  /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`). */
-  const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
+  /** Each floating tab bar's item, with its bar (`tabBarsOf`). */
+  const tabItems = new Map(tabBarsOf(order, screen, keyboard?.keys ?? new Set()).flatMap((bar) => [...bar.items].map((item) => [item, bar] as const)));
+  /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`) — a floating tab bar's items included. */
+  const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? []), ...tabItems.keys()]);
   /**
    * Where a cover of a target presses (`exposure`): its rect — or, for a node
    * pinned at a flat list's bottom (`bottomPinned`), its rect run down to the
@@ -1139,10 +1328,25 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
       const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets };
+      /** The tab bar `p` is an item of, when `node` lies outside it (`tabBarsOf`): a target wholly in the items' box is the bar's own. */
+      const floatsOver = (p: Placed): TabBar | undefined => {
+        const bar = tabItems.get(p);
+        return bar === undefined || rectWithin(node.rect, bar.rect) ? undefined : bar;
+      };
+      /** Where `p` presses over this target: `pinnedReach`, raised by its tab bar's lift when it floats over the target. */
+      const reach = (p: Placed): Rect => {
+        const r = pinnedReach(p);
+        const bar = floatsOver(p);
+        return bar === undefined ? r : { ...r, y: r.y - bar.lift, height: r.height + bar.lift };
+      };
+      // In idb's flat list a floating tab bar's items cover what lies outside the bar whatever their place in the list (idb lists them first); a nested
+      // tree's order IS its draw order (an action sheet listed after the bar is drawn over it), so there only the items listed after the target count.
+      // A flat list has no nesting, so no item listed before the target is its ancestor.
+      const before = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       const over =
         shown === undefined || about === undefined
           ? []
-          : laterThan(places, (p) => rectIntersection(pinnedReach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: pinnedReach(p) }));
+          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: reach(p) }));
       const covers = over.map((c) => c.node);
       const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);

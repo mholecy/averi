@@ -1543,6 +1543,27 @@ describe('round — a target resting in the frame at the edge the strokes push i
     });
   });
 
+  describe('a floating tab bar reaches 0.2 × its items\' height above them (draw-order.ts#tabBarsOf; docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md)', () => {
+    /** mp-native Account Detail's four tab items, `37,755 82x64` …, iPhone 17. */
+    const TABS = [37, 119, 201, 283].map((x, i) => node({ role: 'button', identifier: `nav.tab_${i}`, rect: { x, y: 755, width: 82, height: 64 } }));
+    /** `transactions.list.row_3` (354x52) at y, the tab items drawn over the rest — idb's flat list or WDA's nested tree. */
+    const rowAt = (y: number, flatList: boolean): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'row_3')], over: TABS, screen: BANDED, ...(flatList && { flatList }) });
+
+    it.each([true, false])('measured, row_3 at 721 (flat list: %s): its centre (201,747) is under the bar\'s reach — not "fully visible after 0 swipes"; the bar is over its near (bottom) side, so one stroke the caller\'s way, then a stop', (flat) => {
+      const played = play(MEASURED, [rowAt(721, flat), rowAt(500, flat), rowAt(500, flat)]);
+      expect(strokesToward(played)).toEqual(['down']);
+      expect(reaches(played)).toEqual([1]);
+      expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    });
+
+    it('direction up, row_3 at 721: the reach is over its far (bottom) side — turned at once, half the reach, as under CONTINUE', () => {
+      const played = play({ ...MEASURED, direction: 'up' }, [rowAt(721, true), rowAt(500, true), rowAt(500, true)]);
+      expect(strokesToward(played)).toEqual(['down']);
+      expect(reaches(played)).toEqual([0.5]);
+      expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    });
+  });
+
   it('the stuck turn is ONE stroke, once: a stroke back that moves it, and a second stuck, fail as before — no third direction change for the stuck test', () => {
     // The stroke back stops it at 300; the confirming read finds it flung back to 776 (a bounce), and up twice moves it no more.
     const played = play({ ...MEASURED, direction: 'up', fully: true, maxSwipes: 10 }, [form(-20), form(776), form(776), form(776), form(300), form(776), form(776), form(776)]);

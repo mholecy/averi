@@ -202,6 +202,17 @@ export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
 export const KEYBOARD_ROLE = 'keyboard';
 
 /**
+ * The normalised role of every text input (adapters/ios-node.ts: TextField,
+ * SecureTextField, TextView; adapters/android.ts: EditText,
+ * AutoCompleteTextView and the Compose input that dumps as a focusable,
+ * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
+ * because the adapters write it and both ui-tree (draw-order.ts: a text
+ * input's own scroll indicator and its label) and interaction (the fill,
+ * through interact/input-role.ts) read it — round 7, review of fix/r7-covers.
+ */
+export const INPUT_ROLE = 'textfield';
+
+/**
  * The roles every source gives its wrappers (Application, Window, Other,
  * Cell; FrameLayout, View). Beside KEYBOARD_ROLE since 2026-10-07: it was
  * `ui-tree/bare-tree.ts`'s, and the draw order (`ui-tree/draw-order.ts`'s
