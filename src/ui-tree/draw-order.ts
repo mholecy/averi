@@ -319,6 +319,26 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
   return least >= 1 && most - least <= 1 && 2 * most <= Math.min(control.width, control.height) + 1 && Math.abs(c.x - t.x) <= 1 && Math.abs(c.y - t.y) <= 1;
 };
 
+/**
+ * How far a label may overhang the text input it lies in and still be read
+ * as that field's (`fieldOf`, the `ownControl` row), on every side, in the
+ * tree's units: 2 — the owner's decision of round 7, "up to 1–2 pt";
+ * measured, the SWIFT form's `Payee’s name` `42,446 103x22` over its
+ * `textfield 42,447 318x20`, 1 pt above and below. In pixels on Android, so
+ * there a third of that — stricter, the safe direction.
+ */
+export const LABEL_OVERHANG = 2;
+
+/**
+ * The `ownControl` row's text input: `control` is one (`TEXT_INPUT_ROLE`),
+ * holds `target`'s centre, and holds its rect whole once grown by
+ * `LABEL_OVERHANG` on every side.
+ */
+const fieldOf = (control: UiNode, target: Rect): boolean =>
+  control.role === TEXT_INPUT_ROLE &&
+  containsPoint(control.rect, rectCentre(target)) &&
+  rectWithin(target, { x: control.rect.x - LABEL_OVERHANG, y: control.rect.y - LABEL_OVERHANG, width: control.rect.width + 2 * LABEL_OVERHANG, height: control.rect.height + 2 * LABEL_OVERHANG });
+
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
 const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
@@ -728,7 +748,9 @@ const NOT_DRAWN = {
    * a sibling of a NON-INTERACTIVE target, that holds the target's rect whole
    * and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
    * exactly (`spansWidth`) — or is PADDED in it on all four sides, evenly and
-   * centred on the target (`paddedOn`); the parent not the screen's size
+   * centred on the target (`paddedOn`); or a TEXT INPUT holding the target's
+   * centre, the target overhanging it by at most `LABEL_OVERHANG`
+   * (`fieldOf`, below); the parent not the screen's size
    * (`screenSized`), nor the control. `target` only (2026-10-09,
    * docs/bugs/2026-10-09-android-compose-button-text-refused-
    * as-under-its-own-button.md — a regression of this column's first round):
@@ -793,8 +815,8 @@ const NOT_DRAWN = {
    * of the screen) — a scrim, an RN transparent Modal's backdrop, a dismiss
    * region, ONLY when it or its parent is that large (see the residual); one
    * that does not hold the label whole (a field's clear button); one in
-   * another parent. idb's flat list never meets this row: every node's parent
-   * is its 0×0 root, which no control spans or lies in. Residual, stated: an
+   * another parent. idb's flat list meets only the text-input shape: every
+   * node's parent is its 0×0 root, which no control spans or lies in. Residual, stated: an
    * unlabelled interactive node spanning the width of a wrapper it shares
    * with a label, or padded evenly in it and centred on the label, is read as
    * the label's control, and the tap is sent to it — geometry cannot tell it
@@ -810,6 +832,27 @@ const NOT_DRAWN = {
    * sheet's texts — all excused; and, on uiautomator's tree, an unlabelled
    * clickable overlay laid with an even margin over a centred text in its
    * card (the margin at most half the overlay's side).
+   *
+   * And a THIRD shape, the text input over its own label (round 7, the
+   * owner's decision; docs/bugs/2026-10-09-ios-wda-cell-background-and-
+   * textfield-scroll-bar-read-as-covers.md): an unlabelled, unvalued text
+   * input that holds the label's centre, the label overhanging it by at
+   * most `LABEL_OVERHANG` on any side (`fieldOf`) — neither spanning its
+   * parent nor padded in it. Measured under WDA on the SWIFT form: `container
+   * swift_payment.form.payee_name_input 24,431 354x52` → `text 'Payee’s
+   * name' 42,446 103x22`, then `textfield 42,447 318x20` — the label 1 pt
+   * taller than the field above and below, so not held whole, and the field
+   * inset 18 pt from its wrapper; it refused `tap text:"Payee’s name"`, the
+   * natural selector for an unlabelled field, on every such row of the form,
+   * while a tap at the label's centre lands in the field. A row of this
+   * table, not one of its own: it is the same judgement — the label's
+   * control laid after it, taking the tap the caller means — whose
+   * geometry is per shape. Still covers: a label overhanging further, or
+   * whose centre lies off the field (a floating label above its outline); a
+   * labelled or valued field (one holding typed text: the label it lies on
+   * is then not its placeholder — a residual, stated: a placeholder label
+   * WDA keeps listing over a filled field is refused); any other control
+   * of that shape (a button).
    */
   ownControl: {
     target: (placed, { target, screenArea, paddedTouchTargets }) =>
@@ -818,8 +861,9 @@ const NOT_DRAWN = {
       !placed.node.label &&
       !placed.node.value &&
       !isInteractive(target.node) &&
-      rectWithin(target.node.rect, placed.node.rect) &&
-      (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect))) &&
+      ((rectWithin(target.node.rect, placed.node.rect) &&
+        (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect)))) ||
+        fieldOf(placed.node, target.node.rect)) &&
       !screenSized(placed.parent.node, screenArea) &&
       !fillsScreen(placed.node.rect, screenArea),
   },

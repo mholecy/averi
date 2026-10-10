@@ -779,6 +779,26 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         }
       });
 
+      it('the textfield holding the label\'s centre, the label overhanging it by a point above and below (446–468 against 447–467), is the label\'s own field (round 7, the owner\'s decision): nothing over the label, tapped at its centre (94,457), where the field takes the tap', () => {
+        const text = label();
+        expect(drawOrder(field(text, textfield(bar()))).exposure(text, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 94, y: 457 }, moved: false } });
+        // An overhang of 2 is the field's too; beyond it, a cover.
+        const two = uiNode({ role: 'text', label: 'Payee’s name', rect: rect(42, 445, 103, 24) });
+        expect(drawOrder(field(two, textfield(bar()))).exposure(two, IPHONE).covers).toEqual([]);
+      });
+
+      it('…and no other control: a label overhanging by 3, one whose centre lies off the field, a labelled or valued field, a button of the field\'s rect — each still covers', () => {
+        const at = (r: ReturnType<typeof rect>) => uiNode({ role: 'text', label: 'Payee’s name', rect: r });
+        const cases: [UiNode, UiNode][] = [
+          [at(rect(42, 444, 103, 26)), textfield(bar())], // 3 above and below
+          [at(rect(42, 440, 103, 10)), textfield(bar())], // its centre (93,445) above the field
+          [label(), textfield(bar(), { label: 'Payee’s name' })],
+          [label(), textfield(bar(), { value: 'ACME s.r.o.' })],
+          [label(), uiNode({ role: 'button', rect: rect(42, 447, 318, 20) })],
+        ];
+        for (const [text, control] of cases) expect(drawOrder(field(text, control)).exposure(text, IPHONE).covers).toContain(control);
+      });
+
       it('…and the shape stays narrow: under another interactive parent (a button), or an identified container of that shape, it covers', () => {
         const text = label();
         const underButton = bar();
