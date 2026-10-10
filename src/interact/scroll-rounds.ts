@@ -1,6 +1,6 @@
-import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
+import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { clippedEdges, containsPoint, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -730,7 +730,7 @@ interface State {
   /** The direction of the last stroke SENT, a probe included — the way the content last moved, for `dropped`. */
   readonly lastSent: Direction | undefined;
   /** The last read that read: the judged match's rect and the frames it was judged in — undefined when it found no match. */
-  readonly lastFound: { rect: Rect; frames: readonly Rect[] } | undefined;
+  readonly lastFound: { rect: Rect; clippedOut?: ClippedSide; frames: readonly Rect[] } | undefined;
   /**
    * The target was dropped from the tree by the content's motion — the
    * last read had it short of the far edge of that motion, this one has no
@@ -1034,6 +1034,27 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
 }
 
 /**
+ * `beyondFarEdge` in every frame judged — or the target was dumped CLIPPED
+ * OUT past that edge of its scroll container (UiNode.clippedOut, 2026-10-09,
+ * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-
+ * negative-heights.md): uiautomator inverts the bounds of a node scrolled
+ * wholly past its container, the parser clamps it to zero size AT the
+ * container's edge — inside the frame, past neither of its edges — and the
+ * mark is all that says which way it went. Settings' `Apps` under the
+ * collapsing app bar read `126x-132` and was neither beyond the far edge
+ * nor in the frame. Beyond, a target a read saw short of the far edge
+ * turns the next stroke (`carriedPast`), and one lost after it was there
+ * is not `dropped`. Not a stroke turned on the FIRST read (the owner's
+ * call, 2026-10-09: iOS parity — a target read wholly beyond the far edge
+ * before any read saw it short is the caller's direction to honour, as
+ * `nextStroke` says; a node clipped out has nothing in the frame, so
+ * `atFarEdge`, which needs some, never fires for it).
+ */
+function beyondFarEdgeIn(found: Pick<UiNode, 'rect' | 'clippedOut'>, direction: Direction, frames: readonly Rect[]): boolean {
+  return found.clippedOut === FAR_EDGE[direction].far || frames.every((f) => beyondFarEdge(found.rect, direction, f));
+}
+
+/**
  * `cover`, drawn over the target, lies over its FAR side for a scroll
  * toward `direction` — the side `beyondFarEdge` reads against the frame:
  * over its far edge and short of its near one (for content below, a bar
@@ -1049,7 +1070,9 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * strokes where one stopped it (review of the first cut, 2026-10-09). A
  * pinned bar sits at the edge it is pinned to, so the half it lies in is
  * that edge's. A cover centred exactly on the middle lies in neither far
- * half: not turned for, either way.
+ * half: not turned for, either way. Or, in that half, a cover the target
+ * shows past only on its far side (`showsOnlyPast`, 2026-10-09): a bar a
+ * few points short of the row's far edge and over the rest of it.
  */
 function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect): boolean {
   const over: Record<Edge, boolean> = {
@@ -1063,7 +1086,38 @@ function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect)
   const sideways = 2 * cover.x + cover.width - (2 * frame.x + frame.width);
   const inHalfOf: Record<Edge, boolean> = { top: vertical < 0, bottom: vertical > 0, left: sideways < 0, right: sideways > 0 };
   const { far, near } = FAR_EDGE[direction];
-  return inHalfOf[far] && over[far] && !over[near];
+  return inHalfOf[far] && ((over[far] && !over[near]) || showsOnlyPast(rect, far, cover, frame));
+}
+
+/**
+ * Everything of the target that shows past `cover` lies between the
+ * frame's `far` edge and the cover's — and some does: the target, cut to
+ * the frame, sticks out past the cover's far edge, and the rest of it lies
+ * under the cover, across the whole of its width (its height, sideways).
+ * The second way `overFarSide` reads a cover over the far side (2026-10-09,
+ * the round-6b device check's S-1 residual): Contacts' New Contact under
+ * idb, `add url` at `20,78 362x51` under the sheet's `Toolbar` `0,83
+ * 402x48` — the bar starts 5 pt BELOW the row's top, so it is not over the
+ * row's far edge, and it reaches past its near one; it was stroked the
+ * wrong way once or twice before the turn. The strip that shows is at the
+ * far edge's side of the bar: strokes push it further under, a stroke back
+ * brings the row out below the bar. No pixel slack: a bar starting any
+ * distance below the row's top counts, as long as nothing of the row shows
+ * on the bar's other side or beside it — a badge inside a row, or a bar
+ * narrower than it, leaves some showing there and is no side's.
+ */
+function showsOnlyPast(rect: Rect, far: Edge, cover: Rect, frame: Rect): boolean {
+  const inFrame = rectIntersection(rect, frame);
+  if (inFrame === undefined) return false;
+  const vertical = far === 'top' || far === 'bottom';
+  // Along the scroll: [lo, hi) of the target in the frame and of the cover; across it, the target's span must lie in the cover's.
+  const [lo, hi] = vertical ? [inFrame.y, inFrame.y + inFrame.height] : [inFrame.x, inFrame.x + inFrame.width];
+  const [from, to] = vertical ? [cover.y, cover.y + cover.height] : [cover.x, cover.x + cover.width];
+  const across = vertical
+    ? cover.x <= inFrame.x && cover.x + cover.width >= inFrame.x + inFrame.width
+    : cover.y <= inFrame.y && cover.y + cover.height >= inFrame.y + inFrame.height;
+  // Some of it past the cover's far edge, the rest under the cover through to its near end.
+  return across && (far === 'top' || far === 'left' ? lo < from && hi > from && hi <= to : hi > to && lo < to && lo >= from);
 }
 
 /** The same set of rects, each within a pixel — every match where it was. Empty sets say nothing. */
@@ -1145,10 +1199,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // The strokes now go back (`dropped`, `nextStroke`) — a turn, halving
   // the reach like any — until a read finds it.
   if (best === undefined && current !== 'start' && s.lastFound !== undefined && s.lastSent !== undefined) {
-    const { rect, frames: lastFrames } = s.lastFound;
-    if (!lastFrames.every((f) => beyondFarEdge(rect, s.lastSent as Direction, f))) s.dropped = OPPOSITE[s.lastSent];
+    if (!beyondFarEdgeIn(s.lastFound, s.lastSent, s.lastFound.frames)) s.dropped = OPPOSITE[s.lastSent];
   }
-  s.lastFound = best === undefined ? undefined : { rect: { ...best.node.rect }, frames };
+  s.lastFound =
+    best === undefined ? undefined : { rect: { ...best.node.rect }, ...(best.node.clippedOut !== undefined && { clippedOut: best.node.clippedOut }), frames };
   if (best !== undefined) {
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
@@ -1167,8 +1221,9 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     s.targetContainers = facts.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
-    // way up but across both edges the other is not turned for.
-    const beyond = frames.every((f) => beyondFarEdge(best.node.rect, s.rules.direction, f));
+    // way up but across both edges the other is not turned for. Or dumped
+    // clipped out past it (`beyondFarEdgeIn`).
+    const beyond = beyondFarEdgeIn(best.node, s.rules.direction, frames);
     // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
     // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
     // band.md): across it — clipped there, or its centre in iOS's status

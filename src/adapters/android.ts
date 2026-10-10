@@ -7,7 +7,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -974,7 +974,10 @@ export function parseUiautomatorXml(xml: string): UiNode {
   }).parse(xml);
   const roots: RawNode[] = parsed.hierarchy?.node ?? [];
   if (roots.length === 0) throw new Error('uiautomator dump contained no nodes');
-  const children = roots.map(normalizeNode);
+  // An arrow, not `roots.map(normalizeNode)`: map would hand its index in as `around`.
+  const grown = new Map<UiNode, Rect>();
+  const children = roots.map((root) => normalizeNode(root, { grown }));
+  widenUnderOverlays(children, grown);
   // The source's mark (types.ts#UiNode.paddedTouchTargets): Compose lists a control's touch target as its wrapper.
   if (children.length === 1) return { ...children[0], paddedTouchTargets: true };
   return {
@@ -983,7 +986,19 @@ export function parseUiautomatorXml(xml: string): UiNode {
   };
 }
 
-function normalizeNode(raw: RawNode): UiNode {
+/**
+ * Where a node lies in the dump: its parent's rect as normalized, and its
+ * nearest clipping ancestor's (`UiNode.clipsDescendants`), when it has them;
+ * and the dump's `grown` — each node `uncut` would widen, with the rect,
+ * applied by `widenUnderOverlays` once the whole tree is read.
+ */
+interface Around {
+  parent?: Rect;
+  clip?: Rect;
+  grown: Map<UiNode, Rect>;
+}
+
+function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
   const text = emptyToNull(raw.text);
   const contentDesc = emptyToNull(raw['content-desc']);
@@ -998,18 +1013,24 @@ function normalizeNode(raw: RawNode): UiNode {
     raw.focusable === 'true' &&
     raw['long-clickable'] === 'true';
   const isTextInput = className.endsWith('EditText') || composeTextInput;
+  const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
+  const clips = raw.scrollable === 'true';
+  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip, grown: around.grown }));
+  const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {
     role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),
     label: contentDesc ?? text,
     // resource-id is "com.example.app:id/login_button" — selectors use the short name
     identifier: emptyToNull(raw['resource-id']?.split('/').pop()),
     value: isTextInput ? text : null,
-    rect: parseBounds(raw.bounds),
-    children: rawChildren.map(normalizeNode),
+    rect,
+    children,
     // The one fact the role cannot carry: uiautomator has already cut every
     // descendant's bounds to this node (types.ts#UiNode.clipsDescendants —
     // why a flag and not a `scrollable` role for a Compose scroller).
-    ...(raw.scrollable === 'true' && { clipsDescendants: true as const }),
+    ...(clips && { clipsDescendants: true as const }),
+    // Dumped inverted: wholly outside its container, on this side (types.ts#UiNode.clippedOut).
+    ...(clippedOut !== undefined && { clippedOut }),
   };
   // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
   // .getText() returns the hint while isShowingHintText() — and the API 33
@@ -1023,7 +1044,133 @@ function normalizeNode(raw: RawNode): UiNode {
   // are not dumped as text at all (measured the same day), so need none.
   const hint = isTextInput ? emptyToNull(raw.hint) : null;
   if (hint !== null) node.placeholder = hint;
+  if (whole !== undefined) around.grown.set(node, whole);
   return node;
+}
+
+/**
+ * The node's whole extent when uiautomator cut its bounds short of its own
+ * descendants (2026-10-09, docs/bugs/2026-10-09-android-fully-trusts-row-
+ * bounds-cut-at-a-sticky-header.md): Compose subtracts what an overlay
+ * sibling drawn over a node covers from that node's bounds, and not from
+ * its descendants' — mp-native's Account Detail row under its sticky date
+ * header (`0,401 1080x79`) dumps as `row_0 66,480 948x66`, its own label
+ * and button as `66,403 948x143`, the row's true rect. The cut rect lies
+ * whole in the list and clear of the header, so it read "fully visible".
+ * Only a CANDIDATE here: `widenUnderOverlays` widens it when a node drawn
+ * after it lies on the strip gained.
+ *
+ * Only descendants with the node's EXACT x and width count — a row's own
+ * label or button, which ARE the row; not a badge or an icon hanging off
+ * one side, and not a full-bleed child (a carousel breaking out of a
+ * card's padding: counted, it widened the card sideways, and the card's
+ * own button no longer spanned it, so its label read covered — code review
+ * of fix/r7-bounds P1). And the node grows along y alone, on ONE side: a
+ * cut leaves the node's other edge where its descendants' is (row_0's
+ * bottom, 546; the rows cut at the tab bar, their tops), while a child
+ * overflowing both edges (a touch target, an offset) is no cut (code review
+ * P3). The residual that rule leaves, stated (review round 2): a node cut
+ * at BOTH ends — a tall card between a sticky header and a floating tab
+ * bar, dumped `66,480 948x1360` over its own `66,420 948x1480` — is not
+ * widened either, and reads whole. Vertical only: every cut measured was a list's row under a bar
+ * across it, and no sideways one was seen. The grown rect is cut to the
+ * nearest clipping ancestor's, as uiautomator cut the descendants, so a node
+ * cut by the list's own edge (or by the display) is not widened past it —
+ * the flush probe (interact/scroll-rounds.ts#PROBE_REACH) judges that one —
+ * and a node in no clipping container is left as dumped: the overlay cut
+ * was measured inside a scroller only. A node with no area (collapsed, or
+ * scrolled off) stays so: widening it would make a target of a node the
+ * dump says is not shown. Undefined when nothing grows — a control and its
+ * padded touch target lie inside their wrapper (I-1, round 6b: wrapper
+ * 132, control 110, label 66), so they never widen it.
+ */
+function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | undefined {
+  if (rectArea(rect) === 0) return undefined;
+  const bottom = rect.y + rect.height;
+  let [top, low] = [rect.y, bottom];
+  for (const child of children) {
+    for (const d of everyNode(child)) {
+      if (rectArea(d.rect) === 0 || d.rect.x !== rect.x || d.rect.width !== rect.width) continue;
+      [top, low] = [Math.min(top, d.rect.y), Math.max(low, d.rect.y + d.rect.height)];
+    }
+  }
+  // What is gained is cut to the clip; what was dumped stays, even past it (a wrapper Compose dumps overhanging its list).
+  [top, low] = [Math.min(rect.y, Math.max(top, clip.y)), Math.max(bottom, Math.min(low, clip.y + clip.height))];
+  const grewUp = top < rect.y;
+  const grewDown = low > bottom;
+  if (grewUp === grewDown) return undefined; // nothing gained, or both sides: overflow, not a cut
+  return { ...rect, y: top, height: low - top };
+}
+
+/**
+ * Widen each `grown` node whose gained strip — the part of the grown rect
+ * outside the dumped one — a node listed AFTER it meets (code review of
+ * fix/r7-bounds P3): the overlay that cut it, drawn after it in the dump's
+ * order, lies there — row_0's sticky header, the floating tab bar over the
+ * rows cut at it. A strip nothing later meets is the node's own overflow,
+ * and widening it would make the node overlap what it does not. Judged on
+ * the dumped rects, every decision before any is applied; the dumped rect
+ * is kept as `cutBounds` (types.ts#UiNode.cutBounds). The residual, stated:
+ * a node overflowing one edge into the next row listed after it (a touch
+ * target running into it), or into a screen-sized wrapper listed after it
+ * (a snackbar host), reads like a cut and is widened under that node.
+ */
+function widenUnderOverlays(roots: readonly UiNode[], grown: ReadonlyMap<UiNode, Rect>): void {
+  if (grown.size === 0) return;
+  const order = roots.flatMap((root) => [...everyNode(root)]);
+  const after = new Map<UiNode, number>(); // each node's index past its own subtree
+  const walk = (node: UiNode, i: number): number => {
+    let next = i + 1;
+    for (const child of node.children) next = walk(child, next);
+    after.set(node, next);
+    return next;
+  };
+  roots.reduce((i, root) => walk(root, i), 0);
+  const widen = [...grown].filter(([node, whole]) => {
+    const strip: Rect =
+      whole.y < node.rect.y ? { ...whole, height: node.rect.y - whole.y } : { ...whole, y: node.rect.y + node.rect.height, height: whole.y + whole.height - (node.rect.y + node.rect.height) };
+    for (let i = after.get(node) ?? order.length; i < order.length; i++) if (rectIntersection(order[i].rect, strip) !== undefined) return true;
+    return false;
+  });
+  for (const [node, whole] of widen) {
+    node.cutBounds = node.rect;
+    node.rect = whole;
+  }
+}
+
+/**
+ * A node's bounds as dumped — unless uiautomator dumped them INVERTED, bottom
+ * above top or right left of left (2026-10-09, docs/bugs/2026-10-09-android-
+ * inverted-uiautomator-bounds-pass-through-as-negative-heights.md: Settings'
+ * rows scrolled under the collapsing app bar, `text="Apps"
+ * bounds="[198,297][324,58]"`, `homepage_title` `[66,66][428,44]`). The
+ * node is clipped OUT of its container: one edge is the container's (the
+ * clip, 297: the list's top), the other the node's own, already past it
+ * (58). Which edge is the clip's is read off the parent, whose rect is cut
+ * to the same clip: the edge of the two nearer the parent's same edge —
+ * the top to its top, the bottom to its bottom (a tie, and a root, read
+ * top or left). Such a node is clamped to zero size AT the clip edge — a
+ * node with no area is never a target (interact/resolve.ts), and none
+ * other reads a negative side — and the side it lies past is kept as
+ * `clippedOut` (types.ts#UiNode.clippedOut), for the scroll and the wait's
+ * hint. Both axes are clamped; the vertical side is the one named when
+ * both are inverted.
+ */
+function nodeBounds(bounds: string | undefined, parent: Rect | undefined): { rect: Rect; clippedOut?: ClippedSide } {
+  const m = bounds?.match(BOUNDS_RE);
+  if (!m) return { rect: zeroRect() };
+  const [, l, t, r, b] = m.map(Number);
+  const nearer = (a: number, edgeA: number, z: number, edgeZ: number) => Math.abs(z - edgeZ) < Math.abs(a - edgeA);
+  const vertical: ClippedSide | undefined = b >= t ? undefined : parent !== undefined && nearer(t, parent.y, b, parent.y + parent.height) ? 'bottom' : 'top';
+  const sideways: ClippedSide | undefined = r >= l ? undefined : parent !== undefined && nearer(l, parent.x, r, parent.x + parent.width) ? 'right' : 'left';
+  const rect: Rect = {
+    x: sideways === 'right' ? r : l,
+    y: vertical === 'bottom' ? b : t,
+    width: sideways === undefined ? r - l : 0,
+    height: vertical === undefined ? b - t : 0,
+  };
+  const clippedOut = vertical ?? sideways;
+  return clippedOut === undefined ? { rect } : { rect, clippedOut };
 }
 
 function parseBounds(bounds: string | undefined): Rect {
