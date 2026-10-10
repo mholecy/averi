@@ -1116,15 +1116,16 @@ function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | unde
  */
 function widenUnderOverlays(roots: readonly UiNode[], grown: ReadonlyMap<UiNode, Rect>): void {
   if (grown.size === 0) return;
-  const order = roots.flatMap((root) => [...everyNode(root)]);
+  // A walk of its own, not types.ts#everyNode (the one pre-order walk that yields nodes only): "listed AFTER it" needs each node's subtree END
+  // in the order, which a generator of nodes does not give. One walk builds both the order and that index (code review of round 7, S2).
+  const order: UiNode[] = [];
   const after = new Map<UiNode, number>(); // each node's index past its own subtree
-  const walk = (node: UiNode, i: number): number => {
-    let next = i + 1;
-    for (const child of node.children) next = walk(child, next);
-    after.set(node, next);
-    return next;
+  const walk = (node: UiNode): void => {
+    order.push(node);
+    for (const child of node.children) walk(child);
+    after.set(node, order.length);
   };
-  roots.reduce((i, root) => walk(root, i), 0);
+  for (const root of roots) walk(root);
   const widen = [...grown].filter(([node, whole]) => {
     const strip: Rect =
       whole.y < node.rect.y ? { ...whole, height: node.rect.y - whole.y } : { ...whole, y: node.rect.y + node.rect.height, height: whole.y + whole.height - (node.rect.y + node.rect.height) };

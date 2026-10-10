@@ -440,7 +440,11 @@ export interface UiNode {
  * field-error pairing feeds WDA's nested tree to its flat rule with it, the
  * text hint flattens with it, ui_snapshot's note counts with it. It lives
  * beside UiNode rather than in a verify/ or adapters/ sibling because all
- * three layers need it and none owns it (review 2026-10-06).
+ * three layers need it and none owns it (review 2026-10-06). It yields nodes
+ * only: a walk that needs each node's subtree end in the order
+ * (android.ts#widenUnderOverlays, ui-tree/draw-order.ts) or what its
+ * ancestors hand down (ui-tree/geometry.ts#scrollersOf) recurses on its own
+ * — the stated exception (code review of round 7, S2).
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {
   yield root;
