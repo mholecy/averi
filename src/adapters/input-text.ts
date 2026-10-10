@@ -8,7 +8,11 @@
  * itself so interact/ does not import the Android adapter for a sentence.
  */
 
-/** Every C0 control character (U+0000–U+001F) and DEL (U+007F): a key, not text. */
+/**
+ * Every C0 control character (U+0000–U+001F) and DEL (U+007F): a key, not text.
+ * Also the refusal rule on BOTH platforms — type-text.ts applies it under iOS
+ * too, before any device call — which is why it is read from here.
+ */
 export const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
 
 /**

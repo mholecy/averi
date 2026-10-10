@@ -292,6 +292,7 @@ describe('resolveSettled — appear AND hold still', () => {
       const fake = new FakeAdapter({ without }, 'without');
       const start = Date.now();
       let reads = 0;
+      let goneReads = 0;
       let phase: 'first' | 'gone' | 'late' | 'after' = 'first';
       fake.uiTree = async () => {
         reads++;
@@ -299,7 +300,11 @@ describe('resolveSettled — appear AND hold still', () => {
           phase = 'gone';
           return withTitle();
         }
-        if (phase === 'gone' && Date.now() - start < 12) return structuredClone(without);
+        // At least one read without it, whatever the clock: a stalled first poll must not skip the gap.
+        if (phase === 'gone' && (goneReads === 0 || Date.now() - start < 12)) {
+          goneReads++;
+          return structuredClone(without);
+        }
         if (phase === 'gone') {
           phase = 'late';
           title.rect = { ...title.rect, y: 120 };
