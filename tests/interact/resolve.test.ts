@@ -840,7 +840,7 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     expect(error).toBeInstanceOf(ClippedRefusal);
     expect((error as Error).message).toBe(
       `${TOGGLE} is cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, ` +
-        '55 deep across that edge, under the 65 a tap needs — scroll_until it with fully: true first; nothing was tapped',
+        '55 deep across that edge, under the 65 a tap needs — scroll_until it first; nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([]);
   });
@@ -895,6 +895,23 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     await expect(tapElement(fake, 'id:first_name_row', OPTS)).rejects.toThrow(
       "id:first_name_row is cut at its scroll container's top edge (container 0,242 1080x1736); only a 948x33 part of it shows, 33 deep across that edge",
     );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('cut at the top, or at a side: the remedy names the direction the rest lies in', async () => {
+    const top = swiftForm(node({ role: 'container', identifier: 'row', rect: { x: 66, y: 242, width: 948, height: 40 }, children: [node({ role: 'button', rect: { x: 66, y: 242, width: 948, height: 30 } })] }));
+    await expect(tapElement(top, 'id:row', OPTS)).rejects.toThrow(/cut at its scroll container's top edge .* 40 deep across that edge, under the 65 a tap needs — scroll_until it with direction: up first; nothing was tapped$/);
+    const side = swiftForm(node({ role: 'container', identifier: 'card', rect: { x: 1030, y: 900, width: 50, height: 300 }, children: [node({ role: 'image', rect: { x: 1040, y: 950, width: 200, height: 40 } })] }));
+    await expect(tapElement(side, 'id:card', OPTS)).rejects.toThrow(/cut at its scroll container's right edge .* 50 deep across that edge, under the 65 a tap needs — scroll_until it with direction: right first; nothing was tapped$/);
+    expect([top.tapPoints, side.tapPoints]).toEqual([[], []]);
+  });
+
+  it('a sliver whose centre is ALSO under a node drawn over it: refused for its cut, judged before the cover', async () => {
+    const fake = swiftForm(toggle(1924, 55));
+    fake.live().children.push(node({ role: 'other', label: 'Snackbar', rect: { x: 0, y: 1930, width: 1080, height: 40 } }));
+    const error = await tapElement(fake, TOGGLE, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ClippedRefusal);
+    expect((error as Error).message).toMatch(/^id:swift_payment\.form\.details_toggle is cut at its scroll container's bottom edge/);
     expect(fake.tapPoints).toEqual([]);
   });
 

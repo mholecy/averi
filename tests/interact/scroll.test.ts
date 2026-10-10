@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
+import { tapElement } from '../../src/interact/tap.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { flingCarry, LazyList } from '../helpers/lazy-list.js';
@@ -537,6 +538,78 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
     await scrollUntilVisible(fake, 'text:"Display"', { maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(fake.swipes.every((st) => st.durationMs === undefined)).toBe(true);
+  });
+});
+
+/**
+ * Code review of fix/r7-sliver, item 1 (2026-10-10): uiautomator cuts every rect to its scroller, so a node cut to a
+ * sliver at the scroller's edge has its centre on the screen, and a plain stop stopped on exactly the strip the next
+ * tap refuses (resolve.ts#refuseCutSliver). The plain stop now scrolls on.
+ */
+describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap refuses (2026-10-10)', () => {
+  const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
+  /** mp-native's SWIFT form: the "Payment details" toggle (132 px whole, its button 12 px inside) at 1924 − offset, cut to the form as uiautomator cuts it; strokes on the form move it by the finger's travel, up to `max`. */
+  class SwiftForm extends FakeAdapter {
+    offset = 0;
+    constructor(readonly max: number, readonly leaf = false) {
+      super({ s: node({ role: 'container' }) }, 's');
+      this.viewportSize = { width: 1080, height: 2220 };
+    }
+    override async uiTree(): Promise<UiNode> {
+      // Cut at the form's bottom, 1978 — the toggle at 1979, as measured (`66,1924 948x55`, its button `66,1936 948x42`).
+      const cut = (y: number, height: number, bottom: number): Rect => {
+        const top = Math.max(y, FORM.y);
+        return { x: 66, y: top, width: 948, height: Math.min(y + height, bottom) - top };
+      };
+      const y = 1924 - this.offset;
+      const button = node({ role: 'button', rect: cut(y + 12, 108, 1978) });
+      const toggle = node({ role: 'container', identifier: 'details_toggle', rect: cut(y, 132, 1979), children: this.leaf ? [] : [button] });
+      return node({
+        role: 'container',
+        rect: { x: 0, y: 0, width: 1080, height: 2220 },
+        children: [
+          node({ role: 'container', clipsDescendants: true, rect: { ...FORM }, children: [toggle] }),
+          node({ role: 'button', label: 'CONTINUE', rect: { x: 66, y: 1979, width: 948, height: 132 } }),
+        ],
+      });
+    }
+    override async swipe(from: Point, to: Point, durationMs?: number): Promise<void> {
+      await super.swipe(from, to, durationMs);
+      if (from.y >= FORM.y && from.y < FORM.y + FORM.height) this.offset = Math.min(this.max, Math.max(0, this.offset + from.y - to.y));
+    }
+  }
+
+  it('the note\'s shape, 948x55 at the form\'s bottom: the plain scroll_until strokes on, stops with a tappable piece, and the tap then goes through', async () => {
+    const fake = new SwiftForm(1000);
+    fake.tap = async (x, y) => {
+      fake.tapPoints.push({ x, y });
+    };
+    // One stroke over the form (finger up 1042 px, the content's end at 1000): the toggle whole at 66,924 948x132…
+    expect(await scrollUntilVisible(fake, 'id:details_toggle', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([{ from: { x: 540, y: 1631 }, to: { x: 540, y: 589 } }]);
+    // …where the tap then goes, at its centre, refused nothing.
+    await tapElement(fake, 'id:details_toggle', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 990 }]);
+  });
+
+  it('no room to scroll it in (the content ends there): fails naming the cut, not "visible"', async () => {
+    const fake = new SwiftForm(0);
+    await expect(scrollUntilVisible(fake, 'id:details_toggle', FAST)).rejects.toThrow(
+      "element is in the viewport but cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs — and the content is exhausted",
+    );
+  });
+
+  it('at the bound (maxSwipes: 0): the failure says what it was short of — the cut', async () => {
+    const fake = new SwiftForm(1000);
+    await expect(scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs (last rect",
+    );
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('a cut leaf shows no evidence (the stated residual): the plain stop stops on it at once, as before', async () => {
+    const fake = new SwiftForm(1000, true);
+    expect(await scrollUntilVisible(fake, 'id:details_toggle', FAST)).toMatchObject({ swipes: 0 });
   });
 });
 

@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, drawnOverText, evidentCut, insideScroller, rectText, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
@@ -632,34 +632,45 @@ export class ClippedRefusal extends PresentElementRefusal {}
 /**
  * THE cut-sliver rule for a node about to be tapped (2026-10-10, the bug
  * note above ClippedRefusal): refuse when the node is EVIDENTLY cut at a
- * clipping ancestor's edge (ui-tree/geometry.ts#evidentCut — flush with it
- * within a pixel, its own content running into it) and what shows of it
- * across that edge is under `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION,
+ * clipping ancestor's edge (ui-tree/geometry.ts#cutSliver over
+ * #evidentCut — flush with it within a pixel, its own content running on
+ * past it; the shallowest such edge) and what shows of it across that edge
+ * is under `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION,
  * `Exposure.minPiece`: the minimum that already refuses a sliver left by a
  * cover, 65 px on the Pixel_3a). A node that merely touches the edge with
  * nothing of it shown cut — a whole button at a form's end — is tapped as
  * before; so is a node deep enough across the edge, at its centre.
  *
- * The remedy is `scroll_until … fully: true`, as for a centre off the screen
- * (`refuseOffScreen`): a plain `scroll_until` stops on any part with its
- * centre on the screen and hands back the same sliver, while a `fully: true`
- * stop flush with a clipping container probes it (scroll-rounds.ts
- * #PROBE_REACH). Only nodes under a clipping ancestor (UiNode
- * .clipsDescendants, Android's) are asked: an iOS tree has none, so this
- * never refuses there. Cost: one walk of the tree for the ancestor chain,
- * and the node's subtree per flush edge.
+ * Judged BEFORE the cover check, so a sliver also covered is refused for
+ * its cut, whose remedy is a scroll toward the edge. The remedy is a plain
+ * `scroll_until` toward that edge (`CUT_REVEALS`): its plain stop does not
+ * stop on such a sliver either (scroll-rounds.ts#stops, code review of
+ * fix/r7-sliver, item 1), and its default direction is down, so a cut at the
+ * bottom needs no direction and the others name theirs. Only nodes under a
+ * clipping ancestor (UiNode.clipsDescendants, Android's) are asked: an iOS
+ * tree has none, so this never refuses there. Applied inside the chrome
+ * check rather than beside the on-screen rule (keyboard.ts) because the
+ * minimum is the draw order's and the node judged must be the one the
+ * guard hands back — the chrome check already has both. Cost: one walk of
+ * the tree for the ancestor chain, and the node's subtree per flush edge.
  */
 function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: number, sent?: string): void {
-  const cut = evidentCut(node, scrollersOf(tree)(node));
+  const cut = cutSliver(node, scrollersOf(tree)(node), minPiece);
   if (cut === undefined) return;
-  const depth = cut.edge === 'top' || cut.edge === 'bottom' ? node.rect.height : node.rect.width;
-  if (depth >= minPiece) return;
   const finding =
     `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${node.rect.width}x${node.rect.height} part of it shows, ` +
-    `${depth} deep across that edge, under the ${minPiece} a tap needs — scroll_until it with fully: true first`;
+    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs — ${CUT_REVEALS[cut.edge]}`;
   const what = describeTarget(target);
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }
+
+/** The remedy for a target cut at each edge: a scroll toward where the rest of it lies — down, `scroll_until`'s default, needs no word. */
+const CUT_REVEALS: Readonly<Record<Edge, string>> = {
+  bottom: 'scroll_until it first',
+  top: 'scroll_until it with direction: up first',
+  left: 'scroll_until it with direction: left first',
+  right: 'scroll_until it with direction: right first',
+};
 
 /** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
 export interface Aim {

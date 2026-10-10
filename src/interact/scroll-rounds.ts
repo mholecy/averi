@@ -1,6 +1,6 @@
 import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, flushEdges, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Edge } from '../ui-tree/geometry.js';
+import { clippedEdges, containsPoint, cutSliver, flushEdges, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -320,6 +320,13 @@ export interface Judged {
   bandOverCentre?: number;
   /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
   shows: number;
+  /**
+   * Its scroll container cuts it to a sliver the next tap refuses
+   * (ui-tree/geometry.ts#cutSliver, interact/resolve.ts#refuseCutSliver,
+   * 2026-10-10) — the cut and the minimum it is under; a plain stop does not
+   * stop on it (`stops`).
+   */
+  sliver?: { cut: Cut; minPiece: number };
 }
 
 /**
@@ -439,7 +446,11 @@ export type Shortfall =
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean };
 
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
-export type InFrameShort = { of: 'clipped'; judged: Judged } | { of: 'covered'; judged: Judged } | { of: 'statusBar'; judged: Judged; band: number };
+export type InFrameShort =
+  | { of: 'clipped'; judged: Judged }
+  | { of: 'covered'; judged: Judged }
+  | { of: 'statusBar'; judged: Judged; band: number }
+  | { of: 'sliver'; judged: Judged & Required<Pick<Judged, 'sliver'>> };
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
@@ -865,6 +876,7 @@ function judge(
   found: readonly UiNode[],
   { box: viewport, statusBand }: Pick<JudgingScreen, 'box' | 'statusBand'>,
   order: DrawOrder | undefined,
+  chainOf: ((node: UiNode) => readonly Rect[]) | undefined,
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
@@ -881,10 +893,13 @@ function judge(
     // The draw order's answer, as the tap's chrome check reads it (resolve.ts#aimClearOfChrome): the cover at the centre inside the frame.
     const centreCover = seen?.centreCover;
     const visible = visibleFractionInViewport(node.rect, frame);
+    // The tap's cut-sliver rule, by the same minimum (resolve.ts#refuseCutSliver): what `stops` asks of a plain stop.
+    const cut = seen === undefined || chainOf === undefined ? undefined : cutSliver(node, chainOf(node), seen.minPiece);
     return {
       node,
       visible,
       clipped: clippedEdges(node.rect, frame),
+      ...(cut !== undefined && seen !== undefined && { sliver: { cut, minPiece: seen.minPiece } }),
       ...(under !== undefined && { under }),
       covers: seen?.covers ?? [],
       reaches: seen?.reaches ?? [],
@@ -903,9 +918,15 @@ function judge(
 }
 
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: JudgingScreen, order: DrawOrder | undefined, fully: boolean): Judged | undefined {
+function judgeOver(
+  found: readonly UiNode[],
+  frame: JudgingScreen,
+  order: DrawOrder | undefined,
+  chainOf: ((node: UiNode) => readonly Rect[]) | undefined,
+  fully: boolean,
+): Judged | undefined {
   return frame.boxes
-    .map((box) => judge(found, { ...frame, box }, order, fully))
+    .map((box) => judge(found, { ...frame, box }, order, chainOf, fully))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
 }
 
@@ -946,9 +967,21 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * than twice the band less a point: 122 pt or less under 62, while 123 pt
  * rounds its centre 61.5 to 62 and stops) stops neither way, and fails
  * naming the status bar (`shortOf`'s `statusBar`; code review of round 6, P2).
+ *
+ * A plain stop is also not one on a SLIVER its scroll container cuts it to
+ * (`Judged.sliver`, 2026-10-10, code review of fix/r7-sliver, item 1):
+ * uiautomator cuts every rect to its scroller, so a cut node's centre is
+ * always on the screen, and the stop handed back the very strip the next
+ * tap refuses (resolve.ts#refuseCutSliver) — `scroll_until X` then `tap X`
+ * failed. Scrolling on reveals it. `fully: true` keeps its own rule: a stop
+ * flush with a clipping container is probed (PROBE_REACH).
  */
 function stops(j: Judged, fully: boolean): boolean {
-  return j.visible > 0 && j.centreOnScreen && (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined);
+  return (
+    j.visible > 0 &&
+    j.centreOnScreen &&
+    (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined && j.sliver === undefined)
+  );
 }
 
 /**
@@ -958,12 +991,17 @@ function stops(j: Judged, fully: boolean): boolean {
  * `covered` — something of the app drawn over it (over its centre, without
  * `fully`). With `fully: true` a cut edge leads, as it always has. A centre
  * on the screen but in iOS's status band is `statusBar` (2026-10-09): the
- * sentence names the status bar, never a clip or a layout defect.
+ * sentence names the status bar, never a clip or a layout defect. Without
+ * `fully`, a centre under nothing on a sliver its scroll container cuts it
+ * to is `sliver` (2026-10-10, `stops`).
  */
 function shortOf(j: Judged, fully: boolean): InFrameShort {
   if (fully && j.clipped.length > 0) return { of: 'clipped', judged: j };
   if (j.bandOverCentre !== undefined) return { of: 'statusBar', judged: j, band: j.bandOverCentre };
-  return { of: !j.centreOnScreen ? 'clipped' : 'covered', judged: j };
+  if (!j.centreOnScreen) return { of: 'clipped', judged: j };
+  // Without `fully`, a centre under nothing yet no stop: the sliver (`stops`).
+  if (!fully && j.centreCover === undefined && j.sliver !== undefined) return { of: 'sliver', judged: { ...j, sliver: j.sliver } };
+  return { of: 'covered', judged: j };
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
@@ -1297,11 +1335,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // What is drawn over what, once a round (ui-tree/draw-order.ts): the
   // judgement's covers, and the stroke's (`TreeFacts.drawOrder`).
   const order = read === undefined ? undefined : drawOrder(read.tree);
-  const whole = judgeOver(found, s.frame, order, fully);
+  // Each match's clipping ancestors, for the plain stop's sliver rule (`stops`) — one walk of the tree a round.
+  const chainOf = read === undefined ? undefined : scrollersOf(read.tree);
+  const whole = judgeOver(found, s.frame, order, chainOf, fully);
   let cover: Cover | undefined;
   let best = whole;
   if (offered !== undefined && read !== undefined) {
-    const covered = judge(found, s.frame, order, fully, { cover: offered, keyboardSide: read.ofKeyboard });
+    const covered = judge(found, s.frame, order, chainOf, fully, { cover: offered, keyboardSide: read.ofKeyboard });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a

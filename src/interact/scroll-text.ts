@@ -140,6 +140,12 @@ function underText(j: Judged): string {
   return `${under} — ${percent(j.shows)}% of it shows`;
 }
 
+/** A plain stop's sliver (scroll-rounds.ts#stops, 2026-10-10): `cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs` — the tap's refusal's facts (resolve.ts#refuseCutSliver). */
+function sliverText(j: Judged & Required<Pick<Judged, 'sliver'>>): string {
+  const { cut, minPiece } = j.sliver;
+  return `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}) to a ${j.node.rect.width}x${j.node.rect.height} part, ${cut.depth} deep across it, under the ${minPiece} a tap needs`;
+}
+
 /**
  * How much of an element is on screen, in the terms the caller's next call
  * cares about. Takes the already-computed edges rather than a rect and a
@@ -287,6 +293,15 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
             `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
         );
       }
+      // Cut to a sliver by its scroll container at the end of the content (2026-10-10, scroll-rounds.ts#stops):
+      // the rest stays past the container's edge however it is swiped — or the node only reads cut (geometry.ts#evidentCut's residual).
+      if (short.of === 'sliver') {
+        return new Error(
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short.judged)} — and the content is exhausted: ` +
+            `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays past its container's edge at the end of the content — a layout ` +
+            `defect (no room after it?), or its own content runs to its edge, which reads as cut. ${last}`,
+        );
+      }
       if (short.of === 'covered') {
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
@@ -390,6 +405,10 @@ function shortText(short: Shortfall): string {
     case 'statusBar': {
       const { judged } = short;
       return `element reached the viewport but ${statusBarText(judged, short.band)} (last rect ${JSON.stringify(judged.node.rect)})`;
+    }
+    case 'sliver': {
+      const { judged } = short;
+      return `element reached the viewport but stayed ${sliverText(judged)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'absent':
       return 'element never appeared in the tree';
