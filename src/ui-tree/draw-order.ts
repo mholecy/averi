@@ -96,12 +96,16 @@ export interface DrawOrder {
    * no keyboard node, and its band is read with the input method's word,
    * ui-tree/keyboard-cover.ts — so the caller cuts it out of `within`). The
    * covers are the nodes after `node`'s subtree in pre-order (its first
-   * place in the tree, as `shadowing`) that draw for a target
-   * (`NOT_DRAWN`'s `target` column) and share area with the part of `node`
-   * inside `within` — a cover's rect, or, for a node pinned at the bottom of
-   * idb's flat list, that rect run down to the screen's bottom edge
-   * (`bottomPinned`, `pinnedReach`: the pinned bar's background and hit
-   * area, which idb lists as no node). A node not in this tree has no covers.
+   * place in the tree, as `shadowing`) — and a floating tab bar's items
+   * listed before it, when it lies outside the bar (`tabBarsOf`: the bar
+   * floats over the content whatever its source's order) — that draw for a
+   * target (`NOT_DRAWN`'s `target` column) and share area with the part of
+   * `node` inside `within` — a cover's rect, or, for a node pinned at the
+   * bottom of idb's flat list, that rect run down to the screen's bottom
+   * edge (`bottomPinned`, `pinnedReach`: the pinned bar's background and hit
+   * area, which idb lists as no node), and, for a tab bar's item, raised
+   * above it by the bar's lift (its surface, no node of any tree). A node
+   * not in this tree has no covers.
    */
   exposure(node: UiNode, within: Rect): Exposure;
 }
@@ -125,12 +129,13 @@ export const MIN_TAP_PIECE_FRACTION = 0.06;
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
   readonly shows: number;
-  /** The nodes drawn over it inside `within`, in pre-order; empty when none. */
+  /** The nodes drawn over it inside `within`, in pre-order (a floating tab bar's items listed before it among them, `tabBarsOf`); empty when none. */
   readonly covers: readonly UiNode[];
   /**
    * Where each of `covers` presses, in the same order: its rect, or — for a
    * node pinned at a flat list's bottom (`bottomPinned`) — its reach
-   * (`pinnedReach`). The rects `shows`, `largest` and `coverAt` are judged
+   * (`pinnedReach`), raised by its bar's lift for a floating tab bar's item
+   * (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`). The rects `shows`, `largest` and `coverAt` are judged
    * against, so a caller asking where a cover lies over the target (scroll-
    * rounds.ts#overFarSide) asks of the same rect.
    */
@@ -195,7 +200,7 @@ interface SeenFor extends Seen {
   readonly barLine: number;
   /** The walk index of the reading-order break after a flat list's CONTENT target (`readingBreak`): the later nodes from it on are no cover of it. The walk's length when there is none, the target is the top bar's, or the tree is not a flat list. */
   readonly readingBreak: number;
-  /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`) and idb's keyboard (`keyboardOf`): never past the break. */
+  /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) and a floating tab bar's items (`tabBarsOf`): never past the break. */
   readonly bottomChrome: ReadonlySet<Placed>;
   /** The tree's source lists a control's touch target as its wrapper (`UiNode.paddedTouchTargets` on its root): `ownControl`'s padded shape is asked only then. */
   readonly paddedTouchTargets: boolean;
@@ -546,7 +551,8 @@ const NOT_DRAWN = {
    * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
    * where idb resumes listing another container in reading order
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
-   * its bottom (`bottomPinned`) or idb's keyboard (`keyboardOf`). `target`
+   * its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) or a
+   * floating tab bar's item (`tabBarsOf`, round 7). `target`
    * only: the owner's decision of 2026-10-09 on docs/bugs/2026-10-09-ios-
    * idb-modal-listed-before-content-reads-covered-by-the-content-behind-
    * it.md, a regression of `flatListChrome`.
@@ -1027,10 +1033,98 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
 }
 
 /**
+ * A FLOATING TAB BAR's reach ABOVE its items, as a fraction of their height
+ * (`tabBarsOf`, `exposure`): 0.2 — the owner's decision (round 7, docs/bugs/
+ * 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-
+ * tap.md), unit-free, so the same in points and in pixels. Measured on
+ * mp-native's Account Detail (iPhone 17, idb and WDA alike): the bar's pill
+ * starts ≈12 pt above its 64-pt items (`run9-ios/img-374-0.png`, 743 against
+ * 755) and is no node of either tree; 0.2 × 64, rounded, is 13.
+ */
+export const TAB_BAR_REACH_FRACTION = 0.2;
+
+/** The share of the screen's width a tab bar's items together span (`tabBarsOf`): 60 % — mp-native's four 82-pt items, 328 of 402 pt (82 %). */
+export const TAB_BAR_WIDTH_FRACTION = 0.6;
+
+/**
+ * The bottom of the screen a tab bar's items end in (`tabBarsOf`), as a
+ * fraction of its height: 10 %, 87 pt of the 874-pt iPhone 17 — mp-native's
+ * items end at 819, 55 pt above the bottom, outside the pinned bar's
+ * `FLAT_LIST_BOTTOM_BAR_FRACTION`.
+ */
+export const TAB_BAR_BOTTOM_FRACTION = 0.1;
+
+/** The fewest items a tab bar has (`tabBarsOf`). */
+const TAB_BAR_MIN_ITEMS = 3;
+
+/** A floating tab bar (`tabBarsOf`): its items, the box they span, and how far above them it reaches. */
+interface TabBar {
+  readonly items: ReadonlySet<Placed>;
+  /** The items' bounding box: a target lying wholly in it is the bar's own (a tab, its label), and the bar is no cover of it. */
+  readonly rect: Rect;
+  /** `TAB_BAR_REACH_FRACTION` of the items' height, rounded: how far above them its surface reaches. */
+  readonly lift: number;
+}
+
+/**
+ * The FLOATING TAB BARS of a tree, read by their shape, asked of every tree
+ * (the owner's decision, round 7): at least `TAB_BAR_MIN_ITEMS` INTERACTIVE
+ * siblings of one rect's y and height, no two overlapping, together
+ * spanning `TAB_BAR_WIDTH_FRACTION` of the screen's width, ending on the
+ * screen and inside its bottom `TAB_BAR_BOTTOM_FRACTION`; the keyboard's
+ * nodes (`Placed.inKeyboard`, and idb's keys, `keyboardOf`) are none — a
+ * row of keys has the same shape. Such a bar floats over what lies outside
+ * it, whatever the order its source lists it in (`exposure`), and its
+ * surface reaches `TAB_BAR_REACH_FRACTION` of its items' height above them.
+ * Measured (docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-
+ * buttons-takes-a-rows-tap.md): idb lists mp-native's four tab items
+ * `37,755 82x64` … `283,755 82x64` FIRST, then the content; WDA the row,
+ * then the four buttons; neither lists the pill the bar draws from ≈743
+ * down, over `transactions.list.row_3 24,721 354x52` — its centre (201,747)
+ * read clear, and the tap pressed the Cards item. Not on Android's Compose
+ * bar: its items reach uiautomator as `container`s, no interactive role, and
+ * its host covers the rows beneath it as a structural node with children
+ * (`NOT_DRAWN.structural`), listed after the list. Residuals, stated: a
+ * bottom row of an app's own grid of buttons (a PIN pad's last row) that
+ * has the shape reads as a bar — what lies within the reach above it, the
+ * row of keys above included, reads as under it (a false refusal, the safe
+ * direction; the centre of a key of the row above lies clear of it); a sheet
+ * drawn over the bar has the bar's items over its rows where they reach them
+ * (a false refusal); a tab bar of two items, or of items of unequal height,
+ * is not seen.
+ */
+function tabBarsOf(order: readonly Placed[], screen: Rect, keys: ReadonlySet<Placed>): readonly TabBar[] {
+  const bottom = screen.y + screen.height;
+  const rows = new Map<string, Placed[]>();
+  for (const placed of order) {
+    const r = placed.node.rect;
+    if (placed.parent === undefined || !isInteractive(placed.node) || !(rectArea(r) > 0) || placed.inKeyboard || keys.has(placed)) continue;
+    const key = `${placed.parent.at} ${r.y} ${r.height}`;
+    rows.set(key, [...(rows.get(key) ?? []), placed]);
+  }
+  return [...rows.values()].flatMap((items) => {
+    const rects = items.map(({ node }) => node.rect);
+    const { y, height } = rects[0];
+    const end = y + height;
+    const shaped =
+      items.length >= TAB_BAR_MIN_ITEMS &&
+      end <= bottom &&
+      end >= bottom - screen.height * TAB_BAR_BOTTOM_FRACTION &&
+      rects.reduce((sum, r) => sum + r.width, 0) >= screen.width * TAB_BAR_WIDTH_FRACTION &&
+      rects.every((a, i) => rects.slice(i + 1).every((b) => rectIntersection(a, b) === undefined));
+    if (!shaped) return [];
+    const left = Math.min(...rects.map((r) => r.x));
+    const right = Math.max(...rects.map((r) => r.x + r.width));
+    return [{ items: new Set(items), rect: { x: left, y, width: right - left, height }, lift: Math.round(height * TAB_BAR_REACH_FRACTION) }];
+  });
+}
+
+/**
  * The reading-order break after a flat list's CONTENT target
  * (`flatListReadingOrder`): the walk index of the first node after it with
  * area whose top lies above the target's — but never a node of the bottom
- * chrome (`bottomChrome`: pinned at the bottom, or idb's keyboard), one that
+ * chrome (`bottomChrome`: pinned at the bottom, idb's keyboard, or a
+ * floating tab bar's item), one that
  * holds the target whole (a later node enclosing it is a cover in its own
  * right — r6b-icon's padded control, on a synthetic tree, not a device
  * dump; in the 69 device dumps only a pinned CONTINUE and the keyboard's
@@ -1081,8 +1175,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
   const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
-  /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`). */
-  const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? [])]);
+  /** Each floating tab bar's item, with its bar (`tabBarsOf`). */
+  const tabItems = new Map(tabBarsOf(order, screen, keyboard?.keys ?? new Set()).flatMap((bar) => [...bar.items].map((item) => [item, bar] as const)));
+  /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`) — a floating tab bar's items included. */
+  const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? []), ...tabItems.keys()]);
   /**
    * Where a cover of a target presses (`exposure`): its rect — or, for a node
    * pinned at a flat list's bottom (`bottomPinned`), its rect run down to the
@@ -1139,10 +1235,23 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
       const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets };
+      /** The tab bar `p` is an item of, when `node` lies outside it (`tabBarsOf`): a target wholly in the items' box is the bar's own. */
+      const floatsOver = (p: Placed): TabBar | undefined => {
+        const bar = tabItems.get(p);
+        return bar === undefined || rectWithin(node.rect, bar.rect) ? undefined : bar;
+      };
+      /** Where `p` presses over this target: `pinnedReach`, raised by its tab bar's lift when it floats over the target. */
+      const reach = (p: Placed): Rect => {
+        const r = pinnedReach(p);
+        const bar = floatsOver(p);
+        return bar === undefined ? r : { ...r, y: r.y - bar.lift, height: r.height + bar.lift };
+      };
+      // A floating tab bar's items cover what lies outside the bar whatever the order its source lists them in (idb: first), never the target's ancestors.
+      const before = places.length === 0 ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined && !places.some((place) => within(place, p)));
       const over =
         shown === undefined || about === undefined
           ? []
-          : laterThan(places, (p) => rectIntersection(pinnedReach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: pinnedReach(p) }));
+          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: reach(p) }));
       const covers = over.map((c) => c.node);
       const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
