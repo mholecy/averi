@@ -906,6 +906,63 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
   });
 
+  it('a bottom sheet\'s unlabelled background with NO keyboard (code review of round 7, MAJOR 1 — `Other 0,400 402x474` listed before its rows): no band — the strokes are the whole screen\'s, and the sheet\'s target is reached', async () => {
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('StaticText', 'Behind', 20, 200, 300, 40),
+        el('Other', null, 0, 400, 402, 474),
+        el('Button', 'Row 1', 0, 420, 402, 60),
+        el('Button', 'Row 2', 0, 480, 402, 60),
+        el('Button', 'Target', 0, 1100, 402, 60),
+      ]),
+    );
+    const target = tree.children.find((n) => n.label === 'Target')!;
+    class Sheet extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        if (from.y >= 400) target.rect = { ...target.rect, y: target.rect.y - 300 }; // a stroke on the sheet scrolls it
+      }
+    }
+    const fake = new Sheet({ form: tree }, 'form');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    expect(await scrollUntilVisible(fake, 'text:"Target"', FAST)).toMatchObject({ visible: 1 });
+    expect(fake.swipes[0]).toEqual({ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } });
+  });
+
+  it('a band top at the gesture box\'s bottom (a device box ending at 589) changes no stroke: the same as with no band (code review of round 7, MINOR 3 — why strokeTop has no guard)', async () => {
+    const strokes = async (band: boolean) => {
+      const { tree, street } = await numberPad();
+      if (!band) tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);
+      const fake = idbForm(tree, street, 589);
+      fake.viewportSize = { width: 402, height: 589 };
+      await scrollUntilVisible(fake, 'text:"Payee\u2019s street"', { ...FAST, maxSwipes: 1 }).catch(() => undefined);
+      return fake.swipes;
+    };
+    const banded = await strokes(true);
+    expect(banded).toHaveLength(1);
+    expect(banded).toEqual(await strokes(false));
+  });
+
+  it('the fully: true flush probe keeps above the band too (code review of round 7, MINOR 2; synthetic — idb lists no clipping container): a row flush with its list\'s bottom, the pad up (keys "1" and "3" clear of the stroke\'s line) — the probe touches down above 589, not in the band at 759', async () => {
+    const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+    const row = node({ role: 'button', identifier: 'row', rect: r(0, 834, 402, 40) });
+    const list = node({ role: 'container', rect: r(0, 300, 402, 574), clipsDescendants: true, children: [row] });
+    const keys = [5, 270].map((x, i) => node({ role: 'button', label: String(2 * i + 1), rect: r(x, 596, 132, 54) }));
+    const tree = node({ role: 'container', rect: r(0, 0, 0, 0), flatList: true, children: [node({ role: 'other', label: 'App', rect: r(0, 0, 402, 874) }), list, ...keys, node({ role: 'other', rect: r(0, 589, 402, 285) })] });
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
+    expect(result.flush).toEqual({ edge: 'bottom', container: list.rect, checked: true });
+    expect(fake.swipes).toEqual([{ from: { x: 201, y: 532 }, to: { x: 201, y: 484 } }]);
+  });
+
   it('an app\'s PIN pad (no background listed — run5-ios #81\'s shape) is content: the stroke box is the whole screen, as before', async () => {
     const { tree, street } = await numberPad();
     tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);

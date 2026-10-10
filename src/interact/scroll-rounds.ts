@@ -873,14 +873,19 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
  * cover: idb's tree cannot say the keyboard is shown (the in-tree reading
  * stays `unknown`), so nothing is judged under it, no witness is asked for
  * it and no failure names it — only the touch-down keeps off the keys, as
- * under WDA, whose band is a cover. Only a band top strictly inside the
- * gesture box, the precondition of swipe.ts#swipeVectorAbove; never on a
- * tree that is not idb's flat list (WDA, Android: undefined).
+ * under WDA, whose band is a cover. Never on a tree that is not idb's flat
+ * list (WDA, Android: undefined) — so today the two never both read and the
+ * "higher of the two" never runs: idb's reading has no cover, and a tree
+ * with a cover has no band; kept for a source that one day gives both. No
+ * guard on where the band lies in the gesture box (code review of round 7,
+ * MINOR 3): a top at or below the box's bottom changes no stroke
+ * (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
+ * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
+ * the band starts below the top bar's line, a fifth of the screen down.
  */
-function strokeTop(cover: Cover | undefined, bandTop: number | undefined, gesture: Rect | undefined): number | undefined {
-  const band = bandTop !== undefined && gesture !== undefined && bandTop > gesture.y && bandTop < gesture.y + gesture.height ? bandTop : undefined;
+function strokeTop(cover: Cover | undefined, bandTop: number | undefined): number | undefined {
   const top = cover?.topCover.y;
-  return band === undefined ? top : top === undefined ? band : Math.min(top, band);
+  return bandTop === undefined ? top : top === undefined ? bandTop : Math.min(top, bandTop);
 }
 
 /**
@@ -1436,7 +1441,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           // above it — the probe would touch down off it and move nothing.
           // Twice only to keep the ask order: no room even over the whole
           // screen is `room` with no witness asked, as it was.
-          const over = roomOver(strokeTop(probeCover, s.lastReadBandTop, gesture));
+          const over = roomOver(strokeTop(probeCover, s.lastReadBandTop));
           if (over === undefined) flush = { edge, container, ...noRoom };
           else {
             const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
@@ -1559,7 +1564,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // review of fix/r5-stroke). `over` is looked up by the candidate's own
   // rect object — strokeRoom hands back the one it was given — so nested
   // containers of equal rects keep their own.
-  const kept = strokeTop(strokeCover, s.lastReadBandTop, gesture);
+  const kept = strokeTop(strokeCover, s.lastReadBandTop);
   const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, kept, (w) => candidates.find((c) => c.rect === w)?.over);
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;

@@ -694,6 +694,7 @@ export async function aimClearOfChrome(
   if (cover === undefined) return { point: centre };
   const read = await keyboardTop();
   const band = keyboardBandTop(tree);
+  // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
   const top = band === undefined ? read : read === undefined ? band : Math.min(read, band);
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
