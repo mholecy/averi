@@ -6,7 +6,7 @@ import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { keyboardBandTop, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { belowStatusBand, inStatusBand, judgingOf, OPPOSITE, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { belowStatusBand, inStatusBand, judgingOf, OPPOSITE, REVEALS, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -611,9 +611,6 @@ export const PROBE_REACH = 0.25;
  * a cut deeper than the probe moves the row takes another probe.
  */
 export const PROBE_MAX_TRAVEL_FRACTION = 0.08;
-
-/** The direction a probe strokes toward to reveal a flush edge: content beyond the top lies up, and so on. */
-const REVEALS: Record<Edge, Direction> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
 
 /** The axis a scroll along `direction` runs on: `flushEdges`' along it. */
 const axisOf = (direction: Direction): 'vertical' | 'horizontal' => (direction === 'up' || direction === 'down' ? 'vertical' : 'horizontal');

@@ -1,11 +1,11 @@
-import { rectArea, type ClippedSide, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
+import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { keyboardBandTop } from '../ui-tree/soft-keyboard.js';
-import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
+import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -364,13 +364,8 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
 export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
 
-/** Where a node clipped out past each side of its container lies, and the scroll_until direction that brings it back. */
-const CLIPPED_OUT: Readonly<Record<ClippedSide, { where: string; direction: string }>> = {
-  top: { where: 'above', direction: 'up' },
-  bottom: { where: 'below', direction: 'down' },
-  left: { where: 'left of', direction: 'left' },
-  right: { where: 'right of', direction: 'right' },
-};
+/** Where a node clipped out past each side of its container lies; the scroll_until direction that brings it back is swipe.ts#REVEALS'. */
+const CLIPPED_OUT_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'left of', right: 'right of' };
 
 /**
  * The hint for a target this tree matched, but only with zero-area nodes —
@@ -387,9 +382,9 @@ function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
   if (matched.length === 0) return undefined;
   const sides = new Set(matched.map((n) => n.clippedOut));
   if (sides.has(undefined)) return ZERO_AREA_HINT;
-  const [only, ...more] = [...sides] as ClippedSide[];
-  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => CLIPPED_OUT[side].where).join(' or ')} its scroll container — scroll_until it first`;
-  return `it matched only nodes clipped out ${CLIPPED_OUT[only].where} its scroll container (scrolled past it) — scroll_until it with direction: "${CLIPPED_OUT[only].direction}" first`;
+  const [only, ...more] = [...sides] as Edge[];
+  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => CLIPPED_OUT_WHERE[side]).join(' or ')} its scroll container — scroll_until it first`;
+  return `it matched only nodes clipped out ${CLIPPED_OUT_WHERE[only]} its scroll container (scrolled past it) — scroll_until it with direction: "${REVEALS[only]}" first`;
 }
 
 /**
@@ -709,7 +704,7 @@ export class ClippedRefusal extends PresentElementRefusal {}
  *
  * Judged BEFORE the cover check, so a sliver also covered is refused for
  * its cut, whose remedy is a scroll toward the edge. The remedy is a plain
- * `scroll_until` toward that edge (`CUT_REVEALS`): its plain stop does not
+ * `scroll_until` toward that edge (`cutRemedy`): its plain stop does not
  * stop on such a sliver either (scroll-rounds.ts#stops, code review of
  * fix/r7-sliver, item 1), and its default direction is down, so a cut at the
  * bottom needs no direction and the others name theirs — and, for the
@@ -728,19 +723,17 @@ function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: n
   if (cut === undefined) return;
   const finding =
     `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${node.rect.width}x${node.rect.height} part of it shows, ` +
-    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs — ${CUT_REVEALS[cut.edge]} ` +
+    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs — ${cutRemedy(cut.edge)} ` +
     `(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates)`;
   const what = describeTarget(target);
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }
 
-/** The remedy for a target cut at each edge: a scroll toward where the rest of it lies — down, `scroll_until`'s default, needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
-export const CUT_REVEALS: Readonly<Record<Edge, string>> = {
-  bottom: 'scroll_until it first',
-  top: 'scroll_until it with direction: up first',
-  left: 'scroll_until it with direction: left first',
-  right: 'scroll_until it with direction: right first',
-};
+/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#REVEALS) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
+export function cutRemedy(edge: Edge): string {
+  const direction = REVEALS[edge];
+  return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
+}
 
 /** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
 export interface Aim {
