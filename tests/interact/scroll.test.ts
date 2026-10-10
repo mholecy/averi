@@ -822,3 +822,95 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 1, visible: expect.closeTo(0.615, 3), clipped: ['top'] });
   });
 });
+
+/**
+ * idb's keyboard band in the stroke box (round 7, 2026-10-10; docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
+ * soft-keyboard.md): idb marks no keyboard node, so the reading saw none and every stroke was `201 699 201 175` — a
+ * touch-down on the keys (`Z X C V`, `5`), the form never scrolled, and the reply said "content exhausted". The band's
+ * TOP (ui-tree/soft-keyboard.ts#keyboardBandTop) now ends the stroke box; nothing else about the keyboard is read.
+ */
+describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
+  const NO_STROKE_ON_KEYS = 'never on the keys';
+  /** `tree` on an idb-shaped fake (no oracle, 402x874), its `target` moved 300 pt up by a stroke that touches down above `bandTop` and left where it is by one on the keys. */
+  function idbForm(tree: UiNode, target: UiNode, bandTop: number) {
+    class Form extends FakeAdapter {
+      override async swipe(from: Point, to: Point): Promise<void> {
+        await super.swipe(from, to);
+        if (from.y >= bandTop) return; // a key touched, not the form
+        target.rect = { ...target.rect, y: target.rect.y - 300 };
+      }
+    }
+    const fake = new Form({ form: tree }, 'form');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  }
+  const numberPad = async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    return { tree, street: tree.children.find((n) => n.label === 'Payee’s street')! };
+  };
+
+  it('the SWIFT form with the number pad up (run2-ios #250, band top 589): the stroke touches down above the band — the form scrolls and `Payee’s street` (42,885) is reached; the reply names no keyboard', async () => {
+    const { tree, street } = await numberPad();
+    const fake = idbForm(tree, street, 589);
+    const result = await scrollUntilVisible(fake, 'text:"Payee’s street"', FAST);
+    expect(result).toMatchObject({ swipes: 1, visible: 1 });
+    expect(result).not.toHaveProperty('keyboard');
+    expect(fake.swipes.every(({ from }) => from.y < 589), NO_STROKE_ON_KEYS).toBe(true);
+    expect(fake.swipes[0]).toEqual({ from: { x: 201, y: 472 }, to: { x: 201, y: 118 } }); // as WDA draws it over its own band (573): `201 459 201 115`
+  });
+
+  it('a round whose tree did not read keeps the last read round\'s band top: its stroke touches down above the keys too', async () => {
+    const { tree, street } = await numberPad();
+    const fake = idbForm(tree, street, 589);
+    street.rect = { ...street.rect, y: 1600 }; // three strokes away
+    const real = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (reads++ === 1) throw new Error('idb describe-all failed');
+      return real();
+    };
+    await scrollUntilVisible(fake, 'text:"Payee\u2019s street"', FAST);
+    expect(fake.swipes.length).toBeGreaterThan(1);
+    expect(fake.swipes[1]).toEqual({ from: { x: 201, y: 472 }, to: { x: 201, y: 118 } }); // round 1, unread
+  });
+
+  it('Contacts\' New Contact with QWERTY up (the band `other 0,590 402x284`, Dictate after it): `add url` at 20,902 is stroked toward from above the keys', async () => {
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'Contacts', 0, 0, 402, 874),
+        el('TextField', 'First name', 20, 200, 362, 44),
+        el('Button', 'add url', 20, 902, 362, 51),
+        ...['Z', 'X', 'C', 'V'].map((k, i) => el('Button', k, 48 + 40 * i, 714, 36, 46)),
+        el('Keyboard', null, 0, 590, 402, 284),
+        el('Button', 'Dictate', 325, 805, 68, 69),
+      ]),
+    );
+    const url = tree.children.find((n) => n.label === 'add url')!;
+    const fake = idbForm(tree, url, 590);
+    expect(await scrollUntilVisible(fake, 'role:button text:"add url"', FAST)).toMatchObject({ visible: 1 });
+    expect(fake.swipes.every(({ from }) => from.y < 590), NO_STROKE_ON_KEYS).toBe(true);
+  });
+
+  it('WDA and Android unchanged: the same nodes in a tree that is not idb\'s flat list are stroked over the whole screen, as before (`201 699 201 175`)', async () => {
+    const { tree, street } = await numberPad();
+    delete tree.flatList;
+    tree.rect = { x: 0, y: 0, width: 402, height: 874 };
+    const fake = idbForm(tree, street, 589);
+    await expect(scrollUntilVisible(fake, 'text:"Payee’s street"', { ...FAST, maxSwipes: 1 })).rejects.toThrow();
+    expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
+  });
+
+  it('an app\'s PIN pad (no background listed — run5-ios #81\'s shape) is content: the stroke box is the whole screen, as before', async () => {
+    const { tree, street } = await numberPad();
+    tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);
+    const fake = idbForm(tree, street, 589);
+    await expect(scrollUntilVisible(fake, 'text:"Payee’s street"', { ...FAST, maxSwipes: 1 })).rejects.toThrow();
+    expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
+  });
+});
