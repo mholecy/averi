@@ -839,3 +839,22 @@ export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier
  * two docs each claimed to be the one way) — see the pair's note above.
  */
 export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}][${x + width},${y + height}]`;
+
+/**
+ * The top of the screen a flat list's top bar lies in (ui-tree/draw-order.ts#firstContent), as
+ * a fraction of the screen's height: 20 %, 175 pt of the 874-pt iPhone 17.
+ * Measured: idb lists the SWIFT form's Back at y 70–98 and its title at
+ * 74–94, under a bar that ends at y 116 (13 %); a large-title bar ends
+ * near 158 pt of 874 (18 %, inferred). A content row lying wholly inside
+ * this band at the head of the content is read as the bar's
+ * (`firstContent`'s misses, stated there). Here since round 7 (2026-10-10),
+ * moved from ui-tree/draw-order.ts: idb's keyboard band starts below it too
+ * (ui-tree/soft-keyboard.ts#keyboardBandTop).
+ */
+export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
+
+/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). Moved from ui-tree/draw-order.ts in round 7 (2026-10-10): soft-keyboard.ts#keyboardBandTop sizes idb's keyboard band against the same screen. */
+export function screenOf(tree: UiNode): Rect {
+  if (rectArea(tree.rect) > 0) return tree.rect;
+  return [...everyNode(tree)].reduce((best, n) => (rectArea(n.rect) > rectArea(best) ? n.rect : best), tree.rect);
+}

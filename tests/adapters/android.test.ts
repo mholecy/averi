@@ -5,6 +5,11 @@ import { AndroidAdapter, parseImeInsets, parseInputShown, parseTouchableRegion, 
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
+import { everyNode, type UiNode } from '../../src/adapters/types.js';
+import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { scrollUntilVisible } from '../../src/interact/scroll.js';
+import { resolveSettled } from '../../src/interact/resolve.js';
+import { FakeAdapter } from '../helpers/fake.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -94,6 +99,232 @@ describe('parseUiautomatorXml', () => {
     expect(t.children[0].children[0].clipsDescendants).toBeUndefined();
     expect(t.children[1].clipsDescendants).toBeUndefined();
     expect('clipsDescendants' in t).toBe(false); // absent, not false: ui_snapshot prints the tree as JSON
+  });
+});
+
+describe('parseUiautomatorXml — a node cut short of its own descendants is widened to them (docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md)', () => {
+  // The measured Account Detail shape (run9-android, 5e5a3d1, after the second drag): row_0's testTag node cut at its sticky
+  // date header's bottom (480) to 66,480 948x66, its own label and button the true rect 66,403 948x143, the header listed after
+  // the rows inside the scrolling list.
+  const ACCOUNT_DETAIL = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="transactions.list.container" scrollable="true" bounds="[0,401][1080,2154]">
+    <node class="android.view.View" resource-id="transactions.list.row_0" bounds="[66,480][1014,546]">
+      <node class="android.view.View" content-desc="Loan repayment, 17.07.2026, +602.00 EUR" bounds="[66,403][1014,546]" />
+      <node class="android.view.View" bounds="[116,480][204,552]"><node class="android.widget.TextView" text="LR" bounds="[136,484][184,533]" /></node>
+      <node class="android.widget.Button" bounds="[66,403][1014,546]" />
+    </node>
+    <node class="android.view.View" resource-id="transactions.list.row_1" bounds="[66,592][1014,735]">
+      <node class="android.view.View" content-desc="Loan repayment, 16.07.2026, +250.00 EUR" bounds="[66,592][1014,735]" />
+      <node class="android.widget.Button" bounds="[66,592][1014,735]" />
+    </node>
+    <node class="android.view.View" resource-id="transactions.list.date_header_0" bounds="[0,401][1080,480]">
+      <node class="android.widget.TextView" text="17.07.2026" bounds="[66,415][286,465]" />
+    </node>
+  </node>
+</node>
+</hierarchy>`;
+  const tree = parseUiautomatorXml(ACCOUNT_DETAIL);
+  const byIdIn = (t: UiNode, id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
+  const byId = (id: string) => byIdIn(tree, id);
+  const PIXEL = { x: 0, y: 0, width: 1080, height: 2220 };
+
+  it('row_0 reads its descendants\' union, the dumped bounds kept as cutBounds; a whole row and the header are left as dumped', () => {
+    expect(byId('transactions.list.row_0')).toMatchObject({ rect: { x: 66, y: 403, width: 948, height: 143 }, cutBounds: { x: 66, y: 480, width: 948, height: 66 } });
+    expect(byId('transactions.list.row_1').rect).toEqual({ x: 66, y: 592, width: 948, height: 143 });
+    expect(byId('transactions.list.row_1')).not.toHaveProperty('cutBounds');
+    expect(byId('transactions.list.date_header_0')).not.toHaveProperty('cutBounds');
+    expect([...everyNode(tree)].filter((n) => 'cutBounds' in n)).toHaveLength(1); // absent, not undefined: ui_snapshot prints the tree as JSON
+  });
+
+  it('…so the row reads under the header drawn after it: 66 of its 143 px show', () => {
+    const seen = drawOrder(tree).exposure(byId('transactions.list.row_0'), PIXEL);
+    expect(seen.covers.map((c) => c.identifier)).toContain('transactions.list.date_header_0');
+    expect(seen.shows).toBeCloseTo(66 / 143, 9);
+  });
+
+  it('…and `scroll_until id:row_0 fully` turns at once (the label selector\'s measured stroke, content down) instead of "fully visible after 0 swipes"', async () => {
+    const fake = new FakeAdapter({ list: tree }, 'list');
+    const outcome = await scrollUntilVisible(fake, 'id:transactions.list.row_0', { fully: true, maxSwipes: 1, timeoutMs: 2_000, settleMs: 1 }).catch((e: unknown) => e);
+    expect(outcome).toBeInstanceOf(Error);
+    expect(fake.swipes).toHaveLength(1);
+    expect(fake.swipes[0].to.y).toBeGreaterThan(fake.swipes[0].from.y);
+  });
+
+  it('a tap on the widened row aims at the part clear of the header (66 px), and is refused when what shows is under the minimum tap piece (a 30-px strip) — before, it tapped the strip that showed', async () => {
+    const fake = new FakeAdapter({ list: tree }, 'list');
+    await tapElement(fake, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    expect(fake.taps).toHaveLength(1);
+    const thin = parseUiautomatorXml(ACCOUNT_DETAIL.replace('bounds="[66,480][1014,546]"', 'bounds="[66,516][1014,546]"').replace('[0,401][1080,480]', '[0,401][1080,516]'));
+    expect(byIdIn(thin, 'transactions.list.row_0').rect).toEqual({ x: 66, y: 403, width: 948, height: 143 });
+    const refused = new FakeAdapter({ list: thin }, 'list');
+    const error = await tapElement(refused, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('date_header_0');
+    expect(refused.taps).toEqual([]);
+  });
+
+  /** A list holding `rows`, and — when `overlay` — a bar listed after it over the whole list, as a sticky header or a tab bar is drawn over the rows it cuts. */
+  const listOf = (rows: string, overlay: boolean) =>
+    parseUiautomatorXml(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">${rows}</node>
+  <node class="android.view.View" resource-id="unscrolled" bounds="[66,2100][1014,2150]"><node class="android.widget.Button" bounds="[66,2050][1014,2150]" /></node>
+  ${overlay ? '<node class="android.view.View" resource-id="overlay" bounds="[0,400][1080,2000]" />' : ''}
+</node>
+</hierarchy>`);
+  const ROWS = `
+    <node class="android.view.View" resource-id="cut_row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1450][1014,1550]" /></node>
+    <node class="android.view.View" resource-id="badge_row" bounds="[66,500][1014,600]"><node class="android.widget.TextView" text="badge" bounds="[900,470][1000,530]" /></node>
+    <node class="android.view.View" resource-id="wider_row" bounds="[66,700][1014,760]"><node class="android.widget.Button" bounds="[0,680][1080,760]" /></node>
+    <node class="android.view.View" resource-id="both_sides" bounds="[66,1200][1014,1300]"><node class="android.widget.Button" bounds="[66,1190][1014,1310]" /></node>
+    <node class="android.view.View" resource-id="edge_row" bounds="[66,1950][1014,2000]"><node class="android.widget.Button" bounds="[66,1950][1014,2093]" /></node>
+    <node class="android.view.View" resource-id="overhang" bounds="[0,1900][1080,2060]"><node class="android.widget.Button" bounds="[0,1850][1080,2060]" /></node>
+    <node class="android.view.View" resource-id="top_edge_row" bounds="[0,400][1080,450]"><node class="android.widget.Button" bounds="[0,400][1080,450]" /></node>
+    <node class="android.view.View" resource-id="top_cut_row" bounds="[66,430][1014,470]"><node class="android.widget.Button" bounds="[66,380][1014,470]" /></node>
+    <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>`;
+
+  it('under a node listed after it: a row whose own button has its exact x and width and reaches past ONE edge is widened along y — no other shape is', () => {
+    const t = listOf(ROWS, true);
+    const of = (id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
+    expect(of('cut_row')).toMatchObject({ rect: { x: 66, y: 1450, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+    expect(of('badge_row')).not.toHaveProperty('cutBounds'); // a badge hanging off it
+    expect(of('wider_row')).not.toHaveProperty('cutBounds'); // a full-bleed child: not its exact x and width (code review P1)
+    expect(of('wider_row').rect).toEqual({ x: 66, y: 700, width: 948, height: 60 });
+    expect(of('both_sides')).not.toHaveProperty('cutBounds'); // past both edges: overflow, not a cut (code review P3)
+    expect(of('edge_row')).not.toHaveProperty('cutBounds'); // past the list's edge only: the flush probe's case
+    expect(of('collapsed')).not.toHaveProperty('cutBounds');
+    expect(of('unscrolled')).not.toHaveProperty('cutBounds'); // in no scroll container
+    expect(of('top_edge_row')).not.toHaveProperty('cutBounds');
+    // The gained TOP strip is cut at the list's top edge (400): its button dumped from 380 reaches no higher.
+    expect(of('top_cut_row')).toMatchObject({ rect: { x: 66, y: 400, width: 948, height: 70 }, cutBounds: { x: 66, y: 430, width: 948, height: 40 } });
+    // What is gained is cut to the list; what was dumped past it stays: grown up to 1850, its bottom kept at 2060.
+    expect(of('overhang')).toMatchObject({ rect: { x: 0, y: 1850, width: 1080, height: 210 }, cutBounds: { x: 0, y: 1900, width: 1080, height: 160 } });
+  });
+
+  it('…and with nothing listed after it on the strip gained, not even that row: its own overflow, not an overlay\'s cut (code review P3)', () => {
+    expect([...everyNode(listOf(ROWS, false))].filter((n) => 'cutBounds' in n)).toEqual([]);
+  });
+
+  it('the residual, pinned (review round 2): a card cut at BOTH ends — between the sticky header and the floating tab bar, dumped 66,480 948x1360 over its own 66,420 948x1480 — is not widened and reads whole', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,401][1080,2154]">
+ <node class="android.view.View" resource-id="card" bounds="[66,480][1014,1840]"><node class="android.widget.Button" bounds="[66,420][1014,1900]" /></node>
+ <node class="android.view.View" resource-id="date_header_0" bounds="[0,401][1080,480]" />
+</node>
+<node class="android.view.View" resource-id="tab_bar_host" bounds="[66,1840][1014,2088]" />
+</node></hierarchy>`);
+    const card = [...everyNode(t)].find((n) => n.identifier === 'card')!;
+    expect(card.rect).toEqual({ x: 66, y: 480, width: 948, height: 1360 });
+    expect(card).not.toHaveProperty('cutBounds');
+    expect(drawOrder(t).exposure(card, PIXEL).shows).toBe(1);
+  });
+
+  it('code review P1: a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="card" bounds="[66,500][1014,900]">
+  <node class="android.widget.TextView" text="Pay now" bounds="[100,520][980,600]" />
+  <node class="android.widget.Button" bounds="[66,500][1014,620]" />
+  <node class="android.view.View" scrollable="true" resource-id="carousel" bounds="[0,640][1080,880]" />
+ </node>
+</node></node></hierarchy>`);
+    const card = [...everyNode(t)].find((n) => n.identifier === 'card')!;
+    expect(card.rect).toEqual({ x: 66, y: 500, width: 948, height: 400 });
+    expect(card).not.toHaveProperty('cutBounds');
+    const label = [...everyNode(t)].find((n) => n.label === 'Pay now')!;
+    expect(drawOrder(t).exposure(label, PIXEL)).toMatchObject({ covers: [], shows: 1 });
+  });
+
+  it('code review P3: a full-width child overflowing its row by 10 px each side does not widen the row over the next one — row_a is not covered by row_b', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row_a" bounds="[0,600][1080,705]">
+  <node class="android.view.View" content-desc="A" clickable="true" bounds="[0,590][1080,716]" />
+ </node>
+ <node class="android.view.View" resource-id="row_b" bounds="[0,705][1080,810]">
+  <node class="android.view.View" content-desc="B" clickable="true" bounds="[0,695][1080,821]" />
+ </node>
+</node></node></hierarchy>`);
+    const a = [...everyNode(t)].find((n) => n.identifier === 'row_a')!;
+    expect(a.rect).toEqual({ x: 0, y: 600, width: 1080, height: 105 });
+    expect(drawOrder(t).exposure(a, PIXEL).covers.map((c) => c.identifier)).not.toContain('row_b');
+  });
+
+  it('the round-5 ui_snapshots, re-dumped through the parser: only the two rows cut at the floating tab bar widen — every other rect, Contacts\' padded icons (wrapper 132, control 110, label 66) and the IME-cut "Add fields"/"Add phone" among them, stays as dumped', async () => {
+    const fixture = JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+    const CLASS: Record<string, string> = { button: 'android.widget.Button', text: 'android.widget.TextView', textfield: 'android.widget.EditText', image: 'android.widget.ImageView' };
+    const attr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const toXml = (n: UiNode): string => {
+      const { x, y, width, height } = n.rect;
+      const attrs = [
+        `class="${CLASS[n.role] ?? 'android.view.View'}"`,
+        `bounds="[${x},${y}][${x + width},${y + height}]"`,
+        n.identifier !== null ? `resource-id="${attr(n.identifier)}"` : '',
+        n.label !== null ? `content-desc="${attr(n.label)}"` : '',
+        n.clipsDescendants === true ? 'scrollable="true"' : '',
+      ].join(' ');
+      return `<node ${attrs}>${n.children.map(toXml).join('')}</node>`;
+    };
+    const widened: string[] = [];
+    for (const [screen, dumped] of Object.entries(fixture.screens)) {
+      const parsed = parseUiautomatorXml(`<hierarchy rotation="0">${toXml(dumped)}</hierarchy>`);
+      const before = [...everyNode(dumped)];
+      const after = [...everyNode(parsed)];
+      expect(after).toHaveLength(before.length);
+      after.forEach((n, i) => {
+        if (n.cutBounds === undefined) expect(n.rect).toEqual(before[i].rect);
+        else {
+          expect(n.cutBounds).toEqual(before[i].rect);
+          widened.push(`${screen} ${n.identifier} ${n.rect.y} ${n.rect.height}`);
+        }
+      });
+    }
+    expect(widened).toEqual(['accountDetail transactions.list.row_29 1784 143', 'accountDetail transactions.list.row_30 2044 143']);
+  });
+});
+
+describe('parseUiautomatorXml — bounds dumped inverted are a node clipped out of its container (docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md)', () => {
+  // Settings' homepage, its first rows scrolled under the collapsing app bar (run9-android, 5e5a3d1): uiautomator's raw bounds.
+  const SETTINGS = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="com.android.settings:id/collapsing_toolbar" bounds="[0,66][1080,297]">
+    <node class="android.widget.TextView" resource-id="com.android.settings:id/homepage_title" text="Settings" bounds="[66,66][428,44]" />
+  </node>
+  <node class="androidx.recyclerview.widget.RecyclerView" resource-id="com.android.settings:id/recycler_view" scrollable="true" bounds="[0,297][1080,2220]">
+    <node class="android.widget.LinearLayout" bounds="[0,297][1080,58]">
+      <node class="android.widget.TextView" resource-id="android:id/title" text="Apps" bounds="[198,297][324,58]" />
+      <node class="android.widget.TextView" resource-id="android:id/summary" text="Assistant, recent apps, default apps" bounds="[198,297][819,111]" />
+    </node>
+    <node class="android.widget.LinearLayout" bounds="[0,400][1080,600]"><node class="android.widget.TextView" text="Display" bounds="[198,450][400,520]" /></node>
+    <node class="android.widget.LinearLayout" bounds="[0,2400][1080,2220]"><node class="android.widget.TextView" text="System" bounds="[198,2450][400,2220]" /></node>
+    <node class="android.widget.HorizontalScrollView" bounds="[1200,500][1080,600]" />
+  </node>
+</node>
+</hierarchy>`;
+  const tree = parseUiautomatorXml(SETTINGS);
+  const byLabel = (label: string) => [...everyNode(tree)].find((n) => n.label === label)!;
+
+  it('clamped to zero size at the container\'s edge, the side it lies past kept: above (Apps, its summary, the title under the app bar), below (System), right of', () => {
+    expect(byLabel('Apps')).toMatchObject({ rect: { x: 198, y: 297, width: 126, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('Assistant, recent apps, default apps')).toMatchObject({ rect: { x: 198, y: 297, width: 621, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('Settings')).toMatchObject({ rect: { x: 66, y: 66, width: 362, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('System')).toMatchObject({ rect: { x: 198, y: 2220, width: 202, height: 0 }, clippedOut: 'bottom' });
+    const sideways = tree.children[1].children[3];
+    expect(sideways).toMatchObject({ rect: { x: 1080, y: 500, width: 0, height: 100 }, clippedOut: 'right' });
+  });
+
+  it('no negative side anywhere; a node dumped the right way round carries no mark', () => {
+    for (const n of everyNode(tree)) expect([n.rect.width, n.rect.height].every((side) => side >= 0)).toBe(true);
+    expect(byLabel('Display')).not.toHaveProperty('clippedOut');
+    expect(byLabel('Display').rect).toEqual({ x: 198, y: 450, width: 202, height: 70 });
+  });
+
+  it('tap text:"Apps" says where it went and the way back — not "0×0"', async () => {
+    const error = await resolveSettled(new FakeAdapter({ s: tree }, 's'), 'text:"Apps"', { ambiguous: 'refuse', timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe(
+      'Timed out after 20ms waiting for element text:"Apps" to appear\n  (it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first)',
+    );
   });
 });
 

@@ -1,9 +1,10 @@
-import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
+import { rectArea, type ClippedSide, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Edge } from '../ui-tree/geometry.js';
-import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
+import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
+import { keyboardBandTop } from '../ui-tree/soft-keyboard.js';
 import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
 
 /**
@@ -237,6 +238,21 @@ export interface ResolvedSettled extends Resolved {
  *   moving, or kept vanishing): a plain Error, "…waiting for element X to
  *   hold still (found, but never at the same position in two consecutive
  *   reads)".
+ * - the last tree read resolved it after a read that did not (or as the
+ *   first read): a run of ONE sighting, with no second read within the
+ *   budget to compare it with (2026-10-09, docs/bugs/2026-10-09-hold-still-
+ *   timeout-after-one-read-blames-a-moving-element.md: WDA's start-up,
+ *   ≈4–5 s, spent the 5 s budget inside the first read of a static title;
+ *   code review of round 7: a target seen, gone, then seen again on a slow
+ *   last read is the same shape). One more read is taken past the deadline
+ *   — the slack pollTree's last round already has: the same rect settles
+ *   it, a different one is the movement above. Otherwise a plain Error that
+ *   says what happened, never that two reads disagreed: "…to hold still
+ *   (found once, but no second read came within the budget to confirm its
+ *   position)" when the late read failed, "…(found once; the one read after
+ *   the budget did not find it again)" when it read a tree without it —
+ *   "found on the last read" in place of "found once" when an earlier run
+ *   had seen it too.
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
  */
@@ -248,17 +264,22 @@ export async function resolveSettled(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
   let sighted = false;
-  let zeroOnly = false;
+  let sightings = 0;
+  let run = 0; // consecutive rounds that resolved it, up to the last tree read
+  let zeroHint: string | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
+      zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
       if (resolved === undefined) {
         lastRect = undefined;
+        run = 0;
         return undefined;
       }
       sighted = true;
+      sightings++;
+      run++;
       const rect = JSON.stringify(resolved.node.rect);
       if (rect === lastRect) return { ...resolved, tree };
       lastRect = rect;
@@ -267,16 +288,32 @@ export async function resolveSettled(
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
+  let { readError } = outcome;
+  // A run of one: the last tree read saw it, the one before it did not.
+  if (run === 1) {
+    const late = await readTreeOrError(adapter);
+    readError = late.error; // the late read is now the last one
+    const resolved = late.tree === undefined ? undefined : resolveNow(late.tree, target, opts);
+    if (late.tree !== undefined && resolved !== undefined && JSON.stringify(resolved.node.rect) === lastRect) return { ...resolved, tree: late.tree };
+    if (resolved === undefined) {
+      const found = sightings === 1 ? 'found once' : 'found on the last read';
+      const after =
+        late.tree === undefined
+          ? `${found}, but no second read came within the budget to confirm its position`
+          : `${found}; the one read after the budget did not find it again`;
+      throw new Error(pollTimeoutMessage(`element ${describeTarget(target)} to hold still (${after})`, timeoutMs, readError));
+    }
+  }
   if (sighted) {
     throw new Error(
       pollTimeoutMessage(
         `element ${describeTarget(target)} to hold still (found, but never at the same position in two consecutive reads)`,
         timeoutMs,
-        outcome.readError,
+        readError,
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome, zeroOnly);
+  throw notFound(target, timeoutMs, outcome, zeroHint);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -303,28 +340,54 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
 
 /**
  * A wait that never resolved its target, worded for what it waited for —
- * nothing about settling. `zeroOnly`: the last tree read matched the target,
- * but only with zero-area nodes (2026-10-08,
+ * nothing about settling. `zeroHint`: the last tree read matched the
+ * target, but only with zero-area nodes (2026-10-08,
  * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md: idb reports a
  * node scrolled above the top of a scroll view as 0×0, and the wait read
  * "to appear" for a node the snapshot showed). The hint says so beneath the
  * headline (pollTimeoutMessage drops it when the last read failed). Still
  * absence for ElementNotFoundError's purpose — nothing was ever ACTIONABLE,
  * and a collapsed view, the case the zero-area rule was written for, carries
- * its id at 0×0 too, which is why the hint names both.
+ * its id at 0×0 too, which is why the hint names both (`zeroAreaHint`
+ * words it, and names the side when Android dumped them clipped out).
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroOnly = false): Error {
-  return absenceError(
-    pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroOnly ? ZERO_AREA_HINT : undefined),
-    { sighted: false, ...outcome },
-  );
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string): Error {
+  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint), {
+    sighted: false,
+    ...outcome,
+  });
 }
 
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
 export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
 
-/** Did the target match in this tree, but only with zero-area nodes — resolveNow's filter, the reason it answered `undefined`? */
-const matchedOnlyZeroArea = (tree: UiNode, target: Target): boolean => findTarget(tree, target).length > 0;
+/** Where a node clipped out past each side of its container lies, and the scroll_until direction that brings it back. */
+const CLIPPED_OUT: Readonly<Record<ClippedSide, { where: string; direction: string }>> = {
+  top: { where: 'above', direction: 'up' },
+  bottom: { where: 'below', direction: 'down' },
+  left: { where: 'left of', direction: 'left' },
+  right: { where: 'right of', direction: 'right' },
+};
+
+/**
+ * The hint for a target this tree matched, but only with zero-area nodes —
+ * resolveNow's filter, the reason it answered `undefined` — or undefined
+ * when it matched nothing (or something resolveNow took). When every such
+ * match was dumped clipped out of its scroll container (Android's inverted
+ * bounds, adapters/types.ts#UiNode.clippedOut, 2026-10-09: Settings' `Apps`
+ * under the collapsing app bar read "0×0" for a `126x-239` node), it says
+ * where, and the direction that scrolls it back when they agree; else
+ * ZERO_AREA_HINT.
+ */
+function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
+  const matched = findTarget(tree, target);
+  if (matched.length === 0) return undefined;
+  const sides = new Set(matched.map((n) => n.clippedOut));
+  if (sides.has(undefined)) return ZERO_AREA_HINT;
+  const [only, ...more] = [...sides] as ClippedSide[];
+  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => CLIPPED_OUT[side].where).join(' or ')} its scroll container — scroll_until it first`;
+  return `it matched only nodes clipped out ${CLIPPED_OUT[only].where} its scroll container (scrolled past it) — scroll_until it with direction: "${CLIPPED_OUT[only].direction}" first`;
+}
 
 /**
  * Wait only for the target to APPEAR — one round that resolves it under the
@@ -346,18 +409,18 @@ export async function resolvePresent(
   opts: SettleOptions,
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
-  let zeroOnly = false;
+  let zeroHint: string | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
+      zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
       return resolved;
     },
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome, zeroOnly);
+  throw notFound(target, timeoutMs, outcome, zeroHint);
 }
 
 // ─── On screen ───────────────────────────────────────────────────────────────
@@ -712,7 +775,15 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * under the keyboard is never aimed at. Its cost is the reading's, on that
  * path only (on Android the touchable region and the witness, with the
  * keyboard shown; nothing more with it hidden — the guard's first reading
- * is reused).
+ * is reused). Under idb, whose reading is always `unknown`, the cut is at
+ * the top of idb's keyboard band in the tree instead
+ * (ui-tree/soft-keyboard.ts#keyboardBandTop; round 7, 2026-10-10 — the
+ * higher of the two when both read): M-1.4's refusal said "only a 354x7
+ * part of it shows" of `value_date_select`'s strip 589–596, under the
+ * band, between the lifted CONTINUE's reach and the keys. A line only: the
+ * guard still reads no keyboard on idb, and a centre clear of every node
+ * (the band's background is none, draw-order's `structural` row) is tapped
+ * as before.
  *
  * The box is cut below iOS's status band (swipe.ts#belowStatusBand,
  * 2026-10-09) before a piece is chosen, as above a keyboard: a moved tap
@@ -746,7 +817,10 @@ export async function aimClearOfChrome(
   refuseCutSliver(target, node, tree, exposed.minPiece, sent);
   const cover = exposed.centreCover;
   if (cover === undefined) return { point: centre };
-  const top = await keyboardTop();
+  const read = await keyboardTop();
+  const band = keyboardBandTop(tree);
+  // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
+  const top = band === undefined ? read : read === undefined ? band : Math.min(read, band);
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
   const seen = order.exposure(node, within);

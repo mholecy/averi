@@ -172,10 +172,12 @@ export type LostWhy = 'screen-changed' | 'unmatched';
  * be set apart — a `lost` without its reason was rendered, and pinned, as
  * a sentence with none):
  * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
- * - `no-value`: the field WAS found (by the selector or by identity) and
- *   exposed no value on the last read (the poll stops on the second
- *   read that shows none, whether or not a read before it missed the
- *   field) — the text may or may not be there; nothing was compared. Not to
+ * - `no-value`: the node WAS found (by the selector or by identity), is not
+ *   an input, and exposed no value on the last read (the poll stops on the
+ *   second read that shows none, whether or not a read before it missed the
+ *   field) — the text may or may not be there; nothing was compared. An
+ *   input with no value is EMPTY (UiNode.value) and compared as "" — never
+ *   this kind (2026-10-09). Not to
  *   be confused with `lost` (the last read found no field at all) or with a
  *   read that showed a value (`landed`, `not-taken`, or the mismatch error).
  * - `not-taken`: the node is not an input and its value does not show the

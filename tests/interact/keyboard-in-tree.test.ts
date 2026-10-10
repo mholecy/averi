@@ -9,6 +9,7 @@ import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { bandNode, dropBand, FAST, FakeAdapter, hidesKeyboardOn, IOS_LOGIN_BAND, iosLoginFake, node, recorded } from '../helpers/fake.js';
 import { readFile } from 'node:fs/promises';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
 // The IN-TREE model (interact/keyboard-in-tree.ts: iOS under WDA, the adapter
 // has no keyboard oracle), through the module's interface — tapElement,
@@ -655,7 +656,9 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   // The read that installs the dead tree still returned a tree holding the
   // target, so the second look DID find it once: since 2026-10-08 that is
   // the "found, but never held still" sentence, not the never-found one, with
-  // the read error beneath saying why no second agreeing read came.
+  // the read error beneath saying why no second agreeing read came — since
+  // 2026-10-09 worded "found once, but no second read came" (one more read
+  // was taken past the budget, and it failed too).
   it('a second look that reads a dead tree keeps the read error beneath the headline', async () => {
     const fake = iosFake();
     onRead(fake, 3, () => {
@@ -666,7 +669,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message.split('\n')).toEqual([
       'After the soft keyboard covered id:login_submit at (107,571) on a first look, the second look failed: Timed out after 200ms ' +
-        'waiting for element id:login_submit to hold still (found, but never at the same position in two consecutive reads). ' +
+        'waiting for element id:login_submit to hold still (found once, but no second read came within the budget to confirm its position). ' +
         'Nothing was pressed; the screen is as the step found it',
       '  (last UI tree read failed: device offline)',
     ]);
@@ -907,6 +910,17 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(events).toEqual(['read']);
     expect(fake.keys).toEqual([]);
     expect(sleeps).toEqual([]);
+  });
+
+  it('idb\'s number pad (run2-ios #250) — its band\'s TOP is known since round 7 (ui-tree/soft-keyboard.ts#keyboardBandTop), the keyboard is NOT: one read, nothing tapped, nothing pressed, an empty result (a blind key submitted, K5d)', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const events = recorded(fake);
+    expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [{ kind: 'tap', target: { id: 'swift_payment.form.title' } }] })).toEqual({});
+    expect(events).toEqual(['read']);
+    expect([fake.keys, sleeps]).toEqual([[], []]);
   });
 
   it('a band and nothing usable: a WARNING, not a throw — none configured, or none on screen — and nothing is pressed or tapped', async () => {

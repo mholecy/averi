@@ -363,9 +363,17 @@ describe('the three questions disagree on purpose, per row', () => {
   /** Overlaps the target (150,280 100x40) without holding it whole. */
   const strip = rect(100, 300, 200, 50);
 
+  /** What the Compose tab-bar host holds: a tab, an identified `container` (its content off the target here). */
+  const tab = () => uiNode({ role: 'container', identifier: 'nav.tab_home', rect: rect(0, 700, 10, 10) });
+
   it('structural: an unlabelled `container` with children is no cover at a point, but is drawn over a container (the Compose tab-bar host) and over a target it does not hold whole', () => {
-    const later = uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+    const later = uiNode({ role: 'container', rect: strip, children: [tab()] });
     expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
+  });
+
+  it('structural, holding nothing but empty frames: no cover of a target — it carries nothing drawable (round 7: WDA\'s grouped cell background) — but drawn over a container, as a leaf is not', () => {
+    const later = uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] })] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later, later.children[0]], target: [] });
   });
 
   it('structural, holding the target AND its scroll view whole: judged through its content for a target — a WDA `Other` frame laid after the form', () => {
@@ -374,7 +382,7 @@ describe('the three questions disagree on purpose, per row', () => {
   });
 
   it('structural, holding the target whole but not its scroll view nor the screen: a bar\'s host, a cover (review round 1: the Compose host over a small target above its tabs)', () => {
-    const later = uiNode({ role: 'container', rect: card, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+    const later = uiNode({ role: 'container', rect: card, children: [tab()] });
     expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
   });
 
@@ -596,6 +604,145 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     expect(seen.coverAt({ x: 540, y: 198 })).toBe(bar);
   });
 
+  describe('a floating tab bar covers what lies outside it, whatever the listing order (docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md)', () => {
+    /** mp-native Account Detail, iPhone 17 (idb and WDA, 2026-10-09 21:11 UTC): the four tab items, `37,755 82x64` … `283,755 82x64`. */
+    const tabs = () => ['home', 'transactions', 'cards', 'more'].map((id, i) => uiNode({ role: 'button', label: id, identifier: `nav.tab_${id}`, rect: rect(37 + 82 * i, 755, 82, 64) }));
+    /** `transactions.list.row_3 24,721 354x52`, its centre (201,747) in the pill the bar draws ≈12 pt above its buttons. */
+    const row3 = () => uiNode({ role: 'button', identifier: 'transactions.list.row_3', rect: rect(24, 721, 354, 52) });
+    const title = () => uiNode({ role: 'text', label: 'Account', rect: rect(150, 70, 100, 22) });
+    /** idb's flat list, as measured: the Application, the tab items FIRST, then the content. */
+    const idb = (...content: UiNode[]) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', label: 'mp-native', rect: IPHONE }), ...tabs(), ...content] });
+
+    it('measured, idb (tabs listed before the content): row_3 is under the tab items and their reach 0.2 × 64 ≈ 13 pt above them — the 21-pt strip above is under the minimum, so it is refused; the cover at its centre is the Cards item, whose column x 201 the tap pressed', () => {
+      const row = row3();
+      const tree = idb(title(), row);
+      const seen = drawOrder(tree).exposure(row, IPHONE);
+      expect(seen.covers.map((n) => n.identifier)).toEqual(['nav.tab_home', 'nav.tab_transactions', 'nav.tab_cards', 'nav.tab_more']);
+      expect(seen.reaches).toEqual([rect(37, 742, 82, 77), rect(119, 742, 82, 77), rect(201, 742, 82, 77), rect(283, 742, 82, 77)]);
+      expect(seen.centreCover?.identifier).toBe('nav.tab_cards');
+      expect(seen.largest).toEqual(rect(24, 721, 354, 21));
+      expect(seen.tapAt).toBeUndefined();
+    });
+
+    it('measured, WDA (the row, then the four tab buttons, no bar): the same — the reach above the buttons is the pill\'s, not their frames\'', () => {
+      const row = row3();
+      const tree = uiNode({
+        role: 'application',
+        rect: IPHONE,
+        children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 874), children: [row] }), uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: tabs() })] })],
+      });
+      const seen = drawOrder(tree).exposure(row, IPHONE);
+      expect(seen.centreCover?.identifier).toBe('nav.tab_cards');
+      expect(seen.tapAt).toBeUndefined();
+    });
+
+    it('whatever the order: the tab items listed last cover row_3 the same; a row clear of the reach (bottom at 742) has nothing over it, in either order', () => {
+      const row = row3();
+      const last = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', label: 'mp-native', rect: IPHONE }), title(), row, ...tabs()] });
+      expect(drawOrder(last).exposure(row, IPHONE)).toMatchObject({ reaches: [37, 119, 201, 283].map((x) => rect(x, 742, 82, 77)), centreCover: { identifier: 'nav.tab_cards' } });
+      const clear = uiNode({ role: 'button', identifier: 'transactions.list.row_2', rect: rect(24, 690, 354, 52) });
+      expect(drawOrder(idb(title(), clear)).exposure(clear, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
+      const clearLast = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), title(), clear, ...tabs()] });
+      expect(drawOrder(clearLast).exposure(clear, IPHONE).covers).toEqual([]);
+    });
+
+    it('a row with its centre above the reach is tapped there; one with its centre in it is moved to a fingertip\'s piece above, or refused — never sent onto a tab', () => {
+      const at = (y: number) => uiNode({ role: 'button', identifier: 'row', rect: rect(24, y, 354, 52) });
+      const moved = at(712); // centre 738 clear of the reach (742); a cover only over its bottom 22 pt
+      expect(drawOrder(idb(title(), moved)).exposure(moved, IPHONE).tapAt).toEqual({ point: { x: 201, y: 738 }, moved: false });
+      const lower = at(725); // centre 751 in the reach; the 17-pt strip above is too thin
+      expect(drawOrder(idb(title(), lower)).exposure(lower, IPHONE).tapAt).toBeUndefined();
+      const tall = uiNode({ role: 'button', identifier: 'card', rect: rect(24, 690, 354, 80) }); // centre 730 clear
+      expect(drawOrder(idb(title(), tall)).exposure(tall, IPHONE).tapAt).toMatchObject({ moved: false });
+      const tallLow = uiNode({ role: 'button', identifier: 'card', rect: rect(24, 700, 354, 90) }); // centre 745 under the reach: moved to the 42-pt strip above it
+      expect(drawOrder(idb(title(), tallLow)).exposure(tallLow, IPHONE).tapAt).toEqual({ point: { x: 201, y: 721 }, moved: true, piece: rect(24, 700, 354, 42) });
+    });
+
+    it('the tab items themselves stay tappable (device check M-1.5): a tab, its own label inside it, nothing of the bar over them — rows listed after the tabs are no cover of them', () => {
+      // row_4 runs under the bar, the list on past the screen (`date_header_5` at 876, as measured: so row_4 is not pinned).
+      const tree = idb(title(), row3(), uiNode({ role: 'button', identifier: 'transactions.list.row_4', rect: rect(24, 817, 354, 52) }), uiNode({ role: 'text', identifier: 'transactions.list.date_header_5', rect: rect(0, 876, 402, 30) }));
+      const order = drawOrder(tree);
+      for (const tab of tree.children.filter((n) => n.identifier?.startsWith('nav.tab_'))) expect(order.exposure(tab, IPHONE)).toMatchObject({ covers: [], tapAt: { moved: false } });
+      // WDA: a tab's label inside its button — the bar's own; the items beside it are no cover.
+      const label = uiNode({ role: 'text', label: 'Cards', rect: rect(220, 795, 44, 14) });
+      const items = tabs();
+      items[2] = uiNode({ ...items[2], children: [label] });
+      const wda = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [row3()] }), uiNode({ role: 'container', rect: IPHONE, children: items })] });
+      expect(drawOrder(wda).exposure(label, IPHONE).covers).toEqual([]);
+    });
+
+    it('the shape, and nothing short of it: two items, items of unequal height or y, overlapping items, items spanning under 60 % of the width, or ending above the screen\'s lowest 10 %, are no tab bar — row_3 reads clear of their frames, as before', () => {
+      const row = row3();
+      const with_ = (items: UiNode[]) => drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), ...items, title(), row] })).exposure(row, IPHONE);
+      const item = (x: number, y = 755, w = 82, h = 64) => uiNode({ role: 'button', label: `i${x}`, rect: rect(x, y, w, h) });
+      expect(with_([item(37), item(119), item(201), item(283)]).covers).toHaveLength(4); // the control: the shape
+      for (const items of [
+        [item(37, 755, 160), item(201, 755, 160)], // two, wide enough together (320 of 402)
+        [item(37), item(119, 755, 82, 60), item(201), item(283, 755, 82, 60)], // two and two of unequal height
+        [item(37), item(119, 756), item(201), item(283, 756)], // two and two at unequal y
+        [item(37), item(100), item(201), item(283)], // overlapping
+        [item(37, 755, 60), item(119, 755, 60), item(201, 755, 60), item(283, 755, 60)], // 240 of 402: under 60 %
+        [item(37, 700), item(119, 700), item(201, 700), item(283, 700)], // bottom 764, above the band (786.6)
+      ]) {
+        expect(with_(items)).toMatchObject({ covers: [], tapAt: { moved: false } });
+      }
+      // Not interactive: a text row of the same shape is no tab bar.
+      expect(with_([37, 119, 201, 283].map((x) => uiNode({ role: 'text', label: `t${x}`, rect: rect(x, 755, 82, 64) }))).covers).toEqual([]);
+    });
+
+    it('a nested tree\'s order is its draw order (review of fix/r7-covers): a WDA action sheet listed after the bar is drawn over it — its Cancel and Delete account are tapped at their centres; tabs listed before a row there cover nothing of it, while idb\'s, listed first, do', () => {
+      const cancel = uiNode({ role: 'button', label: 'Cancel', rect: rect(8, 782, 386, 57) });
+      const del = uiNode({ role: 'button', label: 'Delete account', rect: rect(8, 717, 386, 57) });
+      const bar = uiNode({ role: 'container', rect: rect(20, 743, 362, 76), children: tabs() });
+      const content = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'text', label: 'row', rect: rect(24, 600, 354, 52) })] });
+      const sheet = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: rect(8, 600, 386, 240), children: [del, cancel] })] });
+      const order = drawOrder(uiNode({ role: 'application', rect: IPHONE, children: [content, bar, sheet] }));
+      expect(order.exposure(cancel, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 811 }, moved: false } });
+      expect(order.exposure(del, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 746 }, moved: false } });
+      // The tab bar listed BEFORE row_3 in a nested tree is beneath it; the same order in idb's flat list is reading order, and the bar covers it.
+      const row = row3();
+      const nested = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', rect: rect(20, 743, 362, 76), children: tabs() }), uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] });
+      expect(drawOrder(nested).exposure(row, IPHONE).covers).toEqual([]);
+      const flat = row3();
+      expect(drawOrder(idb(flat)).exposure(flat, IPHONE).centreCover?.identifier).toBe('nav.tab_cards');
+    });
+
+    it('in idb\'s list the items are bottom chrome: a row listed BEFORE them, a reading-order break between (a date header above it), still has them over it', () => {
+      const row = uiNode({ role: 'button', identifier: 'transactions.list.row_4', rect: rect(24, 735, 354, 52) });
+      const header = uiNode({ role: 'text', identifier: 'transactions.list.date_header_0', rect: rect(0, 600, 402, 30) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), title(), row, header, ...tabs()] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers.map((n) => n.identifier)).toEqual(['nav.tab_home', 'nav.tab_transactions', 'nav.tab_cards', 'nav.tab_more']);
+    });
+
+    it('a text in the items\' box, listed after them in idb\'s list (a tab\'s caption), is the bar\'s own: no item covers it', () => {
+      const caption = uiNode({ role: 'text', label: 'Cards', rect: rect(220, 795, 44, 14) });
+      expect(drawOrder(idb(caption)).exposure(caption, IPHONE).covers).toEqual([]);
+    });
+
+    it('items ending below the screen\'s bottom are no bar: listed first in idb\'s list, they cover nothing of a row listed after them', () => {
+      const items = [37, 119, 201, 283].map((x) => uiNode({ role: 'button', label: `i${x}`, rect: rect(x, 850, 82, 64) }));
+      const row = uiNode({ role: 'button', identifier: 'row', rect: rect(24, 790, 354, 52) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), ...items, title(), row] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([]);
+    });
+
+    it('a pinned item keeps its pinned reach and gains the one above: a bar ending inside the bottom 6 % reaches from 0.2 × its height above it down to the screen\'s bottom', () => {
+      const items = [37, 119, 201, 283].map((x) => uiNode({ role: 'button', label: `i${x}`, rect: rect(x, 790, 82, 49) }));
+      const below = uiNode({ role: 'text', label: 'footnote', rect: rect(40, 850, 300, 14) });
+      const row = uiNode({ role: 'button', identifier: 'row', rect: rect(24, 760, 354, 30) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), title(), row, below, ...items] });
+      expect(drawOrder(tree).exposure(row, IPHONE).reaches).toEqual([37, 119, 201, 283].map((x) => rect(x, 780, 82, 94)));
+    });
+
+    it('the keyboard\'s keys are no tab bar: idb\'s number pad (run2-ios #250) — its bottom row `,` `0` `Delete`, three equal keys across the screen — reaches no key above it', () => {
+      const tree = parseIdbDescribeAll(JSON.stringify(PAD.elements));
+      const order = drawOrder(tree);
+      const keys = [...everyNode(tree)].filter((n) => ['7', '8', '9'].includes(n.label ?? ''));
+      expect(keys).toHaveLength(3);
+      for (const key of keys) expect(order.exposure(key, IPHONE)).toMatchObject({ covers: [], shows: 1 });
+    });
+  });
+
   describe('no false cover — the shapes measured clean', () => {
     it('every WDA fixture (real /source payloads): no interactive or labelled node reads as covered — the scroll indicators WDA lists last in a ScrollView are no cover (review round 1)', async () => {
       const dir = new URL('../fixtures/', import.meta.url);
@@ -615,6 +762,37 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(covered).toEqual([]);
     });
 
+    it('WDA, Settings › General › Language & Region (2026-10-09 21:04 UTC): a grouped cell\'s background — an unlabelled `container` of the cell\'s size holding one empty frame, listed after the row\'s button — is no cover of `text:"Region"` nor of `id:LOCALE`', () => {
+      const region = uiNode({ role: 'text', label: 'Region', rect: rect(36, 428, 50, 21) });
+      const button = uiNode({ role: 'button', identifier: 'LOCALE', label: 'Region, Slovakia', rect: rect(36, 428, 308, 21), children: [region, uiNode({ role: 'text', label: 'Slovakia', rect: rect(280, 428, 64, 21) })] });
+      const background = (inner: Partial<UiNode> = {}) => uiNode({ role: 'container', rect: rect(20, 411, 362, 54), children: [uiNode({ role: 'container', rect: rect(20, 411, 362, 54), ...inner })] });
+      const cell = (bg: UiNode) =>
+        uiNode({
+          role: 'container',
+          identifier: 'LOCALE',
+          label: 'Region, Slovakia',
+          rect: rect(20, 411, 362, 54),
+          children: [
+            uiNode({ role: 'container', rect: rect(20, 411, 332, 54), children: [uiNode({ role: 'container', rect: rect(20, 411, 332, 54), children: [button] })] }),
+            bg,
+            uiNode({ role: 'container', rect: rect(36, 464, 346, 1) }),
+            uiNode({ role: 'button', label: 'chevron', rect: rect(352, 432, 12, 12) }),
+          ],
+        });
+      const tree = (bg: UiNode) => uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 812), children: [cell(bg)] })] });
+      const order = drawOrder(tree(background()));
+      expect(order.exposure(region, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
+      expect(order.exposure(button, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
+      // Something drawable at any depth — a label, an identifier, another role — and the wrapper covers, as the Compose tab-bar host does.
+      for (const inner of [{ label: 'Badge' }, { identifier: 'bg' }, { role: 'image' }]) {
+        const bg = background(inner);
+        expect(drawOrder(tree(bg)).exposure(region, IPHONE).covers).toContain(bg);
+      }
+      // …and an identified background itself (the measured one has no identifier).
+      const named = { ...background(), identifier: 'cell_bg' };
+      expect(drawOrder(tree(named)).exposure(region, IPHONE).covers).toContain(named);
+    });
+
     it('the myport 2FA screen\'s Späť moved down onto the horizontal scroll indicator (0,485 402x30): still tapped at its centre', async () => {
       const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-2fa-keyboard-toolbar.json', import.meta.url), 'utf8'));
       const nodes = [...everyNode(tree)];
@@ -623,6 +801,51 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const back = nodes.find((n) => n.label === 'Späť')!;
       back.rect = { ...back.rect, y: indicator.rect.y - 5 };
       expect(drawOrder(tree).exposure(back, tree.rect)).toMatchObject({ covers: [], tapAt: { moved: false } });
+    });
+
+    describe('WDA, the SWIFT form (2026-10-09 20:57 UTC): an unlabelled textfield over its placeholder label `Payee’s name`, holding its own horizontal scroll indicator', () => {
+      const label = () => uiNode({ role: 'text', label: 'Payee’s name', rect: rect(42, 446, 103, 22) });
+      const bar = (partial: Partial<UiNode> = {}) =>
+        uiNode({ role: 'container', label: 'Horizontal scroll bar, 1 page', value: '0 %', rect: rect(42, 454, 318, 10), children: [uiNode({ role: 'container', rect: rect(45, 461, 309, 3) })], ...partial });
+      const field = (text: UiNode, input: UiNode) =>
+        uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 116, 402, 664), children: [uiNode({ role: 'container', identifier: 'swift_payment.form.payee_name_input', rect: rect(24, 431, 354, 52), children: [text, input] })] })] });
+      const textfield = (indicator: UiNode, partial: Partial<UiNode> = {}) => uiNode({ role: 'textfield', rect: rect(42, 447, 318, 20), children: [indicator], ...partial });
+
+      it('the textfield\'s scroll indicator is no cover of the label — a text input\'s, as a scroll view\'s, matched by shape: localised, it is excused the same', () => {
+        for (const indicator of [bar(), bar({ label: 'Vodorovný posuvník, 1 strana' }), bar({ label: null, value: null })]) {
+          const text = label();
+          expect(drawOrder(field(text, textfield(indicator))).exposure(text, IPHONE).covers).not.toContain(indicator);
+        }
+      });
+
+      it('the textfield holding the label\'s centre, the label overhanging it by a point above and below (446–468 against 447–467), is the label\'s own field (round 7, the owner\'s decision): nothing over the label, tapped at its centre (94,457), where the field takes the tap', () => {
+        const text = label();
+        expect(drawOrder(field(text, textfield(bar()))).exposure(text, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 94, y: 457 }, moved: false } });
+        // An overhang of 2 is the field's too; beyond it, a cover.
+        const two = uiNode({ role: 'text', label: 'Payee’s name', rect: rect(42, 445, 103, 24) });
+        expect(drawOrder(field(two, textfield(bar()))).exposure(two, IPHONE).covers).toEqual([]);
+      });
+
+      it('…and no other control: a label overhanging by 3, one whose centre lies off the field, a labelled or valued field, a button of the field\'s rect — each still covers', () => {
+        const at = (r: ReturnType<typeof rect>) => uiNode({ role: 'text', label: 'Payee’s name', rect: r });
+        const cases: [UiNode, UiNode][] = [
+          [at(rect(42, 444, 103, 26)), textfield(bar())], // 3 above and below
+          [at(rect(42, 466, 103, 3)), textfield(bar())], // within the overhang, but its centre (94,468) below the field
+          [at(rect(42, 440, 103, 10)), textfield(bar())], // its centre (93,445) above the field
+          [label(), textfield(bar(), { label: 'Payee’s name' })],
+          [label(), textfield(bar(), { value: 'ACME s.r.o.' })],
+          [label(), uiNode({ role: 'button', rect: rect(42, 447, 318, 20) })],
+        ];
+        for (const [text, control] of cases) expect(drawOrder(field(text, control)).exposure(text, IPHONE).covers).toContain(control);
+      });
+
+      it('…and the shape stays narrow: under another interactive parent (a button), or an identified container of that shape, it covers', () => {
+        const text = label();
+        const underButton = bar();
+        expect(drawOrder(field(text, uiNode({ role: 'button', label: 'Pick', rect: rect(42, 447, 318, 20), children: [underButton] }))).exposure(text, IPHONE).covers).toContain(underButton);
+        const identified = bar({ identifier: 'pager' });
+        expect(drawOrder(field(text, textfield(identified))).exposure(text, IPHONE).covers).toContain(identified);
+      });
     });
 
     it('the scroll-indicator excuse is narrow: an `other` (an unmapped control) or an identified container of the same shape in the target\'s scroll view still covers', () => {

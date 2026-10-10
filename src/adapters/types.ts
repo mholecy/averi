@@ -98,6 +98,9 @@ export interface Rect {
  */
 export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
 
+/** The side of its container a node lies wholly past (`UiNode.clippedOut`). */
+export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
+
 /**
  * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
  * a negative or NaN side. The one spelling of "has this rect an area": the
@@ -199,6 +202,17 @@ export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
 export const KEYBOARD_ROLE = 'keyboard';
 
 /**
+ * The normalised role of every text input (adapters/ios-node.ts: TextField,
+ * SecureTextField, TextView; adapters/android.ts: EditText,
+ * AutoCompleteTextView and the Compose input that dumps as a focusable,
+ * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
+ * because the adapters write it and both ui-tree (draw-order.ts: a text
+ * input's own scroll indicator and its label) and interaction (the fill,
+ * through interact/input-role.ts) read it — round 7, review of fix/r7-covers.
+ */
+export const INPUT_ROLE = 'textfield';
+
+/**
  * The roles every source gives its wrappers (Application, Window, Other,
  * Cell; FrameLayout, View). Beside KEYBOARD_ROLE since 2026-10-07: it was
  * `ui-tree/bare-tree.ts`'s, and the draw order (`ui-tree/draw-order.ts`'s
@@ -225,7 +239,16 @@ export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, keyboard (KEYBOARD_ROLE), ...
   label: string | null; // visible text / content description
   identifier: string | null; // resource-id / accessibilityIdentifier
-  value: string | null; // current value (text field contents, toggle state)
+  /**
+   * Current value (text field contents, toggle state). A `textfield`'s null
+   * value means EMPTY: both parsers map an empty or absent value to null
+   * (android.ts and ios-node.ts, `emptyToNull` — an empty Compose field
+   * dumps no `text` at all), so on an input null is "", never "withheld" (2026-10-09,
+   * docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
+   * reads-exposes-no-value.md; interact/fill.ts reads it so). On any other
+   * role null is "no value exposed".
+   */
+  value: string | null;
   /** Validation message associated with an input, when the platform exposes one. */
   error?: string;
   rect: Rect;
@@ -305,11 +328,66 @@ export interface UiNode {
    * — a row cut by a pinned bar drawn over the list reads cut at the bar's
    * edge, not flush with any marked node, so the flag cannot reveal it (the
    * pinned-chrome bug, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-
-   * pinned-app-chrome.md, out of scope). A RecyclerView with padding and
+   * pinned-app-chrome.md, out of scope; since 2026-10-09 a node whose own
+   * descendants still carry the uncut extent is widened to it in the
+   * parser — `cutBounds` — and one whose descendants are cut too stays
+   * this residual). A RecyclerView with padding and
    * clipToPadding draws a row cut at its padding edge while the row's rect
    * runs on to the view's edge: not flush, not caught either.
    */
   clipsDescendants?: true;
+  /**
+   * The bounds the tree source dumped for this node, when they were CUT
+   * short of its own descendants by something drawn over it, and `rect` is
+   * widened to their extent (2026-10-09, docs/bugs/2026-10-09-android-fully-
+   * trusts-row-bounds-cut-at-a-sticky-header.md): Android only, set by the
+   * uiautomator parser (adapters/android.ts#uncut, #widenUnderOverlays).
+   * Compose subtracts what an overlay sibling covers from a node's bounds
+   * but not from its descendants': mp-native's Account Detail row under its
+   * sticky date header (`0,401 1080x79`) dumped as `66,480 948x66` while its
+   * own label and button read `66,403 948x143` — and the cut rect, whole in
+   * the list and clear of the header, read "fully visible" with 77 of its
+   * 143 px under the header. Widened, the row lies under the header drawn
+   * after it: the draw order judges it covered there, `scroll_until`
+   * strokes it out from under the header, a tap aims at the part that
+   * shows (and is refused when that part is under the minimum tap piece),
+   * and a rect assert measures the whole row, not the strip that showed.
+   * Widened only along y, on one side, to descendants with the node's
+   * exact x and width, cut to the nearest clipping ancestor
+   * (`clipsDescendants`), and only where a node listed after it lies on the
+   * strip gained — the overlay; a control padded inside its wrapper
+   * (`paddedTouchTargets`), a full-bleed child and a child overflowing both
+   * edges never widen it — nor, the residual, a node cut at BOTH ends (a
+   * tall card between a sticky header and a floating tab bar reads whole);
+   * and a node overflowing one edge into the next row, or into a
+   * screen-sized wrapper (a snackbar host), listed after it is widened as
+   * if cut. Kept so `ui_snapshot` shows what was dumped beside
+   * what is judged: "its rect was cut here; something is drawn over the
+   * rest". Absent on iOS (WDA and idb report frames unclipped) and on every
+   * node the parser left as dumped.
+   */
+  cutBounds?: Rect;
+  /**
+   * The side of its container this node lies wholly PAST, when the tree
+   * source dumped its bounds inverted (2026-10-09, docs/bugs/2026-10-09-
+   * android-inverted-uiautomator-bounds-pass-through-as-negative-
+   * heights.md): Android only, set by the uiautomator parser (adapters/
+   * android.ts#nodeBounds). uiautomator cuts a node's bounds to its
+   * container, and a node scrolled wholly past it keeps one edge of each —
+   * Settings' `Apps` row under the collapsing app bar dumped
+   * `[198,297][324,58]`, the list's top and the row's own bottom — which
+   * reached every reader as `126x-239`: `ui_snapshot` printed it, the wait
+   * called it "0×0", and `scroll_until` read it neither past the far edge
+   * nor in the frame. `rect` is clamped to zero size at the container's
+   * edge (`y` 297, height 0), so it is never a target, and this says which
+   * way it went: `top` — clipped out above its scroll container — and
+   * `bottom`, `left`, `right` likewise. Read by the wait's hint
+   * (interact/resolve.ts#zeroAreaHint) and by `scroll_until`, which reads a
+   * node clipped out past its far edge as beyond it (interact/scroll-
+   * rounds.ts#observe). Absent on iOS and on every node dumped the right
+   * way round.
+   */
+  clippedOut?: ClippedSide;
   /**
    * Set on the ROOT of a tree its source gives as a FLAT LIST (code review
    * of deep/r5-covers, P1, 2026-10-09): idb's `describe-all`, every element

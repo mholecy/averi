@@ -2063,6 +2063,25 @@ flows:
       expect(fake.taps).toEqual(['amount_input']); // never the step after it
     });
 
+    // docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
+    // reads-exposes-no-value.md (F-1.1): the EMPTY field (null value) that
+    // dropped every character read "exposes no value" and the flow went on.
+    it('a fill into an EMPTY field that drops every character: fails the flow — shows 0, its value did not land', async () => {
+      const fake = formFake(null);
+      fake.typeText = async (text: string) => {
+        fake.typed.push(text);
+      };
+      const error = await notSkipped(fake, 'fill: { id: amount_input, value: "abc" }');
+      expect(error.trace.slice(1)).toEqual([
+        {
+          action: '✗ fill id:"amount_input"',
+          detail:
+            'failed — optional step not skipped: its field is present, but its value did not land — ' +
+            'fill: typed 3 characters but the field shows 0 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
+        },
+      ]);
+    });
+
     it('a fill whose clear leaves text twice: fails the flow — its value did not land', async () => {
       const fake = formFake('9.99');
       fake.clearText = async (count: number) => {
