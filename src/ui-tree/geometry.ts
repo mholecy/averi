@@ -570,6 +570,9 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
  */
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
+/** A rect's side: one a rect extends past (`clippedEdges`), or lies flush with (`flushEdges`). */
+export type Edge = 'top' | 'bottom' | 'left' | 'right';
+
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
@@ -580,9 +583,9 @@ export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2
 export function clippedEdges(
   rect: Rect,
   viewport: { x?: number; y?: number; width: number; height: number },
-): ('top' | 'bottom' | 'left' | 'right')[] {
+): Edge[] {
   const { x = 0, y = 0 } = viewport;
-  const out: ('top' | 'bottom' | 'left' | 'right')[] = [];
+  const out: Edge[] = [];
   if (rect.y < y) out.push('top');
   if (rect.y + rect.height > y + viewport.height) out.push('bottom');
   if (rect.x < x) out.push('left');
@@ -618,6 +621,26 @@ export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
   };
   walk(tree, []);
   return (node) => chains.get(node) ?? [];
+}
+
+/**
+ * The edges of `rect` that lie on `container`'s, within a pixel — along
+ * `axis` only when given (top and bottom are the vertical's), else both —
+ * in `clippedEdges`' order; none when the container has no area. Moved here
+ * from interact/scroll-rounds.ts on 2026-10-10, where `scroll_until`'s
+ * `fully: true` stop asks it along the scroll (scroll-rounds.ts
+ * #PROBE_REACH), to be asked by more than the scroll.
+ */
+export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'horizontal'): Edge[] {
+  if (rectArea(container) === 0) return [];
+  const on = (a: number, b: number) => Math.abs(a - b) <= 1;
+  const flush: Record<Edge, boolean> = {
+    top: axis !== 'horizontal' && on(rect.y, container.y),
+    bottom: axis !== 'horizontal' && on(rect.y + rect.height, container.y + container.height),
+    left: axis !== 'vertical' && on(rect.x, container.x),
+    right: axis !== 'vertical' && on(rect.x + rect.width, container.x + container.width),
+  };
+  return (['top', 'bottom', 'left', 'right'] as const).filter((e) => flush[e]);
 }
 
 /**

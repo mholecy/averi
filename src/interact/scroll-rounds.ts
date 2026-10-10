@@ -1,6 +1,6 @@
 import type { DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { clippedEdges, containsPoint, flushEdges, largestScroller, rectArea, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -251,9 +251,6 @@ export type RoundStep =
   | { do: 'stroke'; toward: Direction; reach: number; coverTop?: number; box?: Rect; probe?: true; maxTravel?: number }
   /** The scroll is over. */
   | { do: 'stop'; outcome: ScrollOutcome };
-
-/** A viewport edge an element extends past. */
-export type Edge = 'top' | 'bottom' | 'left' | 'right';
 
 /**
  * A shown soft keyboard as the round may apply it (2026-10-08): its frame,
@@ -605,25 +602,13 @@ export const PROBE_MAX_TRAVEL_FRACTION = 0.08;
 /** The direction a probe strokes toward to reveal a flush edge: content beyond the top lies up, and so on. */
 const REVEALS: Record<Edge, Direction> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
 
-/**
- * The judged match's edges that lie on its container's edges, along the
- * scroll's axis (`direction`'s), within a pixel, low edge first — none, one,
- * or both (it fills the container: PROBE_REACH); none when the container
- * has no area.
- */
-function flushEdges(rect: Rect, container: Rect, direction: Direction): Edge[] {
-  if (rectArea(container) === 0) return [];
-  const on = (a: number, b: number) => Math.abs(a - b) <= 1;
-  const [low, high]: [Edge, Edge] = direction === 'up' || direction === 'down' ? ['top', 'bottom'] : ['left', 'right'];
-  const atLow = low === 'top' ? on(rect.y, container.y) : on(rect.x, container.x);
-  const atHigh =
-    high === 'bottom' ? on(rect.y + rect.height, container.y + container.height) : on(rect.x + rect.width, container.x + container.width);
-  return [...(atLow ? [low] : []), ...(atHigh ? [high] : [])];
-}
+/** The axis a scroll along `direction` runs on: `flushEdges`' along it. */
+const axisOf = (direction: Direction): 'vertical' | 'horizontal' => (direction === 'up' || direction === 'down' ? 'vertical' : 'horizontal');
 
 /**
  * Where the match lies flush, of `chain` (clipping ancestors, nearest
- * first): the nearest it is flush with on ONE edge along the scroll — that
+ * first; `flushEdges`, ui-tree/geometry.ts, along the scroll's axis, within
+ * a pixel): the nearest it is flush with on ONE edge along the scroll — that
  * edge and the ancestor's index, the probe's question — else, when it
  * fills the NEAREST along the scroll, both edges (`fills`: reported, never
  * probed); undefined when neither.
@@ -634,10 +619,10 @@ function flushWith(
   direction: Direction,
 ): { edge: Edge; at: number } | { fills: readonly [Edge, Edge] } | undefined {
   for (const [at, container] of chain.entries()) {
-    const edges = flushEdges(rect, container, direction);
+    const edges = flushEdges(rect, container, axisOf(direction));
     if (edges.length === 1) return { edge: edges[0], at };
   }
-  const nearest = chain.length === 0 ? [] : flushEdges(rect, chain[0], direction);
+  const nearest = chain.length === 0 ? [] : flushEdges(rect, chain[0], axisOf(direction));
   return nearest.length === 2 ? { fills: [nearest[0], nearest[1]] } : undefined;
 }
 

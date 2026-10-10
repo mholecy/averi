@@ -4,6 +4,7 @@ import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
   containsPoint,
+  flushEdges,
   inferScreenSize,
   intersectsViewport,
   rectArea,
@@ -380,6 +381,18 @@ describe('scrollersOf — each node\'s clipping ancestors, nearest first (2026-1
     expect(of(outer)).toEqual([]);
     expect(of(bare)).toEqual([]);
     expect(of(leaf(600))).toEqual([]); // a node of another read
+  });
+});
+
+describe('flushEdges — a rect\'s edges on its container\'s, within a pixel (moved here from scroll-rounds.ts, 2026-10-10)', () => {
+  const form = { x: 0, y: 242, width: 1080, height: 1736 };
+  it('both axes by default, in clippedEdges\' order; one axis when asked; none for a container of no area', () => {
+    expect(flushEdges({ x: 66, y: 1924, width: 948, height: 55 }, form)).toEqual(['bottom']); // 1979 against 1978: within a pixel
+    expect(flushEdges({ x: 0, y: 242, width: 1080, height: 100 }, form)).toEqual(['top', 'left', 'right']);
+    expect(flushEdges({ x: 0, y: 242, width: 1080, height: 100 }, form, 'vertical')).toEqual(['top']);
+    expect(flushEdges({ x: 0, y: 242, width: 1080, height: 100 }, form, 'horizontal')).toEqual(['left', 'right']);
+    expect(flushEdges({ x: 66, y: 1920, width: 948, height: 56 }, form)).toEqual([]); // 2 px short
+    expect(flushEdges({ x: 0, y: 0, width: 0, height: 0 }, { x: 0, y: 0, width: 0, height: 0 })).toEqual([]);
   });
 });
 

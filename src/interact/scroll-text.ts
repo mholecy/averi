@@ -1,11 +1,11 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
-import { drawnOverText, frameText, nodeText, rectText } from '../ui-tree/geometry.js';
+import { drawnOverText, frameText, nodeText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { absenceError, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Edge, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
