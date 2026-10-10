@@ -570,6 +570,9 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
  */
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
+/** A rect's side: one a rect extends past (`clippedEdges`), or lies flush with (`flushEdges`). */
+export type Edge = 'top' | 'bottom' | 'left' | 'right';
+
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
@@ -580,9 +583,9 @@ export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2
 export function clippedEdges(
   rect: Rect,
   viewport: { x?: number; y?: number; width: number; height: number },
-): ('top' | 'bottom' | 'left' | 'right')[] {
+): Edge[] {
   const { x = 0, y = 0 } = viewport;
-  const out: ('top' | 'bottom' | 'left' | 'right')[] = [];
+  const out: Edge[] = [];
   if (rect.y < y) out.push('top');
   if (rect.y + rect.height > y + viewport.height) out.push('bottom');
   if (rect.x < x) out.push('left');
@@ -618,6 +621,136 @@ export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
   };
   walk(tree, []);
   return (node) => chains.get(node) ?? [];
+}
+
+/**
+ * The edges of `rect` that lie on `container`'s, within a pixel — along
+ * `axis` only when given (top and bottom are the vertical's), else both —
+ * in `clippedEdges`' order; none when the container has no area. Moved here
+ * from interact/scroll-rounds.ts on 2026-10-10, where `scroll_until`'s
+ * `fully: true` stop asks it along the scroll (scroll-rounds.ts
+ * #PROBE_REACH), so the tap's cut-sliver rule (`evidentCut`) asks the same
+ * question, not a copy of it.
+ */
+export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'horizontal'): Edge[] {
+  if (rectArea(container) === 0) return [];
+  const on = (a: number, b: number) => Math.abs(a - b) <= 1;
+  const flush: Record<Edge, boolean> = {
+    top: axis !== 'horizontal' && on(rect.y, container.y),
+    bottom: axis !== 'horizontal' && on(rect.y + rect.height, container.y + container.height),
+    left: axis !== 'vertical' && on(rect.x, container.x),
+    right: axis !== 'vertical' && on(rect.x + rect.width, container.x + container.width),
+  };
+  return (['top', 'bottom', 'left', 'right'] as const).filter((e) => flush[e]);
+}
+
+/**
+ * The least extent along y a descendant reaching the top or bottom edge from
+ * inside the node needs to count as `evidentCut`'s inside evidence, in the
+ * tree's units (px on Android, where alone the rule applies): 8 px — a 1-dp
+ * divider or a 2-dp focus line is at most 7 px at density 3.5, while the
+ * measured toggle's button showed 42 px. Content past the edge counts at any
+ * thickness.
+ */
+export const MIN_INSIDE_EVIDENCE = 8;
+
+/** An evidenced cut of a node at a clipping ancestor's edge (`evidentCut`): the edge, that ancestor's rect, and how deep the node shows across the edge. */
+export interface Cut {
+  readonly edge: Edge;
+  readonly container: Rect;
+  /** The node's extent across `edge` — its height at the top or bottom, its width at a side: what of it shows that way. */
+  readonly depth: number;
+}
+
+/**
+ * Where `node` is EVIDENTLY cut by its clipping ancestors (`chain`,
+ * `scrollersOf`'s): of every edge, over the WHOLE chain, that the node lies
+ * flush with (`flushEdges`) while a descendant of it says the node runs on
+ * past it, the shallowest (`Cut.depth`; the first of equals, nearest
+ * ancestor first); undefined when none (2026-10-10, docs/bugs/2026-10-09-
+ * android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-
+ * nothing.md). The shallowest, not the first found (code review of
+ * fix/r7-sliver, item 2): a card cut to 50 px at a carousel's right edge is
+ * a 50-px sliver whatever its top says. The tap's cut-sliver rule
+ * (interact/resolve.ts#refuseCutSliver) and `scroll_until`'s plain stop
+ * (interact/scroll-rounds.ts#stops) ask it, against the same minimum.
+ *
+ * What a descendant (of some area) must show, along the edge's axis:
+ * - At ANY edge: it lies more than a pixel PAST the edge. Compose's nodes
+ *   are cut to the scroller while their children may not be (the round-5
+ *   snapshot `contactsCreateStaged`: a row `132,242 948x33` at the list's
+ *   top, its First name field `132,115 816x160` running on above it).
+ * - At the TOP or BOTTOM only: it reaches the edge (within a pixel) from
+ *   more than a pixel inside the node's opposite side — content laid out
+ *   across the edge and cut with it. uiautomator cuts a View's children
+ *   with it, so on classic Views this is the only evidence there is: the
+ *   measured toggle `66,1924 948x55` (132 px whole) on a form ending at
+ *   1978, its button `66,1936 948x42` starting 12 px inside it and ending
+ *   on the cut. A whole element's content keeps inside it (a label centred
+ *   in a button) or fills it (a background of the same rect): neither runs
+ *   into the edge from inside. Not at a side (code review item 4): every
+ *   full-bleed row touches a vertical list's sides with content flush there,
+ *   and a whole tile flush with a list's left edge has its icon flush left
+ *   — the tree does not say which way a scroller scrolls, and screens are
+ *   mostly vertical lists, so the inside evidence is believed along y only.
+ *   Nor from a descendant thinner than MIN_INSIDE_EVIDENCE along y (code
+ *   review round 3): a divider or a focus line at a whole last row's bottom
+ *   reaches the edge from inside too, and on a tablet, where the minimum
+ *   piece grows (≈ 96 px at 1600 px), a dense 40-dp row is under it.
+ *
+ * Why evidence, not flushness alone: a node whose edge lies on a scroller's
+ * may be cut there or whole and touching it — a first row at rest, a last
+ * one scrolled to the end — and the tree does not say which.
+ *
+ * Unknowable, stated: a cut node with no descendants (a leaf, or a Compose
+ * node whose text is merged into it) shows no evidence and reads whole; so
+ * does a classic View cut at a horizontal scroller's side (its children cut
+ * with it, never past); a whole node whose content runs to its top or
+ * bottom edge without padding (a divider at a last row's bottom, an image
+ * flush with a first row's top) reads cut. The tree carries no natural size
+ * of a node to settle either. Cost: a walk of the node's subtree per flush
+ * edge, for a node with a clipping ancestor only.
+ */
+export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
+  const n = node.rect;
+  // Along the edge's axis, as offsets INTO the container from that edge: where the descendant's near and far sides lie, and the node's far side.
+  const runsOnPast = (d: Rect, c: Rect, edge: Edge): boolean => {
+    if (rectArea(d) === 0) return false;
+    const [near, far, nodeFar] = {
+      top: [d.y - c.y, d.y + d.height - c.y, n.y + n.height - c.y],
+      bottom: [c.y + c.height - (d.y + d.height), c.y + c.height - d.y, c.y + c.height - n.y],
+      left: [d.x - c.x, d.x + d.width - c.x, n.x + n.width - c.x],
+      right: [c.x + c.width - (d.x + d.width), c.x + c.width - d.x, c.x + c.width - n.x],
+    }[edge];
+    const fromInside = (edge === 'top' || edge === 'bottom') && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
+    return near < -1 || fromInside;
+  };
+  let shallowest: Cut | undefined;
+  for (const container of chain) {
+    for (const edge of flushEdges(n, container)) {
+      const depth = edge === 'top' || edge === 'bottom' ? n.height : n.width;
+      if (shallowest !== undefined && depth >= shallowest.depth) continue;
+      for (const d of everyNode(node)) {
+        if (d !== node && runsOnPast(d.rect, container, edge)) {
+          shallowest = { edge, container: { ...container }, depth };
+          break;
+        }
+      }
+    }
+  }
+  return shallowest;
+}
+
+/**
+ * `evidentCut` when what shows of the node across that edge is under
+ * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`) —
+ * a sliver a tap is refused on (interact/resolve.ts#refuseCutSliver) and
+ * `scroll_until`'s plain stop does not stop on (scroll-rounds.ts#stops);
+ * undefined otherwise. The one spelling of the rule both ask.
+ */
+export function cutSliver(node: UiNode, chain: readonly Rect[], minPiece: number): Cut | undefined {
+  const cut = evidentCut(node, chain);
+  return cut !== undefined && cut.depth < minPiece ? cut : undefined;
 }
 
 /**

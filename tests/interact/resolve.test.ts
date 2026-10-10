@@ -12,6 +12,7 @@ import { tapText } from '../../src/mcp/tool-text.js';
 import {
   absenceError,
   AmbiguityRefusal,
+  ClippedRefusal,
   CoveredRefusal,
   DEFAULT_SETTLE_TIMEOUT_MS,
   ElementNotFoundError,
@@ -990,6 +991,147 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     await expect(scrollUntilVisible(terms, 'text:"By continuing you accept the terms"', { maxSwipes: 2, settleMs: 0 })).rejects.toThrow(
       /under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows — and the content is exhausted.* a layout defect/,
     );
+  });
+});
+
+describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-10)', () => {
+  // docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md, owner decision: refuse.
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const TOGGLE = 'id:swift_payment.form.details_toggle';
+  /** mp-native's SWIFT form on the Pixel_3a as measured: the form's scroller `0,242 1080x1736` (bottom 1978), `inside` in it, the CONTINUE bar below it. */
+  const swiftForm = (...inside: UiNode[]) => {
+    const fake = new FakeAdapter(
+      {
+        s: node({
+          role: 'container',
+          rect: { x: 0, y: 0, width: 1080, height: 2220 },
+          children: [
+            node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 242, width: 1080, height: 1736 }, children: inside }),
+            node({ role: 'button', label: 'CONTINUE', identifier: 'swift_payment.form.continue_button', rect: { x: 66, y: 1979, width: 948, height: 132 } }),
+          ],
+        }),
+      },
+      's',
+    );
+    fake.viewportSize = { width: 1080, height: 2220 };
+    return fake;
+  };
+  /** The "Payment details" toggle (a FiSectionHeadline, 132 px whole) at `y`, `height` of it showing, its button 12 px below its top and cut with it. */
+  const toggle = (y: number, height: number) =>
+    node({
+      role: 'container',
+      identifier: 'swift_payment.form.details_toggle',
+      rect: { x: 66, y, width: 948, height },
+      children: [node({ role: 'button', rect: { x: 66, y: y + 12, width: 948, height: Math.min(108, 1978 - (y + 12)) } })],
+    });
+
+  it('the measured sliver, 66,1924 948x55 on the form\'s bottom edge, its button 66,1936 948x42 running into it: refused, nothing tapped', async () => {
+    const fake = swiftForm(toggle(1924, 55));
+    const error = await tapElement(fake, TOGGLE, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ClippedRefusal);
+    expect((error as Error).message).toBe(
+      `${TOGGLE} is cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, ` +
+        '55 deep across that edge, under the 65 a tap needs — scroll_until it first' +
+        ' (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates); nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('the same toggle wholly on screen (66,1793 948x132): tapped at its centre (540,1859), as measured to expand it', async () => {
+    const fake = swiftForm(toggle(1793, 132));
+    expect(await tapElement(fake, TOGGLE, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1859 }]);
+  });
+
+  it('cut, but 65 of it across the edge (the minimum): tapped at its centre as before', async () => {
+    const fake = swiftForm(toggle(1913, 65));
+    await tapElement(fake, TOGGLE, OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1946 }]);
+  });
+
+  it('a whole button under the minimum touching the edge, its label inside it: nothing of it is cut — tapped at its centre', async () => {
+    const fake = swiftForm(
+      node({
+        role: 'button',
+        identifier: 'save',
+        rect: { x: 66, y: 1930, width: 948, height: 48 },
+        children: [node({ role: 'text', label: 'Save', rect: { x: 480, y: 1942, width: 120, height: 24 } })],
+      }),
+    );
+    await tapElement(fake, 'id:save', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1954 }]);
+  });
+
+  it('a WHOLE dense 40-px last row at the list\'s end, its 2-px divider flush with its bottom (code review round 3): a divider is no evidence — tapped; the note\'s toggle beside it still refused', async () => {
+    const fake = swiftForm(
+      node({
+        role: 'button',
+        identifier: 'last_row',
+        rect: { x: 66, y: 1938, width: 948, height: 40 },
+        children: [node({ role: 'text', label: 'Row', rect: { x: 100, y: 1946, width: 200, height: 24 } }), node({ role: 'other', rect: { x: 66, y: 1976, width: 948, height: 2 } })],
+      }),
+    );
+    await tapElement(fake, 'id:last_row', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1958 }]);
+    await expect(tapElement(swiftForm(toggle(1924, 55)), TOGGLE, OPTS)).rejects.toBeInstanceOf(ClippedRefusal);
+  });
+
+  it('a whole button whose background fills it, and a leaf, at the edge: no evidence of a cut — tapped (the leaf is the stated residual: a cut leaf reads the same)', async () => {
+    const fake = swiftForm(
+      node({ role: 'button', identifier: 'filled', rect: { x: 66, y: 1923, width: 400, height: 55 }, children: [node({ role: 'other', rect: { x: 66, y: 1923, width: 400, height: 55 } })] }),
+      node({ role: 'button', identifier: 'leaf', rect: { x: 614, y: 1923, width: 400, height: 55 } }),
+    );
+    await tapElement(fake, 'id:filled', OPTS);
+    await tapElement(fake, 'id:leaf', OPTS);
+    expect(fake.tapPoints).toEqual([
+      { x: 266, y: 1951 },
+      { x: 814, y: 1951 },
+    ]);
+  });
+
+  it('Compose\'s shape (round-5 snapshot contactsCreateStaged): a row cut to 948x33 at the list\'s TOP, its field running on above it — refused', async () => {
+    const fake = swiftForm(
+      node({
+        role: 'container',
+        identifier: 'first_name_row',
+        rect: { x: 132, y: 242, width: 948, height: 33 },
+        children: [node({ role: 'textfield', label: 'First name', rect: { x: 132, y: 115, width: 816, height: 160 } })],
+      }),
+    );
+    await expect(tapElement(fake, 'id:first_name_row', OPTS)).rejects.toThrow(
+      "id:first_name_row is cut at its scroll container's top edge (container 0,242 1080x1736); only a 948x33 part of it shows, 33 deep across that edge",
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('cut at the top, or at a side: the remedy names the direction the rest lies in', async () => {
+    const top = swiftForm(node({ role: 'container', identifier: 'row', rect: { x: 66, y: 242, width: 948, height: 40 }, children: [node({ role: 'button', rect: { x: 66, y: 242, width: 948, height: 30 } })] }));
+    await expect(tapElement(top, 'id:row', OPTS)).rejects.toThrow(/cut at its scroll container's top edge .* 40 deep across that edge, under the 65 a tap needs — scroll_until it with direction: up first \(if it is whole .*, or tap by coordinates\); nothing was tapped$/);
+    const side = swiftForm(node({ role: 'container', identifier: 'card', rect: { x: 1030, y: 900, width: 50, height: 300 }, children: [node({ role: 'image', rect: { x: 1040, y: 950, width: 200, height: 40 } })] }));
+    await expect(tapElement(side, 'id:card', OPTS)).rejects.toThrow(/cut at its scroll container's right edge .* 50 deep across that edge, under the 65 a tap needs — scroll_until it with direction: right first \(if it is whole .*, or tap by coordinates\); nothing was tapped$/);
+    expect([top.tapPoints, side.tapPoints]).toEqual([[], []]);
+  });
+
+  it('a sliver whose centre is ALSO under a node drawn over it: refused for its cut, judged before the cover', async () => {
+    const fake = swiftForm(toggle(1924, 55));
+    fake.live().children.push(node({ role: 'other', label: 'Snackbar', rect: { x: 0, y: 1930, width: 1080, height: 40 } }));
+    const error = await tapElement(fake, TOGGLE, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ClippedRefusal);
+    expect((error as Error).message).toMatch(/^id:swift_payment\.form\.details_toggle is cut at its scroll container's bottom edge/);
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('the fill\'s focus tap goes through the same rule: refused before anything is tapped or typed', async () => {
+    const fake = swiftForm(
+      node({
+        role: 'textfield',
+        identifier: 'payee',
+        rect: { x: 66, y: 1940, width: 948, height: 38 },
+        children: [node({ role: 'text', label: 'Payee', rect: { x: 100, y: 1950, width: 300, height: 28 } })],
+      }),
+    );
+    await expect(fillField(fake, 'id:payee', 'x', OPTS)).rejects.toBeInstanceOf(ClippedRefusal);
+    expect([fake.tapPoints, fake.typed]).toEqual([[], []]);
   });
 });
 
