@@ -175,6 +175,18 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     },
   );
 
+  // Worded as interact/type-text.ts (round 7): ENTER for a newline and a return only.
+  it.each([
+    ['ab\ncd', /\(a newline into ENTER, which submits the form mid-fill\)/],
+    ['ab\rcd', /\(a return into ENTER, which submits the form mid-fill\)/],
+    ['ab\x07cd', /`input text` may send it as a key event\. Type the text/],
+  ])('typeText on %j says what `input text` would do with it — ENTER only for a newline or a return', async (text, said) => {
+    const { fn } = deviceShExec();
+    const message = ((await new AndroidAdapter({ serial: 'e', exec: fn }).typeText(text).catch((e: unknown) => e)) as Error).message;
+    expect(message).toMatch(said);
+    if (text.includes('\x07')) expect(message).not.toMatch(/ENTER \(|newline/);
+  });
+
   it('isAppRunning: the package name is quoted INTO the rawShell line — pidof gets one word, the `|| true` still runs', async () => {
     const { fn, commands, adbArgv } = deviceShExec();
     expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x; echo injected')).toBe(false);

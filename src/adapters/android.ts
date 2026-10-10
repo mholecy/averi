@@ -1,6 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
+import { CONTROL_CHAR_RE, inputTextControlFate } from './input-text.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -9,15 +10,6 @@ import { formatSeconds } from '../util/duration.js';
 import { zeroRect, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
-
-/**
- * Characters typeText refuses (a key, not text, for `input text`) — see
- * adb-shell.ts. A DEFENSIVE assert since the 2026-10-07 code review: the
- * user-facing refusal, of every C0 control character and DEL on both
- * platforms, is interact/type-text.ts's and comes before any device call;
- * this one only stops a caller that bypasses interact/.
- */
-const CONTROL_KEY_CHAR_RE = /[\u0000-\u001f\u007f]/;
 
 /** One adb call's options: its own budget. */
 interface AdbCallOptions {
@@ -543,11 +535,14 @@ export class AndroidAdapter implements DeviceAdapter {
     // Each character is one quoted `shell` word; a space is `input text`'s
     // own `%s`; a control character is refused up front — by interact/
     // first (type-text.ts), here again defensively — see adb-shell.ts.
-    const control = text.match(CONTROL_KEY_CHAR_RE);
+    // Defensive only (since the 2026-10-07 code review): it stops a caller
+    // that bypasses interact/. The character set and the words are
+    // input-text.ts's, shared with type-text.ts (code review of round 7).
+    const control = text.match(CONTROL_CHAR_RE);
     if (control !== null) {
+      const ch = control[0];
       throw new Error(
-        `typeText cannot type ${JSON.stringify(control[0])} on Android: \`input text\` may turn it into a key ` +
-          `event (a newline into ENTER, which submits the form mid-fill). Type the text without it and send ` +
+        `typeText cannot type ${JSON.stringify(ch)} on Android: \`input text\` ${inputTextControlFate(ch)}. Type the text without it and send ` +
           `the key deliberately — pressKey('enter') (the \`press_key\` tool, \`key: enter\`); there is no tab key.`,
       );
     }

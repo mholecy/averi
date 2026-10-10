@@ -215,6 +215,155 @@ describe('resolveSettled — appear AND hold still', () => {
     expect((error as Error).message).toMatch(/to hold still \(found, /);
   });
 
+  // docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-
+  // element.md: the first WDA tap after WebDriverAgent starts spent the 5 s
+  // budget inside ONE read (start-up ≈4–5 s) of a title that never moves
+  // (`135,73 131x22`), and the timeout said two reads disagreed.
+  describe('a budget spent inside the first read: one sighting, no second read', () => {
+    /** The SWIFT title; read 1 outlasts the budget, the later ones answer `next(read)`. */
+    function wdaStart(next: (read: number, title: UiNode) => UiNode | Error) {
+      resetLayout();
+      const title = node({ role: 'text', identifier: 'swift_payment.form.title', label: 'SWIFT', rect: { x: 135, y: 73, width: 131, height: 22 } });
+      const root = node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [title] });
+      let reads = 0;
+      const fake = new FakeAdapter({ root }, 'root');
+      fake.uiTree = async () => {
+        reads++;
+        if (reads === 1) {
+          await new Promise((r) => setTimeout(r, 30)); // WDA starting: the whole 20 ms budget
+          return structuredClone(root);
+        }
+        const answer = next(reads, title);
+        if (answer instanceof Error) throw answer;
+        return structuredClone(answer);
+      };
+      return { fake, root, reads: () => reads };
+    }
+    const BUDGET = { ...FIRST, timeoutMs: 20, pollMs: 2 };
+
+    it('a static element: one more read at the same rect settles it — no timeout', async () => {
+      const { fake, root, reads } = wdaStart(() => root);
+      const { node: settled } = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET);
+      expect(settled.rect).toEqual({ x: 135, y: 73, width: 131, height: 22 });
+      expect(reads()).toBe(2);
+    });
+
+    it('the late read fails: "found once, but no second read came", the read error beneath — never "two consecutive reads"', async () => {
+      const { fake, reads } = wdaStart(() => new Error('WDA session not created'));
+      const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
+      expect(reads()).toBe(2);
+      expect(error).not.toBeInstanceOf(ElementNotFoundError);
+      expect((error as Error).message.split('\n')).toEqual([
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once, but no second read came within the budget to confirm its position)',
+        '  (last UI tree read failed: WDA session not created)',
+      ]);
+    });
+
+    it('the late read no longer finds it: said exactly — the one read after the budget did not find it again; no read error', async () => {
+      const { fake } = wdaStart(() => node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 } }));
+      const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once; the one read after the budget did not find it again)',
+      );
+    });
+
+    it('the late read finds it elsewhere: genuine movement keeps "never at the same position in two consecutive reads"', async () => {
+      const { fake, root } = wdaStart((_, title) => {
+        title.rect = { ...title.rect, y: 120 };
+        return root;
+      });
+      const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found, but never at the same position in two consecutive reads)',
+      );
+    });
+  });
+
+  // Code review of round 7: the extra read follows a RUN of one sighting,
+  // not one sighting in all — a target seen, gone, and seen again only on a
+  // slow last read had no second read either.
+  describe('the extra read follows a run of one sighting at the end of the budget', () => {
+    /** Read 1 sees the title at y 73; then it is gone until 12 ms in; the read that finds it again (at y 120) outlasts the budget. */
+    function seenGoneSeenLate(late: () => 'same' | Error) {
+      resetLayout();
+      const title = node({ role: 'text', identifier: 'title', label: 'SWIFT', rect: { x: 135, y: 73, width: 131, height: 22 } });
+      const withTitle = () => node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [structuredClone(title)] });
+      const without = node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 } });
+      const fake = new FakeAdapter({ without }, 'without');
+      const start = Date.now();
+      let reads = 0;
+      let goneReads = 0;
+      let phase: 'first' | 'gone' | 'late' | 'after' = 'first';
+      fake.uiTree = async () => {
+        reads++;
+        if (phase === 'first') {
+          phase = 'gone';
+          return withTitle();
+        }
+        // At least one read without it, whatever the clock: a stalled first poll must not skip the gap.
+        if (phase === 'gone' && (goneReads === 0 || Date.now() - start < 12)) {
+          goneReads++;
+          return structuredClone(without);
+        }
+        if (phase === 'gone') {
+          phase = 'late';
+          title.rect = { ...title.rect, y: 120 };
+          await new Promise((r) => setTimeout(r, 30)); // the slow read the budget ends inside
+          phase = 'after';
+          return withTitle();
+        }
+        const answer = late();
+        if (answer instanceof Error) throw answer;
+        return withTitle();
+      };
+      return { fake, reads: () => reads };
+    }
+    const BUDGET = { ...FIRST, timeoutMs: 20, pollMs: 2 };
+
+    it('seen, gone, seen again at the end: one more read at the same rect settles it', async () => {
+      const { fake } = seenGoneSeenLate(() => 'same');
+      const { node: settled } = await resolveSettled(fake, 'id:title', BUDGET);
+      expect(settled.rect.y).toBe(120);
+    });
+
+    it('seen, gone, seen again at the end, then the late read fails: "found on the last read, but no second read came"', async () => {
+      const { fake } = seenGoneSeenLate(() => new Error('device offline'));
+      const error = await resolveSettled(fake, 'id:title', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message.split('\n')).toEqual([
+        'Timed out after 20ms waiting for element id:title to hold still (found on the last read, but no second read came within the budget to confirm its position)',
+        '  (last UI tree read failed: device offline)',
+      ]);
+    });
+
+    it('an element that moves on every read within the budget gets NO extra read: the old sentence', async () => {
+      // It moves on every read the poll makes, the last of them a slow one
+      // that outlasts the budget; any read after that finds it where that
+      // one did — so an extra read here would wrongly settle it.
+      resetLayout();
+      const target = el({ role: 'button', identifier: 'tab' });
+      const dash = screen(target);
+      const fake = new FakeAdapter({ dash }, 'dash');
+      const start = Date.now();
+      let y = 100;
+      let slowDone = false;
+      fake.uiTree = async () => {
+        if (!slowDone) {
+          y++;
+          if (Date.now() - start >= 12) {
+            await new Promise((r) => setTimeout(r, 30));
+            slowDone = true;
+          }
+        }
+        target.rect = { ...target.rect, y };
+        return structuredClone(dash);
+      };
+      const error = await resolveSettled(fake, 'id:tab', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        'Timed out after 20ms waiting for element id:tab to hold still (found, but never at the same position in two consecutive reads)',
+      );
+    });
+  });
+
   it('a wait that read good trees and then LOST the device is not ElementNotFoundError: the last read is the fresher fact', async () => {
     const fake = new FakeAdapter({ s: screen() }, 's');
     const real = fake.uiTree.bind(fake);

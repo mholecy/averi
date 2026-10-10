@@ -2,7 +2,7 @@ import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, typ
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
-import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
+import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
 
@@ -237,6 +237,21 @@ export interface ResolvedSettled extends Resolved {
  *   moving, or kept vanishing): a plain Error, "…waiting for element X to
  *   hold still (found, but never at the same position in two consecutive
  *   reads)".
+ * - the last tree read resolved it after a read that did not (or as the
+ *   first read): a run of ONE sighting, with no second read within the
+ *   budget to compare it with (2026-10-09, docs/bugs/2026-10-09-hold-still-
+ *   timeout-after-one-read-blames-a-moving-element.md: WDA's start-up,
+ *   ≈4–5 s, spent the 5 s budget inside the first read of a static title;
+ *   code review of round 7: a target seen, gone, then seen again on a slow
+ *   last read is the same shape). One more read is taken past the deadline
+ *   — the slack pollTree's last round already has: the same rect settles
+ *   it, a different one is the movement above. Otherwise a plain Error that
+ *   says what happened, never that two reads disagreed: "…to hold still
+ *   (found once, but no second read came within the budget to confirm its
+ *   position)" when the late read failed, "…(found once; the one read after
+ *   the budget did not find it again)" when it read a tree without it —
+ *   "found on the last read" in place of "found once" when an earlier run
+ *   had seen it too.
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
  */
@@ -248,6 +263,8 @@ export async function resolveSettled(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let lastRect: string | undefined;
   let sighted = false;
+  let sightings = 0;
+  let run = 0; // consecutive rounds that resolved it, up to the last tree read
   let zeroOnly = false;
   const outcome = await pollTree(
     adapter,
@@ -256,9 +273,12 @@ export async function resolveSettled(
       zeroOnly = resolved === undefined && matchedOnlyZeroArea(tree, target);
       if (resolved === undefined) {
         lastRect = undefined;
+        run = 0;
         return undefined;
       }
       sighted = true;
+      sightings++;
+      run++;
       const rect = JSON.stringify(resolved.node.rect);
       if (rect === lastRect) return { ...resolved, tree };
       lastRect = rect;
@@ -267,12 +287,28 @@ export async function resolveSettled(
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
+  let { readError } = outcome;
+  // A run of one: the last tree read saw it, the one before it did not.
+  if (run === 1) {
+    const late = await readTreeOrError(adapter);
+    readError = late.error; // the late read is now the last one
+    const resolved = late.tree === undefined ? undefined : resolveNow(late.tree, target, opts);
+    if (late.tree !== undefined && resolved !== undefined && JSON.stringify(resolved.node.rect) === lastRect) return { ...resolved, tree: late.tree };
+    if (resolved === undefined) {
+      const found = sightings === 1 ? 'found once' : 'found on the last read';
+      const after =
+        late.tree === undefined
+          ? `${found}, but no second read came within the budget to confirm its position`
+          : `${found}; the one read after the budget did not find it again`;
+      throw new Error(pollTimeoutMessage(`element ${describeTarget(target)} to hold still (${after})`, timeoutMs, readError));
+    }
+  }
   if (sighted) {
     throw new Error(
       pollTimeoutMessage(
         `element ${describeTarget(target)} to hold still (found, but never at the same position in two consecutive reads)`,
         timeoutMs,
-        outcome.readError,
+        readError,
       ),
     );
   }

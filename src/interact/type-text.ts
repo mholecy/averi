@@ -1,3 +1,4 @@
+import { CONTROL_CHAR_RE, inputTextControlFate } from '../adapters/input-text.js';
 import type { DeviceAdapter } from '../adapters/types.js';
 
 /**
@@ -7,9 +8,9 @@ import type { DeviceAdapter } from '../adapters/types.js';
  *
  * The rule: no C0 control character (U+0000–U+001F — newline, return, tab,
  * escape, form feed, …) and no DEL (U+007F), on either platform. A control
- * character is a KEY, not text: on Android `input text` may turn it into a
- * key event (a newline into ENTER, which submits a form mid-fill — the
- * reason it was refused at all, adb-shell.ts's header); on iOS idb's
+ * character is a KEY, not text: on Android `input text` may send it as a
+ * key event (a newline or a return as ENTER, which submits a form mid-fill —
+ * the reason it was refused at all, adb-shell.ts's header); on iOS idb's
  * `ui text` types through HID, where a newline is the Return key too. The
  * deliberate route is `pressKey('enter')` (the `press_key` tool); there is
  * no tab key.
@@ -34,8 +35,6 @@ import type { DeviceAdapter } from '../adapters/types.js';
  * The error names the character by code point, never the value around it:
  * values may be credentials.
  */
-const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
-
 /** The short escapes a reader knows on sight; every other refused character is shown as `\uXXXX`. */
 const SHORT_ESCAPES: Readonly<Record<string, string>> = { '\n': '\\n', '\t': '\\t', '\r': '\\r' };
 
@@ -56,7 +55,7 @@ export function assertTypeable(value: string): void {
   const code = `U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
   throw new Error(
     `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
-      '`input text` may turn it into a key event (a newline into ENTER, which submits the form mid-fill), on iOS ' +
+      `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
       'idb types it as a key press. Refused on both platforms before anything was sent. Type the text without it ' +
       "and send the key deliberately — pressKey('enter') (the `press_key` tool, `key: enter`); there is no tab key.",
   );

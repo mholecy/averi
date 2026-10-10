@@ -1058,6 +1058,76 @@ describe('fillField — the mismatch error says what differs, without content (2
 });
 
 /**
+ * docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-reads-
+ * exposes-no-value.md (round-6b device check, F-1.1): mp-native's SWIFT
+ * `amount_input` (a Compose TextField, digits only) fed `abc` dropped all
+ * three letters and stayed empty — and an empty field dumps no `text`, so
+ * the read-back saw null and said "the matched node exposes no value (role
+ * textfield)": NOT verified, never "did not land", so `optional:` passed
+ * over it. An input's null value is empty (types.ts#UiNode.value).
+ */
+describe('fillField — a textfield whose null value is empty: a dropped fill is a mismatch (2026-10-09)', () => {
+  /** The SWIFT amount field: empty (null), and it keeps only digits. */
+  const digitsOnly = () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      const kept = text.replace(/\D/g, '');
+      if (fake.focused && kept !== '') fake.focused.value = (fake.focused.value ?? '') + kept;
+    };
+    return fake;
+  };
+  const failureOf = async (p: Promise<unknown>) => (await p.catch((e: unknown) => e)) as Error & { fillValue?: string };
+
+  it('`abc` into the empty digits-only field: typed 3 but the field shows 0 — did not change; a did-not-land FillValueFailure, after the five value rounds', async () => {
+    const fake = digitsOnly();
+    sleeps.length = 0;
+    const error = await failureOf(fillField(fake, { id: 'amount_input' }, 'abc', FAST));
+    expect(error).toMatchObject({ name: 'FillValueFailure', fillValue: 'did-not-land' });
+    expect(error.message).toBe(
+      'fill: typed 3 characters but the field shows 0 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
+    );
+    expect(sleeps.slice(sleeps.indexOf(DEFAULT_FOCUS_DELAY_MS) + 1)).toEqual([2, 2, 2, 2, 2]); // the whole poll, not a stop on the second empty read
+  });
+
+  it('with clear: no delete (nothing held), one retype, then the same mismatch', async () => {
+    const fake = digitsOnly();
+    const error = await failureOf(fillField(fake, { id: 'amount_input' }, 'abc', { ...FAST, clear: true }));
+    expect(fake.deletes).toEqual([]);
+    expect(fake.typed).toEqual(['abc', 'abc']);
+    expect(error.message).toMatch(/^fill: typed 3 characters but the field shows 0 — the field did not change/);
+  });
+
+  it('digits into the same field still land', async () => {
+    const result = await fillField(digitsOnly(), { id: 'amount_input' }, '250', FAST);
+    expect(result.readBack).toEqual({ kind: 'landed' });
+  });
+
+  it('a field whose text appears late (empty for the first reads) still gets the polls, and lands', async () => {
+    const fake = formFake(null);
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      reads = 0;
+      const field = fake.focused;
+      fake.uiTree = async () => {
+        if (++reads === 3 && field) field.value = text; // Compose state catches up on the third read
+        return real();
+      };
+    };
+    const result = await fillField(fake, { id: 'amount_input' }, '250', FAST);
+    expect(reads).toBe(3);
+    expect(result.readBack).toEqual({ kind: 'landed' });
+  });
+
+  it('a non-input that shows no value is still `no-value` (the iOS floating-label fill, unchanged)', async () => {
+    const result = await fillField(idbFloatingLabelFake('IBAN*', null), 'text:"IBAN*"', 'DE89', FAST);
+    expect(result).toMatchObject({ role: 'text', readBack: { kind: 'no-value' } });
+  });
+});
+
+/**
  * The review of fix/r3-fill (2026-10-09) probed the hint-aware clear and the
  * mismatch wording with shapes the first round missed (its probes A–K; the
  * letters are kept in the test names). Since the fill-clear deepening

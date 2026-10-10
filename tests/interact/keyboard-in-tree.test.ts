@@ -655,7 +655,9 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   // The read that installs the dead tree still returned a tree holding the
   // target, so the second look DID find it once: since 2026-10-08 that is
   // the "found, but never held still" sentence, not the never-found one, with
-  // the read error beneath saying why no second agreeing read came.
+  // the read error beneath saying why no second agreeing read came — since
+  // 2026-10-09 worded "found once, but no second read came" (one more read
+  // was taken past the budget, and it failed too).
   it('a second look that reads a dead tree keeps the read error beneath the headline', async () => {
     const fake = iosFake();
     onRead(fake, 3, () => {
@@ -666,7 +668,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message.split('\n')).toEqual([
       'After the soft keyboard covered id:login_submit at (107,571) on a first look, the second look failed: Timed out after 200ms ' +
-        'waiting for element id:login_submit to hold still (found, but never at the same position in two consecutive reads). ' +
+        'waiting for element id:login_submit to hold still (found once, but no second read came within the budget to confirm its position). ' +
         'Nothing was pressed; the screen is as the step found it',
       '  (last UI tree read failed: device offline)',
     ]);
