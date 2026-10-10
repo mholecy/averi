@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { containsPoint, cutSliver, drawnOverText, higherTop, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
@@ -832,10 +832,8 @@ export async function aimClearOfChrome(
   refuseCutSliver(target, node, tree, exposed.minPiece, sent);
   const cover = exposed.centreCover;
   if (cover === undefined) return { point: centre };
-  const read = await keyboardTop();
-  const band = order.keyboardBandTop;
   // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
-  const top = band === undefined ? read : read === undefined ? band : Math.min(read, band);
+  const top = higherTop(await keyboardTop(), order.keyboardBandTop);
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
   const seen = order.exposure(node, within);

@@ -1,6 +1,6 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, cutSliver, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { clippedEdges, containsPoint, cutSliver, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -891,8 +891,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
  * the band starts below the top bar's line, a fifth of the screen down.
  */
 function strokeTop(cover: Cover | undefined, bandTop: number | undefined): number | undefined {
-  const top = cover?.topCover.y;
-  return bandTop === undefined ? top : top === undefined ? bandTop : Math.min(top, bandTop);
+  return higherTop(cover?.topCover.y, bandTop);
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   cutSliver,
   evidentCut,
   flushEdges,
+  higherTop,
   inferScreenSize,
   intersectsViewport,
   rectArea,
@@ -467,6 +468,16 @@ describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its 
     const inner = { x: 0, y: 1900, width: 1080, height: 79 };
     const row = at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1936, width: 948, height: 42 }));
     expect(evidentCut(row, [inner, form])).toEqual({ edge: 'bottom', container: inner, depth: 55 });
+  });
+});
+
+describe('higherTop — the higher of two top edges, either unknown (code review of round 7, S5)', () => {
+  it('the smaller y of two; the one known; undefined when neither is', () => {
+    expect(higherTop(600, 589)).toBe(589);
+    expect(higherTop(589, 600)).toBe(589);
+    expect(higherTop(589, undefined)).toBe(589);
+    expect(higherTop(undefined, 590)).toBe(590);
+    expect(higherTop(undefined, undefined)).toBeUndefined();
   });
 });
 

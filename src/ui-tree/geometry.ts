@@ -571,6 +571,16 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
 /**
+ * The HIGHER of two top edges a box is cut above (the smaller y), either of
+ * which may be unknown — undefined only when both are. The one spelling
+ * (code review of round 7, S5) of what the tap's chrome check
+ * (interact/resolve.ts#aimClearOfChrome) and `scroll_until`'s stroke box
+ * (interact/scroll-rounds.ts#strokeTop) each wrote out: a keyboard cover's
+ * top and idb's keyboard band's.
+ */
+export const higherTop = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b));
+
+/**
  * A rect's side: one a rect extends past (`clippedEdges`), or lies flush with
  * (`flushEdges`) — adapters/types.ts#ClippedSide, the side a node dumped
  * inverted lies past, re-exported under the name ui-tree asks it by (code
