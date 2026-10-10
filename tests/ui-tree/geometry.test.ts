@@ -416,6 +416,11 @@ describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its 
     expect(evidentCut(toggleWith(1936, 1977), [form])?.edge).toBe('bottom');
     expect(evidentCut(toggleWith(1936, 1976), [form])).toBeUndefined();
   });
+  it('inside evidence needs MIN_INSIDE_EVIDENCE (8) along y (code review round 3): a 7-px divider or focus line at the cut is none, 8 px is; past the edge, any thickness counts', () => {
+    expect(evidentCut(toggleWith(1971, 1978), [form])).toBeUndefined();
+    expect(evidentCut(toggleWith(1970, 1978), [form])?.edge).toBe('bottom');
+    expect(evidentCut(at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1977, width: 948, height: 3 })), [form])?.edge).toBe('bottom'); // 2 px past
+  });
   it('past the edge by more than a pixel: 1 px past is on it (a fill), 2 px past is evidence', () => {
     expect(evidentCut(toggleWith(1924, 1979), [form])).toBeUndefined();
     expect(evidentCut(toggleWith(1924, 1980), [form])?.edge).toBe('bottom');

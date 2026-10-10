@@ -2182,7 +2182,8 @@ flows:
           detail:
             'failed — optional step not skipped: its element is present, but the tap was refused — ' +
             'id:"details_toggle" is cut at its scroll container\'s bottom edge (container 0,200 1000x1800); only a 900x50 part of it shows, ' +
-            '50 deep across that edge, under the 60 a tap needs — scroll_until it first; nothing was tapped',
+            '50 deep across that edge, under the 60 a tap needs — scroll_until it first' +
+            ' (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates); nothing was tapped',
         },
       ]);
       expect(fake.taps).toEqual([]);

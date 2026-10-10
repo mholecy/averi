@@ -644,6 +644,16 @@ export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'hor
   return (['top', 'bottom', 'left', 'right'] as const).filter((e) => flush[e]);
 }
 
+/**
+ * The least extent along y a descendant reaching the top or bottom edge from
+ * inside the node needs to count as `evidentCut`'s inside evidence, in the
+ * tree's units (px on Android, where alone the rule applies): 8 px — a 1-dp
+ * divider or a 2-dp focus line is at most 7 px at density 3.5, while the
+ * measured toggle's button showed 42 px. Content past the edge counts at any
+ * thickness.
+ */
+export const MIN_INSIDE_EVIDENCE = 8;
+
 /** An evidenced cut of a node at a clipping ancestor's edge (`evidentCut`): the edge, that ancestor's rect, and how deep the node shows across the edge. */
 export interface Cut {
   readonly edge: Edge;
@@ -683,6 +693,10 @@ export interface Cut {
  *   and a whole tile flush with a list's left edge has its icon flush left
  *   — the tree does not say which way a scroller scrolls, and screens are
  *   mostly vertical lists, so the inside evidence is believed along y only.
+ *   Nor from a descendant thinner than MIN_INSIDE_EVIDENCE along y (code
+ *   review round 3): a divider or a focus line at a whole last row's bottom
+ *   reaches the edge from inside too, and on a tablet, where the minimum
+ *   piece grows (≈ 96 px at 1600 px), a dense 40-dp row is under it.
  *
  * Why evidence, not flushness alone: a node whose edge lies on a scroller's
  * may be cut there or whole and touching it — a first row at rest, a last
@@ -708,7 +722,7 @@ export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefine
       left: [d.x - c.x, d.x + d.width - c.x, n.x + n.width - c.x],
       right: [c.x + c.width - (d.x + d.width), c.x + c.width - d.x, c.x + c.width - n.x],
     }[edge];
-    const fromInside = (edge === 'top' || edge === 'bottom') && near <= 1 && far < nodeFar - 1;
+    const fromInside = (edge === 'top' || edge === 'bottom') && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
     return near < -1 || fromInside;
   };
   let shallowest: Cut | undefined;

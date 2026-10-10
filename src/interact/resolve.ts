@@ -709,7 +709,10 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * `scroll_until` toward that edge (`CUT_REVEALS`): its plain stop does not
  * stop on such a sliver either (scroll-rounds.ts#stops, code review of
  * fix/r7-sliver, item 1), and its default direction is down, so a cut at the
- * bottom needs no direction and the others name theirs. Only nodes under a
+ * bottom needs no direction and the others name theirs — and, for the
+ * node that only READS cut (geometry.ts#evidentCut's residual: whole, its
+ * own content running to the edge), the way past it: a child, or a
+ * coordinate tap (code review round 3). Only nodes under a
  * clipping ancestor (UiNode.clipsDescendants, Android's) are asked: an iOS
  * tree has none, so this never refuses there. Applied inside the chrome
  * check rather than beside the on-screen rule (keyboard.ts) because the
@@ -722,7 +725,8 @@ function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: n
   if (cut === undefined) return;
   const finding =
     `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${node.rect.width}x${node.rect.height} part of it shows, ` +
-    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs — ${CUT_REVEALS[cut.edge]}`;
+    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs — ${CUT_REVEALS[cut.edge]} ` +
+    `(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates)`;
   const what = describeTarget(target);
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }
