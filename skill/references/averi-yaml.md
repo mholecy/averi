@@ -96,6 +96,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
   - A config refusal: an undeclared or empty credential, an unset `${VAR}`, a PIN with no digits, a `launch` with no `app.<platform>` section in averi.yaml, a malformed `timeout:` on the optional `tap` itself.
   - A tap (or a `fill`'s focus tap) on an element that IS on screen but that averi refuses to tap. The interstitial the step was written for is there. Refused means one of:
     - the element's centre is off screen, or under another node drawn over it with too little of the element showing;
+    - the element is cut by its scroll container's edge to a strip too thin to tap (`… is cut at its scroll container's … edge …`; Android);
     - on iOS, the element's centre is under the status bar (the top safe-area inset, 62 pt on a 402x874 iPhone). This counts as off screen even though the centre lies inside the rect you see on screen, because a tap there goes to the status bar. A target PINNED there, in no scroll view (a layout that ignores the safe area, such as a close button drawn at the very top), is refused every time, and no scroll moves it: the refusal says `it is pinned under the status bar`. Under `optional:` it fails the flow like any other refusal;
     - a soft keyboard covers it and averi sent nothing: on iOS no usable `keyboardDismiss` entry, on Android the window state and the input method disagree about the keyboard.
 

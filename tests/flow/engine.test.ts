@@ -2149,6 +2149,26 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
+    // 2026-10-10 (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-…, owner decision: refuse):
+    // a target cut to a sliver by its scroll container's edge is a refusal on a present element — terminal in an optional:.
+    it('a tap on an element cut to a sliver at its scroll container\'s edge: refused, the flow fails — not skipped, nothing tapped', async () => {
+      const fake = formFake();
+      const toggle = node({ role: 'container', identifier: 'details_toggle', rect: { x: 40, y: 1950, width: 900, height: 50 }, children: [node({ role: 'button', rect: { x: 40, y: 1962, width: 900, height: 38 } })] });
+      fake.live().children.push(node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 200, width: 1000, height: 1800 }, children: [toggle] }));
+      const error = (await FlowEngine.run(optionalFlow('tap: { id: details_toggle }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error).toBeInstanceOf(FlowError);
+      expect(error.trace.slice(1)).toEqual([
+        {
+          action: '✗ tap id:"details_toggle"',
+          detail:
+            'failed — optional step not skipped: its element is present, but the tap was refused — ' +
+            'id:"details_toggle" is cut at its scroll container\'s bottom edge (container 0,200 1000x1800); only a 900x50 part of it shows, ' +
+            '50 deep across that edge, under the 60 a tap needs — scroll_until it with fully: true first; nothing was tapped',
+        },
+      ]);
+      expect(fake.taps).toEqual([]);
+    });
+
     // Code review of round 6, P1: a button pinned under iOS's status bar (centre in the band) is an OffScreenRefusal on
     // a present element — terminal in an optional:, the owner's safe direction — and its remedy offers no scroll_until.
     it('a tap on an element pinned under iOS\'s status bar: refused, the flow fails — not skipped, nothing tapped — and the line says it is pinned', async () => {

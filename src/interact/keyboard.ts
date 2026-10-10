@@ -56,7 +56,9 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * sent, when it does not), not under the soft keyboard (2026-10-03), and —
  * last, on the node and tree the guard hands back — not under a node of the
  * app drawn over it (2026-10-09 — resolve.ts#aimClearOfChrome: the tap moves
- * to an uncovered piece large enough, said in `moved`, or a CoveredRefusal).
+ * to an uncovered piece large enough, said in `moved`, or a CoveredRefusal;
+ * since 2026-10-10 first a ClippedRefusal for a target cut to a sliver at its
+ * scroll container's edge).
  * The answer carries the point to tap (`ResolvedClear.point`). Used by
  * tapElement (the flow `tap:` step and the MCP `tap` tool) and by
  * fillField's focus tap; there is no third tap on a resolved node.
@@ -132,7 +134,8 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // or from the re-read a refusal makes first.
   const screen = await refuseOffScreen(adapter, target, first.node, first.tree, await tapScreen(adapter, first.tree));
   // The LAST rule (2026-10-09): nothing of the app drawn over the point —
-  // else an uncovered piece of the target, or a CoveredRefusal
+  // else an uncovered piece of the target, or a CoveredRefusal — and, first,
+  // no target cut to a sliver by its scroll container (a ClippedRefusal)
   // (resolve.ts#aimClearOfChrome, the reasons there). On the node and tree
   // the guard hands back, after the on-screen rule; the keyboard is read for
   // it only when the centre is covered, off `reading` — the look's own, so

@@ -4,6 +4,7 @@ import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
   containsPoint,
+  evidentCut,
   flushEdges,
   inferScreenSize,
   intersectsViewport,
@@ -393,6 +394,33 @@ describe('flushEdges — a rect\'s edges on its container\'s, within a pixel (mo
     expect(flushEdges({ x: 0, y: 242, width: 1080, height: 100 }, form, 'horizontal')).toEqual(['left', 'right']);
     expect(flushEdges({ x: 66, y: 1920, width: 948, height: 56 }, form)).toEqual([]); // 2 px short
     expect(flushEdges({ x: 0, y: 0, width: 0, height: 0 }, { x: 0, y: 0, width: 0, height: 0 })).toEqual([]);
+  });
+});
+
+describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its own content says (2026-10-10)', () => {
+  const form = { x: 0, y: 242, width: 1080, height: 1736 };
+  const at = (rect: UiNode['rect'], ...children: UiNode[]) => node(rect, null, children);
+  it('the measured toggle: flush with the form\'s bottom, its button running into the cut from 12 px inside — cut there', () => {
+    const toggle = at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1936, width: 948, height: 42 }));
+    expect(evidentCut(toggle, [form])).toEqual({ edge: 'bottom', container: form });
+  });
+  it('Compose\'s shape: a descendant past the edge is evidence whatever its other side', () => {
+    const row = at({ x: 132, y: 242, width: 948, height: 33 }, at({ x: 132, y: 115, width: 816, height: 160 }));
+    expect(evidentCut(row, [form])).toEqual({ edge: 'top', container: form });
+  });
+  it('nothing cut: a label inside, a background filling the node, a leaf, a node not flush, a zero-area descendant, no clipping ancestor', () => {
+    const whole = { x: 66, y: 1930, width: 948, height: 48 };
+    expect(evidentCut(at(whole, at({ x: 480, y: 1942, width: 120, height: 24 })), [form])).toBeUndefined();
+    expect(evidentCut(at(whole, at(whole)), [form])).toBeUndefined();
+    expect(evidentCut(at(whole), [form])).toBeUndefined();
+    expect(evidentCut(at({ x: 66, y: 1900, width: 948, height: 48 }, at({ x: 66, y: 1920, width: 948, height: 28 })), [form])).toBeUndefined();
+    expect(evidentCut(at(whole, at({ x: 66, y: 1978, width: 948, height: 0 })), [form])).toBeUndefined();
+    expect(evidentCut(at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1936, width: 948, height: 42 })), [])).toBeUndefined();
+  });
+  it('an outer clipping ancestor is asked too, and a cut across the other axis is found (a card cut at a carousel\'s right edge)', () => {
+    const carousel = { x: 0, y: 600, width: 1080, height: 300 };
+    const card = at({ x: 1030, y: 600, width: 50, height: 300 }, at({ x: 1046, y: 620, width: 200, height: 40 }));
+    expect(evidentCut(card, [{ x: 0, y: 0, width: 500, height: 500 }, carousel])).toEqual({ edge: 'right', container: carousel });
   });
 });
 

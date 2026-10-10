@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
+import { containsPoint, drawnOverText, evidentCut, insideScroller, rectText, scrollersOf, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
@@ -368,7 +368,7 @@ export async function resolvePresent(
  * the author meant — on every look the refusal rests on, and a rule of this
  * module, not its absence, is why nothing was tapped. Carried by:
  * - PresentElementRefusal's subclasses, the tap rules on a resolved node:
- *   OffScreenRefusal and CoveredRefusal (behind `tapElement` and
+ *   OffScreenRefusal, CoveredRefusal and ClippedRefusal (behind `tapElement` and
  *   `fillField`'s focus tap). These may follow the keyboard guard's own
  *   `back` or dismissal tap — the target was resolved again after it, and
  *   it is still there.
@@ -521,7 +521,9 @@ export function statusBarRemedy(scrolls: boolean | undefined): string {
  * focus tap — to the node it hands back.
  *
  * Judged on the tap POINT, not the rect: a node whose centre is on screen
- * is tapped as before, however much of it is clipped. A node partly on
+ * is tapped as before, however much of it is clipped — by THIS rule: one
+ * cut to a sliver by its scroll container is the cut-sliver rule's, judged
+ * later (`refuseCutSliver`, 2026-10-10). A node partly on
  * screen with its centre off is REFUSED, not tapped at the centre of its
  * visible part: the smallest change that makes the reply true. Moving the
  * point would change what the keyboard guard judged (it tests the centre),
@@ -614,6 +616,51 @@ export async function refuseOffScreen(
  */
 export class CoveredRefusal extends PresentElementRefusal {}
 
+/**
+ * The target resolved, settled, lies on screen, but it is CUT to a sliver by
+ * its scroll container's edge (2026-10-10, docs/bugs/2026-10-09-android-tap-
+ * on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md,
+ * owner decision: refuse). Measured on mp-native's SWIFT form (Android): the
+ * "Payment details" toggle, 132 px tall, read `66,1924 948x55` at the form's
+ * bottom edge (1978); the tap went to (540,1952), "Tapped" was reported, and
+ * the section did not expand — nor for hand taps on the strip. Nothing is
+ * tapped. The covered sliver's sibling (CoveredRefusal): what shows is cut
+ * by a clip, not by a node drawn over it, and refused by the same minimum.
+ */
+export class ClippedRefusal extends PresentElementRefusal {}
+
+/**
+ * THE cut-sliver rule for a node about to be tapped (2026-10-10, the bug
+ * note above ClippedRefusal): refuse when the node is EVIDENTLY cut at a
+ * clipping ancestor's edge (ui-tree/geometry.ts#evidentCut — flush with it
+ * within a pixel, its own content running into it) and what shows of it
+ * across that edge is under `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION,
+ * `Exposure.minPiece`: the minimum that already refuses a sliver left by a
+ * cover, 65 px on the Pixel_3a). A node that merely touches the edge with
+ * nothing of it shown cut — a whole button at a form's end — is tapped as
+ * before; so is a node deep enough across the edge, at its centre.
+ *
+ * The remedy is `scroll_until … fully: true`, as for a centre off the screen
+ * (`refuseOffScreen`): a plain `scroll_until` stops on any part with its
+ * centre on the screen and hands back the same sliver, while a `fully: true`
+ * stop flush with a clipping container probes it (scroll-rounds.ts
+ * #PROBE_REACH). Only nodes under a clipping ancestor (UiNode
+ * .clipsDescendants, Android's) are asked: an iOS tree has none, so this
+ * never refuses there. Cost: one walk of the tree for the ancestor chain,
+ * and the node's subtree per flush edge.
+ */
+function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: number, sent?: string): void {
+  const cut = evidentCut(node, scrollersOf(tree)(node));
+  if (cut === undefined) return;
+  const depth = cut.edge === 'top' || cut.edge === 'bottom' ? node.rect.height : node.rect.width;
+  if (depth >= minPiece) return;
+  const finding =
+    `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${node.rect.width}x${node.rect.height} part of it shows, ` +
+    `${depth} deep across that edge, under the ${minPiece} a tap needs — scroll_until it with fully: true first`;
+  const what = describeTarget(target);
+  throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
+}
+
 /** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
 export interface Aim {
   point: Point;
@@ -632,7 +679,9 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
 
 /**
  * THE chrome check for a point about to be tapped on a resolved node
- * (2026-10-09; the bug note's owner decision 1): the target's centre, unless
+ * (2026-10-09; the bug note's owner decision 1) — after, since 2026-10-10,
+ * the cut-sliver rule (`refuseCutSliver`: a ClippedRefusal for a target its
+ * scroll container cuts to a strip under the minimum below): the target's centre, unless
  * a node of the tree is drawn over it there — then the centre of the
  * largest piece of it nothing is drawn over, when both its sides reach the
  * minimum (ui-tree/draw-order.ts#exposure, its rows and MIN_TAP_PIECE_FRACTION),
@@ -681,7 +730,10 @@ export async function aimClearOfChrome(
   // Below iOS's status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
   const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
   const order = drawOrder(tree);
-  const cover = order.exposure(node, box).centreCover;
+  const exposed = order.exposure(node, box);
+  // A sliver cut by a clip is refused first, by the minimum a cover's sliver is (refuseCutSliver).
+  refuseCutSliver(target, node, tree, exposed.minPiece, sent);
+  const cover = exposed.centreCover;
   if (cover === undefined) return { point: centre };
   const top = await keyboardTop();
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };

@@ -629,7 +629,8 @@ export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
  * in `clippedEdges`' order; none when the container has no area. Moved here
  * from interact/scroll-rounds.ts on 2026-10-10, where `scroll_until`'s
  * `fully: true` stop asks it along the scroll (scroll-rounds.ts
- * #PROBE_REACH), to be asked by more than the scroll.
+ * #PROBE_REACH), so the tap's cut-sliver rule (`evidentCut`) asks the same
+ * question, not a copy of it.
  */
 export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'horizontal'): Edge[] {
   if (rectArea(container) === 0) return [];
@@ -641,6 +642,64 @@ export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'hor
     right: axis !== 'vertical' && on(rect.x + rect.width, container.x + container.width),
   };
   return (['top', 'bottom', 'left', 'right'] as const).filter((e) => flush[e]);
+}
+
+/**
+ * Where `node` is EVIDENTLY cut by one of its clipping ancestors (`chain`,
+ * `scrollersOf`'s, nearest first): the first edge, of the nearest ancestor,
+ * that the node lies flush with (`flushEdges`) while a descendant of it
+ * RUNS INTO that edge — the descendant has area and lies more than a pixel
+ * past the edge, or reaches it (within a pixel) from more than a pixel
+ * inside the node's opposite side; undefined when none (2026-10-10, docs/bugs/2026-10-09-
+ * android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-
+ * nothing.md). The tap's cut-sliver rule asks it (interact/resolve.ts
+ * #refuseCutSliver).
+ *
+ * Why evidence, not flushness alone: uiautomator hands every node already
+ * cut to its scrollers (adapters/types.ts#UiNode.clipsDescendants), so a
+ * node whose edge lies on a scroller's may be cut there — the measured
+ * toggle, `66,1924 948x55` of 132 px on a form ending at 1978 — or whole and
+ * touching it: a first row at rest, a last one scrolled to the end. The
+ * tree does not say which. What it does say: the toggle's button, `66,1936
+ * 948x42`, starts 12 px inside the toggle and ends ON the cut — content laid
+ * out across the edge, cut with it. A whole element's content keeps inside
+ * it (a label centred in a button), or fills it (a background of the same
+ * rect, which starts on the node's own side): neither runs into the edge
+ * from inside. A descendant past the edge is the same evidence, plainer:
+ * Compose's nodes are cut to the scroller while their children may not be
+ * (the round-5 snapshot `contactsCreateStaged`: a row `132,242 948x33` at
+ * the list's top, its First name field `132,115 816x160` running on above
+ * it).
+ *
+ * Unknowable, stated: a cut node with no descendants (a leaf, or a Compose
+ * node whose text is merged into it) shows no evidence and reads whole; a
+ * whole node whose content runs to the edge it touches without padding (a
+ * divider at a last row's bottom, an image flush with a first row's top)
+ * reads cut. The tree carries no natural size of a node to settle either.
+ * Cost: a walk of the node's subtree per flush edge, for a node with a
+ * clipping ancestor only.
+ */
+export function evidentCut(node: UiNode, chain: readonly Rect[]): { edge: Edge; container: Rect } | undefined {
+  const n = node.rect;
+  // Along the edge's axis, as offsets INTO the container from that edge: where the descendant's near and far sides lie, and the node's far side.
+  const runsInto = (d: Rect, c: Rect, edge: Edge): boolean => {
+    if (rectArea(d) === 0) return false;
+    const [near, far, nodeFar] = {
+      top: [d.y - c.y, d.y + d.height - c.y, n.y + n.height - c.y],
+      bottom: [c.y + c.height - (d.y + d.height), c.y + c.height - d.y, c.y + c.height - n.y],
+      left: [d.x - c.x, d.x + d.width - c.x, n.x + n.width - c.x],
+      right: [c.x + c.width - (d.x + d.width), c.x + c.width - d.x, c.x + c.width - n.x],
+    }[edge];
+    return near < -1 || (near <= 1 && far < nodeFar - 1);
+  };
+  for (const container of chain) {
+    for (const edge of flushEdges(n, container)) {
+      for (const d of everyNode(node)) {
+        if (d !== node && runsInto(d.rect, container, edge)) return { edge, container: { ...container } };
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
