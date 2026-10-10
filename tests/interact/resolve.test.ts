@@ -602,6 +602,31 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(fake.tapPoints).toEqual([]);
   });
 
+  it('idb, M-1.4 of the round-6b device check (round 7): value_date_select under the lifted CONTINUE — refused naming it, and no "part that shows" inside the keyboard band (its strip 589–596 lies under the band, top 589)', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:swift_payment.form.value_date_select', OPTS)).rejects.toThrow(
+      'id:swift_payment.form.value_date_select is under button "Continue to summary" (24,512 354x44) at its centre (201,571), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre, as before', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    for (const n of tree.children) if (n.role === 'button' && n.rect.y >= 596) n.rect = { ...n.rect, y: n.rect.y + 30 };
+    tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 540, width: 354, height: 80 } }));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:fees', OPTS)).rejects.toThrow('id:fees is under button "Continue to summary" (24,512 354x44) at its centre (201,580), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped');
+    expect(fake.tapPoints).toEqual([]);
+    tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);
+    expect((await tapElement(fake, 'id:fees', OPTS)).moved).toBeUndefined();
+    expect(fake.tapPoints).toEqual([{ x: 201, y: 580 }]);
+  });
+
   it('idb, a label 3 pt below the pinned CONTINUE (round-6 device check H-1, which pressed CONTINUE): refused, nothing tapped — the bar reaches the screen\'s bottom', async () => {
     const elements = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')).positions.pos1;
     const tree = parseIdbDescribeAll(JSON.stringify(elements));

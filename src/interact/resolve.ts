@@ -4,6 +4,7 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { containsPoint, drawnOverText, insideScroller, rectText, visibleFractionInViewport } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
+import { keyboardBandTop } from '../ui-tree/soft-keyboard.js';
 import { belowStatusBand, inStatusBand, judgingScreen, type JudgingScreen } from './swipe.js';
 
 /**
@@ -652,7 +653,15 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * under the keyboard is never aimed at. Its cost is the reading's, on that
  * path only (on Android the touchable region and the witness, with the
  * keyboard shown; nothing more with it hidden — the guard's first reading
- * is reused).
+ * is reused). Under idb, whose reading is always `unknown`, the cut is at
+ * the top of idb's keyboard band in the tree instead
+ * (ui-tree/soft-keyboard.ts#keyboardBandTop; round 7, 2026-10-10 — the
+ * higher of the two when both read): M-1.4's refusal said "only a 354x7
+ * part of it shows" of `value_date_select`'s strip 589–596, under the
+ * band, between the lifted CONTINUE's reach and the keys. A line only: the
+ * guard still reads no keyboard on idb, and a centre clear of every node
+ * (the band's background is none, draw-order's `structural` row) is tapped
+ * as before.
  *
  * The box is cut below iOS's status band (swipe.ts#belowStatusBand,
  * 2026-10-09) before a piece is chosen, as above a keyboard: a moved tap
@@ -683,7 +692,9 @@ export async function aimClearOfChrome(
   const order = drawOrder(tree);
   const cover = order.exposure(node, box).centreCover;
   if (cover === undefined) return { point: centre };
-  const top = await keyboardTop();
+  const read = await keyboardTop();
+  const band = keyboardBandTop(tree);
+  const top = band === undefined ? read : read === undefined ? band : Math.min(read, band);
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
   const above = within === box ? '' : ' above the soft keyboard';
   const seen = order.exposure(node, within);
