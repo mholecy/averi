@@ -337,7 +337,11 @@ export interface UiNode {
    * (`clipsDescendants`), and only where a node listed after it lies on the
    * strip gained — the overlay; a control padded inside its wrapper
    * (`paddedTouchTargets`), a full-bleed child and a child overflowing both
-   * edges never widen it. Kept so `ui_snapshot` shows what was dumped beside
+   * edges never widen it — nor, the residual, a node cut at BOTH ends (a
+   * tall card between a sticky header and a floating tab bar reads whole);
+   * and a node overflowing one edge into the next row, or into a
+   * screen-sized wrapper (a snackbar host), listed after it is widened as
+   * if cut. Kept so `ui_snapshot` shows what was dumped beside
    * what is judged: "its rect was cut here; something is drawn over the
    * rest". Absent on iOS (WDA and idb report frames unclipped) and on every
    * node the parser left as dumped.

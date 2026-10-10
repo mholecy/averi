@@ -180,6 +180,8 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     <node class="android.view.View" resource-id="both_sides" bounds="[66,1200][1014,1300]"><node class="android.widget.Button" bounds="[66,1190][1014,1310]" /></node>
     <node class="android.view.View" resource-id="edge_row" bounds="[66,1950][1014,2000]"><node class="android.widget.Button" bounds="[66,1950][1014,2093]" /></node>
     <node class="android.view.View" resource-id="overhang" bounds="[0,1900][1080,2060]"><node class="android.widget.Button" bounds="[0,1850][1080,2060]" /></node>
+    <node class="android.view.View" resource-id="top_edge_row" bounds="[0,400][1080,450]"><node class="android.widget.Button" bounds="[0,400][1080,450]" /></node>
+    <node class="android.view.View" resource-id="top_cut_row" bounds="[66,430][1014,470]"><node class="android.widget.Button" bounds="[66,380][1014,470]" /></node>
     <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>`;
 
   it('under a node listed after it: a row whose own button has its exact x and width and reaches past ONE edge is widened along y — no other shape is', () => {
@@ -193,12 +195,29 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(of('edge_row')).not.toHaveProperty('cutBounds'); // past the list's edge only: the flush probe's case
     expect(of('collapsed')).not.toHaveProperty('cutBounds');
     expect(of('unscrolled')).not.toHaveProperty('cutBounds'); // in no scroll container
+    expect(of('top_edge_row')).not.toHaveProperty('cutBounds');
+    // The gained TOP strip is cut at the list's top edge (400): its button dumped from 380 reaches no higher.
+    expect(of('top_cut_row')).toMatchObject({ rect: { x: 66, y: 400, width: 948, height: 70 }, cutBounds: { x: 66, y: 430, width: 948, height: 40 } });
     // What is gained is cut to the list; what was dumped past it stays: grown up to 1850, its bottom kept at 2060.
     expect(of('overhang')).toMatchObject({ rect: { x: 0, y: 1850, width: 1080, height: 210 }, cutBounds: { x: 0, y: 1900, width: 1080, height: 160 } });
   });
 
   it('…and with nothing listed after it on the strip gained, not even that row: its own overflow, not an overlay\'s cut (code review P3)', () => {
     expect([...everyNode(listOf(ROWS, false))].filter((n) => 'cutBounds' in n)).toEqual([]);
+  });
+
+  it('the residual, pinned (review round 2): a card cut at BOTH ends — between the sticky header and the floating tab bar, dumped 66,480 948x1360 over its own 66,420 948x1480 — is not widened and reads whole', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,401][1080,2154]">
+ <node class="android.view.View" resource-id="card" bounds="[66,480][1014,1840]"><node class="android.widget.Button" bounds="[66,420][1014,1900]" /></node>
+ <node class="android.view.View" resource-id="date_header_0" bounds="[0,401][1080,480]" />
+</node>
+<node class="android.view.View" resource-id="tab_bar_host" bounds="[66,1840][1014,2088]" />
+</node></hierarchy>`);
+    const card = [...everyNode(t)].find((n) => n.identifier === 'card')!;
+    expect(card.rect).toEqual({ x: 66, y: 480, width: 948, height: 1360 });
+    expect(card).not.toHaveProperty('cutBounds');
+    expect(drawOrder(t).exposure(card, PIXEL).shows).toBe(1);
   });
 
   it('code review P1: a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {

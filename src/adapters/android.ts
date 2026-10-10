@@ -1074,7 +1074,10 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
  * cut leaves the node's other edge where its descendants' is (row_0's
  * bottom, 546; the rows cut at the tab bar, their tops), while a child
  * overflowing both edges (a touch target, an offset) is no cut (code review
- * P3). Vertical only: every cut measured was a list's row under a bar
+ * P3). The residual that rule leaves, stated (review round 2): a node cut
+ * at BOTH ends — a tall card between a sticky header and a floating tab
+ * bar, dumped `66,480 948x1360` over its own `66,420 948x1480` — is not
+ * widened either, and reads whole. Vertical only: every cut measured was a list's row under a bar
  * across it, and no sideways one was seen. The grown rect is cut to the
  * nearest clipping ancestor's, as uiautomator cut the descendants, so a node
  * cut by the list's own edge (or by the display) is not widened past it —
@@ -1114,7 +1117,8 @@ function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | unde
  * the dumped rects, every decision before any is applied; the dumped rect
  * is kept as `cutBounds` (types.ts#UiNode.cutBounds). The residual, stated:
  * a node overflowing one edge into the next row listed after it (a touch
- * target running into it) reads like a cut and is widened under that row.
+ * target running into it), or into a screen-sized wrapper listed after it
+ * (a snackbar host), reads like a cut and is widened under that node.
  */
 function widenUnderOverlays(roots: readonly UiNode[], grown: ReadonlyMap<UiNode, Rect>): void {
   if (grown.size === 0) return;
@@ -1130,7 +1134,8 @@ function widenUnderOverlays(roots: readonly UiNode[], grown: ReadonlyMap<UiNode,
   const widen = [...grown].filter(([node, whole]) => {
     const strip: Rect =
       whole.y < node.rect.y ? { ...whole, height: node.rect.y - whole.y } : { ...whole, y: node.rect.y + node.rect.height, height: whole.y + whole.height - (node.rect.y + node.rect.height) };
-    return order.slice(after.get(node)).some((later) => rectIntersection(later.rect, strip) !== undefined);
+    for (let i = after.get(node) ?? order.length; i < order.length; i++) if (rectIntersection(order[i].rect, strip) !== undefined) return true;
+    return false;
   });
   for (const [node, whole] of widen) {
     node.cutBounds = node.rect;
