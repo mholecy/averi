@@ -1,5 +1,5 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, STRUCTURAL_ROLES, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
-import { rectWithin } from './geometry.js';
+import { FLAT_LIST_TOP_BAR_FRACTION, rectWithin, screenOf } from './geometry.js';
 
 /**
  * What the TREE says about the soft keyboard (2026-10-07): the in-tree half
@@ -92,15 +92,6 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
 }
 
 /**
- * The top bar's band of a flat list as `keyboardBandTop` reads it: the
- * fraction of the screen's height the band's background must start below.
- * draw-order.ts#FLAT_LIST_TOP_BAR_FRACTION's value — that module imports
- * this one, so this one may not import it back; a test pins the two equal
- * (tests/ui-tree/soft-keyboard.test.ts).
- */
-export const KEYBOARD_BAND_BAR_FRACTION = 0.2;
-
-/**
  * The TOP EDGE of idb's keyboard band (`flatListKeyboardBand`) in `tree`, or
  * undefined — round 7, 2026-10-10 (docs/bugs/2026-10-09-ios-idb-scroll-
  * stroke-starts-on-the-soft-keyboard.md, and M-1.4's "354x7 part shows"
@@ -114,14 +105,13 @@ export const KEYBOARD_BAND_BAR_FRACTION = 0.2;
  * that shows", inside the band — interact/resolve.ts#aimClearOfChrome).
  * Only a FLAT LIST (`UiNode.flatList`, idb's mark) is read: WDA marks its
  * band itself (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree
- * — both always undefined here. The screen is draw-order's: the root's rect,
- * or the tree's largest when the root has none (idb's synthetic 0×0 root).
+ * — both always undefined here. The screen and the top bar's line are
+ * draw-order's (geometry.ts#screenOf, FLAT_LIST_TOP_BAR_FRACTION).
  */
 export function keyboardBandTop(tree: UiNode): number | undefined {
   if (tree.flatList !== true) return undefined;
-  const nodes = [...everyNode(tree)];
-  const screen = rectArea(tree.rect) > 0 ? tree.rect : nodes.reduce((best, n) => (rectArea(n.rect) > rectArea(best) ? n.rect : best), tree.rect);
-  return flatListKeyboardBand(nodes, screen, screen.y + screen.height * KEYBOARD_BAND_BAR_FRACTION)?.top;
+  const screen = screenOf(tree);
+  return flatListKeyboardBand([...everyNode(tree)], screen, screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION)?.top;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { containsPoint, largestRect, rectCentre, rectWithin, subtract } from './geometry.js';
+import { containsPoint, FLAT_LIST_TOP_BAR_FRACTION, largestRect, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
@@ -902,17 +902,6 @@ const NOT_DRAWN = {
 const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
 
 /**
- * The top of the screen a flat list's top bar lies in (`firstContent`), as
- * a fraction of the screen's height: 20 %, 175 pt of the 874-pt iPhone 17.
- * Measured: idb lists the SWIFT form's Back at y 70–98 and its title at
- * 74–94, under a bar that ends at y 116 (13 %); a large-title bar ends
- * near 158 pt of 874 (18 %, inferred). A content row lying wholly inside
- * this band at the head of the content is read as the bar's
- * (`firstContent`'s misses, stated there).
- */
-export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
-
-/**
  * Where a flat list's CONTENT starts (`flatListChrome`): the walk index of
  * the first node, after the root and the screen-sized structural hosts
  * (idb's Application, `other`), that lies
@@ -1030,12 +1019,6 @@ function readingBreak(order: readonly Placed[], target: Placed, contentFrom: num
       .find(({ node }, i, later) => rectArea(node.rect) > 0 && !bottomChrome.has(later[i]) && node.rect.y < t.y && node.rect.y + node.rect.height > barLine && !rectWithin(t, node.rect))?.at ??
     order.length
   );
-}
-
-/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). */
-function screenOf(tree: UiNode): Rect {
-  if (rectArea(tree.rect) > 0) return tree.rect;
-  return [...everyNode(tree)].reduce((best, n) => (rectArea(n.rect) > rectArea(best) ? n.rect : best), tree.rect);
 }
 
 /**

@@ -4,8 +4,8 @@ import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { FLAT_LIST_TOP_BAR_FRACTION } from '../../src/ui-tree/draw-order.js';
-import { accessoryDismissButton, flatListKeyboardBand, KEYBOARD_BAND_BAR_FRACTION, keyboardBandTop, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
+import { FLAT_LIST_TOP_BAR_FRACTION } from '../../src/ui-tree/geometry.js';
+import { accessoryDismissButton, flatListKeyboardBand, keyboardBandTop, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node, screen } from '../helpers/fake.js';
 
@@ -143,9 +143,5 @@ describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing 
   it('a band top is not a keyboard reading: keyboardInTree still says `unknown` of both idb keyboards — the in-tree dismissal presses nothing there (K5d)', async () => {
     expect(keyboardInTree(await pad())).toEqual({ state: 'unknown' });
     expect(keyboardInTree(contacts())).toEqual({ state: 'unknown' });
-  });
-
-  it('its top-bar line is draw-order\'s: the two fractions agree (soft-keyboard.ts cannot import draw-order.ts, which imports it)', () => {
-    expect(KEYBOARD_BAND_BAR_FRACTION).toBe(FLAT_LIST_TOP_BAR_FRACTION);
   });
 });
