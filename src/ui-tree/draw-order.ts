@@ -1,4 +1,4 @@
-import { everyNode, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, largestRect, rectCentre, rectWithin, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 
@@ -251,13 +251,6 @@ const screenSized = (n: UiNode, screenArea: number): boolean => n.children.lengt
 /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
 
-/**
- * The normalised role of every text input — interact/input-role.ts#INPUT_ROLE,
- * which this module, below interaction, does not import (the `scrollIndicator`
- * and `ownControl` rows).
- */
-const TEXT_INPUT_ROLE = 'textfield';
-
 /** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
 const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));
 
@@ -330,12 +323,12 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
 export const LABEL_OVERHANG = 2;
 
 /**
- * The `ownControl` row's text input: `control` is one (`TEXT_INPUT_ROLE`),
+ * The `ownControl` row's text input: `control` is one (`INPUT_ROLE`),
  * holds `target`'s centre, and holds its rect whole once grown by
  * `LABEL_OVERHANG` on every side.
  */
 const fieldOf = (control: UiNode, target: Rect): boolean =>
-  control.role === TEXT_INPUT_ROLE &&
+  control.role === INPUT_ROLE &&
   containsPoint(control.rect, rectCentre(target)) &&
   rectWithin(target, { x: control.rect.x - LABEL_OVERHANG, y: control.rect.y - LABEL_OVERHANG, width: control.rect.width + 2 * LABEL_OVERHANG, height: control.rect.height + 2 * LABEL_OVERHANG });
 
@@ -871,7 +864,7 @@ const NOT_DRAWN = {
   /**
    * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
    * child of a scroll view (`scrolls`) or of a text input
-   * (`TEXT_INPUT_ROLE`) and holds nothing but empty frames
+   * (`INPUT_ROLE`) and holds nothing but empty frames
    * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
    * a UIScrollView's two indicators LAST among its children, after every
    * row — `Other 'Vertical scroll bar, 2 pages' 369,62 30x456` and
@@ -899,7 +892,7 @@ const NOT_DRAWN = {
   scrollIndicator: {
     target: ({ node, parent }) =>
       parent !== undefined &&
-      (scrolls(parent.node) || parent.node.role === TEXT_INPUT_ROLE) &&
+      (scrolls(parent.node) || parent.node.role === INPUT_ROLE) &&
       node.role === 'container' &&
       !node.identifier &&
       node.children.length > 0 &&
