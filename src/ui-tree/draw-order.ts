@@ -96,9 +96,10 @@ export interface DrawOrder {
    * no keyboard node, and its band is read with the input method's word,
    * ui-tree/keyboard-cover.ts — so the caller cuts it out of `within`). The
    * covers are the nodes after `node`'s subtree in pre-order (its first
-   * place in the tree, as `shadowing`) — and a floating tab bar's items
-   * listed before it, when it lies outside the bar (`tabBarsOf`: the bar
-   * floats over the content whatever its source's order) — that draw for a
+   * place in the tree, as `shadowing`) — and, in idb's flat list, a
+   * floating tab bar's items listed before it, when it lies outside the bar
+   * (`tabBarsOf`: idb lists the bar first; a nested tree's order is its draw
+   * order) — that draw for a
    * target (`NOT_DRAWN`'s `target` column) and share area with the part of
    * `node` inside `within` — a cover's rect, or, for a node pinned at the
    * bottom of idb's flat list, that rect run down to the screen's bottom
@@ -129,7 +130,7 @@ export const MIN_TAP_PIECE_FRACTION = 0.06;
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
   readonly shows: number;
-  /** The nodes drawn over it inside `within`, in pre-order (a floating tab bar's items listed before it among them, `tabBarsOf`); empty when none. */
+  /** The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before it among them, `tabBarsOf`); empty when none. */
   readonly covers: readonly UiNode[];
   /**
    * Where each of `covers` presses, in the same order: its rect, or — for a
@@ -396,8 +397,8 @@ const NOT_DRAWN = {
    * frame) — a bar holds neither (`holdsWhole`).
    * And, since round 7 (docs/bugs/2026-10-09-ios-wda-cell-background-and-
    * textfield-scroll-bar-read-as-covers.md), an unlabelled, unvalued one
-   * whose every descendant is an EMPTY FRAME (`framesOnly`; a leaf is the
-   * case of none), as `itemlessToolbar` judges a toolbar: it carries
+   * and with no identifier, whose every descendant is an EMPTY FRAME
+   * (`framesOnly`), as `itemlessToolbar` judges a toolbar: it carries
    * nothing drawable. Measured under WDA on Settings › General › Language &
    * Region (iOS 27): a grouped cell `container LOCALE 'Region, Slovakia'
    * 20,411 362x54` lists its button's wrapper, then its background —
@@ -417,7 +418,8 @@ const NOT_DRAWN = {
   structural: {
     shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: ({ node }, { target, screenArea }) => STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (framesOnly(node) || holdsWhole(node, target, screenArea)),
+    target: ({ node }, { target, screenArea }) =>
+      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
   },
 
   /**
@@ -1156,8 +1158,13 @@ interface TabBar {
  * screen and inside its bottom `TAB_BAR_BOTTOM_FRACTION`; the keyboard's
  * nodes (`Placed.inKeyboard`, and idb's keys, `keyboardOf`) are none — a
  * row of keys has the same shape. Such a bar floats over what lies outside
- * it, whatever the order its source lists it in (`exposure`), and its
- * surface reaches `TAB_BAR_REACH_FRACTION` of its items' height above them.
+ * it, and its surface reaches `TAB_BAR_REACH_FRACTION` of its items' height
+ * above them (`exposure`) — in idb's flat list whatever the bar's place in
+ * the list, since idb lists it in reading order, FIRST; in a nested tree
+ * (WDA, uiautomator) only over what is listed before it, since that order
+ * IS the draw order: an action sheet listed after the bar is drawn over it,
+ * and its Cancel `8,782 386x57` is tapped at its centre (review of
+ * fix/r7-covers: order-blind, the bar moved it to a 29x37 piece).
  * Measured (docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-
  * buttons-takes-a-rows-tap.md): idb lists mp-native's four tab items
  * `37,755 82x64` … `283,755 82x64` FIRST, then the content; WDA the row,
@@ -1170,7 +1177,11 @@ interface TabBar {
  * bottom row of an app's own grid of buttons (a PIN pad's last row) that
  * has the shape reads as a bar — what lies within the reach above it, the
  * row of keys above included, reads as under it (a false refusal, the safe
- * direction; the centre of a key of the row above lies clear of it); a sheet
+ * direction; the centre of a key of the row above lies clear of it), and so
+ * does a row of three equal content buttons scrolled into the bottom 10 %
+ * over what lies just above it; a classic, non-floating UITabBar, its items
+ * filling the bar, has the shape too — a row at `0,770 402x30` just above it
+ * is now refused (both the safe direction); in idb's flat list, a sheet
  * drawn over the bar has the bar's items over its rows where they reach them
  * (a false refusal); a tab bar of two items, or of items of unequal height,
  * is not seen.
@@ -1328,8 +1339,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
         const bar = floatsOver(p);
         return bar === undefined ? r : { ...r, y: r.y - bar.lift, height: r.height + bar.lift };
       };
-      // A floating tab bar's items cover what lies outside the bar whatever the order its source lists them in (idb: first), never the target's ancestors.
-      const before = places.length === 0 ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined && !places.some((place) => within(place, p)));
+      // In idb's flat list a floating tab bar's items cover what lies outside the bar whatever their place in the list (idb lists them first); a nested
+      // tree's order IS its draw order (an action sheet listed after the bar is drawn over it), so there only the items listed after the target count.
+      // A flat list has no nesting, so no item listed before the target is its ancestor.
+      const before = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       const over =
         shown === undefined || about === undefined
           ? []

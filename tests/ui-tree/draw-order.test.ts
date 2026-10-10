@@ -677,7 +677,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const item = (x: number, y = 755, w = 82, h = 64) => uiNode({ role: 'button', label: `i${x}`, rect: rect(x, y, w, h) });
       expect(with_([item(37), item(119), item(201), item(283)]).covers).toHaveLength(4); // the control: the shape
       for (const items of [
-        [item(37), item(201)], // two
+        [item(37, 755, 160), item(201, 755, 160)], // two, wide enough together (320 of 402)
         [item(37), item(119, 755, 82, 60), item(201), item(283, 755, 82, 60)], // two and two of unequal height
         [item(37), item(119, 756), item(201), item(283, 756)], // two and two at unequal y
         [item(37), item(100), item(201), item(283)], // overlapping
@@ -688,6 +688,42 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       }
       // Not interactive: a text row of the same shape is no tab bar.
       expect(with_([37, 119, 201, 283].map((x) => uiNode({ role: 'text', label: `t${x}`, rect: rect(x, 755, 82, 64) }))).covers).toEqual([]);
+    });
+
+    it('a nested tree\'s order is its draw order (review of fix/r7-covers): a WDA action sheet listed after the bar is drawn over it — its Cancel and Delete account are tapped at their centres; tabs listed before a row there cover nothing of it, while idb\'s, listed first, do', () => {
+      const cancel = uiNode({ role: 'button', label: 'Cancel', rect: rect(8, 782, 386, 57) });
+      const del = uiNode({ role: 'button', label: 'Delete account', rect: rect(8, 717, 386, 57) });
+      const bar = uiNode({ role: 'container', rect: rect(20, 743, 362, 76), children: tabs() });
+      const content = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'text', label: 'row', rect: rect(24, 600, 354, 52) })] });
+      const sheet = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: rect(8, 600, 386, 240), children: [del, cancel] })] });
+      const order = drawOrder(uiNode({ role: 'application', rect: IPHONE, children: [content, bar, sheet] }));
+      expect(order.exposure(cancel, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 811 }, moved: false } });
+      expect(order.exposure(del, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 746 }, moved: false } });
+      // The tab bar listed BEFORE row_3 in a nested tree is beneath it; the same order in idb's flat list is reading order, and the bar covers it.
+      const row = row3();
+      const nested = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', rect: rect(20, 743, 362, 76), children: tabs() }), uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] });
+      expect(drawOrder(nested).exposure(row, IPHONE).covers).toEqual([]);
+      const flat = row3();
+      expect(drawOrder(idb(flat)).exposure(flat, IPHONE).centreCover?.identifier).toBe('nav.tab_cards');
+    });
+
+    it('in idb\'s list the items are bottom chrome: a row listed BEFORE them, a reading-order break between (a date header above it), still has them over it', () => {
+      const row = uiNode({ role: 'button', identifier: 'transactions.list.row_4', rect: rect(24, 735, 354, 52) });
+      const header = uiNode({ role: 'text', identifier: 'transactions.list.date_header_0', rect: rect(0, 600, 402, 30) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), title(), row, header, ...tabs()] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers.map((n) => n.identifier)).toEqual(['nav.tab_home', 'nav.tab_transactions', 'nav.tab_cards', 'nav.tab_more']);
+    });
+
+    it('a text in the items\' box, listed after them in idb\'s list (a tab\'s caption), is the bar\'s own: no item covers it', () => {
+      const caption = uiNode({ role: 'text', label: 'Cards', rect: rect(220, 795, 44, 14) });
+      expect(drawOrder(idb(caption)).exposure(caption, IPHONE).covers).toEqual([]);
+    });
+
+    it('items ending below the screen\'s bottom are no bar: listed first in idb\'s list, they cover nothing of a row listed after them', () => {
+      const items = [37, 119, 201, 283].map((x) => uiNode({ role: 'button', label: `i${x}`, rect: rect(x, 850, 82, 64) }));
+      const row = uiNode({ role: 'button', identifier: 'row', rect: rect(24, 790, 354, 52) });
+      const tree = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), ...items, title(), row] });
+      expect(drawOrder(tree).exposure(row, IPHONE).covers).toEqual([]);
     });
 
     it('a pinned item keeps its pinned reach and gains the one above: a bar ending inside the bottom 6 % reaches from 0.2 × its height above it down to the screen\'s bottom', () => {
@@ -752,6 +788,9 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const bg = background(inner);
         expect(drawOrder(tree(bg)).exposure(region, IPHONE).covers).toContain(bg);
       }
+      // …and an identified background itself (the measured one has no identifier).
+      const named = { ...background(), identifier: 'cell_bg' };
+      expect(drawOrder(tree(named)).exposure(region, IPHONE).covers).toContain(named);
     });
 
     it('the myport 2FA screen\'s Späť moved down onto the horizontal scroll indicator (0,485 402x30): still tapped at its centre', async () => {
@@ -791,6 +830,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const at = (r: ReturnType<typeof rect>) => uiNode({ role: 'text', label: 'Payee’s name', rect: r });
         const cases: [UiNode, UiNode][] = [
           [at(rect(42, 444, 103, 26)), textfield(bar())], // 3 above and below
+          [at(rect(42, 466, 103, 3)), textfield(bar())], // within the overhang, but its centre (94,468) below the field
           [at(rect(42, 440, 103, 10)), textfield(bar())], // its centre (93,445) above the field
           [label(), textfield(bar(), { label: 'Payee’s name' })],
           [label(), textfield(bar(), { value: 'ACME s.r.o.' })],
