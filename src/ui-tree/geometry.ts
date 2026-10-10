@@ -1,4 +1,4 @@
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -570,8 +570,14 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
  */
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
-/** A rect's side: one a rect extends past (`clippedEdges`), or lies flush with (`flushEdges`). */
-export type Edge = 'top' | 'bottom' | 'left' | 'right';
+/**
+ * A rect's side: one a rect extends past (`clippedEdges`), or lies flush with
+ * (`flushEdges`) — adapters/types.ts#ClippedSide, the side a node dumped
+ * inverted lies past, re-exported under the name ui-tree asks it by (code
+ * review of round 7, S1: the two were the same union spelled twice). One
+ * definition, the adapter's: adapters/ may not import ui-tree.
+ */
+export type { Edge };
 
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.

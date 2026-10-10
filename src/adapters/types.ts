@@ -98,7 +98,12 @@ export interface Rect {
  */
 export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
 
-/** The side of its container a node lies wholly past (`UiNode.clippedOut`). */
+/**
+ * The side of its container a node lies wholly past (`UiNode.clippedOut`) —
+ * and any rect's side: ui-tree/geometry.ts re-exports it as `Edge` (the side
+ * a rect extends past or lies flush with), so `clippedOut` and a cut's edge
+ * compare as one type (code review of round 7, S1).
+ */
 export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
 
 /**
