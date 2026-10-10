@@ -1,3 +1,4 @@
+import { CONTROL_CHAR_RE, inputTextControlFate } from '../adapters/input-text.js';
 import type { DeviceAdapter } from '../adapters/types.js';
 
 /**
@@ -34,8 +35,6 @@ import type { DeviceAdapter } from '../adapters/types.js';
  * The error names the character by code point, never the value around it:
  * values may be credentials.
  */
-const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
-
 /** The short escapes a reader knows on sight; every other refused character is shown as `\uXXXX`. */
 const SHORT_ESCAPES: Readonly<Record<string, string>> = { '\n': '\\n', '\t': '\\t', '\r': '\\r' };
 
@@ -48,19 +47,6 @@ function visibleEscape(ch: string): string {
   return `"${SHORT_ESCAPES[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`}"`;
 }
 
-/**
- * What Android's `input text` may do with the refused character. ENTER is
- * named for a newline and a return only (round 7, 2026-10-09: a refused
- * U+0007 was told "a newline into ENTER"); any other is sent as a key event.
- * adapters/android.ts's defensive assert words it the same way.
- */
-function androidFate(ch: string): string {
-  if (ch === '\n' || ch === '\r') {
-    return `may turn it into a key event (${ch === '\n' ? 'a newline' : 'a return'} into ENTER, which submits the form mid-fill)`;
-  }
-  return 'may send it as a key event';
-}
-
 /** Throws when `value` holds a character typing cannot deliver as text (see the module doc). */
 export function assertTypeable(value: string): void {
   const match = value.match(CONTROL_CHAR_RE);
@@ -69,7 +55,7 @@ export function assertTypeable(value: string): void {
   const code = `U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
   throw new Error(
     `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
-      `\`input text\` ${androidFate(ch)}, on iOS ` +
+      `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
       'idb types it as a key press. Refused on both platforms before anything was sent. Type the text without it ' +
       "and send the key deliberately — pressKey('enter') (the `press_key` tool, `key: enter`); there is no tab key.",
   );
