@@ -246,7 +246,10 @@ export interface ResolvedSettled extends Resolved {
  *   code review of round 7: a target seen, gone, then seen again on a slow
  *   last read is the same shape). One more read is taken past the deadline
  *   — the slack pollTree's last round already has: the same rect settles
- *   it, a different one is the movement above. Otherwise a plain Error that
+ *   it, a different one is the movement above, worded as such ("never at
+ *   the same position in two consecutive reads": the late read and the one
+ *   before it disagreed — reviewed and kept, code review of round 7 D2).
+ *   Otherwise a plain Error that
  *   says what happened, never that two reads disagreed: "…to hold still
  *   (found once, but no second read came within the budget to confirm its
  *   position)" when the late read failed, "…(found once; the one read after
