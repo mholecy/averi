@@ -4,7 +4,6 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { keyboardBandTop } from '../ui-tree/soft-keyboard.js';
 import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
 
 /**
@@ -792,7 +791,8 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * keyboard shown; nothing more with it hidden — the guard's first reading
  * is reused). Under idb, whose reading is always `unknown`, the cut is at
  * the top of idb's keyboard band in the tree instead
- * (ui-tree/soft-keyboard.ts#keyboardBandTop; round 7, 2026-10-10 — the
+ * (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop, read off the draw
+ * order the check already holds; round 7, 2026-10-10 — the
  * higher of the two when both read): M-1.4's refusal said "only a 354x7
  * part of it shows" of `value_date_select`'s strip 589–596, under the
  * band, between the lifted CONTINUE's reach and the keys. A line only: the
@@ -833,7 +833,7 @@ export async function aimClearOfChrome(
   const cover = exposed.centreCover;
   if (cover === undefined) return { point: centre };
   const read = await keyboardTop();
-  const band = keyboardBandTop(tree);
+  const band = order.keyboardBandTop;
   // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
   const top = band === undefined ? read : read === undefined ? band : Math.min(read, band);
   const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };

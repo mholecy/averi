@@ -882,14 +882,17 @@ export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}]
  * this band at the head of the content is read as the bar's
  * (`firstContent`'s misses, stated there). Here since round 7 (2026-10-10),
  * moved from ui-tree/draw-order.ts: idb's keyboard band starts below it too
- * (ui-tree/soft-keyboard.ts#keyboardBandTop).
+ * (ui-tree/soft-keyboard.ts#flatListKeyboardBand's `barLine`, which
+ * draw-order.ts passes it as, `flatListBarLine` — since the code review of
+ * round 7, S3, draw-order.ts is again its one reader: the band's top is
+ * `DrawOrder.keyboardBandTop`).
  */
 export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
 
-/** The top bar's line on `screen` (geometry.ts#screenOf's): the bottom of its band, FLAT_LIST_TOP_BAR_FRACTION of the screen down — the one spelling draw-order.ts and soft-keyboard.ts both read (code review of round 7, S6: each wrote the product out). */
+/** The top bar's line on `screen` (geometry.ts#screenOf's): the bottom of its band, FLAT_LIST_TOP_BAR_FRACTION of the screen down — the one spelling (code review of round 7, S6: draw-order.ts and soft-keyboard.ts each wrote the product out). */
 export const flatListBarLine = (screen: Rect): number => screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
 
-/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). Moved from ui-tree/draw-order.ts in round 7 (2026-10-10): soft-keyboard.ts#keyboardBandTop sizes idb's keyboard band against the same screen. */
+/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). Moved from ui-tree/draw-order.ts in round 7 (2026-10-10), when soft-keyboard.ts sized idb's keyboard band against the same screen (its top is `DrawOrder.keyboardBandTop` since the code review of round 7, S3). */
 export function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
   return [...everyNode(tree)].reduce((best, n) => (rectArea(n.rect) > rectArea(best) ? n.rect : best), tree.rect);

@@ -1,5 +1,5 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, STRUCTURAL_ROLES, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
-import { flatListBarLine, rectWithin, screenOf } from './geometry.js';
+import { rectWithin } from './geometry.js';
 
 /**
  * What the TREE says about the soft keyboard (2026-10-07): the in-tree half
@@ -21,7 +21,8 @@ import { flatListBarLine, rectWithin, screenOf } from './geometry.js';
  * the lowest layer every sentence that says so imports. Since round 7
  * (2026-10-10) it also reads idb's keyboard band, which carries no mark, by
  * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a TOP
- * EDGE only (`keyboardBandTop`), never as a keyboard shown.
+ * EDGE only (draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard
+ * shown.
  */
 
 /**
@@ -57,7 +58,8 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * the list's order (`nodes`, pre-order: the synthetic root first) — moved
  * here from ui-tree/draw-order.ts (round 7, 2026-10-10), where
  * `keyboardOf` still reads it for `flatListReadingOrder` and `bottomPinned`
- * unchanged. idb marks no keyboard node, so its keys — plain `button`s
+ * unchanged, and for its top (`DrawOrder.keyboardBandTop`, the one way the
+ * stroke box and the tap's chrome check know it). idb marks no keyboard node, so its keys — plain `button`s
  * listed LAST — are the only covers of the rows under it. Its background is
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the
@@ -100,29 +102,6 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
     return { top: band.y, from, to };
   }
   return undefined;
-}
-
-/**
- * The TOP EDGE of idb's keyboard band (`flatListKeyboardBand`) in `tree`, or
- * undefined — round 7, 2026-10-10 (docs/bugs/2026-10-09-ios-idb-scroll-
- * stroke-starts-on-the-soft-keyboard.md, and M-1.4's "354x7 part shows"
- * inside the band). A LINE, deliberately, and nothing more: not a reading of
- * the keyboard (`keyboardInTree` stays `unknown` on an idb tree, and with it
- * every `shown`/`hidden` question of keyboard-cover.ts#readKeyboard and the
- * in-tree dismissal — a blind key there was measured to submit, K5d). Two
- * readers, and only these: `scroll_until`'s stroke box ends above it (no
- * touch-down on a key — interact/scroll-rounds.ts), and the tap's chrome
- * check cuts its box above it before a piece is chosen (no piece, no "part
- * that shows", inside the band — interact/resolve.ts#aimClearOfChrome).
- * Only a FLAT LIST (`UiNode.flatList`, idb's mark) is read: WDA marks its
- * band itself (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree
- * — both always undefined here. The screen and the top bar's line are
- * draw-order's (geometry.ts#screenOf, #flatListBarLine).
- */
-export function keyboardBandTop(tree: UiNode): number | undefined {
-  if (tree.flatList !== true) return undefined;
-  const screen = screenOf(tree);
-  return flatListKeyboardBand([...everyNode(tree)], screen, flatListBarLine(screen))?.top;
 }
 
 /**
