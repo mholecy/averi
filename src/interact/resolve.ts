@@ -727,8 +727,8 @@ function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: n
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }
 
-/** The remedy for a target cut at each edge: a scroll toward where the rest of it lies — down, `scroll_until`'s default, needs no word. */
-const CUT_REVEALS: Readonly<Record<Edge, string>> = {
+/** The remedy for a target cut at each edge: a scroll toward where the rest of it lies — down, `scroll_until`'s default, needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
+export const CUT_REVEALS: Readonly<Record<Edge, string>> = {
   bottom: 'scroll_until it first',
   top: 'scroll_until it with direction: up first',
   left: 'scroll_until it with direction: left first',

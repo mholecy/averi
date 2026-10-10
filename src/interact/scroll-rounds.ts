@@ -360,9 +360,11 @@ export type ScrollOutcome =
       /**
        * The other way (`round`'s stuck turn): `unmoved` — one stroke back moved
        * it neither; `stroked` — swiped earlier in the scroll (a turn), so not
-       * tried again; `untried` — no swipe or time was left to try it.
+       * tried again; `untried` — no swipe or time was left to try it;
+       * `outward` — a sliver stuck on strokes toward its cut edge, which the
+       * other way only pushes out through that edge (2026-10-10), not tried.
        */
-      otherWay: 'unmoved' | 'stroked' | 'untried';
+      otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
   | {
@@ -728,7 +730,7 @@ interface State {
   /** The direction of the last stroke SENT, a probe included — the way the content last moved, for `dropped`. */
   readonly lastSent: Direction | undefined;
   /** The last read that read: the judged match's rect and the frames it was judged in — undefined when it found no match. */
-  readonly lastFound: { rect: Rect; clippedOut?: ClippedSide; frames: readonly Rect[] } | undefined;
+  readonly lastFound: (FarFacts & { frames: readonly Rect[] }) | undefined;
   /**
    * The target was dropped from the tree by the content's motion — the
    * last read had it short of the far edge of that motion, this one has no
@@ -1100,10 +1102,35 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * before any read saw it short is the caller's direction to honour, as
  * `nextStroke` says; a node clipped out has nothing in the frame, so
  * `atFarEdge`, which needs some, never fires for it).
+ *
+ * Or CUT to a sliver at that edge of its scroll container (`FarFacts
+ * .slicedAt`, `Judged.sliver`, 2026-10-10, code review round 2 of
+ * fix/r7-sliver): the rest of it lies past the far edge as surely as a
+ * clipped-out node's does, while its rect, cut to the container, lies
+ * inside the frame. A plain stop does not stop on it (`stops`), so without
+ * this a 132-px row showing its bottom 40 px at a form's top under a
+ * default (down) scroll was pushed out and back until "turned round 3
+ * times"; now `atFarEdge` turns the next stroke at once. A sliver at the
+ * NEAR edge is coming in, and the strokes go on.
  */
-function beyondFarEdgeIn(found: Pick<UiNode, 'rect' | 'clippedOut'>, direction: Direction, frames: readonly Rect[]): boolean {
-  return found.clippedOut === FAR_EDGE[direction].far || frames.every((f) => beyondFarEdge(found.rect, direction, f));
+function beyondFarEdgeIn(found: FarFacts, direction: Direction, frames: readonly Rect[]): boolean {
+  const { far } = FAR_EDGE[direction];
+  return found.clippedOut === far || found.slicedAt === far || frames.every((f) => beyondFarEdge(found.rect, direction, f));
 }
+
+/** What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, and the edge its scroll container cuts it to a sliver at. */
+interface FarFacts {
+  readonly rect: Rect;
+  readonly clippedOut?: ClippedSide;
+  readonly slicedAt?: Edge;
+}
+
+/** A judged match's `FarFacts`, its rect copied. */
+const farFacts = ({ node, sliver }: Judged): FarFacts => ({
+  rect: { ...node.rect },
+  ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
+  ...(sliver !== undefined && { slicedAt: sliver.cut.edge }),
+});
 
 /**
  * `cover`, drawn over the target, lies over its FAR side for a scroll
@@ -1252,8 +1279,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   if (best === undefined && current !== 'start' && s.lastFound !== undefined && s.lastSent !== undefined) {
     if (!beyondFarEdgeIn(s.lastFound, s.lastSent, s.lastFound.frames)) s.dropped = OPPOSITE[s.lastSent];
   }
-  s.lastFound =
-    best === undefined ? undefined : { rect: { ...best.node.rect }, ...(best.node.clippedOut !== undefined && { clippedOut: best.node.clippedOut }), frames };
+  s.lastFound = best === undefined ? undefined : { ...farFacts(best), frames };
   if (best !== undefined) {
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
@@ -1273,8 +1299,8 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
-    // clipped out past it (`beyondFarEdgeIn`).
-    const beyond = beyondFarEdgeIn(best.node, s.rules.direction, frames);
+    // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
+    const beyond = beyondFarEdgeIn(farFacts(best), s.rules.direction, frames);
     // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
     // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
     // band.md): across it — clipped there, or its centre in iOS's status
@@ -1558,10 +1584,17 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // way — after which the strokes go the caller's way again, and a second
     // stuck is declared as before. Not when that stroke would pass the
     // bound: the stuck sentence beats "maxSwipes".
+    // Not for a sliver stuck on strokes toward its cut edge (2026-10-10,
+    // code review round 2 of fix/r7-sliver): the content is exhausted where
+    // the rest of it lies, and a stroke the other way only pushes it out
+    // through that edge — measured on the fake, a whole 50-px row at a
+    // list's top, its image flush with that top (geometry.ts#evidentCut's
+    // residual), swung out and lost after 5 swipes. `outward`, said so.
     const backUnmoved = answersBack && observed.bestUnmoved;
     const stuckOn = backUnmoved ? s.stuckOn : observed.stuck ? s.lastStroke : undefined;
     if (stuckOn !== undefined) {
-      const otherWay = backUnmoved ? 'unmoved' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
+      const outward = !fully && best.sliver !== undefined && REVEALS[best.sliver.cut.edge] === stuckOn;
+      const otherWay = backUnmoved ? 'unmoved' : outward ? 'outward' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
       const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
       if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best, fully), lastStroke: stuckOn, viewport, otherWay });
       s.stuckOn = stuckOn;

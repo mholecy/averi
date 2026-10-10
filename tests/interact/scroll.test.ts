@@ -602,9 +602,55 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('at the bound (maxSwipes: 0): the failure says what it was short of — the cut', async () => {
     const fake = new SwiftForm(1000);
     await expect(scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
-      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs (last rect",
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, " +
+        'under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
     );
     expect(fake.swipes).toEqual([]);
+  });
+
+  /** A form whose content starts at its top (offset 0 = at rest): a 132-px (or `height`) row at content y `y0`, its child `rel` inside it, cut to the form; strokes move the content, clamped to [0, 3000]. */
+  class TopForm extends FakeAdapter {
+    constructor(readonly y0: number, readonly height: number, readonly rel: [number, number], public offset: number) {
+      super({ s: node({ role: 'container' }) }, 's');
+      this.viewportSize = { width: 1080, height: 2220 };
+    }
+    override async uiTree(): Promise<UiNode> {
+      const cut = (y: number, h: number): Rect => {
+        const top = Math.max(y, FORM.y);
+        return { x: 66, y: top, width: 948, height: Math.max(0, Math.min(y + h, FORM.y + FORM.height) - top) };
+      };
+      const y = this.y0 - this.offset;
+      const inView = y + this.height > FORM.y && y < FORM.y + FORM.height;
+      const row = node({ role: 'container', identifier: 'row', rect: cut(y, this.height), children: [node({ role: 'other', rect: cut(y + this.rel[0], this.rel[1] - this.rel[0]) })] });
+      return node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'container', clipsDescendants: true, rect: { ...FORM }, children: inView ? [row] : [] })] });
+    }
+    override async swipe(from: Point, to: Point, durationMs?: number): Promise<void> {
+      await super.swipe(from, to, durationMs);
+      this.offset = Math.min(3000, Math.max(0, this.offset + from.y - to.y));
+    }
+  }
+
+  it('a sliver at the form\'s TOP under a default (down) scroll (code review round 2): it lies at the far edge, so the first stroke turns at once — one swipe, the row whole', async () => {
+    const fake = new TopForm(1000, 132, [12, 120], 1000 + 132 - 242 - 40); // its bottom 40 px showing
+    expect((await fake.uiTree()).children[0].children[0].rect).toEqual({ x: 66, y: 242, width: 948, height: 40 });
+    expect(await scrollUntilVisible(fake, 'id:row', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(fake.swipes).toEqual([{ from: { x: 540, y: 589 }, to: { x: 540, y: 1110 } }]); // content down 521: a turn's half reach
+    expect((await fake.uiTree()).children[0].children[0].rect.height).toBe(132);
+  });
+
+  it('the stated residual: a WHOLE 50-px row at rest at the list\'s top, its image flush with that top, reads cut — two unmoved strokes up, no stroke back down (it would push it out), and the failure says why', async () => {
+    const fake = new TopForm(242, 50, [0, 40], 0);
+    await expect(scrollUntilVisible(fake, 'id:row', FAST)).rejects.toThrow(
+      "scroll_until id:row failed after 2 swipes — element is in the viewport but cut at its scroll container's top edge (container 0,242 1080x1736) to a 948x50 part, 50 deep across it, " +
+        'under the 65 a tap needs — and the content is exhausted: swiping up no longer moves it, and swiping down would only push it out through that edge. ' +
+        "The rest of it stays past its container's edge at the end of the content — a layout defect (no room beyond it?), or its own content runs to its edge, which reads as cut; " +
+        'a tap refuses it so cut (scroll_until it with direction: up first). Last rect {"x":66,"y":242,"width":948,"height":50} in a 1080x2220 viewport',
+    );
+    expect(fake.swipes).toEqual([
+      { from: { x: 540, y: 589 }, to: { x: 540, y: 1110 } },
+      { from: { x: 540, y: 589 }, to: { x: 540, y: 1110 } },
+    ]);
+    expect(fake.offset).toBe(0);
   });
 
   it('a cut leaf shows no evidence (the stated residual): the plain stop stops on it at once, as before', async () => {
