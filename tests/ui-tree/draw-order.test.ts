@@ -764,6 +764,30 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree).exposure(back, tree.rect)).toMatchObject({ covers: [], tapAt: { moved: false } });
     });
 
+    describe('WDA, the SWIFT form (2026-10-09 20:57 UTC): an unlabelled textfield over its placeholder label `Payee’s name`, holding its own horizontal scroll indicator', () => {
+      const label = () => uiNode({ role: 'text', label: 'Payee’s name', rect: rect(42, 446, 103, 22) });
+      const bar = (partial: Partial<UiNode> = {}) =>
+        uiNode({ role: 'container', label: 'Horizontal scroll bar, 1 page', value: '0 %', rect: rect(42, 454, 318, 10), children: [uiNode({ role: 'container', rect: rect(45, 461, 309, 3) })], ...partial });
+      const field = (text: UiNode, input: UiNode) =>
+        uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 116, 402, 664), children: [uiNode({ role: 'container', identifier: 'swift_payment.form.payee_name_input', rect: rect(24, 431, 354, 52), children: [text, input] })] })] });
+      const textfield = (indicator: UiNode, partial: Partial<UiNode> = {}) => uiNode({ role: 'textfield', rect: rect(42, 447, 318, 20), children: [indicator], ...partial });
+
+      it('the textfield\'s scroll indicator is no cover of the label — a text input\'s, as a scroll view\'s, matched by shape: localised, it is excused the same', () => {
+        for (const indicator of [bar(), bar({ label: 'Vodorovný posuvník, 1 strana' }), bar({ label: null, value: null })]) {
+          const text = label();
+          expect(drawOrder(field(text, textfield(indicator))).exposure(text, IPHONE).covers).not.toContain(indicator);
+        }
+      });
+
+      it('…and the shape stays narrow: under another interactive parent (a button), or an identified container of that shape, it covers', () => {
+        const text = label();
+        const underButton = bar();
+        expect(drawOrder(field(text, uiNode({ role: 'button', label: 'Pick', rect: rect(42, 447, 318, 20), children: [underButton] }))).exposure(text, IPHONE).covers).toContain(underButton);
+        const identified = bar({ identifier: 'pager' });
+        expect(drawOrder(field(text, textfield(identified))).exposure(text, IPHONE).covers).toContain(identified);
+      });
+    });
+
     it('the scroll-indicator excuse is narrow: an `other` (an unmapped control) or an identified container of the same shape in the target\'s scroll view still covers', () => {
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 470, 402, 52) });
       const shaped = (partial: Partial<UiNode>) => uiNode({ role: 'container', label: 'Horizontal scroll bar, 1 page', value: '0 %', rect: rect(0, 485, 402, 30), children: [uiNode({ role: 'container', rect: rect(43, 512, 316, 3) })], ...partial });

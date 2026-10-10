@@ -251,6 +251,13 @@ const screenSized = (n: UiNode, screenArea: number): boolean => n.children.lengt
 /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
 
+/**
+ * The normalised role of every text input — interact/input-role.ts#INPUT_ROLE,
+ * which this module, below interaction, does not import (the `scrollIndicator`
+ * and `ownControl` rows).
+ */
+const TEXT_INPUT_ROLE = 'textfield';
+
 /** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
 const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));
 
@@ -819,7 +826,8 @@ const NOT_DRAWN = {
 
   /**
    * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
-   * child of a scroll view (`scrolls`) and holds nothing but empty frames
+   * child of a scroll view (`scrolls`) or of a text input
+   * (`TEXT_INPUT_ROLE`) and holds nothing but empty frames
    * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
    * a UIScrollView's two indicators LAST among its children, after every
    * row — `Other 'Vertical scroll bar, 2 pages' 369,62 30x456` and
@@ -832,10 +840,26 @@ const NOT_DRAWN = {
    * an accessibility region. Narrow on purpose: a `container` — not
    * `other`, an unmapped type that may be a control — with no identifier
    * and no content but frames; a sticky header carries its text.
+   *
+   * A text input's too (round 7, docs/bugs/2026-10-09-ios-wda-cell-
+   * background-and-textfield-scroll-bar-read-as-covers.md): a UITextField
+   * scrolls its text, and WDA lists its indicator as its child — the SWIFT
+   * form's `textfield 42,447 318x20` → `Other 'Horizontal scroll bar, 1
+   * page' 42,454 318x10` → a bare thumb `45,461 309x3` — which refused `tap
+   * text:"Payee’s name"`, the field's placeholder label beside it, and
+   * named the bar over every such label of the form. Matched by its shape
+   * and its parent's role, never by its label: WDA's label follows the
+   * device's language. A labelled `container` of that shape under any other
+   * interactive parent (a button) still covers.
    */
   scrollIndicator: {
     target: ({ node, parent }) =>
-      parent !== undefined && scrolls(parent.node) && node.role === 'container' && !node.identifier && node.children.length > 0 && framesOnly(node),
+      parent !== undefined &&
+      (scrolls(parent.node) || parent.node.role === TEXT_INPUT_ROLE) &&
+      node.role === 'container' &&
+      !node.identifier &&
+      node.children.length > 0 &&
+      framesOnly(node),
   },
 
   /**
