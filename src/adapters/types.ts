@@ -212,8 +212,11 @@ export const KEYBOARD_ROLE = 'keyboard';
  * AutoCompleteTextView and the Compose input that dumps as a focusable,
  * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
  * because the adapters write it and both ui-tree (draw-order.ts: a text
- * input's own scroll indicator and its label) and interaction (the fill,
- * through interact/input-role.ts) read it — round 7, review of fix/r7-covers.
+ * input's own scroll indicator and its label) and interaction (fill.ts acts
+ * on it, fill-text.ts names it in the not-an-input caveat) read it — round
+ * 7, review of fix/r7-covers. Imported from here directly since the code
+ * review of round 7 (S9): interact/input-role.ts, which only re-exported
+ * it, is gone.
  */
 export const INPUT_ROLE = 'textfield';
 
