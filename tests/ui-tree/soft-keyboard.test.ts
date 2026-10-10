@@ -144,4 +144,24 @@ describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing 
     expect(keyboardInTree(await pad())).toEqual({ state: 'unknown' });
     expect(keyboardInTree(contacts())).toEqual({ state: 'unknown' });
   });
+
+  it('a bottom sheet\'s unlabelled background with NO keyboard on screen (code review of round 7, MAJOR 1): listed before its own rows, so no node before it lies inside it — no band', () => {
+    const sheet = flat(
+      node({ role: 'text', label: 'Behind', rect: r(20, 200, 300, 40) }),
+      node({ role: 'other', rect: r(0, 400, 402, 474) }),
+      node({ role: 'button', label: 'Row 1', rect: r(0, 420, 402, 60) }),
+      node({ role: 'button', label: 'Row 2', rect: r(0, 480, 402, 60) }),
+    );
+    expect(keyboardBandTop(sheet)).toBeUndefined();
+    // …and a keyboard up over that sheet is still found: the later background, its keys listed before it.
+    sheet.children.push(node({ role: 'button', label: 'Z', rect: r(48, 714, 36, 46) }), node({ role: 'other', rect: r(0, 590, 402, 284) }));
+    expect(keyboardBandTop(sheet)).toBe(590);
+  });
+
+  it('a keyboard-shaped background listed after it is passed over when it has no key before it, and an earlier one with keys is taken', () => {
+    const tree = contacts();
+    tree.children.pop(); // Dictate
+    tree.children.push(node({ role: 'other', rect: r(0, 700, 402, 174) })); // the node before it, the 590 background, is not inside it
+    expect(keyboardBandTop(tree)).toBe(590);
+  });
 });

@@ -627,6 +627,23 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(fake.tapPoints).toEqual([{ x: 201, y: 580 }]);
   });
 
+  it('idb, a bottom sheet\'s unlabelled background with NO keyboard (code review of round 7, MAJOR 1): no band — a row under a bar in the sheet is tapped on its uncovered part, never refused as "above the soft keyboard"', async () => {
+    const tree = parseIdbDescribeAll(
+      JSON.stringify(
+        [
+          ['Application', 'App', 0, 0, 402, 874, null],
+          ['Other', null, 0, 400, 402, 474, null],
+          ['Button', 'Row', 24, 420, 354, 80, 'row'],
+          ['Button', 'Done', 24, 440, 354, 30, null],
+        ].map(([type, AXLabel, x, y, width, height, AXUniqueId]) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } })),
+      ),
+    );
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    expect((await tapElement(fake, 'id:row', OPTS)).moved).toBe('at (201,485) — its centre (201,460) is under button "Done" (24,440 354x30), drawn over it; tapped the uncovered part 354x30');
+  });
+
   it('idb, a label 3 pt below the pinned CONTINUE (round-6 device check H-1, which pressed CONTINUE): refused, nothing tapped — the bar reaches the screen\'s bottom', async () => {
     const elements = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')).positions.pos1;
     const tree = parseIdbDescribeAll(JSON.stringify(elements));
