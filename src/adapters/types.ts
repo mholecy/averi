@@ -382,9 +382,11 @@ export interface UiNode {
    * edge (`y` 297, height 0), so it is never a target, and this says which
    * way it went: `top` — clipped out above its scroll container — and
    * `bottom`, `left`, `right` likewise. Read by the wait's hint
-   * (interact/resolve.ts#zeroAreaHint) and by `scroll_until`, which reads a
+   * (interact/resolve.ts#zeroAreaHint), by `scroll_until`, which reads a
    * node clipped out past its far edge as beyond it (interact/scroll-
-   * rounds.ts#observe). Absent on iOS and on every node dumped the right
+   * rounds.ts#observe), and by the cut-sliver rule, to which a descendant
+   * clipped out past an edge its ancestor lies flush with is evidence of a
+   * cut there (ui-tree/geometry.ts#evidentCut, code review of round 7 P1). Absent on iOS and on every node dumped the right
    * way round.
    */
   clippedOut?: ClippedSide;

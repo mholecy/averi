@@ -5,6 +5,8 @@ import { tapElement } from '../../src/interact/tap.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { flingCarry, LazyList } from '../helpers/lazy-list.js';
+import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import { SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -651,6 +653,14 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
       { from: { x: 540, y: 589 }, to: { x: 540, y: 1110 } },
     ]);
     expect(fake.offset).toBe(0);
+  });
+
+  it('a classic-View row cut to 33 px at the list\'s TOP, its texts dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER): their clippedOut is the evidence — the plain stop does not stop on it', async () => {
+    const fake = new FakeAdapter({ s: parseUiautomatorXml(SETTINGS_ROW_SLIVER) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    await expect(scrollUntilVisible(fake, 'id:apps_row', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's top edge (container 0,297 1080x1857)",
+    );
   });
 
   it('a cut leaf shows no evidence (the stated residual): the plain stop stops on it at once, as before', async () => {

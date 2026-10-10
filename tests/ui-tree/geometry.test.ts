@@ -449,6 +449,20 @@ describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its 
     const outerCard = at({ x: 1030, y: 600, width: 50, height: 300 }, at({ x: 1046, y: 600, width: 34, height: 200 }), at({ x: 1040, y: 650, width: 200, height: 40 }));
     expect(evidentCut(outerCard, [{ x: 0, y: 600, width: 2000, height: 300 }, page])).toEqual({ edge: 'right', container: page, depth: 50 });
   });
+  it('a descendant dumped CLIPPED OUT past the flush edge is evidence there (code review of round 7, P1): Settings\' row cut to 33 px at the list\'s top, its texts clamped to zero area at 297 — cut, 33 deep', () => {
+    const list = { x: 0, y: 297, width: 1080, height: 1857 };
+    const out = (rect: UiNode['rect'], side: NonNullable<UiNode['clippedOut']>): UiNode => ({ ...node(rect), clippedOut: side });
+    const row = (...texts: UiNode[]) => at({ x: 0, y: 297, width: 1080, height: 33 }, at({ x: 66, y: 297, width: 66, height: 33 }), ...texts);
+    expect(evidentCut(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'top'), out({ x: 198, y: 297, width: 621, height: 0 }, 'top')), [list])).toEqual({ edge: 'top', container: list, depth: 33 });
+    expect(evidentCut(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'top')), [list])).toEqual({ edge: 'top', container: list, depth: 33 });
+    // Without them the icon, cut with the row to its own height, says nothing.
+    expect(evidentCut(row(), [list])).toBeUndefined();
+    // Clipped out the OTHER way, or clamped at an edge that is not this one (an inner clip 13 px down): no evidence of a cut at the top.
+    expect(evidentCut(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'bottom')), [list])).toBeUndefined();
+    expect(evidentCut(row(out({ x: 198, y: 310, width: 126, height: 0 }, 'top')), [list])).toBeUndefined();
+    // A plain zero-area descendant (no mark) stays none, as before.
+    expect(evidentCut(row(at({ x: 198, y: 297, width: 126, height: 0 })), [list])).toBeUndefined();
+  });
   it('equal depths: the NEAREST ancestor\'s edge wins (the chain is walked nearest first; a later edge must be shallower)', () => {
     const inner = { x: 0, y: 1900, width: 1080, height: 79 };
     const row = at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1936, width: 948, height: 42 }));
