@@ -95,6 +95,10 @@ Failure lines:
 - **`tapped id:"…" to hide it, still covered`**: the dismissal was tapped ONCE and may have changed the screen. Take a `screenshot` before you retry, and configure a dismissal that works on this screen.
 - **The keyboard's return key** (`tap: { label: search }`) is tappable. Use it only while `ui_snapshot` shows the `keyboard` band. After a `fill`, the keyboard is usually parked below the screen, and a tap there is refused as off screen.
 
+### iOS (`treeSource: idb`, the default)
+
+idb's tree cannot say whether the keyboard is up, so averi never hides it there and presses nothing. It does see where the keyboard's background starts. `scroll_until` starts its swipes above it, and a tap moved off covered chrome never lands inside it. A refusal then says `nothing of it shows above the soft keyboard`. Hide the keyboard yourself (tap a neutral title), then retry.
+
 ## Screenshots, pixels and visual checks
 
 - **`⚠ frame:` / `the screen did not settle`**: the screen kept changing (an animation, a spinner, a clock, a caret). The picture is the last capture, and `color`/`ocr` asserts and baseline creation refuse it. Wait for the animation to end (in a flow, a `wait:` for what appears after it), or hide the live content. For `color`/`ocr`, stability is judged over the element only.
