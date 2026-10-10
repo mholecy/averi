@@ -733,10 +733,23 @@ export interface Cut {
  * node whose text is merged into it) shows no evidence and reads whole; so
  * does a classic View cut at a horizontal scroller's side (its children cut
  * with it, never past — unless one lies wholly past it, dumped inverted:
- * then its `clippedOut` is the evidence); a whole node whose content runs to its top or
+ * then its `clippedOut` is the evidence), and so does a node whose
+ * descendant was dumped inverted on BOTH axes and is cut at a side: the
+ * parser names the vertical side (android.ts#nodeBounds, `vertical ??
+ * sideways`), so a card cut to 40 px at a carousel's left edge, its title
+ * dumped `[0,450][-100,440]`, carries `clippedOut: 'top'` and its left cut
+ * is missed. The other way, a whole node whose content runs to its top or
  * bottom edge without padding (a divider at a last row's bottom, an image
- * flush with a first row's top) reads cut. The tree carries no natural size
- * of a node to settle either. Cost: a walk of the node's subtree per flush
+ * flush with a first row's top) reads cut; so does a WHOLE thin row at rest
+ * flush with its list's top with a child laid out wholly above it — a
+ * translated or hidden swipe-action view dumped `[40,297][400,250]` over a
+ * row `0,297 1080x50` (verification of the code review of round 7: a
+ * synthetic shape, no dump has it) — refused, its remedy naming a child or
+ * a coordinate tap. Not tightened (to "a descendant WITH area is also cut
+ * to that line"): a real cut row may show only its padding across the
+ * edge, no child of it on the line, and then the cut would be missed — a
+ * refusal that names its way past is the safer error. The tree carries no
+ * natural size of a node to settle any of these. Cost: a walk of the node's subtree per flush
  * edge, for a node with a clipping ancestor only.
  */
 export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {

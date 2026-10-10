@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
@@ -22,7 +23,7 @@ import {
   rectCentre,
   subtract,
 } from '../../src/ui-tree/geometry.js';
-import { type UiNode } from '../../src/adapters/types.js';
+import { everyNode, type UiNode } from '../../src/adapters/types.js';
 
 /**
  * Regression cover for docs/bugs/2026-08-26-ios-ocr-crop-scale.md: with a
@@ -468,6 +469,41 @@ describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its 
     const inner = { x: 0, y: 1900, width: 1080, height: 79 };
     const row = at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1936, width: 948, height: 42 }));
     expect(evidentCut(row, [inner, form])).toEqual({ edge: 'bottom', container: inner, depth: 55 });
+  });
+});
+
+/**
+ * The clippedOut evidence (code review of round 7, P1) at every edge, through the parser as uiautomator dumps it —
+ * the verification's probe shapes — and the two stated residuals it leaves (geometry.ts#evidentCut, "Unknowable").
+ */
+describe('evidentCut — clippedOut evidence at each edge, parsed (verification of the code review of round 7)', () => {
+  const dump = (inner: string, list = '[0,297][1080,2154]') =>
+    `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"><node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="a:id/list" bounds="${list}">${inner}</node></node></hierarchy>`;
+  const cutOf = (xml: string, id: string) => {
+    const tree = parseUiautomatorXml(xml);
+    const find = (n: UiNode): UiNode | undefined => (n.identifier === id ? n : n.children.map(find).find(Boolean));
+    const n = find(tree)!;
+    return evidentCut(n, scrollersOf(tree)(n));
+  };
+  const text = (bounds: string) => `<node class="android.widget.TextView" resource-id="a:id/title" text="Apps" bounds="${bounds}"/>`;
+  const row = (id: string, bounds: string, ...kids: string[]) => `<node class="android.widget.LinearLayout" clickable="true" resource-id="a:id/${id}" bounds="${bounds}">${kids.join('')}</node>`;
+  const carousel = '[0,400][1080,700]';
+
+  it('bottom: a row cut to 34 px at the list\'s bottom, its text dumped wholly below — cut there, 34 deep', () => {
+    expect(cutOf(dump(row('row', '[0,2120][1080,2154]', text('[198,2200][324,2154]'))), 'row')).toEqual({ edge: 'bottom', container: { x: 0, y: 297, width: 1080, height: 1857 }, depth: 34 });
+  });
+  it('left and right: a card cut to 40 px at a carousel\'s side, its text dumped wholly past it — cut there, 40 deep', () => {
+    expect(cutOf(dump(row('card', '[0,400][40,700]', text('[0,420][-100,460]')), carousel), 'card')).toEqual({ edge: 'left', container: { x: 0, y: 400, width: 1080, height: 300 }, depth: 40 });
+    expect(cutOf(dump(row('card', '[1040,400][1080,700]', text('[1200,420][1080,460]')), carousel), 'card')).toEqual({ edge: 'right', container: { x: 0, y: 400, width: 1080, height: 300 }, depth: 40 });
+  });
+  it('stated residual: a text dumped inverted on BOTH axes is clippedOut \'top\' (the parser\'s `vertical ?? sideways`), so the card\'s left cut is missed', () => {
+    const xml = dump(row('card', '[0,400][40,700]', text('[0,450][-100,440]')), carousel);
+    expect([...everyNode(parseUiautomatorXml(xml))].find((n) => n.label === 'Apps')?.clippedOut).toBe('top');
+    expect(cutOf(xml, 'card')).toBeUndefined();
+  });
+  it('stated residual: a WHOLE 50-px row at rest at the list\'s top with a child laid out wholly above it (a hidden swipe-action view) reads cut, 50 deep', () => {
+    const xml = dump(row('row', '[0,297][1080,347]', text('[40,305][400,340]'), '<node class="android.widget.TextView" resource-id="a:id/hidden" text="x" bounds="[40,297][400,250]"/>'));
+    expect(cutOf(xml, 'row')).toEqual({ edge: 'top', container: { x: 0, y: 297, width: 1080, height: 1857 }, depth: 50 });
   });
 });
 

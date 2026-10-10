@@ -912,7 +912,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([]);
   });
 
-  it('idb\'s number pad (run2-ios #250) — its band\'s TOP is known since round 7 (ui-tree/soft-keyboard.ts#keyboardBandTop), the keyboard is NOT: one read, nothing tapped, nothing pressed, an empty result (a blind key submitted, K5d)', async () => {
+  it('idb\'s number pad (run2-ios #250) — its band\'s TOP is known since round 7 (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop), the keyboard is NOT: one read, nothing tapped, nothing pressed, an empty result (a blind key submitted, K5d)', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.keyboard = undefined;
