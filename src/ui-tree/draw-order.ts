@@ -1181,7 +1181,7 @@ interface TabBar {
  * does a row of three equal content buttons scrolled into the bottom 10 %
  * over what lies just above it; a classic, non-floating UITabBar, its items
  * filling the bar, has the shape too — a row at `0,770 402x30` just above it
- * is now refused (both the safe direction); in idb's flat list, a sheet
+ * is refused (both the safe direction); in idb's flat list, a sheet
  * drawn over the bar has the bar's items over its rows where they reach them
  * (a false refusal); a tab bar of two items, or of items of unequal height,
  * is not seen.
