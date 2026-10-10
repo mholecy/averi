@@ -1,6 +1,7 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, largestRect, rectCentre, rectWithin, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
+import { flatListKeyboardBand } from './soft-keyboard.js';
 
 /**
  * DRAW ORDER: what a tree says is drawn on top of what — and, for a target,
@@ -954,36 +955,15 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
 export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 
 /**
- * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): idb marks
- * no keyboard node, so its keys — plain `button`s listed LAST — are the only
- * covers of the rows under it. Its background is a screen-wide, unlabelled
- * structural node ending at the screen's bottom and starting below the top
- * bar's band (so never the screen's size), listed right after the keys; the
- * keyboard is that node and the run of nodes listed beside it (before and
- * after, in the list's order) lying wholly inside it. Measured on all four
- * keyboard dumps of the round-2 to round-8 device checks: run2-ios #250 (the
- * SWIFT form's number pad, `other 0,589 402x285` after `1`…`Delete`),
- * run3-ios #45 and #51 and run8-ios #233 (`other 0,590 402x284` after the
- * QWERTY keys, `Dictate 325,805 68x69` after it). Shape, not labels: key
- * labels follow the language and the layout. The app's own PIN pad (run5-ios
- * #81) has no such background, and is content. Undefined when no node has
- * that shape (the last one listed is taken).
+ * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): the band
+ * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
+ * rule and its measurements there, moved there in round 7 so the stroke
+ * box and the tap's chrome check read the band's top too — `keyboardBandTop`),
+ * with the run of nodes it holds as the keys.
  */
 function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
-  const bottom = screen.y + screen.height;
-  let back: Placed | undefined;
-  for (let i = order.length - 1; i > 0 && back === undefined; i--) {
-    const { node } = order[i];
-    const r = node.rect;
-    if (STRUCTURAL_ROLES.has(node.role) && !node.label && r.x === screen.x && r.width === screen.width && r.y + r.height === bottom && r.y >= barLine) back = order[i];
-  }
-  if (back === undefined) return undefined;
-  const inside = (p: Placed | undefined): boolean => p !== undefined && rectWithin(p.node.rect, back.node.rect);
-  let from = back.at;
-  while (from > 1 && inside(order[from - 1])) from--;
-  let to = back.at + 1;
-  while (inside(order[to])) to++;
-  return { top: back.node.rect.y, keys: new Set(order.slice(from, to)) };
+  const band = flatListKeyboardBand(order.map((p) => p.node), screen, barLine);
+  return band === undefined ? undefined : { top: band.top, keys: new Set(order.slice(band.from, band.to)) };
 }
 
 /**

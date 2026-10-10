@@ -9,6 +9,7 @@ import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { bandNode, dropBand, FAST, FakeAdapter, hidesKeyboardOn, IOS_LOGIN_BAND, iosLoginFake, node, recorded } from '../helpers/fake.js';
 import { readFile } from 'node:fs/promises';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
 // The IN-TREE model (interact/keyboard-in-tree.ts: iOS under WDA, the adapter
 // has no keyboard oracle), through the module's interface — tapElement,
@@ -907,6 +908,17 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(events).toEqual(['read']);
     expect(fake.keys).toEqual([]);
     expect(sleeps).toEqual([]);
+  });
+
+  it('idb\'s number pad (run2-ios #250) — its band\'s TOP is known since round 7 (ui-tree/soft-keyboard.ts#keyboardBandTop), the keyboard is NOT: one read, nothing tapped, nothing pressed, an empty result (a blind key submitted, K5d)', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    const events = recorded(fake);
+    expect(await dismissKeyboard(fake, { ...FIRST, dismissals: [{ kind: 'tap', target: { id: 'swift_payment.form.title' } }] })).toEqual({});
+    expect(events).toEqual(['read']);
+    expect([fake.keys, sleeps]).toEqual([[], []]);
   });
 
   it('a band and nothing usable: a WARNING, not a throw — none configured, or none on screen — and nothing is pressed or tapped', async () => {

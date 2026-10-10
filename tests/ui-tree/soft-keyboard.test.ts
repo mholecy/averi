@@ -1,6 +1,12 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
-import { accessoryDismissButton, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
+import { FLAT_LIST_TOP_BAR_FRACTION } from '../../src/ui-tree/draw-order.js';
+import { accessoryDismissButton, flatListKeyboardBand, KEYBOARD_BAND_BAR_FRACTION, keyboardBandTop, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
+import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node, screen } from '../helpers/fake.js';
 
 // The tree's own marks (ui-tree/soft-keyboard.ts). The reading built over
@@ -84,5 +90,62 @@ describe('accessoryDismissButton — the input-accessory toolbar\'s trailing but
     const empty = node({ role: 'toolbar', rect: { x: 0, y: 500, width: 402, height: 18 } });
     expect(accessoryDismissButton(screen(app, host(empty, toolbar(done)), keyboardWindow()))).toBe(done);
     expect(accessoryDismissButton(screen(app, host(), keyboardWindow()))).toBeUndefined();
+  });
+});
+
+/**
+ * idb's keyboard band, by its shape (round 7, 2026-10-10: moved from ui-tree/draw-order.ts's private `keyboardOf`, whose
+ * own pins stay in tests/ui-tree/draw-order.test.ts). Known outside draw-order as a TOP EDGE only — for the stroke box
+ * and the tap's chrome cut — never as "the keyboard is shown": the in-tree reading stays `unknown` on idb (K5d).
+ */
+describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing more (round 7)', () => {
+  /** run2-ios #250: the SWIFT form with the number pad up, as idb lists it (`Keyboard 0,589 402x285` last, after `1`…`Delete`). */
+  const pad = async () => parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+  const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  /** idb's flat list: a 0×0 root marked `flatList`, the Application first. */
+  const flat = (...children: UiNode[]): UiNode => node({ role: 'container', rect: r(0, 0, 0, 0), flatList: true, children: [node({ role: 'other', label: 'Contacts', rect: r(0, 0, 402, 874) }), ...children] });
+  /** Contacts' New Contact with QWERTY up (docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md): `add url` below the fold, keys, the band `other 0,590 402x284`, then Dictate. */
+  const contacts = () =>
+    flat(
+      node({ role: 'textfield', label: 'First name', rect: r(20, 200, 362, 44) }),
+      node({ role: 'button', label: 'add url', rect: r(20, 902, 362, 51) }),
+      ...['Z', 'X', 'C', 'V'].map((label, i) => node({ role: 'button', label, rect: r(48 + 40 * i, 714, 36, 46) })),
+      node({ role: 'other', rect: r(0, 590, 402, 284) }),
+      node({ role: 'button', label: 'Dictate', rect: r(325, 805, 68, 69) }),
+    );
+
+  it('the measured number pad (run2-ios #250): 589, the background\'s top — the keys `1`…`Delete` and the background are the run', async () => {
+    const tree = await pad();
+    expect(keyboardBandTop(tree)).toBe(589);
+    const nodes = [tree, ...tree.children];
+    const band = flatListKeyboardBand(nodes, r(0, 0, 402, 874), 874 * FLAT_LIST_TOP_BAR_FRACTION)!;
+    expect(nodes.slice(band.from, band.to).map((n) => n.label ?? n.role)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'Delete', 'other']);
+  });
+
+  it('Contacts\' QWERTY (run3-ios #45/#51, run8-ios #233 shape): 590, Dictate listed after the background inside the run', () => {
+    expect(keyboardBandTop(contacts())).toBe(590);
+  });
+
+  it('an app\'s own PIN pad with no background (run5-ios #81): no band — the pad is content', () => {
+    const keys = [1, 2, 3].map((d, i) => node({ role: 'button', label: String(d), rect: r(40 + 110 * i, 600, 100, 80) }));
+    expect(keyboardBandTop(flat(node({ role: 'text', label: 'Enter PIN', rect: r(120, 300, 160, 30) }), ...keys))).toBeUndefined();
+  });
+
+  it('a tree that is not idb\'s flat list never has one — WDA marks its band itself, Android\'s keyboard is never in the tree: the same nodes nested, the measured WDA keyboard, an Android dump with the keyboard up', async () => {
+    const nested = contacts();
+    delete nested.flatList;
+    nested.rect = r(0, 0, 402, 874);
+    expect(keyboardBandTop(nested)).toBeUndefined();
+    expect(keyboardBandTop(parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-keyboard.json', import.meta.url), 'utf8')))).toBeUndefined();
+    expect(keyboardBandTop(parseUiautomatorXml(CLASSIC_VIEWS.loginImeUp))).toBeUndefined();
+  });
+
+  it('a band top is not a keyboard reading: keyboardInTree still says `unknown` of both idb keyboards — the in-tree dismissal presses nothing there (K5d)', async () => {
+    expect(keyboardInTree(await pad())).toEqual({ state: 'unknown' });
+    expect(keyboardInTree(contacts())).toEqual({ state: 'unknown' });
+  });
+
+  it('its top-bar line is draw-order\'s: the two fractions agree (soft-keyboard.ts cannot import draw-order.ts, which imports it)', () => {
+    expect(KEYBOARD_BAND_BAR_FRACTION).toBe(FLAT_LIST_TOP_BAR_FRACTION);
   });
 });
