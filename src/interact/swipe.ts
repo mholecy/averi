@@ -1,11 +1,22 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
-import { containsPoint, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type ScreenSize } from '../ui-tree/geometry.js';
+import { containsPoint, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type Edge, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
 /** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
 export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+/**
+ * The `scroll_until` direction (where the content lies) that reveals what
+ * lies past each EDGE of a rect: content beyond the top lies up, and so on.
+ * One map (code review of round 7, S7: it was spelled three times) — read by
+ * `scroll_until`'s probe and its stroke toward a cut edge
+ * (scroll-rounds.ts), by the tap's cut-sliver remedy (resolve.ts#cutRemedy,
+ * which `scroll_until`'s sliver failures quote) and by the wait's hint for a
+ * node clipped out past its container (resolve.ts#zeroAreaHint).
+ */
+export const REVEALS: Readonly<Record<Edge, Direction>> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
 
 /**
  * Which thing `direction` names. A `swipe:` step names the FINGER's movement

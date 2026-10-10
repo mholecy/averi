@@ -5,7 +5,8 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { FLAT_LIST_TOP_BAR_FRACTION } from '../../src/ui-tree/geometry.js';
-import { accessoryDismissButton, flatListKeyboardBand, keyboardBandTop, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
+import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { accessoryDismissButton, flatListKeyboardBand, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node, screen } from '../helpers/fake.js';
 
@@ -99,6 +100,8 @@ describe('accessoryDismissButton — the input-accessory toolbar\'s trailing but
  * and the tap's chrome cut — never as "the keyboard is shown": the in-tree reading stays `unknown` on idb (K5d).
  */
 describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing more (round 7)', () => {
+  /** Read off the draw order since the code review of round 7 (S3): `DrawOrder.keyboardBandTop`, the one derivation. */
+  const keyboardBandTop = (tree: UiNode) => drawOrder(tree).keyboardBandTop;
   /** run2-ios #250: the SWIFT form with the number pad up, as idb lists it (`Keyboard 0,589 402x285` last, after `1`…`Delete`). */
   const pad = async () => parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
   const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });

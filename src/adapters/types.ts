@@ -98,7 +98,12 @@ export interface Rect {
  */
 export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
 
-/** The side of its container a node lies wholly past (`UiNode.clippedOut`). */
+/**
+ * The side of its container a node lies wholly past (`UiNode.clippedOut`) —
+ * and any rect's side: ui-tree/geometry.ts re-exports it as `Edge` (the side
+ * a rect extends past or lies flush with), so `clippedOut` and a cut's edge
+ * compare as one type (code review of round 7, S1).
+ */
 export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
 
 /**
@@ -207,8 +212,11 @@ export const KEYBOARD_ROLE = 'keyboard';
  * AutoCompleteTextView and the Compose input that dumps as a focusable,
  * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
  * because the adapters write it and both ui-tree (draw-order.ts: a text
- * input's own scroll indicator and its label) and interaction (the fill,
- * through interact/input-role.ts) read it — round 7, review of fix/r7-covers.
+ * input's own scroll indicator and its label) and interaction (fill.ts acts
+ * on it, fill-text.ts names it in the not-an-input caveat) read it — round
+ * 7, review of fix/r7-covers. Imported from here directly since the code
+ * review of round 7 (S9): interact/input-role.ts, which only re-exported
+ * it, is gone.
  */
 export const INPUT_ROLE = 'textfield';
 
@@ -382,9 +390,11 @@ export interface UiNode {
    * edge (`y` 297, height 0), so it is never a target, and this says which
    * way it went: `top` — clipped out above its scroll container — and
    * `bottom`, `left`, `right` likewise. Read by the wait's hint
-   * (interact/resolve.ts#zeroAreaHint) and by `scroll_until`, which reads a
+   * (interact/resolve.ts#zeroAreaHint), by `scroll_until`, which reads a
    * node clipped out past its far edge as beyond it (interact/scroll-
-   * rounds.ts#observe). Absent on iOS and on every node dumped the right
+   * rounds.ts#observe), and by the cut-sliver rule, to which a descendant
+   * clipped out past an edge its ancestor lies flush with is evidence of a
+   * cut there (ui-tree/geometry.ts#evidentCut, code review of round 7 P1). Absent on iOS and on every node dumped the right
    * way round.
    */
   clippedOut?: ClippedSide;
@@ -430,7 +440,11 @@ export interface UiNode {
  * field-error pairing feeds WDA's nested tree to its flat rule with it, the
  * text hint flattens with it, ui_snapshot's note counts with it. It lives
  * beside UiNode rather than in a verify/ or adapters/ sibling because all
- * three layers need it and none owns it (review 2026-10-06).
+ * three layers need it and none owns it (review 2026-10-06). It yields nodes
+ * only: a walk that needs each node's subtree end in the order
+ * (android.ts#widenUnderOverlays, ui-tree/draw-order.ts) or what its
+ * ancestors hand down (ui-tree/geometry.ts#scrollersOf) recurses on its own
+ * — the stated exception (code review of round 7, S2).
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {
   yield root;

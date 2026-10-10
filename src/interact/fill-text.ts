@@ -50,11 +50,11 @@
  * decision, uninspected here).
  */
 
+import { INPUT_ROLE } from '../adapters/types.js';
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
 import type { Difference, FillFailure, FillResult, LostWhy } from './fill-facts.js';
 import { judgeFill, type Caveat, type FillVerdict, type Reason, type Sent } from './fill-verdict.js';
-import { INPUT_ROLE } from './input-role.js';
 
 /** One flow trace line: the action column and its text. */
 export interface FillTraceLine {

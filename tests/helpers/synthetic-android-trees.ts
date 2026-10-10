@@ -49,3 +49,28 @@ export const CLASSIC_VIEWS = {
   </node>
 </hierarchy>`,
 } as const;
+
+/**
+ * A classic-View Settings row cut to a 33-px SLIVER at its list's top, its
+ * texts dumped INVERTED — SYNTHETIC, built by the code review of round 7
+ * (P1) on the shape of run9-android's Settings homepage (tests/adapters/
+ * android.test.ts's SETTINGS: `text="Apps" bounds="[198,297][324,58]"`
+ * under the collapsing app bar). uiautomator cuts the row to the list
+ * (`[0,297][1080,330]`) and its icon with it (`[66,297][132,330]`, the
+ * row's own height: no inside evidence), while the title and the summary,
+ * wholly above the cut, come out inverted and are clamped to zero area at
+ * 297 with `clippedOut: 'top'` (android.ts#nodeBounds) — the only evidence
+ * of the cut the dump gives. The row below is whole.
+ */
+export const SETTINGS_ROW_SLIVER = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="com.android.settings:id/recycler_view" bounds="[0,297][1080,2154]">
+    <node class="android.widget.LinearLayout" clickable="true" resource-id="com.android.settings:id/apps_row" bounds="[0,297][1080,330]">
+      <node class="android.widget.ImageView" resource-id="android:id/icon" bounds="[66,297][132,330]" />
+      <node class="android.widget.TextView" resource-id="android:id/title" text="Apps" bounds="[198,297][324,58]" />
+      <node class="android.widget.TextView" resource-id="android:id/summary" text="Recent apps" bounds="[198,297][819,111]" />
+    </node>
+    <node class="android.widget.LinearLayout" clickable="true" resource-id="com.android.settings:id/next_row" bounds="[0,330][1080,550]" />
+  </node>
+</node>
+</hierarchy>`;

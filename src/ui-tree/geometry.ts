@@ -1,4 +1,4 @@
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -570,8 +570,24 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
  */
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
-/** A rect's side: one a rect extends past (`clippedEdges`), or lies flush with (`flushEdges`). */
-export type Edge = 'top' | 'bottom' | 'left' | 'right';
+/**
+ * The HIGHER of two top edges a box is cut above (the smaller y), either of
+ * which may be unknown — undefined only when both are. The one spelling
+ * (code review of round 7, S5) of what the tap's chrome check
+ * (interact/resolve.ts#aimClearOfChrome) and `scroll_until`'s stroke box
+ * (interact/scroll-rounds.ts#strokeTop) each wrote out: a keyboard cover's
+ * top and idb's keyboard band's.
+ */
+export const higherTop = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b));
+
+/**
+ * A rect's side: one a rect extends past (`clippedEdges`), or lies flush with
+ * (`flushEdges`) — adapters/types.ts#ClippedSide, the side a node dumped
+ * inverted lies past, re-exported under the name ui-tree asks it by (code
+ * review of round 7, S1: the two were the same union spelled twice). One
+ * definition, the adapter's: adapters/ may not import ui-tree.
+ */
+export type { Edge };
 
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.
@@ -675,11 +691,22 @@ export interface Cut {
  * (interact/resolve.ts#refuseCutSliver) and `scroll_until`'s plain stop
  * (interact/scroll-rounds.ts#stops) ask it, against the same minimum.
  *
- * What a descendant (of some area) must show, along the edge's axis:
+ * What a descendant must show, along the edge's axis:
  * - At ANY edge: it lies more than a pixel PAST the edge. Compose's nodes
  *   are cut to the scroller while their children may not be (the round-5
  *   snapshot `contactsCreateStaged`: a row `132,242 948x33` at the list's
  *   top, its First name field `132,115 816x160` running on above it).
+ * - At ANY edge, with no area: it was dumped wholly past THIS edge
+ *   (`UiNode.clippedOut` equal to it) and clamped onto it, within a pixel
+ *   (code review of round 7, P1). The parser clamps every node uiautomator
+ *   dumped inverted to zero size at the clip (adapters/android.ts
+ *   #nodeBounds), so the content past the edge reaches here with no rect to
+ *   lie past it with: a classic-View Settings row cut to `0,297 1080x33` at
+ *   its list's top, its icon cut with it to the row's own height, its title
+ *   and summary dumped `[198,297][324,58]` and `[198,297][819,111]` — whole
+ *   above the cut — read whole and was tapped until then. Clamped onto
+ *   another line (an inner clip's), or past another edge, it says nothing
+ *   of this one; any other zero-area descendant says nothing at all.
  * - At the TOP or BOTTOM only: it reaches the edge (within a pixel) from
  *   more than a pixel inside the node's opposite side — content laid out
  *   across the edge and cut with it. uiautomator cuts a View's children
@@ -705,23 +732,38 @@ export interface Cut {
  * Unknowable, stated: a cut node with no descendants (a leaf, or a Compose
  * node whose text is merged into it) shows no evidence and reads whole; so
  * does a classic View cut at a horizontal scroller's side (its children cut
- * with it, never past); a whole node whose content runs to its top or
+ * with it, never past — unless one lies wholly past it, dumped inverted:
+ * then its `clippedOut` is the evidence), and so does a node whose
+ * descendant was dumped inverted on BOTH axes and is cut at a side: the
+ * parser names the vertical side (android.ts#nodeBounds, `vertical ??
+ * sideways`), so a card cut to 40 px at a carousel's left edge, its title
+ * dumped `[0,450][-100,440]`, carries `clippedOut: 'top'` and its left cut
+ * is missed. The other way, a whole node whose content runs to its top or
  * bottom edge without padding (a divider at a last row's bottom, an image
- * flush with a first row's top) reads cut. The tree carries no natural size
- * of a node to settle either. Cost: a walk of the node's subtree per flush
+ * flush with a first row's top) reads cut; so does a WHOLE thin row at rest
+ * flush with its list's top with a child laid out wholly above it — a
+ * translated or hidden swipe-action view dumped `[40,297][400,250]` over a
+ * row `0,297 1080x50` (verification of the code review of round 7: a
+ * synthetic shape, no dump has it) — refused, its remedy naming a child or
+ * a coordinate tap. Not tightened (to "a descendant WITH area is also cut
+ * to that line"): a real cut row may show only its padding across the
+ * edge, no child of it on the line, and then the cut would be missed — a
+ * refusal that names its way past is the safer error. The tree carries no
+ * natural size of a node to settle any of these. Cost: a walk of the node's subtree per flush
  * edge, for a node with a clipping ancestor only.
  */
 export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
   const n = node.rect;
   // Along the edge's axis, as offsets INTO the container from that edge: where the descendant's near and far sides lie, and the node's far side.
-  const runsOnPast = (d: Rect, c: Rect, edge: Edge): boolean => {
-    if (rectArea(d) === 0) return false;
+  const runsOnPast = ({ rect: d, clippedOut }: UiNode, c: Rect, edge: Edge): boolean => {
     const [near, far, nodeFar] = {
       top: [d.y - c.y, d.y + d.height - c.y, n.y + n.height - c.y],
       bottom: [c.y + c.height - (d.y + d.height), c.y + c.height - d.y, c.y + c.height - n.y],
       left: [d.x - c.x, d.x + d.width - c.x, n.x + n.width - c.x],
       right: [c.x + c.width - (d.x + d.width), c.x + c.width - d.x, c.x + c.width - n.x],
     }[edge];
+    // Dumped wholly past this edge and clamped onto it (UiNode.clippedOut): past-the-edge evidence with no area left to show it.
+    if (rectArea(d) === 0) return clippedOut === edge && Math.abs(near) <= 1;
     const fromInside = (edge === 'top' || edge === 'bottom') && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
     return near < -1 || fromInside;
   };
@@ -731,7 +773,7 @@ export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefine
       const depth = edge === 'top' || edge === 'bottom' ? n.height : n.width;
       if (shallowest !== undefined && depth >= shallowest.depth) continue;
       for (const d of everyNode(node)) {
-        if (d !== node && runsOnPast(d.rect, container, edge)) {
+        if (d !== node && runsOnPast(d, container, edge)) {
           shallowest = { edge, container: { ...container }, depth };
           break;
         }
@@ -863,11 +905,17 @@ export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}]
  * this band at the head of the content is read as the bar's
  * (`firstContent`'s misses, stated there). Here since round 7 (2026-10-10),
  * moved from ui-tree/draw-order.ts: idb's keyboard band starts below it too
- * (ui-tree/soft-keyboard.ts#keyboardBandTop).
+ * (ui-tree/soft-keyboard.ts#flatListKeyboardBand's `barLine`, which
+ * draw-order.ts passes it as, `flatListBarLine` — since the code review of
+ * round 7, S3, draw-order.ts is again its one reader: the band's top is
+ * `DrawOrder.keyboardBandTop`).
  */
 export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
 
-/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). Moved from ui-tree/draw-order.ts in round 7 (2026-10-10): soft-keyboard.ts#keyboardBandTop sizes idb's keyboard band against the same screen. */
+/** The top bar's line on `screen` (geometry.ts#screenOf's): the bottom of its band, FLAT_LIST_TOP_BAR_FRACTION of the screen down — the one spelling (code review of round 7, S6: draw-order.ts and soft-keyboard.ts each wrote the product out). */
+export const flatListBarLine = (screen: Rect): number => screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
+
+/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). Moved from ui-tree/draw-order.ts in round 7 (2026-10-10), when soft-keyboard.ts sized idb's keyboard band against the same screen (its top is `DrawOrder.keyboardBandTop` since the code review of round 7, S3). */
 export function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
   return [...everyNode(tree)].reduce((best, n) => (rectArea(n.rect) > rectArea(best) ? n.rect : best), tree.rect);

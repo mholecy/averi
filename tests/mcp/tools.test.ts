@@ -740,7 +740,8 @@ describe('type_text refuses a control character before anything is sent', () => 
       const result = await call('type_text', { platform: p, selector: 'id:amount_input', text: 'tab\there', clear: true, configPath: missing() });
       expect(result.isError).toBe(true);
       expect(result.text).toContain('cannot type U+0009');
-      expect(result.text).toContain("pressKey('enter')");
+      expect(result.text).toContain('there is no tab key');
+      expect(result.text).not.toContain("pressKey('enter')"); // code review of round 7, P2: ENTER is a newline's and a return's remedy only
       expect(fake.taps).toEqual([]);
       expect(fake.deletes).toEqual([]);
       expect(fake.typed).toEqual([]);

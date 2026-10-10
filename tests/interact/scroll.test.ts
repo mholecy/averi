@@ -5,6 +5,8 @@ import { tapElement } from '../../src/interact/tap.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { flingCarry, LazyList } from '../helpers/lazy-list.js';
+import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import { SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -595,14 +597,14 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('no room to scroll it in (the content ends there): fails naming the cut, not "visible"', async () => {
     const fake = new SwiftForm(0);
     await expect(scrollUntilVisible(fake, 'id:details_toggle', FAST)).rejects.toThrow(
-      "element is in the viewport but cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs — and the content is exhausted",
+      "element is in the viewport but cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across that edge, under the 65 a tap needs — and the content is exhausted",
     );
   });
 
   it('at the bound (maxSwipes: 0): the failure says what it was short of — the cut', async () => {
     const fake = new SwiftForm(1000);
     await expect(scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
-      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, " +
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across that edge, " +
         'under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
     );
     expect(fake.swipes).toEqual([]);
@@ -641,7 +643,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('the stated residual: a WHOLE 50-px row at rest at the list\'s top, its image flush with that top, reads cut — two unmoved strokes up, no stroke back down (it would push it out), and the failure says why', async () => {
     const fake = new TopForm(242, 50, [0, 40], 0);
     await expect(scrollUntilVisible(fake, 'id:row', FAST)).rejects.toThrow(
-      "scroll_until id:row failed after 2 swipes — element is in the viewport but cut at its scroll container's top edge (container 0,242 1080x1736) to a 948x50 part, 50 deep across it, " +
+      "scroll_until id:row failed after 2 swipes — element is in the viewport but cut at its scroll container's top edge (container 0,242 1080x1736); only a 948x50 part of it shows, 50 deep across that edge, " +
         'under the 65 a tap needs — and the content is exhausted: swiping up no longer moves it, and swiping down would only push it out through that edge. ' +
         "The rest of it stays past its container's edge at the end of the content — a layout defect (no room beyond it?), or its own content runs to its edge, which reads as cut; " +
         'a tap refuses it so cut (scroll_until it with direction: up first). Last rect {"x":66,"y":242,"width":948,"height":50} in a 1080x2220 viewport',
@@ -651,6 +653,14 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
       { from: { x: 540, y: 589 }, to: { x: 540, y: 1110 } },
     ]);
     expect(fake.offset).toBe(0);
+  });
+
+  it('a classic-View row cut to 33 px at the list\'s TOP, its texts dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER): their clippedOut is the evidence — the plain stop does not stop on it', async () => {
+    const fake = new FakeAdapter({ s: parseUiautomatorXml(SETTINGS_ROW_SLIVER) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    await expect(scrollUntilVisible(fake, 'id:apps_row', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's top edge (container 0,297 1080x1857)",
+    );
   });
 
   it('a cut leaf shows no evidence (the stated residual): the plain stop stops on it at once, as before', async () => {
@@ -946,7 +956,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
  * idb's keyboard band in the stroke box (round 7, 2026-10-10; docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
  * soft-keyboard.md): idb marks no keyboard node, so the reading saw none and every stroke was `201 699 201 175` — a
  * touch-down on the keys (`Z X C V`, `5`), the form never scrolled, and the reply said "content exhausted". The band's
- * TOP (ui-tree/soft-keyboard.ts#keyboardBandTop) now ends the stroke box; nothing else about the keyboard is read.
+ * TOP (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop) now ends the stroke box; nothing else about the keyboard is read.
  */
 describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
   const NO_STROKE_ON_KEYS = 'never on the keys';

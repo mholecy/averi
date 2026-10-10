@@ -427,7 +427,8 @@ describe('fillField refuses a control character before anything is sent', () => 
         const { proxy, calls } = recorded(fake);
         const fill = fillField(proxy, { id: 'amount_input' }, `ab${ch}cd`, { ...FAST, clear: true });
         await expect(fill).rejects.toThrow(`cannot type ${code}`);
-        await expect(fill).rejects.toThrow(/pressKey\('enter'\)/);
+        // The remedy names pressKey('enter') for a newline and a return only (code review of round 7, P2).
+        await expect(fill).rejects.toThrow(ch === '\n' || ch === '\r' ? /pressKey\('enter'\)/ : /^(?!.*pressKey).*cannot be typed\.$/);
         expect(calls).toEqual([]);
         expect(fake.taps).toEqual([]);
         expect(fake.deletes).toEqual([]);

@@ -28,7 +28,7 @@ import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { COMPOSE } from '../helpers/android-dumps.js';
-import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
+import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
@@ -1100,6 +1100,15 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     );
     await expect(tapElement(fake, 'id:first_name_row', OPTS)).rejects.toThrow(
       "id:first_name_row is cut at its scroll container's top edge (container 0,242 1080x1736); only a 948x33 part of it shows, 33 deep across that edge",
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('a classic-View row cut to 33 px at the list\'s TOP whose texts were dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER) — their clippedOut is the evidence: refused, nothing tapped', async () => {
+    const fake = new FakeAdapter({ s: parseUiautomatorXml(SETTINGS_ROW_SLIVER) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    await expect(tapElement(fake, 'id:apps_row', OPTS)).rejects.toThrow(
+      "id:apps_row is cut at its scroll container's top edge (container 0,297 1080x1857); only a 1080x33 part of it shows, 33 deep across that edge, under the 65 a tap needs — scroll_until it with direction: up first",
     );
     expect(fake.tapPoints).toEqual([]);
   });

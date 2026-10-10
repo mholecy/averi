@@ -4,7 +4,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, CUT_REVEALS, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
+import { absenceError, cutRemedy, cutSliverText, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -140,10 +140,9 @@ function underText(j: Judged): string {
   return `${under} — ${percent(j.shows)}% of it shows`;
 }
 
-/** A plain stop's sliver (scroll-rounds.ts#stops, 2026-10-10): `cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs` — the tap's refusal's facts (resolve.ts#refuseCutSliver). */
+/** A plain stop's sliver (scroll-rounds.ts#stops, 2026-10-10), in the tap's refusal's own words (resolve.ts#cutSliverText). */
 function sliverText(j: Judged & Required<Pick<Judged, 'sliver'>>): string {
-  const { cut, minPiece } = j.sliver;
-  return `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}) to a ${j.node.rect.width}x${j.node.rect.height} part, ${cut.depth} deep across it, under the ${minPiece} a tap needs`;
+  return cutSliverText(j.sliver.cut, j.node.rect, j.sliver.minPiece);
 }
 
 /**
@@ -301,7 +300,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short.judged)} — and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays past its container's edge at the end of the content — a layout ` +
-            `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${CUT_REVEALS[short.judged.sliver.cut.edge]}). ${last}`,
+            `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutRemedy(short.judged.sliver.cut.edge)}). ${last}`,
         );
       }
       if (short.of === 'covered') {
@@ -410,7 +409,7 @@ function shortText(short: Shortfall): string {
     }
     case 'sliver': {
       const { judged } = short;
-      return `element reached the viewport but stayed ${sliverText(judged)} (last rect ${JSON.stringify(judged.node.rect)}) — a tap refuses it so cut (${CUT_REVEALS[judged.sliver.cut.edge]})`;
+      return `element reached the viewport but stayed ${sliverText(judged)} (last rect ${JSON.stringify(judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(judged.sliver.cut.edge)})`;
     }
     case 'absent':
       return 'element never appeared in the tree';
