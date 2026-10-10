@@ -1,5 +1,5 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, STRUCTURAL_ROLES, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
-import { FLAT_LIST_TOP_BAR_FRACTION, rectWithin, screenOf } from './geometry.js';
+import { flatListBarLine, rectWithin, screenOf } from './geometry.js';
 
 /**
  * What the TREE says about the soft keyboard (2026-10-07): the in-tree half
@@ -113,12 +113,12 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
  * Only a FLAT LIST (`UiNode.flatList`, idb's mark) is read: WDA marks its
  * band itself (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree
  * — both always undefined here. The screen and the top bar's line are
- * draw-order's (geometry.ts#screenOf, FLAT_LIST_TOP_BAR_FRACTION).
+ * draw-order's (geometry.ts#screenOf, #flatListBarLine).
  */
 export function keyboardBandTop(tree: UiNode): number | undefined {
   if (tree.flatList !== true) return undefined;
   const screen = screenOf(tree);
-  return flatListKeyboardBand([...everyNode(tree)], screen, screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION)?.top;
+  return flatListKeyboardBand([...everyNode(tree)], screen, flatListBarLine(screen))?.top;
 }
 
 /**

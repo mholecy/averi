@@ -1,5 +1,5 @@
 import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { containsPoint, FLAT_LIST_TOP_BAR_FRACTION, largestRect, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
+import { containsPoint, flatListBarLine, largestRect, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
@@ -1227,7 +1227,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     placed.end = order.length;
   };
   walk(tree, undefined, undefined);
-  const barLine = screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
+  const barLine = flatListBarLine(screen);
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
   const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
