@@ -251,6 +251,9 @@ const screenSized = (n: UiNode, screenArea: number): boolean => n.children.lengt
 /** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
 const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
 
+/** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
+const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));
+
 /**
  * `node` repeats `target` (the `onTarget` row, in a flat list): it carries
  * the target's identifier, or its label or value is the target's label,
@@ -310,7 +313,7 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
 };
 
 /** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
-const itemless = (n: UiNode): boolean => n.role === 'toolbar' && n.children.every((child) => [...everyNode(child)].every(emptyFrame));
+const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
@@ -371,12 +374,30 @@ const NOT_DRAWN = {
    * So the wrapper must also be the screen's size (`SCREEN_SIZED_FRACTION`,
    * a Window's `Other`) or hold the target's scroll view whole (the form's
    * frame) — a bar holds neither (`holdsWhole`).
+   * And, since round 7 (docs/bugs/2026-10-09-ios-wda-cell-background-and-
+   * textfield-scroll-bar-read-as-covers.md), an unlabelled, unvalued one
+   * whose every descendant is an EMPTY FRAME (`framesOnly`; a leaf is the
+   * case of none), as `itemlessToolbar` judges a toolbar: it carries
+   * nothing drawable. Measured under WDA on Settings › General › Language &
+   * Region (iOS 27): a grouped cell `container LOCALE 'Region, Slovakia'
+   * 20,411 362x54` lists its button's wrapper, then its background —
+   * `container 20,411 362x54` → `container 20,411 362x54`, nothing else —
+   * then a separator and the chevron; the background, the cell's size and
+   * neither the screen's nor holding its scroll view, refused `tap
+   * text:"Region"` and `id:LOCALE`, and `scroll_until` swiped to maxSwipes
+   * with the row on screen. The Compose tab-bar host still covers: its
+   * tabs carry identifiers and labels. Residual, stated: an opaque wrapper
+   * whose only content is empty frames (a card's background drawn by a
+   * bare `Other` over a row it was laid after), or an icon WDA gives as
+   * nested empty frames (an RN SVG: the myport login's flag icons, whose
+   * unlabelled frames no longer cover the switcher they lie in), reads as
+   * drawing nothing — a false "clear"; WDA gives such a node no trait that
+   * tells it from the cell's background.
    */
   structural: {
     shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: ({ node }, { target, screenArea }) =>
-      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea)),
+    target: ({ node }, { target, screenArea }) => STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (framesOnly(node) || holdsWhole(node, target, screenArea)),
   },
 
   /**
@@ -814,7 +835,7 @@ const NOT_DRAWN = {
    */
   scrollIndicator: {
     target: ({ node, parent }) =>
-      parent !== undefined && scrolls(parent.node) && node.role === 'container' && !node.identifier && node.children.length > 0 && node.children.every((c) => [...everyNode(c)].every(emptyFrame)),
+      parent !== undefined && scrolls(parent.node) && node.role === 'container' && !node.identifier && node.children.length > 0 && framesOnly(node),
   },
 
   /**

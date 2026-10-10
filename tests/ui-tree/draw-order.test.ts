@@ -363,9 +363,17 @@ describe('the three questions disagree on purpose, per row', () => {
   /** Overlaps the target (150,280 100x40) without holding it whole. */
   const strip = rect(100, 300, 200, 50);
 
+  /** What the Compose tab-bar host holds: a tab, an identified `container` (its content off the target here). */
+  const tab = () => uiNode({ role: 'container', identifier: 'nav.tab_home', rect: rect(0, 700, 10, 10) });
+
   it('structural: an unlabelled `container` with children is no cover at a point, but is drawn over a container (the Compose tab-bar host) and over a target it does not hold whole', () => {
-    const later = uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+    const later = uiNode({ role: 'container', rect: strip, children: [tab()] });
     expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
+  });
+
+  it('structural, holding nothing but empty frames: no cover of a target — it carries nothing drawable (round 7: WDA\'s grouped cell background) — but drawn over a container, as a leaf is not', () => {
+    const later = uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: strip, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] })] });
+    expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later, later.children[0]], target: [] });
   });
 
   it('structural, holding the target AND its scroll view whole: judged through its content for a target — a WDA `Other` frame laid after the form', () => {
@@ -374,7 +382,7 @@ describe('the three questions disagree on purpose, per row', () => {
   });
 
   it('structural, holding the target whole but not its scroll view nor the screen: a bar\'s host, a cover (review round 1: the Compose host over a small target above its tabs)', () => {
-    const later = uiNode({ role: 'container', rect: card, children: [uiNode({ role: 'container', rect: rect(0, 700, 10, 10) })] });
+    const later = uiNode({ role: 'container', rect: card, children: [tab()] });
     expect(ask(later)).toEqual({ shadowing: undefined, drawnOver: [later], target: [later] });
   });
 
@@ -716,6 +724,34 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       }
       expect(judged).toBeGreaterThan(200);
       expect(covered).toEqual([]);
+    });
+
+    it('WDA, Settings › General › Language & Region (2026-10-09 21:04 UTC): a grouped cell\'s background — an unlabelled `container` of the cell\'s size holding one empty frame, listed after the row\'s button — is no cover of `text:"Region"` nor of `id:LOCALE`', () => {
+      const region = uiNode({ role: 'text', label: 'Region', rect: rect(36, 428, 50, 21) });
+      const button = uiNode({ role: 'button', identifier: 'LOCALE', label: 'Region, Slovakia', rect: rect(36, 428, 308, 21), children: [region, uiNode({ role: 'text', label: 'Slovakia', rect: rect(280, 428, 64, 21) })] });
+      const background = (inner: Partial<UiNode> = {}) => uiNode({ role: 'container', rect: rect(20, 411, 362, 54), children: [uiNode({ role: 'container', rect: rect(20, 411, 362, 54), ...inner })] });
+      const cell = (bg: UiNode) =>
+        uiNode({
+          role: 'container',
+          identifier: 'LOCALE',
+          label: 'Region, Slovakia',
+          rect: rect(20, 411, 362, 54),
+          children: [
+            uiNode({ role: 'container', rect: rect(20, 411, 332, 54), children: [uiNode({ role: 'container', rect: rect(20, 411, 332, 54), children: [button] })] }),
+            bg,
+            uiNode({ role: 'container', rect: rect(36, 464, 346, 1) }),
+            uiNode({ role: 'button', label: 'chevron', rect: rect(352, 432, 12, 12) }),
+          ],
+        });
+      const tree = (bg: UiNode) => uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 812), children: [cell(bg)] })] });
+      const order = drawOrder(tree(background()));
+      expect(order.exposure(region, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
+      expect(order.exposure(button, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
+      // Something drawable at any depth — a label, an identifier, another role — and the wrapper covers, as the Compose tab-bar host does.
+      for (const inner of [{ label: 'Badge' }, { identifier: 'bg' }, { role: 'image' }]) {
+        const bg = background(inner);
+        expect(drawOrder(tree(bg)).exposure(region, IPHONE).covers).toContain(bg);
+      }
     });
 
     it('the myport 2FA screen\'s Späť moved down onto the horizontal scroll indicator (0,485 402x30): still tapped at its centre', async () => {
