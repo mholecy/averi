@@ -259,11 +259,11 @@ describe('resolveSettled — appear AND hold still', () => {
       ]);
     });
 
-    it('the late read no longer finds it: the same sentence, no read error', async () => {
+    it('the late read no longer finds it: said exactly — the one read after the budget did not find it again; no read error', async () => {
       const { fake } = wdaStart(() => node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 } }));
       const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
       expect((error as Error).message).toBe(
-        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once, but no second read came within the budget to confirm its position)',
+        'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once; the one read after the budget did not find it again)',
       );
     });
 
@@ -275,6 +275,86 @@ describe('resolveSettled — appear AND hold still', () => {
       const error = await resolveSettled(fake, 'id:swift_payment.form.title', BUDGET).catch((e: unknown) => e);
       expect((error as Error).message).toBe(
         'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found, but never at the same position in two consecutive reads)',
+      );
+    });
+  });
+
+  // Code review of round 7: the extra read follows a RUN of one sighting,
+  // not one sighting in all — a target seen, gone, and seen again only on a
+  // slow last read had no second read either.
+  describe('the extra read follows a run of one sighting at the end of the budget', () => {
+    /** Read 1 sees the title at y 73; then it is gone until 12 ms in; the read that finds it again (at y 120) outlasts the budget. */
+    function seenGoneSeenLate(late: () => 'same' | Error) {
+      resetLayout();
+      const title = node({ role: 'text', identifier: 'title', label: 'SWIFT', rect: { x: 135, y: 73, width: 131, height: 22 } });
+      const withTitle = () => node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [structuredClone(title)] });
+      const without = node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 } });
+      const fake = new FakeAdapter({ without }, 'without');
+      const start = Date.now();
+      let reads = 0;
+      let phase: 'first' | 'gone' | 'late' | 'after' = 'first';
+      fake.uiTree = async () => {
+        reads++;
+        if (phase === 'first') {
+          phase = 'gone';
+          return withTitle();
+        }
+        if (phase === 'gone' && Date.now() - start < 12) return structuredClone(without);
+        if (phase === 'gone') {
+          phase = 'late';
+          title.rect = { ...title.rect, y: 120 };
+          await new Promise((r) => setTimeout(r, 30)); // the slow read the budget ends inside
+          phase = 'after';
+          return withTitle();
+        }
+        const answer = late();
+        if (answer instanceof Error) throw answer;
+        return withTitle();
+      };
+      return { fake, reads: () => reads };
+    }
+    const BUDGET = { ...FIRST, timeoutMs: 20, pollMs: 2 };
+
+    it('seen, gone, seen again at the end: one more read at the same rect settles it', async () => {
+      const { fake } = seenGoneSeenLate(() => 'same');
+      const { node: settled } = await resolveSettled(fake, 'id:title', BUDGET);
+      expect(settled.rect.y).toBe(120);
+    });
+
+    it('seen, gone, seen again at the end, then the late read fails: "found on the last read, but no second read came"', async () => {
+      const { fake } = seenGoneSeenLate(() => new Error('device offline'));
+      const error = await resolveSettled(fake, 'id:title', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message.split('\n')).toEqual([
+        'Timed out after 20ms waiting for element id:title to hold still (found on the last read, but no second read came within the budget to confirm its position)',
+        '  (last UI tree read failed: device offline)',
+      ]);
+    });
+
+    it('an element that moves on every read within the budget gets NO extra read: the old sentence', async () => {
+      // It moves on every read the poll makes, the last of them a slow one
+      // that outlasts the budget; any read after that finds it where that
+      // one did — so an extra read here would wrongly settle it.
+      resetLayout();
+      const target = el({ role: 'button', identifier: 'tab' });
+      const dash = screen(target);
+      const fake = new FakeAdapter({ dash }, 'dash');
+      const start = Date.now();
+      let y = 100;
+      let slowDone = false;
+      fake.uiTree = async () => {
+        if (!slowDone) {
+          y++;
+          if (Date.now() - start >= 12) {
+            await new Promise((r) => setTimeout(r, 30));
+            slowDone = true;
+          }
+        }
+        target.rect = { ...target.rect, y };
+        return structuredClone(dash);
+      };
+      const error = await resolveSettled(fake, 'id:tab', BUDGET).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        'Timed out after 20ms waiting for element id:tab to hold still (found, but never at the same position in two consecutive reads)',
       );
     });
   });
