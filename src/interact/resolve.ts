@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Edge } from '../ui-tree/geometry.js';
+import { containsPoint, cutSliver, drawnOverText, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { keyboardBandTop } from '../ui-tree/soft-keyboard.js';
@@ -722,11 +722,26 @@ function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: n
   const cut = cutSliver(node, scrollersOf(tree)(node), minPiece);
   if (cut === undefined) return;
   const finding =
-    `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${node.rect.width}x${node.rect.height} part of it shows, ` +
-    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs — ${cutRemedy(cut.edge)} ` +
+    `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} ` +
     `(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates)`;
   const what = describeTarget(target);
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
+}
+
+/**
+ * THE sentence for a node cut to a sliver (`cutSliver`'s answer, `cut`, of a
+ * node whose rect is `shown`): `cut at its scroll container's bottom edge
+ * (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across
+ * that edge, under the 65 a tap needs`. Said by the tap's refusal
+ * (`refuseCutSliver`) and by `scroll_until`'s sliver failures
+ * (scroll-text.ts) — one wording since the code review of round 7 (S8),
+ * where the two had drifted apart ("to a 948x55 part, 55 deep across it").
+ */
+export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
+  return (
+    `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${shown.width}x${shown.height} part of it shows, ` +
+    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
+  );
 }
 
 /** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#REVEALS) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */

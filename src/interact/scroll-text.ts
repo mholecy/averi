@@ -4,7 +4,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, cutRemedy, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
+import { absenceError, cutRemedy, cutSliverText, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -140,10 +140,9 @@ function underText(j: Judged): string {
   return `${under} — ${percent(j.shows)}% of it shows`;
 }
 
-/** A plain stop's sliver (scroll-rounds.ts#stops, 2026-10-10): `cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs` — the tap's refusal's facts (resolve.ts#refuseCutSliver). */
+/** A plain stop's sliver (scroll-rounds.ts#stops, 2026-10-10), in the tap's refusal's own words (resolve.ts#cutSliverText). */
 function sliverText(j: Judged & Required<Pick<Judged, 'sliver'>>): string {
-  const { cut, minPiece } = j.sliver;
-  return `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}) to a ${j.node.rect.width}x${j.node.rect.height} part, ${cut.depth} deep across it, under the ${minPiece} a tap needs`;
+  return cutSliverText(j.sliver.cut, j.node.rect, j.sliver.minPiece);
 }
 
 /**

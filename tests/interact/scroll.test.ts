@@ -597,14 +597,14 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('no room to scroll it in (the content ends there): fails naming the cut, not "visible"', async () => {
     const fake = new SwiftForm(0);
     await expect(scrollUntilVisible(fake, 'id:details_toggle', FAST)).rejects.toThrow(
-      "element is in the viewport but cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, under the 65 a tap needs — and the content is exhausted",
+      "element is in the viewport but cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across that edge, under the 65 a tap needs — and the content is exhausted",
     );
   });
 
   it('at the bound (maxSwipes: 0): the failure says what it was short of — the cut', async () => {
     const fake = new SwiftForm(1000);
     await expect(scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
-      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736) to a 948x55 part, 55 deep across it, " +
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across that edge, " +
         'under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
     );
     expect(fake.swipes).toEqual([]);
@@ -643,7 +643,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('the stated residual: a WHOLE 50-px row at rest at the list\'s top, its image flush with that top, reads cut — two unmoved strokes up, no stroke back down (it would push it out), and the failure says why', async () => {
     const fake = new TopForm(242, 50, [0, 40], 0);
     await expect(scrollUntilVisible(fake, 'id:row', FAST)).rejects.toThrow(
-      "scroll_until id:row failed after 2 swipes — element is in the viewport but cut at its scroll container's top edge (container 0,242 1080x1736) to a 948x50 part, 50 deep across it, " +
+      "scroll_until id:row failed after 2 swipes — element is in the viewport but cut at its scroll container's top edge (container 0,242 1080x1736); only a 948x50 part of it shows, 50 deep across that edge, " +
         'under the 65 a tap needs — and the content is exhausted: swiping up no longer moves it, and swiping down would only push it out through that edge. ' +
         "The rest of it stays past its container's edge at the end of the content — a layout defect (no room beyond it?), or its own content runs to its edge, which reads as cut; " +
         'a tap refuses it so cut (scroll_until it with direction: up first). Last rect {"x":66,"y":242,"width":948,"height":50} in a 1080x2220 viewport',
