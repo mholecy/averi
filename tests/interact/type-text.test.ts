@@ -65,3 +65,27 @@ describe('assertTypeable names ENTER only for a newline and a return', () => {
     expect(msg).not.toMatch(/into ENTER|a newline/);
   });
 });
+
+/**
+ * Code review of round 7, P2: the remedy after the fate told U+0007, a tab
+ * and ESC to "send the key deliberately — pressKey('enter')" — a key that is
+ * not theirs, and submits the form. `pressKey('enter')` is named for a
+ * newline and a return only (adapters/input-text.ts#controlCharRemedy).
+ */
+describe('assertTypeable names pressKey(\'enter\') as the remedy only for a newline and a return', () => {
+  it.each(['\n', '\r'])('%j: send ENTER deliberately', (ch) => {
+    expect(refusal(`a${ch}b`)).toMatch(/before anything was sent\. Type the text without it and send the key deliberately — pressKey\('enter'\) \(the `press_key` tool, `key: enter`\)\.$/);
+  });
+
+  it('a tab: there is no tab key, and no ENTER', () => {
+    const msg = refusal('a\tb');
+    expect(msg).toMatch(/before anything was sent\. Type the text without it; there is no tab key, so a tab cannot be typed\.$/);
+    expect(msg).not.toContain('pressKey');
+  });
+
+  it.each(['\x00', '\x07', '\x0b', '\x1b', '\x7f'])('%j: no key for it at all, and no ENTER', (ch) => {
+    const msg = refusal(`a${ch}b`);
+    expect(msg).toMatch(/before anything was sent\. Type the text without it; there is no key for it, so it cannot be typed\.$/);
+    expect(msg).not.toMatch(/pressKey|tab key/);
+  });
+});

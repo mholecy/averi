@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
-import { CONTROL_CHAR_RE, inputTextControlFate } from './input-text.js';
+import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -542,8 +542,7 @@ export class AndroidAdapter implements DeviceAdapter {
     if (control !== null) {
       const ch = control[0];
       throw new Error(
-        `typeText cannot type ${JSON.stringify(ch)} on Android: \`input text\` ${inputTextControlFate(ch)}. Type the text without it and send ` +
-          `the key deliberately — pressKey('enter') (the \`press_key\` tool, \`key: enter\`); there is no tab key.`,
+        `typeText cannot type ${JSON.stringify(ch)} on Android: \`input text\` ${inputTextControlFate(ch)}. ${controlCharRemedy(ch)}`,
       );
     }
     for (const ch of text) {

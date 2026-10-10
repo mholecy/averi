@@ -164,13 +164,19 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     ]);
   });
 
-  it.each([['a newline', 'ab\ncd', '"\\n"'], ['a return', 'ab\rcd', '"\\r"'], ['a tab', 'ab\tcd', '"\\t"']])(
+  // The remedy (code review of round 7, P2): pressKey('enter') for a newline and a return only; a tab has no key.
+  it.each([
+    ['a newline', 'ab\ncd', '"\\n"', /pressKey\('enter'\)/],
+    ['a return', 'ab\rcd', '"\\r"', /pressKey\('enter'\)/],
+    ['a tab', 'ab\tcd', '"\\t"', /^(?!.*pressKey).*Type the text without it; there is no tab key, so a tab cannot be typed\.$/],
+    ['a bell', 'ab\x07cd', '"\\u0007"', /^(?!.*pressKey).*Type the text without it; there is no key for it, so it cannot be typed\.$/],
+  ])(
     'typeText refuses %s before sending anything — input text would make it a key (ENTER submits)',
-    async (_name, text, shown) => {
+    async (_name, text, shown, remedy) => {
       const { fn, commands } = deviceShExec();
       const typing = new AndroidAdapter({ serial: 'e', exec: fn }).typeText(text);
       await expect(typing).rejects.toThrow(`typeText cannot type ${shown} on Android`);
-      await expect(typing).rejects.toThrow(/pressKey\('enter'\)/);
+      await expect(typing).rejects.toThrow(remedy);
       expect(commands).toEqual([]);
     },
   );

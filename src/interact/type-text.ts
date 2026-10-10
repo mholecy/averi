@@ -1,4 +1,4 @@
-import { CONTROL_CHAR_RE, inputTextControlFate } from '../adapters/input-text.js';
+import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from '../adapters/input-text.js';
 import type { DeviceAdapter } from '../adapters/types.js';
 
 /**
@@ -12,8 +12,9 @@ import type { DeviceAdapter } from '../adapters/types.js';
  * key event (a newline or a return as ENTER, which submits a form mid-fill —
  * the reason it was refused at all, adb-shell.ts's header); on iOS idb's
  * `ui text` types through HID, where a newline is the Return key too. The
- * deliberate route is `pressKey('enter')` (the `press_key` tool); there is
- * no tab key.
+ * deliberate route for a newline or a return is `pressKey('enter')` (the
+ * `press_key` tool); there is no tab key, nor one for any other control
+ * character (input-text.ts#controlCharRemedy words which).
  *
  * Why here and not in the adapter. Until this review the refusal of `\n`,
  * `\r` and `\t` lived inside the Android adapter's `typeText` only, so:
@@ -56,8 +57,7 @@ export function assertTypeable(value: string): void {
   throw new Error(
     `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
       `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
-      'idb types it as a key press. Refused on both platforms before anything was sent. Type the text without it ' +
-      "and send the key deliberately — pressKey('enter') (the `press_key` tool, `key: enter`); there is no tab key.",
+      `idb types it as a key press. Refused on both platforms before anything was sent. ${controlCharRemedy(ch)}`,
   );
 }
 
