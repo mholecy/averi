@@ -125,7 +125,8 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
 </node>
 </hierarchy>`;
   const tree = parseUiautomatorXml(ACCOUNT_DETAIL);
-  const byId = (id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
+  const byIdIn = (t: UiNode, id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
+  const byId = (id: string) => byIdIn(tree, id);
   const PIXEL = { x: 0, y: 0, width: 1080, height: 2220 };
 
   it('row_0 reads its descendants\' union, the dumped bounds kept as cutBounds; a whole row and the header are left as dumped', () => {
@@ -150,24 +151,85 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(fake.swipes[0].to.y).toBeGreaterThan(fake.swipes[0].from.y);
   });
 
-  it('only descendants spanning it across count, the union is cut to the clipping list, a node outside any list or with no area is left as dumped', () => {
-    const t = parseUiautomatorXml(`<hierarchy rotation="0">
+  it('a tap on the widened row aims at the part clear of the header (66 px), and is refused when what shows is under the minimum tap piece (a 30-px strip) — before, it tapped the strip that showed', async () => {
+    const fake = new FakeAdapter({ list: tree }, 'list');
+    await tapElement(fake, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    expect(fake.taps).toHaveLength(1);
+    const thin = parseUiautomatorXml(ACCOUNT_DETAIL.replace('bounds="[66,480][1014,546]"', 'bounds="[66,516][1014,546]"').replace('[0,401][1080,480]', '[0,401][1080,516]'));
+    expect(byIdIn(thin, 'transactions.list.row_0').rect).toEqual({ x: 66, y: 403, width: 948, height: 143 });
+    const refused = new FakeAdapter({ list: thin }, 'list');
+    const error = await tapElement(refused, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('date_header_0');
+    expect(refused.taps).toEqual([]);
+  });
+
+  /** A list holding `rows`, and — when `overlay` — a bar listed after it over the whole list, as a sticky header or a tab bar is drawn over the rows it cuts. */
+  const listOf = (rows: string, overlay: boolean) =>
+    parseUiautomatorXml(`<hierarchy rotation="0">
 <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
-  <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
-    <node class="android.view.View" resource-id="badge_row" bounds="[66,500][1014,600]"><node class="android.widget.TextView" text="badge" bounds="[900,470][1000,530]" /></node>
-    <node class="android.view.View" resource-id="wider_row" bounds="[66,700][1014,760]"><node class="android.widget.Button" bounds="[0,680][1080,800]" /></node>
-    <node class="android.view.View" resource-id="edge_row" bounds="[66,1950][1014,2000]"><node class="android.widget.Button" bounds="[66,1950][1014,2093]" /></node>
-    <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>
-  </node>
+  <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">${rows}</node>
   <node class="android.view.View" resource-id="unscrolled" bounds="[66,2100][1014,2150]"><node class="android.widget.Button" bounds="[66,2050][1014,2150]" /></node>
+  ${overlay ? '<node class="android.view.View" resource-id="overlay" bounds="[0,400][1080,2000]" />' : ''}
 </node>
 </hierarchy>`);
+  const ROWS = `
+    <node class="android.view.View" resource-id="cut_row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1450][1014,1550]" /></node>
+    <node class="android.view.View" resource-id="badge_row" bounds="[66,500][1014,600]"><node class="android.widget.TextView" text="badge" bounds="[900,470][1000,530]" /></node>
+    <node class="android.view.View" resource-id="wider_row" bounds="[66,700][1014,760]"><node class="android.widget.Button" bounds="[0,680][1080,760]" /></node>
+    <node class="android.view.View" resource-id="both_sides" bounds="[66,1200][1014,1300]"><node class="android.widget.Button" bounds="[66,1190][1014,1310]" /></node>
+    <node class="android.view.View" resource-id="edge_row" bounds="[66,1950][1014,2000]"><node class="android.widget.Button" bounds="[66,1950][1014,2093]" /></node>
+    <node class="android.view.View" resource-id="overhang" bounds="[0,1900][1080,2060]"><node class="android.widget.Button" bounds="[0,1850][1080,2060]" /></node>
+    <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>`;
+
+  it('under a node listed after it: a row whose own button has its exact x and width and reaches past ONE edge is widened along y — no other shape is', () => {
+    const t = listOf(ROWS, true);
     const of = (id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
-    expect(of('badge_row')).not.toHaveProperty('cutBounds');
-    expect(of('wider_row')).toMatchObject({ rect: { x: 0, y: 680, width: 1080, height: 120 }, cutBounds: { x: 66, y: 700, width: 948, height: 60 } });
-    expect(of('edge_row')).not.toHaveProperty('cutBounds');
+    expect(of('cut_row')).toMatchObject({ rect: { x: 66, y: 1450, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+    expect(of('badge_row')).not.toHaveProperty('cutBounds'); // a badge hanging off it
+    expect(of('wider_row')).not.toHaveProperty('cutBounds'); // a full-bleed child: not its exact x and width (code review P1)
+    expect(of('wider_row').rect).toEqual({ x: 66, y: 700, width: 948, height: 60 });
+    expect(of('both_sides')).not.toHaveProperty('cutBounds'); // past both edges: overflow, not a cut (code review P3)
+    expect(of('edge_row')).not.toHaveProperty('cutBounds'); // past the list's edge only: the flush probe's case
     expect(of('collapsed')).not.toHaveProperty('cutBounds');
-    expect(of('unscrolled')).not.toHaveProperty('cutBounds');
+    expect(of('unscrolled')).not.toHaveProperty('cutBounds'); // in no scroll container
+    // What is gained is cut to the list; what was dumped past it stays: grown up to 1850, its bottom kept at 2060.
+    expect(of('overhang')).toMatchObject({ rect: { x: 0, y: 1850, width: 1080, height: 210 }, cutBounds: { x: 0, y: 1900, width: 1080, height: 160 } });
+  });
+
+  it('…and with nothing listed after it on the strip gained, not even that row: its own overflow, not an overlay\'s cut (code review P3)', () => {
+    expect([...everyNode(listOf(ROWS, false))].filter((n) => 'cutBounds' in n)).toEqual([]);
+  });
+
+  it('code review P1: a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="card" bounds="[66,500][1014,900]">
+  <node class="android.widget.TextView" text="Pay now" bounds="[100,520][980,600]" />
+  <node class="android.widget.Button" bounds="[66,500][1014,620]" />
+  <node class="android.view.View" scrollable="true" resource-id="carousel" bounds="[0,640][1080,880]" />
+ </node>
+</node></node></hierarchy>`);
+    const card = [...everyNode(t)].find((n) => n.identifier === 'card')!;
+    expect(card.rect).toEqual({ x: 66, y: 500, width: 948, height: 400 });
+    expect(card).not.toHaveProperty('cutBounds');
+    const label = [...everyNode(t)].find((n) => n.label === 'Pay now')!;
+    expect(drawOrder(t).exposure(label, PIXEL)).toMatchObject({ covers: [], shows: 1 });
+  });
+
+  it('code review P3: a full-width child overflowing its row by 10 px each side does not widen the row over the next one — row_a is not covered by row_b', () => {
+    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row_a" bounds="[0,600][1080,705]">
+  <node class="android.view.View" content-desc="A" clickable="true" bounds="[0,590][1080,716]" />
+ </node>
+ <node class="android.view.View" resource-id="row_b" bounds="[0,705][1080,810]">
+  <node class="android.view.View" content-desc="B" clickable="true" bounds="[0,695][1080,821]" />
+ </node>
+</node></node></hierarchy>`);
+    const a = [...everyNode(t)].find((n) => n.identifier === 'row_a')!;
+    expect(a.rect).toEqual({ x: 0, y: 600, width: 1080, height: 105 });
+    expect(drawOrder(t).exposure(a, PIXEL).covers.map((c) => c.identifier)).not.toContain('row_b');
   });
 
   it('the round-5 ui_snapshots, re-dumped through the parser: only the two rows cut at the floating tab bar widen — every other rect, Contacts\' padded icons (wrapper 132, control 110, label 66) and the IME-cut "Add fields"/"Add phone" among them, stays as dumped', async () => {

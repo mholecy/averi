@@ -6,7 +6,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -979,7 +979,10 @@ export function parseUiautomatorXml(xml: string): UiNode {
   }).parse(xml);
   const roots: RawNode[] = parsed.hierarchy?.node ?? [];
   if (roots.length === 0) throw new Error('uiautomator dump contained no nodes');
-  const children = roots.map((root) => normalizeNode(root));
+  // An arrow, not `roots.map(normalizeNode)`: map would hand its index in as `around`.
+  const grown = new Map<UiNode, Rect>();
+  const children = roots.map((root) => normalizeNode(root, { grown }));
+  widenUnderOverlays(children, grown);
   // The source's mark (types.ts#UiNode.paddedTouchTargets): Compose lists a control's touch target as its wrapper.
   if (children.length === 1) return { ...children[0], paddedTouchTargets: true };
   return {
@@ -988,13 +991,19 @@ export function parseUiautomatorXml(xml: string): UiNode {
   };
 }
 
-/** Where a node lies in the dump: its parent's rect as normalized, and its nearest clipping ancestor's (`UiNode.clipsDescendants`), when it has them. */
+/**
+ * Where a node lies in the dump: its parent's rect as normalized, and its
+ * nearest clipping ancestor's (`UiNode.clipsDescendants`), when it has them;
+ * and the dump's `grown` — each node `uncut` would widen, with the rect,
+ * applied by `widenUnderOverlays` once the whole tree is read.
+ */
 interface Around {
   parent?: Rect;
   clip?: Rect;
+  grown: Map<UiNode, Rect>;
 }
 
-function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
+function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
   const text = emptyToNull(raw.text);
   const contentDesc = emptyToNull(raw['content-desc']);
@@ -1011,7 +1020,7 @@ function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
   const isTextInput = className.endsWith('EditText') || composeTextInput;
   const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
-  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip }));
+  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip, grown: around.grown }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {
     role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),
@@ -1019,15 +1028,12 @@ function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
     // resource-id is "com.example.app:id/login_button" — selectors use the short name
     identifier: emptyToNull(raw['resource-id']?.split('/').pop()),
     value: isTextInput ? text : null,
-    rect: whole ?? rect,
+    rect,
     children,
     // The one fact the role cannot carry: uiautomator has already cut every
     // descendant's bounds to this node (types.ts#UiNode.clipsDescendants —
     // why a flag and not a `scrollable` role for a Compose scroller).
     ...(clips && { clipsDescendants: true as const }),
-    // The bounds as dumped, when they were cut short of the node's own
-    // descendants (types.ts#UiNode.cutBounds): `rect` is their union.
-    ...(whole !== undefined && { cutBounds: rect }),
     // Dumped inverted: wholly outside its container, on this side (types.ts#UiNode.clippedOut).
     ...(clippedOut !== undefined && { clippedOut }),
   };
@@ -1043,6 +1049,7 @@ function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
   // are not dumped as text at all (measured the same day), so need none.
   const hint = isTextInput ? emptyToNull(raw.hint) : null;
   if (hint !== null) node.placeholder = hint;
+  if (whole !== undefined) around.grown.set(node, whole);
   return node;
 }
 
@@ -1052,42 +1059,83 @@ function normalizeNode(raw: RawNode, around: Around = {}): UiNode {
  * bounds-cut-at-a-sticky-header.md): Compose subtracts what an overlay
  * sibling drawn over a node covers from that node's bounds, and not from
  * its descendants' — mp-native's Account Detail row under its sticky date
- * header (`0,401 1080x79`) dumps as `row_0 66,480 948x84`, its own label
+ * header (`0,401 1080x79`) dumps as `row_0 66,480 948x66`, its own label
  * and button as `66,403 948x143`, the row's true rect. The cut rect lies
- * whole in the list and clear of the header, so it read "fully visible";
- * the union lies under the header, which is drawn after it, and every
- * reader of the tree judges what it is.
+ * whole in the list and clear of the header, so it read "fully visible".
+ * Only a CANDIDATE here: `widenUnderOverlays` widens it when a node drawn
+ * after it lies on the strip gained.
  *
- * Only descendants that span the node across — its x and width, or as wide
- * — count: a row's own label or button, which ARE the row, not a badge or
- * an icon hanging off one side. The union is cut to the nearest clipping
- * ancestor's rect, as uiautomator cut the descendants, so a node cut by the
- * list's own edge (or by the display) is not widened past it — the flush
- * probe (interact/scroll-rounds.ts#PROBE_REACH) judges that one — and a
- * node in no clipping container is left as dumped: the overlay cut was
- * measured inside a scroller only. A node with no area (collapsed, or
+ * Only descendants with the node's EXACT x and width count — a row's own
+ * label or button, which ARE the row; not a badge or an icon hanging off
+ * one side, and not a full-bleed child (a carousel breaking out of a
+ * card's padding: counted, it widened the card sideways, and the card's
+ * own button no longer spanned it, so its label read covered — code review
+ * of fix/r7-bounds P1). And the node grows along y alone, on ONE side: a
+ * cut leaves the node's other edge where its descendants' is (row_0's
+ * bottom, 546; the rows cut at the tab bar, their tops), while a child
+ * overflowing both edges (a touch target, an offset) is no cut (code review
+ * P3). Vertical only: every cut measured was a list's row under a bar
+ * across it, and no sideways one was seen. The grown rect is cut to the
+ * nearest clipping ancestor's, as uiautomator cut the descendants, so a node
+ * cut by the list's own edge (or by the display) is not widened past it —
+ * the flush probe (interact/scroll-rounds.ts#PROBE_REACH) judges that one —
+ * and a node in no clipping container is left as dumped: the overlay cut
+ * was measured inside a scroller only. A node with no area (collapsed, or
  * scrolled off) stays so: widening it would make a target of a node the
- * dump says is not shown. Undefined when nothing changes — a control and
- * its padded touch target lie inside their wrapper (I-1, round 6b:
- * wrapper 132, control 110, label 66), so they never widen it.
+ * dump says is not shown. Undefined when nothing grows — a control and its
+ * padded touch target lie inside their wrapper (I-1, round 6b: wrapper
+ * 132, control 110, label 66), so they never widen it.
  */
 function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | undefined {
   if (rectArea(rect) === 0) return undefined;
-  const right = rect.x + rect.width;
   const bottom = rect.y + rect.height;
-  let [l, t, r, b] = [rect.x, rect.y, right, bottom];
+  let [top, low] = [rect.y, bottom];
   for (const child of children) {
     for (const d of everyNode(child)) {
-      const { x, y, width, height } = d.rect;
-      if (rectArea(d.rect) === 0 || x > rect.x || x + width < right) continue;
-      [l, t, r, b] = [Math.min(l, x), Math.min(t, y), Math.max(r, x + width), Math.max(b, y + height)];
+      if (rectArea(d.rect) === 0 || d.rect.x !== rect.x || d.rect.width !== rect.width) continue;
+      [top, low] = [Math.min(top, d.rect.y), Math.max(low, d.rect.y + d.rect.height)];
     }
   }
-  [l, t, r, b] = [Math.max(l, clip.x), Math.max(t, clip.y), Math.min(r, clip.x + clip.width), Math.min(b, clip.y + clip.height)];
-  if (l >= rect.x && t >= rect.y && r <= right && b <= bottom) return undefined;
-  // Never narrower than dumped on a side the clip would cut: only grown.
-  [l, t, r, b] = [Math.min(l, rect.x), Math.min(t, rect.y), Math.max(r, right), Math.max(b, bottom)];
-  return { x: l, y: t, width: r - l, height: b - t };
+  // What is gained is cut to the clip; what was dumped stays, even past it (a wrapper Compose dumps overhanging its list).
+  [top, low] = [Math.min(rect.y, Math.max(top, clip.y)), Math.max(bottom, Math.min(low, clip.y + clip.height))];
+  const grewUp = top < rect.y;
+  const grewDown = low > bottom;
+  if (grewUp === grewDown) return undefined; // nothing gained, or both sides: overflow, not a cut
+  return { ...rect, y: top, height: low - top };
+}
+
+/**
+ * Widen each `grown` node whose gained strip — the part of the grown rect
+ * outside the dumped one — a node listed AFTER it meets (code review of
+ * fix/r7-bounds P3): the overlay that cut it, drawn after it in the dump's
+ * order, lies there — row_0's sticky header, the floating tab bar over the
+ * rows cut at it. A strip nothing later meets is the node's own overflow,
+ * and widening it would make the node overlap what it does not. Judged on
+ * the dumped rects, every decision before any is applied; the dumped rect
+ * is kept as `cutBounds` (types.ts#UiNode.cutBounds). The residual, stated:
+ * a node overflowing one edge into the next row listed after it (a touch
+ * target running into it) reads like a cut and is widened under that row.
+ */
+function widenUnderOverlays(roots: readonly UiNode[], grown: ReadonlyMap<UiNode, Rect>): void {
+  if (grown.size === 0) return;
+  const order = roots.flatMap((root) => [...everyNode(root)]);
+  const after = new Map<UiNode, number>(); // each node's index past its own subtree
+  const walk = (node: UiNode, i: number): number => {
+    let next = i + 1;
+    for (const child of node.children) next = walk(child, next);
+    after.set(node, next);
+    return next;
+  };
+  roots.reduce((i, root) => walk(root, i), 0);
+  const widen = [...grown].filter(([node, whole]) => {
+    const strip: Rect =
+      whole.y < node.rect.y ? { ...whole, height: node.rect.y - whole.y } : { ...whole, y: node.rect.y + node.rect.height, height: whole.y + whole.height - (node.rect.y + node.rect.height) };
+    return order.slice(after.get(node)).some((later) => rectIntersection(later.rect, strip) !== undefined);
+  });
+  for (const [node, whole] of widen) {
+    node.cutBounds = node.rect;
+    node.rect = whole;
+  }
 }
 
 /**

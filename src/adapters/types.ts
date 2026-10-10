@@ -318,23 +318,27 @@ export interface UiNode {
   clipsDescendants?: true;
   /**
    * The bounds the tree source dumped for this node, when they were CUT
-   * short of its own descendants and `rect` is widened to their union
-   * (2026-10-09, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-
-   * at-a-sticky-header.md): Android only, set by the uiautomator parser
-   * (adapters/android.ts#uncut). Compose subtracts what an overlay sibling
-   * covers from a node's bounds but not from its descendants': mp-native's
-   * Account Detail row under its sticky date header (`0,401 1080x79`)
-   * dumped as `66,480 948x84` while its own label and button read
-   * `66,403 948x143` — and the cut rect, whole in the list and clear of the
-   * header, read "fully visible" with 77 of its 143 px under the header.
-   * Widened, the row lies under the header drawn after it, and every
-   * reader — draw order, scroll_until, a rect assert — judges the element
-   * as drawn. Only descendants that span the node across (its x and width,
-   * or as wide) count, the union is cut to the nearest clipping ancestor
-   * (`clipsDescendants`) and only a node inside one with an area is
-   * widened; a control padded inside its wrapper (`paddedTouchTargets`)
-   * never widens it. Kept so `ui_snapshot` shows what was dumped beside
-   * what is judged: "its rect was cut here; something may be drawn over the
+   * short of its own descendants by something drawn over it, and `rect` is
+   * widened to their extent (2026-10-09, docs/bugs/2026-10-09-android-fully-
+   * trusts-row-bounds-cut-at-a-sticky-header.md): Android only, set by the
+   * uiautomator parser (adapters/android.ts#uncut, #widenUnderOverlays).
+   * Compose subtracts what an overlay sibling covers from a node's bounds
+   * but not from its descendants': mp-native's Account Detail row under its
+   * sticky date header (`0,401 1080x79`) dumped as `66,480 948x66` while its
+   * own label and button read `66,403 948x143` — and the cut rect, whole in
+   * the list and clear of the header, read "fully visible" with 77 of its
+   * 143 px under the header. Widened, the row lies under the header drawn
+   * after it: the draw order judges it covered there, `scroll_until`
+   * strokes it out from under the header, a tap aims at the part that
+   * shows (and is refused when that part is under the minimum tap piece),
+   * and a rect assert measures the whole row, not the strip that showed.
+   * Widened only along y, on one side, to descendants with the node's
+   * exact x and width, cut to the nearest clipping ancestor
+   * (`clipsDescendants`), and only where a node listed after it lies on the
+   * strip gained — the overlay; a control padded inside its wrapper
+   * (`paddedTouchTargets`), a full-bleed child and a child overflowing both
+   * edges never widen it. Kept so `ui_snapshot` shows what was dumped beside
+   * what is judged: "its rect was cut here; something is drawn over the
    * rest". Absent on iOS (WDA and idb report frames unclipped) and on every
    * node the parser left as dumped.
    */
