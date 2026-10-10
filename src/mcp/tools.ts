@@ -341,7 +341,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'An EMPTY textfield\'s "value" is often its hint or placeholder text — every tree source reports it that way; where the source also names it (iOS wda, an Android dump with a hint attribute) the node carries "placeholder", and a value equal to it is an empty field. ' +
         'Android: a node that scrolls (scrollable="true" in uiautomator; a Compose scroller keeps role "container") carries "clipsDescendants": true — every rect under it is already cut to its rect, so a row whose edge sits exactly on that rect may be partly hidden there; ' +
         'a node carrying "clippedOut" ("top", "bottom", "left", "right") was dumped with inverted bounds — clipped out above, below, left or right of its scroll container, scrolled past it — and its rect is zero-size at that edge; ' +
-        'a node carrying "cutBounds" was dumped cut short of its own children (something drawn over part of it, e.g. a sticky header): "cutBounds" is the rect as dumped, "rect" its children\'s extent, which averi judges.',
+        'a node carrying "cutBounds" was dumped cut short of its own children by something listed after it drawn over part of it (e.g. a sticky header): "cutBounds" is the rect as dumped, "rect" its children\'s extent, which averi judges — a tap on such a row whose part clear of the header is too small to tap is refused (scroll_until it first), where before it tapped the strip that showed.',
       inputSchema: {
         platform,
         filter: z.string().optional().describe('Selector to filter nodes'),
