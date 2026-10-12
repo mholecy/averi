@@ -442,13 +442,16 @@ export interface TouchedOn {
  *   without (`stops`);
  * - `absent`: not in the last tree, and never in the frame before it —
  *   `unsearched` (2026-10-12, round 8's B1 gap) the side the strokes never
- *   read, when there is evidence it is the only one left: the bound was the
- *   screen unchanged by the caller's own strokes (`exhausted`, `tree`), none
- *   of them touched down on a node drawn over the list, and no stroke was
- *   drawn the other way — every row on the caller's side went through the
- *   tree, so a target this list holds lies on the side it started from.
- *   Without that (maxSwipes, the deadline: more may lie ahead; a stroke the
- *   other way already looked) nothing is guessed;
+ *   read, when there is evidence it is the only one left: a stroke changed
+ *   the screen (`State.treeMoved`), then the caller's own strokes no longer
+ *   did (`exhausted`, `tree`), and none of them touched down on a node drawn
+ *   over the list — the content ran to its end the caller's way, every row
+ *   on that side through the tree, so a target this list holds lies on the
+ *   side it started from. Without that (maxSwipes, the deadline: more may
+ *   lie ahead; a screen no stroke ever changed: the swipes may not have
+ *   been taken) nothing is guessed. Every stroke of a scroll that never
+ *   found its target goes the caller's way (a turn needs a sighting), so
+ *   the other side was never stroked;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
  *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
@@ -805,6 +808,8 @@ interface State {
   readonly strokeWithin: Rect | undefined;
   /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
   readonly prevFingerprint: string | undefined;
+  /** A read after a stroke found the whole tree changed from the read before — the content moved at least once (`Shortfall.absent`'s `unsearched`: not a screen no stroke ever changed). */
+  readonly treeMoved: boolean;
   readonly treeUnmovedStrokes: number;
 }
 
@@ -885,6 +890,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     strokeWithin: undefined,
     prevFingerprint: undefined,
     treeUnmovedStrokes: 0,
+    treeMoved: false,
   };
   return state as unknown as Rounds;
 }
@@ -1281,6 +1287,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST,
     // 2026-10-09): the same streak rule, over the fingerprint.
     const treeUnmoved = s.prevFingerprint === fingerprint && !loading;
+    if (s.prevFingerprint !== undefined && s.prevFingerprint !== fingerprint) s.treeMoved = true;
     const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
     s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
     // Every match, not only the judged one, for "exhausted" (review round
@@ -1335,8 +1342,11 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // way up but across both edges the other is not turned for. Or dumped
     // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
     const beyond = beyondFarEdgeIn(farFacts(best), s.rules.direction, frames);
+    // Kept whatever the target showed: only a read with none of it in the
+    // frame reaches the failure's `past` (`left` needs it never in the
+    // frame, `offFrame` this read's match at visible 0).
     const { far } = FAR_EDGE[s.rules.direction];
-    s.lastPast = beyond && best.visible === 0 ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
+    s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
     // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
     // band.md): across it — clipped there, or its centre in iOS's status
@@ -1823,15 +1833,15 @@ function shortfall(s: State, readError: Error | undefined, found: readonly UiNod
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
   const left = s.inFrameAfter;
-  const untried = (side: Edge) => !s.strokedToward.includes(REVEALS[side]);
-  const past = s.lastPast !== undefined && untried(s.lastPast.side) ? s.lastPast : undefined;
+  const past = s.lastPast !== undefined && !s.strokedToward.includes(REVEALS[s.lastPast.side]) ? s.lastPast : undefined;
   if (found.length === 0) {
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
-    const { far } = FAR_EDGE[s.rules.direction];
-    const ranToEnd = by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined && untried(far);
-    return { of: 'absent', ...(ranToEnd && { unsearched: far }) };
+    // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
+    const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
+    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[s.rules.direction].far }) };
   }
+  // In the tree: `judge` scores every match, so this read judged one and `past` is this read's.
   return {
     of: 'offFrame',
     rect: (best?.node ?? found[0]).rect,
@@ -1839,6 +1849,6 @@ function shortfall(s: State, readError: Error | undefined, found: readonly UiNod
     viewport,
     ...(cover !== undefined && { cover }),
     eitherWayUp: s.frame.boxes.length > 1 && cover?.above === undefined,
-    ...(best !== undefined && past !== undefined && { past }),
+    ...(past !== undefined && { past }),
   };
 }
