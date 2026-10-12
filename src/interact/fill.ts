@@ -379,11 +379,13 @@ export async function fillField(
     if (observed !== undefined && !tookText(observed)) {
       readBack = { kind: 'not-taken' };
     } else if (observed !== undefined && !landed(observed)) {
+      let retried: { wiped: boolean } | undefined;
       if (clear) {
         // What the field holds: a field showing only its placeholder (the
         // typing never landed) gets no deletes.
         const wipe = heldText(observed, placeholder).length;
         if (wipe > 0) await adapter.clearText(wipe);
+        retried = { wiped: wipe > 0 };
         await adapter.typeText(value);
         observed = await pollValue(refetchValue, landed, pollMs);
       }
@@ -395,6 +397,7 @@ export async function fillField(
           shows: observed.length,
           differs: differenceOf({ observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
           notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
+          ...(retried !== undefined && { retried }),
         });
       }
     }

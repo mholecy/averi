@@ -233,12 +233,22 @@ export type ReadBack =
  *   (`typed`, `shows`: the two lengths), after the clear-fill's one retry;
  *   `differs` says what can be said of the difference without content;
  *   `notInput` when the matched node is not an input (the nearest input,
- *   as FillResult.notInput).
+ *   as FillResult.notInput); `retried` when that retry ran (`clear`) —
+ *   `wiped` when it deleted what the field held first, else it only typed
+ *   again (the field showed nothing, or its placeholder) — so the error
+ *   says the read-back is the second (round 8's D3 nit, 2026-10-12).
  */
 export type FillFailure =
   | { code: 'reread-failed'; target: string; cause: string }
   | { code: 'clear-twice'; left: number; rounds: number }
-  | { code: 'mismatch'; typed: number; shows: number; differs: Difference; notInput?: { role: string; input: NearbyInput | 'none' | 'unread' } };
+  | {
+      code: 'mismatch';
+      typed: number;
+      shows: number;
+      differs: Difference;
+      notInput?: { role: string; input: NearbyInput | 'none' | 'unread' };
+      retried?: { wiped: boolean };
+    };
 
 /**
  * What differs between the typed value and a read-back that did not match

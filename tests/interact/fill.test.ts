@@ -151,7 +151,7 @@ describe('fillField — focus, clear, type, verify', () => {
       stubborn.deletes.push(count); // nothing ever leaves the field
     };
     await expect(fillField(stubborn, { id: 'amount_input' }, '7', { ...FAST, clear: true })).rejects.toThrow(
-      'fill: typed 1 character but the field shows 6 (content withheld from this error)',
+      'fill: typed 1 character (after one wipe and retype) but the field shows 6 (content withheld from this error)',
     );
     expect(stubborn.deletes).toEqual([4, 5]); // the unchanged round, then the retry's wipe of "2.507"
     expect(stubborn.typed).toEqual(['7', '7']);
@@ -566,7 +566,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
       live().value = (live().value ?? '').slice(0, -count) || null;
     };
     await expect(fillField(fake, 'id:title', 'abc', { ...FAST, clear: true })).rejects.toThrow(
-      /^fill: typed 3 characters but the field shows 4 \(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"name"/,
+      /^fill: typed 3 characters \(after one wipe and retype\) but the field shows 4 \(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"name"/,
     );
     expect(fake.deletes).toEqual([4]); // the retry's wipe of what it showed: "abc!"
   });
@@ -1017,7 +1017,7 @@ describe('fillField — the mismatch error says what differs, without content (2
     const fake = transforming('old', capitalise);
     const message = await failureOf(fillField(fake, { id: 'notes' }, 'hello world', { ...FAST, clear: true }));
     expect(fake.typed).toEqual(['hello world', 'hello world']);
-    expect(message).toMatch(/^fill: typed 11 characters but the field shows 11 — the typed text is there but for letter case, 1 character differing:/);
+    expect(message).toMatch(/^fill: typed 11 characters \(after one wipe and retype\) but the field shows 11 — the typed text is there but for letter case, 1 character differing:/);
   });
 
   it('no clear onto held text: the typed text is found in the field but for case, however long the field', async () => {
@@ -1033,7 +1033,7 @@ describe('fillField — the mismatch error says what differs, without content (2
 
   it('with clear the field must EQUAL the value: a longer field holding it but for case is a length difference, not a case one', async () => {
     const message = await failureOf(fillField(transforming(null, (s) => `Re: ${capitalise(s)}`), { id: 'notes' }, 'hello', { ...FAST, clear: true }));
-    expect(message).toBe('fill: typed 5 characters but the field shows 9 (content withheld from this error)');
+    expect(message).toBe('fill: typed 5 characters (after one wipe and retype) but the field shows 9 (content withheld from this error)');
   });
 
   it('a masked field with clear says it compared by length, and names no held count (the clear emptied it)', async () => {
@@ -1041,7 +1041,7 @@ describe('fillField — the mismatch error says what differs, without content (2
     const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'pw', value: '••••' })) }, 'form');
     appendBullets(fake, 1);
     const message = await failureOf(fillField(fake, { id: 'pw' }, 'secret', { ...FAST, clear: true }));
-    expect(message).toBe('fill: typed 6 characters but the field shows 5 (masked field — compared by length)');
+    expect(message).toBe('fill: typed 6 characters (after one wipe and retype) but the field shows 5 (masked field — compared by length)');
   });
 
   it('same length, more than case (autocorrect `teh` → `the`): how many characters differ', async () => {
@@ -1096,7 +1096,7 @@ describe('fillField — a textfield whose null value is empty: a dropped fill is
     const error = await failureOf(fillField(fake, { id: 'amount_input' }, 'abc', { ...FAST, clear: true }));
     expect(fake.deletes).toEqual([]);
     expect(fake.typed).toEqual(['abc', 'abc']);
-    expect(error.message).toMatch(/^fill: typed 3 characters but the field shows 0 — the field did not change/);
+    expect(error.message).toMatch(/^fill: typed 3 characters \(after typing it once more\) but the field shows 0 — the field did not change/); // nothing held: no wipe
   });
 
   it('digits into the same field still land', async () => {

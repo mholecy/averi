@@ -252,8 +252,8 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
     'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
     'xcrun simctl list), then retry with clear: true so the field is reset',
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
-  mismatch: ({ typed, shows, differs, notInput }) =>
-    `fill: typed ${charactersText(typed)} but the field shows ${shows}` +
+  mismatch: ({ typed, shows, differs, notInput, retried }) =>
+    `fill: typed ${charactersText(typed)}${retried === undefined ? '' : retried.wiped ? ' (after one wipe and retype)' : ' (after typing it once more)'} but the field shows ${shows}` +
     DIFFERENCE_TEXT[differs.kind](differs as never) +
     (notInput === undefined ? '' : `; ${caveatText({ code: 'not-input', role: notInput.role, typed: true, input: notInput.input })}`),
 };
