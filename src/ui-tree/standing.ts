@@ -6,8 +6,6 @@ import {
   clippedEdges,
   clipsOf,
   containsPoint,
-  inNavigationBand,
-  inStatusBand,
   overlapsPastSlack,
   rectCentre,
   screenOf,
@@ -221,6 +219,9 @@ export type SystemBar = { readonly edge: 'top'; readonly bottom: number } | { re
 /** The navigation bar: the system bar at the screen's bottom. */
 export type NavigationBar = Extract<SystemBar, { readonly edge: 'bottom' }>;
 
+/** The status bar: the system bar at the screen's top. */
+type StatusBar = Extract<SystemBar, { readonly edge: 'top' }>;
+
 /** What a standing was judged from — every kind carries them. */
 export interface StandingFacts {
   /** The point a tap presses (selectors.ts#tapPoint). */
@@ -338,24 +339,27 @@ interface Judged {
 /** Where a point lies: on the screen, off it, or in a system band. */
 type PointPlace = 'on' | 'off' | { readonly bar: SystemBar };
 
+/** A system band on a box: the bar it is, as a sentence quotes it, and its rect on the box. */
+interface SystemBand<B extends SystemBar = SystemBar> {
+  readonly bar: B;
+  readonly band: Rect;
+}
+
 /** Where the pixel assert's region lies: on the screen, in a system band (with the band's rect), or under the band a keyboard line marks — never off the screen. */
 type RegionPlace = 'on' | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /** The no-screen boxes: the tree's root rect, or none (undefined) when it has no area — every point on the screen. */
 const rootBoxes = (tree: UiNode): Rect[] | undefined => (rectArea(tree.rect) > 0 ? [tree.rect] : undefined);
 
-/** `box` less both system bands, judged on its own shape. */
-const lessSystemBands = (box: Rect, bands: Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined): Rect =>
-  aboveNavigationBand(belowStatusBand(box, bands), bands, box);
-
-/** Where `point` lies against `boxes` (none: on, failing open) and their system bands: on, in the top band, in the bottom band (in that order), or off. */
-function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined): PointPlace {
-  if (boxes === undefined || boxes.some((box) => containsPoint(lessSystemBands(box, bands), point))) return 'on';
-  // The bands only: `bands` may be a whole screen, whose own `boxes` must not stand in for the ones judged (the stop's box alone).
-  const judged = { boxes, statusBand: bands?.statusBand, navigationBand: bands?.navigationBand };
-  if (inStatusBand(point, judged)) return { bar: { edge: 'top', bottom: bands?.statusBand ?? 0 } };
-  if (inNavigationBand(point, judged)) return { bar: { edge: 'bottom', top: bands?.navigationBand ?? 0 } };
-  return 'off';
+/** Where `point` lies against `boxes` (none: on, failing open) and their system bands (`systemBands`): on, in the top band, in the bottom band (in that order), or off. */
+function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands): PointPlace {
+  if (boxes === undefined) return 'on';
+  const judged = boxes.map((box) => systemBands(box, bands));
+  if (judged.some(({ clear }) => containsPoint(clear, point))) return 'on';
+  const top = judged.find((b) => b.top !== undefined && containsPoint(b.top.band, point))?.top;
+  if (top !== undefined) return { bar: top.bar };
+  const bottom = judged.find((b) => b.bottom !== undefined && containsPoint(b.bottom.band, point))?.bottom;
+  return bottom === undefined ? 'off' : { bar: bottom.bar };
 }
 
 /**
@@ -370,21 +374,42 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelPurpose, box: Rect
     const band = bandRect(keyboardTop, box);
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
   }
-  const { top, bottom } = systemBands(box, bands);
-  if (top !== undefined && overlapsPastSlack(reads, top)) return { bar: { edge: 'top', bottom: bands?.statusBand ?? 0 }, band: top };
-  if (bottom !== undefined && overlapsPastSlack(reads, bottom)) return { bar: { edge: 'bottom', top: bands?.navigationBand ?? 0 }, band: bottom };
-  return 'on';
+  return systemBandOver(reads, box, bands) ?? 'on';
 }
 
-/** The system bands' rects on `box`, each only where it has height (portrait, and a band read): the status band at its top, the navigation band at its bottom. */
-function systemBands(box: Rect, bands: Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined): { top?: Rect; bottom?: Rect } {
+/**
+ * The system band `rect` overlaps past PIXEL_OVERLAP_SLACK on `box`
+ * (geometry.ts#overlapsPastSlack) — the status band's before the
+ * navigation band's — or undefined.
+ * docs/adr/0002-pixel-overlap-slack.md
+ */
+function systemBandOver(rect: Rect, box: Rect, bands: Bands): SystemBand | undefined {
+  const { top, bottom } = systemBands(box, bands);
+  if (top !== undefined && overlapsPastSlack(rect, top.band)) return top;
+  if (bottom !== undefined && overlapsPastSlack(rect, bottom.band)) return bottom;
+  return undefined;
+}
+
+/** The screen's system bands, as `StandingScreen` carries them. */
+type Bands = Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined;
+
+/**
+ * THE system bands of `box`, derived once for every judgement: `clear`,
+ * the box less both, judged on its own shape (geometry.ts#belowStatusBand,
+ * then geometry.ts#aboveNavigationBand — a navigation band reaching above
+ * the status band's bottom fails open); and each band only where it has
+ * height on the box (portrait, and a band read) — the status band at its
+ * top, the navigation band at its bottom, each with its bar.
+ */
+function systemBands(box: Rect, bands: Bands): { clear: Rect; top?: SystemBand<StatusBar>; bottom?: SystemBand<NavigationBar> } {
   const below = belowStatusBand(box, bands);
-  // Below the status band, as the tap's box (`lessSystemBands`): a navigation band reaching above it fails open.
-  const above = aboveNavigationBand(below, bands, box);
-  const bottomTop = above.y + above.height;
+  const clear = aboveNavigationBand(below, bands, box);
+  const boxBottom = box.y + box.height;
+  const bottomTop = clear.y + clear.height;
   return {
-    ...(below.y > box.y && { top: { ...box, height: below.y - box.y } }),
-    ...(bottomTop < box.y + box.height && { bottom: { ...box, y: bottomTop, height: box.y + box.height - bottomTop } }),
+    clear,
+    ...(below.y > box.y && { top: { bar: { edge: 'top', bottom: bands?.statusBand ?? 0 }, band: { ...box, height: Math.min(below.y, boxBottom) - box.y } } }),
+    ...(bottomTop < boxBottom && { bottom: { bar: { edge: 'bottom', top: bands?.navigationBand ?? 0 }, band: { ...box, y: bottomTop, height: boxBottom - bottomTop } } }),
   };
 }
 
@@ -499,7 +524,7 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
 function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
   const { scene, node } = judged;
-  const box = lessSystemBands(chosen, bands);
+  const box = systemBands(chosen, bands).clear;
   const within = aboveLine(box, line);
   const unwitnessed = line?.witnessed === false ? line : undefined;
   const frame = unwitnessed === undefined ? box : within;
@@ -547,7 +572,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
     if ('keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
     return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, band: place.band };
   })();
-  const cut: PixelStanding | undefined = flush === undefined ? undefined : { facts, kind: 'cut', bar: { edge: 'bottom', top: bands?.navigationBand ?? 0 }, container: flush };
+  const cut: PixelStanding | undefined = flush === undefined ? undefined : { facts, kind: 'cut', ...flush };
   return ordered<PixelStanding>(placed, cut, cover, undefined, { facts, kind: 'reachable', at: facts.centre });
 }
 
@@ -560,6 +585,27 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
 export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >= rectArea(box) * SCREEN_SIZED_FRACTION;
 
 /**
+ * `rect` is a full-bleed header on `box`: laid from the box's top edge at its
+ * full width (iOS's, or Android 15+'s edge-to-edge app bar under the status
+ * band). No scroll moves it out from under the status bar — a pinned
+ * header's place, verify/pixel-poll.ts's remedy.
+ */
+export const fullBleedHeader = (rect: Rect, box: Rect): boolean => rect.y <= box.y && rect.x <= box.x && rect.x + rect.width >= box.x + box.width;
+
+/**
+ * The pixel assert's screen (D6): ONE box, the usable screen's `oriented`
+ * — the gesture's box — never `boxes`, with the device's system bands. The
+ * other orientation of a turn suggested but not witnessed is never judged.
+ * docs/adr/0012-pixel-assert-residuals-d4-d6.md
+ */
+export const singleBox = (usable: UsableScreen): StandingScreen => ({
+  box: usable.oriented,
+  boxes: [usable.oriented],
+  statusBand: usable.statusBand,
+  navigationBand: usable.navigationBand,
+});
+
+/**
  * The node's cut at the navigation bar, as the tree can tell it (N-b,
  * ADR 0009): its bottom flush, within a unit, with the band's top
  * (geometry.ts#flushEdges' unit), inside a clipping scroller
@@ -567,15 +613,15 @@ export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >=
  * it at the window's visible frame and left no evidence (no `cutBounds`,
  * no content past the edge). A node in no such scroller (a non-edge-to-edge
  * app's pinned bottom bar, ending at the band's top) is whole. Only on a
- * portrait box with a band (`systemBands`). The scroller's rect, or
- * undefined.
+ * portrait box with a band (`systemBands`). The bar and the scroller's
+ * rect, or undefined.
  * docs/adr/0009-android-navigation-band.md
  */
-function cutAtNavigationBar(node: UiNode, box: Rect, bands: StandingScreen | undefined, scene: Pick<Scene, 'clips'>): Rect | undefined {
+function cutAtNavigationBar(node: UiNode, box: Rect, bands: Bands, scene: Pick<Scene, 'clips'>): { bar: NavigationBar; container: Rect } | undefined {
   const { bottom } = systemBands(box, bands);
   if (bottom === undefined) return undefined;
-  const on = (y: number) => Math.abs(y - bottom.y) <= 1;
+  const on = (y: number) => Math.abs(y - bottom.band.y) <= 1;
   if (!on(node.rect.y + node.rect.height)) return undefined;
   const container = scene.clips.scrollersOf(node).find((c) => on(c.y + c.height));
-  return container === undefined ? undefined : { ...container };
+  return container === undefined ? undefined : { bar: bottom.bar, container: { ...container } };
 }

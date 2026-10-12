@@ -579,14 +579,6 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
 }
 
 /**
- * `point` lies on the screen but in its status band: inside one of `boxes`,
- * and inside none of them less the band (`belowStatusBand`). The tap's
- * and the stop's standing (ui-tree/standing.ts#Scene.standing) asks it.
- */
-export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; statusBand?: number }): boolean =>
-  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
-
-/**
  * `box` less the screen's navigation band (`DeviceScreen.navigationBand`,
  * the band's TOP line, carried as ui-tree/usable-screen.ts#UsableScreen's) at its
  * bottom when `box` is portrait — `belowStatusBand`'s twin at the other
@@ -601,10 +593,6 @@ export function aboveNavigationBand(box: Rect, screen: { navigationBand?: number
   if (top === undefined || top <= box.y || shape.height <= shape.width) return box;
   return { ...box, height: Math.max(0, Math.min(box.y + box.height, top) - box.y) };
 }
-
-/** `point` lies on the screen but in its navigation band: inside one of `boxes`, and inside none of them less the band (`aboveNavigationBand`) — `inStatusBand`'s twin. */
-export const inNavigationBand = (point: Point, screen: { boxes: readonly Rect[]; navigationBand?: number }): boolean =>
-  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(aboveNavigationBand(box, screen), point));
 
 /**
  * How thick, in tree units (points on iOS, pixels on Android), an overlap

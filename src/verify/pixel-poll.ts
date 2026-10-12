@@ -1,11 +1,12 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { systemBarName } from '../interact/resolve.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { nodeText, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
 import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, screenSized, type Scene } from '../ui-tree/standing.js';
+import { fullBleedHeader, sceneOf, screenSized, singleBox, type Scene } from '../ui-tree/standing.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
@@ -483,7 +484,7 @@ async function judgeOver(
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
   const screen = usable.oriented;
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
-  const standing = scene.standing(element, { box: screen, boxes: [screen], statusBand: usable.statusBand, navigationBand: usable.navigationBand }, purpose);
+  const standing = scene.standing(element, singleBox(usable), purpose);
   if (standing.kind === 'reachable') return undefined;
   if (standing.kind === 'underKeyboard') return keyboardOver(element.rect, standing.band, keyboard.remedy);
   const at = `(element ${rectText(element.rect)}`;
@@ -491,12 +492,10 @@ async function judgeOver(
   const pinned = scene.clips.inScroller(element) !== true;
   // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
   // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
-  const sized = screenSized(element.rect, screen);
-  const fullBleed = element.rect.y <= screen.y && element.rect.x <= screen.x && element.rect.x + element.rect.width >= screen.x + screen.width;
-  const never = sized ? 'screen' : fullBleed ? 'header' : undefined;
+  const never = screenSized(element.rect, screen) ? 'screen' : fullBleedHeader(element.rect, screen) ? 'header' : undefined;
   switch (standing.kind) {
     case 'systemBar': {
-      const bar = standing.bar.edge === 'top' ? 'status bar' : 'navigation bar';
+      const bar = systemBarName(standing.bar.edge);
       // Laid from the screen's top edge, under the status bar: a scroll may not move it (a pinned header's place).
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
       return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(never ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
