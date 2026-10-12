@@ -1032,9 +1032,65 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     expect((error as Error).message).toBe(
       `${TOGGLE} is cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, ` +
         '55 deep across that edge, under the 65 a tap needs — scroll_until it first' +
-        ' (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates); nothing was tapped',
+        ' (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates); nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  /** The toggle as dumped at 35d5997 (the device check's re-run): its leaf label, a chevron, its button. */
+  const dumpedToggle = (y: number, height: number) => {
+    const cut = (top: number, h: number) => ({ x: 66, y: top, width: 948, height: Math.min(h, 1978 - top) });
+    return node({
+      role: 'container',
+      identifier: 'swift_payment.form.details_toggle',
+      rect: { x: 66, y, width: 948, height },
+      children: [
+        node({ role: 'other', label: 'Payment details', rect: cut(y + 12, 108) }),
+        node({ role: 'other', identifier: 'chevron', rect: { x: 926, y: y + 31, width: 88, height: Math.min(66, 1978 - (y + 31)) } }),
+        node({ role: 'button', rect: cut(y + 12, 108) }),
+      ],
+    });
+  };
+
+  it('the cut toggle\'s leaf label "Payment details" 66,1936 948x42, flush with the edge the toggle is a sliver at (round 8, A2 residual: tapped at (540,1957), nothing expanded): refused like its toggle, naming it', async () => {
+    const fake = swiftForm(dumpedToggle(1924, 55));
+    const error = await tapElement(fake, 'label:"Payment details"', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ClippedRefusal);
+    expect((error as Error).message).toBe(
+      'label:"Payment details" is cut at its scroll container\'s bottom edge (container 0,242 1080x1736), as is the 66,1924 948x55 it lies in; ' +
+        'only a 948x42 part of it shows, 42 deep across that edge, under the 65 a tap needs — scroll_until it first' +
+        ' (if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates); nothing was tapped',
+    );
+    await expect(tapElement(fake, 'id:chevron', OPTS)).rejects.toBeInstanceOf(ClippedRefusal);
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('the same label in the toggle wholly on screen (A2.2: 66,1793 948x132): tapped at its centre', async () => {
+    const fake = swiftForm(dumpedToggle(1793, 132));
+    await tapElement(fake, 'label:"Payment details"', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 1859 }]);
+  });
+
+  it('A2.4: Create contact\'s label "Company" 176,1373 190x25 flush with the IME-cut form\'s bottom (1398), its field cut there 91 deep — not a sliver: tapped at (271,1386), as measured to focus the field', async () => {
+    const field = node({
+      role: 'textfield',
+      rect: { x: 132, y: 1307, width: 816, height: 91 },
+      children: [
+        node({ role: 'other', rect: { x: 132, y: 1329, width: 816, height: 69 } }),
+        node({ role: 'text', label: 'Company', identifier: 'company', rect: { x: 176, y: 1373, width: 190, height: 25 } }),
+        node({ role: 'other', rect: { x: 176, y: 1340, width: 728, height: 58 } }),
+      ],
+    });
+    const form = node({
+      role: 'container',
+      clipsDescendants: true,
+      rect: { x: 0, y: 242, width: 1080, height: 1156 },
+      children: [node({ role: 'container', rect: { x: 132, y: 1307, width: 948, height: 91 }, children: [field, node({ role: 'other', rect: { x: 948, y: 1346, width: 132, height: 52 } })] })],
+    });
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [form] }) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    await tapElement(fake, 'text:"Company"', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 271, y: 1386 }]);
   });
 
   it('the same toggle wholly on screen (66,1793 948x132): tapped at its centre (540,1859), as measured to expand it', async () => {

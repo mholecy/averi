@@ -82,7 +82,7 @@ export interface DrawOrder {
    * ancestor or a descendant: its own rows scroll with it. The container is
    * found by its rect: the outermost clipping node (`clipsDescendants`)
    * with that rect outside the keyboard, since the round carries containers
-   * as rects (geometry.ts#scrollersOf, #largestScroller). UNDEFINED when this
+   * as rects (geometry.ts#clipsOf's `scrollersOf`, #largestScroller). UNDEFINED when this
    * tree has no such container (a rect of another read — the list has moved
    * since), so the caller can tell "nothing over it" from "not asked of this
    * tree".
