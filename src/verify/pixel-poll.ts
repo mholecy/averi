@@ -365,10 +365,11 @@ class PixelPollMemory {
  * pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on
  * the usable screen (`judgeOver`), given idb's band as its keyboard line
  * (ui-tree/keyboard-cover.ts#keyboardEdge — no reading stands by it:
- * idb's reading is `unknown`; docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md), so an element its band meets
- * is the same keyboard miss, quoting the band, and its keys are no covers
- * named instead. `reads`: what the measurement reads (`PixelPollSpec.reads`;
- * the whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert).
+ * idb's reading is `unknown`), so an element its band meets is the same
+ * keyboard miss, quoting the band, and its keys are no covers named
+ * instead. `reads`: what the measurement reads (`PixelPollSpec.reads`; the
+ * whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert).
+ * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  *
  * The reading's two rects are in the same units: on Android both are device
  * pixels, read from the same `[l,t][r,b]` notation by the same
@@ -434,11 +435,10 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * #Scene.standing, which owns the rule: what counts as over what it reads,
  * in which order), worded — a system band (the status bar's, then the
  * navigation bar's), the navigation bar's possible cut, then the app's own
- * covers, or undefined when nothing is over it (it fails closed:
- * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md). The screen is the usable screen's single
- * `oriented` box (ui-tree/standing.ts#usableScreen, which owns the
- * derivation; D6, docs/adr/0012-pixel-assert-residuals-d4-d6.md), with the device's system bands
- * — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
+ * covers, or undefined when nothing is over it (it fails closed, ADR
+ * 0001). The screen is the usable screen's single `oriented` box
+ * (ui-tree/standing.ts#usableScreen, which owns the derivation; D6, ADR
+ * 0012), with the device's system bands — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
  * gesture, so under a rectless root whose largest node is a scroll view's
  * tall content (402x2000 under a 402x874 window) a window-sized element is
@@ -452,25 +452,26 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * (`cut`: the ocr crop would read only what shows — scroll it up).
  *
  * The remedy is `scroll_until … fully: true`; it adds "assert something
- * in it that lies clear of that" (the tap's sliver hint's words, "tap
- * something in it that lies clear of that edge") when a scroll may not
+ * in it that lies clear of that" when a scroll may not
  * cure it: the element lies in no scroll view as far as the tree says
  * (`Clips.inScroller` false — or undefined: idb's flat list has no
  * ancestry, so EVERY idb miss carries the clause), it is laid from the
  * screen's top edge under the status bar, or the cover holds the element
  * whole. Not for an element reaching the screen's bottom under the
- * navigation bar (docs/adr/0011-no-stuck-clause-at-the-bottom-edge.md).
- * For the screen ITSELF — an element screen-sized
+ * navigation bar (ADR 0011). For the screen ITSELF — an element screen-sized
  * (ui-tree/standing.ts#screenSized) — no scroll can cure it, and the
  * remedy leads with the child; so too for an element laid from the
  * screen's top edge at full width, a full-bleed header — iOS's, or
  * Android 15+'s edge-to-edge app bar (`0,0 1080x220` under the 66-px band
- * fails a colour assert closed, docs/adr/0001-pixel-assert-fails-closed-on-chrome.md) — whose remedy leads
+ * fails a colour assert closed, ADR 0001) — whose remedy leads
  * with "assert something in it that lies clear of that (its title, say)":
  * the title, below the band, is judged on its own and passes. For idb's
  * flat-list root (`covered.overRoot`: its Application node, screen-sized,
  * and never a full-bleed header in a flat list) it says the node named is
  * content drawn over the root's background.
+ * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
+ * docs/adr/0011-no-stuck-clause-at-the-bottom-edge.md
+ * docs/adr/0012-pixel-assert-residuals-d4-d6.md
  */
 async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
@@ -510,17 +511,22 @@ async function judgeOver(
       const root = standing.overRoot === true ? 'root' : never;
       return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, standing.reach) ? 'stuck' : 'scroll'))}`;
     }
+    default: {
+      // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).
+      const unworded: never = standing;
+      throw new Error(`pixel assert: a standing ${(unworded as { kind: string }).kind} with no sentence`);
+    }
   }
 }
 
 /**
- * What to do about a pixel assert's element under chrome (`judgeOver`), worded as the tap's sliver hint
- * ("tap something in it that lies clear of that edge"): `scroll` — scroll it clear; `stuck` — that, or, when a
+ * What to do about a pixel assert's element under chrome (`judgeOver`): `scroll` — scroll it clear; `stuck` — that, or, when a
  * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
  * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
  * for an element laid from the screen's top edge at full width, a full-bleed header, whose title, clear of the band,
- * is what to assert (docs/adr/0001-pixel-assert-fails-closed-on-chrome.md); `root` — the screen, for idb's flat-list root,
+ * is what to assert; `root` — the screen, for idb's flat-list root,
  * whose cover is the app's own content laid on its background.
+ * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
 const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): string => {
   const child = 'assert something in it that lies clear of that';

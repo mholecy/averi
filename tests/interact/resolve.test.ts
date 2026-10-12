@@ -818,6 +818,14 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     return fake;
   };
 
+  it('a piece above the keyboard band large enough: tapped there, and the result says it was above the soft keyboard', async () => {
+    // The keyboard up from y 1380, clear of the centre (540,1250): the strip 1300–1380 (80 px, over the 65 minimum) is the piece.
+    const up = androidSheet(1380);
+    const result = await tapElement(up, 'id:row', OPTS);
+    expect(up.tapPoints).toEqual([{ x: 540, y: 1340 }]);
+    expect(result.moved).toBe('at (540,1340) — its centre (540,1250) is under button "Next" (0,1100 1080x200), drawn over it; tapped the uncovered part 1080x80 above the soft keyboard');
+  });
+
   it('the keyboard is no cover node, but a piece under its band is not tapped: the band is read again only when the centre is covered, and cut away', async () => {
     const hidden = androidSheet();
     const events = recorded(hidden);
@@ -872,6 +880,25 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     const under = await tapElement(fake, 'label:"Card payment, 15.12.2025, -12.00 EUR"', OPTS).catch((e: unknown) => e);
     expect(under).toBeInstanceOf(CoveredRefusal);
     expect(fake.tapPoints).toEqual([]);
+  });
+
+  /** A fake on one screen of the round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json); its taps recorded by point (the snapshot's Compose nodes carry no ids for the fake to hit). */
+  const snapshot = async (screen: string) => {
+    const { screens } = JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+    // The root marked as the parser marks every uiautomator root since the snapshots were taken (types.ts#UiNode.paddedTouchTargets).
+    const fake = new FakeAdapter({ s: { ...screens[screen], paddedTouchTargets: true } }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    fake.tap = async (x, y) => {
+      fake.tapPoints.push({ x, y });
+    };
+    return fake;
+  };
+
+  it('the real Account Detail snapshot (one integration case; the other snapshots are rows of tests/ui-tree/standing.test.ts): a row\'s label node clear of the tab bar is fully visible after 0 swipes; the row cut at the tab bar\'s top is tapped at its title\'s centre', async () => {
+    const fake = await snapshot('accountDetail');
+    expect(await scrollUntilVisible(fake, 'label:"Loan repayment, 04.01.2026, +91.00 EUR"', { maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await tapElement(fake, 'text:"+493"', OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
+    expect([fake.tapPoints, fake.swipes]).toEqual([[{ x: 782, y: 1836 }], []]);
   });
 
   it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE keeps the layout-defect diagnosis', async () => {

@@ -972,6 +972,27 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
     expect(said(sceneOf(t).standing(n, IPHONE_BARE, tapOf(t, n)))).toEqual(expected);
   });
 
+  it.each([
+    ['idb SWIFT form through the parser: priority_select at rest', () => swiftIdb(), 'swift_payment.form.priority_select', { x: 201, y: 797 }],
+    ['idb number pad: value_date_select under the lifted CONTINUE', () => numberPad(), 'swift_payment.form.value_date_select', { x: 201, y: 571 }],
+    ['idb modal: Payee\u2019s name behind the picker', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'Payee\u2019s name', { x: 94, y: 827 }],
+    [
+      'scrolled form pos1: the bank-street label 3 pt under CONTINUE',
+      async () => {
+        const t = await idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos1');
+        (byId(t, 'Payee\u2019s bank street & no.*') as { rect: Rect }).rect = { x: 42, y: 817, width: 186, height: 20 };
+        return t;
+      },
+      'Payee\u2019s bank street & no.*',
+      { x: 135, y: 827 },
+    ],
+  ] as const)('%s: covered by CONTINUE at the centre its refusal quotes', async (_name, tree, id, centre) => {
+    const t = await tree();
+    const n = byId(t, id);
+    const s = sceneOf(t).standing(n, IPHONE_BARE, tapOf(t, n));
+    expect([s.kind, s.facts.centre, s.facts.centreCover?.identifier]).toEqual(['covered', centre, 'swift_payment.form.continue_button']);
+  });
+
   it('the number pad\'s covered row is judged above the keyboard (its 589–596 strip lies under the band): `aboveKeyboard`, nothing of it shows', async () => {
     const t = await numberPad();
     const n = byId(t, 'swift_payment.form.value_date_select');
