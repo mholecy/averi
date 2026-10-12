@@ -442,7 +442,8 @@ export interface PastSide {
 export type InFrameShort =
   | { of: 'clipped'; judged: Judged }
   | { of: 'covered'; judged: Judged; cover: UiNode }
-  | { of: 'systemBar'; judged: Judged; bar: SystemBar }
+  /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
+  | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
   | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
@@ -953,7 +954,7 @@ function stops(j: Judged): boolean {
  * their sentences group it: a cut edge (`fully: true`), a centre off the
  * screen or one under idb's band (`underKeyboard` with something in the
  * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`;
- * a centre in a system band (the status bar's, the navigation bar's) `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
+ * a centre in a system band (the status bar's, the navigation bar's), or for `fully` any of it there past the slack, `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
  * `sliver`; anything of the app drawn over it `covered`, naming the cover
  * the standing names. Asked only of a match with something in the frame
  * that does not stop the round: a match that stops it is reported before
@@ -967,7 +968,7 @@ function shortOf(j: Judged): InFrameShort {
     case 'underKeyboard':
       return { of: 'clipped', judged: j };
     case 'systemBar':
-      return { of: 'systemBar', judged: j, bar: s.bar };
+      return { of: 'systemBar', judged: j, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
     case 'cut':
       return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
     case 'covered':

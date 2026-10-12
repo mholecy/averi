@@ -43,7 +43,9 @@ import type { UsableScreen } from './usable-screen.js';
  *   applies and the node is in the box, else `offScreen`; with `fully`, a
  *   frame edge it runs past: `clipped`): its centre off the screen —
  *   `offScreen`; its centre in a system band — `systemBar`, the top's
- *   before the bottom's; cut to a sliver at its scroll container's edge
+ *   before the bottom's (for `fully`, any of the node in a band past the
+ *   slack too: the band as a region, `systemBandOver`, with its rect); cut
+ *   to a sliver at its scroll container's edge
  *   (`Clips.cutSliver` by the exposure's minimum piece) — `cut`; drawn over
  *   — `covered`; its centre under a keyboard line no guard acts on
  *   (`witnessed: false`, idb's band) — `underKeyboard`; else `reachable`.
@@ -128,13 +130,21 @@ import type { UsableScreen } from './usable-screen.js';
  * - A centre in a system band is off the screen for a tap and for both
  *   stops — measured: one stroke flung `priority_select` to `24,-20` and
  *   the plain stop stopped with its centre at (201,6), where the tap
- *   pressed the status bar. Only the centre: the rest of the rect is judged
- *   against the box (`fully` judges clipping against the whole box), so
- *   full-bleed content at the top stops once its ROUNDED centre lies below
- *   the band; one at y 0 shorter than twice the band less a point (122 pt
- *   or less under 62; 123 pt rounds its centre 61.5 to 62 and stops) stops
- *   neither way, and its failure names the status bar. The navigation band
- *   likewise, whatever the navigation mode.
+ *   pressed the status bar. The tap and the plain stop judge only the
+ *   centre: the rest of the rect may lie in the band, so full-bleed content
+ *   at the top stops plain once its ROUNDED centre lies below the band; one
+ *   at y 0 shorter than twice the band less a point (122 pt or less under
+ *   62; 123 pt rounds its centre 61.5 to 62 and stops) never stops, and its
+ *   failure names the status bar. The navigation band likewise, whatever
+ *   the navigation mode.
+ * - `fully` judges the bands as a REGION, by the pixel assert's rule and
+ *   slack (`systemBandOver`): it stops only with none of the node in a band
+ *   past the slack, so a pixel assert after it is never refused for a band.
+ *   Judged by the centre alone, the pixel remedy "scroll_until … `fully:
+ *   true` first" stopped at once on a row reaching 33 px into the
+ *   navigation band (accountDetail's `row_30` `66,2088 948x99`, its centre
+ *   clear), and the agent looped. A node pinned in a band ends stuck naming
+ *   the bar.
  *   docs/adr/0009-android-navigation-band.md
  * - A sliver: uiautomator cuts every rect to its scroller, so a cut node's
  *   centre is always on the screen; the stop handed back the very strip the
@@ -154,9 +164,9 @@ import type { UsableScreen } from './usable-screen.js';
  *   of a turn suggested but not witnessed is never judged; landscape is
  *   unmeasured.
  *   docs/adr/0012-pixel-assert-residuals-d4-d6.md
- * - `fully` judges a system band at the centre only: the rest of the node
- *   may lie in the band, and a pixel assert on it fails closed (the parity's
- *   pixel-only exemption).
+ * - `fully` never stops on content laid under the status bar by design (a
+ *   full-bleed header, a screen-sized root): it ends stuck naming the bar,
+ *   as a pixel assert on it fails closed. The plain stop stops on it.
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
@@ -253,7 +263,8 @@ export type Standing = { readonly facts: StandingFacts } & (
   | { readonly kind: 'reachable'; readonly at: Point; readonly moved?: { readonly piece: Rect; readonly cover: UiNode; readonly aboveKeyboard: boolean } }
   /** `visible`: the most of the node inside any box judged. */
   | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number }
-  | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar }
+  /** `band`: the band's rect on the box, only when the node's rect (not its centre) lies in it past the slack — a `fully` stop's region rule. */
+  | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band?: Rect }
   | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
   /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
@@ -336,8 +347,8 @@ interface Judged {
   readonly centre: Point;
 }
 
-/** Where a point lies: on the screen, off it, or in a system band. */
-type PointPlace = 'on' | 'off' | { readonly bar: SystemBar };
+/** Where a point lies: on the screen, off it, or in a system band — with the band's rect when a region, not the point, lies in it. */
+type PointPlace = 'on' | 'off' | { readonly bar: SystemBar; readonly band?: Rect };
 
 /** A system band on a box: the bar it is, as a sentence quotes it, and its rect on the box. */
 interface SystemBand<B extends SystemBar = SystemBar> {
@@ -380,7 +391,9 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelPurpose, box: Rect
 /**
  * The system band `rect` overlaps past PIXEL_OVERLAP_SLACK on `box`
  * (geometry.ts#overlapsPastSlack) — the status band's before the
- * navigation band's — or undefined.
+ * navigation band's — or undefined: the bands judged as a region, over
+ * what the pixel assert reads (`regionPlace`) and over the node's rect for
+ * a `fully` stop, one rule for both.
  * docs/adr/0002-pixel-overlap-slack.md
  */
 function systemBandOver(rect: Rect, box: Rect, bands: Bands): SystemBand | undefined {
@@ -443,7 +456,7 @@ function ordered<S>(placed: S | undefined, cut: S | undefined, cover: () => S | 
 /** A touch's place as its answer: off the screen, or its centre in a system band; undefined when on the screen. */
 function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): Standing | undefined {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
-  return place === 'on' ? undefined : { facts, kind: 'systemBar', at: facts.centre, bar: place.bar };
+  return place === 'on' ? undefined : { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
 }
 
 /** A touch's cut to a sliver as its answer, when the frame left a minimum to judge it by. */
@@ -495,8 +508,11 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
   }
   if (fully && facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
   const cover = fully && facts.covers.length > 0 ? (facts.centreCover ?? facts.covers[facts.covers.length - 1]) : facts.centreCover;
+  // `fully`: the system bands as a region, as the pixel assert judges them — any of the node past the slack.
+  // docs/adr/0009-android-navigation-band.md
+  const placed = fully && place === 'on' ? (systemBandOver(node.rect, box, bands) ?? place) : place;
   return ordered<Standing>(
-    pointPlaced(facts, place, facts.visible),
+    pointPlaced(facts, placed, facts.visible),
     fully ? undefined : sliverCut(facts, facts.sliver),
     () => (cover === undefined ? undefined : { facts, kind: 'covered', cover, aboveKeyboard: line !== undefined }),
     underLine(facts, line?.witnessed === false ? line : undefined),

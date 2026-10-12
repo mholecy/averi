@@ -1607,6 +1607,36 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
       'failed after 0 swipes (maxSwipes) — element reached the viewport but its centre stays under the navigation bar at (540,2186), from y 2154 to the bottom of the screen (tree units)',
     );
   });
+
+  /** accountDetail's row_30 66,2088 948x99: its centre (540,2138) clear of the band, its bottom 33 px into it. */
+  const row30 = (y = 2088): Row => ({ found: [match({ x: 66, y, width: 948, height: 99 }, 'row_30')], screen: NAV });
+
+  it('fully: true on row_30 reaching 33 px into the band: no stop at 0 swipes (the pixel assert\'s region rule) — stroked until it clears the band; the plain stop stops at once', () => {
+    const fully = play({ ...ANDROID, fully: true }, [row30(), row30(1600), row30(1600)]);
+    expect(strokesToward(fully)).toEqual(['down']);
+    expect(resultOf(fully)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(resultOf(play(ANDROID, [row30()]))).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
+  it('fully: true on row_30 pinned there (no stroke moves it): stuck, naming the navigation bar it reaches into — not its centre, which a tap presses', () => {
+    const played = play({ ...ANDROID, fully: true, maxSwipes: 6 }, [row30(), row30(), row30(), row30()]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'up']);
+    expect(played.outcome?.kind).toBe('stuck');
+    const message = failureOf(played, 'id:row_30').message;
+    expect(message).toContain(
+      'it stays partly under the navigation bar, from y 2154 to the bottom of the screen (tree units), and the content is exhausted: ' +
+        'swiping down no longer moves it out from under the navigation bar',
+    );
+    expect(message).toContain('it is pinned under the navigation bar (a layout that does not keep clear of it?), and fully: true never stops on it (its centre is clear: a plain scroll_until stops on it, and a tap lands).');
+    expect(message).not.toContain('its centre stays');
+  });
+
+  it('fully: true at the bound: short of the navigation bar it reaches into', () => {
+    const played = play({ ...ANDROID, fully: true, maxSwipes: 0 }, [row30()]);
+    expect(failureOf(played, 'id:row_30').message).toContain(
+      'failed after 0 swipes (maxSwipes) — element reached the viewport but it stays partly under the navigation bar, from y 2154 to the bottom of the screen (tree units) (last rect',
+    );
+  });
 });
 
 describe('round — a target uiautomator dumped CLIPPED OUT of its scroll container (docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md)', () => {

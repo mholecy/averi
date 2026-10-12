@@ -2,8 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { everyNode, rectIntersection, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { containsPoint } from '../../src/ui-tree/geometry.js';
+import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { onScreen, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -219,7 +218,7 @@ describe('Scene.standing for the tap — measured cases, fixture × purpose → 
   });
 });
 
-describe('Scene.standing — the Android navigation band (D7): a centre in it is under the navigation bar, for the tap and both stops', () => {
+describe('Scene.standing — the Android navigation band (D7): a centre in it is under the navigation bar, for the tap and both stops; for `fully: true`, any of it past the slack', () => {
   it.each([
     // mp-native's Account Detail at its top, drawn edge to edge: row_4 66,2152 948x68 lies under the bar; the tap went to (540,2186).
     ['accountDetailTop row_4, tap', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, TAP, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
@@ -231,6 +230,15 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
     ['…plain stop: reachable', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 288, y: 2130 } }],
     // Settings' title 198,2105 428x49 flush with the band: its centre (412,2130) clears it.
     ['Settings title flush with the band, tap: reachable', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 412, y: 2130 } }],
+    // `fully` judges the bands as a REGION (the owner's decision, ADR 0009): accountDetail's row_30 66,2088 948x99 — its
+    // centre (540,2138) clear of the band, its bottom 33 px into it. The pixel assert fails it closed under the bar and
+    // advised `fully: true`, which stopped at once; now `fully` strokes on, the plain stop and the tap keep the centre rule.
+    ['accountDetail row_30 reaching 33 px into the band, fully: true: under the navigation bar, as a region', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 2138 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
+    ['…plain stop: reachable (its centre clear)', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 540, y: 2138 } }],
+    ['…tap: reachable', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 540, y: 2138 } }],
+    // The top band likewise: contactsSyncPromo's "Close sheet" scrim 0,0 1080x1087 lies under the 66-px status bar, its centre (540,544) clear.
+    ['contactsSyncPromo "Close sheet" 0,0 1080x1087, fully: true: under the status bar, as a region', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, FULLY, { kind: 'systemBar', at: { x: 540, y: 544 }, bar: { edge: 'top', bottom: 66 }, band: { x: 0, y: 0, width: 1080, height: 66 } }],
+    ['…plain stop: reachable', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, PLAIN, { kind: 'reachable', at: { x: 540, y: 544 } }],
   ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
     const t = await tree();
     expect(said(sceneOf(t).standing(byId(t, id), screen, purpose))).toEqual(expected);
@@ -257,6 +265,16 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
     const row = tree(1000);
     for (const top of [0, -5]) expect(said(sceneOf(row.t).standing(row.r, { ...PIXEL, navigationBand: top }, TAP))).toEqual({ kind: 'reachable', at: { x: 540, y: 1000 } });
     expect(said(sceneOf(row.t).standing(row.r, { ...PIXEL, navigationBand: 50 }, TAP))).toEqual({ kind: 'reachable', at: { x: 540, y: 1000 } });
+  });
+  it('`fully: true` and the 2-unit slack (geometry.ts#PIXEL_OVERLAP_SLACK, the pixel assert\'s): a row 2 px into either band stops, 3 px does not — its centre clear either way', () => {
+    const row = (y: number, height: number) => {
+      const r = node({ role: 'button', identifier: 'row', rect: { x: 0, y, width: 1080, height } });
+      return said(sceneOf(node({ role: 'container', rect: box(1080, 2220), children: [r] })).standing(r, PIXEL_NAV, FULLY));
+    };
+    expect(row(2056, 100)).toMatchObject({ kind: 'reachable' });
+    expect(row(2057, 100)).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } });
+    expect(row(64, 100)).toMatchObject({ kind: 'reachable' });
+    expect(row(63, 100)).toMatchObject({ kind: 'systemBar', bar: { edge: 'top', bottom: 66 }, band: { x: 0, y: 0, width: 1080, height: 66 } });
   });
   it('portrait only: on a landscape box a band read upright is not judged', () => {
     const turned = tree(1050, box(2220, 1080));
@@ -393,37 +411,38 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
 /** D3: scroll_until's exposure box is cut below the status band, as the tap's and the pixel assert's are. */
 describe('Scene.standing for the stop — its covers judged below the status band (D3)', () => {
   const tree = () => {
-    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 40, width: 402, height: 100 } });
+    // The row reaches 2 pt into the band — within the slack, so `fully` judges no band (its region rule).
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 60, width: 402, height: 100 } });
     // A node of the app lying only in the band, over the row's top: what the status bar hides anyway.
-    const inBand = node({ role: 'image', identifier: 'in_band', rect: { x: 0, y: 0, width: 402, height: 50 } });
+    const inBand = node({ role: 'image', identifier: 'in_band', rect: { x: 0, y: 0, width: 402, height: 62 } });
     return { t: node({ role: 'container', rect: box(402, 874), children: [row, inBand] }), row };
   };
   it('a node lying only in the band no longer blocks a `fully: true` stop, nor lowers what shows', () => {
     const { t, row } = tree();
     const s = sceneOf(t).standing(row, IPHONE, FULLY);
-    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 90 } });
-    // All of it shows: its own part in the band (40–62) counts, the node over it there does not.
+    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 110 } });
+    // All of it shows: its own part in the band (60–62) counts, the node over it there does not.
     expect([s.facts.covers, s.facts.shows]).toEqual([[], 1]);
   });
   it('a cover reaching into the band and below it is not dropped: what shows is exactly what it was — its part in the band still hidden', () => {
-    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 40, width: 402, height: 100 } });
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 60, width: 402, height: 100 } });
     const over = node({ role: 'image', identifier: 'over', rect: { x: 0, y: 30, width: 402, height: 50 } });
     const t = node({ role: 'container', rect: box(402, 874), children: [row, over] });
     const s = sceneOf(t).standing(row, IPHONE, FULLY);
     expect([said(s), s.facts.shows]).toEqual([{ kind: 'covered', cover: 'over' }, sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY).facts.shows]);
-    expect(s.facts.shows).toBeCloseTo(0.6);
+    expect(s.facts.shows).toBeCloseTo(0.8);
   });
   it('under a keyboard line high enough that the frame above it is landscape-shaped (402x300), the band is still cut — judged on the box\'s shape', () => {
     const { t, row } = tree();
     const s = sceneOf(t).standing(row, IPHONE, { ...FULLY, keyboardTop: wda(300) });
     expect(s.facts.screen).toEqual({ x: 0, y: 0, width: 402, height: 300 });
-    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 90 } });
+    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 110 } });
   });
   it('with no band read, it covers as before', () => {
     const { t, row } = tree();
     const s = sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY);
     expect(said(s)).toEqual({ kind: 'covered', cover: 'in_band' });
-    expect(s.facts.shows).toBeCloseTo(0.9);
+    expect(s.facts.shows).toBeCloseTo(0.98);
   });
 });
 
@@ -472,11 +491,10 @@ describe('parity — `scroll_until X` then `tap X`: a plain stop that is reachab
   });
 });
 
-describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `fully` stop that is reachable leaves nothing of the app over what the assert reads, and no band at its centre', () => {
-  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered; under a system bar only where the band meets what it reads, off the stop\'s centre — the stated exemption (one way: the pixel assert is stricter)', async () => {
+describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `fully` stop that is reachable leaves nothing of the app, and no system band, over what the assert reads', () => {
+  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered, never under a system bar (one way: the pixel assert is stricter)', async () => {
     let judged = 0;
     let reachable = 0;
-    let exempt = 0;
     const broken: string[] = [];
     for (const [name, tree, os] of await everyFixture()) {
       const box: Rect = os === 'ios' ? { x: 0, y: 0, width: 402, height: 874 } : { x: 0, y: 0, width: 1080, height: 2220 };
@@ -493,25 +511,15 @@ describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `f
           reachable++;
           for (const purpose of [OCR(n), COLOUR(n)]) {
             const pixel = scene.standing(n, screen, purpose);
-            // The exemption: `fully` judges a band at the centre only (the module's residual), the pixel assert over what it reads.
-            if (pixel.kind === 'systemBar') {
-              // The exemption, and only it: the band lies off the stop's centre and meets what the assert reads.
-              const band = pixel.band;
-              const reads = purpose.of === 'pixel' ? purpose.reads : n.rect;
-              if (band === undefined || containsPoint(band, stop.at) || rectIntersection(band, reads) === undefined) broken.push(`${name} ${n.role} ${JSON.stringify(n.rect)}: band ${JSON.stringify(band)} at the centre or off what it reads`);
-              exempt++;
-              continue;
-            }
-            if (pixel.kind === 'covered') broken.push(`${name} ${JSON.stringify(band)} ${n.role} ${JSON.stringify(n.rect)}: pixel ${pixel.kind}`);
+            if (pixel.kind === 'systemBar' || pixel.kind === 'covered') broken.push(`${name} ${JSON.stringify(band)} ${n.role} ${JSON.stringify(n.rect)}: pixel ${pixel.kind}`);
           }
         }
       }
     }
     expect(broken).toEqual([]);
-    // Not vacuous: thousands judged, most reachable, and the exemption met (a full-bleed root under the status band, a row reaching into the navigation band).
+    // Not vacuous: thousands judged, most of them reachable.
     expect(judged).toBeGreaterThan(4000);
     expect(reachable).toBeGreaterThan(judged / 2);
-    expect(exempt).toBeGreaterThan(0);
   });
 });
 
@@ -849,16 +857,20 @@ describe('Scene.standing — Compose labels under their own control, the bug not
 
 describe('Scene.standing for the stop — the status band and a keyboard line (moved from scroll_until\'s tests)', () => {
   it.each([
-    // Only the centre: a row reaching into the band with its centre below it (36–88, centre (201,62)) stops plain AND fully.
+    // A row reaching into the band with its centre below it (36–88, centre (201,62)): the plain stop judges the centre and
+    // stops; `fully` judges the band as a region (ADR 0009), and 26 pt of it lie under the bar.
     ['priority_select at 36, plain', () => swiftIdbAt(36), 'swift_payment.form.priority_select', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 62 } }],
-    ['…fully: true', () => swiftIdbAt(36), 'swift_payment.form.priority_select', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    ['…fully: true: under the status bar, as a region', () => swiftIdbAt(36), 'swift_payment.form.priority_select', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 62 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
     // No band read (an Android adapter): the row at -20 stops, its centre (201,6) on the screen.
     ['…at -20 with no band read, plain', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE_BARE, PLAIN, { kind: 'reachable', at: { x: 201, y: 6 } }],
-    // Full-bleed content at the top: the ROUNDED centre decides — 0,0 402x300 and 402x123 (61.5 sent as 62) stop; 402x122 (61) does not.
-    ['a hero 0,0 402x300, fully: true', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 150 } }],
-    ['a hero 0,0 402x123, fully: true', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
-    ['a hero 0,0 402x124, fully: true', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 124) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
-    ['a hero 0,0 402x122, fully: true: under the status bar', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 122) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
+    // Full-bleed content at the top: the plain stop's ROUNDED centre decides — 0,0 402x123 (61.5 sent as 62) stops,
+    // 402x122 (61) does not; `fully` stops on none of them, each lying under the bar (a region), the centre's rule first.
+    ['a hero 0,0 402x300, plain', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 150 } }],
+    ['a hero 0,0 402x123, plain', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    ['a hero 0,0 402x122, plain: under the status bar', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 122) })), 'hero', IPHONE, PLAIN, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
+    ['a hero 0,0 402x300, fully: true: under the status bar, as a region', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 150 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
+    ['a hero 0,0 402x123, fully: true: likewise', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 62 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
+    ['a hero 0,0 402x122, fully: true: its centre under the status bar (the centre\'s rule, no region)', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 122) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
   ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
     const t = await tree();
     expect(said(sceneOf(t).standing(byId(t, id), screen, purpose))).toEqual(expected);

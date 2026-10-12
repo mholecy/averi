@@ -38,8 +38,9 @@ A full-bleed header still fails closed. This covers iOS's header and Android 15+
   - a screen resized above the keyboard (WDA's `login_screen` `0,0 402x566`);
   - a window under an ocr assert.
 - A colour assert on idb's Application node fails on the content listed over its sample.
-- `scroll_until … fully: true` judges a band at the centre only. The rest of the element may still lie under the band,
-  and only the child advice cures that miss.
+- `scroll_until … fully: true` judges the bands as a region, by this assert's rule and slack (ADR 0009), so it never
+  stops on an element reaching into a band by design: such an element ends stuck naming the bar, and only the child
+  advice cures the miss.
 - What a tree does not list is no cover, as for the tap. One example is a top bar that WDA lists before the scroll view.
 
 ## Bug note

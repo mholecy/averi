@@ -532,6 +532,14 @@ export const underSystemBar = (at: Point, bar: SystemBar): string => {
 };
 
 /**
+ * A rect reaching into a system bar's band, its centre clear, as one clause
+ * — `partly under the navigation bar, from y 2154 to the bottom of the
+ * screen (tree units)` — `scroll_until`'s words for a `fully: true` stop the
+ * band's region refuses (ui-tree/standing.ts#Standing's `band`).
+ */
+export const partlyUnderSystemBar = (bar: SystemBar): string => `partly under the ${systemBarName(bar.edge)}, ${bandText(bar)} (tree units)`;
+
+/**
  * What to do about a target whose centre lies under a system bar (the bar
  * at `edge`), said as far as the tree knows it: the refusal had said
  * `scroll_until it first` of a button pinned at the top, which no scroll
