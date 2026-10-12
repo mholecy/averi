@@ -2156,7 +2156,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
   const CONTINUE = 'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)';
   const REMEDY = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   /** idb's flat list cannot say whether the element scrolls (geometry.ts#insideScroller): the remedy names a child clear of it too. */
-  const OR_CHILD = `${REMEDY} — or, if no scroll moves it out from under that, assert a child of it that lies clear of it`;
+  const OR_CHILD = `${REMEDY} — or, if no scroll moves it out from under that, assert something in it that lies clear of that`;
   const IPHONE = { width: 402, height: 874, statusBand: 62 };
   /** The whole screen one colour: what the bar or the button would give the sampler. */
   const solid = (hex: string) =>
@@ -2261,6 +2261,35 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect(await judged(node({ role: 'text', identifier: 'row_label', rect: { x: 150, y: 76, width: 60, height: 16 } }), true)).toBe(
       `text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 150,76 60x16) — ${OR_CHILD}; failing closed, color unchecked`,
     );
+  });
+
+  it('a screen-sized element is judged too (review of fix/r8-pixel, round 2): a colour assert on a root under a near-fullscreen dialog, and an ocr assert on a root reading the status bar\'s "Contacts", fail closed', async () => {
+    resetLayout();
+    const full = { x: 0, y: 0, width: 1080, height: 2220 };
+    const root = node({ identifier: 'root', rect: { ...full }, children: [node({ role: 'text', label: 'Content', rect: { x: 66, y: 300, width: 900, height: 100 } })] });
+    const dialog = node({ rect: { ...full }, children: [node({ role: 'button', rect: { ...full } }), node({ label: 'Dialog', rect: { x: 90, y: 200, width: 900, height: 1800 } })] });
+    const android = new FakeAdapter({ s: node({ rect: { ...full }, children: [root, dialog] }) }, 's');
+    android.viewportSize = { width: 1080, height: 2220, statusBand: 66 };
+    android.nextScreenshot = png(1080, 2220);
+    const c = await new Verifier(android, FAST).assert({ element: { id: 'root' }, color: { expected: '#FFFFFF' } });
+    expect(c.pass).toBe(false);
+    expect(c.detail).toMatch(/is drawn over the element \(element 0,0 1080x2220\) — the capture would show it/);
+    expect(android.screenshots).toHaveLength(0);
+
+    const window = node({ identifier: 'screen', rect: { x: 0, y: 0, width: 402, height: 874 } });
+    const ios = new FakeAdapter({ s: node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [window] }) }, 's');
+    ios.platform = 'ios';
+    ios.keyboard = undefined;
+    ios.viewportSize = { ...IPHONE };
+    ios.nextScreenshot = solid('#FFFFFF');
+    const { probe, engine } = engineReading('Contacts');
+    const o = await new Verifier(ios, { ...FAST, ocr: { engine } }).assert({ element: { id: 'screen' }, ocr: { text: 'Contacts' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toMatch(/^the status bar is drawn over the element \(element 0,0 402x874, status bar 0,0 402x62\)/);
+    expect(probe.recognized).toBe(0);
+    // …while a colour assert on the same window samples 12 % down, below the band, and is measured.
+    const colour = await new Verifier(ios, FAST).assert({ element: { id: 'screen' }, color: { expected: '#FFFFFF' } });
+    expect([colour.pass, colour.detail]).toEqual([true, expect.stringContaining('sampled #FFFFFF')]);
   });
 
   it('a container element: its own descendants are never covers — measured as before', async () => {

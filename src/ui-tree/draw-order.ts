@@ -149,13 +149,19 @@ export interface DrawOrder {
    * - the node's OWN CONTENT listed beside it: a cover whose reach lies
    *   wholly inside the node's rect, when it hangs off one of the node's
    *   own branches (`ownBranch`) — WDA's React Native `login_username_field`
-   *   and the input box (36,367 330x52) listed after it,
-   *   `login_language_switcher` and its `lang_en_flag`, idb's account card
-   *   and its "Accounting Balance" text. In a flat list every node is
-   *   beside every other, so the reach alone decides there. The REACH, not
-   *   the frame: CONTINUE's frame lies inside a 52-pt row it hangs over
-   *   (`Payee's country` at 24,776, idb-swift-form-scrolled-under-top-bar
-   *   pos6), and its reach, run down to the screen's bottom, does not;
+   *   and the input box (36,367 330x52) and "Meno" field listed after it,
+   *   `login_language_switcher` and its `lang_en_flag` and "English"
+   *   button. A flat list has no branches, so there the cover must SAY
+   *   something and nothing the node does not (`wordsOf`: idb lists a
+   *   container with its children's text) — idb's account card and its
+   *   "Accounting Balance, 2 000, ,00, CZK" text; a sheet listed after a
+   *   card and inside its rect says other words and still counts (review
+   *   of fix/r8-pixel, round 2, probe A: until then the rect alone decided
+   *   in a flat list, and a colour assert on the card PASSED on the
+   *   sheet). The REACH, not the frame: CONTINUE's frame lies inside a
+   *   52-pt row it hangs over (`Payee's country` at 24,776,
+   *   idb-swift-form-scrolled-under-top-bar pos6), and its reach, run down
+   *   to the screen's bottom, does not;
    * - a CLICKABLE LAYER: an unlabelled, unvalued interactive node that
    *   holds the node's rect whole, on one of its own branches
    *   (`ownBranch`; never in a flat list, which gives no branches to tell
@@ -168,11 +174,18 @@ export interface DrawOrder {
    *   "Amount*"` (42,283 51x15) and `text "Value*"` at y 296, 2 pt; a
    *   `Payee's country` row ending 2 pt into CONTINUE.
    * `ownBranch`: the nearest ancestor of the node whose subtree holds the
-   * cover is not screen-sized (`fillsScreen`) — a row, a card, a field's
-   * wrapper. A cover met only at a screen-sized ancestor (a title in the
-   * navigation bar over a row of the form, a dialog's scrim) is another
-   * layer of the screen, and still counts. What stays: CONTINUE over a row,
-   * the floating tab bar and its strip, a title laid over a scrolled row.
+   * cover is one component — at most OWN_BRANCH_SCREEN_FRACTION (half) of
+   * the screen: a row, a card, a form's card. A cover met only at a larger
+   * ancestor (a title in the navigation bar over a row of the form, a
+   * dialog's scrim, a FAB in Compose's 90 % content container over a row
+   * of its list — review round 2, probe B2: "not screen-sized", 90 %, let
+   * that FAB through) is another layer of the screen, and still counts.
+   * What stays: CONTINUE over a row, the floating tab bar and its strip, a
+   * title laid over a scrolled row, a sheet or a dialog over anything.
+   * Judged over `within` as `exposure` is: the caller passes the part of
+   * the screen its measurement reads (pixel-poll.ts, the colour sampler's
+   * inset rect), and the 2-unit edge is measured against the node's rect
+   * inside it.
    */
   paintsOver(node: UiNode, within: Rect): readonly PixelCover[];
 }
@@ -1283,6 +1296,21 @@ function readingBreak(order: readonly Placed[], target: Placed, contentFrom: num
  * The draw order of `tree`: one pre-order walk when called; each answer a
  * scan of it. The tree must not change while the answer is in use.
  */
+/**
+ * The largest share of the screen's area the branch a node and a cover of
+ * it share may have for the cover to be the node's own content or layer
+ * (`DrawOrder.paintsOver`, `ownBranch`): one component — a row, a card, a
+ * form's card (RN's `login_card`, 370x400 of 402x874, 42 %) — and not a
+ * screen's content area (Compose's `accounts.detail.container`, 0,225
+ * 1080x1995, 90 %, where a FAB over a row is chrome; review of
+ * fix/r8-pixel, round 2, probe B2).
+ */
+const OWN_BRANCH_SCREEN_FRACTION = 0.5;
+
+/** The words a node says — its label's and value's, lower-cased, split at anything not a letter or a digit (`paintsOver`'s own content: idb's "Accounting Balance, 2 000, ,00, CZK" says only words of its card's label). */
+const wordsOf = (n: UiNode): ReadonlySet<string> =>
+  new Set([n.label ?? '', n.value ?? ''].flatMap((t) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u)).filter((w) => w.length > 0));
+
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
   const seen: Seen = { screenArea: rectArea(screen) };
@@ -1352,10 +1380,17 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const ownBranch = (target: Placed, cover: Placed): boolean => {
     let shared = target.parent;
     while (shared !== undefined && !within(cover, shared)) shared = shared.parent;
-    return shared !== undefined && !fillsScreen(shared.node.rect, seen.screenArea);
+    return shared !== undefined && rectArea(shared.node.rect) <= seen.screenArea * OWN_BRANCH_SCREEN_FRACTION;
   };
-  const ownContent = (target: Placed, cover: Placed, reach: Rect): boolean =>
-    rectWithin(reach, target.node.rect) && (flatList || ownBranch(target, cover));
+  /** `paintsOver`'s own content (`DrawOrder.paintsOver`): inside the node's rect and on its own branch — or, in a flat list, which has no branches, saying something and all of it the node's. */
+  const ownContentOf = (target: Placed, cover: Placed, reach: Rect): boolean => {
+    if (!rectWithin(reach, target.node.rect)) return false;
+    if (!flatList) return ownBranch(target, cover);
+    const said = wordsOf(cover.node);
+    const says = wordsOf(target.node);
+    return said.size > 0 && [...said].every((w) => says.has(w));
+  };
+  /** `paintsOver`'s clickable layer: unlabelled, unvalued, interactive, holding the node whole, on its own branch — never in a flat list. */
   const clickableLayer = (target: Placed, cover: Placed): boolean => {
     const n = cover.node;
     return !flatList && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);
@@ -1367,10 +1402,12 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const target = placesOf(node)[0];
       if (target === undefined) return [];
       const { covers, reaches } = api.exposure(node, box);
+      const read = rectIntersection(node.rect, box);
       return covers.flatMap((cover, i) => {
         const placed = placesOf(cover)[0];
         const reach = reaches[i];
-        return ownContent(target, placed, reach) || clickableLayer(target, placed) || !overlapsPastSlack(reach, node.rect) ? [] : [{ node: cover, reach: { ...reach } }];
+        const hides = read !== undefined && overlapsPastSlack(reach, read);
+        return !hides || ownContentOf(target, placed, reach) || clickableLayer(target, placed) ? [] : [{ node: cover, reach: { ...reach } }];
       });
     },
     shadowing(node, point) {

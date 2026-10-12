@@ -23,7 +23,7 @@ import {
 import { failClosed } from './fail-closed.js';
 import { pollPixels, screenshotFailed } from './pixel-poll.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
-import { DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
+import { colorSampleRect, DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrEngineFor, type OcrEngineChoice } from './ocr.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
@@ -448,6 +448,7 @@ export class Verifier {
       timeoutMs,
       pollMs: this.pollMs,
       unchecked: 'color',
+      reads: colorSampleRect,
       measure: ({ rect, measured }) => evaluateColorAssert(rect, expectation, measured),
     });
     return { description, ...result };
