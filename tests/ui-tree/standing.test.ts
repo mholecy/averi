@@ -140,6 +140,11 @@ describe('usableScreen — the fallback window, and nothing', () => {
     expect(await usableOf(device(tree, dev))).toBeUndefined();
   });
 
+  it('no usable screen, failing open, when sizing the tree throws (a malformed tree): the judgements behave as with no box', async () => {
+    const malformed = { ...node({ rect: box(0, 0) }), children: undefined } as unknown as UiNode;
+    expect(await usableScreen(device(screen(), { width: 402, height: 874 }), { tree: malformed })).toBeUndefined();
+  });
+
   it('no usable screen: neither the device nor the tree read', async () => {
     expect(await usableScreen(device(screen(), new Error('device offline')), { error: new Error('null root node') })).toBeUndefined();
   });

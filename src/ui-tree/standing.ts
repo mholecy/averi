@@ -6,7 +6,8 @@ import type { TreeRead } from './read-tree.js';
  * Standing: where a target stands on the screen, for every verb that asks
  * "can this be used where it stands?". It holds THE USABLE SCREEN — the one
  * value every judgement of "on screen" reads, built in one place: the tap's
- * on-screen rule (interact/resolve.ts#onScreen), `scroll_until`'s stop
+ * on-screen rule (interact/resolve.ts#onScreen, which the in-tree keyboard
+ * dismissal picker asks too, interact/keyboard-in-tree.ts), `scroll_until`'s stop
  * (interact/scroll-rounds.ts, over the screen interact/scroll.ts reads each
  * round), the pixel assert (verify/pixel-poll.ts#chromeOverElement) and, for
  * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and
@@ -71,11 +72,17 @@ export interface UsableScreen {
  * The usable screen for `read` (the tree the caller already read) on
  * `adapter`'s device — `usableScreenOf` over the device's size and the
  * tree's. A device whose size cannot be read is no device; undefined when
- * there is no usable screen at all.
+ * there is no usable screen at all. FAILS OPEN: a tree that cannot be sized
+ * (a throw out of `inferScreenSize`) is no usable screen either, so a
+ * judgement behaves as with no box rather than failing the verb.
  */
 export async function usableScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<UsableScreen | undefined> {
   const device = await adapter.viewport().catch(() => undefined);
-  return usableScreenOf(device, read.tree === undefined ? undefined : inferScreenSize(read.tree));
+  try {
+    return usableScreenOf(device, read.tree === undefined ? undefined : inferScreenSize(read.tree));
+  } catch {
+    return undefined;
+  }
 }
 
 /** The usable screen of a device size read (or none) and a tree's `inferScreenSize` (or none) — the one derivation, pure. */

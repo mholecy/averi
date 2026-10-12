@@ -502,13 +502,11 @@ export interface ScreenBox {
  * a window the tree vouches for; the rules are there), and what this adds
  * is the gesture's own: the note and the throw.
  *
- * Why the device's size and not the tree's: until 2026-10-08 `swipeScreen`
- * took it from the tree (`inferScreenSize`) and ignored its `reliable`
- * flag, while the scroll loop took the device's for the same `swipeVector`:
- * two owners of one box, and the tree one had already been wrong once (the
- * union-of-children rule read the 2026-08-26 WDA sheet as 804x1748), and a
- * tree with no geometry gave a 0×0 box — a swipe from (0,0) to (0,0) that
- * every caller reported as done. The window fallback is kept, rather than
+ * Why the device's size and not the tree's: a box taken from the tree
+ * (`inferScreenSize`, its `reliable` flag ignored) beside the scroll loop's
+ * device box made two owners of one box; the tree's had been wrong (the
+ * union-of-children rule read a WDA sheet as 804x1748), and a tree with no
+ * geometry gave a 0×0 box — a swipe from (0,0) to (0,0) reported as done. The window fallback is kept, rather than
  * refusing whenever the device is silent, because the gesture's own input
  * path (`adb shell input`, `idb ui`) can be healthy when the size read is
  * not — `wm size` output that does not parse, `idb describe` with no

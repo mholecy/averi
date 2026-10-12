@@ -517,12 +517,9 @@ async function keyboardOverElement(
  * fixture sweeps (tests/verify/pixel-chrome.test.ts).
  *
  * The screen is the usable screen's single `oriented` box
- * (ui-tree/standing.ts#usableScreen, the gesture box's derivation): the
- * device's (`viewport()`, memoized by the adapter, in the tree's units),
- * turned when the tree's window says it is held sideways; else the tree's
- * window when the tree vouches for it (reliable, a window's own height);
- * else the tree's own screen (ui-tree/standing.ts#treeScreen, the `'tree'`
- * source) — and without the device, no band. Until S3 the
+ * (ui-tree/standing.ts#usableScreen, which owns the derivation), else the
+ * tree's own screen (ui-tree/standing.ts#treeScreen) — with no band but the
+ * device's. Until S3 the
  * tree's screen was taken whenever the device was silent, so a rectless
  * root whose largest node is a scroll view's tall content (402x2000 under
  * a 402x874 window) judged the window as no screen-sized element and

@@ -685,14 +685,14 @@ export interface Rounds {
   readonly [opaque]: 'scroll-rounds';
 }
 
+/** The screen a round judges in: the usable screen's judging part (ui-tree/standing.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
+type Frame = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'>;
+
 /**
  * Everything the scroll remembers between rounds, one record with one
  * writer (`round`). Until 2026-10-09 the motion half was the `Motion` class
  * and the rest the loop's `let`s.
  */
-/** The screen a round judges in: the usable screen's judging part (ui-tree/standing.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
-type Frame = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'>;
-
 interface State {
   readonly rules: RoundRules;
   readonly swipes: number;
@@ -701,8 +701,7 @@ interface State {
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
   readonly owesDrawn: boolean;
   /**
-   * The visibility reference frame (2026-10-08, review of the off-screen tap
-   * refusal, M2): the usable screen of the round's tree
+   * The visibility reference frame: the usable screen of the round's tree
    * (ui-tree/standing.ts#usableScreen, through swipe.ts#screenBox) — the
    * tap's screen too, so a stop the scroll calls visible is
    * judged on the screen the next tap is judged on, by construction: the

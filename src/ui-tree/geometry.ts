@@ -50,9 +50,9 @@ export interface ScreenSize extends ScreenWidth {
    * the window by construction) or a screen-shaped child of a rectless root
    * (`child`: a guessed window, which may be an oversized node crowned as
    * one) — reliable or not; absent when the walk answered, whose height is
-   * a content maximum. Read by ui-tree/standing.ts#usableScreenOf (2026-10-08, code
-   * review of the off-screen judgement): only a window's own sides may
-   * suggest that the screen is turned, never a walked extent.
+   * a content maximum. Read by ui-tree/standing.ts#usableScreenOf: only a
+   * window's own sides may suggest that the screen is turned, never a walked
+   * extent.
    */
   windowLeg?: 'root' | 'child';
   /**
@@ -352,8 +352,9 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * window? `wm size` and `idb describe` report the panel as built — portrait
  * on a phone — whichever way it is held; the tree's window is laid out as the
  * screen is now. The one owner of "which way does this window say the screen
- * faces" (2026-10-08, for ui-tree/standing.ts#usableScreenOf, the box a
- * gesture swipes in and every judgement's usable screen). Here rather than in verify/scale.ts, where it was written:
+ * faces", for ui-tree/standing.ts#usableScreenOf (the box a gesture swipes
+ * in and every judgement's usable screen). Here rather than in
+ * verify/scale.ts, where it was written:
  * `interact/` may not import `verify/` (ARCHITECTURE.md §2), and the
  * question is rect arithmetic over a tree's size and the device's — the
  * reason the absent-in-viewport rule both engines need lives in this file
