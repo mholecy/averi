@@ -9,6 +9,7 @@ import { KEYBOARD_ROLE } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 import { OcrUnavailableError } from '../../src/verify/ocr.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
@@ -2137,6 +2138,181 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
       expect(c.pass).toBe(true);
       expect(fake.screenshots).toHaveLength(2);
     }
+  });
+});
+
+/**
+ * Round 8 (N2, docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md; the owner's
+ * decision: fail closed): a pixel assert's element under something of the app drawn over it — the tap's covers,
+ * ui-tree/draw-order.ts#exposure — or under the status band fails closed, as the keyboard case does, naming what
+ * lies over it; nothing is captured. Measured on the iPhone 17 (402x874, a 62-pt band): a colour assert on
+ * `value_date_select` at 24,30 PASSED on the status bar's #EFF1F4, its ocr read the bar's "Contacts"; one under
+ * CONTINUE sampled CONTINUE's #91919A. The same shapes, through the idb parser.
+ */
+describe('pixel asserts under chrome drawn over the element (round 8)', async () => {
+  const FORM = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
+  const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')).screens as Record<string, unknown[]>;
+  const CONTINUE = 'button "Continue to summary" (24,780 354x44)';
+  const REMEDY = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
+  const IPHONE = { width: 402, height: 874, statusBand: 62 };
+  /** The whole screen one colour: what the bar or the button would give the sampler. */
+  const solid = (hex: string) =>
+    png(402, 874, (p) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      for (let o = 0; o < p.data.length; o += 4) [p.data[o], p.data[o + 1], p.data[o + 2]] = [r, g, b];
+    });
+  /** The SWIFT form as idb lists it, in `app`'s window, with `extra` elements in content order (after the title, before CONTINUE). */
+  const swiftFormIn = (app: Record<string, unknown>, ...extra: Record<string, unknown>[]) => {
+    const elements = [app, ...FORM.slice(1, 3), ...extra, ...FORM.slice(3)];
+    const fake = new FakeAdapter({ form: parseIdbDescribeAll(JSON.stringify(elements)) }, 'form');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { ...IPHONE };
+    return fake;
+  };
+  const swiftForm = (...extra: Record<string, unknown>[]) => swiftFormIn(FORM[0], ...extra);
+  const VALUE_DATE = { type: 'Button', AXLabel: 'Value date', AXUniqueId: 'swift_payment.form.value_date_select', AXValue: null, frame: { x: 24, y: 30, width: 354, height: 52 } };
+  const MESSAGE = { type: 'StaticText', AXLabel: 'Message for my bank', AXUniqueId: null, AXValue: null, frame: { x: 42, y: 778, width: 160, height: 20 } };
+  const engineReading = (text: string) => {
+    const probe = { recognized: 0 };
+    const engine = {
+      recognize: async (_png: Buffer, regions: { id: string }[]) => {
+        probe.recognized += 1;
+        return regions.map((r) => ({ id: r.id, lines: [{ text, confidence: 1, x: 0, y: 0, w: 200, h: 30 }] }));
+      },
+    };
+    return { probe, engine };
+  };
+
+  it('the measured status-band case (value_date_select at 24,30 under the 62-pt band): the colour assert no longer PASSES on the bar\'s #EFF1F4 — it fails closed naming the band, nothing captured', async () => {
+    const fake = swiftForm(VALUE_DATE);
+    fake.nextScreenshot = solid('#EFF1F4');
+    const c = await new Verifier(fake, FAST).assert({ element: { id: 'swift_payment.form.value_date_select' }, color: { expected: '#FDFDFD', deltaE: 8, sample: 'dominant' } });
+    expect(c.pass).toBe(false);
+    expect(c.detail).toBe(`the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — ${REMEDY}; failing closed, color unchecked`);
+    expect(fake.screenshots).toHaveLength(0);
+
+    // …and the ocr assert does not read the bar's breadcrumb as the element's copy.
+    const ocr = swiftForm(VALUE_DATE);
+    const { probe, engine } = engineReading('Contacts');
+    const o = await new Verifier(ocr, { ...FAST, ocr: { engine } }).assert({ element: { id: 'swift_payment.form.value_date_select' }, ocr: { text: 'Value date' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toBe(`the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — ${REMEDY}; failing closed, rendered text unchecked`);
+    expect(probe.recognized).toBe(0);
+  });
+
+  it('the measured CONTINUE case ("Message for my bank" at 42,778 under CONTINUE at 24,780): fails closed naming the button — not a colour the element was blamed for', async () => {
+    const fake = swiftForm(MESSAGE);
+    fake.nextScreenshot = solid('#91919A');
+    const c = await new Verifier(fake, FAST).assert({ element: { text: 'Message for my bank' }, color: { expected: '#91919A' } });
+    expect(c.pass).toBe(false);
+    expect(c.detail).toBe(`${CONTINUE} is drawn over the element (element 42,778 160x20) — ${REMEDY}; failing closed, color unchecked`);
+    expect(fake.screenshots).toHaveLength(0);
+
+    const ocr = swiftForm(MESSAGE);
+    const { probe, engine } = engineReading('Message for my bank');
+    const o = await new Verifier(ocr, { ...FAST, ocr: { engine } }).assert({ element: { text: 'Message for my bank' }, ocr: { text: 'Message for my bank' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toBe(`${CONTINUE} is drawn over the element (element 42,778 160x20) — ${REMEDY}; failing closed, rendered text unchecked`);
+    expect(probe.recognized).toBe(0);
+  });
+
+  it('an ocr target under a navigation title laid after the content (a nested tree): fails closed naming the title', async () => {
+    resetLayout();
+    const full = { x: 0, y: 0, width: 402, height: 874 };
+    const row = node({ role: 'text', identifier: 'row_label', label: 'Payee', rect: { x: 24, y: 70, width: 354, height: 30 } });
+    const title = node({ role: 'text', label: 'SWIFT PAYMENT', rect: { x: 135, y: 73, width: 131, height: 22 } });
+    const tree = node({
+      role: 'application',
+      rect: full,
+      children: [node({ role: 'scrollable', rect: full, children: [row] }), node({ role: 'other', rect: { x: 0, y: 62, width: 402, height: 54 }, children: [title] })],
+    });
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { ...IPHONE };
+    fake.nextScreenshot = solid('#FFFFFF');
+    const { probe, engine } = engineReading('Payee');
+    const o = await new Verifier(fake, { ...FAST, ocr: { engine } }).assert({ element: { id: 'row_label' }, ocr: { text: 'Payee' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toBe(`text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 24,70 354x30) — ${REMEDY}; failing closed, rendered text unchecked`);
+    expect(probe.recognized).toBe(0);
+  });
+
+  it('a container element: its own descendants are never covers — measured as before', async () => {
+    resetLayout();
+    const card = node({
+      identifier: 'card',
+      rect: { x: 24, y: 200, width: 354, height: 100 },
+      children: [node({ role: 'text', label: 'Title', rect: { x: 40, y: 210, width: 200, height: 20 } }), node({ role: 'button', label: 'Go', rect: { x: 300, y: 250, width: 60, height: 40 } })],
+    });
+    const fake = new FakeAdapter({ s: node({ role: 'application', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [card] }) }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { ...IPHONE };
+    fake.nextScreenshot = solid('#3F3F50');
+    const c = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
+    expect(c.pass).toBe(true);
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('the non-covers the tap was taught stay non-covers: idb\'s modal listed before the content, and the form\'s rows clear of CONTINUE, are measured', async () => {
+    for (const [screen, id] of [
+      ['chooser', 'accounts.detail.payment_type_sheet.row_own'],
+      ['chooser', 'accounts.detail.payment_type_sheet.row_swift'],
+      ['valueDatePicker', 'swift_payment.form.value_date_picker'],
+      ['valueDatePicker', 'swift_payment.form.fees_select'],
+    ] as const) {
+      const fake = new FakeAdapter({ s: parseIdbDescribeAll(JSON.stringify(MODAL[screen])) }, 's');
+      fake.platform = 'ios';
+      fake.keyboard = undefined;
+      fake.viewportSize = { ...IPHONE };
+      fake.nextScreenshot = solid('#FDFDFD');
+      const c = await new Verifier(fake, FAST).assert({ element: { id }, color: { expected: '#FDFDFD' } });
+      expect([id, c.pass, c.detail]).toEqual([id, true, expect.stringContaining('sampled #FDFDFD')]);
+    }
+  });
+
+  it('no status band (Android today, a landscape window, or a device size that cannot be read): an element at the top is measured as before', async () => {
+    for (const shape of ['android', 'landscape', 'unread'] as const) {
+      const fake = swiftFormIn(shape === 'landscape' ? { ...FORM[0], frame: { x: 0, y: 0, width: 874, height: 402 } } : FORM[0], VALUE_DATE);
+      // The device reports its panel as built; a window held sideways turns it (geometry.ts#windowTurnsScreen), and a landscape screen has no band.
+      if (shape === 'android') fake.viewportSize = { width: 402, height: 874 };
+      if (shape === 'unread') {
+        fake.viewport = async () => {
+          throw new Error('idb describe: no screen_dimensions');
+        };
+      }
+      fake.nextScreenshot = shape === 'landscape' ? png(874, 402) : solid('#FDFDFD');
+      const c = await new Verifier(fake, FAST).assert({ element: { id: 'swift_payment.form.value_date_select' }, color: { expected: '#FFFFFF' } });
+      expect([shape, c.detail]).toEqual([shape, expect.stringContaining('vs expected #FFFFFF')]);
+    }
+  });
+
+  it('a finding like the keyboard\'s: an element scrolled out from under CONTINUE between rounds is measured — the cover cost one round, not the verdict', async () => {
+    const fake = swiftForm(MESSAGE);
+    fake.nextScreenshot = solid('#FDFDFD');
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      const tree = await real();
+      // From the second read on, the label sits clear of CONTINUE.
+      if (++reads >= 2) tree.children.find((n) => n.label === 'Message for my bank')!.rect.y = 700;
+      return tree;
+    };
+    const c = await new Verifier(fake, FAST).assert({ element: { text: 'Message for my bank' }, color: { expected: '#FDFDFD' } });
+    expect(c.pass).toBe(true);
+    expect(reads).toBe(2); // covered, nothing captured; then clear at 700, two captures that agree, measured
+    expect(fake.screenshots).toHaveLength(2);
+  });
+
+  it('the keyboard is asked first: an element under both the in-tree keyboard band and a cover reads as under the keyboard', async () => {
+    const fake = swiftForm(MESSAGE);
+    fake.live().children.push(node({ role: KEYBOARD_ROLE, rect: { x: 0, y: 589, width: 402, height: 285 } }));
+    fake.keyboardAdvice = 'ADVICE';
+    const c = await new Verifier(fake, FAST).assert({ element: { text: 'Message for my bank' }, color: { expected: '#FDFDFD' } });
+    expect(c.pass).toBe(false);
+    expect(c.detail).toMatch(/^the soft keyboard covers the element \(element 42,778 160x20, keyboard 0,589 402x285\)/);
   });
 });
 
