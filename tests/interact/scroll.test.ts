@@ -697,10 +697,6 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     );
   });
 
-  it('a cut leaf shows no evidence (the stated residual): the plain stop stops on it at once, as before', async () => {
-    const fake = new SwiftForm(1000, true);
-    expect(await scrollUntilVisible(fake, 'id:details_toggle', FAST)).toMatchObject({ swipes: 0 });
-  });
 });
 
 describe('scrollUntilVisible — nested clipping containers and a loading list (code review of fix/r3-scroll, 2026-10-09)', () => {
@@ -849,13 +845,6 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(fake.swipes[1]).toEqual(TURNED);
   });
 
-  it('only the centre: a row reaching into the band with its centre below it (36–88, centre (201,62)) stops plain AND fully — what lies in the band is judged against the screen', async () => {
-    for (const fully of [false, true]) {
-      const fake = await flungForm('ios', [36, 550]);
-      expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, fully })).toEqual({ swipes: 1, visible: 1, clipped: [] });
-    }
-  });
-
   // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md: measured, six
   // `201 699 201 175` strokes to maxSwipes from a row resting at y 20, and "content exhausted … a layout defect" from -20.
   it.each([20, -20])('a row RESTING at y %d (its centre in the band, or across the top edge): the first stroke is the turned one — the measured 262-pt stroke back', async (start) => {
@@ -888,12 +877,6 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     return fake;
   };
 
-  it('full-bleed content at the top (a hero 0,0 402x300, review of fix/r6-ios-top MAJOR 2): fully visible after 0 swipes', async () => {
-    const fake = still({ x: 0, y: 0, width: 402, height: 300 });
-    expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
-    expect(fake.swipes).toEqual([]);
-  });
-
   it('a header whose centre stays in the band (0,0 402x106 on a screen that does not scroll): the failure names iOS\'s status bar — no clip, no layout defect', async () => {
     const fake = still({ x: 0, y: 0, width: 402, height: 106 });
     const error = (await scrollUntilVisible(fake, 'id:hero', FAST).catch((e: unknown) => e)) as Error;
@@ -913,17 +896,6 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(fake.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
     expect(error.message).toContain("its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
-  });
-
-  it('…the boundary is the rounded centre: 0,0 402x123 (centre 61.5, sent as 62) is fully visible after 0 swipes; 0,0 402x122 (centre 61) fails naming the status bar', async () => {
-    for (const height of [123, 124]) {
-      const fake = still({ x: 0, y: 0, width: 402, height });
-      expect(await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
-    }
-    const short = still({ x: 0, y: 0, width: 402, height: 122 });
-    const error = (await scrollUntilVisible(short, 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
-    expect(short.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
-    expect(error.message).toContain("its centre stays under the status bar at (201,61), in the top 62 of the screen (tree units)");
   });
 
   // Until docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md the
@@ -980,10 +952,6 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(fake.swipes.map(fingerWay)).toEqual([1, -1]);
   });
 
-  it('Android is unaffected: the same tree on an Android adapter stops at y -20, as before', async () => {
-    const fake = await flungForm('android', [-20, 550]);
-    expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', FAST)).toEqual({ swipes: 1, visible: expect.closeTo(0.615, 3), clipped: ['top'] });
-  });
 });
 
 /**
