@@ -34,11 +34,10 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * registered on a server this module BUILDS but never connects.
  *
  * Importing this file has no side effects — no registry, no transport, no
- * version read. Until 2026-10-03 the registrations lived in mcp/server.ts,
- * which constructed the registry and the server at module top level and ended
- * in a top-level `await server.connect(stdio)`: importing it opened a stdio
- * transport, so no handler could be exercised by a test. Three review rounds
- * hit that wall — a mutant replacing ensure_state's settled frame with a bare
+ * version read. Registrations in mcp/server.ts, which constructs the server
+ * and ends in a top-level `await server.connect(stdio)`, would open a stdio
+ * transport on import, so no handler could be exercised by a test. That
+ * wall was hit three times — a mutant replacing ensure_state's settled frame with a bare
  * `adapter.screenshot()` survived the whole suite, "tap and type_text refuse
  * an ambiguous selector" was verified only by reading, and tool-text.ts,
  * lifecycle.ts and util/version.ts were each split out because server.ts
@@ -53,7 +52,7 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * response content, `isError`.
  *
  * What is injected, and what is not: the registry (whose AdapterFactory seam
- * already existed; its DeviceDiscovery joined it 2026-10-08) and the version
+ * also carries its DeviceDiscovery) and the version
  * string. Config and contract files stay real files read from disk — a test
  * writes an averi.yaml into a temp dir and passes `configPath`, as a user
  * would. Rejected: a config-loader or file-system parameter. It would be a
@@ -61,28 +60,26 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * path-resolution rules (projectConfigPath, baselineDirFor) are exactly what
  * such a fake would skip.
  *
- * What a handler holds, since 2026-10-03 (later the same day; the same list
- * as ARCHITECTURE.md §2): its description and input schema, which includes
+ * What a handler holds (the same list as ARCHITECTURE.md §2): its description and input schema, which includes
  * parsing the assert specs; resolving the platform to an adapter through the
  * registry, this layer's own state; the config it needs, read ONCE per
  * call by flow/tool-config.ts#loadForCall under the tool's entry in
- * mcp/config-policy.ts#TOOL_CONFIG (since 2026-10-08; until then each
- * handler chose one of four loaders by hand, and `assert` ran two of them), and the
+ * mcp/config-policy.ts#TOOL_CONFIG (not one of four loaders chosen by hand
+ * per handler, where `assert` ran two of them), and the
  * answers asked of that loaded config (which build to install, which iOS
  * tree source and dismissals — flow/); one call into an adapter method,
  * interact/, run/ or flow/launch.ts (launch_app's, which resolves the
- * activity itself since 2026-10-09), handed the loaded config rather than a
+ * activity itself), handed the loaded config rather than a
  * path to read again; and the response — text through tool-text.ts or the
  * callee (a fill's through interact/fill-text.ts, shared with the flow line), wrapped by `text`/`image` below. The sequences once written out
  * here (ensure_state, run_flow, assert, the contract file read) are below
  * this layer.
  *
- * That is several statements, not one: this comment first said "ONE
- * delegation" and overclaimed. `install_app` chooses between the given path
+ * That is several statements, not "ONE delegation". `install_app` chooses between the given path
  * and the config's; `assert` parses its specs, resolves the adapter and the
  * baseline dir, then calls runAsserts; `verify` is the widest — it loads the
  * config, parses the specs, then calls runVerification. Every handler that
- * reads averi.yaml now starts with the same line, `loadForCall(TOOL_CONFIG.<tool>(…), cp)`
+ * reads averi.yaml starts with the same line, `loadForCall(TOOL_CONFIG.<tool>(…), cp)`
  * — the read stays here, above run/, so the policy has one caller shape
  * and nothing below reads the file again.
  */
@@ -118,8 +115,8 @@ const treeOpts = (settings: IosToolSettings): AdapterOpts => ({ treeSource: sett
  * ambiguous selector is REFUSED — an agent exploring through the tools has
  * not seen the tree it would be guessing in (interact/resolve.ts, Ambiguity;
  * a flow step picks the first, flow/engine.ts#FLOW_AMBIGUITY) — and the
- * call's dismissals go to the keyboard guard. Given once, as treeOpts is
- * (2026-10-09; the two handlers spelled it out until then); a fill adds its
+ * call's dismissals go to the keyboard guard. Given once, as treeOpts is,
+ * not spelled out per handler; a fill adds its
  * `clear`.
  */
 const guardOpts = (settings: IosToolSettings): Pick<GuardOptions, 'ambiguous' | 'dismissals'> => ({ ambiguous: 'refuse', dismissals: settings.dismissals });
@@ -150,9 +147,8 @@ const launchIntentInput = z
 /**
  * The operation defaults as the tool descriptions quote them — each derived
  * from the constant its module owns, so a default changed there cannot leave
- * a description stale (architecture review 2026-10-07, mcp-surface candidate
- * 3: half the numbers were derived, half were literals — "3 s" in three
- * places, "12 s", "Default 6", "~20 s"). tests/mcp/tool-descriptions.test.ts pins each
+ * a description stale (literals — "3 s" in three places, "12 s", "Default
+ * 6", "~20 s" — went stale beside derived numbers). tests/mcp/tool-descriptions.test.ts pins each
  * description against its constant.
  */
 const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/resolve.ts
@@ -197,9 +193,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   // The session's state that outlives one engine run — the clearState count
   // (flow/launch.ts#EngineSession). One per server: the server IS the
   // session. Every tool that runs the engine (ensure_state, run_flow, verify)
-  // hands it down, and launch_app, which wipes through the same launch
-  // (since 2026-10-09); until 2026-10-07 it was a module global in the
-  // engine, shared by every server in the process.
+  // hands it down, and launch_app, which wipes through the same launch. Not
+  // a module global in the engine, which every server in the process would
+  // share.
   const session = new EngineSession();
 
   registerTool(

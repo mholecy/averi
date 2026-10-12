@@ -7,8 +7,7 @@ import { sleep } from '../util/sleep.js';
 import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type Target } from './resolve.js';
 
 /**
- * The seam between the two keyboard models (2026-10-07, the keyboard-model
- * review): what `keyboard.ts` — the guard and the post-fill dismissal,
+ * The seam between the two keyboard models: what `keyboard.ts` — the guard and the post-fill dismissal,
  * written once — needs of a model, and what both models share. A soft
  * keyboard is one of two things to a platform, and each is an adapter at
  * this seam:
@@ -19,12 +18,12 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  *   tree, read off the band the tree source marks, hidden by one tap on an
  *   element the config names — iOS under WDA.
  * Which one an adapter gets is decided ONCE, from whether it has the oracle
- * (`keyboard.ts#keyboardModel`); until this date the same question was asked
- * again inside the guard and again inside the dismissal, and each branch
- * re-wrote the shape every model shares — one irreversible side effect, the
- * hide delay, the target resolved AGAIN with the same options, a reading
- * against where it is now, a refusal if it still covers — around its own
- * decisions and words. The shape is `keyboard.ts`'s now; the decisions, the
+ * (`keyboard.ts#keyboardModel`), not again inside the guard and again inside
+ * the dismissal, where each branch would re-write the shape every model
+ * shares — one irreversible side effect, the hide delay, the target resolved
+ * AGAIN with the same options, a reading against where it is now, a refusal
+ * if it still covers — around its own decisions and words. The shape is
+ * `keyboard.ts`'s; the decisions, the
  * side effect and the words are the model's (`KeyboardModel`, `Hiding`).
  *
  * The READING half — what the keyboard covers, and whether the input
@@ -34,21 +33,21 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * must read it the same way. Every look the guard takes, every re-check
  * round and both models' dismissals ask a reading, so the guard and the
  * poll see one keyboard by construction, and neither model calls the
- * oracle itself (since 2026-10-09).
+ * oracle itself.
  */
 
 /**
  * The pause before every look that follows a covering reading or the one
  * side effect — `confirmHidden` sleeps it before each of its looks, the
- * in-tree model before its second look. Measured 2026-10-03 (API 33
- * emulator): ~0.4 s after `back` the IME insets already read
+ * in-tree model before its second look. Measured on an API 33
+ * emulator: ~0.4 s after `back` the IME insets already read
  * `visible=false` but still carried the keyboard's full frame — the hide
  * animation was running — and ~0.9 s after, the frame was empty. The settle
  * poll that follows adds its own two tree reads on top (a uiautomator dump
  * is about a second each), so this is the floor, not the whole wait: it
  * keeps the FIRST of those reads from seeing the pre-resize layout twice
  * and calling it settled. On iOS the hide animation's length is still
- * unmeasured (as of 2026-10-08) — the in-tree model's looks take the same
+ * unmeasured — the in-tree model's looks take the same
  * pause for the same reason (a hide animation caught mid-way must not be a
  * refusal), and its KEYBOARD_HIDE_CONFIRM_LOOKS says how many of them it
  * takes; what was observed there is that pause plus the first read of a
@@ -61,7 +60,7 @@ export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' 
 
 /**
  * A resolved node whose tap point no soft keyboard covers, and the point a
- * tap on it goes to — its centre, or since 2026-10-09 an uncovered piece of
+ * tap on it goes to — its centre, or an uncovered piece of
  * it when a node of the app is drawn over the centre
  * (resolve.ts#aimClearOfChrome).
  */
@@ -80,7 +79,7 @@ export interface ResolvedClear extends Resolved {
   /**
    * Set when the guard had to do something before the tap — the sentence
    * itself: `back` pressed and the keyboard hidden; pressed and unconfirmed;
-   * a configured dismissal tapped; or, since 2026-10-04, nothing pressed but
+   * a configured dismissal tapped; or nothing pressed but
    * a wait for a window state the input method contradicted. It is ALSO
    * folded into `note`, so a caller that prints notes (the MCP tools) needs
    * nothing new; a caller that does not (the flow trace) reads this field to
@@ -107,8 +106,7 @@ export class KeyboardGuardError extends Error {
 }
 
 /**
- * One way to hide the in-tree keyboard without submitting (stage B,
- * 2026-10-07), tried by the in-tree model only where it would otherwise
+ * One way to hide the in-tree keyboard without submitting, tried by the in-tree model only where it would otherwise
  * refuse — never by the window model, whose `back` is the dismissal. The
  * config's vocabulary (`app.ios.keyboardDismiss`, flow/config.ts) is
  * converted to this before it crosses into interact/, which knows neither
@@ -131,7 +129,7 @@ export interface GuardOptions extends SettleOptions {
   /**
    * Tried in order on the tree of the look that found the keyboard covering;
    * the FIRST whose element is on screen and usable is tapped, once. Absent
-   * or empty: the guard refuses a covered target as it did before stage B.
+   * or empty: the guard refuses a covered target.
    * Read by the in-tree model only — the window model never sees them, so
    * an Android run with dismissals configured is the same run.
    */
@@ -141,11 +139,11 @@ export interface GuardOptions extends SettleOptions {
 /** What `dismissKeyboard` takes of the guard's options: the dismissals it may tap and the ambiguity policy they are judged under — no default policy is written here. The settle options are not among them: it resolves nothing. */
 export type DismissOptions = Pick<GuardOptions, 'dismissals' | 'ambiguous'>;
 
-/** What `dismissKeyboard` did, for the caller's trace: at most one of the two — on the window model never `hiddenBy`, and `warning` only on its `unlocated` row (since 2026-10-08). */
+/** What `dismissKeyboard` did, for the caller's trace: at most one of the two — on the window model never `hiddenBy`, and `warning` only on its `unlocated` row. */
 export interface DismissResult {
   /** The in-tree keyboard was up and this hid it: `tapping id:"login_title"`, the fragment the flow's fill line appends after `; keyboard hidden by ` — not a `keyboardHidden` sentence, so the engine's `⚠` tracing cannot take this result by mistake. */
   hiddenBy?: string;
-  /** A keyboard was left up, said so — the flow logs it as a `⚠ fill` line: on the in-tree model, up with nothing usable configured; on the window model (2026-10-08), reported by the input method with no area in the window state, nothing pressed (keyboard-window.ts#dismissal, `unlocated`). */
+  /** A keyboard was left up, said so — the flow logs it as a `⚠ fill` line: on the in-tree model, up with nothing usable configured; on the window model, reported by the input method with no area in the window state, nothing pressed (keyboard-window.ts#dismissal, `unlocated`). */
   warning?: string;
 }
 
@@ -205,9 +203,9 @@ export interface Look {
  * decides, never the witness: on the window model this is the look after
  * `back`, and the key is already pressed. The reading is the first look's
  * rule on every look: a target that is the keyboard's own UI reads
- * `unknown` and the oracle is not asked — until 2026-10-07 that look called
+ * `unknown` and the oracle is not asked — rather than calling
  * `oracle.state()` directly, so an oracle adapter handed an
- * `ofKeyboard`-marked tree would now skip that read and proceed as unknown;
+ * `ofKeyboard`-marked tree skips that read and proceeds as unknown;
  * no real adapter produces one (the Android tree is never marked), so the
  * difference is unreachable, and the event-log pins hold. A resolution that
  * fails — the target not coming back, or coming back ambiguous — is the
