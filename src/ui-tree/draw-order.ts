@@ -131,7 +131,8 @@ export interface DrawOrder {
    * short of its own content would gain (adapters/android.ts#widenUnderCovers,
    * through types.ts#DrawnOverStrip). Rects as the tree gives them — no
    * flat-list reach, no tab-bar item listed before the node: a nested tree's
-   * order is its draw order. Empty for a node not in this tree.
+   * order is its draw order. Empty for a node not in this tree. The parser
+   * asks only whether it is empty; the list is for diagnosis and tests.
    */
   coversOf(node: UiNode, region: Rect): readonly UiNode[];
   /**
@@ -352,6 +353,9 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
   rectWithin(target.node.rect, node.rect) &&
   (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
+/** `inner` lies in `outer`'s subtree (or is it). */
+const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
+
 /** Some node from `from` up to, not including, `above` `fillsScreen`: a screen-sized layer around `from` below `above`. */
 const screenLayerBelow = (from: Placed | undefined, above: Placed, screenArea: number): boolean => {
   for (let p = from; p !== undefined && p !== above; p = p.parent) if (fillsScreen(p.node.rect, screenArea)) return true;
@@ -373,9 +377,6 @@ const stackedScreens = (scroller: Placed, target: Placed, screenArea: number): b
   if (both.parent === undefined && rectArea(both.node.rect) === 0) return true;
   return screenLayerBelow(scroller, both, screenArea) && screenLayerBelow(target.parent, both, screenArea);
 };
-
-/** `inner` lies in `outer`'s subtree (or is it). */
-const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
 
 /**
  * The roles whose frame is not a surface: a node of one, non-interactive and

@@ -378,9 +378,7 @@ export interface UiNode {
    * exact x and width, cut to the nearest clipping ancestor
    * (`clipsDescendants`), and only where something is drawn over the strip
    * gained, as draw order's target column judges it for this node
-   * (DrawnOverStrip; every excuse of that column applies — e.g. never under a
-   * screen-sized wrapper with nothing of its own there, a snackbar host, nor
-   * a bare structural node or a childless scrim); a control
+   * (DrawnOverStrip; what draws is ui-tree/draw-order.ts's `NOT_DRAWN`); a control
    * padded inside its wrapper (`paddedTouchTargets`), a full-bleed child and
    * a child overflowing both edges never widen it either. Residuals,
    * stated: a node cut at BOTH ends (a tall card between a sticky header and
