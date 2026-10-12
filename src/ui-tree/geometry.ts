@@ -434,6 +434,41 @@ export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boole
   return fits({ width: screen.height, height: screen.width }) && !fits(screen);
 }
 
+/**
+ * The device's screen as a box in the tree's units, anchored at the origin —
+ * the ONE derivation (code review of round 8, S3: interact/swipe.ts#screenBox
+ * and verify/pixel-poll.ts#chromeOverElement each wrote it, with different
+ * fallbacks; verify/ may not import interact/, so it lives here):
+ * - `device` — the size the device reported (`DeviceAdapter.viewport`) when
+ *   it is usable, turned when the tree's window says the panel is held
+ *   sideways (`windowTurnsScreen`, `size` being the tree's
+ *   `inferScreenSize`; no tree, no turn);
+ * - `window` — else the tree's window, only when the tree vouches for it:
+ *   `reliable` AND a window's own height (`trustworthyHeight` — a walked
+ *   height is the lowest content edge, which a scroll view inflates without
+ *   limit) and usable. The one fallback rule, the gesture box's: a tree that
+ *   cannot vouch for a window is never taken for the screen;
+ * - undefined — neither. The caller says what that means: the gesture box
+ *   throws (nothing is swiped), the pixel assert judges on the tree's own
+ *   screen (`screenOf`, the one draw-order.ts sizes its hosts against —
+ *   and with no device, no status band).
+ */
+export type DeviceBox =
+  | { readonly from: 'device'; readonly box: Rect; readonly device: DeviceScreen; readonly sideways: boolean }
+  | { readonly from: 'window'; readonly box: Rect };
+
+export function deviceBox(device: DeviceScreen | undefined, size: ScreenSize | undefined): DeviceBox | undefined {
+  if (device !== undefined && usableScreen(device)) {
+    const sideways = size !== undefined && windowTurnsScreen(size, device);
+    const { width, height } = sideways ? { width: device.height, height: device.width } : device;
+    return { from: 'device', box: { x: 0, y: 0, width, height }, device, sideways };
+  }
+  if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
+    return { from: 'window', box: { x: 0, y: 0, width: size.width, height: size.height } };
+  }
+  return undefined;
+}
+
 // ─── Viewport predicates ─────────────────────────────────────────────────────
 
 /**

@@ -291,3 +291,31 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
     );
   });
 });
+
+/**
+ * Code review of round 8, S3: the screen a pixel assert judges in is geometry.ts#deviceBox's — the gesture box's
+ * derivation. With the device silent, a window the tree vouches for is the screen, not the tree's largest node.
+ */
+describe('the screen without the device: the window the tree vouches for (geometry.ts#deviceBox)', () => {
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
+  const silent = { viewport: async (): Promise<DeviceScreen> => Promise.reject(new Error('idb describe: no screen_dimensions')) };
+
+  it('a rectless root whose largest node is a 402x1300 scroll content: the 402x874 window is the screen, so a window-sized element is the screen itself', async () => {
+    const element = n('container', rect(0, 40, 402, 834), { identifier: 'page' });
+    const pay = n('button', rect(24, 600, 354, 52), { label: 'Pay' });
+    const window = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 1300)), element, pay] });
+    const tree = n('container', rect(0, 0, 0, 0), { children: [window] });
+    // Until S3 the tree's screen (screenOf: the 402x1300 content) — the page was no screen-sized element and was offered a scroll.
+    expect(await chromeOverElement(silent, tree, element)).toMatch(
+      /^button "Pay" \(24,600 354x52\) is drawn over the element \(element 0,40 402x834\) — the capture would show it, not the element; no scroll moves the screen itself/,
+    );
+  });
+
+  it('a tree that vouches for no window (no screen-shaped child: a walked height) still judges on its own screen, with no band', async () => {
+    const element = n('container', rect(0, 0, 402, 200), { identifier: 'row' });
+    const tree = n('container', rect(0, 0, 0, 0), { children: [n('other', rect(0, 0, 402, 1300), { children: [element] }), n('other', rect(0, 150, 402, 100), { label: 'Bar' })] });
+    expect(await chromeOverElement(silent, tree, element)).toMatch(/^other "Bar" \(0,150 402x100\) is drawn over the element \(element 0,0 402x200\)/);
+  });
+});
+

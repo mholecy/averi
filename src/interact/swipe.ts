@@ -1,5 +1,5 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
-import { containsPoint, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type Edge, type ScreenSize } from '../ui-tree/geometry.js';
+import { containsPoint, deviceBox, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, type Edge, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -609,20 +609,20 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   const unread = `the UI tree could not be read${read.error !== undefined ? ` (${read.error.message})` : ''}`;
   const size = tree === undefined ? undefined : inferScreenSize(tree);
 
-  if (device !== undefined && usableScreen(device)) {
-    const sideways = size !== undefined && windowTurnsScreen(size, device);
-    const { width, height } = sideways ? { width: device.height, height: device.width } : device;
-    const box = { x: 0, y: 0, width, height };
+  // The device, turned as the window says, else a window the tree vouches for (geometry.ts#deviceBox, the one derivation).
+  const screen = deviceBox(device, size);
+  if (screen?.from === 'device') {
+    const { box, sideways } = screen;
     return {
       box,
-      ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
-      boxes: judgedBoxes(size, device, box, sideways),
-      ...(device.statusBand !== undefined && { statusBand: device.statusBand }),
+      ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${box.width}x${box.height}` }),
+      boxes: judgedBoxes(size, screen.device, box, sideways),
+      ...(screen.device.statusBand !== undefined && { statusBand: screen.device.statusBand }),
     };
   }
-  if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
-    const box = { x: 0, y: 0, width: size.width, height: size.height };
-    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`, boxes: [box] };
+  if (screen?.from === 'window') {
+    const { box } = screen;
+    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${box.width}x${box.height}`, boxes: [box] };
   }
   const treeProblem =
     size === undefined

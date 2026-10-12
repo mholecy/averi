@@ -1,7 +1,7 @@
-import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, usableScreen, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, containsPoint, inferScreenSize, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect, screenOf, windowTurnsScreen } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, deviceBox, inferScreenSize, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect, screenOf } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
@@ -507,11 +507,18 @@ async function keyboardOverElement(
  * element.md: fail closed). Header, "Since round 8". Exported for the
  * fixture sweeps (tests/verify/pixel-chrome.test.ts).
  *
- * The screen is the device's (`viewport()`, memoized by the adapter, in the
- * tree's units), turned when the tree's window says it is held sideways
- * (geometry.ts#windowTurnsScreen, the gesture box's rule); the tree's
- * screen (`screenOf`) when the device size cannot be read or is unusable —
- * and then no band. The band is `DeviceScreen.statusBand` at the top of a
+ * The screen is geometry.ts#deviceBox's, the gesture box's derivation
+ * (interact/swipe.ts#screenBox; one owner since the code review of round 8,
+ * S3): the device's (`viewport()`, memoized by the adapter, in the tree's
+ * units), turned when the tree's window says it is held sideways; else the
+ * tree's window when the tree vouches for it (reliable, a window's own
+ * height); else the tree's own screen (`screenOf`, what draw-order.ts
+ * sizes its hosts against) — and without the device, no band. Until S3 the
+ * tree's screen was taken whenever the device was silent, so a rectless
+ * root whose largest node is a scroll view's tall content (402x2000 under
+ * a 402x874 window) judged the window as no screen-sized element and
+ * offered it a scroll; the vouched-for window is the screen now, as it is
+ * for the gesture. The band is `DeviceScreen.statusBand` at the top of a
  * portrait screen (geometry.ts#belowStatusBand — the tap's and
  * `scroll_until`'s rule; iOS's, and Android's visible status bar since fix/r8-band). The covers
  * are the PIXEL covers (ui-tree/draw-order.ts#paintsOver, judged in the
@@ -562,12 +569,11 @@ export async function chromeOverElement(
   element: UiNode,
   reads: Rect = element.rect,
 ): Promise<string | undefined> {
-  const reported = await adapter.viewport().catch(() => undefined);
-  const device = reported !== undefined && usableScreen(reported) ? reported : undefined;
-  const turned = device !== undefined && windowTurnsScreen(inferScreenSize(tree), device);
-  const screen: Rect =
-    device === undefined ? screenOf(tree) : { x: 0, y: 0, width: turned ? device.height : device.width, height: turned ? device.width : device.height };
-  const below = belowStatusBand(screen, device);
+  // The device's screen, turned as the window says, else a window the tree vouches for (geometry.ts#deviceBox, the
+  // gesture box's derivation); with neither, the tree's own screen — and no band, which only the device reports.
+  const found = deviceBox(await adapter.viewport().catch(() => undefined), inferScreenSize(tree));
+  const screen = found?.box ?? screenOf(tree);
+  const below = belowStatusBand(screen, found?.from === 'device' ? found.device : undefined);
   const band: Rect = { ...screen, height: below.y - screen.y };
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
