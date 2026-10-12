@@ -47,14 +47,18 @@ const ROWS =
   // A back button where mp-native's sits, centre (77,154).
   `<node index="3" text="" resource-id="" class="android.widget.ImageButton" package="com.google.android.contacts" content-desc="Navigate up" bounds="${bounds(33, 110, 88, 88)}"/>`;
 
-const adapterOver = async (xml: string) => {
+/** `xml` is the tree every dump returns, or a function of the content's offset, which each `input swipe` moves by its dy. */
+const adapterOver = async (xml: string | ((offset: number) => string)) => {
+  let offset = 0;
   const dump = await readFile(new URL('../fixtures/dumpsys-window-displays-api33-keyboard-hidden.txt', import.meta.url), 'utf8');
   const calls: string[] = [];
   const fn: ExecFn = async (cmd, args) => {
     const full = [cmd, ...args].join(' ');
     calls.push(full);
     const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
-    if (full.includes('uiautomator dump')) return out(xml);
+    const swipe = full.match(/input swipe \d+ (\d+) \d+ (\d+) \d+$/);
+    if (swipe) offset += Number(swipe[2]) - Number(swipe[1]);
+    if (full.includes('uiautomator dump')) return out(typeof xml === 'string' ? xml : xml(offset));
     if (full === wmSize) return out('Physical size: 1080x2220\n');
     if (full === displays) return out(dump);
     if (full.includes('dumpsys input_method')) return out('  mInputShown=false\n');
@@ -71,7 +75,7 @@ describe('Android\'s status band through AndroidAdapter and adb', () => {
     const refusal = await tapElement(adapter, 'text:"All contacts"', OPTS).catch((e: unknown) => e);
     expect(refusal).toBeInstanceOf(OffScreenRefusal);
     expect((refusal as Error).message).toBe(
-      'text:"All contacts" is under the status bar at (256,3) — the screen\'s top 66, where a tap goes to the status bar ' +
+      'text:"All contacts" is under the status bar at (256,3), in the top 66 of the screen (tree units), where a tap goes to the status bar ' +
         '(rect 149,0 213x6) — it lies in a scroll view — scroll_until it first, to move it out from under the bar; nothing was tapped',
     );
     expect(calls.some((c) => c.includes('input tap'))).toBe(false);
@@ -81,7 +85,7 @@ describe('Android\'s status band through AndroidAdapter and adb', () => {
     const { adapter, calls } = await adapterOver(contacts(ROWS));
     const failure = await scrollUntilVisible(adapter, 'text:"All contacts"', { maxSwipes: 2, settleMs: 0, timeoutMs: 5_000 }).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/under the status bar at \(256,3\) — the screen's top 66,/);
+    expect((failure as Error).message).toMatch(/under the status bar at \(256,3\), in the top 66 of the screen \(tree units\),/);
     expect(calls.some((c) => c.includes('input swipe'))).toBe(true);
   });
 
@@ -91,5 +95,51 @@ describe('Android\'s status band through AndroidAdapter and adb', () => {
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 1010 154');
     await tapElement(adapter, 'label:"Navigate up"', OPTS);
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 77 154');
+  });
+
+  /**
+   * The list as a scroller moves it (round 6b's rules, re-checked on Android as the note asks): `All contacts` laid out
+   * at `149,-49 213x55`, uiautomator cutting it to the list's top — `149,0 213x6` before any swipe — and each stroke
+   * moving it by its dy. The device check measured `fully: true` stopping at `149,149 213x55` after one stroke.
+   */
+  const moving = (offset: number) => {
+    const top = -49 + offset;
+    const shown = Math.max(0, top);
+    const label = `<node index="0" text="All contacts" resource-id="" class="android.widget.TextView" package="com.google.android.contacts" content-desc="" bounds="${bounds(149, shown, 213, Math.max(0, top + 55 - shown))}"/>`;
+    return contacts(ROWS).replace(/<node index="0" text="All contacts"[^>]*\/>/, label);
+  };
+  const strokes = (calls: string[]) =>
+    calls.flatMap((c) => {
+      const m = c.match(/input swipe \d+ (\d+) \d+ (\d+) \d+$/);
+      return m ? [Number(m[2]) - Number(m[1])] : [];
+    });
+
+  it('fully: true on the Contacts shape: one stroke drawing the content DOWN, and the stop wholly below the band', async () => {
+    const { adapter, calls } = await adapterOver(moving);
+    const r = await scrollUntilVisible(adapter, 'text:"All contacts"', { fully: true, maxSwipes: 4, settleMs: 0, timeoutMs: 5_000 });
+    const d = strokes(calls);
+    expect(d).toHaveLength(1);
+    expect(d[0]).toBeGreaterThan(0);
+    expect(r.swipes).toBe(1);
+    const tree = moving(d[0]);
+    expect(tree).toContain(`text="All contacts" resource-id="" class="android.widget.TextView" package="com.google.android.contacts" content-desc="" bounds="[149,${-49 + d[0]}]`);
+    expect(-49 + d[0]).toBeGreaterThanOrEqual(66);
+  });
+
+  it('the far-edge turn, the band its reason: a plain scroll_until (direction down, strokes push content UP) turns its first stroke back, and stops once the centre is below the band', async () => {
+    const { adapter, calls } = await adapterOver(moving);
+    const r = await scrollUntilVisible(adapter, 'text:"All contacts"', { maxSwipes: 4, settleMs: 0, timeoutMs: 5_000 });
+    const d = strokes(calls);
+    expect(d.length).toBeGreaterThanOrEqual(1);
+    expect(d[0]).toBeGreaterThan(0); // turned: content drawn down, not up past the top
+    expect(r.swipes).toBe(d.length);
+    const offset = d.reduce((a, b) => a + b, 0);
+    expect(-49 + offset + 55 / 2).toBeGreaterThanOrEqual(66); // the centre the tap would press, below the band
+  });
+
+  it('a Compose list (no scrollable role, only uiautomator\'s scrollable="true") counts as a scroll view in the refusal\'s remedy', async () => {
+    const compose = contacts(ROWS).replace('class="androidx.recyclerview.widget.RecyclerView"', 'class="android.view.View"');
+    const { adapter } = await adapterOver(compose);
+    await expect(tapElement(adapter, 'text:"All contacts"', OPTS)).rejects.toThrow(/it lies in a scroll view — scroll_until it first/);
   });
 });

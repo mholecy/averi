@@ -236,7 +236,7 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
-/** `its centre stays under the status bar at (201,53) — the screen's top 62, …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
+/** `its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
 const statusBarText = (judged: Judged, band: number): string => `its centre stays ${underStatusBar(tapPoint(judged.node), band)}`;
 
 /** "after swipe 2", "before the first swipe" — when the target was last in the frame. */

@@ -1558,7 +1558,7 @@ describe('iOS\'s status band (2026-10-09)', () => {
     const error = await tapElement(fake, PRIORITY, OPTS).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OffScreenRefusal);
     expect((error as Error).message).toBe(
-      `${PRIORITY} is under the status bar at (201,6) — the screen's top 62, where a tap goes to the status bar ` +
+      `${PRIORITY} is under the status bar at (201,6), in the top 62 of the screen (tree units), where a tap goes to the status bar ` +
         '(rect 24,-20 354x52) — if it lies in a scroll view, scroll_until it first, to move it out from under the bar; ' +
         'if not, no scroll moves it out: it is pinned under the status bar (a layout that does not keep clear of it?) — fix the layout, or tap something else; nothing was tapped',
     );
@@ -1587,7 +1587,7 @@ describe('iOS\'s status band (2026-10-09)', () => {
       const error = await tapElement(fake, 'id:close', OPTS).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(OffScreenRefusal);
       expect((error as Error).message).toBe(
-        "id:close is under the status bar at (362,34) — the screen's top 62, where a tap goes to the status bar (rect 340,14 44x40) — " +
+        "id:close is under the status bar at (362,34), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 340,14 44x40) — " +
           'it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a layout that does not keep clear of it?) — fix the layout, or tap something else; nothing was tapped',
       );
       expect((error as Error).message).not.toContain('scroll_until');

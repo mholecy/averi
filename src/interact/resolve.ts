@@ -547,17 +547,18 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
 }
 
 /**
- * The status band as one clause — `under the status bar at (201,6) — the
- * screen's top 62, where a tap goes to the status bar` — the words for a
- * point there, read by the tap's refusal (`refuseOffScreen`) and by
- * `scroll_until`'s failures (scroll-text.ts), so the two say the one fact
- * alike (code review of round 6, S5). Platform-neutral since 2026-10-12,
- * when Android reported its band too: no platform named, and the band in
- * the tree's own units, unnamed (pt on iOS, px on Android — until then the
+ * The status band as one clause — `under the status bar at (201,6), in the
+ * top 62 of the screen (tree units), where a tap goes to the status bar` —
+ * the words for a point there, read by the tap's refusal
+ * (`refuseOffScreen`) and by `scroll_until`'s failures (scroll-text.ts),
+ * so the two say the one fact alike (code review of round 6, S5).
+ * Platform-neutral since 2026-10-12, when Android reported its band too: no
+ * platform named, and the band in the tree's units — pt on iOS, px on
+ * Android, the units every rect in the same reply is in (until then the
  * clause said "iOS's status bar … the top 62 pt").
  */
 export const underStatusBar = (at: Point, band: number): string =>
-  `under the status bar at (${at.x},${at.y}) — the screen's top ${band}, where a tap goes to the status bar`;
+  `under the status bar at (${at.x},${at.y}), in the top ${band} of the screen (tree units), where a tap goes to the status bar`;
 
 /**
  * The diagnosis of a target no scroll moves out from under the status bar, in the tap's refusal (`statusBarRemedy`) and in

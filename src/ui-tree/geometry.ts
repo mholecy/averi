@@ -802,14 +802,15 @@ export function cutSliver(node: UiNode, chain: readonly Rect[], minPiece: number
  * has no ancestry, and a node of another tree has none here. The tap's
  * status-bar refusal asks it to say whether `scroll_until` can move the
  * target out from under the bar (interact/resolve.ts#statusBarRemedy, code
- * review of round 6, P1). One walk, stopping at the node. iOS only, as
- * the band is: `clipsDescendants` (Android's mark) is deliberately not read.
+ * review of round 6, P1). One walk, stopping at the node. Android's band
+ * too since 2026-10-12, so Android's mark of a node that scrolls now
+ * (`clipsDescendants`: a Compose list has no `scrollable` role) counts.
  */
 export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined {
   if (tree.flatList === true) return undefined;
   const walk = (n: UiNode, scrolled: boolean): boolean | undefined => {
     if (n === node) return scrolled;
-    const below = scrolled || n.role === 'scrollable' || n.role === 'webview';
+    const below = scrolled || n.role === 'scrollable' || n.role === 'webview' || n.clipsDescendants === true;
     for (const child of n.children) {
       const found = walk(child, below);
       if (found !== undefined) return found;
