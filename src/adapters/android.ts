@@ -244,6 +244,23 @@ export class AndroidAdapter implements DeviceAdapter {
    * and LaunchOutcome carries no note.
    */
   async launch(packageName: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
+    // The foreground app changes here, and with it whether the status bar shows: the band is read again
+    // (`#band`). Dropped once the launch is over, so a read that started before or during it keeps nothing.
+    try {
+      return await this.launchApp(packageName, opts);
+    } finally {
+      this.dropStatusBand();
+    }
+  }
+
+  /** Forget the status band read so far (`#band`), and keep no answer from a read already in flight. */
+  private dropStatusBand(): void {
+    this.#band = undefined;
+    this.#bandRead = undefined;
+    this.#bandEpoch++;
+  }
+
+  private async launchApp(packageName: string, opts: LaunchOptions): Promise<LaunchOutcome> {
     if (opts.clearState) await this.shell(['pm', 'clear', packageName]);
     if (opts.activity === undefined && opts.intent === undefined) {
       // monkey resolves the launcher activity for us, but picks ARBITRARILY
@@ -450,29 +467,9 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   /**
-   * The screen: `wm size`, then — only once that has read — the status
-   * band (`statusBand`, a second adb call). Both are ONE memo
-   * (viewport-memo.ts): read once per adapter, and again on
-   * `viewport({ fresh: true })`.
-   *
-   * Memoized, the band included — the choice, stated (2026-10-12). The band
-   * CAN change under a session: an immersive or full-screen app (a video
-   * player, a game, a camera) hides the status bar, and the bar comes back
-   * with the next app. Read per call instead, it would cost one more adb
-   * call (18–37 ms through execFile, keyboardState's figures) on every
-   * `viewport()` — every tap's on-screen rule and every `scroll_until`
-   * round — where the keyboard guard already spends one. What the memo
-   * costs, and why it is safe enough:
-   * - a bar HIDDEN since the read: the band is stale, so a point in the top
-   *   of the screen is judged off it. A tap there is refused only after the
-   *   refusal path's own fresh read (resolve.ts#refuseOffScreen re-reads
-   *   with `{ fresh: true }`), which sees the bar gone and taps — so the
-   *   tap is right; `scroll_until` reads the memo, so it strokes on, or
-   *   fails naming the status bar, for a target the app shows at the very
-   *   top — a refusal, never a false "visible";
-   * - a bar SHOWN since a read that found none: no band until the next fresh
-   *   read — a point under the bar is judged on the screen, as before the
-   *   band existed (fail open).
+   * The screen SIZE: `wm size`, memoized (viewport-memo.ts) — read once per
+   * adapter, and again on `viewport({ fresh: true })`. The status band
+   * beside it has a lifetime of its own (`#band`, below).
    */
   private readonly viewportMemo = new ViewportMemo(async () => {
     const { stdout } = await this.shell(['wm', 'size']);
@@ -480,10 +477,51 @@ export class AndroidAdapter implements DeviceAdapter {
     // "Physical size: 1080x2280", optionally overridden ("Override size: ...")
     const m = raw.match(/Override size:\s*(\d+)x(\d+)/) ?? raw.match(/Physical size:\s*(\d+)x(\d+)/);
     if (!m) throw new Error(`Cannot parse wm size output: ${raw.slice(0, 120)}`);
-    const band = await this.statusBand();
     // An Android app window may sit beside a side nav bar or a cutout (types.ts#DeviceScreen).
-    return { width: Number(m[1]), height: Number(m[2]), windowsBesideSystemBars: true, ...(band !== undefined && { statusBand: band }) };
+    return { width: Number(m[1]), height: Number(m[2]), windowsBesideSystemBars: true };
   });
+
+  /**
+   * The status band as last READ (2026-10-12): `{ band }` once a
+   * `dumpsys window displays` call answered — `band` undefined when that
+   * dump said no visible bar (hidden, or not one band) — and undefined
+   * while there is no such answer to keep. Its lifetime, the choice stated
+   * (code review of fix/r8-band, round 1): the registry keeps ONE adapter
+   * per device for the MCP server's life (mcp/registry.ts), so whatever is
+   * kept here is kept that long unless something drops it.
+   * - A call that FAILED (adb exit, the 2 s budget on a cold or loaded
+   *   device) is not an answer: nothing is kept, and the next `viewport()`
+   *   asks again — until one answers. Until that review a failed first read
+   *   was kept as "no band" for the server's life, and a tap under the bar
+   *   went through again. The cost: while the call keeps failing, every
+   *   `viewport()` (each tap's on-screen rule, each `scroll_until` round)
+   *   spends one more call, up to its 2 s budget, and judges with no band
+   *   (fail open).
+   * - An answer is dropped by `launch` — the foreground app changes there,
+   *   and with it whether the bar shows (an immersive app hides it) — and
+   *   replaced by `viewport({ fresh: true })`: the tap's refusal path
+   *   (resolve.ts#refuseOffScreen) and the window witness (verify/
+   *   capture.ts). Otherwise it is kept: read per call, it would cost one
+   *   adb call (18–37 ms through execFile, keyboardState's figures) on every
+   *   `viewport()`, where the keyboard guard already spends one.
+   * What that leaves, stated — a bar the app shows or hides WITHOUT a
+   * launch (a video going full screen, an app opened from another by an
+   * intent, the user's own navigation):
+   * - HIDDEN since the read: the band is stale, so a point in the top of the
+   *   screen is judged off it. A tap there is refused only after the refusal
+   *   path's fresh read, which sees the bar gone and taps — the tap is right;
+   *   `scroll_until` keeps the stale band, so it strokes on, or fails naming
+   *   the status bar, for a target the app shows at the very top — a
+   *   refusal, never a false "visible";
+   * - SHOWN since an answer that found none: no band until the next launch
+   *   or fresh read — a point under the bar is judged on the screen, as
+   *   before the band existed (fail open).
+   */
+  #band: { band: number | undefined } | undefined;
+  /** The band read in flight, shared by concurrent `viewport()` calls. */
+  #bandRead: Promise<number | undefined> | undefined;
+  /** Bumped by `launch`: a read that started before it does not keep its answer. */
+  #bandEpoch = 0;
 
   /**
    * The VISIBLE system status bar's height (types.ts#DeviceScreen.statusBand,
@@ -496,21 +534,40 @@ export class AndroidAdapter implements DeviceAdapter {
    * app: in an app that does not draw under the bar no node lies in the band,
    * so it changes nothing there.
    *
-   * FAILS OPEN, as keyboardState does: any failure of the call, or a dump
-   * that does not say one visible bar, is no band — the judgements behave as
-   * before the band existed. The size's own failure is still the screen's.
+   * FAILS OPEN, as keyboardState does: a failed call, or a dump that does not
+   * say one visible bar, is no band — the judgements behave as before the
+   * band existed. Kept or not as `#band` says. The size's own failure is
+   * still the screen's.
    */
-  private async statusBand(): Promise<number | undefined> {
-    try {
-      return parseStatusBand((await this.shell(['dumpsys', 'window', 'displays'], { timeoutMs: STATUS_BAND_QUERY_TIMEOUT_MS })).stdout.toString('utf8'));
-    } catch {
-      return undefined;
-    }
+  private statusBand(fresh: boolean): Promise<number | undefined> {
+    if (!fresh && this.#band !== undefined) return Promise.resolve(this.#band.band);
+    if (!fresh && this.#bandRead !== undefined) return this.#bandRead;
+    const epoch = this.#bandEpoch;
+    const read = (async () => {
+      try {
+        const dump = (await this.shell(['dumpsys', 'window', 'displays'], { timeoutMs: STATUS_BAND_QUERY_TIMEOUT_MS })).stdout.toString('utf8');
+        const band = parseStatusBand(dump);
+        if (epoch === this.#bandEpoch) this.#band = { band };
+        return band;
+      } catch {
+        return undefined; // not an answer: nothing kept, the next viewport() asks again
+      }
+    })().finally(() => {
+      if (this.#bandRead === read) this.#bandRead = undefined;
+    });
+    this.#bandRead = read;
+    return read;
   }
 
-  /** Screen size in device pixels — the units uiautomator bounds use, and the status band. Memoized: types.ts#viewport, and the memo's choice above. */
-  viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
-    return this.viewportMemo.get(opts);
+  /**
+   * Screen size in device pixels — the units uiautomator bounds use — and
+   * the status band. The size is memoized (types.ts#viewport); the band is
+   * read after it, kept as `#band` says. `fresh` reads both again.
+   */
+  async viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
+    const size = await this.viewportMemo.get(opts);
+    const band = await this.statusBand(opts?.fresh === true);
+    return { ...size, ...(band !== undefined && { statusBand: band }) };
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {

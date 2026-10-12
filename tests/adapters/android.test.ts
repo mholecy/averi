@@ -1199,6 +1199,80 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
     expect(await adapter.viewport({ fresh: true })).toEqual({ width: 1080, height: 2220, windowsBesideSystemBars: true });
   });
 
+  /** An adb whose status-bar answer is `bar()` — a dump line, or an error to throw — counting the band reads. */
+  const scripted = (bar: () => string | Error) => {
+    const reads: string[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.endsWith('wm size')) return { stdout: Buffer.from('Physical size: 1080x2220\n'), stderr: '' };
+      if (full.endsWith('dumpsys window displays')) {
+        reads.push(full);
+        const answer = bar();
+        if (answer instanceof Error) throw answer;
+        return { stdout: Buffer.from(answer), stderr: '' };
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    return { adapter: new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), reads };
+  };
+
+  // Code review of fix/r8-band, round 1, MAJOR-1: the registry keeps one adapter per device for the server's life,
+  // and a failed first read was kept as "no band" — a cold device's 2 s timeout switched N1's fix off for good.
+  it('a FAILED band read is not kept: the next viewport() asks again, and the first answer is kept', async () => {
+    let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
+    const { adapter, reads } = scripted(() => answer);
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // fail open
+    answer = lines(STATUS_33('[0,0][1080,66]'));
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    expect(reads).toHaveLength(2); // the failure, the answer — then kept
+  });
+
+  it('an ANSWER of no band (the bar hidden) is kept, like a band — and launch drops either, so the next viewport() reads it again', async () => {
+    let hidden = true;
+    const { adapter, reads } = scripted(() => lines(STATUS_33('[0,0][1080,66]', String(!hidden))));
+    expect((await adapter.viewport()).statusBand).toBeUndefined();
+    hidden = false;
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // kept: no launch, no fresh read
+    expect(reads).toHaveLength(1);
+    await adapter.launch('com.google.android.contacts');
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    hidden = true;
+    await adapter.launch('com.example.player');
+    expect((await adapter.viewport()).statusBand).toBeUndefined();
+    expect(reads).toHaveLength(3);
+  });
+
+  it('a band read in flight when launch runs keeps no answer: the next viewport() reads the new app\'s bar', async () => {
+    let release: (out: string) => void = () => {};
+    let reads = 0;
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.endsWith('wm size')) return { stdout: Buffer.from('Physical size: 1080x2220\n'), stderr: '' };
+      if (full.endsWith('dumpsys window displays')) {
+        reads++;
+        if (reads === 1) return { stdout: Buffer.from(await new Promise<string>((r) => (release = r))), stderr: '' };
+        return { stdout: Buffer.from(lines(STATUS_33('[0,0][1080,66]', 'false'))), stderr: '' };
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const before = adapter.viewport();
+    await vi.waitFor(() => expect(reads).toBe(1));
+    await adapter.launch('com.example.player');
+    release(lines(STATUS_33('[0,0][1080,66]'))); // the previous app's bar, answered after the launch
+    expect((await before).statusBand).toBe(66);
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // read again: the player hides it
+    expect(reads).toBe(2);
+  });
+
+  it('concurrent viewport() calls share one band read', async () => {
+    const { adapter, reads } = scripted(() => lines(STATUS_36('[0,0][1080,66]')));
+    const screens = await Promise.all([adapter.viewport(), adapter.viewport(), adapter.viewport()]);
+    expect(screens.map((sc) => sc.statusBand)).toEqual([66, 66, 66]);
+    expect(reads).toHaveLength(1);
+  });
+
   it.each([
     ['adb exits non-zero', execErrorLikeExec('adb shell dumpsys window displays', 1, "error: device 'emulator-5554' not found")],
     ['the call times out', execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true })],
