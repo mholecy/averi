@@ -318,6 +318,12 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
     const tree = n('container', rect(0, 0, 0, 0), { children: [n('other', rect(0, 0, 402, 1300), { children: [element] }), n('other', rect(0, 150, 402, 100), { label: 'Bar' })] });
     expect(await chromeOverElement(silent, tree, element)).toMatch(/^other "Bar" \(0,150 402x100\) is drawn over the element \(element 0,0 402x200\)/);
   });
+
+  it('a banner crowned as the window turns the screen the pixel assert judges its single box over (`oriented`, D6), not the judged panel as built: a landscape box, no band — measured', async () => {
+    const banner = n('image', rect(0, 0, 500, 300), { identifier: 'banner' });
+    const tree = n('container', rect(0, 0, 0, 0), { children: [banner, n('button', rect(425, 400, 50, 40), { identifier: 'next' })] });
+    expect(await chromeOverElement({ viewport: async () => IPHONE }, tree, banner)).toBeUndefined();
+  });
 });
 
 

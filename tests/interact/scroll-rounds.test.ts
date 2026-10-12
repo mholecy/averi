@@ -6,7 +6,7 @@ import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
 import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Played, type Row } from '../helpers/rounds.js';
-import type { ScreenBox } from '../../src/interact/swipe.js';
+import type { UsableScreen } from '../../src/ui-tree/standing.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
@@ -967,7 +967,7 @@ describe('round — the flush check across nested clipping containers, and a pro
 
   it('room is judged over the GESTURE box the stroke would be drawn in, not the judged frame: a landscape window crowned as a child turns the gesture box but not the frame — a container below the turned box\'s bottom has no room there, so no probe', () => {
     const PORTRAIT: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
-    const screen: ScreenBox = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/standing.ts#UsableScreen: turned gesture, panel as built judged
+    const screen: UsableScreen = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/standing.ts#UsableScreen: turned gesture, panel as built judged
     const LOW: Rect = { x: 0, y: 1100, width: 1080, height: 600 };
     const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 1100, width: 948, height: 143 }, 'row')], scroller: LOW, screen }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
@@ -1350,7 +1350,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
 
 describe('round — a target resting in the frame at the edge the strokes push it out through (docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md)', () => {
   /** The iPhone 17 as the iOS adapter reports it: the 62-pt status band (adapters/ios-status-band.ts). */
-  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], oriented: IPHONE_BOX, from: 'device', statusBand: 62 };
+  const BANDED: UsableScreen = { box: IPHONE_BOX, boxes: [IPHONE_BOX], oriented: IPHONE_BOX, from: 'device', statusBand: 62 };
   const CONTINUE = node({ role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: { x: 24, y: 780, width: 354, height: 44 } });
   /** A read of the SWIFT form with `priority_select` (354x52) at y, on the banded screen, CONTINUE drawn over the rest. */
   const form = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [CONTINUE], screen: BANDED });
@@ -1509,7 +1509,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
   it('a cover is on the far side only in EVERY frame the round judged in, as `beyond` is: either way up, a bar in the upper half of the portrait box lies in the lower half of the landscape one — no turn', () => {
     const portrait = IPHONE_BOX;
     const landscape: Rect = { x: 0, y: 0, width: 874, height: 402 };
-    const screen: ScreenBox = { box: portrait, boxes: [portrait, landscape], oriented: portrait, from: 'device' };
+    const screen: UsableScreen = { box: portrait, boxes: [portrait, landscape], oriented: portrait, from: 'device' };
     const bar = node({ role: 'other', label: 'Bar', rect: { x: 0, y: 300, width: 402, height: 60 } });
     const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [bar], screen });
     const played = play({ ...IPHONE, fully: true }, [row(320), row(100), row(100)]);
@@ -1683,7 +1683,7 @@ describe('round — a target read wholly past the far edge on iOS, and one never
 });
 
 describe('round — a cover the target shows past only on its far side (the round-6b device check\'s S-1 residual: Contacts\' toolbar 5 pt below the row\'s top)', () => {
-  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], oriented: IPHONE_BOX, from: 'device', statusBand: 62 };
+  const BANDED: UsableScreen = { box: IPHONE_BOX, boxes: [IPHONE_BOX], oriented: IPHONE_BOX, from: 'device', statusBand: 62 };
   /** Contacts' New Contact sheet under idb: `Toolbar` `0,83 402x48`, listed last. */
   const TOOLBAR = node({ role: 'other', label: 'Toolbar', rect: { x: 0, y: 83, width: 402, height: 48 } });
   /** `add url` (362x51 at x 20) at y, the toolbar — or `bar` — drawn over the rest. */

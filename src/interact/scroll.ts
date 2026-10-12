@@ -302,7 +302,7 @@ export async function scrollUntilVisible(
         elapsedMs: 0,
       };
     }
-    if (screen !== undefined) seen.screen = screen;
+    if (screen !== undefined) seen.screen = screen.usable;
     if (drawn !== undefined) seen.drawn = drawn;
     drawn = undefined;
     // The clock is stamped on every call, re-entry included: a witness that
@@ -348,7 +348,7 @@ export async function scrollUntilVisible(
       if (box === undefined || screen === undefined) throw noBox;
       drawn = scrollStroke({ ...step, box });
       if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
-      else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.box));
+      else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.usable.oriented));
     }
     await sleep(settleMs);
   }

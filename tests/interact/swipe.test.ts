@@ -88,6 +88,13 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     );
   });
 
+  it('a banner at the origin crowned as an idb window turns the box a swipe strokes in (the usable screen\'s `oriented`), though no judgement takes that turn', async () => {
+    const tree = node({ rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ rect: { x: 0, y: 0, width: 500, height: 300 } }), node({ rect: { x: 425, y: 400, width: 50, height: 40 } })] });
+    const fake = device(tree, { width: 402, height: 874 });
+    await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
+    expect(fake.swipes).toEqual([{ from: { x: 437, y: 322 }, to: { x: 437, y: 80 } }]); // 874x402; as built it would be (201,699)→(201,175)
+  });
+
   it('an Android landscape window beside a LEFT nav bar or cutout turns the box too — with and without a status bar above it', async () => {
     // Not origin-anchored, so the tree walks it (reliable: false); its reach,
     // 2400x1080, is the panel turned. The old tree box got this right.

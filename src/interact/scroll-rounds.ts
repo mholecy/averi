@@ -7,7 +7,7 @@ import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { UsableScreen } from '../ui-tree/standing.js';
 import type { WaitEvidence } from './resolve.js';
-import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -86,18 +86,18 @@ export interface RoundSeen {
   /** This round's tree read: what it held, or the error that stood in for it (a miss, not a failure — read-tree.ts#readTreeOrError). */
   read: RoundRead | { error: Error };
   /**
-   * This round's swipe.ts#screenBox — ONE read gives both boxes the round
+   * This round's usable screen (swipe.ts#screenBox's `usable`) — ONE read gives both boxes the round
    * uses, so they can never come from different reads: its `oriented` box,
    * the GESTURE box the stroke is drawn in, over which the round judges a
    * container's room (swipe.ts#strokeRoom) and from which a stroke step's
    * `box` is cut; and, on a round whose tree read, its `boxes`, the frame
    * the round judges in (the tap's screen too). On a round
-   * whose tree did not read it is the device as built and only its `box`
-   * is used: the frame stays the last one. Absent when there is none
+   * whose tree did not read it is the device as built and only its
+   * `oriented` box is used: the frame stays the last one. Absent when there is none
    * (screenBox threw): the frame stays, no container has room, and a stroke
    * step carries no box — the driver throws why.
    */
-  screen?: ScreenBox;
+  screen?: UsableScreen;
   /** The stroke the previous `stroke` step drew, as sent. Required after `stroke`, refused otherwise. */
   drawn?: Stroke;
   /** The answer to `ask witness`: the round's keyboard reading's `corroborated()`. */

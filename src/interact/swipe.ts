@@ -473,10 +473,15 @@ function keyboardClearance(uncovered: Rect): number {
 
 /**
  * The box a screen gesture swipes in: the usable screen
- * (ui-tree/standing.ts#UsableScreen — its `oriented` box is the one stroked
- * in), and what the caller should say about where it came from.
+ * (ui-tree/standing.ts#UsableScreen), whose `oriented` box is the one
+ * stroked in, and what the caller should say about where it came from.
+ * The screen is a member, not the gesture's own shape: its `box` is the
+ * box a JUDGEMENT quotes (the panel as built when a turn is no evidence),
+ * and a gesture that read it would stroke over the wrong box.
  */
-export interface ScreenBox extends UsableScreen {
+export interface ScreenBox {
+  /** The usable screen the gesture was worked out over: `usable.oriented` is the box stroked in. */
+  usable: UsableScreen;
   /**
    * Set when the box is not WITNESSED as the screen held the way it is now:
    * the tree's window stood in for a device size that could not be read, or
@@ -530,14 +535,14 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   const unread = `the UI tree could not be read${read.error !== undefined ? ` (${read.error.message})` : ''}`;
   const size = tree === undefined ? undefined : inferScreenSize(tree);
 
-  const screen = usableScreenOf(device, size);
-  if (screen?.from === 'device') {
-    const { oriented } = screen;
-    return { ...screen, ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${oriented.width}x${oriented.height}` }) };
+  const usable = usableScreenOf(device, size);
+  if (usable?.from === 'device') {
+    const { oriented } = usable;
+    return { usable, ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${oriented.width}x${oriented.height}` }) };
   }
-  if (screen !== undefined) {
-    const { oriented } = screen;
-    return { ...screen, note: `${deviceProblem}; swiped over the UI tree's window, ${oriented.width}x${oriented.height}` };
+  if (usable !== undefined) {
+    const { oriented } = usable;
+    return { usable, note: `${deviceProblem}; swiped over the UI tree's window, ${oriented.width}x${oriented.height}` };
   }
   const treeProblem =
     size === undefined
@@ -580,8 +585,8 @@ export async function swipeScreen(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe'>,
   opts: SwipeOptions,
 ): Promise<ScreenSwipe> {
-  const { oriented, note } = await screenBox(adapter, await readTreeOrError(adapter));
-  const { from, to } = swipeVector(oriented, opts.direction, opts.meaning);
+  const { usable, note } = await screenBox(adapter, await readTreeOrError(adapter));
+  const { from, to } = swipeVector(usable.oriented, opts.direction, opts.meaning);
   const times = opts.times ?? 1;
   for (let i = 0; i < times; i++) await adapter.swipe(from, to, opts.durationMs);
   return { from, to, ...(note !== undefined && { note }) };
