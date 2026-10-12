@@ -2,7 +2,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, rectIntersection, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { containsPoint } from '../../src/ui-tree/geometry.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
 import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
@@ -271,15 +272,21 @@ const said = (s: Standing): unknown => {
     case 'offScreen':
       return { kind: s.kind, at: s.at, visible: s.visible };
     case 'systemBar':
-      return { kind: s.kind, at: s.at, bar: s.bar };
+      return { kind: s.kind, at: s.at, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
     case 'clipped':
       return { kind: s.kind, edges: s.edges };
     case 'cut':
-      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }) };
+      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }), ...(s.bar !== undefined && { bar: s.bar, container: s.cut.container }) };
     case 'covered':
-      return { kind: s.kind, cover: s.cover.identifier ?? s.cover.label, ...(s.largest !== undefined && { largest: s.largest }) };
+      return {
+        kind: s.kind,
+        cover: s.cover.identifier ?? s.cover.label,
+        ...(s.largest !== undefined && { largest: s.largest }),
+        ...(s.reach !== undefined && { reach: s.reach }),
+        ...(s.overRoot === true && { overRoot: true }),
+      };
     case 'underKeyboard':
-      return { kind: s.kind, top: s.line.y, source: s.line.source };
+      return { kind: s.kind, top: s.line.y, source: s.line.source, ...(s.band !== undefined && { band: s.band }) };
   }
 };
 
@@ -464,6 +471,161 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
   });
 });
 
+/** The pixel assert's purposes over `n`: the ocr crop (the whole rect, read as glyphs) and the colour sample (inset 12 % a side, verify/color-parity.ts#colorSampleRect). */
+const OCR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
+const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => {
+  const { x, y, width, height } = n.rect;
+  return { of: 'pixel', reads: { x: x + width * 0.12, y: y + height * 0.12, width: width * 0.76, height: height * 0.76 }, glyphs: false, ...(keyboardTop !== undefined && { keyboardTop }) };
+};
+/** A non-edge-to-edge app's screen on the Pixel_3a: its window ends at the navigation bar (2154), a list clipping above a pinned bottom bar that ends there too. */
+const PINNED_BOTTOM_BAR = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2154]">
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="list" bounds="[0,66][1080,2000]"><node class="android.widget.TextView" resource-id="row" text="Row" bounds="[0,1900][1080,2000]" /></node>
+  <node class="android.widget.LinearLayout" resource-id="bottom_bar" bounds="[0,2000][1080,2154]"><node class="android.widget.TextView" resource-id="bar_title" text="Pay" bounds="[400,2100][680,2154]" /></node>
+</node></hierarchy>`;
+
+describe('Scene.standing for the pixel assert — measured cases, fixture × reader → kind (its region, not its centre)', () => {
+  it.each([
+    // Round 8: a label under CONTINUE sampled CONTINUE's colour — the pinned bar named, with its reach to the screen's bottom.
+    ['idb SWIFT form, priority_select at rest under CONTINUE, colour', () => swiftIdb(), 'swift_payment.form.priority_select', IPHONE, COLOUR, { kind: 'covered', cover: 'swift_payment.form.continue_button', reach: { x: 24, y: 780, width: 354, height: 94 } }],
+    ['…at 700, its sample (706–746) clear of the bar from 780: colour measures', () => swiftIdbAt(700), 'swift_payment.form.priority_select', IPHONE, COLOUR, { kind: 'reachable', at: { x: 201, y: 726 } }],
+    // Round 8: `value_date_select` at 24,30 under the 62-pt band passed on the status bar's colour.
+    ['…flung to -20: the status band over what it reads, the band\'s rect quoted', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE, OCR, { kind: 'systemBar', at: { x: 201, y: 6 }, bar: { edge: 'top', bottom: 62 }, band: { x: 0, y: 0, width: 402, height: 62 } }],
+    // idb's flat list: its Application node, screen-sized, under the content listed over it — the root's own remedy.
+    ['idb number pad: the Application root, colour: content on its background', () => idbAt('idb-swift-form-number-pad.json', 'elements'), 'Skeleton Internal', IPHONE, COLOUR, { kind: 'covered', cover: 'TextFieldWithComponentStyle', reach: { x: 42, y: 425, width: 318, height: 20 }, overRoot: true }],
+    // D2: idb's band over the element — under the keyboard, the band's rect on the screen, whatever key lies over it.
+    ['idb number pad: value_date_select at rest (545), its bottom 8 pt into the band: under the keyboard', () => idbAt('idb-swift-form-number-pad.json', 'elements'), 'swift_payment.form.value_date_select', IPHONE, (n: UiNode) => OCR(n, idb(589)), { kind: 'underKeyboard', top: 589, source: 'idb-band', band: { x: 0, y: 589, width: 402, height: 285 } }],
+    // D7 (N-b): mp-native's Account Detail at its top, drawn edge to edge — row_4 and its texts lie in 2154–2220.
+    ['accountDetailTop row_4 66,2152 948x68, ocr: under the navigation bar', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, OCR, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
+    ['…colour too: its sample 2160–2212 lies in the band', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, COLOUR, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
+    ['…its text "Loan repayment" 254,2199 298x21 wholly in the band', () => compose('accountDetailTop'), 'Loan repayment@2199', PIXEL_NAV, OCR, { kind: 'systemBar', at: { x: 403, y: 2210 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
+    ['…with no navigation band read (an immersive app): measured', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL, OCR, { kind: 'reachable', at: { x: 540, y: 2186 } }],
+    // D7 (N-b, owner: ocr only): the Settings title 198,2105 428x49 ends on the band's top, its list too — the crop may read it cut.
+    ['Settings title flush with the band in a list flush with it, ocr: cut at the navigation bar', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, OCR, { kind: 'cut', edge: 'bottom', depth: 49, bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 596, width: 1080, height: 1558 } }],
+    ['…colour: measured on what shows (D5)', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, COLOUR, { kind: 'reachable', at: { x: 412, y: 2130 } }],
+    ['…no navigation band (an immersive app): measured', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL, OCR, { kind: 'reachable', at: { x: 412, y: 2130 } }],
+    // Contacts' Create contact: "Add fields" 198,2106 180x48 flush with the form's scroller 0,242 1080x1912, which ends at 2154.
+    ['contactsCreateStaged "Add fields", ocr: cut at the navigation bar', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, OCR, { kind: 'cut', edge: 'bottom', depth: 48, bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 242, width: 1080, height: 1912 } }],
+    // A non-edge-to-edge app's pinned bottom bar ends at 2154 too, in no scroller: measured.
+    ['a pinned bottom bar ending at the band, in no scroller, ocr: measured', async () => parseDump(PINNED_BOTTOM_BAR), 'bottom_bar', PIXEL_NAV, OCR, { kind: 'reachable', at: { x: 540, y: 2077 } }],
+    ['…its title flush with it too: measured', async () => parseDump(PINNED_BOTTOM_BAR), 'bar_title', PIXEL_NAV, OCR, { kind: 'reachable', at: { x: 540, y: 2127 } }],
+  ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
+    const t = await tree();
+    // `label@y`: the node with that label at that y, where the label repeats.
+    const [label, y] = id.split('@');
+    const n = y === undefined ? byId(t, id) : [...everyNode(t)].find((m) => m.label === label && m.rect.y === Number(y))!;
+    expect(said(sceneOf(t).standing(n, screen, purpose(n)))).toEqual(expected);
+  });
+
+  it('the 2-unit edge (geometry.ts#PIXEL_OVERLAP_SLACK) for the navigation band too: 2 px into it measured, 3 px under the bar', () => {
+    const at = (bottom: number) => {
+      const r = node({ role: 'text', identifier: 'r', rect: { x: 100, y: bottom - 50, width: 400, height: 50 } });
+      return { t: node({ role: 'container', rect: box(1080, 2220), children: [r] }), r };
+    };
+    const two = at(2156);
+    expect(said(sceneOf(two.t).standing(two.r, PIXEL_NAV, OCR(two.r)))).toMatchObject({ kind: 'reachable' });
+    const three = at(2157);
+    expect(said(sceneOf(three.t).standing(three.r, PIXEL_NAV, OCR(three.r)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom', top: 2154 } });
+  });
+
+  it('a navigation band reading that leaves nothing above it (its top above the status band\'s bottom) is no band, as for the tap: fails open', () => {
+    const r = node({ role: 'text', identifier: 'r', rect: { x: 100, y: 1000, width: 400, height: 50 } });
+    const t = node({ role: 'container', rect: box(1080, 2220), children: [r] });
+    expect(said(sceneOf(t).standing(r, { ...PIXEL, navigationBand: 50 }, OCR(r)))).toMatchObject({ kind: 'reachable' });
+  });
+
+  it('idb\'s band meets the element at ANY overlap, no 2-unit edge (the keyboard\'s own rule): value_date_select 2 pt into it is under the keyboard; flush, measured', async () => {
+    const t = await idbAt('idb-swift-form-number-pad.json', 'elements');
+    const row = byId(t, 'swift_payment.form.value_date_select');
+    (row as { rect: Rect }).rect = { ...row.rect, y: 539 };
+    expect(said(sceneOf(t).standing(row, IPHONE, OCR(row, idb(589))))).toMatchObject({ kind: 'underKeyboard' });
+    (row as { rect: Rect }).rect = { ...row.rect, y: 537 };
+    expect(sceneOf(t).standing(row, IPHONE, OCR(row, idb(589))).kind).not.toBe('underKeyboard');
+  });
+
+  it('a colour assert whose RECT meets idb\'s band while its sample does not still fails closed under the keyboard: value_date_select at 539, its sample ending at 585', async () => {
+    const t = await idbAt('idb-swift-form-number-pad.json', 'elements');
+    const row = byId(t, 'swift_payment.form.value_date_select');
+    (row as { rect: Rect }).rect = { ...row.rect, y: 539 };
+    const purpose = COLOUR(row, idb(589));
+    expect(purpose.of === 'pixel' && purpose.reads.y + purpose.reads.height).toBeLessThan(589);
+    expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band', band: { x: 0, y: 589, width: 402, height: 285 } });
+  });
+
+  it('portrait only (N-c): the Settings shape on a landscape box is measured', async () => {
+    const t = parseDump(SETTINGS_FLUSH);
+    const landscape = { box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 2154 };
+    expect(said(sceneOf(t).standing(byId(t, 'title'), landscape, OCR(byId(t, 'title'))))).toMatchObject({ kind: 'reachable' });
+  });
+
+  it('flush within a unit either way: the title ending at 2153 or 2155 is cut; at 2152, in a list ending at 2152, it is not (the list ends off the band)', () => {
+    const shape = (titleBottom: number, listBottom: number) => {
+      const title = node({ role: 'text', identifier: 'title', rect: { x: 198, y: titleBottom - 49, width: 428, height: 49 } });
+      const list = node({ role: 'container', identifier: 'list', clipsDescendants: true, rect: { x: 0, y: 596, width: 1080, height: listBottom - 596 }, children: [title] });
+      return { t: node({ role: 'container', rect: box(1080, 2220), children: [list] }), title };
+    };
+    for (const [titleBottom, listBottom, kind] of [[2153, 2154, 'cut'], [2155, 2154, 'cut'], [2154, 2155, 'cut'], [2152, 2154, 'reachable'], [2152, 2152, 'reachable']] as const) {
+      const { t, title } = shape(titleBottom, listBottom);
+      expect([titleBottom, listBottom, sceneOf(t).standing(title, PIXEL_NAV, OCR(title)).kind]).toEqual([titleBottom, listBottom, kind]);
+    }
+  });
+
+  it('the order: idb\'s band before the status band (its remedy, hiding it, is no scroll), the status band before the navigation band, before any cover', async () => {
+    const t = await idbAt('idb-swift-form-number-pad.json', 'elements');
+    const root = byId(t, 'Skeleton Internal');
+    expect(said(sceneOf(t).standing(root, IPHONE, OCR(root, idb(589))))).toMatchObject({ kind: 'underKeyboard' });
+    expect(said(sceneOf(t).standing(root, IPHONE, OCR(root)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'top' } });
+    const tall = node({ role: 'container', identifier: 'tall', rect: { x: 0, y: 0, width: 1080, height: 2220 } });
+    const over = node({ role: 'button', identifier: 'over', rect: { x: 0, y: 1000, width: 1080, height: 200 } });
+    const android = node({ role: 'container', rect: box(1080, 2220), children: [tall, over] });
+    expect(said(sceneOf(android).standing(tall, { ...PIXEL_NAV }, OCR(tall)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'top' } });
+    expect(said(sceneOf(android).standing(tall, { box: box(1080, 2220), boxes: [box(1080, 2220)], navigationBand: 2154 }, OCR(tall)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom' } });
+    expect(said(sceneOf(android).standing(tall, { box: box(1080, 2220), boxes: [box(1080, 2220)] }, OCR(tall)))).toMatchObject({ kind: 'covered', cover: 'over' });
+  });
+
+  it('`covered.aboveKeyboard` is filled: false — the pixel judges no cover above a line, an element the band meets being under the keyboard first', async () => {
+    const t = await swiftIdb();
+    const s = sceneOf(t).standing(byId(t, 'swift_payment.form.priority_select'), IPHONE, COLOUR(byId(t, 'swift_payment.form.priority_select')));
+    expect(s.kind === 'covered' && s.aboveKeyboard).toBe(false);
+  });
+});
+
+/** D3: scroll_until's exposure box is cut below the status band, as the tap's and the pixel assert's are. */
+describe('Scene.standing for the stop — its covers judged below the status band (D3)', () => {
+  const tree = () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 40, width: 402, height: 100 } });
+    // A node of the app lying only in the band, over the row's top: what the status bar hides anyway.
+    const inBand = node({ role: 'image', identifier: 'in_band', rect: { x: 0, y: 0, width: 402, height: 50 } });
+    return { t: node({ role: 'container', rect: box(402, 874), children: [row, inBand] }), row };
+  };
+  it('a node lying only in the band no longer blocks a `fully: true` stop, nor lowers what shows', () => {
+    const { t, row } = tree();
+    const s = sceneOf(t).standing(row, IPHONE, FULLY);
+    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 90 } });
+    // All of it shows: its own part in the band (40–62) counts, the node over it there does not.
+    expect([s.facts.covers, s.facts.shows]).toEqual([[], 1]);
+  });
+  it('a cover reaching into the band and below it is not dropped: what shows is exactly what it was — its part in the band still hidden', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 40, width: 402, height: 100 } });
+    const over = node({ role: 'image', identifier: 'over', rect: { x: 0, y: 30, width: 402, height: 50 } });
+    const t = node({ role: 'container', rect: box(402, 874), children: [row, over] });
+    const s = sceneOf(t).standing(row, IPHONE, FULLY);
+    expect([said(s), s.facts.shows]).toEqual([{ kind: 'covered', cover: 'over' }, sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY).facts.shows]);
+    expect(s.facts.shows).toBeCloseTo(0.6);
+  });
+  it('under a keyboard line high enough that the frame above it is landscape-shaped (402x300), the band is still cut — judged on the box\'s shape', () => {
+    const { t, row } = tree();
+    const s = sceneOf(t).standing(row, IPHONE, { ...FULLY, keyboardTop: wda(300) });
+    expect(s.facts.screen).toEqual({ x: 0, y: 0, width: 402, height: 300 });
+    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 90 } });
+  });
+  it('with no band read, it covers as before', () => {
+    const { t, row } = tree();
+    const s = sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY);
+    expect(said(s)).toEqual({ kind: 'covered', cover: 'in_band' });
+    expect(s.facts.shows).toBeCloseTo(0.9);
+  });
+});
+
 /** Every fixture tree the suite parses, with its platform: the WDA sources, the idb dumps, the Compose snapshots and the synthetic uiautomator trees. */
 const everyFixture = async (): Promise<[string, UiNode, 'ios' | 'android'][]> => {
   const trees: [string, UiNode, 'ios' | 'android'][] = [];
@@ -506,6 +668,49 @@ describe('parity — `scroll_until X` then `tap X`: a plain stop that is reachab
     // Not vacuous: thousands of nodes judged, and most of them reachable.
     expect(judged).toBeGreaterThan(8000);
     expect(reachable).toBeGreaterThan(judged / 2);
+  });
+});
+
+describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `fully` stop that is reachable leaves nothing of the app over what the assert reads, and no band at its centre', () => {
+  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered; under a system bar only where the band meets what it reads, off the stop\'s centre — the stated exemption (one way: the pixel assert is stricter)', async () => {
+    let judged = 0;
+    let reachable = 0;
+    let exempt = 0;
+    const broken: string[] = [];
+    for (const [name, tree, os] of await everyFixture()) {
+      const box: Rect = os === 'ios' ? { x: 0, y: 0, width: 402, height: 874 } : { x: 0, y: 0, width: 1080, height: 2220 };
+      const status = os === 'ios' ? 62 : 66;
+      const bands = [{}, { statusBand: status }, ...(os === 'android' ? [{ statusBand: status, navigationBand: 2154 }, { statusBand: status, navigationBand: 2088 }] : [])];
+      const scene = sceneOf(tree);
+      for (const band of bands) {
+        const screen = { box, boxes: [box], ...band };
+        for (const n of everyNode(tree)) {
+          if (n === tree) continue;
+          judged++;
+          const stop = scene.standing(n, screen, FULLY);
+          if (stop.kind !== 'reachable') continue;
+          reachable++;
+          for (const purpose of [OCR(n), COLOUR(n)]) {
+            const pixel = scene.standing(n, screen, purpose);
+            // The exemption: `fully` judges a band at the centre only (the module's residual), the pixel assert over what it reads.
+            if (pixel.kind === 'systemBar') {
+              // The exemption, and only it: the band lies off the stop's centre and meets what the assert reads.
+              const band = pixel.band;
+              const reads = purpose.of === 'pixel' ? purpose.reads : n.rect;
+              if (band === undefined || containsPoint(band, stop.at) || rectIntersection(band, reads) === undefined) broken.push(`${name} ${n.role} ${JSON.stringify(n.rect)}: band ${JSON.stringify(band)} at the centre or off what it reads`);
+              exempt++;
+              continue;
+            }
+            if (pixel.kind === 'covered') broken.push(`${name} ${JSON.stringify(band)} ${n.role} ${JSON.stringify(n.rect)}: pixel ${pixel.kind}`);
+          }
+        }
+      }
+    }
+    expect(broken).toEqual([]);
+    // Not vacuous: thousands judged, most reachable, and the exemption met (a full-bleed root under the status band, a row reaching into the navigation band).
+    expect(judged).toBeGreaterThan(4000);
+    expect(reachable).toBeGreaterThan(judged / 2);
+    expect(exempt).toBeGreaterThan(0);
   });
 });
 

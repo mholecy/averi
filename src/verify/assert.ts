@@ -418,6 +418,7 @@ export class Verifier {
       timeoutMs,
       pollMs: this.pollMs,
       unchecked: 'rendered text',
+      glyphs: true,
       measure: (input) => measureOcrAssert(engine, input, expectation),
     });
     return { description, ...result };

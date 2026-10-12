@@ -1,9 +1,9 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
-import { bandRect, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import { keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
+import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
 import type { WaitEvidence } from './resolve.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
