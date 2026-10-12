@@ -1,5 +1,5 @@
 import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { containsPoint, flatListBarLine, largestRect, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
+import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
@@ -22,8 +22,8 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Four questions, one per caller, read from three columns of `NOT_DRAWN`
- * (`drawnOverAt` reads `drawnOver`'s):
+ * Five questions, one per caller, read from three columns of `NOT_DRAWN`
+ * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s):
  * - `shadowing(node, point)` — the tap guard's dismissal picker
  *   (interact/keyboard-in-tree.ts#pickDismissal): is a configured dismissal
  *   target drawn over at its tap point?
@@ -40,6 +40,12 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   shows, and where a tap on it should go (interact/resolve.ts#
  *   aimClearOfChrome for the tap and the fill's focus tap,
  *   scroll-rounds.ts#judge for `scroll_until`'s stop).
+ * - `paintsOver(node, within)` — a pixel assert's chrome (round 8,
+ *   2026-10-12, verify/pixel-poll.ts#chromeOverElement): which of
+ *   `exposure`'s covers hide PIXELS of the node, not only the touch —
+ *   `exposure` less the node's own content listed beside it, a clickable
+ *   layer with nothing drawn, and an overlap no thicker than an edge
+ *   (`PixelCover`'s doc has the rules and the measured shapes).
  *
  * The three columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -48,7 +54,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * title only, a top bar WDA lists BEFORE the scroll view it is drawn over)
  * is not inferred — the bug note's decision 4; the status bar (iOS's; Android's since 2026-10-12) is no
  * cover but off the screen, cut out of `within` by the caller
- * (interact/swipe.ts#belowStatusBand). Knows no
+ * (geometry.ts#belowStatusBand). Knows no
  * platform commands; the platform shapes are in the rows, each with the
  * device tree it was measured on, and the marks of a source it reads are
  * on the tree's root (`UiNode.flatList`, `UiNode.paddedTouchTargets`). The
@@ -132,6 +138,65 @@ export interface DrawOrder {
    * `scroll_until` round and once per moved tap).
    */
   readonly keyboardBandTop: number | undefined;
+  /**
+   * The covers of `exposure(node, within)` that hide PIXELS of `node` —
+   * what a colour sample or an ocr crop of its rect would read instead of
+   * it (round 8, 2026-10-12; verify/pixel-poll.ts#chromeOverElement) — in
+   * `exposure`'s order, each with its reach. `exposure` answers where a
+   * TOUCH goes, so it counts what takes the touch and draws nothing; three
+   * of its covers are left out here (review of fix/r8-pixel, round 1, a
+   * sweep of every node of every fixture):
+   * - the node's OWN CONTENT listed beside it: a cover whose reach lies
+   *   wholly inside the node's rect, when it hangs off one of the node's
+   *   own branches (`ownBranch`) — WDA's React Native `login_username_field`
+   *   and the input box (36,367 330x52) and "Meno" field listed after it,
+   *   `login_language_switcher` and its `lang_en_flag` and "English"
+   *   button. A flat list has no branches, so there the cover must SAY
+   *   something and nothing the node does not (`wordsOf`: idb lists a
+   *   container with its children's text) — idb's account card and its
+   *   "Accounting Balance, 2 000, ,00, CZK" text; a sheet listed after a
+   *   card and inside its rect says other words and still counts (review
+   *   of fix/r8-pixel, round 2, probe A: until then the rect alone decided
+   *   in a flat list, and a colour assert on the card PASSED on the
+   *   sheet). Residual, stated (review round 3): a real overlay in a flat
+   *   list whose words are all words of the element's label is dropped as
+   *   its content — a toast "Saved" over a card labelled "Saved payments".
+   *   The REACH, not the frame: CONTINUE's frame lies inside a
+   *   52-pt row it hangs over (`Payee's country` at 24,776,
+   *   idb-swift-form-scrolled-under-top-bar pos6), and its reach, run down
+   *   to the screen's bottom, does not;
+   * - a CLICKABLE LAYER: an unlabelled, unvalued interactive node that
+   *   holds the node's rect whole, on one of its own branches
+   *   (`ownBranch`; never in a flat list, which gives no branches to tell
+   *   a row's layer from a sheet's scrim) — Compose's card `button (66,275
+   *   948x330)` listed after `text "1,121"` and the row buttons after
+   *   every "LR" avatar (round-5 snapshot accountDetail*): the ripple's
+   *   touch target, drawn transparent;
+   * - an overlap no thicker than `PIXEL_OVERLAP_SLACK` on its thin side
+   *   (geometry.ts#overlapsPastSlack; the owner's decision): idb's `text
+   *   "Amount*"` (42,283 51x15) and `text "Value*"` at y 296, 2 pt; a
+   *   `Payee's country` row ending 2 pt into CONTINUE.
+   * `ownBranch`: the nearest ancestor of the node whose subtree holds the
+   * cover is one component — at most OWN_BRANCH_SCREEN_FRACTION (half) of
+   * the screen: a row, a card, a form's card. A cover met only at a larger
+   * ancestor (a title in the navigation bar over a row of the form, a
+   * dialog's scrim, a FAB in Compose's 90 % content container over a row
+   * of its list — review round 2, probe B2: "not screen-sized", 90 %, let
+   * that FAB through) is another layer of the screen, and still counts.
+   * What stays: CONTINUE over a row, the floating tab bar and its strip, a
+   * title laid over a scrolled row, a sheet or a dialog over anything.
+   * Judged over `within` as `exposure` is: the caller passes the part of
+   * the screen its measurement reads (pixel-poll.ts, the colour sampler's
+   * inset rect), and the 2-unit edge is measured against the node's rect
+   * inside it.
+   */
+  paintsOver(node: UiNode, within: Rect): readonly PixelCover[];
+}
+
+/** A cover of a pixel assert's element (`DrawOrder.paintsOver`): the node, and where it presses — its rect, or a pinned bar's reach (`Exposure.reaches`). */
+export interface PixelCover {
+  readonly node: UiNode;
+  readonly reach: Rect;
 }
 
 /**
@@ -1234,6 +1299,22 @@ function readingBreak(order: readonly Placed[], target: Placed, contentFrom: num
  * The draw order of `tree`: one pre-order walk when called; each answer a
  * scan of it. The tree must not change while the answer is in use.
  */
+/**
+ * The largest share of the screen's area the branch a node and a cover of
+ * it share may have for the cover to be the node's own content or layer
+ * (`DrawOrder.paintsOver`, `ownBranch`): one component — a row, a card, a
+ * form's card (RN's `login_card`, 370x400 of 402x874, 0.42 of the screen)
+ * — and not a screen's content area (Compose's `accounts.detail.container`,
+ * 0,225 1080x1995, 0.899, where a FAB over a row is chrome; review of
+ * fix/r8-pixel, round 2, probe B2). The measured margin: 0.42 below the
+ * line, 0.899 above it; nothing measured lies between.
+ */
+const OWN_BRANCH_SCREEN_FRACTION = 0.5;
+
+/** The words a node says — its label's and value's, lower-cased, split at anything not a letter or a digit (`paintsOver`'s own content: idb's "Accounting Balance, 2 000, ,00, CZK" says only words of its card's label). */
+const wordsOf = (n: UiNode): ReadonlySet<string> =>
+  new Set([n.label ?? '', n.value ?? ''].flatMap((t) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u)).filter((w) => w.length > 0));
+
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
   const seen: Seen = { screenArea: rectArea(screen) };
@@ -1299,8 +1380,40 @@ export function drawOrder(tree: UiNode): DrawOrder {
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p, 'drawnOver') ? [p.node] : []));
   };
 
-  return {
+  /** `paintsOver`'s two exemptions (`DrawOrder.paintsOver`): the cover hangs off one of `target`'s own branches — the nearest ancestor of it holding the cover is not screen-sized. */
+  const ownBranch = (target: Placed, cover: Placed): boolean => {
+    let shared = target.parent;
+    while (shared !== undefined && !within(cover, shared)) shared = shared.parent;
+    return shared !== undefined && rectArea(shared.node.rect) <= seen.screenArea * OWN_BRANCH_SCREEN_FRACTION;
+  };
+  /** `paintsOver`'s own content (`DrawOrder.paintsOver`): inside the node's rect and on its own branch — or, in a flat list, which has no branches, saying something and all of it the node's. */
+  const ownContentOf = (target: Placed, cover: Placed, reach: Rect): boolean => {
+    if (!rectWithin(reach, target.node.rect)) return false;
+    if (!flatList) return ownBranch(target, cover);
+    const said = wordsOf(cover.node);
+    const says = wordsOf(target.node);
+    return said.size > 0 && [...said].every((w) => says.has(w));
+  };
+  /** `paintsOver`'s clickable layer: unlabelled, unvalued, interactive, holding the node whole, on its own branch — never in a flat list. */
+  const clickableLayer = (target: Placed, cover: Placed): boolean => {
+    const n = cover.node;
+    return !flatList && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);
+  };
+
+  const api: DrawOrder = {
     keyboardBandTop: keyboard?.top,
+    paintsOver(node, box) {
+      const target = placesOf(node)[0];
+      if (target === undefined) return [];
+      const { covers, reaches } = api.exposure(node, box);
+      const read = rectIntersection(node.rect, box);
+      return covers.flatMap((cover, i) => {
+        const placed = placesOf(cover)[0];
+        const reach = reaches[i];
+        const hides = read !== undefined && overlapsPastSlack(reach, read);
+        return !hides || ownContentOf(target, placed, reach) || clickableLayer(target, placed) ? [] : [{ node: cover, reach: { ...reach } }];
+      });
+    },
     shadowing(node, point) {
       const places = placesOf(node);
       if (places.length === 0) return undefined;
@@ -1360,4 +1473,5 @@ export function drawOrder(tree: UiNode): DrawOrder {
       };
     },
   };
+  return api;
 }

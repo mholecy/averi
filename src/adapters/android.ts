@@ -1093,7 +1093,7 @@ export function parseImeInsets(dump: string): SoftKeyboard {
  * top and is not empty. Not measured: a hidden bar (an immersive app) —
  * read by `visible=false`, as a hidden keyboard is, so no band; a
  * landscape screen, whose bar is still at the top (and interact/ cuts no
- * band in landscape — swipe.ts#belowStatusBand, a residual stated there).
+ * band in landscape — ui-tree/geometry.ts#belowStatusBand, a residual stated there).
  *
  * Never guesses — no band (the judgements fail open, as before 2026-10-12)
  * on: no status-bar entry; one that does not read fully (type, frame,

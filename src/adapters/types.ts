@@ -60,7 +60,7 @@ export interface DeviceScreen {
    *   system-status-bar-as-app-screen.md). In an app that keeps clear of
    *   the bar no node lies in the band, so it changes nothing there.
    * Read by interact/swipe.ts#screenBox, which carries it to the judgements
-   * of a tap point. Cut only from a PORTRAIT box (swipe.ts#belowStatusBand):
+   * of a tap point. Cut only from a PORTRAIT box (ui-tree/geometry.ts#belowStatusBand):
    * iOS's rule — an iPhone hides its bar in landscape — which Android, whose
    * bar stays at the top in landscape, shares as a stated residual.
    */

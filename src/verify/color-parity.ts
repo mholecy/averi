@@ -88,6 +88,20 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
   pngRegion(rect, scale, img, EDGE_INSET);
 
 /**
+ * The part of an element's rect the sampler reads, in tree units: the rect
+ * inset EDGE_INSET a side — what the pixel poll judges chrome over for a
+ * colour assert (verify/pixel-poll.ts#chromeOverElement, round 8). The png
+ * mapping's rounding is left out (a fraction of a unit). `patches` reads
+ * inside it too, but for a rect under ~60 png px a side, whose corner
+ * patches' 9-px squares reach a few pixels past the 12 % line.
+ */
+export const colorSampleRect = (rect: Rect): Rect => {
+  const dx = rect.width * EDGE_INSET;
+  const dy = rect.height * EDGE_INSET;
+  return { x: rect.x + dx, y: rect.y + dy, width: rect.width - 2 * dx, height: rect.height - 2 * dy };
+};
+
+/**
  * How much clipping, and how weak a mode, a sample can carry before its row
  * needs a caveat. Both at 40%: a sliver under 60% of its rect may be a
  * neighbour's fill; a dominant bucket under 40% is busy content.

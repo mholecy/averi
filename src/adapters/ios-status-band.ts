@@ -4,7 +4,7 @@
  * chrome.md): the top of a portrait screen down to the safe area,
  * which the layers above count as OFF the screen for the point a tap
  * presses — the tap's on-screen rule, where a moved tap may go, and
- * `scroll_until`'s stop on that point (interact/swipe.ts#belowStatusBand).
+ * `scroll_until`'s stop on that point (ui-tree/geometry.ts#belowStatusBand).
  * Measured: one 0.3-s stroke flung `priority_select` to `24,-20`, its centre
  * (201,6) on the screen and under no node of the idb tree; the plain stop
  * stopped there, and the tap went to the status bar, which scrolled the form

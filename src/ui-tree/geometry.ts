@@ -482,7 +482,7 @@ export function absentFromViewport(
  *
  * The viewport is anchored at the origin unless it says otherwise (`x`,
  * `y`: a box that starts lower — iOS's screen below its status band,
- * interact/swipe.ts#belowStatusBand).
+ * belowStatusBand, below).
  */
 export function visibleFractionInViewport(
   rect: Rect,
@@ -579,6 +579,55 @@ export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2
  * top and idb's keyboard band's.
  */
 export const higherTop = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b));
+
+/**
+ * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as
+ * interact/swipe.ts#JudgingScreen's) at its top when `box` is portrait — the
+ * part of it a point or a rect is judged on screen in; `box` itself with no
+ * band, in landscape, or with no screen. `shape` is the screen box the band
+ * belongs to when `box` was cut from it (the screen above a keyboard): its
+ * shape, not the cut's, says portrait.
+ *
+ * Portrait only is iOS's rule (an iPhone hides its status bar in
+ * landscape). Residual, stated (2026-10-12): Android keeps its status bar
+ * at the top in landscape too, and a point under it there is judged on the
+ * screen, as before Android reported a band. Here since round 8 (2026-10-12),
+ * moved from interact/swipe.ts with `inStatusBand`: rect arithmetic, and
+ * the pixel asserts (verify/pixel-poll.ts), which may not import interact/,
+ * ask where the band lies too.
+ */
+export function belowStatusBand(box: Rect, screen: { statusBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
+  const band = screen?.statusBand ?? 0;
+  if (band <= 0 || shape.height <= shape.width) return box;
+  const top = Math.max(box.y, band);
+  return { ...box, y: top, height: Math.max(0, box.y + box.height - top) };
+}
+
+/**
+ * `point` lies on the screen but in its status band: inside one of `boxes`,
+ * and inside none of them less the band (`belowStatusBand`). The tap's
+ * refusal (interact/resolve.ts#refuseOffScreen) and `scroll_until`'s
+ * judgement (interact/scroll-rounds.ts#judge) ask it alike.
+ */
+export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; statusBand?: number }): boolean =>
+  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
+
+/**
+ * How thick, in tree units (points on iOS, pixels on Android), an overlap
+ * may be on its thin side and still say nothing about a pixel assert's
+ * element — the owner's decision (round 8, 2026-10-12): tree frames are
+ * whole units, so a neighbour laid flush can share an edge's antialiasing
+ * and no more. Measured: idb's `text "Amount*"` (42,283 51x15) under
+ * `text "Value*"` at y 296, and a `Payee's country` row ending 2 pt into
+ * CONTINUE — 2 pt each, neither hiding the element.
+ */
+export const PIXEL_OVERLAP_SLACK = 2;
+
+/** `a` and `b` share area thicker than PIXEL_OVERLAP_SLACK on its thin side — what a pixel assert counts as one hiding the other (ui-tree/draw-order.ts#paintsOver, and the status band, verify/pixel-poll.ts). */
+export const overlapsPastSlack = (a: Rect, b: Rect): boolean => {
+  const shared = rectIntersection(a, b);
+  return shared !== undefined && Math.min(shared.width, shared.height) > PIXEL_OVERLAP_SLACK;
+};
 
 /**
  * A rect's side: one a rect extends past (`clippedEdges`), or lies flush with

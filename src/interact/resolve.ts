@@ -1,10 +1,10 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { clipsOf, containsPoint, drawnOverText, higherTop, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { belowStatusBand, clipsOf, containsPoint, drawnOverText, higherTop, inStatusBand, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
+import { judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -557,7 +557,7 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  *   the status bar, which scrolled the form to its top) and, since
  *   2026-10-12, Android's visible status bar (android.ts#parseStatusBand: a
  *   tap at (256,3) on Google Contacts' collapsed app bar went to the bar).
- *   That band is off the screen for a tap (swipe.ts#inStatusBand words the
+ *   That band is off the screen for a tap (ui-tree/geometry.ts#inStatusBand words the
  *   refusal).
  *
  * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
@@ -848,7 +848,7 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * (the band's background is none, draw-order's `structural` row) is tapped
  * as before.
  *
- * The box is cut below the status band (swipe.ts#belowStatusBand,
+ * The box is cut below the status band (ui-tree/geometry.ts#belowStatusBand,
  * 2026-10-09; Android's too since 2026-10-12) before a piece is chosen, as above a keyboard: a moved tap
  * never lands on the status bar. Its centre is never there — the on-screen
  * rule refused that first.
@@ -872,7 +872,7 @@ export async function aimClearOfChrome(
   sent?: string,
 ): Promise<Aim> {
   const centre = tapPoint(node);
-  // Below the status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
+  // Below the status band (ui-tree/geometry.ts#belowStatusBand): a moved tap is never aimed into it.
   const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
   const order = drawOrder(tree);
   const exposed = order.exposure(node, box);
