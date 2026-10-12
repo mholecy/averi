@@ -440,7 +440,15 @@ export interface TouchedOn {
  * - `covered` (2026-10-09): in the frame, not clipped so, but a node of the
  *   app drawn over it — over any of it with `fully: true`, over its centre
  *   without (`stops`);
- * - `absent`: not in the last tree, and never in the frame before it;
+ * - `absent`: not in the last tree, and never in the frame before it —
+ *   `unsearched` (2026-10-12, round 8's B1 gap) the side the strokes never
+ *   read, when there is evidence it is the only one left: the bound was the
+ *   screen unchanged by the caller's own strokes (`exhausted`, `tree`), none
+ *   of them touched down on a node drawn over the list, and no stroke was
+ *   drawn the other way — every row on the caller's side went through the
+ *   tree, so a target this list holds lies on the side it started from.
+ *   Without that (maxSwipes, the deadline: more may lie ahead; a stroke the
+ *   other way already looked) nothing is guessed;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
  *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
@@ -449,14 +457,28 @@ export interface TouchedOn {
  * - `offFrame`: in the tree, off the frame judged — `inFrameAfter` when an
  *   earlier read had it in the frame; `cover` the one this round applied,
  *   `eitherWayUp` when the whole-screen judgement ran over both boxes.
+ *
+ * `past` on `left` and `offFrame` (2026-10-12, round 8's B1 gap): the read
+ * that last found it found it wholly beyond the FAR edge of the caller's
+ * direction (`State.lastPast`) — the side the strokes push it out through,
+ * so the failure names that side and the direction that brings it back,
+ * not "off the viewport, or under the soft keyboard … (a fling?)". Only
+ * while no stroke was drawn that way (`strokedToward`): once one was — a
+ * turn — that direction was tried, and the turn's own sentence says why.
  */
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
   | InFrameShort
-  | { of: 'absent' }
+  | { of: 'absent'; unsearched?: Edge }
   | { of: 'gone'; inFrameAfter: number }
-  | { of: 'left'; inTreeAfter: number }
-  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean };
+  | { of: 'left'; inTreeAfter: number; past?: PastSide }
+  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide };
+
+/** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
+export interface PastSide {
+  side: Edge;
+  clippedOut: boolean;
+}
 
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
 export type InFrameShort =
@@ -735,6 +757,16 @@ interface State {
   readonly probe: { rect: Rect; edge: Edge } | undefined;
   /** The swipe count at the last read that had the target in the tree at all — for "was in the tree … then left it". */
   readonly inTreeAfter: number | undefined;
+  /**
+   * The far edge of the caller's direction when the last read that found
+   * the target found it wholly beyond it — dumped clipped out past it, or
+   * past it in every frame, nothing of it in the frame (2026-10-12, round
+   * 8's B1 gap: Settings' `Apps` clipped out above the list, four strokes
+   * down, "off the viewport, or under the soft keyboard … (a fling?)") —
+   * undefined when that read had it anywhere else. Kept across reads that
+   * do not find it: the failure's `past` (`shortfall`).
+   */
+  readonly lastPast: PastSide | undefined;
   /** The direction of the last stroke SENT, a probe included — the way the content last moved, for `dropped`. */
   readonly lastSent: Direction | undefined;
   /** The last read that read: the judged match's rect and the frames it was judged in — undefined when it found no match. */
@@ -841,6 +873,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     inFrameAfter: undefined,
     probe: undefined,
     inTreeAfter: undefined,
+    lastPast: undefined,
     lastSent: undefined,
     lastFound: undefined,
     dropped: undefined,
@@ -1302,6 +1335,8 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // way up but across both edges the other is not turned for. Or dumped
     // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
     const beyond = beyondFarEdgeIn(farFacts(best), s.rules.direction, frames);
+    const { far } = FAR_EDGE[s.rules.direction];
+    s.lastPast = beyond && best.visible === 0 ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
     // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
     // band.md): across it — clipped there, or its centre in iOS's status
@@ -1638,7 +1673,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, readError, found, best, viewport, cover),
+      short: shortfall(s, readError, found, best, viewport, cover, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1777,17 +1812,25 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
 }
 
 /**
- * What the target was short of at a bound. In the frame on an earlier read
- * and not on this one: "never" would be false (review round 1) — a fling
- * carried it off, or a lazy list dropped it once it scrolled away.
+ * What the target was short of at a bound (`by`). In the frame on an
+ * earlier read and not on this one: "never" would be false (review round
+ * 1) — a fling carried it off, or a lazy list dropped it once it scrolled
+ * away. Last found beyond the far edge, the side (`Shortfall.past`); never
+ * found, the side left unread when the strokes ran to the end of the
+ * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined): Shortfall {
+function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
   const left = s.inFrameAfter;
+  const untried = (side: Edge) => !s.strokedToward.includes(REVEALS[side]);
+  const past = s.lastPast !== undefined && untried(s.lastPast.side) ? s.lastPast : undefined;
   if (found.length === 0) {
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };
-    return s.inTreeAfter !== undefined ? { of: 'left', inTreeAfter: s.inTreeAfter } : { of: 'absent' };
+    if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
+    const { far } = FAR_EDGE[s.rules.direction];
+    const ranToEnd = by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined && untried(far);
+    return { of: 'absent', ...(ranToEnd && { unsearched: far }) };
   }
   return {
     of: 'offFrame',
@@ -1796,5 +1839,6 @@ function shortfall(s: State, readError: Error | undefined, found: readonly UiNod
     viewport,
     ...(cover !== undefined && { cover }),
     eitherWayUp: s.frame.boxes.length > 1 && cover?.above === undefined,
+    ...(best !== undefined && past !== undefined && { past }),
   };
 }
