@@ -6,7 +6,7 @@ import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { judgingOf, OPPOSITE, REVEALS, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { judgingOf, OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -1578,7 +1578,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         // — so it takes a device reporting 0×0 throughout, and a tree whose
         // window stood in on an earlier round (else the frame is 0×0 and no
         // stop is ever visible) but not on this one.
-        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), REVEALS[edge], coverTop, (w) => overIn(now.facts, w));
+        const roomOver = (coverTop?: number) => strokeRoom(gesture, chain.slice(at), SIDES[edge].reveals, coverTop, (w) => overIn(now.facts, w));
         if (probeHeld) flush = probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
         else if (roomOver() === undefined) flush = { edge, container, ...noRoom };
         else if (s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs) {
@@ -1642,7 +1642,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const backUnmoved = answersBack && observed.bestUnmoved;
     const stuckOn = backUnmoved ? s.stuckOn : observed.stuck ? s.lastStroke : undefined;
     if (stuckOn !== undefined) {
-      const outward = !fully && best.sliver !== undefined && REVEALS[best.sliver.cut.edge] === stuckOn;
+      const outward = !fully && best.sliver !== undefined && SIDES[best.sliver.cut.edge].reveals === stuckOn;
       const otherWay = backUnmoved ? 'unmoved' : outward ? 'outward' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
       const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
       if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best, fully), lastStroke: stuckOn, viewport, otherWay });
@@ -1686,7 +1686,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, readError, found, best, viewport, cover, by),
+      short: shortfall(s, { readError, found, best, viewport, cover }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1760,7 +1760,7 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
   const { box, coverTop } = room;
   s.probe = { rect: { ...rect }, edge };
   s.strokeWithin = { ...room.within };
-  s.lastSent = REVEALS[edge];
+  s.lastSent = SIDES[edge].reveals;
   s.confirmReads = 0;
   s.since = 'stroke';
   s.swipes++;
@@ -1769,7 +1769,7 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
     state: s as unknown as Rounds,
     step: {
       do: 'stroke',
-      toward: REVEALS[edge],
+      toward: SIDES[edge].reveals,
       reach: PROBE_REACH,
       ...(coverTop !== undefined && { coverTop }),
       box: { ...box },
@@ -1825,6 +1825,24 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
 }
 
 /**
+ * What the round at a bound read and judged, as `shortfall` reads it — one
+ * value (code review of round 8, S8: they travelled as five of its seven
+ * positional parameters).
+ */
+interface BoundRound {
+  /** Why this round's tree did not read, if it did not. */
+  readonly readError: Error | undefined;
+  /** The target's matches in this round's tree. */
+  readonly found: readonly UiNode[];
+  /** The best of them as judged (`judge`), if any. */
+  readonly best: Judged | undefined;
+  /** The frame it was judged in — the screen box (`State.frame`) — which an `offFrame` failure quotes. */
+  readonly viewport: Rect;
+  /** The keyboard cover applied to that frame, if any — quoted with it. */
+  readonly cover: Cover | undefined;
+}
+
+/**
  * What the target was short of at a bound (`by`). In the frame on an
  * earlier read and not on this one: "never" would be false (review round
  * 1) — a fling carried it off, or a lazy list dropped it once it scrolled
@@ -1832,11 +1850,11 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined, by: BoundBy): Shortfall {
+function shortfall(s: State, { readError, found, best, viewport, cover }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
   const left = s.inFrameAfter;
-  const past = s.lastPast !== undefined && !s.strokedToward.includes(REVEALS[s.lastPast.side]) ? s.lastPast : undefined;
+  const past = s.lastPast !== undefined && !s.strokedToward.includes(SIDES[s.lastPast.side].reveals) ? s.lastPast : undefined;
   if (found.length === 0) {
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };

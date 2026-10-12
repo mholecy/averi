@@ -189,6 +189,25 @@ export interface DrawOrder {
    * the screen its measurement reads (pixel-poll.ts, the colour sampler's
    * inset rect), and the 2-unit edge is measured against the node's rect
    * inside it.
+   *
+   * THE OWNER'S DECISION (2026-10-12, code review of round 8, P1): the
+   * owner's ruling on fix/r8-pixel was the 2-unit edge alone; the other
+   * three exemptions — own content (with `ownBranch`'s half-screen shared
+   * branch, OWN_BRANCH_SCREEN_FRACTION), the clickable layer, and the flat
+   * list's words rule (`wordsOf`) — went past it, and are APPROVED with
+   * their residuals, each a cover read as none, so a colour or ocr assert
+   * measures the cover's pixels as the element's:
+   * - in idb's flat list, a real overlay whose words are all words of the
+   *   element's label is read as its own content — a toast "Saved" over a
+   *   card labelled "Saved payments";
+   * - a dialog's bare background is not seen when the element is bigger
+   *   than its panel: a container with children covers only through its
+   *   content (`exposure`'s `contentFramed` row), so its button is named
+   *   and the panel between its children is not;
+   * - a childless, labelled panel laid inside the element (listed beside
+   *   it, non-interactive) is read as on it by the target rows — a
+   *   labelled, childless panel over a 0,225 1080x1995 container is no
+   *   cover of it (review round 2's probe D3).
    */
   paintsOver(node: UiNode, within: Rect): readonly PixelCover[];
 }

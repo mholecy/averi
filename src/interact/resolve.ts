@@ -4,7 +4,7 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { belowStatusBand, clipsOf, containsPoint, drawnOverText, higherTop, inStatusBand, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
+import { judgingScreen, SIDES, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -363,12 +363,6 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
 export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
 
-/** Where a node clipped out past each side of its container lies; the scroll_until direction that brings it back is swipe.ts#REVEALS'. */
-const CLIPPED_OUT_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'left of', right: 'right of' };
-
-/** The same sides as `CLIPPED_OUT_WHERE`, standing alone: `if it lies above` (`untriedSideText`). */
-const LIES_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'to the left', right: 'to the right' };
-
 /**
  * Where a node read wholly past `side` lies — `clipped out above its scroll
  * container` when Android dumped it so (UiNode.clippedOut), `above the
@@ -377,15 +371,15 @@ const LIES_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'belo
  * round 8's B1 gap).
  */
 export function pastSideText(side: Edge, clippedOut: boolean): string {
-  return clippedOut ? `clipped out ${CLIPPED_OUT_WHERE[side]} its scroll container` : `${CLIPPED_OUT_WHERE[side]} the viewport`;
+  return clippedOut ? `clipped out ${SIDES[side].past} its scroll container` : `${SIDES[side].past} the viewport`;
 }
 
-/** The scroll that brings back a node lying past `side`: `scroll_until it with direction: "up"` (swipe.ts#REVEALS). */
-export const revealText = (side: Edge): string => `scroll_until it with direction: "${REVEALS[side]}"`;
+/** The scroll that brings back a node lying past `side`: `scroll_until it with direction: "up"` (swipe.ts#SIDES). */
+export const revealText = (side: Edge): string => `scroll_until it with direction: "${SIDES[side].reveals}"`;
 
 /** The direction to try for a target that may lie past `side` and was never read there: `if it lies above, try direction: "up"`. */
 export function untriedSideText(side: Edge): string {
-  return `if it lies ${LIES_WHERE[side]}, try direction: "${REVEALS[side]}"`;
+  return `if it lies ${SIDES[side].lies}, try direction: "${SIDES[side].reveals}"`;
 }
 
 /**
@@ -404,7 +398,7 @@ function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
   const sides = new Set(matched.map((n) => n.clippedOut));
   if (sides.has(undefined)) return ZERO_AREA_HINT;
   const [only, ...more] = [...sides] as Edge[];
-  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => CLIPPED_OUT_WHERE[side]).join(' or ')} its scroll container — scroll_until it first`;
+  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => SIDES[side].past).join(' or ')} its scroll container — scroll_until it first`;
   return `it matched only nodes ${pastSideText(only, true)} (scrolled past it) — ${revealText(only)} first`;
 }
 
@@ -791,9 +785,9 @@ export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
   );
 }
 
-/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#REVEALS) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
+/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
 export function cutRemedy(edge: Edge): string {
-  const direction = REVEALS[edge];
+  const direction = SIDES[edge].reveals;
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
 }
 

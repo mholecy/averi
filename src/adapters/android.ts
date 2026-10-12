@@ -529,6 +529,21 @@ export class AndroidAdapter implements DeviceAdapter {
    * has hidden it. The band then read is the starting window's bar: stale
    * as above, so it errs toward a refusal (the tap's fresh re-read corrects
    * it; `scroll_until` keeps it).
+   *
+   * Why this memo is written out beside `viewportMemo` rather than folded
+   * into ViewportMemo (code review of round 8, S5, weighed and left): an
+   * invalidate hook for `launch` would be clean — ViewportMemo's identity
+   * check (`#pending === attempt`) already keeps a superseded read from
+   * landing, so a `forget()` would do what `#bandEpoch` does — and the
+   * three outcomes could be mapped onto it (a timeout resolved as none and
+   * kept, a fast failure rejected and dropped, the caller catching it). What
+   * does not map is a FRESH read: here the last answer stands until the
+   * fresh read settles — a concurrent plain `viewport()` is answered from it
+   * meanwhile, and a fresh read that fails fast leaves it kept — where
+   * ViewportMemo's fresh read becomes the memo at once and a failed one
+   * empties it (types.ts#viewport's contract, both adapters' sizes). Folding
+   * would change one of the two: the band's lifetime stated above, or the
+   * size's on iOS and Android. Neither is this refactor's to change.
    */
   #band: { band: number | undefined; timedOut?: true } | undefined;
   /** The band read in flight, shared by concurrent `viewport()` calls. */

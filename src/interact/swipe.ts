@@ -1,5 +1,5 @@
 import { usableScreen, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
-import { containsPoint, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, windowTurnsScreen, type Edge, type ScreenSize } from '../ui-tree/geometry.js';
+import { containsPoint, deviceBox, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, type Edge, type ScreenSize } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -7,16 +7,36 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 /** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
 export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
+/** What one side of a rect means to a scroll and to a sentence (`SIDES`). */
+export interface SideWords {
+  /**
+   * The `scroll_until` direction (where the content lies) that reveals what
+   * lies past this edge: content beyond the top lies up, and so on — read by
+   * `scroll_until`'s probe and its stroke toward a cut edge
+   * (scroll-rounds.ts), by the tap's cut-sliver remedy (resolve.ts#cutRemedy,
+   * which `scroll_until`'s sliver failures quote) and by the hints for a node
+   * past a side (resolve.ts#revealText, #untriedSideText).
+   */
+  readonly reveals: Direction;
+  /** Where a node past this edge lies, before what it lies past: `clipped out above its scroll container`, `left of the viewport` (resolve.ts#pastSideText, #zeroAreaHint). */
+  readonly past: string;
+  /** The same side standing alone: `if it lies to the left` (resolve.ts#untriedSideText). */
+  readonly lies: string;
+}
+
 /**
- * The `scroll_until` direction (where the content lies) that reveals what
- * lies past each EDGE of a rect: content beyond the top lies up, and so on.
- * One map (code review of round 7, S7: it was spelled three times) — read by
- * `scroll_until`'s probe and its stroke toward a cut edge
- * (scroll-rounds.ts), by the tap's cut-sliver remedy (resolve.ts#cutRemedy,
- * which `scroll_until`'s sliver failures quote) and by the wait's hint for a
- * node clipped out past its container (resolve.ts#zeroAreaHint).
+ * Each EDGE of a rect's words — one table, a field per use (code review of
+ * round 8, S6: `REVEALS` here and resolve.ts's `CLIPPED_OUT_WHERE` and
+ * `LIES_WHERE` were three switches over the same four sides; `REVEALS` was
+ * already one map for what code review of round 7, S7, found spelled three
+ * times).
  */
-export const REVEALS: Readonly<Record<Edge, Direction>> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
+export const SIDES: Readonly<Record<Edge, SideWords>> = {
+  top: { reveals: 'up', past: 'above', lies: 'above' },
+  bottom: { reveals: 'down', past: 'below', lies: 'below' },
+  left: { reveals: 'left', past: 'left of', lies: 'to the left' },
+  right: { reveals: 'right', past: 'right of', lies: 'to the right' },
+};
 
 /**
  * Which thing `direction` names. A `swipe:` step names the FINGER's movement
@@ -609,20 +629,20 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   const unread = `the UI tree could not be read${read.error !== undefined ? ` (${read.error.message})` : ''}`;
   const size = tree === undefined ? undefined : inferScreenSize(tree);
 
-  if (device !== undefined && usableScreen(device)) {
-    const sideways = size !== undefined && windowTurnsScreen(size, device);
-    const { width, height } = sideways ? { width: device.height, height: device.width } : device;
-    const box = { x: 0, y: 0, width, height };
+  // The device, turned as the window says, else a window the tree vouches for (geometry.ts#deviceBox, the one derivation).
+  const screen = deviceBox(device, size);
+  if (screen?.from === 'device') {
+    const { box, sideways } = screen;
     return {
       box,
-      ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${width}x${height}` }),
-      boxes: judgedBoxes(size, device, box, sideways),
-      ...(device.statusBand !== undefined && { statusBand: device.statusBand }),
+      ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${box.width}x${box.height}` }),
+      boxes: judgedBoxes(size, screen.device, box, sideways),
+      ...(screen.device.statusBand !== undefined && { statusBand: screen.device.statusBand }),
     };
   }
-  if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
-    const box = { x: 0, y: 0, width: size.width, height: size.height };
-    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${size.width}x${size.height}`, boxes: [box] };
+  if (screen?.from === 'window') {
+    const { box } = screen;
+    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${box.width}x${box.height}`, boxes: [box] };
   }
   const treeProblem =
     size === undefined
