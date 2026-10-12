@@ -261,14 +261,15 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
   });
 
   it('the screen itself — screen-sized, or spanning the top edge at full width — is never cured by a scroll: the remedy leads with something in it; idb\'s root says the cover is content on its background', async () => {
-    const NEVER = 'the capture would show it, not the element; no scroll moves the screen itself out from under that — assert something in it that lies clear of that';
+    const NEVER = 'the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself out from under it';
+    const HEADER = 'the capture would show it, not the element — assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it';
     const win = n('container', rect(0, 0, 402, 874), { identifier: 'screen' });
     expect(await judge(IPHONE, n('application', rect(0, 0, 402, 874), { children: [win] }), win)).toBe(
       `the status bar is drawn over the element (element 0,0 402x874, status bar 0,0 402x62) — ${NEVER}`,
     );
     const header = n('container', rect(0, 0, 402, 116), { identifier: 'header' });
     const scrolled = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 874), { children: [header] })] });
-    expect(await judge(IPHONE, scrolled, header, colorSampleRect)).toBe(`the status bar is drawn over the element (element 0,0 402x116, status bar 0,0 402x62) — ${NEVER}`);
+    expect(await judge(IPHONE, scrolled, header, colorSampleRect)).toBe(`the status bar is drawn over the element (element 0,0 402x116, status bar 0,0 402x62) — ${HEADER}`);
     // Screen-sized below the bar (Android's content view, 97 % of the screen) under a dialog: the screen too.
     // (The dialog's panel covers through its content, its button here — the tap's `contentFramed` row; a childless, non-interactive sibling laid on the element is read as on it — both stated residuals.)
     const content = n('container', rect(0, 66, 1080, 2154), { identifier: 'content', children: [n('text', rect(66, 300, 900, 100), { label: 'Body' })] });
@@ -308,7 +309,7 @@ describe('the screen without the device: the window the tree vouches for (geomet
     const tree = n('container', rect(0, 0, 0, 0), { children: [window] });
     // Until S3 the tree's screen (screenOf: the 402x1300 content) — the page was no screen-sized element and was offered a scroll.
     expect(await chromeOverElement(silent, tree, element)).toMatch(
-      /^button "Pay" \(24,600 354x52\) is drawn over the element \(element 0,40 402x834\) — the capture would show it, not the element; no scroll moves the screen itself/,
+      /^button "Pay" \(24,600 354x52\) is drawn over the element \(element 0,40 402x834\) — the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself/,
     );
   });
 
@@ -319,3 +320,52 @@ describe('the screen without the device: the window the tree vouches for (geomet
   });
 });
 
+
+/**
+ * The owner's decision (code review of round 8, P2): Android's status band reaches the pixel asserts. An
+ * edge-to-edge app bar (Android 15+) laid from the screen's top under the 66-px band fails a colour assert closed —
+ * kept — and the advice leads with what to assert instead: its title, which lies clear of the band and is judged on
+ * its own.
+ */
+describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () => {
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
+  const adapter = { viewport: async (): Promise<DeviceScreen> => ({ ...PIXEL_3A, statusBand: 66 }) };
+  const title = n('text', rect(48, 120, 400, 70), { label: 'Contacts' });
+  const bar = n('container', rect(0, 0, 1080, 220), { identifier: 'app_bar', children: [title] });
+  const list = n('container', rect(0, 220, 1080, 2000), { identifier: 'list', clipsDescendants: true, children: [n('text', rect(48, 260, 600, 60), { label: 'All contacts' })] });
+  const tree = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 0, 1080, 2220), { children: [bar, list] })] });
+
+  it('a colour assert on the bar (0,0 1080x220) fails closed on the band, its advice leading with something in it clear of the band', async () => {
+    expect(await chromeOverElement(adapter, tree, bar, colorSampleRect(bar.rect))).toBe(
+      'the status bar is drawn over the element (element 0,0 1080x220, status bar 0,0 1080x66) — the capture would show it, not the element — ' +
+        'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
+    );
+    expect(await chromeOverElement(adapter, tree, bar)).toMatch(/^the status bar is drawn over the element \(element 0,0 1080x220, status bar 0,0 1080x66\) — the capture would show it, not the element — assert something in it/);
+  });
+
+  it('its title, inside the bar and clear of the band, is judged correctly — nothing over it, for colour and ocr alike', async () => {
+    expect(await chromeOverElement(adapter, tree, title, colorSampleRect(title.rect))).toBeUndefined();
+    expect(await chromeOverElement(adapter, tree, title)).toBeUndefined();
+  });
+
+  it('a title laid into the band is named under it, and offered the child too (the bar is in no scroll view)', async () => {
+    const high = n('text', rect(48, 30, 400, 70), { label: 'Contacts' });
+    const highTree = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 0, 1080, 220), { children: [high] })] });
+    expect(await chromeOverElement(adapter, highTree, high)).toMatch(/^the status bar is drawn over the element \(element 48,30 400x70, status bar 0,0 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
+  });
+
+  it('in idb\'s flat list a full-bleed header is a header, not the root: the cover over it is not called content on the root\'s background', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify([
+      ['Application', 'app', null, 0, 0, 402, 874],
+      ['Other', 'Header', 'header', 0, 0, 402, 200],
+      ['Button', 'Close', null, 300, 120, 80, 44],
+    ].map(([type, label, id, x, y, width, height]) => ({ type, AXLabel: label, AXUniqueId: id, AXValue: null, frame: { x, y, width, height } }))));
+    const header = [...everyNode(tree)].find((x) => x.identifier === 'header')!;
+    // No band here (an app that hides the status bar): the cover alone is judged.
+    expect(await chromeOverElement({ viewport: async () => ({ width: 402, height: 874 }) }, tree, header, colorSampleRect(header.rect))).toBe(
+      'button "Close" (300,120 80x44) is drawn over the element (element 0,0 402x200) — the capture would show it, not the element — ' +
+        'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
+    );
+  });
+});

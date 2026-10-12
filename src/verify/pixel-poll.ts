@@ -196,10 +196,14 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * the sampler and the recognizer read the region — judged over what each
  * reads (`PixelPollSpec.reads`: the colour sampler's 12 %-inset rect, the
  * ocr crop's whole rect; `chromeOverElement`). Residuals, stated: an element
- * that reaches into the band by design — a full-bleed header, a screen
- * resized above the keyboard (WDA's `login_screen` 0,0 402x566), a window
- * under an ocr assert — fails closed whatever it shows (a colour assert on
- * a screen-sized one samples 12 % down, below a 62-pt or 66-px band); idb's
+ * that reaches into the band by design — a full-bleed header, on iOS and on
+ * Android 15+, whose apps draw edge-to-edge (an app bar at 0,0 1080x220
+ * under the 66-px band fails a colour assert closed: the owner's decision,
+ * code review of round 8, P2 — kept, its advice leading with something in
+ * it that lies clear of the band, its title), a screen resized above the
+ * keyboard (WDA's `login_screen` 0,0 402x566), a window under an ocr
+ * assert — fails closed whatever it shows (a colour assert on a
+ * screen-sized one samples 12 % down, below a 62-pt or 66-px band); idb's
  * Application node under a colour assert fails on the content listed over
  * its sample; `scroll_until … fully: true` lets the rest of an element lie under
  * the band once its centre is below it, so for such an element only the
@@ -556,10 +560,17 @@ async function keyboardOverElement(
  * idb's flat list has no ancestry, so EVERY idb miss carries the clause),
  * it starts at the screen's top edge under the band (a full-bleed header),
  * or the cover holds the element whole. For the screen ITSELF — an element
- * screen-sized, or spanning the screen's top edge at full width — no scroll
- * can cure it, and the remedy leads with the child (review round 3); for
+ * screen-sized — no scroll can cure it, and the remedy leads with the child
+ * (review round 3); so too for an element laid from the screen's top edge
+ * at full width, a full-bleed header — iOS's, or Android 15+'s edge-to-edge
+ * app bar (`0,0 1080x220` under the 66-px band fails a colour assert
+ * closed, the owner's decision, code review of round 8, P2) — whose remedy
+ * leads with "assert something in it that lies clear of that (its title,
+ * say)": the title, below the band, is judged on its own and passes. For
  * idb's flat-list root (its Application node, screen-sized) it says the
- * node named is content drawn over the root's background.
+ * node named is content drawn over the root's background — only for the
+ * screen-sized root since P2 (a full-bleed header in a flat list was told
+ * that too).
  */
 export async function chromeOverElement(
   adapter: Pick<DeviceAdapter, 'viewport'>,
@@ -576,11 +587,11 @@ export async function chromeOverElement(
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
   const pinned = insideScroller(tree, element) !== true;
-  // No scroll ever moves the screen itself out from under anything: a screen-sized element, or one spanning the screen's top edge.
-  const screenItself =
-    rectArea(element.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION ||
-    (element.rect.y <= screen.y && element.rect.x <= screen.x && element.rect.x + element.rect.width >= screen.x + screen.width);
-  const never = screenItself ? 'never' : undefined;
+  // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
+  // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
+  const screenSized = rectArea(element.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION;
+  const fullBleed = element.rect.y <= screen.y && element.rect.x <= screen.x && element.rect.x + element.rect.width >= screen.x + screen.width;
+  const never = screenSized ? 'screen' : fullBleed ? 'header' : undefined;
   if (band.height > 0 && overlapsPastSlack(reads, band)) {
     return `the status bar is drawn over the element ${at}, status bar ${rectText(band)}) — ${coverRemedy(never ?? (pinned || element.rect.y <= screen.y ? 'stuck' : 'scroll'))}`;
   }
@@ -592,21 +603,25 @@ export async function chromeOverElement(
   const reach = sameRect(cover.reach, cover.node.rect) ? '' : `, reaching ${rectText(cover.reach)}`;
   const named = `${nodeText(cover.node).slice(0, -1)}${reach})`;
   // In idb's flat list the screen-sized node is the root (the Application): everything listed after it is content on its background.
-  const root = screenItself && tree.flatList === true ? 'root' : never;
+  const root = screenSized && tree.flatList === true ? 'root' : never;
   return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, cover.reach) ? 'stuck' : 'scroll'))}`;
 }
 
 /**
  * What to do about a pixel assert's element under chrome (`chromeOverElement`), worded as the tap's sliver hint
  * ("tap something in it that lies clear of that edge"): `scroll` — scroll it clear; `stuck` — that, or, when a
- * scroll may not cure it, assert something in it that lies clear; `never` — the element is the screen itself
- * (screen-sized, or spanning its top edge), which no scroll moves, so only the child; `root` — the same, for idb's
- * flat-list root, whose cover is the app's own content laid on its background.
+ * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
+ * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
+ * for an element laid from the screen's top edge at full width, a full-bleed header (the owner's decision, code
+ * review of round 8, P2: an edge-to-edge Android app bar, 0,0 1080x220 under the 66-px band, fails a colour assert
+ * closed, and its title, clear of the band, is what to assert); `root` — the screen, for idb's flat-list root,
+ * whose cover is the app's own content laid on its background.
  */
-const coverRemedy = (kind: 'scroll' | 'stuck' | 'never' | 'root'): string => {
+const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): string => {
   const child = 'assert something in it that lies clear of that';
   if (kind === 'root') return `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${child}`;
-  if (kind === 'never') return `the capture would show it, not the element; no scroll moves the screen itself out from under that — ${child}`;
+  if (kind === 'screen') return `the capture would show it, not the element — ${child}; no scroll moves the screen itself out from under it`;
+  if (kind === 'header') return `the capture would show it, not the element — ${child} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`;
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   return kind === 'stuck' ? `${scroll} — or, if no scroll moves it out from under that, ${child}` : scroll;
 };
