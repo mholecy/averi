@@ -964,7 +964,7 @@ export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefine
 
 /**
  * Whether `node` lies inside something that scrolls — an ancestor that
- * scroll-containers.ts#scrolls, or a web view — or undefined when the tree
+ * scroll-containers.ts#scrolls — or undefined when the tree
  * cannot say: a flat list (`UiNode.flatList`, idb) has no ancestry, and a
  * node of another tree has none here. The tap's status-bar refusal asks it
  * to say whether `scroll_until` can move the target out from under the bar
@@ -974,8 +974,7 @@ export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined 
   if (tree.flatList === true) return undefined;
   const walk = (n: UiNode, scrolled: boolean): boolean | undefined => {
     if (n === node) return scrolled;
-    // The web view's line goes once a web view is one of scroll-containers.ts#SCROLLING_ROLES.
-    const below = scrolled || scrolls(n) || n.role === 'webview';
+    const below = scrolled || scrolls(n);
     for (const child of n.children) {
       const found = walk(child, below);
       if (found !== undefined) return found;

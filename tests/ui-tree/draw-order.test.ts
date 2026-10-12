@@ -1259,6 +1259,22 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen).toMatchObject({ covers: [], tapAt: { point: { x: 44, y: 84 }, moved: false } });
     });
 
+    it('a navigation bar\'s Back with a web page scrolled under the bar (WDA lists the bar first): the page\'s link is no cover of it — a web view scrolls', () => {
+      const back = uiNode({ role: 'button', label: 'Back', rect: rect(8, 70, 80, 40) });
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 72, 200, 30) });
+      const bar = uiNode({ role: 'other', label: 'NavigationBar', rect: rect(0, 62, 402, 54), children: [back] });
+      const page = uiNode({ role: 'webview', rect: IPHONE, children: [link] });
+      const seen = drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [bar, page] })).exposure(back, IPHONE);
+      expect(seen).toMatchObject({ covers: [], tapAt: { point: { x: 48, y: 90 }, moved: false } });
+    });
+
+    it('a link under a sticky element of ITS OWN web page still has that element over it', () => {
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 100, 200, 30) });
+      const sticky = uiNode({ role: 'text', label: 'Contents', rect: rect(0, 90, 402, 40) });
+      const tree = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [link, sticky] })] });
+      expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([sticky]);
+    });
+
     it('a row under a sticky header of ITS OWN scroll view still has the header over it', () => {
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 100, 402, 52) });
       const header = uiNode({ role: 'text', label: 'Section', rect: rect(0, 90, 402, 30) });

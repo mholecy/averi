@@ -18,7 +18,8 @@ import type { UiNode } from '../adapters/types.js';
  *   (geometry.ts#insideScroller), and whether a node is scrolled content or
  *   a scroll indicator for draw order. A node that clips scrolls (Android's
  *   flag means "scrolls now"); so does a node of a `SCROLLING_ROLES` role,
- *   with or without the flag — a classic Android list whose content fits
+ *   with or without the flag: a scroll view, and a web view, whose page
+ *   scrolls under its frame. A classic Android list whose content fits
  *   (`scrollable="false"`) is still a scroll view, and a remedy that says
  *   "scroll_until it first" over it is answered honestly by scroll_until's
  *   exhaustion.
@@ -29,7 +30,7 @@ import type { UiNode } from '../adapters/types.js';
  *
  * NOT a scroll predicate: draw-order.ts's CONTENT_FRAMED_ROLES. "Its frame
  * is not a drawing surface" is a draw judgement, measured on iOS and narrow
- * on purpose (a web view's frame IS its surface); it is kept
+ * on purpose (a web view scrolls, yet its frame IS its surface); it is kept
  * in draw order and never derived from `scrolls`.
  */
 
@@ -39,7 +40,7 @@ export function clips(n: UiNode): boolean {
 }
 
 /** The roles whose content scrolls under their frame, whatever the source says of clipping. */
-export const SCROLLING_ROLES: ReadonlySet<string> = new Set(['scrollable']);
+export const SCROLLING_ROLES: ReadonlySet<string> = new Set(['scrollable', 'webview']);
 
 /** This node's content scrolls under its frame: it clips, or its role is one of `SCROLLING_ROLES`. `clips(n) ⇒ scrolls(n)`. */
 export function scrolls(n: UiNode): boolean {
