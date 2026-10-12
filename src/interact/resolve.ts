@@ -1,9 +1,9 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, containsPoint, drawnOverText, higherTop, inStatusBand, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { drawnOverText, higherTop, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { sceneOf, usableScreen, type Scene, type UsableScreen } from '../ui-tree/standing.js';
+import { sceneOf, usableScreen, type Scene, type Standing, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -503,130 +503,117 @@ export class PresentElementRefusal extends Error implements RefusedOnPresentElem
 export class OffScreenRefusal extends PresentElementRefusal {}
 
 /**
- * THE on-screen rule for a point about to be tapped (2026-10-08) — the
- * target's centre (`refuseOffScreen`) and a configured keyboard dismissal's
- * (keyboard-in-tree.ts#pickDismissal: WDA keeps off-screen nodes, a title
- * scrolled above the top is still in the tree). One owner since the review
- * of the off-screen refusal: the picker had judged by the root's rect alone.
- *
- * The screen is ui-tree/standing.ts#usableScreen over the tree the tap
- * was resolved in — the one `scroll_until`'s stop reads too, so the two
- * agree.
- *
- * - Inside any of the screen's `boxes` (ui-tree/standing.ts#UsableScreen has the
- *   rule): the box alone when a window witnessed the orientation; the box
- *   EITHER way up when a window's own sides, or a walked-width turn,
- *   suggest a turn no window witnessed; the panel as built otherwise (review 2026-10-08, B1: refusing on a guessed turn
- *   refused every tap past x 402 in an idb landscape tree whose window a
- *   straddling card made unreliable, an iPad strip, a walked-width turn).
- *   A portrait carousel page at x 450 of 402 is refused even when its
- *   straddling neighbour makes the window unreliable (the review's item 1:
- *   until then every unwitnessed box was judged either way up). What is
- *   still given up: on a screen whose turn is suggested but not witnessed,
- *   a point inside the other orientation only. The measured case — below
- *   the fold, (94,895) on 402×874 — lies outside both and is refused.
- * - No screen at all (no usable device size and no window in the tree):
- *   inside the tree's root rect when it has one; with none, on screen —
- *   the keyboard guard's fail-open rule (keyboard.ts). The rule exists to
- *   stop a false "Tapped", and must never be why a tap on a device that
- *   could not report its size did not happen.
- *
- * - Never in the status band at the top of a portrait box, where the
- *   adapter reports one with the device's screen (`DeviceScreen.statusBand`):
- *   iOS's (adapters/ios-status-band.ts, 2026-10-09: a tap at (201,6) went to
- *   the status bar, which scrolled the form to its top) and, since
- *   2026-10-12, Android's visible status bar (android.ts#parseStatusBand: a
- *   tap at (256,3) on Google Contacts' collapsed app bar went to the bar).
- *   That band is off the screen for a tap (ui-tree/geometry.ts#inStatusBand words the
- *   refusal).
- *
- * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
- * a 402-wide screen is judged at 402, off it: that is where the tap would go.
- */
-export function onScreen(point: Point, tree: UiNode, screen: UsableScreen | undefined): boolean {
-  if (screen === undefined) return rectArea(tree.rect) === 0 || containsPoint(tree.rect, point);
-  return screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
-}
-
-/**
  * The status band as one clause — `under the status bar at (201,6), in the
  * top 62 of the screen (tree units), where a tap goes to the status bar` —
  * the words for a point there, read by the tap's refusal
  * (`refuseOffScreen`) and by `scroll_until`'s failures (scroll-text.ts),
- * so the two say the one fact alike (code review of round 6, S5).
- * Platform-neutral since 2026-10-12, when Android reported its band too: no
- * platform named, and the band in the tree's units — pt on iOS, px on
- * Android, the units every rect in the same reply is in (until then the
- * clause said "iOS's status bar … the top 62 pt").
+ * so the two say the one fact alike. No platform named, and the band in the
+ * tree's units — pt on iOS, px on Android, the units every rect in the same
+ * reply is in.
  */
 export const underStatusBar = (at: Point, band: number): string =>
   `under the status bar at (${at.x},${at.y}), in the top ${band} of the screen (tree units), where a tap goes to the status bar`;
 
 /**
- * The diagnosis of a target no scroll moves out from under the status bar, in the tap's refusal (`statusBarRemedy`) and in
+ * The navigation band as one clause — `under the navigation bar at
+ * (540,2186), from y 2154 to the bottom of the screen (tree units), where a
+ * tap goes to the navigation bar` — `underStatusBar`'s twin at the bottom
+ * edge, for the same two readers.
+ */
+export const underNavigationBar = (at: Point, top: number): string =>
+  `under the navigation bar at (${at.x},${at.y}), from y ${top} to the bottom of the screen (tree units), where a tap goes to the navigation bar`;
+
+/** A point under a system bar (ui-tree/standing.ts#SystemBar), in that bar's clause. */
+export const underSystemBar = (at: Point, bar: SystemBar): string => (bar.edge === 'top' ? underStatusBar(at, bar.bottom) : underNavigationBar(at, bar.top));
+
+/** The bar a system band is: `status bar` at the top, `navigation bar` at the bottom. */
+export const systemBarName = (edge: SystemBar['edge']): string => (edge === 'top' ? 'status bar' : 'navigation bar');
+
+/**
+ * The diagnosis of a target no scroll moves out from under the status bar, in the tap's refusal (`systemBarRemedy`) and in
  * `scroll_until`'s failure (scroll-text.ts) alike — a layout drawn under the bar without keeping clear of it (iOS's safe area,
- * Android's window insets: until 2026-10-12 it said "ignores the safe area", iOS's word only).
+ * Android's window insets).
  */
 export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a layout that does not keep clear of it?)';
 
+/** `PINNED_UNDER_STATUS_BAR`'s twin for the navigation bar: an edge-to-edge layout that keeps no clearance at the bottom. */
+export const PINNED_UNDER_NAVIGATION_BAR = 'it is pinned under the navigation bar (a layout that does not keep clear of it?)';
+
+/** The diagnosis for a target pinned under the bar at `edge`. */
+export const pinnedUnder = (edge: SystemBar['edge']): string => (edge === 'top' ? PINNED_UNDER_STATUS_BAR : PINNED_UNDER_NAVIGATION_BAR);
+
 /**
- * What to do about a target whose centre lies under the status bar, said
- * as far as the tree knows it (code review of round 6, P1: the refusal had
- * said `scroll_until it first` of a button pinned at the top, which no
- * scroll moves). In a scroll view (`scrolls`, ui-tree/geometry.ts
- * #Clips.inScroller), `scroll_until` moves it out from under the bar; in none,
- * it is pinned there — a layout that does not keep clear of the bar — and no step
+ * What to do about a target whose centre lies under a system bar (the bar
+ * at `edge`), said as far as the tree knows it: the refusal had said
+ * `scroll_until it first` of a button pinned at the top, which no scroll
+ * moves. In a scroll view (`scrolls`, ui-tree/geometry.ts#Clips.inScroller),
+ * `scroll_until` moves it out from under the bar; in none, it is pinned
+ * there — a layout that does not keep clear of the bar — and no step
  * reaches it; where the tree cannot say (idb's flat list), both. The
  * refusal stays a refusal either way — the safe direction, and terminal in
  * an `optional:` step (flow/engine.ts). Cost, on the refusal path only:
  * the clip facts' two walks of the tree (ui-tree/geometry.ts#clipsOf's own
  * and `Clips.inScroller`'s).
  */
-export function statusBarRemedy(scrolls: boolean | undefined): string {
-  const pinned = `no scroll moves it out: ${PINNED_UNDER_STATUS_BAR} — fix the layout, or tap something else`;
+export function systemBarRemedy(edge: SystemBar['edge'], scrolls: boolean | undefined): string {
+  const pinned = `no scroll moves it out: ${pinnedUnder(edge)} — fix the layout, or tap something else`;
   if (scrolls === true) return 'it lies in a scroll view — scroll_until it first, to move it out from under the bar';
   if (scrolls === false) return `it lies in no scroll view, so ${pinned}`;
   return `if it lies in a scroll view, scroll_until it first, to move it out from under the bar; if not, ${pinned}`;
 }
 
+/** The tap's purpose (ui-tree/standing.ts#Purpose), without a keyboard line: the first ask. */
+const TAP = { of: 'tap' } as const;
+
 /**
- * Refuse a tap whose point lies off the screen (OffScreenRefusal), or return
- * the screen it was judged against. The rule every tap on a resolved node
- * shares, applied by keyboard.ts#resolveClearOfKeyboard — behind
- * `tapElement` (the flow `tap:` step, the MCP `tap` tool) and `fillField`'s
- * focus tap — to the node it hands back.
+ * A tap's judgement of a resolved node: the usable screen it was judged on
+ * (the first look's, or the one read again before a refusal), the scene of
+ * the tree the node is in, and where the node stands for a tap there
+ * (ui-tree/standing.ts#Scene.standing, judged without the keyboard).
+ */
+export interface TapJudgement {
+  readonly screen: UsableScreen | undefined;
+  readonly scene: Scene;
+  readonly standing: Standing;
+}
+
+/** A standing the on-screen rule lets through: anything but a centre off the screen or under a system bar. */
+const onTheScreen = (s: Standing): boolean => s.kind !== 'offScreen' && s.kind !== 'systemBar';
+
+/**
+ * Refuse a tap whose point lies off the screen or under a system bar
+ * (OffScreenRefusal), or return the judgement it passed. The rule every tap
+ * on a resolved node shares, applied by keyboard.ts#resolveClearOfKeyboard
+ * — behind `tapElement` (the flow `tap:` step, the MCP `tap` tool) and
+ * `fillField`'s focus tap — to the node it hands back; where the node
+ * stands is the scene's (ui-tree/standing.ts#Scene.standing).
  *
  * Judged on the tap POINT, not the rect: a node whose centre is on screen
- * is tapped as before, however much of it is clipped — by THIS rule: one
- * cut to a sliver by its scroll container is the cut-sliver rule's, judged
- * later (`refuseCutSliver`, 2026-10-10). A node partly on
- * screen with its centre off is REFUSED, not tapped at the centre of its
- * visible part: the smallest change that makes the reply true. Moving the
- * point would change what the keyboard guard judged (it tests the centre),
- * and the visible part of such a node is a sliver at a screen edge — on iOS
- * the bottom one is the home indicator's gesture zone, the top the status
- * bar — where a tap is least likely to reach the element. Its remedy is
- * `scroll_until … fully: true` (review 2026-10-08, M1: a plain
- * `scroll_until` then stopped on any intersection and handed back the same
- * clipped node); since code review P3 (2026-10-09) a plain one also goes on
- * until the centre is on the screen (ui-tree/standing.ts#Scene.standing), so either
- * agrees with this rule.
+ * passes, however much of it is clipped — by THIS rule: one cut to a sliver
+ * by its scroll container is refused later (`aimClearOfChrome`). A node
+ * partly on screen with its centre off is REFUSED, not tapped at the centre
+ * of its visible part: the smallest change that makes the reply true.
+ * Moving the point would change what the keyboard guard judged (it tests
+ * the centre), and the visible part of such a node is a sliver at a screen
+ * edge — on iOS the bottom one is the home indicator's gesture zone, the top
+ * the status bar — where a tap is least likely to reach the element. Its
+ * remedy is `scroll_until … fully: true`: a plain `scroll_until` that
+ * stopped on any intersection handed back the same clipped node; a plain
+ * one now goes on until the centre is on the screen, so either agrees with
+ * this rule.
  *
- * Before refusing, the device's screen is read AGAIN (`viewport({ fresh:
- * true })`, once, on this path only — the clear path costs nothing new):
+ * Before refusing, the device's screen is read AGAIN (`usableScreen`'s
+ * `fresh`, once, on this path only — the clear path costs nothing new):
  * the adapter memoizes the size for the session, and a fold, an unfold or a
- * `wm size` change would otherwise refuse taps for the server's life (review
- * 2026-10-08, M3; the same re-read verify/capture.ts makes before refusing a
- * window as wider than the screen). The refusal names the size read again
- * when it differs from the first. A fresh read that FAILS is dropped by the
- * memo (adapters/viewport-memo.ts), so `usableScreen` then asks the device once
- * more — one extra read on a refusal path, accepted.
+ * `wm size` change would otherwise refuse taps for the server's life (the
+ * same re-read verify/capture.ts makes before refusing a window as wider
+ * than the screen). The refusal names the size read again when it differs
+ * from the first.
  *
- * A point on the screen but inside the status band (`onScreen`'s band
- * clause, iOS's since 2026-10-09, Android's since 2026-10-12) is refused in its own words (`underStatusBar`, and
- * `statusBarRemedy`: scroll it out only where it can be) — since "off
- * screen" would contradict
- * a rect the reader sees on it.
+ * A point on the screen but inside a system band is refused in that bar's
+ * own words (`underSystemBar`, and `systemBarRemedy`: scroll it out only
+ * where it can be) — "off screen" would contradict a rect the reader sees
+ * on it.
  *
  * `sent`, when the keyboard guard acted before this look — `back was
  * pressed …`, `id:"login_title" was tapped …` (`Hiding.sent`) — fronts the
@@ -639,23 +626,24 @@ export async function refuseOffScreen(
   tree: UiNode,
   screen: UsableScreen | undefined,
   sent?: string,
-): Promise<UsableScreen | undefined> {
-  const at = tapPoint(node);
-  if (onScreen(at, tree, screen)) return screen;
-  try {
-    await adapter.viewport({ fresh: true });
-  } catch {
-    // An unreadable size is the usable screen's to handle (the tree's window stands in).
-  }
-  const again = await usableScreen(adapter, { tree });
-  if (onScreen(at, tree, again)) return again;
-  const judged: Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'> = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
+): Promise<TapJudgement> {
+  const scene = sceneOf(tree);
+  const first = scene.standing(node, screen, TAP);
+  if (onTheScreen(first)) return { screen, scene, standing: first };
+  const again = await usableScreen(adapter, { tree }, { fresh: true });
+  const second = scene.standing(node, again, TAP);
+  if (onTheScreen(second)) return { screen: again, scene, standing: second };
+  // Refused on the screen read again; on the first look's when none could be read again.
+  const [judged, standing] = again === undefined && screen !== undefined ? [screen, first] : [again ?? { box: tree.rect, boxes: [tree.rect] }, second];
   const what = describeTarget(target);
-  if (inStatusBand(at, judged)) {
-    const band = `${underStatusBar(at, judged.statusBand ?? 0)} (rect ${rectText(node.rect)}) — ${statusBarRemedy(sceneOf(tree).clips.inScroller(node))}`;
-    throw new OffScreenRefusal(sent === undefined ? `${what} is ${band}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${band}`);
+  const refuse = (finding: string): never => {
+    throw new OffScreenRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
+  };
+  if (standing.kind === 'systemBar') {
+    return refuse(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${systemBarRemedy(standing.bar.edge, scene.clips.inScroller(node))}`);
   }
-  const visible = Math.max(...judged.boxes.map((b) => visibleFractionInViewport(node.rect, b)));
+  if (standing.kind !== 'offScreen') throw new Error(`tap: a standing ${standing.kind} refused as off the screen`);
+  const { at, visible } = standing;
   const size = `${judged.box.width}x${judged.box.height}`;
   const reread =
     again !== undefined && screen !== undefined && (again.box.width !== screen.box.width || again.box.height !== screen.box.height)
@@ -666,9 +654,7 @@ export async function refuseOffScreen(
     visible > 0
       ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — scroll_until it with fully: true first`
       : ` (rect ${rectText(node.rect)}) — scroll_until it first`;
-  throw new OffScreenRefusal(
-    sent === undefined ? `${what} is off screen ${where}${part}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is off screen ${where}${part}`,
-  );
+  return refuse(`off screen ${where}${part}`);
 }
 
 // ─── Clear of the app's chrome ───────────────────────────────────────────────
@@ -706,51 +692,40 @@ export class CoveredRefusal extends PresentElementRefusal {}
 export class ClippedRefusal extends PresentElementRefusal {}
 
 /**
- * THE cut-sliver rule for a node about to be tapped (2026-10-10, the bug
- * note above ClippedRefusal): refuse when the node is EVIDENTLY cut at a
- * clipping ancestor's edge (ui-tree/geometry.ts#Clips.cutSliver over
- * #evidentCut — flush with it within a pixel, its own content running on
- * past it; the shallowest such edge) and what shows of it across that edge
- * is under `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION,
- * `Exposure.minPiece`: the minimum that already refuses a sliver left by a
- * cover, 65 px on the Pixel_3a). A node that merely touches the edge with
- * nothing of it shown cut — a whole button at a form's end — is tapped as
- * before; so is a node deep enough across the edge, at its centre.
+ * The tap's refusal of a node cut to a sliver (ui-tree/standing.ts
+ * #Scene.standing's `cut`: EVIDENTLY cut at a clipping ancestor's edge —
+ * geometry.ts#Clips.cutSliver, flush with it within a pixel, its own content
+ * running on past it, the shallowest such edge — and what shows of it
+ * across that edge under `minPiece`, draw-order.ts#MIN_TAP_PIECE_FRACTION,
+ * the minimum that already refuses a sliver left by a cover, 65 px on the
+ * Pixel_3a). A node that merely touches the edge with nothing of it shown
+ * cut — a whole button at a form's end — is tapped as before; so is a node
+ * deep enough across the edge, at its centre. A sliver also covered is
+ * refused for its cut (the standing's order), whose remedy names the edge.
  *
- * Judged BEFORE the cover check, so a sliver also covered is refused for
- * its cut, whose remedy is a scroll toward the edge. The remedy is a plain
- * `scroll_until` toward that edge (`cutRemedy`): its plain stop does not
- * stop on such a sliver either (ui-tree/standing.ts#Scene.standing), and its default direction is down, so a cut at the
- * bottom needs no direction and the others name theirs — and, for the
- * node that only READS cut (geometry.ts#evidentCut's residual: whole, its
- * own content running to the edge), the way past it: a child, or a
- * coordinate tap (code review round 3) — a child that lies CLEAR of that
- * edge (round 8): one flush with it inside a sliver cut there is refused
- * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured at
- * 35d5997, the toggle's leaf label "Payment details", tapped as the hint
+ * The remedy is a plain `scroll_until` toward that edge (`cutRemedy`): its
+ * plain stop does not stop on such a sliver either, and its default
+ * direction is down, so a cut at the bottom needs no direction and the
+ * others name theirs — and, for the node that only READS cut
+ * (geometry.ts#evidentCut's residual: whole, its own content running to the
+ * edge), the way past it: a child, or a coordinate tap — a child that lies
+ * CLEAR of that edge: one flush with it inside a sliver cut there is refused
+ * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured
+ * at 35d5997, the toggle's leaf label "Payment details", tapped as the hint
  * then said, did nothing) — whose own way past names what it lies in:
- * something in THAT clear of the edge. Only nodes under a
- * clipping ancestor (UiNode.clipsDescendants, Android's) are asked: an iOS
- * tree has none, so this never refuses there. Applied inside the chrome
- * check rather than beside the on-screen rule (keyboard.ts) because the
- * minimum is the draw order's and the node judged must be the one the
- * guard hands back — the chrome check already has both. Cost: one walk of
- * the tree (geometry.ts#clipsOf), and a subtree per flush edge of the node
- * and of each ancestor shallower than the minimum it inherits through.
+ * something in THAT clear of the edge. Only nodes under a clipping ancestor
+ * (UiNode.clipsDescendants, Android's) are cut: an iOS tree has none, so
+ * this never refuses there.
  */
 /** The way past a cut the node's own content evidences, should it only READ cut (geometry.ts#evidentCut's residual). */
 const OWN_CUT_WAY_PAST = 'if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates';
-/** The way past a cut inherited from what the node lies in (`Cut.within`, round 8): the evidence is that ancestor's, so its "whole" case is that ancestor's. */
+/** The way past a cut inherited from what the node lies in (`Cut.within`): the evidence is that ancestor's, so its "whole" case is that ancestor's. */
 const INHERITED_CUT_WAY_PAST =
   'if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates';
 
-function refuseCutSliver(target: Target, node: UiNode, clips: Scene['clips'], minPiece: number, sent?: string): void {
-  const cut = clips.cutSliver(node, minPiece);
-  if (cut === undefined) return;
-  const finding = `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
-  const what = describeTarget(target);
-  throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
-}
+/** The tap's finding for a node cut to a sliver (`cut`, of a node whose rect is `shown`, under `minPiece`), its remedy and its way past. */
+const cutFinding = (cut: Cut, shown: Rect, minPiece: number): string =>
+  `${cutSliverText(cut, shown, minPiece)} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
 
 /**
  * THE sentence for a node cut to a sliver (`Clips.cutSliver`'s answer, `cut`, of a
@@ -760,7 +735,7 @@ function refuseCutSliver(target: Target, node: UiNode, clips: Scene['clips'], mi
  * lies in (`Cut.within`, round 8) says so after the container — `…(container
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
  * part…`. Said by the tap's refusal
- * (`refuseCutSliver`) and by `scroll_until`'s sliver failures
+ * (`aimClearOfChrome`) and by `scroll_until`'s sliver failures
  * (scroll-text.ts) — one wording since the code review of round 7 (S8),
  * where the two had drifted apart ("to a 948x55 part, 55 deep across it").
  */
@@ -795,44 +770,40 @@ export interface Aim {
 export const movedTapText = (what: string, moved: string): string => `${what} tapped ${moved}`;
 
 /**
- * THE chrome check for a point about to be tapped on a resolved node
- * (2026-10-09; the bug note's owner decision 1) — after, since 2026-10-10,
- * the cut-sliver rule (`refuseCutSliver`: a ClippedRefusal for a target its
- * scroll container cuts to a strip under the minimum below): the target's centre, unless
- * a node of the tree is drawn over it there — then the centre of the
- * largest piece of it nothing is drawn over, when both its sides reach the
- * minimum (ui-tree/draw-order.ts#exposure, its rows and MIN_TAP_PIECE_FRACTION),
- * said in `moved`; else a CoveredRefusal naming the cover. Applied by
- * keyboard.ts#resolveClearOfKeyboard LAST, to the node and tree it hands
- * back — after the on-screen rule and the keyboard guard, so neither of
- * their judgements changes: both are of the centre, and the centre is what
- * is tapped unless something is drawn over it.
+ * THE chrome check for a point about to be tapped on a resolved node (the
+ * bug note's owner decision 1), after the on-screen rule (`refuseOffScreen`,
+ * whose `judged` it reads): where the node stands for a tap
+ * (ui-tree/standing.ts#Scene.standing, `{ of: 'tap' }`) — a ClippedRefusal
+ * for a target its scroll container cuts to a sliver (`cutFinding`); its
+ * centre, unless a node of the tree is drawn over it there — then the centre
+ * of the largest piece of it nothing is drawn over, when both its sides
+ * reach the minimum (ui-tree/draw-order.ts#exposure, its rows and
+ * MIN_TAP_PIECE_FRACTION), said in `moved`; else a CoveredRefusal naming the
+ * cover. Applied by keyboard.ts#resolveClearOfKeyboard LAST, to the node and
+ * tree it hands back — after the on-screen rule and the keyboard guard, so
+ * neither of their judgements changes: both are of the centre, and the
+ * centre is what is tapped unless something is drawn over it.
  *
- * Judged in the screen box that holds the centre (`screen`, the on-screen
- * rule's; the tree's root rect, or the node's own, when there is none — fail
- * open, as there). The soft keyboard is no cover node — Android lists none,
- * and a band is believed only with its input method's word
+ * Judged in the screen box that holds the centre, less the system bands, so
+ * a moved tap never lands on the status bar or the navigation bar (the
+ * tree's root rect, or the node's own, when there is no screen — fail open,
+ * as there). The soft keyboard is no cover node — Android lists none, and a
+ * band is believed only with its input method's word
  * (ui-tree/keyboard-cover.ts) — so it is asked for ONLY when the centre is
  * covered (`keyboardTop`: the top of a band the input method stands by, or
- * undefined), and the box cut above it before a piece is chosen: a piece
- * under the keyboard is never aimed at. Its cost is the reading's, on that
- * path only (on Android the touchable region and the witness, with the
- * keyboard shown; nothing more with it hidden — the guard's first reading
- * is reused). Under idb, whose reading is always `unknown`, the cut is at
- * the top of idb's keyboard band in the tree instead
- * (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop, read off the draw
- * order the check already holds; round 7, 2026-10-10 — the
- * higher of the two when both read): M-1.4's refusal said "only a 354x7
- * part of it shows" of `value_date_select`'s strip 589–596, under the
- * band, between the lifted CONTINUE's reach and the keys. A line only: the
- * guard still reads no keyboard on idb, and a centre clear of every node
- * (the band's background is none, draw-order's `structural` row) is tapped
- * as before.
- *
- * The box is cut below the status band (ui-tree/geometry.ts#belowStatusBand,
- * 2026-10-09; Android's too since 2026-10-12) before a piece is chosen, as above a keyboard: a moved tap
- * never lands on the status bar. Its centre is never there — the on-screen
- * rule refused that first.
+ * undefined), and the standing asked again with that line: a piece under
+ * the keyboard is never aimed at. Its cost is the reading's, on that path
+ * only (on Android the touchable region and the witness, with the keyboard
+ * shown; nothing more with it hidden — the guard's first reading is
+ * reused). Under idb, whose reading is always `unknown`, the line is the
+ * top of idb's keyboard band in the tree instead
+ * (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop, read off the scene's
+ * draw order; the higher of the two when both read): M-1.4's refusal said
+ * "only a 354x7 part of it shows" of `value_date_select`'s strip 589–596,
+ * under the band, between the lifted CONTINUE's reach and the keys. A line
+ * only: the guard still reads no keyboard on idb, and a centre clear of
+ * every node (the band's background is none, draw-order's `structural`
+ * row) is tapped as before.
  *
  * Only nodes of the tree cover (decision 4): a top bar the tree lists
  * before the form — WDA's, idb's (only its button and title) — is not
@@ -847,37 +818,40 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
 export async function aimClearOfChrome(
   target: Target,
   node: UiNode,
-  tree: UiNode,
-  screen: UsableScreen | undefined,
+  judged: TapJudgement,
   keyboardTop: () => Promise<number | undefined>,
   sent?: string,
 ): Promise<Aim> {
-  const centre = tapPoint(node);
-  // Below the status band (ui-tree/geometry.ts#belowStatusBand): a moved tap is never aimed into it.
-  const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
-  const scene = sceneOf(tree);
-  const order = scene.order;
-  const exposed = order.exposure(node, box);
-  // A sliver cut by a clip is refused first, by the minimum a cover's sliver is (refuseCutSliver).
-  refuseCutSliver(target, node, scene.clips, exposed.minPiece, sent);
-  const cover = exposed.centreCover;
-  if (cover === undefined) return { point: centre };
-  // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
-  const top = higherTop(await keyboardTop(), order.keyboardBandTop);
-  const within = top === undefined || top >= box.y + box.height ? box : { ...box, height: Math.max(0, top - box.y) };
-  const above = within === box ? '' : ' above the soft keyboard';
-  const seen = order.exposure(node, within);
-  if (seen.tapAt !== undefined) {
-    const { point } = seen.tapAt;
-    if (!seen.tapAt.moved) return { point };
-    const { width, height } = seen.tapAt.piece;
-    return { point, moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${drawnOverText(cover)}; tapped the uncovered part ${width}x${height}${above}` };
-  }
-  const shows =
-    seen.largest === undefined
-      ? `nothing of it shows${above}`
-      : `only a ${seen.largest.width}x${seen.largest.height} part of it shows${above}, under the ${seen.minPiece}x${seen.minPiece} a tap may be moved to`;
-  const finding = `${drawnOverText(cover, centre)}; ${shows} — scroll_until it first`;
   const what = describeTarget(target);
-  throw new CoveredRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
+  const refusal = (finding: string): string => (sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
+  let standing = judged.standing;
+  if (standing.kind === 'cut') throw new ClippedRefusal(refusal(cutFinding(standing.cut, node.rect, standing.minPiece)));
+  if (standing.facts.centreCover !== undefined) {
+    // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
+    const top = higherTop(await keyboardTop(), judged.scene.order.keyboardBandTop);
+    if (top !== undefined) standing = judged.scene.standing(node, judged.screen, { of: 'tap', keyboardTop: top });
+  }
+  const { centre } = standing.facts;
+  switch (standing.kind) {
+    case 'reachable': {
+      if (standing.moved === undefined) return { point: standing.at };
+      const { at: point, moved } = standing;
+      const above = moved.aboveKeyboard ? ' above the soft keyboard' : '';
+      return {
+        point,
+        moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${drawnOverText(moved.cover)}; tapped the uncovered part ${moved.piece.width}x${moved.piece.height}${above}`,
+      };
+    }
+    case 'covered': {
+      const above = standing.aboveKeyboard ? ' above the soft keyboard' : '';
+      const minPiece = standing.facts.minPiece;
+      const shows =
+        standing.largest === undefined
+          ? `nothing of it shows${above}`
+          : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
+      throw new CoveredRefusal(refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — scroll_until it first`));
+    }
+    default:
+      throw new Error(`tap: a standing ${standing.kind} after the on-screen rule passed`);
+  }
 }

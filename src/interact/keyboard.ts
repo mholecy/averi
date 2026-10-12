@@ -16,7 +16,7 @@ import {
   type ResolvedClear,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
-import { aimClearOfChrome, describeTarget, refuseOffScreen, resolveSettled, type Target } from './resolve.js';
+import { aimClearOfChrome, describeTarget, refuseOffScreen, resolveSettled, type TapJudgement, type Target } from './resolve.js';
 
 /**
  * The soft-keyboard guard and the post-fill dismissal, written ONCE over
@@ -133,28 +133,28 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // keyboard-avoiding scroll view scrolls back down). The screen comes from
   // the first read's tree — the orientation does not turn inside one tap —
   // or from the re-read a refusal makes first.
-  const screen = await refuseOffScreen(adapter, target, first.node, first.tree, await usableScreen(adapter, { tree: first.tree }));
+  const judged = await refuseOffScreen(adapter, target, first.node, first.tree, await usableScreen(adapter, { tree: first.tree }));
+  const { screen } = judged;
   // The LAST rule (2026-10-09): nothing of the app drawn over the point —
   // else an uncovered piece of the target, or a CoveredRefusal — and, first,
   // no target cut to a sliver by its scroll container (a ClippedRefusal)
   // (resolve.ts#aimClearOfChrome, the reasons there). On the node and tree
-  // the guard hands back, after the on-screen rule; the keyboard is read for
-  // it only when the centre is covered, off `reading` — the look's own, so
-  // what it already asked is not asked again.
-  const aimed = async (r: ClearedLook, reading: KeyboardReading, sent?: string): Promise<ResolvedClear> => {
+  // the guard hands back, as the on-screen rule judged them (`now`); the
+  // keyboard is read for it only when the centre is covered, off `reading` —
+  // the look's own, so what it already asked is not asked again.
+  const aimed = async (r: ClearedLook, reading: KeyboardReading, now: TapJudgement, sent?: string): Promise<ResolvedClear> => {
     const keyboardTop = async () => {
       const cover = await reading.cover();
       return cover !== undefined && (await reading.corroborated()) ? cover.top.y : undefined;
     };
-    const { point, moved } = await aimClearOfChrome(target, r.node, r.tree, screen, keyboardTop, sent);
+    const { point, moved } = await aimClearOfChrome(target, r.node, now, keyboardTop, sent);
     return { node: r.node, note: r.note, ...(r.keyboardHidden !== undefined && { keyboardHidden: r.keyboardHidden }), point, ...(moved !== undefined && { moved }) };
   };
   // After the guard: `sent` only when something WAS sent (the hiding path);
   // a model that handed the node back clear sent nothing.
   const onScreen = async (r: ClearedLook, sent?: string, reading = readKeyboard(adapter, r.tree)): Promise<ResolvedClear> => {
-    // r.tree, the read that holds r.node: the status-bar remedy looks the node up in it (resolve.ts#statusBarRemedy).
-    await refuseOffScreen(adapter, target, r.node, r.tree, screen, sent);
-    return aimed(r, reading, sent);
+    // r.tree, the read that holds r.node: the system-bar remedy looks the node up in it (resolve.ts#systemBarRemedy).
+    return aimed(r, reading, await refuseOffScreen(adapter, target, r.node, r.tree, screen, sent), sent);
   };
   const at = tapPoint(first.node);
   const reading = readKeyboard(adapter, first.tree);
@@ -166,7 +166,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // never be the reason a tap did not happen; a device that is really gone
   // fails the tap itself, in the tap's own words. Only a COVERING reading —
   // the input method standing by it or denying it — reaches a model.
-  if (opening.kind === 'clear' || opening.kind === 'unknown') return aimed(first, reading);
+  if (opening.kind === 'clear' || opening.kind === 'unknown') return aimed(first, reading, judged);
 
   // Chosen here, not above: the clear path allocates nothing, and the two
   // reads of `adapter.keyboard` — readKeyboard's and this — sit together.

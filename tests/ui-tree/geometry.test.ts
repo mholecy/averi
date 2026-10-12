@@ -5,7 +5,6 @@ import {
   absentFromViewport,
   clipsOf,
   containsPoint,
-  evidentCut,
   flushEdges,
   higherTop,
   inferScreenSize,
@@ -404,75 +403,85 @@ describe('flushEdges — a rect\'s edges on its container\'s, within a pixel (mo
   });
 });
 
-describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its own content says (2026-10-10)', () => {
+/** Any depth: `Clips.cutSliver` under this minimum is the cut its evidence finds, however deep (geometry.ts#evidentCut, unexported, through the clip facts). */
+const ANY_DEPTH = Number.MAX_SAFE_INTEGER;
+
+/** The cut the clip facts find of `n` nested in clipping containers of `chain`'s rects (nearest first) — the evidence of n's own content, at any depth. */
+const cutOf = (n: UiNode, chain: readonly UiNode['rect'][]) => {
+  let inner: UiNode = n;
+  for (const rect of chain) inner = { ...node(rect, null, [inner]), clipsDescendants: true };
+  return clipsOf(node({ x: -5000, y: -5000, width: 20000, height: 20000 }, null, [inner]), NESTED).cutSliver(n, ANY_DEPTH);
+};
+
+describe('Clips.cutSliver at any depth — a node cut at a clipping ancestor\'s edge, by what its own content says (geometry.ts#evidentCut)', () => {
   const form = { x: 0, y: 242, width: 1080, height: 1736 };
   const at = (rect: UiNode['rect'], ...children: UiNode[]) => node(rect, null, children);
   /** The measured toggle 66,1924 948x55 on the form's bottom (1978), a child from `top` to `bottom`. */
   const toggleWith = (top: number, bottom: number) => at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: top, width: 948, height: bottom - top }));
   it('the measured toggle: flush with the form\'s bottom, its button running into the cut from 12 px inside — cut there, 55 deep', () => {
-    expect(evidentCut(toggleWith(1936, 1978), [form])).toEqual({ edge: 'bottom', container: form, depth: 55 });
+    expect(cutOf(toggleWith(1936, 1978), [form])).toEqual({ edge: 'bottom', container: form, depth: 55 });
   });
   it('Compose\'s shape: a descendant past the edge is evidence whatever its other side', () => {
     const row = at({ x: 132, y: 242, width: 948, height: 33 }, at({ x: 132, y: 115, width: 816, height: 160 }));
-    expect(evidentCut(row, [form])).toEqual({ edge: 'top', container: form, depth: 33 });
+    expect(cutOf(row, [form])).toEqual({ edge: 'top', container: form, depth: 33 });
   });
   it('within a pixel is ON a side: a child starting 1 px inside the node does not run in, 2 px does; one ending 1 px short of the edge reaches it, 2 px short does not', () => {
-    expect(evidentCut(toggleWith(1925, 1978), [form])).toBeUndefined();
-    expect(evidentCut(toggleWith(1926, 1978), [form])?.edge).toBe('bottom');
-    expect(evidentCut(toggleWith(1936, 1977), [form])?.edge).toBe('bottom');
-    expect(evidentCut(toggleWith(1936, 1976), [form])).toBeUndefined();
+    expect(cutOf(toggleWith(1925, 1978), [form])).toBeUndefined();
+    expect(cutOf(toggleWith(1926, 1978), [form])?.edge).toBe('bottom');
+    expect(cutOf(toggleWith(1936, 1977), [form])?.edge).toBe('bottom');
+    expect(cutOf(toggleWith(1936, 1976), [form])).toBeUndefined();
   });
   it('inside evidence needs MIN_INSIDE_EVIDENCE (8) along y (code review round 3): a 7-px divider or focus line at the cut is none, 8 px is; past the edge, any thickness counts', () => {
-    expect(evidentCut(toggleWith(1971, 1978), [form])).toBeUndefined();
-    expect(evidentCut(toggleWith(1970, 1978), [form])?.edge).toBe('bottom');
-    expect(evidentCut(at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1977, width: 948, height: 3 })), [form])?.edge).toBe('bottom'); // 2 px past
+    expect(cutOf(toggleWith(1971, 1978), [form])).toBeUndefined();
+    expect(cutOf(toggleWith(1970, 1978), [form])?.edge).toBe('bottom');
+    expect(cutOf(at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1977, width: 948, height: 3 })), [form])?.edge).toBe('bottom'); // 2 px past
   });
   it('past the edge by more than a pixel: 1 px past is on it (a fill), 2 px past is evidence', () => {
-    expect(evidentCut(toggleWith(1924, 1979), [form])).toBeUndefined();
-    expect(evidentCut(toggleWith(1924, 1980), [form])?.edge).toBe('bottom');
+    expect(cutOf(toggleWith(1924, 1979), [form])).toBeUndefined();
+    expect(cutOf(toggleWith(1924, 1980), [form])?.edge).toBe('bottom');
   });
   it('nothing cut: a label inside, a background filling the node, a leaf, a node not flush, a zero-area descendant, no clipping ancestor', () => {
     const whole = { x: 66, y: 1930, width: 948, height: 48 };
-    expect(evidentCut(at(whole, at({ x: 480, y: 1942, width: 120, height: 24 })), [form])).toBeUndefined();
-    expect(evidentCut(at(whole, at(whole)), [form])).toBeUndefined();
-    expect(evidentCut(at(whole), [form])).toBeUndefined();
-    expect(evidentCut(at({ x: 66, y: 1900, width: 948, height: 48 }, at({ x: 66, y: 1920, width: 948, height: 28 })), [form])).toBeUndefined();
-    expect(evidentCut(at(whole, at({ x: 66, y: 1978, width: 948, height: 0 })), [form])).toBeUndefined();
-    expect(evidentCut(toggleWith(1936, 1978), [])).toBeUndefined();
+    expect(cutOf(at(whole, at({ x: 480, y: 1942, width: 120, height: 24 })), [form])).toBeUndefined();
+    expect(cutOf(at(whole, at(whole)), [form])).toBeUndefined();
+    expect(cutOf(at(whole), [form])).toBeUndefined();
+    expect(cutOf(at({ x: 66, y: 1900, width: 948, height: 48 }, at({ x: 66, y: 1920, width: 948, height: 28 })), [form])).toBeUndefined();
+    expect(cutOf(at(whole, at({ x: 66, y: 1978, width: 948, height: 0 })), [form])).toBeUndefined();
+    expect(cutOf(toggleWith(1936, 1978), [])).toBeUndefined();
   });
   it('at a SIDE only content past the edge counts (code review item 4): a whole 60-px tile flush left with its icon flush left reads whole; a full-bleed row\'s flush content too', () => {
     const list = { x: 0, y: 200, width: 1080, height: 1800 };
-    expect(evidentCut(at({ x: 0, y: 500, width: 60, height: 60 }, at({ x: 0, y: 510, width: 40, height: 40 })), [list])).toBeUndefined();
-    expect(evidentCut(at({ x: 132, y: 600, width: 948, height: 175 }, at({ x: 948, y: 625, width: 132, height: 132 })), [list])).toBeUndefined();
-    expect(evidentCut(at({ x: 1030, y: 900, width: 50, height: 60 }, at({ x: 1030, y: 900, width: 82, height: 60 })), [list])).toEqual({ edge: 'right', container: list, depth: 50 });
+    expect(cutOf(at({ x: 0, y: 500, width: 60, height: 60 }, at({ x: 0, y: 510, width: 40, height: 40 })), [list])).toBeUndefined();
+    expect(cutOf(at({ x: 132, y: 600, width: 948, height: 175 }, at({ x: 948, y: 625, width: 132, height: 132 })), [list])).toBeUndefined();
+    expect(cutOf(at({ x: 1030, y: 900, width: 50, height: 60 }, at({ x: 1030, y: 900, width: 82, height: 60 })), [list])).toEqual({ edge: 'right', container: list, depth: 50 });
   });
   it('the SHALLOWEST evidenced edge over the whole chain (code review item 2): a card cut to 50 px at a carousel\'s right with an image at its top is judged at the right', () => {
     const carousel = { x: 0, y: 600, width: 1080, height: 300 };
     const card = at({ x: 1030, y: 600, width: 50, height: 300 }, at({ x: 1046, y: 600, width: 34, height: 200 }), at({ x: 1040, y: 650, width: 200, height: 40 }));
-    expect(evidentCut(card, [carousel])).toEqual({ edge: 'right', container: carousel, depth: 50 });
+    expect(cutOf(card, [carousel])).toEqual({ edge: 'right', container: carousel, depth: 50 });
     // …and a side cut on an OUTER ancestor is found past the nearest one's evidenced top.
     const page = { x: 0, y: 0, width: 1080, height: 2220 };
     const outerCard = at({ x: 1030, y: 600, width: 50, height: 300 }, at({ x: 1046, y: 600, width: 34, height: 200 }), at({ x: 1040, y: 650, width: 200, height: 40 }));
-    expect(evidentCut(outerCard, [{ x: 0, y: 600, width: 2000, height: 300 }, page])).toEqual({ edge: 'right', container: page, depth: 50 });
+    expect(cutOf(outerCard, [{ x: 0, y: 600, width: 2000, height: 300 }, page])).toEqual({ edge: 'right', container: page, depth: 50 });
   });
   it('a descendant dumped CLIPPED OUT past the flush edge is evidence there (code review of round 7, P1): Settings\' row cut to 33 px at the list\'s top, its texts clamped to zero area at 297 — cut, 33 deep', () => {
     const list = { x: 0, y: 297, width: 1080, height: 1857 };
     const out = (rect: UiNode['rect'], side: NonNullable<UiNode['clippedOut']>): UiNode => ({ ...node(rect), clippedOut: side });
     const row = (...texts: UiNode[]) => at({ x: 0, y: 297, width: 1080, height: 33 }, at({ x: 66, y: 297, width: 66, height: 33 }), ...texts);
-    expect(evidentCut(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'top'), out({ x: 198, y: 297, width: 621, height: 0 }, 'top')), [list])).toEqual({ edge: 'top', container: list, depth: 33 });
-    expect(evidentCut(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'top')), [list])).toEqual({ edge: 'top', container: list, depth: 33 });
+    expect(cutOf(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'top'), out({ x: 198, y: 297, width: 621, height: 0 }, 'top')), [list])).toEqual({ edge: 'top', container: list, depth: 33 });
+    expect(cutOf(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'top')), [list])).toEqual({ edge: 'top', container: list, depth: 33 });
     // Without them the icon, cut with the row to its own height, says nothing.
-    expect(evidentCut(row(), [list])).toBeUndefined();
+    expect(cutOf(row(), [list])).toBeUndefined();
     // Clipped out the OTHER way, or clamped at an edge that is not this one (an inner clip 13 px down): no evidence of a cut at the top.
-    expect(evidentCut(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'bottom')), [list])).toBeUndefined();
-    expect(evidentCut(row(out({ x: 198, y: 310, width: 126, height: 0 }, 'top')), [list])).toBeUndefined();
+    expect(cutOf(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'bottom')), [list])).toBeUndefined();
+    expect(cutOf(row(out({ x: 198, y: 310, width: 126, height: 0 }, 'top')), [list])).toBeUndefined();
     // A plain zero-area descendant (no mark) stays none, as before.
-    expect(evidentCut(row(at({ x: 198, y: 297, width: 126, height: 0 })), [list])).toBeUndefined();
+    expect(cutOf(row(at({ x: 198, y: 297, width: 126, height: 0 })), [list])).toBeUndefined();
   });
   it('equal depths: the NEAREST ancestor\'s edge wins (the chain is walked nearest first; a later edge must be shallower)', () => {
     const inner = { x: 0, y: 1900, width: 1080, height: 79 };
     const row = at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1936, width: 948, height: 42 }));
-    expect(evidentCut(row, [inner, form])).toEqual({ edge: 'bottom', container: inner, depth: 55 });
+    expect(cutOf(row, [inner, form])).toEqual({ edge: 'bottom', container: inner, depth: 55 });
   });
 });
 
@@ -480,14 +489,14 @@ describe('evidentCut — a node cut at a clipping ancestor\'s edge, by what its 
  * The clippedOut evidence (code review of round 7, P1) at every edge, through the parser as uiautomator dumps it —
  * the verification's probe shapes — and the two stated residuals it leaves (geometry.ts#evidentCut, "Unknowable").
  */
-describe('evidentCut — clippedOut evidence at each edge, parsed (verification of the code review of round 7)', () => {
+describe('Clips.cutSliver at any depth — clippedOut evidence at each edge, parsed (geometry.ts#evidentCut)', () => {
   const dump = (inner: string, list = '[0,297][1080,2154]') =>
     `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"><node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="a:id/list" bounds="${list}">${inner}</node></node></hierarchy>`;
   const cutOf = (xml: string, id: string) => {
     const tree = parseDump(xml);
     const find = (n: UiNode): UiNode | undefined => (n.identifier === id ? n : n.children.map(find).find(Boolean));
     const n = find(tree)!;
-    return evidentCut(n, clipsOf(tree, NESTED).scrollersOf(n));
+    return clipsOf(tree, NESTED).cutSliver(n, ANY_DEPTH);
   };
   const text = (bounds: string) => `<node class="android.widget.TextView" resource-id="a:id/title" text="Apps" bounds="${bounds}"/>`;
   const row = (id: string, bounds: string, ...kids: string[]) => `<node class="android.widget.LinearLayout" clickable="true" resource-id="a:id/${id}" bounds="${bounds}">${kids.join('')}</node>`;
@@ -608,7 +617,7 @@ describe('cutSliver — inherited from an ancestor cut to a sliver at the edge t
     const row = node({ x: 132, y: 1307, width: 948, height: 91 }, 'row', [field]);
     const list = { ...node(imeForm, 'form', [row]), clipsDescendants: true as const };
     const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [list]), NESTED);
-    expect(evidentCut(field, clips.scrollersOf(field))?.depth).toBe(91); // cut, but deep enough
+    expect(clips.cutSliver(field, ANY_DEPTH)?.depth).toBe(91); // cut, but deep enough
     expect(clips.cutSliver(company, 65)).toBeUndefined();
   });
 

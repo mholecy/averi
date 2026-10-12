@@ -484,7 +484,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         }
       });
 
-      it('a root without a rect: the DEVICE screen judges — the tap\'s own on-screen rule (resolve.ts#onScreen, one owner since 2026-10-08)', async () => {
+      it('a root without a rect: the DEVICE screen judges — the tap\'s own on-screen rule (ui-tree/standing.ts#onScreen, one owner)', async () => {
         const fake = iosFake();
         fake.live().rect = { x: 0, y: 0, width: 0, height: 0 };
         fake.viewportSize = { width: 402, height: 874 };

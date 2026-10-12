@@ -56,7 +56,7 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  */
 export const KEYBOARD_HIDE_DELAY_MS = 300;
 
-/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice (the in-tree model's refusal), the screen size (the on-screen rule, resolve.ts#onScreen — the tap's and a dismissal's, since 2026-10-08). */
+/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice (the in-tree model's refusal), the screen size (the on-screen rule, ui-tree/standing.ts#onScreen — the tap's and a dismissal's). */
 export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>;
 
 /**

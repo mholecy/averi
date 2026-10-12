@@ -3,7 +3,7 @@ import { belowStatusBand, flushEdges, higherTop, largestScroller, rectArea, rect
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, type Scene, type Standing, type UsableScreen } from '../ui-tree/standing.js';
+import { sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
 import type { WaitEvidence } from './resolve.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
@@ -446,7 +446,7 @@ export interface PastSide {
 export type InFrameShort =
   | { of: 'clipped'; judged: Judged }
   | { of: 'covered'; judged: Judged; cover: UiNode }
-  | { of: 'statusBar'; judged: Judged; band: number }
+  | { of: 'systemBar'; judged: Judged; bar: SystemBar }
   | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
@@ -642,7 +642,7 @@ export interface Rounds {
 }
 
 /** The screen a round judges in: the usable screen's judging part (ui-tree/standing.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
-type Frame = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'>;
+type Frame = StandingScreen;
 
 /**
  * Everything the scroll remembers between rounds, one record with one
@@ -904,8 +904,8 @@ function strokeTop(cover: Cover | undefined, bandTop: number | undefined): numbe
  * Most revealed by what SHOWS — in the frame and under nothing of the app —
  * which is what is in the frame when nothing is drawn over it; a match
  * that stops the round first (`better`). Each match's standing for the stop
- * is the scene's (ui-tree/standing.ts#Scene.standing), in the one box given
- * with its status band. Under a cover, a keyboard-side node (the round's
+ * is the scene's (ui-tree/standing.ts#Scene.standing), in the frame's box
+ * with its system bands. Under a cover, a keyboard-side node (the round's
  * reading's `ofKeyboard`, one walk per round) is judged against the whole
  * screen; every other node against the part above the cover's top edge,
  * and what is drawn over a node is counted only there: a bar under the
@@ -913,7 +913,7 @@ function strokeTop(cover: Cover | undefined, bandTop: number | undefined): numbe
  */
 function judge(
   found: readonly UiNode[],
-  { box, statusBand }: Pick<Frame, 'box' | 'statusBand'>,
+  frame: Frame,
   facts: Pick<TreeFacts, 'scene'> | undefined,
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
@@ -921,7 +921,7 @@ function judge(
   if (facts === undefined) return undefined;
   const scored = found.map((node): Judged => {
     const under = cover === undefined || cover.keyboardSide(node) ? undefined : cover.cover;
-    const standing = facts.scene.standing(node, { box, statusBand, ...(under !== undefined && { keyboardTop: under.topCover.y }) }, { of: 'stop', fully });
+    const standing = facts.scene.standing(node, frame, { of: 'stop', fully, ...(under !== undefined && { keyboardTop: under.topCover.y }) });
     return { node, ...(under !== undefined && { under }), standing };
   });
   return scored.sort((a, b) => better(a, b))[0];
@@ -953,8 +953,8 @@ function stops(j: Judged): boolean {
  * What a judged match in the frame is short of a stop (`stops`) — the one
  * rule the stuck and the bound sentences read, the standing's kind as
  * their sentences group it: a cut edge (`fully: true`) or a centre off the
- * screen is `clipped`; a centre in the status band `statusBar`, never a
- * clip or a layout defect; a sliver its scroll container cuts it to
+ * screen is `clipped`; a centre in a system band (the status bar's, the
+ * navigation bar's) `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
  * `sliver`; anything of the app drawn over it `covered`, naming the cover
  * the standing names. Asked only of a match with something in the frame
  * that does not stop the round: a match that stops it is reported before
@@ -967,8 +967,8 @@ function shortOf(j: Judged): InFrameShort {
     case 'clipped':
     case 'offScreen':
       return { of: 'clipped', judged: j };
-    case 'statusBand':
-      return { of: 'statusBar', judged: j, band: s.band };
+    case 'systemBar':
+      return { of: 'systemBar', judged: j, bar: s.bar };
     case 'cut':
       return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
     case 'covered':

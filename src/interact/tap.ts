@@ -40,7 +40,7 @@ export type TapAdapter = KeyboardAdapter;
  * chrome.md: "Tapped" pressed a payment form's pinned CONTINUE). Since
  * 2026-10-10 the same check first refuses a target its scroll container
  * cuts to a strip under that piece's minimum — a ClippedRefusal
- * (resolve.ts#refuseCutSliver), nothing tapped.
+ * (resolve.ts#aimClearOfChrome), nothing tapped.
  *
  * Moved from ui-tree/tap-element.ts on 2026-10-03, where it read the tree
  * once with the adapter's `settle` retry and threw on ambiguity. The poll is

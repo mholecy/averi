@@ -4,7 +4,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, cutRemedy, cutSliverText, pastSideText, PINNED_UNDER_STATUS_BAR, revealText, underStatusBar, untriedSideText } from './resolve.js';
+import { absenceError, cutRemedy, cutSliverText, pastSideText, pinnedUnder, revealText, systemBarName, underSystemBar, untriedSideText } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -236,8 +236,8 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
-/** `its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
-const statusBarText = (judged: Judged, band: number): string => `its centre stays ${underStatusBar(tapPoint(judged.node), band)}`;
+/** `its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), …` — the tap refusal's clause for the same point (resolve.ts#underSystemBar), at either system bar. */
+const systemBarText = ({ judged, bar }: Extract<Shortfall, { of: 'systemBar' }>): string => `its centre stays ${underSystemBar(tapPoint(judged.node), bar)}`;
 
 /** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
 const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);
@@ -275,23 +275,22 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const back = OPPOSITE[o.lastStroke];
       // The way back (`otherWayText`); one swiped earlier is said only in the status bar's sentence, which would else advise it.
       const neither = o.otherWay === 'stroked' ? '' : otherWayText(o.otherWay, back);
-      // Under something of the app (2026-10-09, scroll-rounds.ts#shortOf) that
-      // stays over it at the end of the content: no clearance for a pinned
-      // bar. Led by the cover whenever that is what it is short of — a plain
-      // stop's centre under a bar, however clipped (code review S1).
-      // Its centre under the status bar at the end of the content (2026-10-09): no defect of the app's — the
-      // point a tap presses is the status bar's, and no swipe that way moves it out. The other way may; a target
-      // pinned there moves neither way (code review of round 6, P1), which is said rather than promised away.
-      // The other way tried (2026-10-09, scroll-rounds.ts#round's stuck turn): "try direction" would send the
-      // reader to a way the scroll already swiped; only one it had no budget left for is still advised.
-      if (short.of === 'statusBar') {
+      // What it is short of, in the standing's order (ui-tree/standing.ts#Scene; scroll-rounds.ts#shortOf):
+      // a centre under a system bar, a sliver cut at its container's edge — so a covered sliver names the
+      // edge the `outward` clause speaks of — then something of the app drawn over it, then a clip.
+      // A centre under a system bar at the end of the content: no defect of the app's — the point a tap
+      // presses is the bar's, and no swipe that way moves it out. The other way may; a target pinned there
+      // moves neither way, which is said rather than promised away. "try direction" only for a way the
+      // scroll never swiped.
+      if (short.of === 'systemBar') {
+        const pinned = pinnedUnder(short.bar.edge);
         const other =
           o.otherWay === 'untried'
-            ? ` — try direction: "${back}"; if no direction moves it, ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `
-            : `${otherWayText(o.otherWay, back)} — ${PINNED_UNDER_STATUS_BAR}, and no step taps it. `;
+            ? ` — try direction: "${back}"; if no direction moves it, ${pinned}, and no step taps it. `
+            : `${otherWayText(o.otherWay, back)} — ${pinned}, and no step taps it. `;
         return new Error(
-          `scroll_until ${describe} failed after ${n} — ${statusBarText(judged, short.band)}, and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
+          `scroll_until ${describe} failed after ${n} — ${systemBarText(short)}, and the content is exhausted: ` +
+            `swiping ${o.lastStroke} no longer moves it out from under the ${systemBarName(short.bar.edge)}${other}${last}`,
         );
       }
       // Cut to a sliver by its scroll container at the end of the content (ui-tree/standing.ts#Scene.standing):
@@ -405,9 +404,9 @@ function shortText(short: Shortfall): string {
       const { judged } = short;
       return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
-    case 'statusBar': {
+    case 'systemBar': {
       const { judged } = short;
-      return `element reached the viewport but ${statusBarText(judged, short.band)} (last rect ${JSON.stringify(judged.node.rect)})`;
+      return `element reached the viewport but ${systemBarText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'sliver': {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(short.cut.edge)})`;
