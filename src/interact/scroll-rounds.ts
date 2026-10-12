@@ -1,11 +1,9 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { belowStatusBand, clippedEdges, clipsOf, containsPoint, flushEdges, higherTop, inStatusBand, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, visibleFractionInViewport, type Clips, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { belowStatusBand, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
-import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import type { UsableScreen } from '../ui-tree/standing.js';
+import { sceneOf, type Scene, type Standing, type UsableScreen } from '../ui-tree/standing.js';
 import type { WaitEvidence } from './resolve.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
@@ -146,17 +144,24 @@ interface RoundRead {
 /** What the round asks of a tree that read — derived by `factsOf`, never handed in. */
 interface TreeFacts {
   /**
-   * The tree's clipping (ui-tree/geometry.ts#clipsOf), one walk: a match's
-   * ancestors that CLIP it, nearest first (`scrollersOf`) — Android's scroll
-   * containers, to whose edges uiautomator has already cut the match's
-   * bounds; empty when it has none (every node of an iOS tree) — for the
-   * `fully: true` stop's flush check (PROBE_REACH) and the box the strokes
-   * are drawn in (swipe.ts#strokeRoom); and the plain stop's sliver rule
-   * (`judge`, `cutSliver`), which a match inherits from an ancestor cut to a
-   * sliver at the edge it lies flush with (round 8) — each ancestor judged
-   * once a round, whatever the number of matches.
+   * The tree's scene (ui-tree/standing.ts#sceneOf), once a round: the
+   * judgement (`judge`, `Scene.standing`); a match's clipping ancestors,
+   * nearest first (`clips.scrollersOf`) — Android's scroll containers, to
+   * whose edges uiautomator has already cut the match's bounds; empty when
+   * it has none (every node of an iOS tree) — for the `fully: true` stop's
+   * flush check (PROBE_REACH) and the box the strokes are drawn in
+   * (swipe.ts#strokeRoom); what is drawn OVER a clipping container (the
+   * floating tab bar) — `order.drawnOver`, what a stroke over it keeps
+   * clear of (swipe.ts#strokeRoom cuts the box above them), and
+   * `order.drawnOverAt`, the one a stroke that still touched down on it
+   * names (`touchedOn`), asked of the rects `clips.scrollersOf` and
+   * `mainScroller` give, undefined when this tree has no container with
+   * that rect (one remembered from an earlier read: the list has moved
+   * since), never any on iOS, which has no clipping container; and idb's
+   * keyboard band's top (`order.keyboardBandTop`), the line the strokes
+   * stay above (`strokeTop`).
    */
-  clips: Clips;
+  scene: Scene;
   /**
    * The largest clipping container (ui-tree/geometry.ts#largestScroller) —
    * the screen's own scroll view, for a stroke while the target's own
@@ -164,20 +169,6 @@ interface TreeFacts {
    * tree has none (iOS).
    */
   mainScroller: Rect | undefined;
-  /**
-   * The tree's draw order (ui-tree/draw-order.ts), once a round: the
-   * judgement's covers and minimum piece (`exposure`, `judge`); what is
-   * drawn OVER a clipping container (2026-10-09, the floating tab bar) —
-   * `drawnOver`, what a stroke over it keeps clear of (swipe.ts#strokeRoom
-   * cuts the box above them), and `drawnOverAt`, the one a stroke that
-   * still touched down on it names (`touchedOn`), asked of the rects
-   * `clips.scrollersOf` and `mainScroller` give, undefined when this tree has no
-   * container with that rect (one remembered from an earlier read: the list
-   * has moved since), never any on iOS, which has no clipping container;
-   * and idb's keyboard band's top (`keyboardBandTop`), the line the strokes
-   * stay above (`strokeTop`).
-   */
-  drawOrder: Pick<DrawOrder, 'exposure' | 'drawnOver' | 'drawnOverAt' | 'keyboardBandTop'>;
   /**
    * A cheap fingerprint of the WHOLE tree (ui-tree/read-tree.ts
    * #treeFingerprint) — every node's role, text, id and rect — for "the
@@ -195,27 +186,22 @@ interface TreeFacts {
 }
 
 /**
- * `TreeFacts` of a tree: five walks — four as the driver made them before
- * deep/r3-scroll, and the draw order's (2026-10-09), which holds idb's
- * keyboard band's top too. Derived ONCE per call of `round`, BEFORE the
- * judgement, and handed to it and along (`ThisRead`) — each fact from one
- * derivation (code review of round 7, S3: the judgement's clipping chains
- * and the band's top were derived beside these, a second clipping walk
- * and a second walk for the band the draw order had already found). A call
- * that re-enters after an `ask witness` (the ask most re-entries are for,
- * which needs only the judgement), an `ask unlocated` (a `fully: true` or
- * bound stop, once a scroll) or an `ask witness` before a probe derives
- * them again: no cache, so the module holds no state between calls (code
- * review of deep/r3-scroll, S6: until then a WeakMap by tree object saved
- * those walks) — the fingerprint, the progress check and the largest
- * scroller are now walked on a round that then asks for the witness too,
- * a pure walk of an in-memory tree beside a device read.
+ * `TreeFacts` of a tree: the scene's draw order and clip facts (each
+ * derived on first use), the largest scroller, the fingerprint and the
+ * progress check. Derived ONCE per call of `round`, BEFORE the judgement,
+ * and handed to it and along (`ThisRead`) — each fact from one
+ * derivation. A call that re-enters after an `ask witness` (the ask most
+ * re-entries are for, which needs only the judgement), an `ask unlocated`
+ * (a `fully: true` or bound stop, once a scroll) or an `ask witness`
+ * before a probe derives them again: no cache, so the module holds no
+ * state between calls (a cache by tree object was dropped for that) — the fingerprint, the progress check and the
+ * largest scroller are walked on a round that then asks for the witness
+ * too, a pure walk of an in-memory tree beside a device read.
  */
 function factsOf(tree: UiNode): TreeFacts {
   return {
-    clips: clipsOf(tree),
+    scene: sceneOf(tree),
     mainScroller: largestScroller(tree),
-    drawOrder: drawOrder(tree),
     fingerprint: treeFingerprint(tree),
     loading: showsProgress(tree),
   };
@@ -299,48 +285,18 @@ export interface Cover {
 }
 
 /**
- * One match as judged: how much of it is in the frame, the frame's edges it
- * extends past, the keyboard cover it was judged under (none for a
- * whole-screen judgement or a keyboard-side node), and — since 2026-10-09
- * (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md) —
- * what of the app is drawn over it inside that frame
- * (ui-tree/draw-order.ts#exposure): the covers, the one over its centre,
- * and how much of it shows.
+ * One match as judged: the keyboard cover it was judged under (none for a
+ * whole-screen judgement or a keyboard-side node) and where it stands for
+ * the stop (ui-tree/standing.ts#Scene.standing) — the kind `stops` and
+ * `shortOf` read, and the facts the rest of the round and the sentences
+ * read: how much of it is in the frame, the frame's edges it extends past,
+ * what of the app is drawn over it inside that frame (the covers, the one
+ * over its centre, how much of it shows) and its cut to a sliver.
  */
 export interface Judged {
   node: UiNode;
-  /** The fraction of it inside the frame — covers or not (`visibleFractionInViewport`). */
-  visible: number;
-  clipped: Edge[];
   under?: Cover;
-  /** The nodes drawn over it inside the frame, pre-order; empty when none. */
-  covers: readonly UiNode[];
-  /** Where each of `covers` presses, in the same order (draw-order.ts#Exposure.reaches): a pinned bar's reach, not its frame — what `observe`'s far-side test reads. */
-  reaches: readonly Rect[];
-  /** The cover drawn over its centre (`tapPoint`, the point a tap presses), when the centre lies in the frame under one. */
-  centreCover?: UiNode;
-  /**
-   * Its centre lies on the SCREEN judged (the whole box, never cut above a
-   * keyboard) — what the next tap's on-screen rule asks of the same point
-   * (resolve.ts#onScreen). A centre under a keyboard band is on the screen:
-   * the tap's keyboard guard deals with that one.
-   */
-  centreOnScreen: boolean;
-  /**
-   * The height of the status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09),
-   * set only when its centre lies on the screen but inside that band — so
-   * not `centreOnScreen`; the failure quotes it (`shortOf`'s `statusBar`).
-   */
-  bandOverCentre?: number;
-  /** The fraction of it inside the frame and under no cover — `visible` less the covers. */
-  shows: number;
-  /**
-   * Its scroll container cuts it to a sliver the next tap refuses
-   * (ui-tree/geometry.ts#Clips.cutSliver, interact/resolve.ts#refuseCutSliver,
-   * 2026-10-10) — the cut and the minimum it is under; a plain stop does not
-   * stop on it (`stops`).
-   */
-  sliver?: { cut: Cut; minPiece: number };
+  standing: Standing;
 }
 
 /**
@@ -491,7 +447,7 @@ export type InFrameShort =
   | { of: 'clipped'; judged: Judged }
   | { of: 'covered'; judged: Judged }
   | { of: 'statusBar'; judged: Judged; band: number }
-  | { of: 'sliver'; judged: Judged & Required<Pick<Judged, 'sliver'>> };
+  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
@@ -822,7 +778,7 @@ interface State {
 /**
  * A container strokes go over, as one value (review round 1 of
  * fix/r4-stroke: the two were separate fields that had to move together):
- * its rect, and the rects drawn over it (`TreeFacts.drawOrder`) at the read
+ * its rect, and the rects drawn over it (the scene's `order`) at the read
  * that chose it — the stroke box's cut (swipe.ts#strokeRoom). A later read
  * that still holds a container of that rect gives its own; one that does
  * not (the list moved — measured on Account Detail, 0,825 → 0,401) keeps
@@ -834,8 +790,8 @@ interface StrokeContainer {
   over: readonly Rect[];
 }
 
-/** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.drawOrder`). */
-const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.drawOrder.drawnOver(rect)?.map((n) => ({ ...n.rect }));
+/** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.scene`'s draw order). */
+const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.scene.order.drawnOver(rect)?.map((n) => ({ ...n.rect }));
 
 /**
  * The containers a round's stroke toward the target may go over, nearest
@@ -917,7 +873,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
 /**
  * The top edge a stroke is kept above (swipe.ts#strokeRoom's `coverTop`):
  * the applied keyboard cover's, and idb's keyboard band's
- * (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop, `TreeFacts.drawOrder`;
+ * (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop, `TreeFacts.scene`;
  * round 7, 2026-10-10 — the
  * Contacts form and the SWIFT form's number pad were stroked from y 699, a
  * touch-down on the keys, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-
@@ -942,68 +898,40 @@ function strokeTop(cover: Cover | undefined, bandTop: number | undefined): numbe
 /**
  * The MOST revealed match, not the first: an id can sit on a container and
  * its child, and reporting the clipped one of the two would invent a defect
- * (since code review P2 the driver hands in only the match the next tap
- * acts on when the preference picks one — resolve.ts#matchesToJudge — so
- * this chooses only among matches the tap could not tell apart either).
- * Most revealed by what SHOWS — in the frame and under nothing of the app
- * (`TreeFacts.drawOrder`'s `exposure`, 2026-10-09) — which is what is in the frame when
- * nothing is drawn over it; a match that stops the round first (`better`). Under a cover, a keyboard-side node (the round's
+ * (the driver hands in only the match the next tap acts on when the
+ * preference picks one — resolve.ts#matchesToJudge — so this chooses only
+ * among matches the tap could not tell apart either).
+ * Most revealed by what SHOWS — in the frame and under nothing of the app —
+ * which is what is in the frame when nothing is drawn over it; a match
+ * that stops the round first (`better`). Each match's standing for the stop
+ * is the scene's (ui-tree/standing.ts#Scene.standing), in the one box given
+ * with its status band. Under a cover, a keyboard-side node (the round's
  * reading's `ofKeyboard`, one walk per round) is judged against the whole
- * screen; every other node against the part above the band, or scores 0
- * when the band leaves none — and what is drawn over a node is counted only
- * inside the box it is judged in: a bar under the keyboard covers nothing
- * the round can see. The box comes with its status band, as one judging
- * screen (`Frame`'s `box` and `statusBand`).
+ * screen; every other node against the part above the cover's top edge,
+ * and what is drawn over a node is counted only there: a bar under the
+ * keyboard covers nothing the round can see.
  */
 function judge(
   found: readonly UiNode[],
-  { box: viewport, statusBand }: Pick<Frame, 'box' | 'statusBand'>,
-  facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined,
+  { box, statusBand }: Pick<Frame, 'box' | 'statusBand'>,
+  facts: Pick<TreeFacts, 'scene'> | undefined,
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  // The screen below the status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
-  const band = { boxes: [viewport], statusBand };
-  const screen: Rect = belowStatusBand(viewport, band);
-  const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
-    const centre = tapPoint(node);
-    return { centreOnScreen: containsPoint(screen, centre), ...(inStatusBand(centre, band) && { bandOverCentre: screen.y - viewport.y }) };
-  };
-  const inFrame = (node: UiNode, frame: DeviceScreen, under?: Cover): Judged => {
-    const box: Rect = { x: 0, y: 0, ...frame };
-    const seen = facts?.drawOrder.exposure(node, box);
-    // The draw order's answer, as the tap's chrome check reads it (resolve.ts#aimClearOfChrome): the cover at the centre inside the frame.
-    const centreCover = seen?.centreCover;
-    const visible = visibleFractionInViewport(node.rect, frame);
-    // The tap's cut-sliver rule, by the same minimum (resolve.ts#refuseCutSliver): what `stops` asks of a plain stop.
-    const cut = seen === undefined || facts === undefined ? undefined : facts.clips.cutSliver(node, seen.minPiece);
-    return {
-      node,
-      visible,
-      clipped: clippedEdges(node.rect, frame),
-      ...(cut !== undefined && seen !== undefined && { sliver: { cut, minPiece: seen.minPiece } }),
-      ...(under !== undefined && { under }),
-      covers: seen?.covers ?? [],
-      reaches: seen?.reaches ?? [],
-      ...(centreCover !== undefined && { centreCover }),
-      ...centreFacts(node),
-      shows: seen?.shows ?? visible,
-    };
-  };
+  if (facts === undefined) return undefined;
   const scored = found.map((node): Judged => {
-    if (cover === undefined || cover.keyboardSide(node)) return inFrame(node, viewport);
-    const { above } = cover.cover;
-    if (above === undefined) return { node, visible: 0, clipped: [], under: cover.cover, covers: [], reaches: [], ...centreFacts(node), shows: 0 };
-    return inFrame(node, above, cover.cover);
+    const under = cover === undefined || cover.keyboardSide(node) ? undefined : cover.cover;
+    const standing = facts.scene.standing(node, { box, statusBand, ...(under !== undefined && { keyboardTop: under.topCover.y }) }, { of: 'stop', fully });
+    return { node, ...(under !== undefined && { under }), standing };
   });
-  return scored.sort((a, b) => better(a, b, fully))[0];
+  return scored.sort((a, b) => better(a, b))[0];
 }
 
 /** The whole-screen judgement over every box that counts (`UsableScreen.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined, fully: boolean): Judged | undefined {
+function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'scene'> | undefined, fully: boolean): Judged | undefined {
   return frame.boxes
     .map((box) => judge(found, { ...frame, box }, facts, fully))
-    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
+    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best) < 0) ? j : best), undefined);
 }
 
 /**
@@ -1012,77 +940,44 @@ function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts
  * more but with its centre covered must not hide one the next tap would hit
  * (review round 1) — then the one more of which shows.
  */
-function better(a: Judged, b: Judged, fully: boolean): number {
-  return Number(stops(b, fully)) - Number(stops(a, fully)) || b.shows - a.shows;
+function better(a: Judged, b: Judged): number {
+  return Number(stops(b)) - Number(stops(a)) || b.standing.facts.shows - a.standing.facts.shows;
 }
 
-/**
- * THE stop condition: the judged match is in the frame, and — `fully: true`
- * — clipped at no edge with nothing of the app drawn over any of it; or —
- * without — its centre, the point the next tap presses, on the screen and
- * under nothing (2026-10-09, the bug note's decisions 2 and 3: keep
- * scrolling until the tap point is uncovered, so the next tap agrees).
- * Until that date a plain stop was any intersection and a `fully: true` one
- * any unclipped rect, and a row under a pinned CONTINUE bar was "fully
- * visible after 0 swipes". On the SCREEN (`Judged.centreOnScreen`, code
- * review P3): a plain stop with its centre past the screen's edge was a
- * stop, "visible … CLIPPED 40%", and the next tap was refused off screen
- * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
- * keyboard — a centre under the band stops as before, and the tap's
- * keyboard guard hides the keyboard. A centre inside the status band is
- * off the screen (`Judged.bandOverCentre`; iOS's, adapters/ios-status-
- * band.ts, 2026-10-09; Android's since 2026-10-12, android.ts
- * #parseStatusBand) — measured, one stroke flung `priority_select` to
- * `24,-20` and the plain stop stopped with its centre at (201,6), where the
- * tap pressed the status bar — for both stops: `fully: true` asks the
- * centre to be on the screen too (an unclipped rect's centre always is,
- * but in the band). Only the centre: what of the rect lies in the band is
- * judged against the screen as before — `fully` judges clipping against the
- * whole screen — so full-bleed content at the top (a hero image at y 0)
- * stops once its centre — ROUNDED, the point a tap sends (`tapPoint`) —
- * lies below the band; one whose rounded centre lies in it (at y 0, shorter
- * than twice the band less a point: 122 pt or less under 62, while 123 pt
- * rounds its centre 61.5 to 62 and stops) stops neither way, and fails
- * naming the status bar (`shortOf`'s `statusBar`; code review of round 6, P2).
- *
- * A plain stop is also not one on a SLIVER its scroll container cuts it to
- * (`Judged.sliver`, 2026-10-10, code review of fix/r7-sliver, item 1):
- * uiautomator cuts every rect to its scroller, so a cut node's centre is
- * always on the screen, and the stop handed back the very strip the next
- * tap refuses (resolve.ts#refuseCutSliver) — `scroll_until X` then `tap X`
- * failed. Scrolling on reveals it. `fully: true` keeps its own rule: a stop
- * flush with a clipping container is probed (PROBE_REACH).
- */
-function stops(j: Judged, fully: boolean): boolean {
-  return (
-    j.visible > 0 &&
-    j.centreOnScreen &&
-    (fully ? j.clipped.length === 0 && j.covers.length === 0 : j.centreCover === undefined && j.sliver === undefined)
-  );
+/** THE stop condition: the judged match stands `reachable` for the stop (ui-tree/standing.ts#Scene.standing owns the rule). */
+function stops(j: Judged): boolean {
+  return j.standing.kind === 'reachable';
 }
 
 /**
  * What a judged match in the frame is short of a stop (`stops`) — the one
- * rule the stuck and the bound sentences read: `clipped` — an edge cut
- * with `fully: true`, or without it the centre off the screen; else
- * `covered` — something of the app drawn over it (over its centre, without
- * `fully`). With `fully: true` a cut edge leads, as it always has. A centre
- * on the screen but in the status band is `statusBar` (2026-10-09): the
- * sentence names the status bar, never a clip or a layout defect. Without
- * `fully`, a centre under nothing on a sliver its scroll container cuts it
- * to is `sliver` (2026-10-10, `stops`).
+ * rule the stuck and the bound sentences read, the standing's kind as
+ * their sentences group it: a cut edge (`fully: true`) or a centre off the
+ * screen is `clipped`; a centre in the status band `statusBar`, never a
+ * clip or a layout defect; a sliver its scroll container cuts it to
+ * `sliver`; anything of the app drawn over it `covered`. Asked only of a
+ * match with something in the frame — a reachable one (a stop the bound
+ * overtook) reads `covered`, as before the standing existed.
  */
-function shortOf(j: Judged, fully: boolean): InFrameShort {
-  if (fully && j.clipped.length > 0) return { of: 'clipped', judged: j };
-  if (j.bandOverCentre !== undefined) return { of: 'statusBar', judged: j, band: j.bandOverCentre };
-  if (!j.centreOnScreen) return { of: 'clipped', judged: j };
-  // Without `fully`, a centre under nothing yet no stop: the sliver (`stops`).
-  if (!fully && j.centreCover === undefined && j.sliver !== undefined) return { of: 'sliver', judged: { ...j, sliver: j.sliver } };
-  return { of: 'covered', judged: j };
+function shortOf(j: Judged): InFrameShort {
+  const s = j.standing;
+  switch (s.kind) {
+    case 'clipped':
+    case 'offScreen':
+    case 'underKeyboard':
+      return { of: 'clipped', judged: j };
+    case 'statusBand':
+      return { of: 'statusBar', judged: j, band: s.band };
+    case 'cut':
+      return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
+    case 'covered':
+    case 'reachable':
+      return { of: 'covered', judged: j };
+  }
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
-const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== undefined && stops(j, fully);
+const endsClean = (j: Judged | undefined): boolean => j !== undefined && stops(j);
 
 /**
  * The two judgements say the same thing about the same node. `clipped` is
@@ -1092,7 +987,7 @@ const endsClean = (j: Judged | undefined, fully: boolean): boolean => j !== unde
  * 2026-10-08: the comparison was dead — a mutation dropping it survived).
  */
 const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
-  a === undefined || b === undefined ? a === b : a.node === b.node && a.visible === b.visible;
+  a === undefined || b === undefined ? a === b : a.node === b.node && a.standing.facts.visible === b.standing.facts.visible;
 
 /**
  * The FAR edge of a scroll toward `direction` — the edge of the frame its
@@ -1151,8 +1046,7 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * `atFarEdge`, which needs some, never fires for it).
  *
  * Or CUT to a sliver at that edge of its scroll container (`FarFacts
- * .slicedAt`, `Judged.sliver`, 2026-10-10, code review round 2 of
- * fix/r7-sliver): the rest of it lies past the far edge as surely as a
+ * .slicedAt`, the standing's `facts.sliver`): the rest of it lies past the far edge as surely as a
  * clipped-out node's does, while its rect, cut to the container, lies
  * inside the frame. A plain stop does not stop on it (`stops`), so without
  * this a 132-px row showing its bottom 40 px at a form's top under a
@@ -1173,10 +1067,10 @@ interface FarFacts {
 }
 
 /** A judged match's `FarFacts`, its rect copied. */
-const farFacts = ({ node, sliver }: Judged): FarFacts => ({
+const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   rect: { ...node.rect },
   ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
-  ...(sliver !== undefined && { slicedAt: sliver.cut.edge }),
+  ...(facts.sliver !== undefined && { slicedAt: facts.sliver.edge }),
 });
 
 /**
@@ -1343,7 +1237,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // stale, and may be another list — and the screen's largest scroller is
     // not taken either: a largest scroller with room that is not one of the
     // target's ancestors is a list that cannot hold the target.
-    s.targetContainers = facts.clips.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
+    s.targetContainers = facts.scene.clips.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
@@ -1366,17 +1260,17 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // "content exhausted … a layout defect" after two, and from -20
     // `direction: "up"` flung it to 771 under CONTINUE and swiped up six
     // times more. The target is right there: the strokes turn at once.
-    // Where a cover presses, as exposure judged it (`Judged.reaches`, code
-    // review of round 6b P1): CONTINUE pinned at idb's flat list reaches the
+    // Where a cover presses, as exposure judged it (the standing's
+    // `facts.reaches`): CONTINUE pinned at idb's flat list reaches the
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
-    const atFarEdge = best.visible > 0 && (beyond || best.reaches.some(overFar));
+    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyond) s.seenShort = true;
-    if (best.visible > 0) s.inFrameAfter = s.swipes;
+    if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
-  const offFrame = best !== undefined && best.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
+  const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
   return {
     bestUnmoved,
     stuck: current === 'stroke' && s.bestUnmovedStrokes >= UNMOVED_STROKES_EXHAUST,
@@ -1509,7 +1403,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Otherwise the witness is asked THIS round, never remembered: a
     // scroll can hide a keyboard (a list that dismisses it on drag) and
     // leave the window state stale-shown behind it (review 2026-10-08).
-    const moot = endsClean(whole, fully) && sameJudgement(whole, covered);
+    const moot = endsClean(whole) && sameJudgement(whole, covered);
     if (!moot) {
       if (seen.corroborated === undefined) return ask('witness');
       if (seen.corroborated) {
@@ -1526,7 +1420,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // idb's keyboard band, read off this round's tree — a line the strokes
   // stay above, never a cover (`strokeTop`); a round whose tree did not
   // read keeps the last read round's, as its cover.
-  if (facts !== undefined) s.lastReadBandTop = facts.drawOrder.keyboardBandTop;
+  if (facts !== undefined) s.lastReadBandTop = facts.scene.order.keyboardBandTop;
   // The frames this round judged in — the screen above an applied keyboard,
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
@@ -1549,8 +1443,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // round decided — back.
   const answersBack = now !== undefined && s.backPending;
   if (now !== undefined) s.backPending = false;
-  if (best !== undefined && best.visible > 0 && observed !== undefined && now !== undefined) {
-    if (stops(best, fully)) {
+  if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
+    if (stops(best)) {
       // The probe moved nothing: the match is where it was sent from — the
       // stop holds (it held still through a stroke), and nothing lies
       // beyond its flush edge.
@@ -1567,7 +1461,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // `fully: true`, an edge flush with the clipping container: possibly
       // cut there — probe once toward it, or say it could not be checked.
       let flush: Flush | undefined;
-      const chain = fully ? now.facts.clips.scrollersOf(best.node) : [];
+      const chain = fully ? now.facts.scene.clips.scrollersOf(best.node) : [];
       const flushed = flushWith(best.node.rect, chain, s.rules.direction);
       if (flushed !== undefined && 'fills' in flushed) flush = { edges: flushed.fills, container: chain[0], checked: false, why: 'fills' };
       else if (flushed !== undefined) {
@@ -1646,10 +1540,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const backUnmoved = answersBack && observed.bestUnmoved;
     const stuckOn = backUnmoved ? s.stuckOn : observed.stuck ? s.lastStroke : undefined;
     if (stuckOn !== undefined) {
-      const outward = !fully && best.sliver !== undefined && SIDES[best.sliver.cut.edge].reveals === stuckOn;
+      const { sliver } = best.standing.facts;
+      const outward = !fully && sliver !== undefined && SIDES[sliver.edge].reveals === stuckOn;
       const otherWay = backUnmoved ? 'unmoved' : outward ? 'outward' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
       const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
-      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best, fully), lastStroke: stuckOn, viewport, otherWay });
+      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best), lastStroke: stuckOn, viewport, otherWay });
       s.stuckOn = stuckOn;
       s.backPending = true;
     }
@@ -1788,8 +1683,8 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
  * when the strokes ended exhausted (2026-10-09, docs/bugs/2026-10-09-
  * android-scroll-stroke-touches-down-on-floating-tab-bar.md): the last of
  * what is drawn over it — the one drawn on top — that contains the stroke's
- * touch-down, in the tree that read unchanged (`TreeFacts.drawOrder
- * .drawnOverAt`, which leaves out a wrapper holding the container whole).
+ * touch-down, in the tree that read unchanged (`TreeFacts.scene`'s
+ * `order.drawnOverAt`, which leaves out a wrapper holding the container whole).
  * A gesture belongs to the view the finger first touches (swipe.ts#swipeVectorAbove), so such a node took
  * the strokes — MAY have: the tree does not say whether a node takes touches
  * (ui-tree/draw-order.ts), so the sentence names it first and keeps the
@@ -1810,7 +1705,7 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
 function touchedOn(s: State, facts: TreeFacts): TouchedOn | undefined {
   const { strokeWithin: container, lastDrawn } = s;
   if (container === undefined || lastDrawn === undefined) return undefined;
-  const on = facts.drawOrder.drawnOverAt(container, lastDrawn.from);
+  const on = facts.scene.order.drawnOverAt(container, lastDrawn.from);
   if (on === undefined) return undefined;
   const { role, label, identifier, rect } = on;
   return { at: { ...lastDrawn.from }, on: { role, label, identifier, rect: { ...rect } }, container };
@@ -1856,7 +1751,7 @@ interface BoundRound {
  */
 function shortfall(s: State, { readError, found, best, viewport, cover }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
-  if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
+  if (best !== undefined && best.standing.facts.visible > 0) return shortOf(best);
   const left = s.inFrameAfter;
   const past = s.lastPast !== undefined && !s.strokedToward.includes(SIDES[s.lastPast.side].reveals) ? s.lastPast : undefined;
   if (found.length === 0) {

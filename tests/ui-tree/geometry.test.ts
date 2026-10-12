@@ -9,7 +9,6 @@ import {
   flushEdges,
   higherTop,
   inferScreenSize,
-  insideScroller,
   intersectsViewport,
   rectArea,
   rectIntersection,
@@ -26,6 +25,9 @@ import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node as fakeNode } from '../helpers/fake.js';
+
+/** A nested tree's listing: its nesting is its ancestry (draw-order.ts#listsAncestry). */
+const NESTED = { ancestry: true } as const;
 
 /**
  * Regression cover for docs/bugs/2026-08-26-ios-ocr-crop-scale.md: with a
@@ -380,7 +382,7 @@ describe('clipsOf(tree).scrollersOf — each node\'s clipping ancestors, nearest
     const outer = { role: 'container', label: null, identifier: 'page', value: null, rect: rect(242, 1736), children: [inOuter, inner], clipsDescendants: true as const };
     const bare = leaf(2000);
     const root = { role: 'container', label: null, identifier: null, value: null, rect: rect(0, 2220), children: [outer, bare] };
-    const of = clipsOf(root).scrollersOf;
+    const of = clipsOf(root, NESTED).scrollersOf;
     expect(of(inInner)).toEqual([rect(500, 400), rect(242, 1736)]);
     expect(of(inOuter)).toEqual([rect(242, 1736)]);
     expect(of(inner)).toEqual([rect(242, 1736)]);
@@ -485,7 +487,7 @@ describe('evidentCut — clippedOut evidence at each edge, parsed (verification 
     const tree = parseDump(xml);
     const find = (n: UiNode): UiNode | undefined => (n.identifier === id ? n : n.children.map(find).find(Boolean));
     const n = find(tree)!;
-    return evidentCut(n, clipsOf(tree).scrollersOf(n));
+    return evidentCut(n, clipsOf(tree, NESTED).scrollersOf(n));
   };
   const text = (bounds: string) => `<node class="android.widget.TextView" resource-id="a:id/title" text="Apps" bounds="${bounds}"/>`;
   const row = (id: string, bounds: string, ...kids: string[]) => `<node class="android.widget.LinearLayout" clickable="true" resource-id="a:id/${id}" bounds="${bounds}">${kids.join('')}</node>`;
@@ -522,16 +524,16 @@ describe('higherTop — the higher of two top edges, either unknown (code review
 describe('clipsOf(tree).cutSliver — evidentCut under the minimum piece', () => {
   const form = { x: 0, y: 242, width: 1080, height: 1736 };
   const toggle = (height: number) => node({ x: 66, y: 1979 - height, width: 948, height }, null, [node({ x: 66, y: 1979 - height + 12, width: 948, height: height - 13 })]);
-  const sliverOf = (n: UiNode, minPiece: number) => clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [{ ...node(form, 'form', [n]), clipsDescendants: true }])).cutSliver(n, minPiece);
+  const sliverOf = (n: UiNode, minPiece: number) => clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [{ ...node(form, 'form', [n]), clipsDescendants: true }]), NESTED).cutSliver(n, minPiece);
   it('64 deep under a 65 minimum is a sliver; 65 is not; no evidence, none; a node of another read, none', () => {
     expect(sliverOf(toggle(64), 65)).toEqual({ edge: 'bottom', container: form, depth: 64 });
     expect(sliverOf(toggle(65), 65)).toBeUndefined();
     expect(sliverOf(node({ x: 66, y: 1924, width: 948, height: 55 }), 65)).toBeUndefined();
-    expect(clipsOf(node(form)).cutSliver(toggle(64), 65)).toBeUndefined();
+    expect(clipsOf(node(form), NESTED).cutSliver(toggle(64), 65)).toBeUndefined();
   });
   it('kept per node and minimum: the same answer for each minimum asked, in any order', () => {
     const t = toggle(64);
-    const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [{ ...node(form, 'form', [t]), clipsDescendants: true }]));
+    const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [{ ...node(form, 'form', [t]), clipsDescendants: true }]), NESTED);
     expect([clips.cutSliver(t, 65)?.depth, clips.cutSliver(t, 64), clips.cutSliver(t, 65)?.depth]).toEqual([64, undefined, 64]);
   });
 });
@@ -544,7 +546,7 @@ describe('clipsOf — the chain through plain containers to the outermost clip (
     const form = { ...node(rect(242, 1736), 'form', [toggle]), clipsDescendants: true as const };
     const page = node(rect(0, 2220), 'page', [form]);
     const root = node(rect(0, 2220), null, [page, node(rect(0, 100), 'bar')]);
-    const of = clipsOf(root).scrollersOf;
+    const of = clipsOf(root, NESTED).scrollersOf;
     expect([of(label), of(toggle)]).toEqual([[form.rect], [form.rect]]);
     expect(of(label)).toBe(of(toggle)); // shared along the branch
     expect([of(form), of(page), of(root.children[1]), of(node(rect(1936, 42)))]).toEqual([[], [], [], []]);
@@ -556,7 +558,7 @@ describe('cutSliver — inherited from an ancestor cut to a sliver at the edge t
   /** The node `n` inside `parent` inside the form, as the tree has them; the tree's cutSliver asked of `n`. */
   const sliverOf = (n: UiNode, parent: UiNode, minPiece = 65) => {
     const formNode = { ...node(form, 'form', [parent]), clipsDescendants: true as const };
-    return clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [formNode])).cutSliver(n, minPiece);
+    return clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [formNode]), NESTED).cutSliver(n, minPiece);
   };
   // As dumped at 35d5997: details_toggle 66,1924 948x55; children other 'Payment details' 66,1936 948x42, other 926,1955 88x23, button 66,1936 948x42.
   const label = () => node({ x: 66, y: 1936, width: 948, height: 42 }, 'label');
@@ -605,7 +607,7 @@ describe('cutSliver — inherited from an ancestor cut to a sliver at the edge t
     const field = node({ x: 132, y: 1307, width: 816, height: 91 }, 'field', [node({ x: 132, y: 1329, width: 816, height: 69 }), company, node({ x: 176, y: 1340, width: 728, height: 58 })]);
     const row = node({ x: 132, y: 1307, width: 948, height: 91 }, 'row', [field]);
     const list = { ...node(imeForm, 'form', [row]), clipsDescendants: true as const };
-    const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [list]));
+    const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [list]), NESTED);
     expect(evidentCut(field, clips.scrollersOf(field))?.depth).toBe(91); // cut, but deep enough
     expect(clips.cutSliver(company, 65)).toBeUndefined();
   });
@@ -628,7 +630,7 @@ describe('cutSliver — inherited from an ancestor cut to a sliver at the edge t
     const leaf = node({ x: 0, y: 1960, width: 100, height: 18 }, 'leaf'); // bottom 1978: the form's, not the inner clip's (2000)
     const strip = node({ x: 0, y: 1950, width: 1080, height: 50 }, 'strip', [leaf, node({ x: 200, y: 1960, width: 100, height: 50 })]); // cut at 2000, 50 deep
     const inner = { ...node({ x: 0, y: 1900, width: 1080, height: 100 }, 'inner', [strip]), clipsDescendants: true as const };
-    const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [{ ...node(form, 'form', [inner]), clipsDescendants: true }]));
+    const clips = clipsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [{ ...node(form, 'form', [inner]), clipsDescendants: true }]), NESTED);
     expect(clips.cutSliver(strip, 65)).toEqual({ edge: 'bottom', container: inner.rect, depth: 50 });
     expect(clips.cutSliver(leaf, 65)).toBeUndefined();
   });
@@ -654,13 +656,15 @@ describe('largestScroller — the screen\'s own scroll view (2026-10-09)', () =>
   });
 });
 
-describe('insideScroller — some ancestor scrolls (scroll-containers.ts#scrolls); unknown on a flat list', () => {
+describe('clipsOf(tree).inScroller — some ancestor scrolls (scroll-containers.ts#scrolls); unknown without ancestry', () => {
   const find = (tree: UiNode, keep: (n: UiNode) => boolean): UiNode => [...everyNode(tree)].find(keep)!;
+  const insideScroller = (tree: UiNode, n: UiNode, ancestry = true) => clipsOf(tree, { ancestry }).inScroller(n);
 
-  it('nested WDA: a field in the login ScrollView is inside; the screen wrapper around it is not', async () => {
+  it('nested WDA: a field in the login ScrollView is inside; the screen wrapper around it is not, nor the ScrollView itself', async () => {
     const tree = parseWdaSourceValue(JSON.parse(await readFile(new URL('../fixtures/wda-source-myport-login-no-keyboard.json', import.meta.url), 'utf8')));
     expect(insideScroller(tree, find(tree, (n) => n.identifier === 'login_username'))).toBe(true);
     expect(insideScroller(tree, find(tree, (n) => n.identifier === 'login_screen'))).toBe(false);
+    expect(insideScroller(tree, find(tree, (n) => n.role === 'scrollable'))).toBe(false);
   });
 
   it('Android Compose: a row of the flagged list is inside (a Compose scroller has no scrollable role); the tab bar after it is not', () => {
@@ -689,10 +693,12 @@ describe('insideScroller — some ancestor scrolls (scroll-containers.ts#scrolls
     expect(insideScroller(tree, back)).toBe(false);
   });
 
-  it("undefined where the tree cannot say: idb's flat list, and a node of another tree", async () => {
+  it("undefined where the tree cannot say: a listing without ancestry (idb's flat list), and a node of another tree", async () => {
     const flat = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
-    expect(flat.flatList).toBe(true);
-    expect(insideScroller(flat, flat.children[flat.children.length - 1])).toBeUndefined();
+    const last = flat.children[flat.children.length - 1];
+    expect(insideScroller(flat, last, false)).toBeUndefined();
+    // Not vacuous: read as nested, the same node lies under nothing that scrolls.
+    expect(insideScroller(flat, last, true)).toBe(false);
     expect(insideScroller(parseDump(COMPOSE.accountDetail), fakeNode({}))).toBeUndefined();
   });
 });

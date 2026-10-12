@@ -1,6 +1,23 @@
-import { usableSize, type DeviceAdapter, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
-import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, type ScreenSize } from './geometry.js';
+import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { drawOrder, listsAncestry, type DrawOrder } from './draw-order.js';
+import {
+  belowStatusBand,
+  clippedEdges,
+  clipsOf,
+  containsPoint,
+  inferScreenSize,
+  inStatusBand,
+  SCREEN_AGREEMENT_PCT,
+  screenOf,
+  visibleFractionInViewport,
+  windowTurnsScreen,
+  type Clips,
+  type Cut,
+  type Edge,
+  type ScreenSize,
+} from './geometry.js';
 import type { TreeRead } from './read-tree.js';
+import { tapPoint } from './selectors.js';
 
 /**
  * Standing: where a target stands on the screen, for every verb that asks
@@ -166,3 +183,167 @@ function judgedBoxes(size: ScreenSize | undefined, device: DeviceScreen, box: Re
 /** The window and the box agree side for side, within SCREEN_AGREEMENT_PCT — the window IS the screen, held the way the box is. */
 const sameSides = (a: { width: number; height: number }, b: { width: number; height: number }): boolean =>
   Math.abs(a.width - b.width) <= (b.width * SCREEN_AGREEMENT_PCT) / 100 && Math.abs(a.height - b.height) <= (b.height * SCREEN_AGREEMENT_PCT) / 100;
+
+// ─── The scene and the standing ──────────────────────────────────────────────
+
+/**
+ * THE SCENE of one tree: its draw order (draw-order.ts) and its clip facts
+ * (geometry.ts#clipsOf), each derived once, on first use — and the
+ * STANDING of a node in it: where the node stands on a screen for what a
+ * verb means to do with it, one ordered judgement.
+ *
+ * Contract of `standing(node, screen, purpose)`:
+ * - Judged in `screen.box` alone (a caller judging in several boxes asks
+ *   once a box and keeps the best), cut above `screen.keyboardTop` when
+ *   given — full width, from the box's origin; a line at or above the top
+ *   leaves nothing: no exposure is asked, nothing shows.
+ * - `facts` are the judgement's inputs, whatever the kind: what a caller's
+ *   motion and sentences read (scroll_until's best-so-far, its far-edge
+ *   turn and its failure text).
+ * - The kind, for the stop (`{ of: 'stop' }`) — `reachable` when the node
+ *   is in the frame, its centre (the point the next tap presses) on the box
+ *   below the status band, and — `fully` — clipped at no edge with nothing
+ *   drawn over any of it, or — plain — nothing over its centre and not cut
+ *   to a sliver (`Clips.cutSliver` by the exposure's minimum piece; the
+ *   `fully` stop leaves a cut to scroll_until's flush probe). Otherwise, in
+ *   this order: nothing in the frame — `underKeyboard` when a keyboard line
+ *   applies and the node is in the box, else `offScreen`; `clipped`
+ *   (`fully` only); `statusBand` (its centre in the band); `offScreen`
+ *   (its centre off the box); `cut` (plain, its centre under nothing);
+ *   else `covered`.
+ *
+ * Why the stop is judged so:
+ * - The plain stop is the next tap's point: its centre on the screen and
+ *   under nothing, so `scroll_until X` then `tap X` agree. A stop that was
+ *   any intersection reported a row under a pinned CONTINUE bar "fully
+ *   visible after 0 swipes"; one with its centre past the screen's edge
+ *   ("visible … CLIPPED 40%") handed the tap an off-screen refusal
+ *   (interact/resolve.ts#refuseOffScreen).
+ * - On the SCREEN, not the frame cut above a keyboard: a centre under the
+ *   keyboard stops, and the tap's keyboard guard hides the keyboard.
+ * - A centre in the status band is off the screen, for both stops —
+ *   measured: one stroke flung `priority_select` to `24,-20` and the plain
+ *   stop stopped with its centre at (201,6), where the tap pressed the
+ *   status bar. Only the centre: the rest of the rect is judged against
+ *   the box (`fully` judges clipping against the whole box), so full-bleed
+ *   content at the top stops once its ROUNDED centre (`tapPoint`) lies below
+ *   the band; one at y 0 shorter than twice the band less a point (122 pt
+ *   or less under 62; 123 pt rounds its centre 61.5 to 62 and stops) stops
+ *   neither way, and its failure names the status bar.
+ * - A sliver: uiautomator cuts every rect to its scroller, so a cut node's
+ *   centre is always on the screen, and the stop handed back the very strip
+ *   the next tap refuses (interact/resolve.ts#refuseCutSliver). Scrolling on
+ *   reveals it. `fully: true` keeps its own rule: a stop flush with a
+ *   clipping container is probed (interact/scroll-rounds.ts#PROBE_REACH).
+ * - With `fully: true` a cut edge leads the shortfall, as it always has.
+ * The owner's decisions for the stop's centre and covers:
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
+ *
+ * TODO: one precedence for the stop and the tap, cut before cover
+ * (the stop judges the cover first today).
+ *
+ * Residuals:
+ * - The frame is not cut below the status band: a node lying only in the
+ *   band counts as a cover for `fully` and lowers `shows`.
+ */
+export interface Scene {
+  /** The tree's draw order (draw-order.ts#drawOrder). */
+  readonly order: DrawOrder;
+  /** The tree's clip facts (geometry.ts#clipsOf), their ancestry as draw order reads it (draw-order.ts#listsAncestry). */
+  readonly clips: Clips;
+  standing(node: UiNode, screen: StandingScreen, purpose: Purpose): Standing;
+}
+
+/** What a verb means to do with the node: `scroll_until`'s stop, `fully` or plain. */
+export type Purpose = { readonly of: 'stop'; readonly fully: boolean };
+
+/** The screen a standing is judged on: one box of the usable screen, its status band, and the top of a keyboard the caller applies. */
+export type StandingScreen = Pick<UsableScreen, 'box' | 'statusBand'> & { readonly keyboardTop?: number };
+
+/** What a standing was judged from — every kind carries them. */
+export interface StandingFacts {
+  /** The point a tap presses (selectors.ts#tapPoint). */
+  readonly centre: Point;
+  /** The frame judged in: the box, cut above the keyboard line when one applies (no height when it leaves nothing). */
+  readonly screen: Rect;
+  /** The fraction of the node inside the frame, covers or not. */
+  readonly visible: number;
+  /** The frame's edges the node extends past (geometry.ts#clippedEdges). */
+  readonly clipped: readonly Edge[];
+  /** draw-order.ts#Exposure's, inside the frame: the covers, where each presses, the one over the centre, and what shows. */
+  readonly covers: readonly UiNode[];
+  readonly reaches: readonly Rect[];
+  readonly centreCover?: UiNode;
+  readonly shows: number;
+  /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
+  readonly minPiece?: number;
+  /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind. */
+  readonly sliver?: Cut;
+}
+
+/** Where the node stands, and why: `facts`, and one kind with what its sentence quotes. */
+export type Standing = { readonly facts: StandingFacts } & (
+  | { readonly kind: 'reachable'; readonly at: Point }
+  | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number }
+  | { readonly kind: 'statusBand'; readonly at: Point; readonly band: number }
+  | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
+  | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
+  | { readonly kind: 'covered'; readonly cover: UiNode }
+  | { readonly kind: 'underKeyboard'; readonly top: number }
+);
+
+/** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
+export function sceneOf(tree: UiNode): Scene {
+  let order: DrawOrder | undefined;
+  let clips: Clips | undefined;
+  const scene: Scene = {
+    get order() {
+      return (order ??= drawOrder(tree));
+    },
+    get clips() {
+      return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree) }));
+    },
+    standing: (node, screen, purpose) => stopStanding(scene, node, screen, purpose.fully),
+  };
+  return scene;
+}
+
+/** The stop's standing (`Scene`'s contract). */
+function stopStanding(scene: Scene, node: UiNode, { box, statusBand, keyboardTop }: StandingScreen, fully: boolean): Standing {
+  const centre = tapPoint(node);
+  const band = { boxes: [box], statusBand };
+  const below = belowStatusBand(box, band);
+  const onScreen = containsPoint(below, centre);
+  const inBand = inStatusBand(centre, band);
+  if (keyboardTop !== undefined && keyboardTop <= 0) {
+    const facts: StandingFacts = { centre, screen: { x: 0, y: 0, width: box.width, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
+    return { facts, kind: 'underKeyboard', top: keyboardTop };
+  }
+  const frame: Rect = keyboardTop === undefined ? { ...box } : { x: 0, y: 0, width: box.width, height: keyboardTop };
+  const seen = scene.order.exposure(node, frame);
+  const visible = visibleFractionInViewport(node.rect, frame);
+  const sliver = scene.clips.cutSliver(node, seen.minPiece);
+  const facts: StandingFacts = {
+    centre,
+    screen: frame,
+    visible,
+    clipped: clippedEdges(node.rect, frame),
+    covers: seen.covers,
+    reaches: seen.reaches,
+    ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
+    shows: seen.shows,
+    minPiece: seen.minPiece,
+    ...(sliver !== undefined && { sliver }),
+  };
+  if (visible === 0) {
+    if (keyboardTop !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, kind: 'underKeyboard', top: keyboardTop };
+    return { facts, kind: 'offScreen', at: centre, visible };
+  }
+  const clear = fully ? facts.clipped.length === 0 && facts.covers.length === 0 : facts.centreCover === undefined && sliver === undefined;
+  if (onScreen && clear) return { facts, kind: 'reachable', at: centre };
+  if (fully && facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
+  if (inBand) return { facts, kind: 'statusBand', at: centre, band: below.y - box.y };
+  if (!onScreen) return { facts, kind: 'offScreen', at: centre, visible };
+  if (!fully && facts.centreCover === undefined && sliver !== undefined) return { facts, kind: 'cut', cut: sliver, minPiece: seen.minPiece };
+  return { facts, kind: 'covered', cover: facts.centreCover ?? facts.covers[facts.covers.length - 1] };
+}

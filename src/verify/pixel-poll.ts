@@ -1,12 +1,11 @@
 import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder } from '../ui-tree/draw-order.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, containsPoint, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { treeScreen, usableScreen } from '../ui-tree/standing.js';
+import { sceneOf, treeScreen, usableScreen } from '../ui-tree/standing.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -224,8 +223,8 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * Cost: the memoized `viewport()`, and walks of the round's tree, no
  * read: `inferScreenSize`'s (the screen's shape, ui-tree/standing.ts#usableScreen),
  * `screenOf`'s when neither the device nor a window vouches for the
- * screen (the last fallback), `insideScroller`'s down to the element
- * (whether a scroll may cure a miss — asked on every round that reaches
+ * screen (the last fallback), the clip facts' walk of the whole tree
+ * (ui-tree/geometry.ts#Clips.inScroller: whether a scroll may cure a miss — asked on every round that reaches
  * the chrome check, a miss or not: the element found, the keyboard not
  * already failing the round), and, unless the band already failed the
  * round, one `drawOrder` walk (`paintsOver`).
@@ -560,7 +559,7 @@ async function keyboardOverElement(
  * in it that lies clear of that" (the tap's sliver hint's words, "tap
  * something in it that lies clear of that edge") when a scroll may not
  * cure it (review of fix/r8-pixel, round 1): the element lies in no scroll
- * view as far as the tree says (`insideScroller` false — or undefined:
+ * view as far as the tree says (`Clips.inScroller` false — or undefined:
  * idb's flat list has no ancestry, so EVERY idb miss carries the clause),
  * it starts at the screen's top edge under the band (a full-bleed header),
  * or the cover holds the element whole. For the screen ITSELF — an element
@@ -590,7 +589,8 @@ export async function chromeOverElement(
   const band: Rect = { ...screen, height: below.y - screen.y };
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
-  const pinned = insideScroller(tree, element) !== true;
+  const scene = sceneOf(tree);
+  const pinned = scene.clips.inScroller(element) !== true;
   // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
   // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
   const screenSized = rectArea(element.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION;
@@ -600,7 +600,7 @@ export async function chromeOverElement(
     return `the status bar is drawn over the element ${at}, status bar ${rectText(band)}) — ${coverRemedy(never ?? (pinned || element.rect.y <= screen.y ? 'stuck' : 'scroll'))}`;
   }
   // Only the part of the screen below the band that the measurement reads: what lies over the rest of the element is never sampled.
-  const covers = drawOrder(tree).paintsOver(element, rectIntersection(below, reads) ?? { ...reads, width: 0, height: 0 });
+  const covers = scene.order.paintsOver(element, rectIntersection(below, reads) ?? { ...reads, width: 0, height: 0 });
   const centre = rectCentre(element.rect);
   const cover = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
   if (cover === undefined) return undefined;

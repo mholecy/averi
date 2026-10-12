@@ -41,7 +41,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   a floating tab bar, a top bar laid after the form — what of it still
  *   shows, and where a tap on it should go (interact/resolve.ts#
  *   aimClearOfChrome for the tap and the fill's focus tap,
- *   scroll-rounds.ts#judge for `scroll_until`'s stop).
+ *   standing.ts#Scene.standing for `scroll_until`'s stop).
  * - `paintsOver(node, within)` — a pixel assert's chrome (round 8,
  *   2026-10-12, verify/pixel-poll.ts#chromeOverElement): which of
  *   `exposure`'s covers hide PIXELS of the node, not only the touch —
@@ -1397,10 +1397,21 @@ const OWN_BRANCH_SCREEN_FRACTION = 0.5;
 const wordsOf = (n: UiNode): ReadonlySet<string> =>
   new Set([n.label ?? '', n.value ?? ''].flatMap((t) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u)).filter((w) => w.length > 0));
 
+/**
+ * Whether the tree's nesting is its nodes' ancestry: false for idb's flat
+ * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
+ * tree's dialect is read here and nowhere else outside draw order — what
+ * geometry.ts#clipsOf's `inScroller` asks it, through
+ * ui-tree/standing.ts#sceneOf.
+ */
+export function listsAncestry(tree: UiNode): boolean {
+  return tree.flatList !== true;
+}
+
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
   const seen: Seen = { screenArea: rectArea(screen) };
-  const flatList = tree.flatList === true;
+  const flatList = !listsAncestry(tree);
   const paddedTouchTargets = tree.paddedTouchTargets === true;
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
   const order: Placed[] = [];
