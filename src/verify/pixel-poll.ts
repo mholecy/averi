@@ -220,8 +220,11 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * children — a dialog's panel — covers only through its content (the
  * tap's `contentFramed` row): its button is named, and its bare
  * background between them is not seen.
- * Cost: one `drawOrder` walk of the round's tree and the memoized
- * `viewport()`.
+ * Cost: the memoized `viewport()`, and walks of the round's tree, no
+ * read: `inferScreenSize`'s (the screen's shape, geometry.ts#deviceBox),
+ * `insideScroller`'s down to the element (whether a scroll may cure a
+ * miss — asked every round, a miss or not), and, unless the band already
+ * failed the round, one `drawOrder` walk (`paintsOver`).
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
  * `measure`, which is text-parity.ts#measureOcrAssert since 2026-10-08, as
