@@ -1588,6 +1588,44 @@ describe('round — a target resting in the frame at the edge the strokes push i
   });
 });
 
+describe('round — the Android navigation band (Spec B, D7): a centre in it is no stop, and a row pinned there fails naming the bar', () => {
+  const PIXEL_BOX: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+  /** The Pixel_3a as the adapter reads it with its navigation bar: the band from 2154. */
+  const NAV: UsableScreen = { box: PIXEL_BOX, boxes: [PIXEL_BOX], oriented: PIXEL_BOX, from: 'device', statusBand: 66, navigationBand: 2154 };
+  const row = (y: number, screen: UsableScreen = NAV): Row => ({ found: [match({ x: 66, y, width: 948, height: 68 }, 'row_4')], screen });
+
+  it('mp-native\'s row_4 at 2152 (centre 2186): no stop at 0 swipes — stroked until its centre clears the band', () => {
+    const played = play(ANDROID, [row(2152), row(1600), row(1600)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('…and with no band read: the stop at 0 swipes, as before the band was read', () => {
+    const unread: UsableScreen = { box: PIXEL_BOX, boxes: [PIXEL_BOX], oriented: PIXEL_BOX, from: 'device', statusBand: 66 };
+    const played = play(ANDROID, [row(2152, unread)]);
+    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
+  it('a row pinned in the band (no stroke moves it): stuck, naming the navigation bar and the row as pinned under it', () => {
+    const played = play({ ...ANDROID, maxSwipes: 6 }, [row(2152), row(2152), row(2152), row(2152)]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'up']);
+    expect(played.outcome?.kind).toBe('stuck');
+    const message = failureOf(played, 'id:row_4').message;
+    expect(message).toContain(
+      'its centre stays under the navigation bar at (540,2186), from y 2154 to the bottom of the screen (tree units), where a tap goes to the navigation bar, and the content is exhausted: ' +
+        'swiping down no longer moves it out from under the navigation bar',
+    );
+    expect(message).toContain('it is pinned under the navigation bar (a layout that does not keep clear of it?), and no step taps it.');
+  });
+
+  it('at the bound: what it was short of is the navigation bar', () => {
+    const played = play({ ...ANDROID, maxSwipes: 0 }, [row(2152)]);
+    expect(failureOf(played, 'id:row_4').message).toContain(
+      'failed after 0 swipes (maxSwipes) — element reached the viewport but its centre stays under the navigation bar at (540,2186), from y 2154 to the bottom of the screen (tree units)',
+    );
+  });
+});
+
 describe('round — a target uiautomator dumped CLIPPED OUT of its scroll container (docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md)', () => {
   /** Settings' list under the collapsing app bar: `[0,297][1080,2220]`. */
   const scroller: Rect = { x: 0, y: 297, width: 1080, height: 1923 };

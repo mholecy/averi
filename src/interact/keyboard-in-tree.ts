@@ -4,7 +4,7 @@ import { frameText } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
-import { usableScreen, type UsableScreen } from '../ui-tree/standing.js';
+import { onScreen, usableScreen, type UsableScreen } from '../ui-tree/standing.js';
 import { sleep } from '../util/sleep.js';
 import {
   confirmHidden,
@@ -22,7 +22,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { describeTarget, findTarget, onScreen, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 
 /**
  * The IN-TREE model (iOS under WDA, 2026-10-07): the soft keyboard is part

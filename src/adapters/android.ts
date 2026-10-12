@@ -1168,8 +1168,15 @@ type SystemBands = Pick<DeviceScreen, 'statusBand' | 'navigationBand'>;
  * width from x 0, starts below the top, is wider than it is tall and ENDS
  * AT THE BOTTOM (`h`) — a bar at the left or right side, or one the width
  * of half the display, is no bottom band. Only on a display in its natural
- * rotation (`r=0`): a turned display (landscape, where 3-button navigation
- * moves the bar to a side) has no band — portrait only, a residual. Never
+ * rotation (`r=0`) that is itself portrait (`w <= h`): a turned display
+ * (landscape, where 3-button navigation moves the bar to a side) has no
+ * band, and neither has a display whose natural rotation is landscape (a
+ * tablet, `w=2560 h=1600 r=0`) — its band, kept with the status band until
+ * a launch or a fresh read, would be applied to the turned portrait box
+ * after a rotation: `scroll_until`'s stop would refuse every centre from
+ * 1504 down (the tap's refusal reads the bands again first). So a band, when
+ * there is one, is always the portrait screen's own: the only portrait box
+ * of that device. Portrait phones only, a residual. Never
  * guesses — no band on: no entry; one that does not read fully (type,
  * frame, visible); a hidden one (an immersive app); a frame of any other
  * shape; no DisplayFrames line, or several that do not all say the same
@@ -1179,7 +1186,7 @@ export function parseNavigationBand(dump: string): number | undefined {
   const frames = [...dump.matchAll(DISPLAY_FRAMES_RE)];
   if (new Set(frames.map(([line]) => line.trim())).size !== 1) return undefined; // none, or displays of different sizes
   const [, w, h, r] = frames[0].map(Number);
-  if (r !== 0) return undefined;
+  if (r !== 0 || w > h) return undefined;
   /** What each navigation-bar entry says: its top, or 'none' (hidden, unread, or not a bar across the display's bottom). */
   const entries = new Set<number | 'none'>();
   for (const [, body] of dump.matchAll(INSETS_SOURCE_LINE_RE)) {

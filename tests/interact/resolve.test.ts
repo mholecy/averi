@@ -855,6 +855,29 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(fake.taps).toEqual(['login_title']);
   });
 
+  it('after the keyboard guard tapped a dismissal: a cut-sliver refusal says what was sent first, too', async () => {
+    // The tap hides the keyboard, and the layout leaves login_submit cut to 141x23 at its scroll view's bottom (570), its label running into the cut.
+    const fake = iosLoginFake({
+      onTap: (id, self) => {
+        if (id !== 'login_title') return;
+        dropBand(self.live());
+        const live = self.live();
+        live.children = live.children.filter((n) => n.identifier !== 'login_submit');
+        const submit = node({ role: 'button', identifier: 'login_submit', rect: { x: 36, y: 547, width: 141, height: 23 }, children: [node({ role: 'text', label: 'Log in', rect: { x: 36, y: 559, width: 141, height: 11 } })] });
+        live.children.push({ ...node({ role: 'scrollable', rect: { x: 0, y: 300, width: 402, height: 270 }, children: [submit] }), clipsDescendants: true });
+      },
+    });
+    fake.viewportSize = { width: 402, height: 874 };
+    const error = await tapElement(fake, 'id:login_submit', { ...OPTS, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ClippedRefusal);
+    expect((error as Error).message).toBe(
+      'id:login_submit was not tapped: after id:"login_title" was tapped at (201,303) to hide the soft keyboard, it is cut at its scroll container\'s bottom edge ' +
+        '(container 0,300 402x270); only a 141x23 part of it shows, 23 deep across that edge, under the 24 a tap needs — scroll_until it first ' +
+        '(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)',
+    );
+    expect(fake.taps).toEqual(['login_title']);
+  });
+
   /** Android (1080x2220, the oracle): a 300-px row whose top 200 px lie under a bar laid after its list — its centre (540,1250) on the bar, a 100-px strip below. */
   const androidSheet = (band?: number) => {
     const fake = new FakeAdapter(
@@ -1713,6 +1736,76 @@ describe('iOS\'s status band (2026-10-09)', () => {
     expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toEqual([{ x: 0, y: 0, width: 874, height: 402 }]);
     await tapElement(fake, 'id:row', OPTS);
     expect(fake.tapPoints).toEqual([{ x: 400, y: 30 }]);
+  });
+});
+
+/**
+ * Android's navigation band (Spec B, D7; triage of the round-8 device check): mp-native draws Account Detail edge to edge,
+ * its `row_4` 66,2152 948x68 lies under the navigation bar (2154–2220 on the Pixel_3a), and the tap went to (540,2186) —
+ * Back, Home or Recents on three-button navigation. Refused whatever the navigation mode, in the bar's own words.
+ */
+describe('Android\'s navigation band', () => {
+  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const PIXEL = { width: 1080, height: 2220, statusBand: 66, navigationBand: 2154 };
+  const accountDetailTop = async () => {
+    const fake = new FakeAdapter({ s: { ...(JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')).screens.accountDetailTop as UiNode), paddedTouchTargets: true } }, 's');
+    fake.viewportSize = PIXEL;
+    return fake;
+  };
+
+  it('row_4 at the top of Account Detail: refused as under the navigation bar, scroll_until offered (it lies in the list), nothing tapped', async () => {
+    const fake = await accountDetailTop();
+    const error = await tapElement(fake, 'id:transactions.list.row_4', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OffScreenRefusal);
+    expect((error as Error).message).toBe(
+      'id:transactions.list.row_4 is under the navigation bar at (540,2186), from y 2154 to the bottom of the screen (tree units), where a tap goes to the navigation bar ' +
+        '(rect 66,2152 948x68) — it lies in a scroll view — scroll_until it first, to move it out from under the bar; nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('with no band read (an immersive app; a dump that does not say): tapped where it stands, as before the band was read', async () => {
+    const fake = await accountDetailTop();
+    fake.viewportSize = { width: 1080, height: 2220, statusBand: 66 };
+    await tapElement(fake, 'id:transactions.list.row_4', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 2186 }]);
+  });
+
+  it('a node in no scroll view under the bar is pinned there: no scroll_until offered', async () => {
+    resetLayout();
+    const bar = node({ role: 'button', label: 'Pay', identifier: 'pay', rect: { x: 0, y: 2160, width: 1080, height: 60 } });
+    const fake = new FakeAdapter({ s: node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [bar] }) }, 's');
+    fake.viewportSize = PIXEL;
+    const error = await tapElement(fake, 'id:pay', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OffScreenRefusal);
+    expect((error as Error).message).toBe(
+      'id:pay is under the navigation bar at (540,2190), from y 2154 to the bottom of the screen (tree units), where a tap goes to the navigation bar (rect 0,2160 1080x60) — ' +
+        'it lies in no scroll view, so no scroll moves it out: it is pinned under the navigation bar (a layout that does not keep clear of it?) — fix the layout, or tap something else; nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('scroll_until then tap: the plain stop goes on until the centre clears the band, and the tap that follows lands', async () => {
+    resetLayout();
+    let offset = 0;
+    const fake = new (class extends FakeAdapter {
+      override async uiTree(): Promise<UiNode> {
+        const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 2160 - offset, width: 1080, height: 60 } });
+        return node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [{ ...node({ role: 'container', rect: { x: 0, y: 300, width: 1080, height: 1920 }, children: [row] }), clipsDescendants: true }] });
+      }
+      override async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+        offset = Math.min(offset + Math.round(from.y - to.y), 400);
+      }
+      override async tap(x: number, y: number): Promise<void> {
+        this.tapPoints.push({ x, y });
+      }
+    })({ s: node({ role: 'other' }) }, 's');
+    fake.viewportSize = PIXEL;
+    const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, timeoutMs: 5_000 });
+    expect(result.swipes).toBeGreaterThan(0);
+    await tapElement(fake, 'id:row', OPTS);
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 2190 - offset }]);
+    expect(2190 - offset).toBeLessThan(2154);
   });
 });
 

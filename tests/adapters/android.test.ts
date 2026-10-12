@@ -1427,6 +1427,8 @@ describe('parseNavigationBand — the visible navigation bar\'s top, out of `dum
     ['a frame taller than it is wide (all but the top 10 px)', lines(NAV_33('[0,10][1080,2220]'))],
     ['a frame the whole display (a natural-landscape tablet, r=0)', display(FRAMES(2220, 1080), NAV_33('[0,0][2220,1080]'))],
     ['a turned display (r=1), its bar at the bottom of the turned frame — portrait only', display(FRAMES(2220, 1080, 1), NAV_33('[0,1014][2220,1080]'))],
+    // A display whose natural rotation is landscape: its band, kept by the adapter, would be applied to the turned (portrait) box after a rotation.
+    ['a natural-landscape tablet (w > h at r=0), its bar across the bottom — portrait displays only', display(FRAMES(2560, 1600), NAV_33('[0,1504][2560,1600]'))],
     ['no DisplayFrames line (the display\'s size unsaid)', `    mInsetsState:\n${NAV_33('[0,2154][1080,2220]')}\n`],
     ['two displays of different sizes, their bars alike', lines(NAV_33('[0,2154][1080,2220]')) + display(FRAMES(1080, 2280), NAV_33('[0,2154][1080,2220]'))],
     ['an entry that does not read fully (no visible=)', display(FRAMES(), '        InsetsSource type=navigationBars frame=[0,2154][1080,2220] flags=')],

@@ -545,7 +545,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 /**
  * Code review of fix/r7-sliver, item 1 (2026-10-10): uiautomator cuts every rect to its scroller, so a node cut to a
  * sliver at the scroller's edge has its centre on the screen, and a plain stop stopped on exactly the strip the next
- * tap refuses (resolve.ts#refuseCutSliver). The plain stop now scrolls on.
+ * tap refuses (resolve.ts#aimClearOfChrome). The plain stop now scrolls on.
  */
 describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap refuses (2026-10-10)', () => {
   const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
@@ -628,18 +628,19 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     expect(fake.swipes).toEqual([]);
   });
 
-  // The stop judges the cover before the cut (ui-tree/standing.ts#Scene.standing): a covered sliver fails naming the cover, not the cut.
-  // Its "that edge" names no edge: the cut is not said — what one precedence for the stop and the tap (cut first) changes.
-  it('a sliver also covered at its centre, stuck at the end of the content: the failure names the cover', async () => {
+  // Cut before cover (ui-tree/standing.ts#Scene): a covered sliver fails naming the cut and its edge, so "that edge" is one the sentence named.
+  it('a sliver also covered at its centre, stuck at the end of the content: the failure names the cut at the bottom edge, not the cover', async () => {
     await expect(scrollUntilVisible(new SwiftForm(0, false, true), 'id:details_toggle', FAST)).rejects.toThrow(
-      'failed after 2 swipes — element is in the viewport but under button "Help" (400,1900 300x78) at its centre (540,1952), drawn over it — 69% of it shows — ' +
-        'and the content is exhausted: swiping down no longer moves it, and swiping up would only push it out through that edge. The app draws that over it',
+      "failed after 2 swipes — element is in the viewport but cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, " +
+        '55 deep across that edge, under the 65 a tap needs — and the content is exhausted: swiping down no longer moves it, and swiping up would only push it out ' +
+        "through that edge. The rest of it stays past its container's edge at the end of the content",
     );
   });
 
-  it('a sliver also covered at its centre, at the bound (maxSwipes: 0): what it was short of is the cover', async () => {
+  it('a sliver also covered at its centre, at the bound (maxSwipes: 0): what it was short of is the cut, with its direction', async () => {
     await expect(scrollUntilVisible(new SwiftForm(1000, false, true), 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
-      'failed after 0 swipes (maxSwipes) — element reached the viewport but stayed under button "Help" (400,1900 300x78) at its centre (540,1952), drawn over it — 69% of it shows (last rect',
+      "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 " +
+        'part of it shows, 55 deep across that edge, under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
     );
   });
 

@@ -405,7 +405,7 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * describes — turns the box. A gesture over a turned box on an unturned
  * screen lands off-centre, not off-screen in the short axis; the tree
  * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
- * refusal (interact/resolve.ts#onScreen) does not take this answer alone —
+ * refusal (ui-tree/standing.ts#onScreen) does not take this answer alone —
  * ui-tree/standing.ts#UsableScreen says which boxes count (`boxes`), and a
  * child window that matches the panel neither way — this crowned node —
  * is no evidence there: the judgement uses the panel as built. A window
@@ -608,11 +608,30 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
 /**
  * `point` lies on the screen but in its status band: inside one of `boxes`,
  * and inside none of them less the band (`belowStatusBand`). The tap's
- * refusal (interact/resolve.ts#refuseOffScreen) and `scroll_until`'s
- * stop (ui-tree/standing.ts#Scene.standing) ask it alike.
+ * and the stop's standing (ui-tree/standing.ts#Scene.standing) asks it.
  */
 export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; statusBand?: number }): boolean =>
   screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
+
+/**
+ * `box` less the screen's navigation band (`DeviceScreen.navigationBand`,
+ * the band's TOP line, carried as ui-tree/standing.ts#UsableScreen's) at its
+ * bottom when `box` is portrait — `belowStatusBand`'s twin at the other
+ * edge, `shape` as there. Portrait only: Android moves the bar to a side
+ * in landscape, and the band, read while the screen was upright, may
+ * outlive a rotation in the adapter's memo (the residual is the standing's).
+ * A reading that leaves nothing above it — its top at or above the box's
+ * — is no band (fails open): `box` itself.
+ */
+export function aboveNavigationBand(box: Rect, screen: { navigationBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
+  const top = screen?.navigationBand;
+  if (top === undefined || top <= box.y || shape.height <= shape.width) return box;
+  return { ...box, height: Math.max(0, Math.min(box.y + box.height, top) - box.y) };
+}
+
+/** `point` lies on the screen but in its navigation band: inside one of `boxes`, and inside none of them less the band (`aboveNavigationBand`) — `inStatusBand`'s twin. */
+export const inNavigationBand = (point: Point, screen: { boxes: readonly Rect[]; navigationBand?: number }): boolean =>
+  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(aboveNavigationBand(box, screen), point));
 
 /**
  * How thick, in tree units (points on iOS, pixels on Android), an overlap
@@ -688,13 +707,12 @@ export interface Clips {
   /**
    * `evidentCut` when what shows of the node across that edge is under
    * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`)
-   * — a sliver a tap is refused on (interact/resolve.ts#refuseCutSliver)
-   * and `scroll_until`'s plain stop does not stop on
-   * (ui-tree/standing.ts#Scene.standing); undefined otherwise. The one spelling of the rule both ask.
+   * — a sliver a tap is refused on and `scroll_until`'s plain stop does
+   * not stop on; undefined otherwise. Asked only by
+   * ui-tree/standing.ts#Scene.standing, which orders it against the rest.
    *
-   * Or INHERITED (round 8, owner decision, docs/bugs/2026-10-09-android-
-   * tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-
-   * nothing.md, "re-run at 35d5997"): a node flush within a pixel with an
+   * Or INHERITED (the owner's decision, the bug note below, "re-run at
+   * 35d5997"): a node flush within a pixel with an
    * edge whose ancestor — below the container of that edge — is itself a
    * sliver cut at that edge of that container, nearest such ancestor first
    * (past a nearer sliver cut at another edge), and the node's own depth
@@ -719,6 +737,7 @@ export interface Clips {
    * scroller (flush with all four edges, its subtree the whole list) is
    * deeper than any sliver, and never walked for it; its own `evidentCut`
    * walks its subtree per flush edge.
+   * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
    */
   cutSliver(node: UiNode, minPiece: number): Cut | undefined;
   /**
@@ -726,7 +745,7 @@ export interface Clips {
    * scroll-containers.ts#scrolls — or undefined when the tree cannot say:
    * a listing without ancestry (`ancestry` false: idb's flat list), and a
    * node of another tree. Whether `scroll_until` can move the target out
-   * from under the status bar (interact/resolve.ts#statusBarRemedy, the
+   * from under a system bar (interact/resolve.ts#systemBarRemedy, the
    * pixel assert's remedy). Cost: one walk of the tree, on the first ask.
    */
   inScroller(node: UiNode): boolean | undefined;
@@ -856,9 +875,9 @@ export interface Cut {
  * android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-
  * nothing.md). The shallowest, not the first found (code review of
  * fix/r7-sliver, item 2): a card cut to 50 px at a carousel's right edge is
- * a 50-px sliver whatever its top says. The tap's cut-sliver rule
- * (interact/resolve.ts#refuseCutSliver) and `scroll_until`'s plain stop
- * (ui-tree/standing.ts#Scene.standing) ask it, against the same minimum.
+ * a 50-px sliver whatever its top says. Asked through `Clips.cutSliver`
+ * only (ui-tree/standing.ts#Scene.standing, for the tap and `scroll_until`'s
+ * plain stop).
  *
  * What a descendant must show, along the edge's axis:
  * - At ANY edge: it lies more than a pixel PAST the edge. Compose's nodes
@@ -923,7 +942,7 @@ export interface Cut {
  * natural size of a node to settle any of these. Cost: a walk of the node's subtree per flush
  * edge, for a node with a clipping ancestor only.
  */
-export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
+function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
   const n = node.rect;
   // Along the edge's axis, as offsets INTO the container from that edge: where the descendant's near and far sides lie, and the node's far side.
   const runsOnPast = ({ rect: d, clippedOut }: UiNode, c: Rect, edge: Edge): boolean => {

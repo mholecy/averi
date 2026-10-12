@@ -4,7 +4,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
-import { sceneOf, treeScreen, usableScreen, usableScreenOf, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
+import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { el, FakeAdapter, node, screen } from '../helpers/fake.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
@@ -173,6 +173,37 @@ describe('usableScreen — the system bands, the device\'s only', () => {
   });
 });
 
+describe('usableScreen — `fresh`: the device read again first (the tap\'s re-read before a refusal)', () => {
+  /** A device whose size reads `sizes` in turn, a fresh read included, recording what each read asked. */
+  const reads = (...sizes: (DeviceScreen | Error)[]) => {
+    const asked: unknown[] = [];
+    return {
+      asked,
+      viewport: async (opts?: { fresh?: boolean }) => {
+        asked.push(opts);
+        const next = sizes.shift()!;
+        if (next instanceof Error) throw next;
+        return next;
+      },
+    };
+  };
+  it('fresh: a fresh read, then the plain one the usable screen is built from — the size the device says now', async () => {
+    const device = reads({ width: 1080, height: 2220 }, { width: 1840, height: 2208 });
+    expect((await usableScreen(device, { tree: undefined }, { fresh: true }))?.box).toEqual(box(1840, 2208));
+    expect(device.asked).toEqual([{ fresh: true }, undefined]);
+  });
+  it('a fresh read that fails is passed over: the plain read is asked as ever', async () => {
+    const device = reads(new Error('wm size timed out'), { width: 1080, height: 2220 });
+    expect((await usableScreen(device, { tree: undefined }, { fresh: true }))?.box).toEqual(box(1080, 2220));
+    expect(device.asked).toEqual([{ fresh: true }, undefined]);
+  });
+  it('without it: one plain read', async () => {
+    const device = reads({ width: 1080, height: 2220 });
+    await usableScreen(device, { tree: undefined });
+    expect(device.asked).toEqual([undefined]);
+  });
+});
+
 describe('treeScreen — the pixel assert\'s last resort: the tree\'s own screen, no band', () => {
   it('a root with a rect is that rect', () => {
     expect(treeScreen(node({ rect: box(402, 874) }))).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree' });
@@ -223,8 +254,8 @@ const fixture = async (name: string): Promise<string> => readFile(new URL(`../fi
 const idbAt = async (name: string, ...path: string[]): Promise<UiNode> =>
   parseIdbDescribeAll(JSON.stringify(path.reduce<any>((j, k) => j[k], JSON.parse(await fixture(name)))));
 
-const IPHONE = { box: box(402, 874), statusBand: 62 };
-const PIXEL = { box: box(1080, 2220), statusBand: 66 };
+const IPHONE = { box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 };
+const PIXEL = { box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 };
 const PLAIN = { of: 'stop', fully: false } as const;
 const FULLY = { of: 'stop', fully: true } as const;
 
@@ -232,17 +263,17 @@ const FULLY = { of: 'stop', fully: true } as const;
 const said = (s: Standing): unknown => {
   switch (s.kind) {
     case 'reachable':
-      return { kind: s.kind, at: s.at };
+      return { kind: s.kind, at: s.at, ...(s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
     case 'offScreen':
       return { kind: s.kind, at: s.at, visible: s.visible };
-    case 'statusBand':
-      return { kind: s.kind, at: s.at, band: s.band };
+    case 'systemBar':
+      return { kind: s.kind, at: s.at, bar: s.bar };
     case 'clipped':
       return { kind: s.kind, edges: s.edges };
     case 'cut':
       return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }) };
     case 'covered':
-      return { kind: s.kind, cover: s.cover.identifier ?? s.cover.label };
+      return { kind: s.kind, cover: s.cover.identifier ?? s.cover.label, ...(s.largest !== undefined && { largest: s.largest }) };
     case 'underKeyboard':
       return { kind: s.kind, top: s.top };
   }
@@ -257,7 +288,7 @@ describe('Scene.standing for scroll_until\'s stop — measured cases, fixture ×
     ['…at 740, the centre clear of the bar, plain', () => swiftIdbAt(740), 'swift_payment.form.priority_select', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 766 } }],
     ['…at 740, fully: true', () => swiftIdbAt(740), 'swift_payment.form.priority_select', IPHONE, FULLY, { kind: 'covered', cover: 'swift_payment.form.continue_button' }],
     // One stroke flung the row to 24,-20: its centre (201,6) in the 62-pt status band, where the tap pressed the status bar.
-    ['…flung to -20, plain: the status band', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE, PLAIN, { kind: 'statusBand', at: { x: 201, y: 6 }, band: 62 }],
+    ['…flung to -20, plain: the status band', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE, PLAIN, { kind: 'systemBar', at: { x: 201, y: 6 }, bar: { edge: 'top', bottom: 62 } }],
     ['…flung to -20, fully: true: a cut edge leads', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE, FULLY, { kind: 'clipped', edges: ['top'] }],
     // Its centre off the screen's bottom: no stop, whatever shows.
     ['…at 860, its centre below the screen, plain', () => swiftIdbAt(860), 'swift_payment.form.priority_select', IPHONE, PLAIN, { kind: 'offScreen', at: { x: 201, y: 886 }, visible: 14 / 52 }],
@@ -267,8 +298,8 @@ describe('Scene.standing for scroll_until\'s stop — measured cases, fixture ×
     // The minimum piece is 65 on a 1080-wide screen: 64 deep is a sliver, 65 is not.
     ['…the toggle 64 deep: a sliver', async () => parseDump(swiftAndroid(64)), 'swift_payment.form.details_toggle', PIXEL, PLAIN, { kind: 'cut', edge: 'bottom', depth: 64 }],
     ['…the toggle 65 deep: no sliver, a stop', async () => parseDump(swiftAndroid(65)), 'swift_payment.form.details_toggle', PIXEL, PLAIN, { kind: 'reachable', at: { x: 540, y: 1947 } }],
-    // The stop judges the cover before the cut — what one precedence with the tap (cut first) changes.
-    ['…the toggle cut and a button over its centre, plain: covered', async () => parseDump(swiftAndroid(55, true)), 'swift_payment.form.details_toggle', PIXEL, PLAIN, { kind: 'covered', cover: 'help' }],
+    // Cut before cover (one precedence with the tap): a sliver with a button over its centre is cut at a named edge.
+    ['…the toggle cut and a button over its centre, plain: cut, not covered', async () => parseDump(swiftAndroid(55, true)), 'swift_payment.form.details_toggle', PIXEL, PLAIN, { kind: 'cut', edge: 'bottom', depth: 55 }],
     ['…its leaf label 66,1936 948x42: the toggle\'s cut, inherited', async () => parseDump(SWIFT_ANDROID), 'Payment details', PIXEL, PLAIN, { kind: 'cut', edge: 'bottom', depth: 42, within: { x: 66, y: 1924, width: 948, height: 55 } }],
     // A classic Settings row cut to 33 px at its list's top, its texts dumped inverted above the cut; the row below is whole.
     ['Settings row cut at its list\'s top, plain', async () => parseDump(SETTINGS_ROW_SLIVER), 'apps_row', PIXEL, PLAIN, { kind: 'cut', edge: 'top', depth: 33 }],
@@ -291,6 +322,216 @@ describe('Scene.standing for scroll_until\'s stop — measured cases, fixture ×
   });
 });
 
+const TAP = { of: 'tap' } as const;
+/** The Pixel_3a as the adapter reads it with its navigation bar: the band from 2154 (dumpsys-window-displays-api33-*.txt). */
+const PIXEL_NAV = { ...PIXEL, navigationBand: 2154 };
+/** A screen of `fixture`'s Compose snapshot, as the parser hands it on. */
+const compose = async (name: string): Promise<UiNode> => ({ ...(JSON.parse(await fixture('android-ui-snapshot-compose.json')).screens[name] as UiNode), paddedTouchTargets: true as const });
+/** The Settings shape of the navigation-band triage: the list 0,596 1080x1558 (clipping), its last row's title 198,2105 428x49 flush with 2154. */
+const SETTINGS_FLUSH = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="list" bounds="[0,596][1080,2154]">
+    <node class="android.widget.LinearLayout" clickable="true" resource-id="row" bounds="[0,2072][1080,2154]"><node class="android.widget.TextView" resource-id="title" text="Sound &amp; vibration" bounds="[198,2105][626,2154]" /></node>
+  </node></node></hierarchy>`;
+
+describe('Scene.standing for the tap — measured cases, fixture × purpose → kind (one order with the stop: off screen, bands, cut, covered)', () => {
+  it.each([
+    // The pinned-chrome bug note: priority_select's centre (201,797) under CONTINUE, 354x9 uncovered above it — under the 24 a tap may move to.
+    ['idb SWIFT form, priority_select at rest under CONTINUE: covered, the strip above it too small', () => swiftIdb(), 'swift_payment.form.priority_select', IPHONE, { kind: 'covered', cover: 'swift_payment.form.continue_button', largest: { x: 24, y: 771, width: 354, height: 9 } }],
+    ['…at 740, its centre clear: reachable at the centre', () => swiftIdbAt(740), 'swift_payment.form.priority_select', IPHONE, { kind: 'reachable', at: { x: 201, y: 766 } }],
+    ['…flung to -20: under the status bar at (201,6)', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE, { kind: 'systemBar', at: { x: 201, y: 6 }, bar: { edge: 'top', bottom: 62 } }],
+    ['…at 860: off the screen, 14 of its 52 on it', () => swiftIdbAt(860), 'swift_payment.form.priority_select', IPHONE, { kind: 'offScreen', at: { x: 201, y: 886 }, visible: 14 / 52 }],
+    ['Android SWIFT form, the toggle cut to 66,1924 948x55: cut at the bottom', async () => parseDump(SWIFT_ANDROID), 'swift_payment.form.details_toggle', PIXEL, { kind: 'cut', edge: 'bottom', depth: 55 }],
+    ['…the toggle cut and a button over its centre: cut, as for the stop', async () => parseDump(swiftAndroid(55, true)), 'swift_payment.form.details_toggle', PIXEL, { kind: 'cut', edge: 'bottom', depth: 55 }],
+    ['…its leaf label: the toggle\'s cut, inherited', async () => parseDump(SWIFT_ANDROID), 'Payment details', PIXEL, { kind: 'cut', edge: 'bottom', depth: 42, within: { x: 66, y: 1924, width: 948, height: 55 } }],
+    ['…the toggle 65 deep: reachable at its centre', async () => parseDump(swiftAndroid(65)), 'swift_payment.form.details_toggle', PIXEL, { kind: 'reachable', at: { x: 540, y: 1947 } }],
+    ['idb scrolled under the top bar, position 2: Back, reachable', () => idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos2'), 'BackButton', IPHONE, { kind: 'reachable', at: { x: 44, y: 84 } }],
+    ['Android Compose snapshot, logged out: LOGIN, reachable', () => compose('loggedOut'), 'LOGIN', PIXEL, { kind: 'reachable', at: { x: 540, y: 1463 } }],
+  ] as const)('%s', async (_name, tree, id, screen, expected) => {
+    const t = await tree();
+    expect(said(sceneOf(t).standing(byId(t, id), screen, TAP))).toEqual(expected);
+  });
+
+  describe('the move to an uncovered piece, above a keyboard line', () => {
+    // A row 0,400 402x100 under a bar at 440–460 over its centre: uncovered 400–440 (402x40) and 460–500 (402x40); the first of equals.
+    const row = () => {
+      const r = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 400, width: 402, height: 100 } });
+      const t = node({ role: 'container', rect: box(402, 874), children: [r, node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 440, width: 402, height: 20 } })] });
+      return { t, r };
+    };
+    it('no keyboard: moved to the largest uncovered piece', () => {
+      const { t, r } = row();
+      expect(said(sceneOf(t).standing(r, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 420 }, moved: { piece: { x: 0, y: 400, width: 402, height: 40 }, cover: 'bar', aboveKeyboard: false } });
+    });
+    it('a keyboard line at 430: the piece above it, 402x30', () => {
+      const { t, r } = row();
+      expect(said(sceneOf(t).standing(r, IPHONE, { ...TAP, keyboardTop: 430 }))).toEqual({ kind: 'reachable', at: { x: 201, y: 415 }, moved: { piece: { x: 0, y: 400, width: 402, height: 30 }, cover: 'bar', aboveKeyboard: true } });
+    });
+    it('a keyboard line at 420: what shows above it is under the minimum — covered, above the keyboard', () => {
+      const { t, r } = row();
+      const s = sceneOf(t).standing(r, IPHONE, { ...TAP, keyboardTop: 420 });
+      expect(said(s)).toEqual({ kind: 'covered', cover: 'bar', largest: { x: 0, y: 400, width: 402, height: 20 } });
+      expect(s.kind === 'covered' && s.aboveKeyboard).toBe(true);
+    });
+    it('a line at or below the box\'s bottom cuts nothing', () => {
+      const { t, r } = row();
+      expect(said(sceneOf(t).standing(r, IPHONE, { ...TAP, keyboardTop: 874 }))).toEqual(said(sceneOf(t).standing(r, IPHONE, TAP)));
+    });
+  });
+
+  describe('the boxes judged in, and no screen at all', () => {
+    const at = (x: number, y: number, root = box(402, 874)) => {
+      const r = node({ role: 'button', identifier: 'row', rect: { x: x - 10, y: y - 10, width: 20, height: 20 } });
+      return { t: node({ role: 'container', rect: root, children: [r] }), r };
+    };
+    const EITHER_WAY = { box: box(402, 874), boxes: [box(402, 874), box(874, 402)], statusBand: 62 };
+    it('the tap judges in ANY of the boxes — a point inside the turned box only is reachable; the stop judges the first box alone', () => {
+      const { t, r } = at(600, 200);
+      expect(said(sceneOf(t).standing(r, EITHER_WAY, TAP))).toEqual({ kind: 'reachable', at: { x: 600, y: 200 } });
+      expect(said(sceneOf(t).standing(r, EITHER_WAY, PLAIN))).toMatchObject({ kind: 'offScreen' });
+    });
+    it('the stop, its centre in the status band of the first box, inside the turned one: under the status bar — the bands judged on the stop\'s box alone', () => {
+      const { t, r } = at(201, 6);
+      expect(said(sceneOf(t).standing(r, EITHER_WAY, PLAIN))).toEqual({ kind: 'systemBar', at: { x: 201, y: 6 }, bar: { edge: 'top', bottom: 62 } });
+      expect(said(sceneOf(t).standing(r, EITHER_WAY, FULLY))).toEqual({ kind: 'clipped', edges: ['top'] });
+    });
+    it('off both: off the screen, with the most of it inside either box', () => {
+      const { t, r } = at(900, 900);
+      expect(said(sceneOf(t).standing(r, EITHER_WAY, TAP))).toEqual({ kind: 'offScreen', at: { x: 900, y: 900 }, visible: 0 });
+    });
+    it('no screen: judged in the tree\'s root rect — and a root of no area leaves every point on the screen (fail open)', () => {
+      const off = at(201, 1000);
+      expect(said(sceneOf(off.t).standing(off.r, undefined, TAP))).toEqual({ kind: 'offScreen', at: { x: 201, y: 1000 }, visible: 0 });
+      const open = at(201, 1000, box(0, 0));
+      expect(said(sceneOf(open.t).standing(open.r, undefined, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 1000 } });
+    });
+  });
+});
+
+describe('Scene.standing — the Android navigation band (D7): a centre in it is under the navigation bar, for the tap and both stops', () => {
+  it.each([
+    // mp-native's Account Detail at its top, drawn edge to edge: row_4 66,2152 948x68 lies under the bar; the tap went to (540,2186).
+    ['accountDetailTop row_4, tap', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, TAP, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
+    ['…plain stop', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, PLAIN, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
+    ['…fully: true', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
+    ['…with no navigation band read (an immersive app, a dump that does not say): tapped as before', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL, TAP, { kind: 'reachable', at: { x: 540, y: 2186 } }],
+    // Contacts' Create contact: "Add fields" 198,2106 180x48 ends flush with the band (its flush case is the pixel assert's); its centre (288,2130) clears it.
+    ['contactsCreateStaged "Add fields", tap: reachable', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 288, y: 2130 } }],
+    ['…plain stop: reachable', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 288, y: 2130 } }],
+    // Settings' title 198,2105 428x49 flush with the band: its centre (412,2130) clears it.
+    ['Settings title flush with the band, tap: reachable', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 412, y: 2130 } }],
+  ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
+    const t = await tree();
+    expect(said(sceneOf(t).standing(byId(t, id), screen, purpose))).toEqual(expected);
+  });
+
+  const tree = (y: number, root = box(1080, 2220)) => {
+    const r = node({ role: 'button', identifier: 'row', rect: { x: 0, y: y - 10, width: root.width, height: 20 } });
+    return { t: node({ role: 'container', rect: root, children: [r] }), r };
+  };
+  it('its edge: a centre at y 2153 is reachable, at 2154 under the bar — whatever the band\'s height (a three-button bar from 2088 too)', () => {
+    const above = tree(2153);
+    expect(said(sceneOf(above.t).standing(above.r, PIXEL_NAV, TAP))).toMatchObject({ kind: 'reachable' });
+    const on = tree(2154);
+    expect(said(sceneOf(on.t).standing(on.r, PIXEL_NAV, TAP))).toEqual({ kind: 'systemBar', at: { x: 540, y: 2154 }, bar: { edge: 'bottom', top: 2154 } });
+    const buttons = tree(2100);
+    expect(said(sceneOf(buttons.t).standing(buttons.r, { ...PIXEL, navigationBand: 2088 }, TAP))).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom', top: 2088 } });
+  });
+  it('the status bar before the navigation bar when a centre lies in both (a screen shorter than its two bands)', () => {
+    const both = tree(100, box(100, 200));
+    const tiny = { box: box(100, 200), boxes: [box(100, 200)], statusBand: 120, navigationBand: 80 };
+    expect(said(sceneOf(both.t).standing(both.r, tiny, TAP))).toMatchObject({ kind: 'systemBar', bar: { edge: 'top', bottom: 120 } });
+  });
+  it('a reading that leaves nothing above it is no band (fails open): at or above the box\'s top, or above the status band\'s bottom — nothing refused, nothing cut', () => {
+    const row = tree(1000);
+    for (const top of [0, -5]) expect(said(sceneOf(row.t).standing(row.r, { ...PIXEL, navigationBand: top }, TAP))).toEqual({ kind: 'reachable', at: { x: 540, y: 1000 } });
+    expect(said(sceneOf(row.t).standing(row.r, { ...PIXEL, navigationBand: 50 }, TAP))).toEqual({ kind: 'reachable', at: { x: 540, y: 1000 } });
+  });
+  it('portrait only: on a landscape box a band read upright is not judged', () => {
+    const turned = tree(1050, box(2220, 1080));
+    const landscape = { box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 1014 };
+    expect(said(sceneOf(turned.t).standing(turned.r, landscape, TAP))).toMatchObject({ kind: 'reachable' });
+  });
+  it('a moved tap is never aimed into the band: the piece is chosen above it', () => {
+    // A row 1900–2220 (centre 2060) under a bar at 1980–2130: uncovered 1900–1980 (80) and 2130–2220 (90, of which 24 lie above the band).
+    const r = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 1900, width: 1080, height: 320 } });
+    const t = node({ role: 'container', rect: box(1080, 2220), children: [r, node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 1980, width: 1080, height: 150 } })] });
+    expect(said(sceneOf(t).standing(r, PIXEL, TAP))).toMatchObject({ kind: 'reachable', at: { x: 540, y: 2175 }, moved: { piece: { x: 0, y: 2130, width: 1080, height: 90 } } });
+    expect(said(sceneOf(t).standing(r, PIXEL_NAV, TAP))).toMatchObject({ kind: 'reachable', at: { x: 540, y: 1940 }, moved: { piece: { x: 0, y: 1900, width: 1080, height: 80 } } });
+  });
+});
+
+/** Every fixture tree the suite parses, with its platform: the WDA sources, the idb dumps, the Compose snapshots and the synthetic uiautomator trees. */
+const everyFixture = async (): Promise<[string, UiNode, 'ios' | 'android'][]> => {
+  const trees: [string, UiNode, 'ios' | 'android'][] = [];
+  for (const f of (await readdir(new URL('../fixtures/', import.meta.url))).filter((f) => f.startsWith('wda-source')).sort()) trees.push([f, parseWdaSource(await fixture(f)), 'ios']);
+  trees.push(['idb continue', await swiftIdb(), 'ios'], ['idb number pad', await idbAt('idb-swift-form-number-pad.json', 'elements'), 'ios']);
+  for (const k of Object.keys(JSON.parse(await fixture('idb-modal-listed-before-content.json')).screens)) trees.push([`idb modal ${k}`, await idbAt('idb-modal-listed-before-content.json', 'screens', k), 'ios']);
+  for (const k of Object.keys(JSON.parse(await fixture('idb-swift-form-scrolled-under-top-bar.json')).positions)) trees.push([`idb top bar ${k}`, await idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', k), 'ios']);
+  for (const k of Object.keys(JSON.parse(await fixture('android-ui-snapshot-compose.json')).screens)) trees.push([`compose ${k}`, await compose(k), 'android']);
+  for (const [k, xml] of Object.entries({ ...COMPOSE, ...CLASSIC_VIEWS, SETTINGS_ROW_SLIVER, SWIFT_ANDROID, SETTINGS_FLUSH, SWIFT_ANDROID_COVERED: swiftAndroid(55, true) })) trees.push([`uiautomator ${k}`, parseDump(xml), 'android']);
+  return trees;
+};
+
+describe('parity — `scroll_until X` then `tap X`: a plain stop that is reachable is a tap at the same centre, unmoved', () => {
+  it('every node of every fixture, on the screen with no band, the status band, and the status band with a navigation band (2154 gesture, 2088 three buttons) — one box, and either way up (a turn suggested, not witnessed)', async () => {
+    let judged = 0;
+    let reachable = 0;
+    const broken: string[] = [];
+    for (const [name, tree, os] of await everyFixture()) {
+      const box: Rect = os === 'ios' ? { x: 0, y: 0, width: 402, height: 874 } : { x: 0, y: 0, width: 1080, height: 2220 };
+      const status = os === 'ios' ? 62 : 66;
+      const bands = [{}, { statusBand: status }, ...(os === 'android' ? [{ statusBand: status, navigationBand: 2154 }, { statusBand: status, navigationBand: 2088 }] : [])];
+      const scene = sceneOf(tree);
+      const turned: Rect = { x: 0, y: 0, width: box.height, height: box.width };
+      for (const band of bands) for (const boxes of [[box], [box, turned]]) {
+        const screen = { box, boxes, ...band };
+        for (const n of everyNode(tree)) {
+          if (n === tree) continue;
+          judged++;
+          const stop = scene.standing(n, screen, PLAIN);
+          if (stop.kind !== 'reachable') continue;
+          reachable++;
+          const tap = scene.standing(n, screen, TAP);
+          if (tap.kind !== 'reachable' || tap.moved !== undefined || tap.at.x !== stop.at.x || tap.at.y !== stop.at.y) {
+            broken.push(`${name} ${JSON.stringify(band)} ${boxes.length} box(es) ${n.role} ${JSON.stringify(n.rect)}: tap ${tap.kind}${tap.kind === 'reachable' && tap.moved !== undefined ? ' moved' : ''}`);
+          }
+        }
+      }
+    }
+    expect(broken).toEqual([]);
+    // Not vacuous: thousands of nodes judged, and most of them reachable.
+    expect(judged).toBeGreaterThan(8000);
+    expect(reachable).toBeGreaterThan(judged / 2);
+  });
+});
+
+describe('Scene.standing for the tap — a keyboard line and a system band together: the moved piece stays out of the band', () => {
+  const covered = (screen: Rect, row: Rect, bar: Rect) => {
+    const r = node({ role: 'button', identifier: 'row', rect: row });
+    return { t: node({ role: 'container', rect: screen, children: [r, node({ role: 'button', identifier: 'bar', rect: bar })] }), r };
+  };
+  it('the status band: a row 30–200 under a bar at 90–140, the keyboard from 170 — the piece 140–170 below the bar, not 30–90 reaching into the band', () => {
+    const { t, r } = covered(box(402, 874), { x: 0, y: 30, width: 402, height: 170 }, { x: 0, y: 90, width: 402, height: 50 });
+    expect(said(sceneOf(t).standing(r, IPHONE, { ...TAP, keyboardTop: 170 }))).toEqual({
+      kind: 'reachable',
+      at: { x: 201, y: 155 },
+      moved: { piece: { x: 0, y: 140, width: 402, height: 30 }, cover: 'bar', aboveKeyboard: true },
+    });
+  });
+  it('the navigation band cuts the piece box (the keyboard line at 2210 lies below it, inert): a row 1900–2220 under a bar at 1950–2130 — what shows above the band is under the minimum: covered, never moved to 2130–2210', () => {
+    const { t, r } = covered(box(1080, 2220), { x: 0, y: 1900, width: 1080, height: 320 }, { x: 0, y: 1950, width: 1080, height: 180 });
+    expect(said(sceneOf(t).standing(r, PIXEL_NAV, { ...TAP, keyboardTop: 2210 }))).toEqual({ kind: 'covered', cover: 'bar', largest: { x: 0, y: 1900, width: 1080, height: 50 } });
+  });
+});
+
+describe('onScreen — the on-screen point rule the tap and the dismissal picker share', () => {
+  const t = node({ role: 'container', rect: box(1080, 2220) });
+  it('inside a box less both system bands; with no screen inside the root rect, or anywhere for a root of no area', () => {
+    expect([onScreen({ x: 540, y: 100 }, t, PIXEL_NAV), onScreen({ x: 540, y: 30 }, t, PIXEL_NAV), onScreen({ x: 540, y: 2190 }, t, PIXEL_NAV), onScreen({ x: 540, y: 2300 }, t, PIXEL_NAV)]).toEqual([true, false, false, false]);
+    expect([onScreen({ x: 540, y: 2300 }, t, undefined), onScreen({ x: 540, y: 2300 }, node({ role: 'container', rect: box(0, 0) }), undefined)]).toEqual([false, true]);
+  });
+});
+
 describe('Scene.standing for the stop — which cover a covered row names', () => {
   const bar = (id: string, y: number) => node({ role: 'button', label: id, identifier: id, rect: { x: 0, y, width: 402, height: 20 } });
   const judged = (purpose: Purpose, ...bars: UiNode[]) => {
@@ -310,7 +551,7 @@ describe('Scene.standing for the stop — under a keyboard line (the WDA band\'s
   const tree = (y: number) => node({ role: 'container', rect: box(402, 874), children: [node({ role: 'button', identifier: 'row', rect: { x: 66, y, width: 336, height: 52 } })] });
   const judged = (y: number, purpose: Purpose, keyboardTop: number) => {
     const t = tree(y);
-    return sceneOf(t).standing(t.children[0], { ...IPHONE, keyboardTop }, purpose);
+    return sceneOf(t).standing(t.children[0], IPHONE, { ...purpose, keyboardTop });
   };
   it('the measured row at 545, partly under the band: a plain stop on its centre, clear above; fully: true clipped at the keyboard\'s edge', () => {
     expect(said(judged(545, PLAIN, 589))).toEqual({ kind: 'reachable', at: { x: 234, y: 571 } });
@@ -329,9 +570,9 @@ describe('Scene.standing for the stop — under a keyboard line (the WDA band\'s
   });
   it('a box that does not start at the origin: the frame runs from its top to the line, and a line at its top leaves nothing', () => {
     const t = tree(545);
-    const shifted = { box: { x: 0, y: 20, width: 402, height: 854 }, statusBand: 62 };
-    expect(sceneOf(t).standing(t.children[0], { ...shifted, keyboardTop: 589 }, FULLY).facts.screen).toEqual({ x: 0, y: 20, width: 402, height: 569 });
-    const nothing = sceneOf(t).standing(t.children[0], { ...shifted, keyboardTop: 20 }, PLAIN);
+    const shifted = { box: { x: 0, y: 20, width: 402, height: 854 }, boxes: [{ x: 0, y: 20, width: 402, height: 854 }], statusBand: 62 };
+    expect(sceneOf(t).standing(t.children[0], shifted, { ...FULLY, keyboardTop: 589 }).facts.screen).toEqual({ x: 0, y: 20, width: 402, height: 569 });
+    const nothing = sceneOf(t).standing(t.children[0], shifted, { ...PLAIN, keyboardTop: 20 });
     expect(said(nothing)).toEqual({ kind: 'underKeyboard', top: 20 });
     // Nothing to judge: no exposure asked, so no minimum piece.
     expect(nothing.facts).toMatchObject({ screen: { x: 0, y: 20, width: 402, height: 0 }, visible: 0 });
@@ -345,7 +586,8 @@ describe('Scene.standing for the stop — under a keyboard line (the WDA band\'s
 describe('Scene.standing for the stop — a box that does not start at the origin', () => {
   it('a centre in the status band quotes the band\'s line, not its height inside the box', () => {
     const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'button', identifier: 'row', rect: { x: 24, y: 10, width: 354, height: 52 } })] });
-    expect(said(sceneOf(t).standing(t.children[0], { box: { x: 0, y: 20, width: 402, height: 854 }, statusBand: 62 }, PLAIN))).toEqual({ kind: 'statusBand', at: { x: 201, y: 36 }, band: 62 });
+    const shifted = { x: 0, y: 20, width: 402, height: 854 };
+    expect(said(sceneOf(t).standing(t.children[0], { box: shifted, boxes: [shifted], statusBand: 62 }, PLAIN))).toEqual({ kind: 'systemBar', at: { x: 201, y: 36 }, bar: { edge: 'top', bottom: 62 } });
   });
 });
 

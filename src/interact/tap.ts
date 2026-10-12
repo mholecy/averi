@@ -37,10 +37,10 @@ export type TapAdapter = KeyboardAdapter;
  * piece large enough to aim at, said in `moved` (the MCP reply puts it after
  * the selector; the flow traces it as `⚠ tap`), or a CoveredRefusal, nothing
  * tapped (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
- * chrome.md: "Tapped" pressed a payment form's pinned CONTINUE). Since
- * 2026-10-10 the same check first refuses a target its scroll container
- * cuts to a strip under that piece's minimum — a ClippedRefusal
- * (resolve.ts#refuseCutSliver), nothing tapped.
+ * chrome.md: "Tapped" pressed a payment form's pinned CONTINUE). The same
+ * check first refuses a target its scroll container cuts to a strip under
+ * that piece's minimum — a ClippedRefusal
+ * (resolve.ts#aimClearOfChrome), nothing tapped.
  *
  * Moved from ui-tree/tap-element.ts on 2026-10-03, where it read the tree
  * once with the adapter's `settle` retry and threw on ambiguity. The poll is
