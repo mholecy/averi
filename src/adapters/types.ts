@@ -59,8 +59,8 @@ export interface DeviceScreen {
    *   the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-
    *   system-status-bar-as-app-screen.md). In an app that keeps clear of
    *   the bar no node lies in the band, so it changes nothing there.
-   * Read by interact/swipe.ts#screenBox, which carries it to the judgements
-   * of a tap point. Cut only from a PORTRAIT box (ui-tree/geometry.ts#belowStatusBand):
+   * Carried to the judgements of a tap point by
+   * ui-tree/standing.ts#UsableScreen. Cut only from a PORTRAIT box (ui-tree/geometry.ts#belowStatusBand):
    * iOS's rule — an iPhone hides its bar in landscape — which Android, whose
    * bar stays at the top in landscape, shares as a stated residual.
    */
@@ -72,7 +72,7 @@ export interface DeviceScreen {
    * `dumpsys window displays` as `statusBand`, ending at the screen's
    * bottom; 2154 on the measured 1080x2220 emulator). Unset when the bar is
    * hidden, at the side (landscape: a residual), or the dump does not say.
-   * Data only: nothing judges it yet.
+   * Carried to ui-tree/standing.ts#UsableScreen; nothing judges it yet.
    */
   navigationBand?: number;
 }
@@ -80,10 +80,10 @@ export interface DeviceScreen {
 /**
  * A screen size that can be divided by, or swiped in: finite and positive on
  * both axes. The one spelling of "this size is usable" — verify/scale.ts's
- * witness and interact/swipe.ts's gesture box both read it (until 2026-10-08
+ * witness and ui-tree/standing.ts#usableScreenOf both read it (until 2026-10-08
  * each had its own copy).
  */
-export const usableScreen = ({ width, height }: { width: number; height: number }): boolean =>
+export const usableSize = ({ width, height }: { width: number; height: number }): boolean =>
   Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
 
 /**

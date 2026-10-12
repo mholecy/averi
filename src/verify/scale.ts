@@ -1,5 +1,5 @@
 import { inferScreenSize, SCREEN_AGREEMENT_PCT, type ScreenSize } from '../ui-tree/geometry.js';
-import { usableScreen, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
+import { usableSize, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * The tree-points → png-pixels scale: THE one owner. Every crop, sample and
@@ -293,7 +293,7 @@ export function windowWidth(
   /** The tree's `inferScreenSize`, when the caller already walked it for this frame (capture.ts). */
   size: ScreenSize = inferScreenSize(tree),
 ): WindowWidth {
-  const witnessed = screen !== undefined && usableScreen(screen) ? screen : undefined;
+  const witnessed = screen !== undefined && usableSize(screen) ? screen : undefined;
   // A1: an Android window beside a left-hand nav bar or cutout starts inset,
   // so the walk calls it a CONTENT width — with the device as witness, and
   // only in the shape `besideSystemBars` admits, it is the window.
@@ -465,7 +465,7 @@ function orient(
   pngHeight: number,
 ): { screen: DeviceScreen; rotated: boolean; rotatedFit: number } | undefined {
   if (screen === undefined) return undefined;
-  if (!usableScreen(screen)) return undefined;
+  if (!usableSize(screen)) return undefined;
   const { width, height } = screen;
   const swapped = { ...screen, width: height, height: width };
   const asIs = axisDisagreement(screen, pngWidth, pngHeight);

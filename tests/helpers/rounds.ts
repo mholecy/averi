@@ -27,7 +27,7 @@ export interface Row {
   found?: readonly UiNode[];
   /** The read failed with this message. */
   error?: string;
-  /** swipe.ts#screenBox's answer this round (`RoundSeen.screen`: the gesture box, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box] }`; `null`: screenBox threw — no box this round, the frame stays. */
+  /** swipe.ts#screenBox's answer this round (`RoundSeen.screen`: the gesture box, `oriented`, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box], oriented: box, from: 'device' }`; `null`: screenBox threw — no box this round, the frame stays. */
   screen?: ScreenBox | null;
   /** The reading's `cover()`: absent for a keyboard hidden or unknown. */
   cover?: KeyboardCover;
@@ -140,7 +140,7 @@ export interface Played {
 export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonly Row[]): Played {
   let state = startRounds(rules, rules.screen);
   const box: Rect = { x: 0, y: 0, ...rules.screen };
-  const asBuilt: ScreenBox = { box, boxes: [box] };
+  const asBuilt: ScreenBox = { box, boxes: [box], oriented: box, from: 'device' };
   const rounds: Played['rounds'] = [];
   let outcome: ScrollOutcome | undefined;
   let stroked: Extract<RoundStep, { do: 'stroke' }> | undefined;

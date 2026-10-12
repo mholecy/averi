@@ -240,8 +240,8 @@ describe('round — the soft keyboard', () => {
     const TURNED: Rect = { x: 0, y: 0, width: 2220, height: 1080 };
     const off: Row = { found: [match({ x: 66, y: 5000, width: 948, height: 73 })] };
     const played = play({ ...ANDROID, maxSwipes: 2 }, [
-      { ...off, screen: { box: TURNED, boxes: [TURNED] } }, // read held sideways
-      { error: 'uiautomator dump returned no XML', screen: { box: SCREEN_1080, boxes: [SCREEN_1080] } }, // unread: the device as built
+      { ...off, screen: { box: TURNED, boxes: [TURNED], oriented: TURNED, from: 'device' } }, // read held sideways
+      { error: 'uiautomator dump returned no XML', screen: { box: SCREEN_1080, boxes: [SCREEN_1080], oriented: SCREEN_1080, from: 'device' } }, // unread: the device as built
       { ...off, screen: null }, // read, but no screen box this round: the frame stays
     ]);
     expect(failureOf(played, 'id:t').message).toMatch(/never intersected the 2220x1080 viewport/);
@@ -967,7 +967,7 @@ describe('round — the flush check across nested clipping containers, and a pro
 
   it('room is judged over the GESTURE box the stroke would be drawn in, not the judged frame: a landscape window crowned as a child turns the gesture box but not the frame — a container below the turned box\'s bottom has no room there, so no probe', () => {
     const PORTRAIT: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
-    const screen = { box: { x: 0, y: 0, width: 2220, height: 1080 }, boxes: [PORTRAIT] }; // swipe.ts#judgedBoxes: turned gesture, panel as built judged
+    const screen: ScreenBox = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/standing.ts#UsableScreen: turned gesture, panel as built judged
     const LOW: Rect = { x: 0, y: 1100, width: 1080, height: 600 };
     const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 1100, width: 948, height: 143 }, 'row')], scroller: LOW, screen }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
@@ -1350,7 +1350,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
 
 describe('round — a target resting in the frame at the edge the strokes push it out through (docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md)', () => {
   /** The iPhone 17 as the iOS adapter reports it: the 62-pt status band (adapters/ios-status-band.ts). */
-  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], statusBand: 62 };
+  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], oriented: IPHONE_BOX, from: 'device', statusBand: 62 };
   const CONTINUE = node({ role: 'button', label: 'Continue to summary', identifier: 'swift_payment.form.continue_button', rect: { x: 24, y: 780, width: 354, height: 44 } });
   /** A read of the SWIFT form with `priority_select` (354x52) at y, on the banded screen, CONTINUE drawn over the rest. */
   const form = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [CONTINUE], screen: BANDED });
@@ -1509,14 +1509,14 @@ describe('round — a target resting in the frame at the edge the strokes push i
   it('a cover is on the far side only in EVERY frame the round judged in, as `beyond` is: either way up, a bar in the upper half of the portrait box lies in the lower half of the landscape one — no turn', () => {
     const portrait = IPHONE_BOX;
     const landscape: Rect = { x: 0, y: 0, width: 874, height: 402 };
-    const screen: ScreenBox = { box: portrait, boxes: [portrait, landscape] };
+    const screen: ScreenBox = { box: portrait, boxes: [portrait, landscape], oriented: portrait, from: 'device' };
     const bar = node({ role: 'other', label: 'Bar', rect: { x: 0, y: 300, width: 402, height: 60 } });
     const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [bar], screen });
     const played = play({ ...IPHONE, fully: true }, [row(320), row(100), row(100)]);
     expect(strokesToward(played)).toEqual(['down']);
     expect(reaches(played)).toEqual([1]);
     // …and with the portrait box alone, the same bar is the far half's: turned.
-    const one = (y: number): Row => ({ ...row(y), screen: { box: portrait, boxes: [portrait] } });
+    const one = (y: number): Row => ({ ...row(y), screen: { box: portrait, boxes: [portrait], oriented: portrait, from: 'device' } });
     expect(strokesToward(play({ ...IPHONE, fully: true }, [one(320), one(100), one(100)]))).toEqual(['up']);
   });
 
@@ -1683,7 +1683,7 @@ describe('round — a target read wholly past the far edge on iOS, and one never
 });
 
 describe('round — a cover the target shows past only on its far side (the round-6b device check\'s S-1 residual: Contacts\' toolbar 5 pt below the row\'s top)', () => {
-  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], statusBand: 62 };
+  const BANDED: ScreenBox = { box: IPHONE_BOX, boxes: [IPHONE_BOX], oriented: IPHONE_BOX, from: 'device', statusBand: 62 };
   /** Contacts' New Contact sheet under idb: `Toolbar` `0,83 402x48`, listed last. */
   const TOOLBAR = node({ role: 'other', label: 'Toolbar', rect: { x: 0, y: 83, width: 402, height: 48 } });
   /** `add url` (362x51 at x 20) at y, the toolbar — or `bar` — drawn over the rest. */

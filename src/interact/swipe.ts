@@ -1,6 +1,7 @@
-import { usableScreen, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
-import { containsPoint, deviceBox, inferScreenSize, rectIntersection, SCREEN_AGREEMENT_PCT, type Edge, type ScreenSize } from '../ui-tree/geometry.js';
+import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
+import { containsPoint, inferScreenSize, rectIntersection, type Edge } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
+import { usableScreenOf, type UsableScreen } from '../ui-tree/standing.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -470,9 +471,12 @@ function keyboardClearance(uncovered: Rect): number {
   return Math.max(from.y, to.y);
 }
 
-/** The box a screen gesture swipes in, and what the caller should say about where it came from. */
-export interface ScreenBox {
-  box: Rect;
+/**
+ * The box a screen gesture swipes in: the usable screen
+ * (ui-tree/standing.ts#UsableScreen — its `oriented` box is the one stroked
+ * in), and what the caller should say about where it came from.
+ */
+export interface ScreenBox extends UsableScreen {
   /**
    * Set when the box is not WITNESSED as the screen held the way it is now:
    * the tree's window stood in for a device size that could not be read, or
@@ -481,140 +485,37 @@ export interface ScreenBox {
    * reply; absent on the ordinary path — a device size and a read tree.
    */
   note?: string;
-  /**
-   * The boxes a point or a rect is judged ON SCREEN in (2026-10-08, the
-   * off-screen tap refusal and its reviews) — read through `judgingScreen`,
-   * the one owner both judges share: the tap's on-screen rule
-   * (interact/resolve.ts#onScreen) and `scroll_until`'s stop
-   * (interact/scroll-rounds.ts#judgeOver, over the frame interact/scroll.ts
-   * reads each round), so the scroll and the tap after it agree on the
-   * screen by construction. A swipe does not read it: a stroke over the
-   * wrong box lands off-centre, a judgement over it is a false refusal or a
-   * false "visible".
-   *
-   * - `[box]` when a window WITNESSED the orientation — the tree has a
-   *   window with its own height (`reliable`, `trustworthyHeight`) matching
-   *   the box side for side, as built or turned, within
-   *   SCREEN_AGREEMENT_PCT — or the box IS the tree's window (the fallback).
-   * - `[box, box turned]` when a turn is SUGGESTED but not witnessed: a
-   *   window's own sides (`ScreenSize.windowLeg`, reliable or not) say the
-   *   panel is turned (its width the long side within 5 %, its height
-   *   within the short side; `judgedBoxes`) — an idb landscape window a straddling card made
-   *   unreliable (probe A), an iPad landscape window (A2) — or the box was
-   *   turned on other evidence: a walked width (the 852-wide walk over a
-   *   393x852 panel that is really portrait, probes E/J), an Android inset
-   *   window beside a nav bar. Inside either counts: refusing on a guessed
-   *   turn would refuse ordinary taps (review B1).
-   * - Otherwise the panel AS BUILT alone, whatever box the gesture uses:
-   *   a portrait window a straddling card made unreliable (the carousel
-   *   case: an item at x 450 of 402 is off screen, scroll_until swipes, the
-   *   tap refuses); a walked extent of any shape (code review round 2: a
-   *   walk is content, and its height never votes — geometry.ts
-   *   #windowTurnsScreen; a carousel walked to x 1500 made the shape vote
-   *   "turned" and brought the carousel case back); a landscape-shaped
-   *   window that fits the panel unturned (a top split-screen pane); a
-   *   child window that matches the panel neither way — an oversized node
-   *   or a banner at the origin crowned as the window, whose turn of the
-   *   gesture box is a swipe's accepted cost and no evidence here.
-   *
-   * Lost, stated: a landscape tree with NO window at all (idb with no
-   * Application node) whose walk the windowless rules cannot turn is judged
-   * on the panel as built, so a point right of x 402 is refused (code review
-   * round 2, P5). An iPad split pane (unmeasured) gets the panel as built.
-   * `judgingScreen`'s `box` is the first of these — what a reply quotes.
-   */
-  boxes: Rect[];
-  /**
-   * The device's `DeviceScreen.statusBand` (adapters/ios-status-band.ts on
-   * iOS; on Android since 2026-10-12, android.ts#parseStatusBand): the band
-   * at the top of a PORTRAIT box whose points a judgement counts as OFF the
-   * screen — the point a tap presses, and `scroll_until`'s stop on it
-   * (ui-tree/geometry.ts#belowStatusBand cuts it). Absent when Android's bar is hidden or its
-   * dump unread, and when the device size could not be read (the tree's
-   * window stands in, and the judgement fails open as the rest of that path
-   * does).
-   */
-  statusBand?: number;
 }
-
-/** The box, its side lengths swapped — the same screen held the other way. */
-export const turnedBox = (b: Rect): Rect => ({ x: b.x, y: b.y, width: b.height, height: b.width });
-
-/** The screen a judgement of "on screen" uses: `ScreenBox.box` (what a reply quotes), `ScreenBox.boxes` (what counts) and `ScreenBox.statusBand` (what of them does not). */
-export interface JudgingScreen {
-  box: Rect;
-  boxes: Rect[];
-  statusBand?: number;
-}
-
-/**
- * `screenBox` for a JUDGEMENT rather than a gesture — the one try/catch the
- * tap's on-screen rule and `scroll_until`'s stop share (review 2026-10-08,
- * item 2: each had its own, with its own turn policy). `undefined` when
- * there is no box at all (no usable device size and no window in the tree);
- * what that means is the caller's: the tap goes ahead (resolve.ts#onScreen
- * falls back to the root rect, then fails open), the scroll keeps the last
- * round's frame (the device as built only when no round had a box).
- * `box` is the first of `boxes` — the box judged first and quoted — which
- * is the panel as built, not the gesture's turned box, when the turn is no
- * evidence (`judgedBoxes`).
- */
-export async function judgingScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<JudgingScreen | undefined> {
-  try {
-    return judgingOf(await screenBox(adapter, read));
-  } catch {
-    return undefined;
-  }
-}
-
-/** The judging screen of a `screenBox` already read — `judgingScreen` without the read, for a caller that also strokes in the box (interact/scroll.ts reads one a round). */
-export const judgingOf = ({ boxes, statusBand }: ScreenBox): JudgingScreen => ({ box: boxes[0], boxes, ...(statusBand !== undefined && { statusBand }) });
 
 /**
  * The screen box a gesture swipes in — the ONE owner, read by `swipeScreen`
  * (the flow's `swipe:` step and the MCP `swipe` tool's `direction`) and by
  * the scroll loop (interact/scroll.ts), so a `swipe: up` and a
  * `scroll_until` to content below draw the same vector on the same screen.
+ * It judges nothing: the box is ui-tree/standing.ts#usableScreenOf's
+ * (`oriented` — the device's screen turned as the tree's window says, else
+ * a window the tree vouches for; the rules are there), and what this adds
+ * is the gesture's own: the note and the throw.
  *
- * The box is the DEVICE's screen, `DeviceAdapter.viewport()` — the only
- * measurement of the screen that does not come from the tree, memoized by
- * the adapter, in the tree's units (types.ts#viewport) — anchored at the
- * origin. Until 2026-10-08 `swipeScreen` took it from the tree
- * (`inferScreenSize`) and ignored its `reliable` flag, while the scroll loop
- * took the device's for the same `swipeVector`: two owners of one box, and
- * the tree one had already been wrong once (the union-of-children rule read
- * the 2026-08-26 WDA sheet as 804x1748; geometry.ts says a device-aware
- * caller should prefer the device), and a tree with no geometry gave a 0×0
- * box — a swipe from (0,0) to (0,0) that every caller reported as done.
+ * Why the device's size and not the tree's: until 2026-10-08 `swipeScreen`
+ * took it from the tree (`inferScreenSize`) and ignored its `reliable`
+ * flag, while the scroll loop took the device's for the same `swipeVector`:
+ * two owners of one box, and the tree one had already been wrong once (the
+ * union-of-children rule read the 2026-08-26 WDA sheet as 804x1748), and a
+ * tree with no geometry gave a 0×0 box — a swipe from (0,0) to (0,0) that
+ * every caller reported as done. The window fallback is kept, rather than
+ * refusing whenever the device is silent, because the gesture's own input
+ * path (`adb shell input`, `idb ui`) can be healthy when the size read is
+ * not — `wm size` output that does not parse, `idb describe` with no
+ * screen_dimensions. Whatever coordinate space the platform's tree uses,
+ * its input uses the same one (taps land on tree rects), so a box oriented
+ * like the window is in the gesture's space. Not measured on a device in
+ * landscape. A tree that could not be read leaves the box as built, with a
+ * note saying so.
  *
- * The tree is read for two things only:
- *
- * - ORIENTATION. The device reports the panel as built; the box is turned
- *   when the tree's window says the screen is held sideways —
- *   ui-tree/geometry.ts#windowTurnsScreen, the one owner of that question (the
- *   window's reach, a left-nav-bar Android window included; never a split
- *   pane that fits the panel unturned). Whatever coordinate space the
- *   platform's tree uses, its input uses the same one (taps land on tree
- *   rects), so a box oriented like the window is in the gesture's space.
- *   Not measured on a device in landscape — and the visibility judgements
- *   that compare rects with `viewport()` (the scroll loop's stop, the
- *   `absent` assert) are not turned; that gap is theirs. A tree that could
- *   not be read leaves the box as built, with a note saying so.
- * - FALLBACK, when the device size cannot be read or is unusable (a 0 or
- *   NaN side): the tree's window, when it is one — `reliable` AND a
- *   window's own height (`trustworthyHeight`; a walked height is the lowest
- *   content edge, which a scroll view inflates without limit). The note
- *   says so. It is kept, rather than refusing whenever the device is
- *   silent, because the gesture's own input path (`adb shell input`,
- *   `idb ui`) can be healthy when the size read is not — `wm size` output
- *   that does not parse, `idb describe` with no screen_dimensions — and on
- *   a root-bearing tree (Android, the WDA/idb Application window) the
- *   window is the screen this function used to swipe in. A tree that is
- *   not reliable is never a box: that is the 0×0 swipe this replaces.
- *
- * With neither, it THROWS, naming both causes; nothing is swiped. `read` is
- * the read the caller already made: `swipeScreen` makes one, the scroll loop
- * hands in its round's.
+ * With no usable screen it THROWS, naming both causes; nothing is swiped.
+ * `read` is the read the caller already made: `swipeScreen` makes one, the
+ * scroll loop hands in its round's.
  */
 export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<ScreenBox> {
   let device: DeviceScreen | undefined;
@@ -629,25 +530,19 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
   const unread = `the UI tree could not be read${read.error !== undefined ? ` (${read.error.message})` : ''}`;
   const size = tree === undefined ? undefined : inferScreenSize(tree);
 
-  // The device, turned as the window says, else a window the tree vouches for (geometry.ts#deviceBox, the one derivation).
-  const screen = deviceBox(device, size);
+  const screen = usableScreenOf(device, size);
   if (screen?.from === 'device') {
-    const { box, sideways } = screen;
-    return {
-      box,
-      ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${box.width}x${box.height}` }),
-      boxes: judgedBoxes(size, screen.device, box, sideways),
-      ...(screen.device.statusBand !== undefined && { statusBand: screen.device.statusBand }),
-    };
+    const { oriented } = screen;
+    return { ...screen, ...(tree === undefined && { note: `${unread}; swiped over the device screen as built, ${oriented.width}x${oriented.height}` }) };
   }
-  if (screen?.from === 'window') {
-    const { box } = screen;
-    return { box, note: `${deviceProblem}; swiped over the UI tree's window, ${box.width}x${box.height}`, boxes: [box] };
+  if (screen !== undefined) {
+    const { oriented } = screen;
+    return { ...screen, note: `${deviceProblem}; swiped over the UI tree's window, ${oriented.width}x${oriented.height}` };
   }
   const treeProblem =
     size === undefined
       ? unread
-      : !usableScreen(size)
+      : !usableSize(size)
         ? 'the UI tree has no geometry'
         : !size.reliable
           ? `the UI tree's ${size.width}x${size.height} is not a window it can vouch for`
@@ -657,59 +552,6 @@ export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: 
       'Check the device answers (`adb shell wm size` / `idb describe`) and retry.',
   );
 }
-
-/**
- * How far a window's width may fall short of (or pass) the panel's long
- * side and still say the screen is turned (review 2026-10-08, round 3): a
- * landscape Application window is often a few percent short of the panel —
- * 852 of 874 is 2.5 % — and the 2 % side-for-side match judged it a
- * crowned child, refusing the right-hand taps B1 had restored. 5 % admits
- * those and none of the crowned shapes pinned (a 500-wide banner, a
- * 1206-wide strip, a 1080x1000 split pane against a 2400-long panel). What
- * it also admits: a node crowned as the window that happens to span the
- * panel's long side within 5 % and no taller than its short side — its
- * judgement counts both ways up (refusals relaxed, never added).
- */
-const TURNED_WIDTH_SLACK_PCT = 5;
-
-/** A window's own sides say the panel is turned: width the turned panel's within TURNED_WIDTH_SLACK_PCT, height within its height (SCREEN_AGREEMENT_PCT of slack) — a window may be short, never taller. */
-const turnedWindow = (size: { width: number; height: number }, panelTurned: { width: number; height: number }): boolean =>
-  Math.abs(size.width - panelTurned.width) <= (panelTurned.width * TURNED_WIDTH_SLACK_PCT) / 100 &&
-  size.height <= panelTurned.height * (1 + SCREEN_AGREEMENT_PCT / 100);
-
-/**
- * The boxes a judgement counts (`ScreenBox.boxes`; the rule is there),
- * given the tree's size, the panel as built, the gesture's box and whether
- * that box was turned:
- * - witnessed — a window with its own height matching `box` side for side:
- *   `[box]`;
- * - a window's own sides (`windowLeg`, reliable or not — never a walked
- *   extent, whose height is a content maximum) saying TURNED: its width
- *   the panel's long side within TURNED_WIDTH_SLACK_PCT, its height within
- *   the panel's short side (`turnedWindow`) — a turn suggested,
- *   `[box, box turned]` (an idb landscape window a straddling card made
- *   unreliable, an iPad landscape window, either a few percent short of
- *   the panel: 874x380 and 852x402 on 402x874, 1180x800 on 820x1180);
- * - the box turned on other evidence (a walked width, an inset window) and
- *   NOT by a child window that matches neither way — an oversized node
- *   crowned as the window, a banner at the origin, whose turn is a swipe's
- *   accepted cost and no evidence for a judgement: suggested too;
- * - otherwise the panel as built alone — whatever box the gesture uses. A
- *   landscape-shaped window that fits the panel unturned (a top split-screen
- *   pane) or a landscape-shaped walk suggests nothing.
- */
-function judgedBoxes(size: ScreenSize | undefined, device: DeviceScreen, box: Rect, sideways: boolean): Rect[] {
-  if (size !== undefined && size.reliable && size.trustworthyHeight && sameSides(size, box)) return [box];
-  const panelTurned = { width: device.height, height: device.width };
-  const windowSaysTurned = size?.windowLeg !== undefined && turnedWindow(size, panelTurned);
-  const crownedChild = size?.windowLeg === 'child' && !windowSaysTurned;
-  if (windowSaysTurned || (sideways && !crownedChild)) return [box, turnedBox(box)];
-  return [{ x: 0, y: 0, width: device.width, height: device.height }];
-}
-
-/** The window and the box agree side for side, within SCREEN_AGREEMENT_PCT — the window IS the screen, held the way the box is. */
-const sameSides = (a: { width: number; height: number }, b: { width: number; height: number }): boolean =>
-  Math.abs(a.width - b.width) <= (b.width * SCREEN_AGREEMENT_PCT) / 100 && Math.abs(a.height - b.height) <= (b.height * SCREEN_AGREEMENT_PCT) / 100;
 
 export interface SwipeOptions {
   direction: Direction;
@@ -738,8 +580,8 @@ export async function swipeScreen(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe'>,
   opts: SwipeOptions,
 ): Promise<ScreenSwipe> {
-  const { box, note } = await screenBox(adapter, await readTreeOrError(adapter));
-  const { from, to } = swipeVector(box, opts.direction, opts.meaning);
+  const { oriented, note } = await screenBox(adapter, await readTreeOrError(adapter));
+  const { from, to } = swipeVector(oriented, opts.direction, opts.meaning);
   const times = opts.times ?? 1;
   for (let i = 0; i < times; i++) await adapter.swipe(from, to, opts.durationMs);
   return { from, to, ...(note !== undefined && { note }) };

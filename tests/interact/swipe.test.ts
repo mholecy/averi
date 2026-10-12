@@ -61,6 +61,7 @@ describe('swipeScreen — one table, two meanings', () => {
   });
 });
 
+/** The box's derivation is ui-tree/standing.ts#usableScreenOf's (tests/ui-tree/standing.test.ts); what stays here is the swipe drawn over it, its note and its throw. */
 describe('screenBox — the device screen is the box a gesture swipes in (2026-10-08)', () => {
   it('swipes over the DEVICE size, not the tree root, when the two differ (an Android window short of the nav bar)', async () => {
     // The tree's root is the app window above a nav bar; the device is the panel.
@@ -73,11 +74,6 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     const fake = device(node({ rect: { x: 0, y: 0, width: 2400, height: 1080 } }), { width: 1080, height: 2400 });
     await swipeScreen(fake, { direction: 'left', meaning: 'finger' });
     expect(fake.swipes).toEqual([{ from: { x: 1920, y: 540 }, to: { x: 480, y: 540 } }]);
-  });
-
-  it('does not turn it for a landscape-SHAPED window that fits the screen unturned (a top split-screen pane)', async () => {
-    const fake = device(node({ rect: { x: 0, y: 0, width: 1080, height: 1000 } }), { width: 1080, height: 2400 });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 1080, height: 2400 });
   });
 
   it('a tree that cannot be read loses only the orientation witness: the device box still stands, and the note says so', async () => {
@@ -105,17 +101,6 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     }
   });
 
-  it("an inset window whose REACH runs past the turned panel witnesses nothing — its left edge counts", async () => {
-    // 2274 wide fits 2400, but starting at 300 it ends at 2574: no window on this panel.
-    const fake = device(node({ rect: { x: 300, y: 0, width: 2274, height: 1080 } }), { width: 1080, height: 2400, windowsBesideSystemBars: true });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 1080, height: 2400 });
-  });
-
-  it('an inset rect in an iOS tree is content, never a window: it turns nothing', async () => {
-    const fake = device(node({ rect: { x: 126, y: 0, width: 2274, height: 1080 } }), { width: 1080, height: 2400 });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 1080, height: 2400 });
-  });
-
   it('a WALKED height never votes: a landscape tree whose rows run to y=3000 still turns the panel, by its width (orient\'s incident)', async () => {
     // No window rect (a rectless root over rows): the walk answers 852 wide —
     // reliable — and 3000 tall, a content maximum that fits no panel.
@@ -126,28 +111,6 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     const fake = device(rows, { width: 393, height: 852 });
     await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
     expect(fake.swipes).toEqual([{ from: { x: 426, y: 315 }, to: { x: 426, y: 79 } }]); // 852x393, not 393x852's (197,682)→(197,170)
-  });
-
-  it('a walked width that fits the panel as built does not turn it (the split-pane guard, by width), nor one that fits it neither way', async () => {
-    const rows = node({
-      rect: { x: 0, y: 0, width: 0, height: 0 },
-      children: [node({ rect: { x: 0, y: 100, width: 393, height: 44 } }), node({ rect: { x: 0, y: 2956, width: 393, height: 44 } })],
-    });
-    const fake = device(rows, { width: 393, height: 852 });
-    expect((await screenBox(fake, { tree: rows })).box).toEqual({ x: 0, y: 0, width: 393, height: 852 });
-    // …nor does one too wide for the panel either way: no window on this screen.
-    const wide = node({ rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ rect: { x: 0, y: 100, width: 1800, height: 44 } })] });
-    expect((await screenBox(device(wide, { width: 393, height: 852 }), { tree: wide })).box).toEqual({ x: 0, y: 0, width: 393, height: 852 });
-  });
-
-  it('rounding slack: a landscape window 1% past the turned panel still turns it', async () => {
-    const fake = device(node({ rect: { x: 0, y: 0, width: 2424, height: 1091 } }), { width: 1080, height: 2400 });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 2400, height: 1080 });
-  });
-
-  it('a window too TALL for the turned panel does not turn it (1200x1200 on 1080x2400 fits neither way)', async () => {
-    const fake = device(node({ rect: { x: 0, y: 0, width: 1200, height: 1200 } }), { width: 1080, height: 2400 });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 1080, height: 2400 });
   });
 
   it('an unreadable device size falls back to a reliable tree window, and says so', async () => {
@@ -209,12 +172,6 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     await expect(screenBox(device(screen(), new Error('device offline')), { error: new Error('null root node') })).rejects.toThrow(
       'No screen box to swipe in: the device screen size could not be read (device offline), and the UI tree could not be read (null root node) — nothing was swiped.',
     );
-  });
-
-  it('an unreliable tree is no orientation witness: a CONTENT extent that would fit the panel sideways does not turn it', async () => {
-    const inset = node({ rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ rect: { x: 50, y: 0, width: 2350, height: 1000 } })] });
-    const fake = device(inset, { width: 1080, height: 2400 });
-    expect((await screenBox(fake, { tree: inset })).box).toEqual({ x: 0, y: 0, width: 1080, height: 2400 });
   });
 
   it('scroll_until draws the same stroke as a swipe: over the same box, turned the same way (content below = finger up)', async () => {

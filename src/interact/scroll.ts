@@ -34,7 +34,7 @@ export interface ScrollOptions {
  * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
  * adapter can scroll, and a reader sees what a scroll can touch. Every
  * reader the driver hands it to takes a `Pick` of its own
- * (`readTreeOrError`, `judgingScreen`, `screenBox`, `readKeyboard`).
+ * (`readTreeOrError`, `screenBox`, `readKeyboard`).
  */
 export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed'>;
 
@@ -104,10 +104,10 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * quoting the read error. Landscape: since 2026-10-08 the judgement, the
  * band's `above` box and the stroke all use the round's `screenBox` box —
  * turned when the tree's window says so — the screen the tap's on-screen
- * rule judges too (resolve.ts#tapScreen); the band's frame is the oracle's
- * or the tree's, in the tree's coordinates already. The whole-screen
- * judgement runs over `ScreenBox.boxes` through `judgingScreen`, the tap's
- * own reader — both ways up (the better of the two) only when a turn is
+ * rule judges too (ui-tree/standing.ts#usableScreen); the band's frame is
+ * the oracle's or the tree's, in the tree's coordinates already. The
+ * whole-screen judgement runs over the usable screen's `boxes`, the tap's
+ * own — both ways up (the better of the two) only when a turn is
  * suggested but not witnessed — so the stop and the tap agree by
  * construction; the band's `above` box stays the chosen one. Unmeasured on
  * a device held sideways.
