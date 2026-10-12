@@ -366,6 +366,9 @@ export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, 
 /** Where a node clipped out past each side of its container lies; the scroll_until direction that brings it back is swipe.ts#REVEALS'. */
 const CLIPPED_OUT_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'left of', right: 'right of' };
 
+/** The same sides as `CLIPPED_OUT_WHERE`, standing alone: `if it lies above` (`untriedSideText`). */
+const LIES_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'to the left', right: 'to the right' };
+
 /**
  * Where a node read wholly past `side` lies — `clipped out above its scroll
  * container` when Android dumped it so (UiNode.clippedOut), `above the
@@ -382,8 +385,7 @@ export const revealText = (side: Edge): string => `scroll_until it with directio
 
 /** The direction to try for a target that may lie past `side` and was never read there: `if it lies above, try direction: "up"`. */
 export function untriedSideText(side: Edge): string {
-  const where: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'to the left', right: 'to the right' };
-  return `if it lies ${where[side]}, try direction: "${REVEALS[side]}"`;
+  return `if it lies ${LIES_WHERE[side]}, try direction: "${REVEALS[side]}"`;
 }
 
 /**
