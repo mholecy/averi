@@ -1,11 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, rectIntersection, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
-import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
+import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { el, FakeAdapter, node, screen } from '../helpers/fake.js';
@@ -265,28 +265,30 @@ const idb = (y: number): KeyboardLine => ({ y, source: 'idb-band', witnessed: fa
 const FULLY = { of: 'stop', fully: true } as const;
 
 /** A standing's kind with the fact its sentence quotes, as one plain value. */
-const said = (s: Standing): unknown => {
+const said = (s: Standing | PixelStanding): unknown => {
   switch (s.kind) {
     case 'reachable':
-      return { kind: s.kind, at: s.at, ...(s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
+      return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
     case 'offScreen':
       return { kind: s.kind, at: s.at, visible: s.visible };
     case 'systemBar':
-      return { kind: s.kind, at: s.at, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
+      return { kind: s.kind, at: s.at, bar: s.bar, ...('band' in s && { band: s.band }) };
     case 'clipped':
       return { kind: s.kind, edges: s.edges };
     case 'cut':
-      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }), ...(s.bar !== undefined && { bar: s.bar, container: s.cut.container }) };
+      // The pixel's own cut: at a bar, in the scroller flush with it.
+      if (!('cut' in s)) return { kind: s.kind, bar: s.bar, container: s.container };
+      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }) };
     case 'covered':
       return {
         kind: s.kind,
         cover: s.cover.identifier ?? s.cover.label,
-        ...(s.largest !== undefined && { largest: s.largest }),
-        ...(s.reach !== undefined && { reach: s.reach }),
-        ...(s.overRoot === true && { overRoot: true }),
+        ...('largest' in s && s.largest !== undefined && { largest: s.largest }),
+        ...('reach' in s && { reach: s.reach }),
+        ...('overRoot' in s && s.overRoot === true && { overRoot: true }),
       };
     case 'underKeyboard':
-      return { kind: s.kind, top: s.line.y, source: s.line.source, ...(s.band !== undefined && { band: s.band }) };
+      return { kind: s.kind, top: s.line.y, source: s.line.source, ...('band' in s && { band: s.band }) };
   }
 };
 
@@ -472,8 +474,8 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
 });
 
 /** The pixel assert's purposes over `n`: the ocr crop (the whole rect, read as glyphs) and the colour sample (inset 12 % a side, verify/color-parity.ts#colorSampleRect). */
-const OCR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
-const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => {
+const OCR = (n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
+const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => {
   const { x, y, width, height } = n.rect;
   return { of: 'pixel', reads: { x: x + width * 0.12, y: y + height * 0.12, width: width * 0.76, height: height * 0.76 }, glyphs: false, ...(keyboardTop !== undefined && { keyboardTop }) };
 };
@@ -500,11 +502,11 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     ['…its text "Loan repayment" 254,2199 298x21 wholly in the band', () => compose('accountDetailTop'), 'Loan repayment@2199', PIXEL_NAV, OCR, { kind: 'systemBar', at: { x: 403, y: 2210 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…with no navigation band read (an immersive app): measured', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL, OCR, { kind: 'reachable', at: { x: 540, y: 2186 } }],
     // D7 (N-b, owner: ocr only): the Settings title 198,2105 428x49 ends on the band's top, its list too — the crop may read it cut.
-    ['Settings title flush with the band in a list flush with it, ocr: cut at the navigation bar', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, OCR, { kind: 'cut', edge: 'bottom', depth: 49, bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 596, width: 1080, height: 1558 } }],
+    ['Settings title flush with the band in a list flush with it, ocr: cut at the navigation bar', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, OCR, { kind: 'cut', bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 596, width: 1080, height: 1558 } }],
     ['…colour: measured on what shows (D5)', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, COLOUR, { kind: 'reachable', at: { x: 412, y: 2130 } }],
     ['…no navigation band (an immersive app): measured', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL, OCR, { kind: 'reachable', at: { x: 412, y: 2130 } }],
     // Contacts' Create contact: "Add fields" 198,2106 180x48 flush with the form's scroller 0,242 1080x1912, which ends at 2154.
-    ['contactsCreateStaged "Add fields", ocr: cut at the navigation bar', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, OCR, { kind: 'cut', edge: 'bottom', depth: 48, bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 242, width: 1080, height: 1912 } }],
+    ['contactsCreateStaged "Add fields", ocr: cut at the navigation bar', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, OCR, { kind: 'cut', bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 242, width: 1080, height: 1912 } }],
     // A non-edge-to-edge app's pinned bottom bar ends at 2154 too, in no scroller: measured.
     ['a pinned bottom bar ending at the band, in no scroller, ocr: measured', async () => parseDump(PINNED_BOTTOM_BAR), 'bottom_bar', PIXEL_NAV, OCR, { kind: 'reachable', at: { x: 540, y: 2077 } }],
     ['…its title flush with it too: measured', async () => parseDump(PINNED_BOTTOM_BAR), 'bar_title', PIXEL_NAV, OCR, { kind: 'reachable', at: { x: 540, y: 2127 } }],
@@ -797,6 +799,21 @@ describe('Scene.standing for the stop — a box that does not start at the origi
     const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'button', identifier: 'row', rect: { x: 24, y: 10, width: 354, height: 52 } })] });
     const shifted = { x: 0, y: 20, width: 402, height: 854 };
     expect(said(sceneOf(t).standing(t.children[0], { box: shifted, boxes: [shifted], statusBand: 62 }, PLAIN))).toEqual({ kind: 'systemBar', at: { x: 201, y: 36 }, bar: { edge: 'top', bottom: 62 } });
+  });
+});
+
+describe('Scene.standing — the purpose names the answer\'s union', () => {
+  it('the pixel purpose answers a PixelStanding (its band, bar and reach always there, its own cut at a bar); the tap and the stop a Standing', () => {
+    const root = node({ rect: box(402, 874) });
+    const scene = sceneOf(root);
+    expectTypeOf(scene.standing(root, undefined, { of: 'pixel', reads: root.rect, glyphs: true })).toEqualTypeOf<PixelStanding>();
+    expectTypeOf(scene.standing(root, undefined, PLAIN)).toEqualTypeOf<Standing>();
+    expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<Standing>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'cut' }>['bar']>().toEqualTypeOf<{ readonly edge: 'bottom'; readonly top: number }>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'covered' }>['reach']>().toEqualTypeOf<Rect>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'systemBar' }>['band']>().toEqualTypeOf<Rect>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'underKeyboard' }>['band']>().toEqualTypeOf<Rect>();
+    expectTypeOf<PixelStanding['kind']>().toEqualTypeOf<'reachable' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
   });
 });
 
