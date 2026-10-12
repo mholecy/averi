@@ -7,16 +7,36 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 /** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
 export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
+/** What one side of a rect means to a scroll and to a sentence (`SIDES`). */
+export interface SideWords {
+  /**
+   * The `scroll_until` direction (where the content lies) that reveals what
+   * lies past this edge: content beyond the top lies up, and so on — read by
+   * `scroll_until`'s probe and its stroke toward a cut edge
+   * (scroll-rounds.ts), by the tap's cut-sliver remedy (resolve.ts#cutRemedy,
+   * which `scroll_until`'s sliver failures quote) and by the hints for a node
+   * past a side (resolve.ts#revealText, #untriedSideText).
+   */
+  readonly reveals: Direction;
+  /** Where a node past this edge lies, before what it lies past: `clipped out above its scroll container`, `left of the viewport` (resolve.ts#pastSideText, #zeroAreaHint). */
+  readonly past: string;
+  /** The same side standing alone: `if it lies to the left` (resolve.ts#untriedSideText). */
+  readonly lies: string;
+}
+
 /**
- * The `scroll_until` direction (where the content lies) that reveals what
- * lies past each EDGE of a rect: content beyond the top lies up, and so on.
- * One map (code review of round 7, S7: it was spelled three times) — read by
- * `scroll_until`'s probe and its stroke toward a cut edge
- * (scroll-rounds.ts), by the tap's cut-sliver remedy (resolve.ts#cutRemedy,
- * which `scroll_until`'s sliver failures quote) and by the wait's hint for a
- * node clipped out past its container (resolve.ts#zeroAreaHint).
+ * Each EDGE of a rect's words — one table, a field per use (code review of
+ * round 8, S6: `REVEALS` here and resolve.ts's `CLIPPED_OUT_WHERE` and
+ * `LIES_WHERE` were three switches over the same four sides; `REVEALS` was
+ * already one map for what code review of round 7, S7, found spelled three
+ * times).
  */
-export const REVEALS: Readonly<Record<Edge, Direction>> = { top: 'up', bottom: 'down', left: 'left', right: 'right' };
+export const SIDES: Readonly<Record<Edge, SideWords>> = {
+  top: { reveals: 'up', past: 'above', lies: 'above' },
+  bottom: { reveals: 'down', past: 'below', lies: 'below' },
+  left: { reveals: 'left', past: 'left of', lies: 'to the left' },
+  right: { reveals: 'right', past: 'right of', lies: 'to the right' },
+};
 
 /**
  * Which thing `direction` names. A `swipe:` step names the FINGER's movement
