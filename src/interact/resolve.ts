@@ -675,13 +675,13 @@ export class CoveredRefusal extends PresentElementRefusal {}
 
 /**
  * The target resolved, settled, lies on screen, but it is CUT to a sliver by
- * its scroll container's edge (the owner's decision: refuse). Measured on
+ * its scroll container's edge: refused (ADR 0013). Measured on
  * mp-native's SWIFT form (Android): the "Payment details" toggle, 132 px
  * tall, read `66,1924 948x55` at the form's bottom edge (1978); the tap went to (540,1952), "Tapped" was reported, and
  * the section did not expand — nor for hand taps on the strip. Nothing is
  * tapped. The covered sliver's sibling (CoveredRefusal): what shows is cut
  * by a clip, not by a node drawn over it, and refused by the same minimum.
- * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
+ * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md
  */
 export class ClippedRefusal extends PresentElementRefusal {}
 
