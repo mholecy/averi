@@ -713,7 +713,8 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * edge (round 8): one flush with it inside a sliver cut there is refused
  * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured at
  * 35d5997, the toggle's leaf label "Payment details", tapped as the hint
- * then said, did nothing). Only nodes under a
+ * then said, did nothing) — whose own way past names what it lies in:
+ * something in THAT clear of the edge. Only nodes under a
  * clipping ancestor (UiNode.clipsDescendants, Android's) are asked: an iOS
  * tree has none, so this never refuses there. Applied inside the chrome
  * check rather than beside the on-screen rule (keyboard.ts) because the
@@ -722,12 +723,16 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * the tree (geometry.ts#clipsOf), and a subtree per flush edge of the node
  * and of each ancestor shallower than the minimum it inherits through.
  */
+/** The way past a cut the node's own content evidences, should it only READ cut (geometry.ts#evidentCut's residual). */
+const OWN_CUT_WAY_PAST = 'if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates';
+/** The way past a cut inherited from what the node lies in (`Cut.within`, round 8): the evidence is that ancestor's, so its "whole" case is that ancestor's. */
+const INHERITED_CUT_WAY_PAST =
+  'if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates';
+
 function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: number, sent?: string): void {
   const cut = clipsOf(tree).cutSliver(node, minPiece);
   if (cut === undefined) return;
-  const finding =
-    `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} ` +
-    `(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)`;
+  const finding = `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
   const what = describeTarget(target);
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }

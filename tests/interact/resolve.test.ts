@@ -1059,7 +1059,7 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     expect((error as Error).message).toBe(
       'label:"Payment details" is cut at its scroll container\'s bottom edge (container 0,242 1080x1736), as is the 66,1924 948x55 it lies in; ' +
         'only a 948x42 part of it shows, 42 deep across that edge, under the 65 a tap needs — scroll_until it first' +
-        ' (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates); nothing was tapped',
+        ' (if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates); nothing was tapped',
     );
     await expect(tapElement(fake, 'id:chevron', OPTS)).rejects.toBeInstanceOf(ClippedRefusal);
     expect(fake.tapPoints).toEqual([]);
