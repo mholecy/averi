@@ -2204,8 +2204,8 @@ flows:
           action: '✗ tap id:"promo_close"',
           detail:
             'failed — optional step not skipped: its element is present, but the tap was refused — ' +
-            'id:"promo_close" is under iOS\'s status bar at (940,30), in the top 62 pt of the screen, where a tap goes to the status bar (rect 900,10 80x40) — ' +
-            'it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else; nothing was tapped',
+            'id:"promo_close" is under the status bar at (940,30) — the screen\'s top 62, where a tap goes to the status bar (rect 900,10 80x40) — ' +
+            'it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a layout that does not keep clear of it?) — fix the layout, or tap something else; nothing was tapped',
         },
       ]);
       expect(fake.taps).toEqual([]);
@@ -3338,9 +3338,9 @@ flows:
         action: '✗ tap id:"login_submit"',
         detail:
           'failed — optional step not skipped: its element is present, but the tap was refused — ' +
-          'id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is under iOS\'s status bar at (249,50), ' +
-          'in the top 62 pt of the screen, where a tap goes to the status bar (rect 99,0 300x100) — it lies in no scroll view, so no scroll moves it out: ' +
-          'it is pinned under the status bar (a layout that ignores the safe area?) — fix the layout, or tap something else',
+          'id:"login_submit" was not tapped: after back was pressed to hide the soft keyboard, it is under the status bar at (249,50) — ' +
+          'the screen\'s top 62, where a tap goes to the status bar (rect 99,0 300x100) — it lies in no scroll view, so no scroll moves it out: ' +
+          'it is pinned under the status bar (a layout that does not keep clear of it?) — fix the layout, or tap something else',
       },
     ]);
     expect(fake.taps).toEqual([]);

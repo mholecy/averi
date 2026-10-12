@@ -33,6 +33,8 @@ const GET_STATE_TIMEOUT_MS = 5_000;
 const KEYBOARD_QUERY_TIMEOUT_MS = 2_000;
 /** The same reasoning for the independent witness (keyboardWitness): past it, `unknown`. */
 const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
+/** The same reasoning for the status band beside the screen size (statusBand): past it, no band. */
+const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
 
 /** A refusal's lines as the messages below quote them: `<command> said: a / b`. */
 function startSaid(refused: StartRefused): string {
@@ -447,17 +449,66 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.shell(['input', 'tap', String(x), String(y)]);
   }
 
+  /**
+   * The screen: `wm size`, then — only once that has read — the status
+   * band (`statusBand`, a second adb call). Both are ONE memo
+   * (viewport-memo.ts): read once per adapter, and again on
+   * `viewport({ fresh: true })`.
+   *
+   * Memoized, the band included — the choice, stated (2026-10-12). The band
+   * CAN change under a session: an immersive or full-screen app (a video
+   * player, a game, a camera) hides the status bar, and the bar comes back
+   * with the next app. Read per call instead, it would cost one more adb
+   * call (18–37 ms through execFile, keyboardState's figures) on every
+   * `viewport()` — every tap's on-screen rule and every `scroll_until`
+   * round — where the keyboard guard already spends one. What the memo
+   * costs, and why it is safe enough:
+   * - a bar HIDDEN since the read: the band is stale, so a point in the top
+   *   of the screen is judged off it. A tap there is refused only after the
+   *   refusal path's own fresh read (resolve.ts#refuseOffScreen re-reads
+   *   with `{ fresh: true }`), which sees the bar gone and taps — so the
+   *   tap is right; `scroll_until` reads the memo, so it strokes on, or
+   *   fails naming the status bar, for a target the app shows at the very
+   *   top — a refusal, never a false "visible";
+   * - a bar SHOWN since a read that found none: no band until the next fresh
+   *   read — a point under the bar is judged on the screen, as before the
+   *   band existed (fail open).
+   */
   private readonly viewportMemo = new ViewportMemo(async () => {
     const { stdout } = await this.shell(['wm', 'size']);
     const raw = stdout.toString('utf8');
     // "Physical size: 1080x2280", optionally overridden ("Override size: ...")
     const m = raw.match(/Override size:\s*(\d+)x(\d+)/) ?? raw.match(/Physical size:\s*(\d+)x(\d+)/);
     if (!m) throw new Error(`Cannot parse wm size output: ${raw.slice(0, 120)}`);
+    const band = await this.statusBand();
     // An Android app window may sit beside a side nav bar or a cutout (types.ts#DeviceScreen).
-    return { width: Number(m[1]), height: Number(m[2]), windowsBesideSystemBars: true };
+    return { width: Number(m[1]), height: Number(m[2]), windowsBesideSystemBars: true, ...(band !== undefined && { statusBand: band }) };
   });
 
-  /** Screen size in device pixels — the units uiautomator bounds use. Memoized: types.ts#viewport. */
+  /**
+   * The VISIBLE system status bar's height (types.ts#DeviceScreen.statusBand,
+   * 2026-10-12): `dumpsys window displays`, read by parseStatusBand below —
+   * the call keyboardState makes, whose cost is written there. An app that
+   * draws edge-to-edge (Google Contacts, measured: its list and its
+   * collapsing app bar start at y 0) has nodes under the bar, and a tap on
+   * one goes to the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-
+   * treat-the-system-status-bar-as-app-screen.md). Reported whatever the
+   * app: in an app that does not draw under the bar no node lies in the band,
+   * so it changes nothing there.
+   *
+   * FAILS OPEN, as keyboardState does: any failure of the call, or a dump
+   * that does not say one visible bar, is no band — the judgements behave as
+   * before the band existed. The size's own failure is still the screen's.
+   */
+  private async statusBand(): Promise<number | undefined> {
+    try {
+      return parseStatusBand((await this.shell(['dumpsys', 'window', 'displays'], { timeoutMs: STATUS_BAND_QUERY_TIMEOUT_MS })).stdout.toString('utf8'));
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Screen size in device pixels — the units uiautomator bounds use, and the status band. Memoized: types.ts#viewport, and the memo's choice above. */
   viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
     return this.viewportMemo.get(opts);
   }
@@ -833,6 +884,8 @@ export function parseTouchableRegion(out: string): readonly Rect[] | undefined {
 const INSETS_SOURCE_LINE_RE = /^[ \t]*InsetsSource (.*)$/gm;
 /** The IME's insets type: `ITYPE_IME` up to Android 13, `ime` (WindowInsets.Type.toString) from 14. */
 const IME_INSETS_TYPES = new Set(['ITYPE_IME', 'ime']);
+/** The status bar's insets type: `ITYPE_STATUS_BAR` up to Android 13, `statusBars` from 14 (both in the real dumps, tests/fixtures). */
+const STATUS_BAR_INSETS_TYPES = new Set(['ITYPE_STATUS_BAR', 'statusBars']);
 /**
  * A screen rect as Android prints it everywhere — `[l,t][r,b]`, in a
  * uiautomator `bounds` attribute and in an InsetsSource `frame=` alike. ONE
@@ -948,6 +1001,47 @@ export function parseImeInsets(dump: string): SoftKeyboard {
   const rect = parseBounds(entry);
   if (rect.width <= 0 || rect.height <= 0 || showing === 'false') return unknown;
   return { state: 'shown', frame: rect };
+}
+
+/**
+ * The VISIBLE system status bar's height, in screen pixels, out of `dumpsys
+ * window displays` (2026-10-12) — the band at the top of the screen a tap
+ * goes to the bar in (types.ts#DeviceScreen.statusBand). The line it reads
+ * is the display's InsetsState entry for the status bar, the same list
+ * parseImeInsets reads (and with the same anchored tokens):
+ *
+ *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, measured
+ *   2026-10-03, emulator Pixel_3a, 1080x2220; the device check of
+ *   2026-10-10 read the same line under Google Contacts):
+ *     InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
+ *   API 36 (…-api36-no-ime-source.txt, Pixel_4 AVD, 1080x2280):
+ *     InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null
+ *
+ * The band is the frame's BOTTOM, of a frame that starts at the screen's
+ * top and is not empty. Not measured: a hidden bar (an immersive app) —
+ * read by `visible=false`, as a hidden keyboard is, so no band; a
+ * landscape screen, whose bar is still at the top (and interact/ cuts no
+ * band in landscape — swipe.ts#belowStatusBand, a residual stated there).
+ *
+ * Never guesses — no band (the judgements fail open, as before 2026-10-12)
+ * on: no status-bar entry; one that does not read fully (type, frame,
+ * visible); a hidden one; an empty frame or one below the top; several
+ * entries (one per display) that do not all say the same band — the
+ * multi-display case parseImeInsets refuses alike.
+ */
+export function parseStatusBand(dump: string): number | undefined {
+  /** What each status-bar entry says: its band, or 'none' (hidden, unread, empty, not at the top). */
+  const entries = new Set<number | 'none'>();
+  for (const [, body] of dump.matchAll(INSETS_SOURCE_LINE_RE)) {
+    const type = body.match(INSETS_TYPE_RE)?.[1];
+    if (type === undefined || !STATUS_BAR_INSETS_TYPES.has(type)) continue;
+    const frame = body.match(INSETS_FRAME_RE)?.[1];
+    const visible = body.match(INSETS_VISIBLE_RE)?.[1];
+    const rect = frame === undefined ? undefined : parseBounds(frame);
+    entries.add(rect === undefined || visible !== 'true' || rect.y !== 0 || rect.width <= 0 || rect.height <= 0 ? 'none' : rect.height);
+  }
+  const [band] = entries;
+  return entries.size === 1 && band !== 'none' ? band : undefined;
 }
 
 interface RawNode {

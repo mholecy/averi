@@ -29,6 +29,9 @@ const touchable = "adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w
 // asked once per adapter, after the first settle, before the keyboard — the adapter memoizes it.
 const wmSize = 'adb -s emulator-5554 shell wm size';
 const PHYSICAL = 'Physical size: 1080x2220\n';
+// The status band, read with the screen size and memoized with it (2026-10-12, android.ts#statusBand): the same
+// `dumpsys window displays` as the keyboard's query, asked once after `wm size` — these dumps hold no status bar, so no band.
+const band = query;
 
 const hierarchy = (nodes: string) => `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy rotation="0">
@@ -61,7 +64,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
     // The witness is asked ONCE, right before the key, and not again for the check after it.
-    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
+    expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
     expect(note).toBe('the soft keyboard covered id:login_submit; hidden before tapping');
   });
 
@@ -79,13 +82,14 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       calls.push(full);
       const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
       if (full.includes('uiautomator dump')) return out(tree);
-      if (full.includes('dumpsys window displays')) return out(++windowQueries <= 2 ? stale : caughtUp);
+      // The first read is the status band's, with the screen size (2026-10-12); the keyboard's two after it are stale.
+      if (full.includes('dumpsys window displays')) return out(++windowQueries <= 3 ? stale : caughtUp);
       if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(false));
       if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
     const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
-    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, query, touchable, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
+    expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, query, touchable, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
     expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
   });
 
@@ -113,7 +117,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
     const { note } = await tapElement(adapter, 'id:message_for_payee_input', { ambiguous: 'refuse', pollMs: 1 });
     // Until 2026-10-08: [dump, dump, wmSize, query, tap 540 1586] — Gboard's `d` key, typed into the IBAN field.
-    expect(calls).toEqual([dump, dump, wmSize, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 540 1586']);
+    expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 540 1586']);
     expect(note).toBe('the soft keyboard covered id:message_for_payee_input; hidden before tapping');
 
     keyboardUp = true;
@@ -123,7 +127,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     expect(clear.note).toBeUndefined();
   });
 
-  it('a target below the screen: refused BEFORE the keyboard is asked — the screen read, re-read once, no dumpsys, no key, no tap (2026-10-08)', async () => {
+  it('a target below the screen: refused BEFORE the keyboard is asked — the screen (and its status band, 2026-10-12) read, re-read once, no keyboard query, no key, no tap (2026-10-08)', async () => {
     const tree = hierarchy(
       '<node index="0" text="Sign in" resource-id="com.example.app:id/login_submit" class="android.widget.Button" package="com.example.app" content-desc="" bounds="[99,2300][399,2432]"/>',
     );
@@ -139,6 +143,6 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     await expect(tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 })).rejects.toThrow(
       'id:login_submit is off screen at (249,2366) on a 1080x2220 screen (rect 99,2300 300x132)',
     );
-    expect(calls).toEqual([dump, dump, wmSize, wmSize]);
+    expect(calls).toEqual([dump, dump, wmSize, band, wmSize, band]);
   });
 });

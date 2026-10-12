@@ -529,10 +529,14 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * - No screen at all: inside the tree's root rect when it has one; with
  *   none, on screen (fail open).
  *
- * - On iOS, never in the status band at the top of a portrait box
- *   (adapters/ios-status-band.ts, reported with the device's screen, 2026-10-09: a tap at (201,6) went to the
- *   status bar, which scrolled the form to its top): that band is off the
- *   screen for a tap (swipe.ts#inStatusBand words the refusal).
+ * - Never in the status band at the top of a portrait box, where the
+ *   adapter reports one with the device's screen (`DeviceScreen.statusBand`):
+ *   iOS's (adapters/ios-status-band.ts, 2026-10-09: a tap at (201,6) went to
+ *   the status bar, which scrolled the form to its top) and, since
+ *   2026-10-12, Android's visible status bar (android.ts#parseStatusBand: a
+ *   tap at (256,3) on Google Contacts' collapsed app bar went to the bar).
+ *   That band is off the screen for a tap (swipe.ts#inStatusBand words the
+ *   refusal).
  *
  * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
  * a 402-wide screen is judged at 402, off it: that is where the tap would go.
@@ -543,25 +547,32 @@ export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefin
 }
 
 /**
- * iOS's status band as one clause — `under iOS's status bar at (201,6), in
- * the top 62 pt of the screen, where a tap goes to the status bar` — the
- * words for a point there, read by the tap's refusal (`refuseOffScreen`) and
- * by `scroll_until`'s failures (scroll-text.ts), so the two say the one fact
- * alike (code review of round 6, S5).
+ * The status band as one clause — `under the status bar at (201,6) — the
+ * screen's top 62, where a tap goes to the status bar` — the words for a
+ * point there, read by the tap's refusal (`refuseOffScreen`) and by
+ * `scroll_until`'s failures (scroll-text.ts), so the two say the one fact
+ * alike (code review of round 6, S5). Platform-neutral since 2026-10-12,
+ * when Android reported its band too: no platform named, and the band in
+ * the tree's own units, unnamed (pt on iOS, px on Android — until then the
+ * clause said "iOS's status bar … the top 62 pt").
  */
 export const underStatusBar = (at: Point, band: number): string =>
-  `under iOS's status bar at (${at.x},${at.y}), in the top ${band} pt of the screen, where a tap goes to the status bar`;
-
-/** The diagnosis of a target no scroll moves out from under iOS's status bar, in the tap's refusal (`statusBarRemedy`) and in `scroll_until`'s failure (scroll-text.ts) alike. */
-export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a layout that ignores the safe area?)';
+  `under the status bar at (${at.x},${at.y}) — the screen's top ${band}, where a tap goes to the status bar`;
 
 /**
- * What to do about a target whose centre lies under iOS's status bar, said
+ * The diagnosis of a target no scroll moves out from under the status bar, in the tap's refusal (`statusBarRemedy`) and in
+ * `scroll_until`'s failure (scroll-text.ts) alike — a layout drawn under the bar without keeping clear of it (iOS's safe area,
+ * Android's window insets: until 2026-10-12 it said "ignores the safe area", iOS's word only).
+ */
+export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a layout that does not keep clear of it?)';
+
+/**
+ * What to do about a target whose centre lies under the status bar, said
  * as far as the tree knows it (code review of round 6, P1: the refusal had
  * said `scroll_until it first` of a button pinned at the top, which no
  * scroll moves). In a scroll view (`scrolls`, ui-tree/geometry.ts
  * #insideScroller), `scroll_until` moves it out from under the bar; in none,
- * it is pinned there — a layout that ignores the safe area — and no step
+ * it is pinned there — a layout that does not keep clear of the bar — and no step
  * reaches it; where the tree cannot say (idb's flat list), both. The
  * refusal stays a refusal either way — the safe direction, and terminal in
  * an `optional:` step (flow/engine.ts).
@@ -606,8 +617,8 @@ export function statusBarRemedy(scrolls: boolean | undefined): string {
  * memo (adapters/viewport-memo.ts), so `tapScreen` then asks the device once
  * more — one extra read on a refusal path, accepted.
  *
- * A point on the screen but inside iOS's status band (`onScreen`'s iOS
- * clause, 2026-10-09) is refused in its own words (`underStatusBar`, and
+ * A point on the screen but inside the status band (`onScreen`'s band
+ * clause, iOS's since 2026-10-09, Android's since 2026-10-12) is refused in its own words (`underStatusBar`, and
  * `statusBarRemedy`: scroll it out only where it can be) — since "off
  * screen" would contradict
  * a rect the reader sees on it.
@@ -800,15 +811,15 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * (the band's background is none, draw-order's `structural` row) is tapped
  * as before.
  *
- * The box is cut below iOS's status band (swipe.ts#belowStatusBand,
- * 2026-10-09) before a piece is chosen, as above a keyboard: a moved tap
+ * The box is cut below the status band (swipe.ts#belowStatusBand,
+ * 2026-10-09; Android's too since 2026-10-12) before a piece is chosen, as above a keyboard: a moved tap
  * never lands on the status bar. Its centre is never there — the on-screen
  * rule refused that first.
  *
  * Only nodes of the tree cover (decision 4): a top bar the tree lists
  * before the form — WDA's, idb's (only its button and title) — is not
  * inferred, so a row scrolled up under it is tapped at its centre as
- * before the check existed (iOS's status bar is off the screen, above).
+ * before the check existed (the status bar is off the screen, above).
  * The other way round — a row scrolled under the bar read as drawn over
  * BackButton and the title, under idb, whose list is flat — is judged by
  * chrome before content (ui-tree/draw-order.ts's `flatListChrome` row,
@@ -824,7 +835,7 @@ export async function aimClearOfChrome(
   sent?: string,
 ): Promise<Aim> {
   const centre = tapPoint(node);
-  // Below iOS's status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
+  // Below the status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
   const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
   const order = drawOrder(tree);
   const exposed = order.exposure(node, box);

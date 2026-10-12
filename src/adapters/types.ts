@@ -45,11 +45,24 @@ export interface DeviceScreen {
   windowsBesideSystemBars?: boolean;
   /**
    * The height of the band at the top of the screen held upright that is
-   * NOT the app's to tap — iOS's status bar, down to the safe area
-   * (ios-status-band.ts, the measurement there). Set by the iOS adapter
-   * only; Android's status bar lies outside the app's window. Read by
-   * interact/swipe.ts#screenBox, which carries it to the judgements of a
-   * tap point (2026-10-09).
+   * NOT the app's to tap — the system status bar, in the tree's units. Set
+   * by both adapters (2026-10-09 iOS, 2026-10-12 Android):
+   * - iOS: the status bar down to the safe area, by the screen's size
+   *   (ios-status-band.ts, the measurement there) — always set;
+   * - Android: the VISIBLE status bar's frame out of `dumpsys window
+   *   displays` (android.ts#parseStatusBand, 66 px on the measured 1080x2220
+   *   emulator) — unset when the bar is hidden (an immersive app) or the
+   *   dump does not say (fail open). Until 2026-10-12 Android set none, on
+   *   the premise that its status bar lies outside the app's window: false
+   *   for an app that draws edge-to-edge — Google Contacts dumps its
+   *   collapsed app bar at y 0 under the bar, and a tap at (256,3) went to
+   *   the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-
+   *   system-status-bar-as-app-screen.md). In an app that keeps clear of
+   *   the bar no node lies in the band, so it changes nothing there.
+   * Read by interact/swipe.ts#screenBox, which carries it to the judgements
+   * of a tap point. Cut only from a PORTRAIT box (swipe.ts#belowStatusBand):
+   * iOS's rule — an iPhone hides its bar in landscape — which Android, whose
+   * bar stays at the top in landscape, shares as a stated residual.
    */
   statusBand?: number;
 }
