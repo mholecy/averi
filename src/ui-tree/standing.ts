@@ -259,7 +259,11 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   when the node is a flat list's screen-sized root (draw-order.ts
  *   #listsAncestry, read here so the pixel assert does not). Its
  *   `keyboardTop` is idb's band only (the pixel poll asks the reading's
- *   frame itself, before).
+ *   frame itself, before); its band is drawn on `screen.box`, the box
+ *   judged (not the tree's own screen), so a device wider than the tree
+ *   quotes the device's band (idb's number pad on a 430x932 device:
+ *   `0,589 430x343`), and a node listed between the tree's bottom and the
+ *   device's (`42,885 318x20`) lies under it.
  * - `facts.screen` is the frame judged, per purpose: the stop's box cut
  *   above its keyboard line; the tap's box less the system bands, cut above
  *   a line no guard acts on; the pixel's box less the status band. The
@@ -435,7 +439,7 @@ export interface StandingFacts {
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
-  /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind. */
+  /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind — never judged for the pixel (D5). */
   readonly sliver?: Cut;
 }
 
@@ -617,9 +621,9 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
   line === undefined || line.y >= box.y + box.height ? box : { ...box, height: Math.max(0, line.y - box.y) };
 
 /** The facts of a node judged in `frame`, from its exposure there. */
-function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = frame): { facts: StandingFacts; seen: Exposure } {
+function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = frame, { sliver: judgeSliver = true } = {}): { facts: StandingFacts; seen: Exposure } {
   const seen = scene.order.exposure(node, exposed);
-  const sliver = scene.clips.cutSliver(node, seen.minPiece);
+  const sliver = judgeSliver ? scene.clips.cutSliver(node, seen.minPiece) : undefined;
   const facts: StandingFacts = {
     centre,
     screen: frame,
@@ -647,9 +651,7 @@ function stopStanding(judged: Judged, box: Rect, bands: StandingScreen | undefin
   // does not — nor lowers what shows: the node's own part in the band still counts, so a match seen only there still
   // outranks one off the frame (interact/scroll-rounds.ts#better).
   const exposed = belowStatusBand(frame, bands, box);
-  const cut = factsIn(judged, frame, exposed).facts;
-  const inBand = cut.visible - visibleFractionInViewport(node.rect, exposed);
-  const facts: StandingFacts = inBand === 0 ? cut : { ...cut, shows: cut.shows + inBand };
+  const facts = bandShows(judged, frame, exposed, factsIn(judged, frame, exposed).facts);
   if (facts.visible === 0) {
     if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, kind: 'underKeyboard', line };
     return { facts, kind: 'offScreen', at: centre, visible: 0 };
@@ -664,6 +666,24 @@ function stopStanding(judged: Judged, box: Rect, bands: StandingScreen | undefin
     () => (cover === undefined ? undefined : { facts, kind: 'covered', cover, aboveKeyboard: line !== undefined }),
     line?.witnessed === false ? line : undefined,
   );
+}
+
+/**
+ * The stop's facts with what shows judged as before the band cut (D3)
+ * wherever the cut dropped no cover: the facts in the whole frame, so a
+ * node clear of the band, or one the cut dropped nothing over, shows
+ * exactly what it did. Where it dropped one (a node lying only in the
+ * band), its own part in the band counts as showing: so a match seen
+ * only there still outranks one off the frame
+ * (interact/scroll-rounds.ts#better). One more `exposure`, for a node
+ * reaching into the band only.
+ */
+function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFacts): StandingFacts {
+  const inBand = cut.visible - visibleFractionInViewport(judged.node.rect, exposed);
+  if (inBand <= 0) return cut;
+  const whole = factsIn(judged, frame).facts;
+  const dropped = whole.covers.length !== cut.covers.length || whole.covers.some((c, i) => c !== cut.covers[i]);
+  return { ...cut, shows: dropped ? cut.shows + inBand : whole.shows };
 }
 
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
@@ -700,18 +720,27 @@ function pixelStanding(judged: Judged, box: Rect, bands: StandingScreen | undefi
   const below = belowStatusBand(box, bands);
   // Only the part of the box below the band that the measurement reads: what lies over the rest of the node is never sampled.
   const read = rectIntersection(below, purpose.reads) ?? { ...purpose.reads, width: 0, height: 0 };
-  const { facts } = factsIn(judged, below, read);
-  const flush = purpose.glyphs ? cutAtNavigationBar(node, box, bands, scene.clips) : undefined;
+  // No sliver: the pixel assert measures a container-cut node on what shows (D5).
+  const { facts } = factsIn(judged, below, read, { sliver: false });
+  const flush = purpose.glyphs ? cutAtNavigationBar(node, box, bands, scene) : undefined;
   const cover = (): Standing | undefined => {
     const covers = scene.order.paintsOver(node, read);
     const centre = rectCentre(node.rect);
     const over = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
     if (over === undefined) return undefined;
-    const overRoot = flat && rectArea(node.rect) >= rectArea(box) * SCREEN_SIZED_FRACTION;
+    const overRoot = flat && screenSized(node.rect, box);
     return { facts, kind: 'covered', cover: over.node, aboveKeyboard: false, reach: over.reach, ...(overRoot && { overRoot: true as const }) };
   };
   return ordered(facts, place, facts.visible, flush, cover, undefined, flush === undefined ? undefined : { edge: 'bottom', top: bands?.navigationBand ?? 0 });
 }
+
+/**
+ * `rect` is the screen itself for the pixel assert: at least
+ * SCREEN_SIZED_FRACTION of `box`'s area (adapters/types.ts). No scroll
+ * moves it out from under anything — verify/pixel-poll.ts's remedy, and a
+ * flat list's root (`covered.overRoot`).
+ */
+export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >= rectArea(box) * SCREEN_SIZED_FRACTION;
 
 /**
  * The node's cut at the navigation bar, as the tree can tell it (owner
@@ -723,11 +752,11 @@ function pixelStanding(judged: Judged, box: Rect, bands: StandingScreen | undefi
  * app's pinned bottom bar, ending at the band's top) is whole. Only on a
  * portrait box with a band (`systemBands`).
  */
-function cutAtNavigationBar(node: UiNode, box: Rect, bands: StandingScreen | undefined, clips: Clips): Cut | undefined {
+function cutAtNavigationBar(node: UiNode, box: Rect, bands: StandingScreen | undefined, scene: Pick<Scene, 'clips'>): Cut | undefined {
   const { bottom } = systemBands(box, bands);
   if (bottom === undefined) return undefined;
   const on = (y: number) => Math.abs(y - bottom.y) <= 1;
   if (!on(node.rect.y + node.rect.height)) return undefined;
-  const container = clips.scrollersOf(node).find((c) => on(c.y + c.height));
+  const container = scene.clips.scrollersOf(node).find((c) => on(c.y + c.height));
   return container === undefined ? undefined : { edge: 'bottom', container: { ...container }, depth: node.rect.height };
 }

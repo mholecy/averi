@@ -1,11 +1,11 @@
-import { rectArea, SCREEN_SIZED_FRACTION, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { nodeText, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
 import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, treeScreen, usableScreen, type Scene } from '../ui-tree/standing.js';
+import { sceneOf, screenSized, treeScreen, usableScreen, type Scene } from '../ui-tree/standing.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -196,14 +196,10 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * scroll. Stricter than the tap, which asks only for a cover at the centre:
  * the sampler and the recognizer read the region — judged over what each
  * reads (`PixelPollSpec.reads`: the colour sampler's 12 %-inset rect, the
- * ocr crop's whole rect; `judgeOver`). The Android navigation band too
- * (owner decisions N-b, N-c): what it reads overlapping the band past the
- * 2-unit edge fails closed naming `the navigation bar …` with its rect, and
- * an ocr assert on an element that may be cut at the bar — its bottom on
- * the band's top, in a clipping scroller ending there too, where
- * uiautomator leaves no evidence of the cut — fails closed with "scroll it
- * up", while a colour assert on it measures what shows (D5); portrait
- * only. Residuals, stated: an element
+ * ocr crop's whole rect; `judgeOver`). The Android navigation band too,
+ * named `the navigation bar …`, and an ocr assert's possible cut at it,
+ * "scroll it up" — ui-tree/standing.ts#Scene has the rules (owner
+ * decisions N-b, N-c). Residuals, stated: an element
  * that reaches into the band by design — a full-bleed header, on iOS and on
  * Android 15+, whose apps draw edge-to-edge (an app bar at 0,0 1080x220
  * under the 66-px band fails a colour assert closed: the owner's decision,
@@ -236,8 +232,9 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * every round that reaches the check), and — on every round the reading
  * leaves clear — the element's `exposure` (the standing's facts) and the
  * clip facts' walks of the whole tree (ui-tree/geometry.ts#clipsOf's own,
- * `Clips.cutSliver`'s of the element's subtree for the facts, and on a
- * miss `Clips.inScroller`'s: whether a scroll may cure it), and, unless a
+ * for an ocr element ending on the navigation bar's top, or a miss's, and
+ * on a miss `Clips.inScroller`'s:
+ * whether a scroll may cure it), and, unless a
  * band already failed the round, `exposure` once more (`paintsOver`).
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
@@ -397,9 +394,8 @@ class PixelPollMemory {
 
   /**
    * Something is over the element, worded with its remedy (`overElement`'s
-   * sentence, which the round hands in whole): the soft keyboard
-   * (2026-10-06), or — round 8, 2026-10-12 — a system band or something of
-   * the app (`scroll_until` with `fully: true`, which stops only once
+   * sentence, which the round hands in whole): the soft keyboard, or a
+   * system band or something of the app (`scroll_until` with `fully: true`, which stops only once
    * nothing is drawn over any of it, and something in it clear of that
    * when no scroll may cure it). A miss naming it, never a measurement —
    * what would be sampled is the cover — and a finding like any other, so
@@ -464,7 +460,7 @@ class PixelPollMemory {
  * (`readKeyboard`, ui-tree/keyboard-cover.ts — the adapter's oracle when it
  * has one, else the round's own tree, the element itself the subject),
  * asked `overlapping`, the fail-closed geometric question that never asks
- * the witness (header, 2026-10-06); then the element's standing for the
+ * the witness (the header says why); then the element's standing for the
  * pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on
  * the usable screen (`judgeOver`), given idb's band as its keyboard line
  * (ui-tree/keyboard-cover.ts#keyboardEdge, owner decision D2 — no reading
@@ -479,7 +475,7 @@ class PixelPollMemory {
  * the IME `InsetsSource` entry's `frame=`); on iOS both are points of one
  * WDA tree; and the tree rect reaches this poll unscaled. `state()` never
  * throws (KeyboardOracle's contract), so no catch. A floating keyboard's
- * panel counts as the band does (2026-10-08): the reading reads it
+ * panel counts as the band does: the reading reads it
  * (`panels`, only when the band is up — one more adb call per such round,
  * the figures on AndroidAdapter's keyboardTouchable), the band first, then
  * the panels: the first that overlaps is the frame the miss quotes. A node
@@ -498,20 +494,20 @@ export async function overElement(
 }
 
 /**
- * The soft keyboard covers the element (2026-10-06): the miss's reason,
+ * The soft keyboard covers the element: the miss's reason,
  * quoting both rects — never a measurement, what would be sampled is the
  * keyboard. The remedy, when the adapter has a `back` (`dismissal:
  * 'back'`, the oracle's window model), names the fill option
  * (`dismissKeyboard`, flow/config.ts) and `back` — not "tap a field above",
- * which keeps the keyboard up (review 2026-10-06). When it has none
- * (`'none'`, the in-tree model, 2026-10-07) it names the flow's two ways:
+ * which keeps the keyboard up. When it has none (`'none'`, the in-tree
+ * model) it names the flow's two ways:
  * a `tap:` step the AUTHOR adds on an element that hides the keyboard
  * (such as the one configured for the guard to tap — configuring it is
  * not enough here: the guard taps it only before a covered tap, and before
  * an assert nothing does), or `dismissKeyboard: true` on a fill that
  * LEAVES it up. Not the fill option alone: it taps only on a band read
  * right after the fill, and HID typing usually parks the keyboard (no
- * band, a no-op — the 2026-10-05 bug note's device check), while a
+ * band, a no-op, measured on device), while a
  * covered miss here means a tap or an autofocus raised it, with or
  * without a fill before. Flow facts, not platform ones; the sentence is
  * this module's, not the guard's (whose refusal can offer its own tap and
@@ -536,10 +532,11 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * What is drawn over the element's rect in this round, worded for the miss
  * with its remedy — a system band (the status bar's, then the navigation
  * bar's), the navigation bar's possible cut, then the app's own covers —
- * or undefined when nothing is (round 8, 2026-10-12, the owner's decision
- * on docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-
- * element.md: fail closed). Header, "Since round 8". No keyboard: that is
- * `overElement`'s, first. Exported for the fixture sweeps and the wording
+ * or undefined when nothing is (the owner's decision: fail closed; the
+ * header has the measurements). No keyboard: that is `overElement`'s,
+ * first.
+ * docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
+ * Exported for the fixture sweeps and the wording
  * cases (tests/verify/pixel-chrome.test.ts). `glyphs`: the measurement
  * reads glyphs (the ocr assert).
  */
@@ -560,11 +557,10 @@ export async function chromeOverElement(
  * `oriented` box (ui-tree/standing.ts#usableScreen, which owns the
  * derivation; D6, the standing's residual), with the device's system bands
  * — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
- * band. Until S3 the tree's screen was taken whenever the device was
- * silent, so a rectless root whose largest node is a scroll view's tall
- * content (402x2000 under a 402x874 window) judged the window as no
- * screen-sized element and offered it a scroll; the vouched-for window is
- * the screen now, as it is for the gesture. `keyboard`: a line to judge
+ * band: a window the tree vouches for is the screen, as it is for the
+ * gesture, so under a rectless root whose largest node is a scroll view's
+ * tall content (402x2000 under a 402x874 window) a window-sized element is
+ * the screen itself, not a row offered a scroll. `keyboard`: a line to judge
  * under (idb's band) and the reading's remedy to word it with.
  *
  * The sentence names what lies over it: `the status bar …` or `the
@@ -576,23 +572,23 @@ export async function chromeOverElement(
  * The remedy is `scroll_until … fully: true`; it adds "assert something
  * in it that lies clear of that" (the tap's sliver hint's words, "tap
  * something in it that lies clear of that edge") when a scroll may not
- * cure it (review of fix/r8-pixel, round 1): the element lies in no scroll
- * view as far as the tree says (`Clips.inScroller` false — or undefined:
- * idb's flat list has no ancestry, so EVERY idb miss carries the clause),
- * it is laid from the screen's edge the band lies at (a full-bleed header
- * at the top, an element reaching the bottom), or the cover holds the
- * element whole. For the screen ITSELF — an element screen-sized — no
- * scroll can cure it, and the remedy leads with the child (review round
- * 3); so too for an element laid from the screen's top edge at full
- * width, a full-bleed header — iOS's, or Android 15+'s edge-to-edge app
- * bar (`0,0 1080x220` under the 66-px band fails a colour assert closed,
- * the owner's decision, code review of round 8, P2) — whose remedy leads
+ * cure it: the element lies in no scroll view as far as the tree says
+ * (`Clips.inScroller` false — or undefined: idb's flat list has no
+ * ancestry, so EVERY idb miss carries the clause), it is laid from the
+ * screen's top edge under the status bar, or the cover holds the element
+ * whole. Not for an element reaching the screen's bottom under the
+ * navigation bar: an edge-to-edge list runs its rows down to it, and a
+ * scroll moves them up. For the screen ITSELF — an element screen-sized
+ * (ui-tree/standing.ts#screenSized) — no scroll can cure it, and the
+ * remedy leads with the child; so too for an element laid from the
+ * screen's top edge at full width, a full-bleed header — iOS's, or
+ * Android 15+'s edge-to-edge app bar (`0,0 1080x220` under the 66-px band
+ * fails a colour assert closed, the owner's decision) — whose remedy leads
  * with "assert something in it that lies clear of that (its title, say)":
  * the title, below the band, is judged on its own and passes. For idb's
- * flat-list root (`covered.overRoot`: its Application node, screen-sized)
- * it says the node named is content drawn over the root's background —
- * only for the screen-sized root since P2 (a full-bleed header in a flat
- * list was told that too).
+ * flat-list root (`covered.overRoot`: its Application node, screen-sized,
+ * and never a full-bleed header in a flat list) it says the node named is
+ * content drawn over the root's background.
  */
 async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
@@ -611,9 +607,9 @@ async function judgeOver(
   const pinned = scene.clips.inScroller(element) !== true;
   // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
   // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
-  const screenSized = rectArea(element.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION;
+  const sized = screenSized(element.rect, screen);
   const fullBleed = element.rect.y <= screen.y && element.rect.x <= screen.x && element.rect.x + element.rect.width >= screen.x + screen.width;
-  const never = screenSized ? 'screen' : fullBleed ? 'header' : undefined;
+  const never = sized ? 'screen' : fullBleed ? 'header' : undefined;
   switch (standing.kind) {
     case 'systemBar': {
       const bar = standing.bar.edge === 'top' ? 'status bar' : 'navigation bar';
@@ -645,9 +641,9 @@ async function judgeOver(
  * ("tap something in it that lies clear of that edge"): `scroll` — scroll it clear; `stuck` — that, or, when a
  * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
  * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
- * for an element laid from the screen's top edge at full width, a full-bleed header (the owner's decision, code
- * review of round 8, P2: an edge-to-edge Android app bar, 0,0 1080x220 under the 66-px band, fails a colour assert
- * closed, and its title, clear of the band, is what to assert); `root` — the screen, for idb's flat-list root,
+ * for an element laid from the screen's top edge at full width, a full-bleed header (the owner's decision: an
+ * edge-to-edge Android app bar, 0,0 1080x220 under the 66-px band, fails a colour assert closed, and its title, clear
+ * of the band, is what to assert); `root` — the screen, for idb's flat-list root,
  * whose cover is the app's own content laid on its background.
  */
 const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): string => {
@@ -704,7 +700,7 @@ export async function pollPixels(
     const { rect } = found[0];
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
-    // The keyboard, then the system bands and what of the app is drawn over it (round 8) — never a measurement.
+    // The keyboard, then the system bands and what of the app is drawn over it — never a measurement.
     const over = await overElement(adapter, tree, found[0], { reads: spec.reads?.(rect), glyphs: spec.glyphs === true });
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();

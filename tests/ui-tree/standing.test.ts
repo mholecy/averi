@@ -2,7 +2,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, rectIntersection, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { containsPoint } from '../../src/ui-tree/geometry.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
 import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
@@ -472,9 +473,9 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
 
 /** The pixel assert's purposes over `n`: the ocr crop (the whole rect, read as glyphs) and the colour sample (inset 12 % a side, verify/color-parity.ts#colorSampleRect). */
 const OCR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
-const COLOUR = (n: UiNode): Purpose => {
+const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => {
   const { x, y, width, height } = n.rect;
-  return { of: 'pixel', reads: { x: x + width * 0.12, y: y + height * 0.12, width: width * 0.76, height: height * 0.76 }, glyphs: false };
+  return { of: 'pixel', reads: { x: x + width * 0.12, y: y + height * 0.12, width: width * 0.76, height: height * 0.76 }, glyphs: false, ...(keyboardTop !== undefined && { keyboardTop }) };
 };
 /** A non-edge-to-edge app's screen on the Pixel_3a: its window ends at the navigation bar (2154), a list clipping above a pinned bottom bar that ends there too. */
 const PINNED_BOTTOM_BAR = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2154]">
@@ -541,6 +542,15 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     expect(sceneOf(t).standing(row, IPHONE, OCR(row, idb(589))).kind).not.toBe('underKeyboard');
   });
 
+  it('a colour assert whose RECT meets idb\'s band while its sample does not still fails closed under the keyboard: value_date_select at 539, its sample ending at 585', async () => {
+    const t = await idbAt('idb-swift-form-number-pad.json', 'elements');
+    const row = byId(t, 'swift_payment.form.value_date_select');
+    (row as { rect: Rect }).rect = { ...row.rect, y: 539 };
+    const purpose = COLOUR(row, idb(589));
+    expect(purpose.of === 'pixel' && purpose.reads.y + purpose.reads.height).toBeLessThan(589);
+    expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band', band: { x: 0, y: 589, width: 402, height: 285 } });
+  });
+
   it('portrait only (N-c): the Settings shape on a landscape box is measured', async () => {
     const t = parseDump(SETTINGS_FLUSH);
     const landscape = { box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 2154 };
@@ -593,6 +603,20 @@ describe('Scene.standing for the stop — its covers judged below the status ban
     expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 90 } });
     // All of it shows: its own part in the band (40–62) counts, the node over it there does not.
     expect([s.facts.covers, s.facts.shows]).toEqual([[], 1]);
+  });
+  it('a cover reaching into the band and below it is not dropped: what shows is exactly what it was — its part in the band still hidden', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 40, width: 402, height: 100 } });
+    const over = node({ role: 'image', identifier: 'over', rect: { x: 0, y: 30, width: 402, height: 50 } });
+    const t = node({ role: 'container', rect: box(402, 874), children: [row, over] });
+    const s = sceneOf(t).standing(row, IPHONE, FULLY);
+    expect([said(s), s.facts.shows]).toEqual([{ kind: 'covered', cover: 'over' }, sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY).facts.shows]);
+    expect(s.facts.shows).toBeCloseTo(0.6);
+  });
+  it('under a keyboard line high enough that the frame above it is landscape-shaped (402x300), the band is still cut — judged on the box\'s shape', () => {
+    const { t, row } = tree();
+    const s = sceneOf(t).standing(row, IPHONE, { ...FULLY, keyboardTop: wda(300) });
+    expect(s.facts.screen).toEqual({ x: 0, y: 0, width: 402, height: 300 });
+    expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 90 } });
   });
   it('with no band read, it covers as before', () => {
     const { t, row } = tree();
@@ -648,7 +672,7 @@ describe('parity — `scroll_until X` then `tap X`: a plain stop that is reachab
 });
 
 describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `fully` stop that is reachable leaves nothing of the app over what the assert reads, and no band at its centre', () => {
-  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered; under a system bar only where the band meets the rect off its centre — the stated exemption (one way: the pixel assert is stricter)', async () => {
+  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered; under a system bar only where the band meets what it reads, off the stop\'s centre — the stated exemption (one way: the pixel assert is stricter)', async () => {
     let judged = 0;
     let reachable = 0;
     let exempt = 0;
@@ -669,11 +693,15 @@ describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `f
           for (const purpose of [OCR(n), COLOUR(n)]) {
             const pixel = scene.standing(n, screen, purpose);
             // The exemption: `fully` judges a band at the centre only (the module's residual), the pixel assert over what it reads.
-            if (pixel.kind === 'systemBar' && onScreen(stop.at, tree, screen)) {
+            if (pixel.kind === 'systemBar') {
+              // The exemption, and only it: the band lies off the stop's centre and meets what the assert reads.
+              const band = pixel.band;
+              const reads = purpose.of === 'pixel' ? purpose.reads : n.rect;
+              if (band === undefined || containsPoint(band, stop.at) || rectIntersection(band, reads) === undefined) broken.push(`${name} ${n.role} ${JSON.stringify(n.rect)}: band ${JSON.stringify(band)} at the centre or off what it reads`);
               exempt++;
               continue;
             }
-            if (pixel.kind === 'systemBar' || pixel.kind === 'covered') broken.push(`${name} ${JSON.stringify(band)} ${n.role} ${JSON.stringify(n.rect)}: pixel ${pixel.kind}`);
+            if (pixel.kind === 'covered') broken.push(`${name} ${JSON.stringify(band)} ${n.role} ${JSON.stringify(n.rect)}: pixel ${pixel.kind}`);
           }
         }
       }
