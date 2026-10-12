@@ -620,8 +620,8 @@ export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; sta
  * edge, `shape` as there. Portrait only: Android moves the bar to a side
  * in landscape, and the band, read while the screen was upright, may
  * outlive a rotation in the adapter's memo (the residual is the standing's).
- * A band whose top lies at or above the box's own is no band, as a status
- * band of 0 or less is none: `box` itself.
+ * A reading that leaves nothing above it — its top at or above the box's
+ * — is no band (fails open): `box` itself.
  */
 export function aboveNavigationBand(box: Rect, screen: { navigationBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
   const top = screen?.navigationBand;
@@ -711,9 +711,8 @@ export interface Clips {
    * not stop on; undefined otherwise. Asked only by
    * ui-tree/standing.ts#Scene.standing, which orders it against the rest.
    *
-   * Or INHERITED (round 8, owner decision, docs/bugs/2026-10-09-android-
-   * tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-
-   * nothing.md, "re-run at 35d5997"): a node flush within a pixel with an
+   * Or INHERITED (the owner's decision, the bug note below, "re-run at
+   * 35d5997"): a node flush within a pixel with an
    * edge whose ancestor — below the container of that edge — is itself a
    * sliver cut at that edge of that container, nearest such ancestor first
    * (past a nearer sliver cut at another edge), and the node's own depth
@@ -738,6 +737,7 @@ export interface Clips {
    * scroller (flush with all four edges, its subtree the whole list) is
    * deeper than any sliver, and never walked for it; its own `evidentCut`
    * walks its subtree per flush edge.
+   * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
    */
   cutSliver(node: UiNode, minPiece: number): Cut | undefined;
   /**

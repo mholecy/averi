@@ -433,7 +433,8 @@ const lessSystemBands = (box: Rect, bands: Pick<StandingScreen, 'statusBand' | '
 /** Where `point` lies against `boxes` (none: on, failing open) and their system bands: on, in the top band, in the bottom band (in that order), or off. */
 function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined): Place {
   if (boxes === undefined || boxes.some((box) => containsPoint(lessSystemBands(box, bands), point))) return 'on';
-  const judged = { boxes, ...bands };
+  // The bands only: `bands` may be a whole screen, whose own `boxes` must not stand in for the ones judged (the stop's box alone).
+  const judged = { boxes, statusBand: bands?.statusBand, navigationBand: bands?.navigationBand };
   if (inStatusBand(point, judged)) return { edge: 'top', bottom: bands?.statusBand ?? 0 };
   if (inNavigationBand(point, judged)) return { edge: 'bottom', top: bands?.navigationBand ?? 0 };
   return 'off';

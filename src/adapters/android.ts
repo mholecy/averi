@@ -1173,7 +1173,8 @@ type SystemBands = Pick<DeviceScreen, 'statusBand' | 'navigationBand'>;
  * band, and neither has a display whose natural rotation is landscape (a
  * tablet, `w=2560 h=1600 r=0`) — its band, kept with the status band until
  * a launch or a fresh read, would be applied to the turned portrait box
- * after a rotation, refusing every centre from 1504 down. So a band, when
+ * after a rotation: `scroll_until`'s stop would refuse every centre from
+ * 1504 down (the tap's refusal reads the bands again first). So a band, when
  * there is one, is always the portrait screen's own: the only portrait box
  * of that device. Portrait phones only, a residual. Never
  * guesses — no band on: no entry; one that does not read fully (type,
