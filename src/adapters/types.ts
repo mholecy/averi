@@ -69,9 +69,10 @@ export interface DeviceScreen {
    * The TOP edge of the band at the bottom of the screen held upright that
    * is the system navigation bar's, in the tree's units — Android only
    * (android.ts#parseNavigationBand: the VISIBLE bar's frame out of the same
-   * `dumpsys window displays` as `statusBand`, ending at the screen's
-   * bottom; 2154 on the measured 1080x2220 emulator). Unset when the bar is
-   * hidden, at the side (landscape: a residual), or the dump does not say.
+   * `dumpsys window displays` as `statusBand`, across the bottom of the
+   * display that dump describes; 2154 on the measured 1080x2220 emulator).
+   * Unset when the bar is hidden, at a side, the display is turned
+   * (landscape: a residual), or the dump does not say.
    * Carried to ui-tree/standing.ts#UsableScreen; nothing judges it yet.
    */
   navigationBand?: number;
@@ -79,9 +80,10 @@ export interface DeviceScreen {
 
 /**
  * A screen size that can be divided by, or swiped in: finite and positive on
- * both axes. The one spelling of "this size is usable" — verify/scale.ts's
- * witness and ui-tree/standing.ts#usableScreenOf both read it (until 2026-10-08
- * each had its own copy).
+ * both axes. The one spelling of "this size is usable", read wherever a
+ * size is: verify/scale.ts's witness, ui-tree/standing.ts#usableScreenOf,
+ * ui-tree/geometry.ts#windowTurnsScreen and interact/swipe.ts#screenBox's
+ * refusal.
  */
 export const usableSize = ({ width, height }: { width: number; height: number }): boolean =>
   Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;

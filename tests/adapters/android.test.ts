@@ -1387,45 +1387,58 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
 
 /**
  * The navigation bar's band (data only: nothing judges it yet; mp-native draws edge-to-edge, and its rows lie in
- * 2154–2220 under the bar on the measured 1080x2220 emulator): read out of
- * the same `dumpsys window displays` call as the status band, its TOP, of a visible frame that ends at the screen's
- * bottom.
+ * 2154–2220 under the bar on the measured 1080x2220 emulator): read out of the same `dumpsys window displays` call
+ * as the status band — its TOP, of a visible full-width frame that ends at the bottom of the display the dump
+ * describes (`DisplayFrames w=… h=… r=0`).
  */
 describe('parseNavigationBand — the visible navigation bar\'s top, out of `dumpsys window displays`', () => {
-  const PIXEL_3A = { width: 1080, height: 2220 };
   const NAV_33 = (frame: string, visible = 'true') => `        InsetsSource type=ITYPE_NAVIGATION_BAR frame=${frame} visible=${visible} insetsRoundedCornerFrame=false`;
   const NAV_36 = (frame: string, visible = 'true') =>
     `        InsetsSource id=ab460001 type=navigationBars frame=${frame} visible=${visible} flags= sideHint=BOTTOM boundingRects=null`;
   const STATUS_33 = '        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false';
-  const lines = (...l: string[]) => `    mInsetsState:\n${l.join('\n')}\n    InsetsSourceProviders:\n`;
+  const FRAMES = (w = 1080, h = 2220, r = 0) => `  DisplayFrames w=${w} h=${h} r=${r}`;
+  /** One display: its DisplayFrames line (default the measured 1080x2220, unrotated), then its InsetsState entries. */
+  const display = (frames: string, ...l: string[]) => `${frames}\n    mInsetsState:\n${l.join('\n')}\n    InsetsSourceProviders:\n`;
+  const lines = (...l: string[]) => display(FRAMES(), ...l);
 
-  it('the real API 33 dumps, keyboard hidden and shown: `type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true` reads 2154', async () => {
-    expect(parseNavigationBand(await dumpsys('api33-keyboard-hidden'), PIXEL_3A)).toBe(2154);
-    expect(parseNavigationBand(await dumpsys('api33-keyboard-shown'), PIXEL_3A)).toBe(2154);
+  it('the real API 33 dumps, keyboard hidden and shown: `DisplayFrames w=1080 h=2220 r=0` and `type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true` read 2154', async () => {
+    expect(parseNavigationBand(await dumpsys('api33-keyboard-hidden'))).toBe(2154);
+    expect(parseNavigationBand(await dumpsys('api33-keyboard-shown'))).toBe(2154);
   });
 
   it('API 14+\'s `type=navigationBars` reads alike; a taller 3-button bar reads its own top; the provider\'s `mSource=` copy is no second entry', () => {
-    expect(parseNavigationBand(lines(STATUS_33, NAV_36('[0,2154][1080,2220]')), PIXEL_3A)).toBe(2154);
-    expect(parseNavigationBand(lines(NAV_36('[0,2094][1080,2220]')), PIXEL_3A)).toBe(2094);
-    expect(parseNavigationBand(`${lines(NAV_33('[0,2154][1080,2220]'))}        mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2000][1080,2220] visible=true\n`, PIXEL_3A)).toBe(2154);
+    expect(parseNavigationBand(lines(STATUS_33, NAV_36('[0,2154][1080,2220]')))).toBe(2154);
+    expect(parseNavigationBand(lines(NAV_36('[0,2094][1080,2220]')))).toBe(2094);
+    expect(parseNavigationBand(`${lines(NAV_33('[0,2154][1080,2220]'))}        mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2000][1080,2220] visible=true\n`)).toBe(2154);
+    expect(parseNavigationBand(display(FRAMES(1080, 2280), NAV_36('[0,2214][1080,2280]')))).toBe(2214); // the display's own height, whatever it is
   });
 
   it.each([
     ['the bar hidden (an immersive app): visible=false', lines(STATUS_33, NAV_33('[0,2154][1080,2220]', 'false'))],
-    ['no navigation-bar entry at all (the API 36 fixture lists none)', lines(STATUS_33)],
+    ['no navigation-bar entry at all', lines(STATUS_33)],
     ['an empty dump', ''],
-    ['a frame that does not end at the screen\'s bottom', lines(NAV_33('[0,2088][1080,2154]'))],
-    ['a bar at the side (landscape, 3-button): its frame ends at the bottom of a screen it does not span', lines(NAV_33('[2094,0][2220,1080]'))],
-    ['an entry that does not read fully (no visible=)', '        InsetsSource type=navigationBars frame=[0,2154][1080,2220] flags=\n'],
+    ['a frame that does not end at the display\'s bottom', lines(NAV_33('[0,2088][1080,2154]'))],
+    ['a frame that ends at 2220 on a display 2280 tall', display(FRAMES(1080, 2280), NAV_33('[0,2154][1080,2220]'))],
+    ['a bar at the LEFT side, running to the bottom', lines(NAV_33('[0,0][126,2220]'))],
+    ['a bar at the RIGHT side, running to the bottom', lines(NAV_33('[954,0][1080,2220]'))],
+    ['a frame from above the screen\'s top', lines(NAV_33('[0,-10][1080,2220]'))],
+    ['a frame half the display wide', lines(NAV_33('[0,2154][540,2220]'))],
+    ['a frame the display\'s width shifted off its left edge', lines(NAV_33('[10,2154][1090,2220]'))],
+    ['a frame taller than it is wide (all but the top 10 px)', lines(NAV_33('[0,10][1080,2220]'))],
+    ['a frame the whole display (a natural-landscape tablet, r=0)', display(FRAMES(2220, 1080), NAV_33('[0,0][2220,1080]'))],
+    ['a turned display (r=1), its bar at the bottom of the turned frame — portrait only', display(FRAMES(2220, 1080, 1), NAV_33('[0,1014][2220,1080]'))],
+    ['no DisplayFrames line (the display\'s size unsaid)', `    mInsetsState:\n${NAV_33('[0,2154][1080,2220]')}\n`],
+    ['two displays of different sizes, their bars alike', lines(NAV_33('[0,2154][1080,2220]')) + display(FRAMES(1080, 2280), NAV_33('[0,2154][1080,2220]'))],
+    ['an entry that does not read fully (no visible=)', display(FRAMES(), '        InsetsSource type=navigationBars frame=[0,2154][1080,2220] flags=')],
     ['a malformed frame', lines('        InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080] visible=true')],
     ['an empty frame', lines(NAV_36('[0,2220][1080,2220]'))],
     ['two displays whose bars disagree (2154 and hidden)', lines(NAV_33('[0,2154][1080,2220]')) + lines(NAV_33('[0,2154][1080,2220]', 'false'))],
   ])('no band on %s', (_name, dump) => {
-    expect(parseNavigationBand(dump, PIXEL_3A)).toBeUndefined();
+    expect(parseNavigationBand(dump)).toBeUndefined();
   });
 
-  it('the API 36 fixture (a Pixel_4 AVD) lists no navigation bar: no band', async () => {
-    expect(parseNavigationBand(await dumpsys('api36-no-ime-source'), { width: 1080, height: 2280 })).toBeUndefined();
+  it('the API 36 fixture (a Pixel_4 AVD, 1080x2280) lists no navigation bar: no band', async () => {
+    expect(parseNavigationBand(await dumpsys('api36-no-ime-source'))).toBeUndefined();
   });
 
   it('viewport reports it beside the status band, out of the one `dumpsys window displays` call, memoized with it', async () => {
@@ -1440,6 +1453,14 @@ describe('parseNavigationBand — the visible navigation bar\'s top, out of `dum
     expect(await adapter.viewport()).toEqual(screen);
     expect(await adapter.viewport()).toEqual(screen);
     expect(calls).toEqual(['adb -s emulator-5554 shell wm size', 'adb -s emulator-5554 shell dumpsys window displays']);
+  });
+
+  it('viewport on a 1080x2280 display whose dump puts the bar\'s bottom at 2220: no band — the display\'s own height decides', async () => {
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      return { stdout: Buffer.from(full.endsWith('wm size') ? 'Physical size: 1080x2280\n' : display(FRAMES(1080, 2280), STATUS_33, NAV_33('[0,2154][1080,2220]'))), stderr: '' };
+    };
+    expect(await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).viewport()).toEqual({ width: 1080, height: 2280, windowsBesideSystemBars: true, statusBand: 66 });
   });
 });
 

@@ -571,11 +571,10 @@ export class AndroidAdapter implements DeviceAdapter {
    * still the screen's.
    *
    * The navigation bar's band (types.ts#DeviceScreen.navigationBand) comes
-   * out of the same dump, parseNavigationBand below, judged against
-   * `screen` — the size this read was made beside — and is kept with the
+   * out of the same dump, parseNavigationBand below, and is kept with the
    * status band: one call, one lifetime.
    */
-  private systemBands(fresh: boolean, screen: { width: number; height: number }): Promise<SystemBands> {
+  private systemBands(fresh: boolean): Promise<SystemBands> {
     if (!fresh && this.#band !== undefined) return Promise.resolve(this.#band.band);
     if (!fresh && this.#bandRead !== undefined) return this.#bandRead;
     const epoch = this.#bandEpoch;
@@ -583,7 +582,7 @@ export class AndroidAdapter implements DeviceAdapter {
       try {
         const dump = (await this.shell(['dumpsys', 'window', 'displays'], { timeoutMs: STATUS_BAND_QUERY_TIMEOUT_MS })).stdout.toString('utf8');
         const status = parseStatusBand(dump);
-        const navigation = parseNavigationBand(dump, screen);
+        const navigation = parseNavigationBand(dump);
         const band: SystemBands = { ...(status !== undefined && { statusBand: status }), ...(navigation !== undefined && { navigationBand: navigation }) };
         if (epoch === this.#bandEpoch) this.#band = { band };
         return band;
@@ -607,7 +606,7 @@ export class AndroidAdapter implements DeviceAdapter {
    */
   async viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
     const size = await this.viewportMemo.get(opts);
-    return { ...size, ...(await this.systemBands(opts?.fresh === true, size)) };
+    return { ...size, ...(await this.systemBands(opts?.fresh === true)) };
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {
@@ -985,6 +984,8 @@ const IME_INSETS_TYPES = new Set(['ITYPE_IME', 'ime']);
 const STATUS_BAR_INSETS_TYPES = new Set(['ITYPE_STATUS_BAR', 'statusBars']);
 /** The navigation bar's insets type: `ITYPE_NAVIGATION_BAR` up to Android 13 (in the real dumps, tests/fixtures), `navigationBars` from 14. */
 const NAVIGATION_BAR_INSETS_TYPES = new Set(['ITYPE_NAVIGATION_BAR', 'navigationBars']);
+/** A display's size and rotation as `dumpsys window displays` lists it, one line a display: `DisplayFrames w=1080 h=2220 r=0` (API 33 and 36 alike, tests/fixtures). */
+const DISPLAY_FRAMES_RE = /^[ \t]*DisplayFrames w=(\d+) h=(\d+) r=(\d+)[ \t]*$/gm;
 /**
  * A screen rect as Android prints it everywhere — `[l,t][r,b]`, in a
  * uiautomator `bounds` attribute and in an InsetsSource `frame=` alike. ONE
@@ -1156,20 +1157,30 @@ type SystemBands = Pick<DeviceScreen, 'statusBand' | 'navigationBand'>;
  *
  *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, emulator
  *   Pixel_3a, 1080x2220, gesture navigation):
+ *     DisplayFrames w=1080 h=2220 r=0
  *     InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true insetsRoundedCornerFrame=false
  *   API 34+: `type=navigationBars` (WindowInsets.Type.toString), unmeasured —
  *   the API 36 fixture lists no navigation-bar entry at all.
  *
- * The band is the frame's TOP, of a frame that is not empty and ENDS AT THE
- * BOTTOM of `screen` (the size `wm size` reported beside it): a bar at the
- * side (landscape, 3-button navigation) ends elsewhere, so no band —
- * portrait only, a residual. Never guesses — no band on: no entry; one that
- * does not read fully (type, frame, visible); a hidden one (an immersive
- * app); an empty frame or one short of the bottom; several entries that do
- * not all say the same band.
+ * The bottom is the display's own, read from the same dump: its
+ * `DisplayFrames w=… h=… r=…` line, the size the insets frames are laid out
+ * in. The band is the frame's TOP, of a frame that spans the display's
+ * width from x 0, starts below the top, is wider than it is tall and ENDS
+ * AT THE BOTTOM (`h`) — a bar at the left or right side, or one the width
+ * of half the display, is no bottom band. Only on a display in its natural
+ * rotation (`r=0`): a turned display (landscape, where 3-button navigation
+ * moves the bar to a side) has no band — portrait only, a residual. Never
+ * guesses — no band on: no entry; one that does not read fully (type,
+ * frame, visible); a hidden one (an immersive app); a frame of any other
+ * shape; no DisplayFrames line, or several that do not all say the same
+ * size; several entries that do not all say the same band.
  */
-export function parseNavigationBand(dump: string, screen: { width: number; height: number }): number | undefined {
-  /** What each navigation-bar entry says: its top, or 'none' (hidden, unread, empty, not at the bottom). */
+export function parseNavigationBand(dump: string): number | undefined {
+  const frames = [...dump.matchAll(DISPLAY_FRAMES_RE)];
+  if (new Set(frames.map(([line]) => line.trim())).size !== 1) return undefined; // none, or displays of different sizes
+  const [, w, h, r] = frames[0].map(Number);
+  if (r !== 0) return undefined;
+  /** What each navigation-bar entry says: its top, or 'none' (hidden, unread, or not a bar across the display's bottom). */
   const entries = new Set<number | 'none'>();
   for (const [, body] of dump.matchAll(INSETS_SOURCE_LINE_RE)) {
     const type = body.match(INSETS_TYPE_RE)?.[1];
@@ -1177,7 +1188,8 @@ export function parseNavigationBand(dump: string, screen: { width: number; heigh
     const frame = body.match(INSETS_FRAME_RE)?.[1];
     const visible = body.match(INSETS_VISIBLE_RE)?.[1];
     const rect = frame === undefined ? undefined : parseBounds(frame);
-    entries.add(rect === undefined || visible !== 'true' || rect.y + rect.height !== screen.height || rect.width <= 0 || rect.height <= 0 ? 'none' : rect.y);
+    const acrossTheBottom = rect !== undefined && rect.x === 0 && rect.width === w && rect.y > 0 && rect.y + rect.height === h && rect.height > 0 && rect.height < rect.width;
+    entries.add(rect === undefined || visible !== 'true' || !acrossTheBottom ? 'none' : rect.y);
   }
   const [band] = entries;
   return entries.size === 1 && band !== 'none' ? band : undefined;
