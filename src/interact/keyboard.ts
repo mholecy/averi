@@ -108,8 +108,12 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * with a keyboard up), beside six tree-settle waits of seconds each. On iOS: no device read for the
  * keyboard on any look, ever. The on-screen rule adds `viewport()` per tap,
  * which the adapter memoizes: one `wm size` / `idb describe` per adapter,
- * re-asked only after a failed read. A raw coordinate tap does not come through here: the caller chose
- * that point.
+ * re-asked only after a failed read. In memory, the on-screen rule asks the
+ * node's whole standing (ui-tree/standing.ts#Scene: the tree's draw order
+ * and clip facts, one exposure) before the guard; the clear path reuses it,
+ * and a guard that acted asks it once more, of the tree it hands back. A
+ * raw coordinate tap does not come through here: the caller chose that
+ * point.
  *
  * Rejected: hiding the keyboard before every tap (a `back` per tap, and a
  * navigation whenever the adapter is wrong); scrolling the target into view

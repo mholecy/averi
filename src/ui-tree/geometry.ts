@@ -620,10 +620,12 @@ export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; sta
  * edge, `shape` as there. Portrait only: Android moves the bar to a side
  * in landscape, and the band, read while the screen was upright, may
  * outlive a rotation in the adapter's memo (the residual is the standing's).
+ * A band whose top lies at or above the box's own is no band, as a status
+ * band of 0 or less is none: `box` itself.
  */
 export function aboveNavigationBand(box: Rect, screen: { navigationBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
   const top = screen?.navigationBand;
-  if (top === undefined || shape.height <= shape.width) return box;
+  if (top === undefined || top <= box.y || shape.height <= shape.width) return box;
   return { ...box, height: Math.max(0, Math.min(box.y + box.height, top) - box.y) };
 }
 

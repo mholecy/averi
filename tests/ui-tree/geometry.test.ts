@@ -406,14 +406,25 @@ describe('flushEdges — a rect\'s edges on its container\'s, within a pixel (mo
 /** Any depth: `Clips.cutSliver` under this minimum is the cut its evidence finds, however deep (geometry.ts#evidentCut, unexported, through the clip facts). */
 const ANY_DEPTH = Number.MAX_SAFE_INTEGER;
 
-/** The cut the clip facts find of `n` nested in clipping containers of `chain`'s rects (nearest first) — the evidence of n's own content, at any depth. */
+/**
+ * The cut the clip facts find of `n` nested in clipping containers of `chain`'s rects (nearest first) — the evidence of
+ * n's OWN content, at any depth: never one inherited from what it lies in (`Cut.within`), which would let the
+ * inheritance path answer for a node whose own evidence broke.
+ */
 const cutOf = (n: UiNode, chain: readonly UiNode['rect'][]) => {
   let inner: UiNode = n;
   for (const rect of chain) inner = { ...node(rect, null, [inner]), clipsDescendants: true };
-  return clipsOf(node({ x: -5000, y: -5000, width: 20000, height: 20000 }, null, [inner]), NESTED).cutSliver(n, ANY_DEPTH);
+  const cut = clipsOf(node({ x: -5000, y: -5000, width: 20000, height: 20000 }, null, [inner]), NESTED).cutSliver(n, ANY_DEPTH);
+  expect(cut?.within).toBeUndefined();
+  return cut;
 };
 
-describe('Clips.cutSliver at any depth — a node cut at a clipping ancestor\'s edge, by what its own content says (geometry.ts#evidentCut)', () => {
+/**
+ * SYNTHETIC shapes, hand-built rects around the measured ones: the edge cases of the evidence a pixel either side
+ * of each threshold, which uiautomator's parser would reshape (Compose's widening of a node cut short of its
+ * children, the clamping of inverted bounds). The parsed set follows.
+ */
+describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a clipping ancestor\'s edge, by what its own content says (geometry.ts#evidentCut)', () => {
   const form = { x: 0, y: 242, width: 1080, height: 1736 };
   const at = (rect: UiNode['rect'], ...children: UiNode[]) => node(rect, null, children);
   /** The measured toggle 66,1924 948x55 on the form's bottom (1978), a child from `top` to `bottom`. */
@@ -496,7 +507,9 @@ describe('Clips.cutSliver at any depth — clippedOut evidence at each edge, par
     const tree = parseDump(xml);
     const find = (n: UiNode): UiNode | undefined => (n.identifier === id ? n : n.children.map(find).find(Boolean));
     const n = find(tree)!;
-    return clipsOf(tree, NESTED).cutSliver(n, ANY_DEPTH);
+    const cut = clipsOf(tree, NESTED).cutSliver(n, ANY_DEPTH);
+    expect(cut?.within).toBeUndefined(); // its own evidence, never an inherited cut
+    return cut;
   };
   const text = (bounds: string) => `<node class="android.widget.TextView" resource-id="a:id/title" text="Apps" bounds="${bounds}"/>`;
   const row = (id: string, bounds: string, ...kids: string[]) => `<node class="android.widget.LinearLayout" clickable="true" resource-id="a:id/${id}" bounds="${bounds}">${kids.join('')}</node>`;

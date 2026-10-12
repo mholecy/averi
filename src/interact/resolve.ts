@@ -552,8 +552,8 @@ export const pinnedUnder = (edge: SystemBar['edge']): string => (edge === 'top' 
  * reaches it; where the tree cannot say (idb's flat list), both. The
  * refusal stays a refusal either way — the safe direction, and terminal in
  * an `optional:` step (flow/engine.ts). Cost, on the refusal path only:
- * the clip facts' two walks of the tree (ui-tree/geometry.ts#clipsOf's own
- * and `Clips.inScroller`'s).
+ * `Clips.inScroller`'s one walk of the tree (ui-tree/geometry.ts#clipsOf's
+ * own walk is every tap's: its standing asks the cut first).
  */
 export function systemBarRemedy(edge: SystemBar['edge'], scrolls: boolean | undefined): string {
   const pinned = `no scroll moves it out: ${pinnedUnder(edge)} — fix the layout, or tap something else`;
@@ -732,12 +732,12 @@ const cutFinding = (cut: Cut, shown: Rect, minPiece: number): string =>
  * node whose rect is `shown`): `cut at its scroll container's bottom edge
  * (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across
  * that edge, under the 65 a tap needs`; a cut inherited from what the node
- * lies in (`Cut.within`, round 8) says so after the container — `…(container
+ * lies in (`Cut.within`) says so after the container — `…(container
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
  * part…`. Said by the tap's refusal
  * (`aimClearOfChrome`) and by `scroll_until`'s sliver failures
- * (scroll-text.ts) — one wording since the code review of round 7 (S8),
- * where the two had drifted apart ("to a 948x55 part, 55 deep across it").
+ * (scroll-text.ts) — one wording, where two had drifted apart ("to a
+ * 948x55 part, 55 deep across it").
  */
 export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
   const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;

@@ -275,9 +275,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const back = OPPOSITE[o.lastStroke];
       // The way back (`otherWayText`); one swiped earlier is said only in the status bar's sentence, which would else advise it.
       const neither = o.otherWay === 'stroked' ? '' : otherWayText(o.otherWay, back);
-      // What it is short of, in the standing's order (ui-tree/standing.ts#Scene; scroll-rounds.ts#shortOf):
-      // a centre under a system bar, a sliver cut at its container's edge — so a covered sliver names the
-      // edge the `outward` clause speaks of — then something of the app drawn over it, then a clip.
+      // What it is short of, in the standing's order (ui-tree/standing.ts#Scene).
       // A centre under a system bar at the end of the content: no defect of the app's — the point a tap
       // presses is the bar's, and no swipe that way moves it out. The other way may; a target pinned there
       // moves neither way, which is said rather than promised away. "try direction" only for a way the

@@ -545,7 +545,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 /**
  * Code review of fix/r7-sliver, item 1 (2026-10-10): uiautomator cuts every rect to its scroller, so a node cut to a
  * sliver at the scroller's edge has its centre on the screen, and a plain stop stopped on exactly the strip the next
- * tap refuses (resolve.ts#refuseCutSliver). The plain stop now scrolls on.
+ * tap refuses (resolve.ts#aimClearOfChrome). The plain stop now scrolls on.
  */
 describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap refuses (2026-10-10)', () => {
   const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };

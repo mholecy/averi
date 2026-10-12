@@ -224,12 +224,17 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * - THE ORDER, once for both verbs — after what only the stop judges first
  *   (nothing of it in its frame: `underKeyboard` when a keyboard line
  *   applies and the node is in the box, else `offScreen`; with `fully`, a
- *   frame edge it runs past: `clipped`): its centre in a system band —
- *   `systemBar`, the top's before the bottom's; its centre off the screen —
- *   `offScreen`; cut to a sliver at its scroll container's edge
+ *   frame edge it runs past: `clipped`): its centre off the screen —
+ *   `offScreen`; its centre in a system band — `systemBar`, the top's
+ *   before the bottom's; cut to a sliver at its scroll container's edge
  *   (`Clips.cutSliver` by the exposure's minimum piece) — `cut`; drawn over
- *   — `covered`; else `reachable`. Cut before cover: a covered sliver is
- *   reported cut at a named edge, whose remedy is a scroll toward it.
+ *   — `covered`; else `reachable` (the keyboard, last, is the caller's: the
+ *   tap's guard, the stop's line). Off the screen and in a band are
+ *   mutually exclusive — a centre in a band lies inside a box — so their
+ *   order is moot. Cut before cover: a covered sliver is reported cut at a
+ *   named edge, whose remedy is a scroll toward it.
+ * - `facts.screen` is the frame judged: the stop's box cut above its
+ *   keyboard line; the tap's box less the system bands.
  * - What each verb counts:
  *   - the stop (`{ of: 'stop' }`) judges in its frame — the box, cut above
  *     `keyboardTop` when given (the box's width, from its top down to the
@@ -294,7 +299,11 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   turned display).
  * - The navigation band fails open — no band, judged as before it was
  *   read — on a `dumpsys window displays` that lists a second display of a
- *   different size, and on a display not in its natural rotation (r≠0).
+ *   different size, on a display not in its natural rotation (r≠0), and on
+ *   one whose natural rotation is landscape (a tablet): portrait phones only.
+ * - On a screen whose turn is suggested but witnessed by no window (two
+ *   `boxes`), the tap accepts a point that lies only in the other
+ *   orientation.
  */
 export interface Scene {
   /** The tree's draw order (draw-order.ts#drawOrder). */
@@ -393,11 +402,11 @@ export function sceneOf(tree: UiNode): Scene {
  *
  * Measured: idb lists a scroll view's content below the fold with real
  * rects, and a tap at (94,895) on a 402x874 screen landed nowhere and was
- * reported done (docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md);
- * a tap at (201,6) went to iOS's status bar, which scrolled the form to its
+ * reported done; a tap at (201,6) went to iOS's status bar, which scrolled the form to its
  * top, and one at (256,3) on Google Contacts' collapsed app bar to
  * Android's; one at (540,2186) on mp-native's Account Detail, drawn edge to
  * edge, to the navigation bar.
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
  */
 export function onScreen(point: Point, tree: UiNode, screen: StandingScreen | undefined): boolean {
   return placeOf(point, screen?.boxes ?? rootBoxes(tree), screen) === 'on';
@@ -436,7 +445,7 @@ const chosenBox = (centre: Point, screen: StandingScreen | undefined, tree: UiNo
 
 /**
  * THE ORDER (`Scene`'s contract), once for both verbs, after what only the
- * stop judges first: a system band, off the screen, cut, covered (`cover`:
+ * stop judges first: off the screen, a system band, cut, covered (`cover`:
  * the verb's answer when something is drawn over it, else undefined) — else
  * reachable at the centre.
  */
@@ -496,7 +505,7 @@ function tapStanding(judged: Judged, chosen: Rect, boxes: readonly Rect[], bands
   const { scene, node, place } = judged;
   const box = lessSystemBands(chosen, bands);
   const { facts, seen } = factsIn(judged, box);
-  const offScreenVisible = Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
+  const offScreenVisible = boxes.length === 0 ? 0 : Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
   return ordered(facts, place, offScreenVisible, facts.sliver, () => {
     const cover = seen.centreCover;
     if (cover === undefined) return undefined;

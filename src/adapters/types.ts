@@ -72,7 +72,8 @@ export interface DeviceScreen {
    * `dumpsys window displays` as `statusBand`, across the bottom of the
    * display that dump describes; 2154 on the measured 1080x2220 emulator).
    * Unset when the bar is hidden, at a side, the display is turned
-   * (landscape: a residual), or the dump does not say.
+   * (landscape: a residual) or naturally landscape (a tablet), or the dump
+   * does not say.
    * Carried to ui-tree/standing.ts#UsableScreen, where a tap point and
    * `scroll_until`'s stop are judged off it (ui-tree/standing.ts#Scene).
    */
