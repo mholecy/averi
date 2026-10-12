@@ -1344,6 +1344,39 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([]);
     });
 
+    it('scrolled content excuses only within the target\'s own screen: a full-screen web view in a LATER screen-sized layer (an RN transparent Modal\'s window) covers a native button of the screen beneath with its text', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const terms = uiNode({ role: 'text', label: 'Terms and conditions', rect: rect(16, 690, 370, 80) });
+      const tree = uiNode({
+        role: 'application',
+        rect: IPHONE,
+        children: [uiNode({ role: 'other', rect: IPHONE, children: [pay] }), uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [terms] })] })],
+      });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([terms]);
+    });
+
+    it('…and so does a native list in a later screen-sized layer (a full-screen sheet\'s rows over the screen beneath)', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 690, 402, 60) });
+      const tree = uiNode({
+        role: 'application',
+        rect: IPHONE,
+        children: [uiNode({ role: 'other', rect: IPHONE, children: [pay] }), uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] })],
+      });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([row]);
+    });
+
+    it('…and where no screen-sized ancestor holds the scroller (a dump of two windows under a 0×0 root), its content is not excused: the safe direction', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 1700, 1000, 120) });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 1680, 1080, 160) });
+      const tree = uiNode({
+        role: 'container',
+        rect: rect(0, 0, 0, 0),
+        children: [uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [pay] }), uiNode({ role: 'scrollable', rect: rect(0, 1200, 1080, 1020), children: [row] })],
+      });
+      expect(drawOrder(tree).exposure(pay, rect(0, 0, 1080, 2220)).covers).toEqual([row]);
+    });
+
     it('a link under a sticky element of ITS OWN web page still has that element over it', () => {
       const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 100, 200, 30) });
       const sticky = uiNode({ role: 'text', label: 'Contents', rect: rect(0, 90, 402, 40) });

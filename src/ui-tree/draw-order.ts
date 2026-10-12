@@ -352,6 +352,13 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
   rectWithin(target.node.rect, node.rect) &&
   (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
+/** `placed`'s nearest ancestor that `fillsScreen` — the window or host layer it lives in — if any. */
+const screenLayerOf = (placed: Placed, screenArea: number): Placed | undefined => {
+  let layer = placed.parent;
+  while (layer !== undefined && !fillsScreen(layer.node.rect, screenArea)) layer = layer.parent;
+  return layer;
+};
+
 /** `inner` lies in `outer`'s subtree (or is it). */
 const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
 
@@ -628,7 +635,10 @@ const NOT_DRAWN = {
 
   /**
    * SCROLLED CONTENT: a node inside something that scrolls
-   * (scroll-containers.ts#scrolls) that does not hold the target. `target` only (2026-10-09): an iOS form scrolls UNDER its
+   * (scroll-containers.ts#scrolls) that does not hold the target, in the
+   * target's own screen — the scroller's nearest screen-sized ancestor
+   * (`screenLayerOf`: the window or host layer it lives in) holds the
+   * target too. `target` only (2026-10-09): an iOS form scrolls UNDER its
    * translucent top bar, and WDA lists the bar's BackButton and Save
    * BEFORE the scroll view (the `contentFramed` row's measurement), so
    * every row scrolled up under the bar follows the bar's buttons in
@@ -636,10 +646,16 @@ const NOT_DRAWN = {
    * one tap that leaves the screen. Content cannot be drawn over what lies
    * outside its scroll view's frame on top of it; the scroll view itself
    * is judged by `contentFramed`. A row of the SAME scroll view as the
-   * target (a sticky section header over a row) still covers. Residual,
-   * stated: a scroll view really drawn over another part of the screen (a
-   * bottom sheet's list over a form) hides nothing through its rows here —
-   * only its frame, or a non-scrolling node of the sheet, can cover. The
+   * target (a sticky section header over a row) still covers, and so does
+   * the content of a scroller in a LATER screen-sized layer — an RN
+   * transparent Modal's window holding a full-screen web view, a
+   * full-screen sheet's list — over a target of the screen beneath. Where
+   * no screen-sized ancestor holds the scroller (a tree with no window or
+   * host layer around it), nothing is excused: the safe direction.
+   * Residual, stated: a scroll view drawn over another part of the SAME
+   * screen (a bottom sheet's list laid in the screen's own layer, over a
+   * form) hides nothing through its rows here — only its frame, or a
+   * non-scrolling node of the sheet, can cover. The
    * point and the container questions never ask it: the dismissal picker's
    * title IS such a target, and its `contentFramed` row was measured with
    * a row under the title still covering (accepted there as a false
@@ -651,7 +667,11 @@ const NOT_DRAWN = {
    * bar.
    */
   scrolledContent: {
-    target: ({ scroller }, { target }) => scroller !== undefined && !within(target, scroller),
+    target: ({ scroller }, { target, screenArea }) => {
+      if (scroller === undefined || within(target, scroller)) return false;
+      const layer = screenLayerOf(scroller, screenArea);
+      return layer !== undefined && within(target, layer);
+    },
   },
 
   /**
