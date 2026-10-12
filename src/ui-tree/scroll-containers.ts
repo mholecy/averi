@@ -17,9 +17,7 @@ import type { UiNode } from '../adapters/types.js';
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
  *   (geometry.ts#insideScroller), and, for draw order, a node's nearest
  *   scroller (`Placed.scroller`), which three target rows read: scrolled
- *   content (within the target's own screen; a web view's FRAME is not
- *   excused by it — draw-order.ts's scrolledContent row says both),
- *   `structural`'s wrapper excuse (`holdsWhole`: a wrapper holding
+ *   content (draw-order.ts's `scrolledContent` row), `structural`'s wrapper excuse (`holdsWhole`: a wrapper holding
  *   the target's nearest scroller whole) and the scroll indicator (a child
  *   of a node that scrolls). A node that clips scrolls (Android's
  *   flag means "scrolls now"); so does a node of a `SCROLLING_ROLES` role,
@@ -45,7 +43,7 @@ export function clips(n: UiNode): boolean {
 }
 
 /** The roles whose content scrolls under their frame, whatever the source says of clipping. */
-export const SCROLLING_ROLES: ReadonlySet<string> = new Set(['scrollable', 'webview']);
+const SCROLLING_ROLES: ReadonlySet<string> = new Set(['scrollable', 'webview']);
 
 /** This node's content scrolls under its frame: it clips, or its role is one of `SCROLLING_ROLES`. `clips(n) ⇒ scrolls(n)`. */
 export function scrolls(n: UiNode): boolean {

@@ -1297,15 +1297,12 @@ function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | unde
  * Widen each `grown` node whose gained strip — the part of the grown rect
  * outside the dumped one — something is drawn over, as draw order's target
  * column judges it for that node (`drawnOverStrip`,
- * types.ts#DrawnOverStrip; every excuse of that column applies): the
+ * types.ts#DrawnOverStrip; what draws is ui-tree/draw-order.ts's
+ * `NOT_DRAWN`): the
  * overlay that cut it lies there — row_0's sticky header, the floating tab
  * bar over the rows cut at it. A strip nothing draws over is the node's own
- * overflow, and widening it would make the node overlap what it does not —
- * e.g. a screen-sized host listed after it (a snackbar host), a bare
- * structural overlay or a childless scrim widens nothing. The column's
- * scrolled-content and content-framed rows were measured on iOS; they now
- * judge Android strips too (a sheet's list over the row widens nothing
- * through its rows or its frame). Judged on
+ * overflow, and widening it would make the node overlap what it does not.
+ * Judged on
  * the dumped rects, every decision before any is applied; the dumped rect
  * is kept as `cutBounds` (types.ts#UiNode.cutBounds, which states the
  * residual: the next row of the same list is drawn over the strip exactly

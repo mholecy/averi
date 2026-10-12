@@ -236,6 +236,22 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(rowOf(rowWith('', sheet))).not.toHaveProperty('cutBounds');
   });
 
+  it('…unless the sheet lies in a LATER stacked screen: the same RecyclerView sheet wrapped in a full-screen layer, over a list in the screen\'s own full-screen layer, widens the row (draw-order.ts\'s scrolledContent row)', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" bounds="[0,0][1080,2220]">
+ <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+  <node class="android.view.View" resource-id="row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1500][1014,1600]" /></node>
+ </node>
+</node>
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+ <node class="androidx.recyclerview.widget.RecyclerView" resource-id="sheet" scrollable="false" bounds="[0,1520][1080,2220]">
+  <node class="android.widget.TextView" resource-id="sheet_row" text="Share" bounds="[0,1540][1080,1700]" />
+ </node>
+</node>
+</node></hierarchy>`);
+    expect(rowOf(t)).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
   it('the strip is judged with the dump\'s mark in place (paddedTouchTargets): a label cut short of its text whose own icon button, padded evenly in their wrapper and centred on it, lies on the strip is not widened under its own control', () => {
     const t = rowWith(`
  <node class="android.view.View" resource-id="wrapper" bounds="[100,1000][400,1300]">
