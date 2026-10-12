@@ -531,7 +531,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
     const error = await scrollUntilVisible(fake, 'text:"row_40"', { fully: true, maxSwipes: 6, timeoutMs: 15_000, settleMs: 1 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect((error as Error).message).toBe(
-      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
+      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree — if it lies above, try direction: "up"',
     );
   });
 

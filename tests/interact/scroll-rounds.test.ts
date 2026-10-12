@@ -813,7 +813,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
     expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
     const error = failureOf(played, 'id:transactions.list.row_40');
     expect(error.message).toBe(
-      'scroll_until id:transactions.list.row_40 failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
+      'scroll_until id:transactions.list.row_40 failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree — if it lies above, try direction: "up"',
     );
     expect(error).toBeInstanceOf(ElementNotFoundError);
   });
@@ -1200,6 +1200,9 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
       'scroll_until id:t failed after 2 swipes (the last 2, swiping up, did not change the screen: they touched down at 540,1104 on text "Account" (id account.title) at 0,1050 1080x100, drawn over the list 0,825 1080x1395, which may have taken them (else: content exhausted, still loading)) — element never appeared in the tree',
     );
     expect(error).toBeInstanceOf(ElementNotFoundError);
+    // A first stroke that changed the screen, then the same touch-down: the header may have taken them — the end of the content is not read, so no side is named (round 8's B1 gap).
+    const moved = failureOf(play({ ...ANDROID, direction: 'up' }, [row('a'), row('b'), row('b'), row('b')]), 'id:t');
+    expect(moved.message).toMatch(/which may have taken them \(else: content exhausted, still loading\)\) — element never appeared in the tree$/);
   });
 
   it('…and so does the match rule ("did not move it"), with the target in the tree off the frame', () => {
@@ -1617,6 +1620,65 @@ describe('round — a target uiautomator dumped CLIPPED OUT of its scroll contai
   it('last read clipped out past the far edge, then dropped by the lazy list: not `dropped` — it already lay where the caller\'s strokes push it', () => {
     const played = play({ ...SETTINGS, maxSwipes: 3 }, [clippedOut('top'), { found: [], scroller, rest: 'a' }, { found: [], scroller, rest: 'b' }, { found: [], scroller, rest: 'c' }]);
     expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
+  });
+
+  it('measured (round 8\'s B1 gap, re-run at 35d5997): plain from `Apps` clipped out past the top, four strokes down, dropped, the screen then unchanged — the failure says where it lay and the way back, not "off the viewport, or under the soft keyboard … (a fling?)"', () => {
+    const gone = (rest: string): Row => ({ found: [], scroller, rest });
+    const played = play(SETTINGS, [clippedOut('top'), gone('a'), gone('b'), gone('b'), gone('b')]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'down', 'down']); // the owner's default: no turn on the first read
+    const error = failureOf(played, 'text:"Apps"');
+    expect(error.message).toBe(
+      'scroll_until text:"Apps" failed after 4 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — ' +
+        'element was in the tree before the first swipe, clipped out above its scroll container, past the edge the swipes push it out through, never in the viewport, ' +
+        'and is no longer in the tree (a lazy list drops what scrolls away) — scroll_until it with direction: "up"',
+    );
+    expect(error).not.toBeInstanceOf(ElementNotFoundError); // it was in the tree
+  });
+
+  it('kept in the tree, clipped out past the top, to maxSwipes: in the tree, off the frame — with where it lay and the way back', () => {
+    const played = play({ ...SETTINGS, maxSwipes: 2 }, [clippedOut('top'), clippedOut('top'), clippedOut('top')]);
+    expect(failureOf(played, 'text:"Apps"').message).toBe(
+      'scroll_until text:"Apps" failed after 2 swipes (maxSwipes) — element in tree but never ' +
+        'intersected the 1080x2220 viewport (last rect {"x":198,"y":297,"width":126,"height":0}) — it lay clipped out above its scroll container, past the edge the swipes ' +
+        'push it out through: scroll_until it with direction: "up"',
+    );
+  });
+
+  it('clipped out past the NEAR edge (the bottom, scrolling down) is coming in, and one last read short of the far edge is no evidence: the old words', () => {
+    const gone = (rest: string): Row => ({ found: [], scroller, rest });
+    const near = play({ ...SETTINGS, maxSwipes: 2 }, [clippedOut('bottom'), gone('a'), gone('b')]);
+    expect(failureOf(near, 'text:"Apps"').message).toMatch(/— element was in the tree before the first swipe \(off the viewport, or under the soft keyboard\), never in the viewport/);
+    // Seen clipped out past the top, then read in the frame and lost: last seen short of the edge, so `gone`, no side named.
+    const back = play({ ...SETTINGS, maxSwipes: 3 }, [clippedOut('top'), { ...apps(2190), rest: 'x' }, gone('a'), gone('b')]);
+    expect(failureOf(back, 'text:"Apps"').message).not.toContain('direction: "up"');
+  });
+});
+
+describe('round — a target read wholly past the far edge on iOS, and one never found by strokes that ran to the end of the content (round 8\'s B1 gap)', () => {
+  /** A 354x52 row at y under WDA, read where it is (iOS keeps a scrolled-past node, its rect off the screen). */
+  const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'row')] });
+  const tree = (rest: string): Row => ({ found: [], rest });
+
+  it('above the screen at every read, the strokes (down) moving it no more: the side and the way back — the owner\'s default kept, no turn', () => {
+    const played = play({ ...IPHONE, maxSwipes: 4 }, [row(-300), row(-300), row(-300)]);
+    expect(strokesToward(played)).toEqual(['down', 'down']);
+    expect(failureOf(played, 'id:row').message).toMatch(/— element in tree but never intersected the 402x874 viewport \(last rect [^)]*\) — it lay above the viewport, past the edge the swipes push it out through: scroll_until it with direction: "up"$/);
+  });
+
+  it('never in the tree, a stroke that changed the screen and then the caller\'s strokes no longer changing it: the end of the content that way was read, so the other side is named as a conditional — down and up', () => {
+    const ranToEnd = [tree('a'), tree('b'), tree('b'), tree('b')];
+    expect(failureOf(play(IPHONE, ranToEnd), 'id:t').message).toMatch(/failed after 3 swipes .* — element never appeared in the tree — if it lies above, try direction: "up"$/);
+    expect(failureOf(play({ ...IPHONE, direction: 'up' }, ranToEnd), 'id:t').message).toMatch(/— element never appeared in the tree — if it lies below, try direction: "down"$/);
+  });
+
+  it('never in the tree, and NO stroke ever changed the screen (review round 1 of fix/r8-wording): nothing says the content ran to its end — the swipes may not have been taken — so no side is named', () => {
+    expect(failureOf(play(IPHONE, [tree('a'), tree('a'), tree('a')]), 'id:t').message).toBe(
+      'scroll_until id:t failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
+    );
+  });
+
+  it('never in the tree at maxSwipes, or at the deadline — more content may lie ahead — guesses nothing', () => {
+    expect(failureOf(play({ ...IPHONE, maxSwipes: 2 }, [tree('a'), tree('b'), tree('c')]), 'id:t').message).toBe('scroll_until id:t failed after 2 swipes (maxSwipes) — element never appeared in the tree');
   });
 });
 

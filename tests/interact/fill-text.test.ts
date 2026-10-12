@@ -290,6 +290,15 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(mismatch({ kind: 'length' }, 1, 4)).toBe('fill: typed 1 character but the field shows 4 (content withheld from this error)');
   });
 
+  it('a mismatch after the clear-fill\'s one retry says so — a wipe and a retype, or a retype alone when the field held nothing (round 8\'s D3 nit: "typed 3 but shows 4" read as the first typing)', () => {
+    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, retried: { wiped: true } })).toBe(
+      'fill: typed 3 characters (after one wipe and retype) but the field shows 4 (content withheld from this error)',
+    );
+    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 0, differs: { kind: 'unchanged' }, retried: { wiped: false } })).toMatch(
+      /^fill: typed 3 characters \(after typing it once more\) but the field shows 0 — the field did not change/,
+    );
+  });
+
   it('a mismatch on a node that is not an input names the input in the caveat\'s own words', () => {
     const input = { identifier: 'name', rect: { x: 0, y: 20, width: 100, height: 10 }, overlaps: false };
     expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, notInput: { role: 'text', input } })).toBe(

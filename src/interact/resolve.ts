@@ -366,6 +366,28 @@ export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, 
 /** Where a node clipped out past each side of its container lies; the scroll_until direction that brings it back is swipe.ts#REVEALS'. */
 const CLIPPED_OUT_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'left of', right: 'right of' };
 
+/** The same sides as `CLIPPED_OUT_WHERE`, standing alone: `if it lies above` (`untriedSideText`). */
+const LIES_WHERE: Readonly<Record<Edge, string>> = { top: 'above', bottom: 'below', left: 'to the left', right: 'to the right' };
+
+/**
+ * Where a node read wholly past `side` lies — `clipped out above its scroll
+ * container` when Android dumped it so (UiNode.clippedOut), `above the
+ * viewport` when its rect lies there — the one wording of it, for this
+ * wait's hint and `scroll_until`'s failure (scroll-text.ts, 2026-10-12,
+ * round 8's B1 gap).
+ */
+export function pastSideText(side: Edge, clippedOut: boolean): string {
+  return clippedOut ? `clipped out ${CLIPPED_OUT_WHERE[side]} its scroll container` : `${CLIPPED_OUT_WHERE[side]} the viewport`;
+}
+
+/** The scroll that brings back a node lying past `side`: `scroll_until it with direction: "up"` (swipe.ts#REVEALS). */
+export const revealText = (side: Edge): string => `scroll_until it with direction: "${REVEALS[side]}"`;
+
+/** The direction to try for a target that may lie past `side` and was never read there: `if it lies above, try direction: "up"`. */
+export function untriedSideText(side: Edge): string {
+  return `if it lies ${LIES_WHERE[side]}, try direction: "${REVEALS[side]}"`;
+}
+
 /**
  * The hint for a target this tree matched, but only with zero-area nodes —
  * resolveNow's filter, the reason it answered `undefined` — or undefined
@@ -383,7 +405,7 @@ function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
   if (sides.has(undefined)) return ZERO_AREA_HINT;
   const [only, ...more] = [...sides] as Edge[];
   if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => CLIPPED_OUT_WHERE[side]).join(' or ')} its scroll container — scroll_until it first`;
-  return `it matched only nodes clipped out ${CLIPPED_OUT_WHERE[only]} its scroll container (scrolled past it) — scroll_until it with direction: "${REVEALS[only]}" first`;
+  return `it matched only nodes ${pastSideText(only, true)} (scrolled past it) — ${revealText(only)} first`;
 }
 
 /**
