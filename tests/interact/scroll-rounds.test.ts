@@ -1235,11 +1235,6 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
   });
 
-  it('fully: true — a row whose centre is clear but whose bottom is still under the bar is not fully visible either', () => {
-    const played = play({ ...IPHONE, fully: true }, [form(740), form(400), form(400)]);
-    expect(played.steps[0].do).toBe('stroke');
-  });
-
   it('without fully — the centre decides: on the bar (771, 754), the scroll goes on; clear of it (740, its bottom still under the bar), it stops', () => {
     const played = play(IPHONE, [form(771), form(754), form(740), form(740)]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stroke', 'confirm', 'stop']);
@@ -1294,13 +1289,6 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
   });
 
-  it('without fully, a centre under the keyboard band is not "covered" by a bar there: the frame is the screen above the band — a stop, as before', () => {
-    const BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
-    const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 560, width: 402, height: 80 } });
-    const played = play(IPHONE, [{ found: [match({ x: 24, y: 550, width: 354, height: 60 }, 'priority')], over: [bar], cover: coverOver(BAND, NO_BACK) }]);
-    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
-  });
-
   it('without fully, the centre must lie on the SCREEN — the frame the next tap\'s on-screen rule judges (code review P3, repro B): a row whose centre is off the bottom edge is scrolled on, and stops once it is on', () => {
     const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 402, height: 60 }, 'r')] });
     const played = play(IPHONE, [row(850), row(600), row(600)]);
@@ -1341,11 +1329,6 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     );
   });
 
-  it('a bar under the soft keyboard is no cover: the round judges above the band, and what is drawn below it does not count', () => {
-    const BAND: Rect = { x: 0, y: 572, width: 402, height: 302 };
-    const played = play({ ...IPHONE, fully: true }, [{ ...form(400), cover: coverOver(BAND, NO_BACK) }]);
-    expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
-  });
 });
 
 describe('round — a target resting in the frame at the edge the strokes push it out through (docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md)', () => {

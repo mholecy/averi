@@ -40,29 +40,26 @@ export interface DeviceScreen {
    * unset: its app window is the screen and the safe areas lie INSIDE it,
    * so an inset rect in an iOS tree is content, never the window. Read by
    * verify/scale.ts, which measures such a window instead of refusing it as
-   * a CONTENT width (2026-10-07, the parity code review's A1/A2).
+   * a CONTENT width.
    */
   windowsBesideSystemBars?: boolean;
   /**
    * The height of the band at the top of the screen held upright that is
    * NOT the app's to tap — the system status bar, in the tree's units. Set
-   * by both adapters (2026-10-09 iOS, 2026-10-12 Android):
+   * by both adapters:
    * - iOS: the status bar down to the safe area, by the screen's size
    *   (ios-status-band.ts, the measurement there) — always set;
    * - Android: the VISIBLE status bar's frame out of `dumpsys window
    *   displays` (android.ts#parseStatusBand, 66 px on the measured 1080x2220
    *   emulator) — unset when the bar is hidden (an immersive app) or the
-   *   dump does not say (fail open). Until 2026-10-12 Android set none, on
-   *   the premise that its status bar lies outside the app's window: false
-   *   for an app that draws edge-to-edge — Google Contacts dumps its
-   *   collapsed app bar at y 0 under the bar, and a tap at (256,3) went to
-   *   the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-
-   *   system-status-bar-as-app-screen.md). In an app that keeps clear of
-   *   the bar no node lies in the band, so it changes nothing there.
-   * Carried to the judgements of a tap point by
-   * ui-tree/standing.ts#UsableScreen. Cut only from a PORTRAIT box (ui-tree/geometry.ts#belowStatusBand):
-   * iOS's rule — an iPhone hides its bar in landscape — which Android, whose
-   * bar stays at the top in landscape, shares as a stated residual.
+   *   dump does not say (fail open). Its status bar does not lie outside
+   *   the app's window for an app that draws edge-to-edge — Google Contacts
+   *   dumps its collapsed app bar at y 0 under the bar, and a tap at (256,3)
+   *   went to the bar. In an app that keeps clear of the bar no node lies in
+   *   the band, so it changes nothing there.
+   *   docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md
+   * Carried to the judgements by ui-tree/standing.ts#UsableScreen, which
+   * says how it is cut (ui-tree/standing.ts#Scene).
    */
   statusBand?: number;
   /**
@@ -74,8 +71,8 @@ export interface DeviceScreen {
    * Unset when the bar is hidden, at a side, the display is turned
    * (landscape: a residual) or naturally landscape (a tablet), or the dump
    * does not say.
-   * Carried to ui-tree/standing.ts#UsableScreen, where a tap point and
-   * `scroll_until`'s stop are judged off it (ui-tree/standing.ts#Scene).
+   * Carried to ui-tree/standing.ts#UsableScreen, where the judgements read
+   * it (ui-tree/standing.ts#Scene).
    */
   navigationBand?: number;
 }
@@ -93,10 +90,9 @@ export const usableSize = ({ width, height }: { width: number; height: number })
 /**
  * A point in the platform's tree units (Android pixels, iOS points) — a tap
  * point, a swipe's end. Named here, beside the screen it lies on, because
- * `DeviceAdapter.swipe` takes it: until 2026-10-08 the adapters and
- * ui-tree's point helpers (`tapPoint`, `containsPoint`, draw order's `shadowing`) spelled
- * `{ x, y }` inline and interact/ named it twice (keyboard-model.ts's tap
- * point, swipe.ts's stroke end).
+ * `DeviceAdapter.swipe` takes it; the adapters, ui-tree's point helpers
+ * (`tapPoint`, `containsPoint`, draw order's `shadowing`) and interact/ all
+ * name it here.
  */
 export interface Point {
   x: number;
@@ -129,7 +125,7 @@ export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
  * The side of its container a node lies wholly past (`UiNode.clippedOut`) —
  * and any rect's side: ui-tree/geometry.ts re-exports it as `Edge` (the side
  * a rect extends past or lies flush with), so `clippedOut` and a cut's edge
- * compare as one type (code review of round 7, S1).
+ * compare as one type.
  */
 export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
 
@@ -138,8 +134,7 @@ export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
  * a negative or NaN side. The one spelling of "has this rect an area": the
  * visible fraction and the bare-tree rule above this layer (ui-tree/
  * geometry.ts re-exports it), and the idb source's empty-tree check here
- * (ios-tree-source.ts). Moved from geometry.ts on 2026-10-06, so that check
- * did not need a second spelling.
+ * (ios-tree-source.ts), which may not import ui-tree/.
  */
 export function rectArea(rect: Rect): number {
   if (!(rect.width > 0 && rect.height > 0)) return 0;
@@ -149,12 +144,12 @@ export function rectArea(rect: Rect): number {
 
 /**
  * Exactly the same rect — x, y, width AND height; a resize is a change.
- * Since 2026-10-06 the pixel poll's rect confirmation (verify/pixel-poll.ts)
- * asks it of two consecutive tree reads; exact, because tree rects are whole
- * points and "nearly the same place" is the stale-crop case it exists to catch.
- * Since 2026-10-08 the WDA parser's text-echo rule (wda-source.ts#isTextEcho)
- * asks it of a StaticText and its one child; moved here from ui-tree/
- * geometry.ts (which re-exports it) so adapters/ need no second spelling.
+ * The pixel poll's rect confirmation (verify/pixel-poll.ts) asks it of two
+ * consecutive tree reads; exact, because tree rects are whole points and
+ * "nearly the same place" is the stale-crop case it exists to catch. The
+ * WDA parser's text-echo rule (wda-source.ts#isTextEcho) asks it of a
+ * StaticText and its one child; here, below ui-tree/geometry.ts (which
+ * re-exports it), so adapters/ need no second spelling.
  */
 export function sameRect(a: Rect, b: Rect): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
@@ -163,8 +158,7 @@ export function sameRect(a: Rect, b: Rect): boolean {
 /**
  * The same rect to within a pixel on every side — under 1 unit of x, y,
  * width and height apart. `sameRect`'s sibling, kept beside it so rect
- * equality has one owner with two honestly named questions (code review of
- * round 2, 2026-10-08: it was `rectsEqual`, private to interact/scroll.ts).
+ * equality has one owner with two honestly named questions.
  * `scroll_until` asks it of one match's rect read for read — "did the
  * stroke move it?", "did the confirming read find it where the stop's read
  * did?" — where a sub-unit difference between reads (fractional
@@ -179,17 +173,16 @@ export function sameRectWithinPixel(a: Rect, b: Rect): boolean {
 /**
  * Do two rects share any area at all? Positive area only: rects that merely
  * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —
- * do not overlap, and neither does a zero-area rect with anything. Added
- * 2026-10-06 for the pixel poll's soft-keyboard check (verify/pixel-poll.ts):
+ * do not overlap, and neither does a zero-area rect with anything. The pixel
+ * poll's soft-keyboard check (verify/pixel-poll.ts) asks it:
  * an element any part of which lies under the keyboard is measured as the
  * keyboard, so ANY overlap counts there, and an element sitting flush on top
  * of the keyboard's frame is not under it. Both rects in the same units —
  * the caller's to guarantee. ui-tree/geometry.ts's `intersectsViewport` is the
  * same arithmetic against a viewport anchored at the origin; its
- * `containsPoint` (the tap guard's, until 2026-10-07 interact/keyboard.ts's
- * `inside`/`covers`) is point-in-rect, a different question.
- * Moved here from ui-tree/geometry.ts (which re-exports it) on 2026-10-07:
- * the WDA parser's keyboard band test needs it and may not import that layer.
+ * `containsPoint` is point-in-rect, a different question. Here, below
+ * ui-tree/geometry.ts (which re-exports it): the WDA parser's keyboard band
+ * test needs it and may not import that layer.
  */
 export function rectsOverlap(a: Rect, b: Rect): boolean {
   return rectIntersection(a, b) !== undefined;
@@ -200,10 +193,8 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
  * or a corner in common is none) — `rectsOverlap`'s question answered with
  * the shared rect itself, and its one arithmetic. Callers: the box a scroll
  * stroke is drawn in, the gesture box met with a clipping container
- * (interact/swipe.ts#strokeBox — a private `meet` there until the code
- * review of round 3, 2026-10-09), and the fill's nearest-input pick
- * (interact/fill.ts, its overlap area — a private `overlapArea` until the
- * verification round). Here beside `rectsOverlap`, below ui-tree/
+ * (interact/swipe.ts#strokeBox), and the fill's nearest-input pick
+ * (interact/fill.ts, its overlap area). Here beside `rectsOverlap`, below ui-tree/
  * geometry.ts, which re-exports it.
  */
 export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
@@ -216,12 +207,11 @@ export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
 
 /**
  * The role of the ONE node per on-screen soft keyboard that a tree source
- * emits when its tree contains the keyboard (2026-10-07: the WDA source,
+ * emits when its tree contains the keyboard (the WDA source,
  * adapters/wda-source.ts#keyboardMarks). Its rect is the screen band the
  * keyboard covers — keys, AutoFill bar, accessory toolbar slot and dictation
  * row together — not the `Keyboard` element's own rect, which was measured
- * 17–44 pt short of the drawn area (docs/bugs/2026-10-05-ios-tap-lands-on-
- * soft-keyboard.md). Read by `ui-tree/soft-keyboard.ts#keyboardInTree`, the
+ * 17–44 pt short of the drawn area (the bug note below). Read by `ui-tree/soft-keyboard.ts#keyboardInTree`, the
  * in-tree half of the soft-keyboard reading the tap guard and the pixel
  * poll share with the Android oracle. Defined beside UiNode because the
  * adapter writes it and ui-tree reads it, and neither may spell the string.
@@ -230,6 +220,7 @@ export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
  * Absent from a tree means nothing — an idb tree never carries one and a
  * WDA tree without one has no keyboard on screen, and the tree cannot say
  * which source it came from.
+ * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
  */
 export const KEYBOARD_ROLE = 'keyboard';
 
@@ -240,21 +231,17 @@ export const KEYBOARD_ROLE = 'keyboard';
  * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
  * because the adapters write it and both ui-tree (draw-order.ts: a text
  * input's own scroll indicator and its label) and interaction (fill.ts acts
- * on it, fill-text.ts names it in the not-an-input caveat) read it — round
- * 7, review of fix/r7-covers. Imported from here directly since the code
- * review of round 7 (S9): interact/input-role.ts, which only re-exported
- * it, is gone.
+ * on it, fill-text.ts names it in the not-an-input caveat) read it,
+ * imported from here directly.
  */
 export const INPUT_ROLE = 'textfield';
 
 /**
  * The roles every source gives its wrappers (Application, Window, Other,
- * Cell; FrameLayout, View). Beside KEYBOARD_ROLE since 2026-10-07: it was
- * `ui-tree/bare-tree.ts`'s, and the draw order (`ui-tree/draw-order.ts`'s
+ * Cell; FrameLayout, View). Beside KEYBOARD_ROLE, the one place
+ * `ui-tree/bare-tree.ts` and the draw order (`ui-tree/draw-order.ts`'s
  * `structural` row: a later wrapper contains every point and draws
- * nothing) needed it too
- * — a low-level module importing a higher sibling for one constant, so the
- * constant moved to the one place both may read.
+ * nothing) both may read.
  */
 export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'other']);
 /**
@@ -262,10 +249,10 @@ export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'othe
  * window or application, whatever label the framework gave it. 0.9 leaves
  * room for a status-bar inset or a rounding difference between the wrapper and
  * the screen, while a content row (a Cell, a Pressable) sits far below it.
- * `ui-tree/bare-tree.ts` reads it for a wrapper by size and, since 2026-10-08,
- * `ui-tree/draw-order.ts` for a screen-sized host — moved here from
- * bare-tree.ts the same day, for STRUCTURAL_ROLES' reason above: neither
- * ui-tree module imports the other for a constant.
+ * `ui-tree/bare-tree.ts` reads it for a wrapper by size and
+ * `ui-tree/draw-order.ts` for a screen-sized host — here, for
+ * STRUCTURAL_ROLES' reason above: neither ui-tree module imports the other
+ * for a constant.
  */
 export const SCREEN_SIZED_FRACTION = 0.9;
 
@@ -278,10 +265,10 @@ export interface UiNode {
    * Current value (text field contents, toggle state). A `textfield`'s null
    * value means EMPTY: both parsers map an empty or absent value to null
    * (android.ts and ios-node.ts, `emptyToNull` — an empty Compose field
-   * dumps no `text` at all), so on an input null is "", never "withheld" (2026-10-09,
-   * docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
-   * reads-exposes-no-value.md; interact/fill.ts reads it so). On any other
-   * role null is "no value exposed".
+   * dumps no `text` at all), so on an input null is "", never "withheld"
+   * (interact/fill.ts reads it so). On any other role null is "no value
+   * exposed".
+   * docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md
    */
   value: string | null;
   /** Validation message associated with an input, when the platform exposes one. */
@@ -289,8 +276,7 @@ export interface UiNode {
   rect: Rect;
   children: UiNode[];
   /**
-   * Set on the ROOT of a subtree that is the soft keyboard's own UI
-   * (2026-10-07, review round 1): on iOS through WDA, the Window that holds
+   * Set on the ROOT of a subtree that is the soft keyboard's own UI: on iOS through WDA, the Window that holds
    * the `Keyboard` element — keys, AutoFill bar, dictation button — and the
    * input-host Window UIKit pairs with it, which holds the app's
    * `inputAccessoryView` toolbar (the "Done" above a number pad) and the
@@ -305,8 +291,8 @@ export interface UiNode {
   ofKeyboard?: true;
   /**
    * The text the field shows while it is EMPTY — its hint or placeholder —
-   * when the tree source reports one apart from the value (2026-10-09,
-   * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md).
+   * when the tree source reports one apart from the value.
+   * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md
    * Every source reports an empty field's placeholder AS its value (WDA
    * `value`, idb `AXValue`, uiautomator `text` on API 33, all measured that
    * day), so `value` alone cannot tell "empty, showing `Company`" from
@@ -328,9 +314,7 @@ export interface UiNode {
   placeholder?: string;
   /**
    * Set on a node whose DESCENDANTS' rects the tree source has already
-   * intersected with this node's own rect (2026-10-09,
-   * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-
-   * to-scroll-container.md): Android only, on every node uiautomator dumps
+   * intersected with this node's own rect (the bug note below): Android only, on every node uiautomator dumps
    * with `scrollable="true"` — a RecyclerView or ScrollView, and a Compose
    * scroller, which dumps as a plain `android.view.View` (role `container`)
    * and is told apart by this attribute alone. uiautomator reports each
@@ -342,8 +326,9 @@ export interface UiNode {
    * ui-tree/geometry.ts#clipsOf, which `scroll_until`'s round asks for
    * each match's such ancestors so a `fully: true` stop flush with one is
    * checked before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
+   * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
    *
-   * A flag, not a role (decided 2026-10-09): mapping a Compose scroller to
+   * A flag, not a role: mapping a Compose scroller to
    * `scrollable` would change three things this fix does not want to touch —
    * ui-tree/bare-tree.ts counts any non-structural role as content, so a
    * Compose screen whose only node is an empty scroller would stop reading
@@ -357,16 +342,14 @@ export interface UiNode {
    * Android node that cannot scroll now (`scrollable="false"`: a list whose
    * content fits), whose children are not cut by it.
    *
-   * Residuals, stated (code review of fix/r3-scroll, 2026-10-09): a View's
+   * Residuals, stated: a View's
    * accessibility bounds are cut to EVERY ancestor's visible rect, not only
    * a scroller's, and Compose also subtracts what an overlay sibling covers
    * — a row cut by a pinned bar drawn over the list reads cut at the bar's
-   * edge, not flush with any marked node, so the flag cannot reveal it (the
-   * pinned-chrome bug, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-
-   * pinned-app-chrome.md, out of scope; since 2026-10-09 a node whose own
-   * descendants still carry the uncut extent is widened to it in the
-   * parser — `cutBounds` — and one whose descendants are cut too stays
-   * this residual). A RecyclerView with padding and
+   * edge, not flush with any marked node, so the flag cannot reveal it (a
+   * node whose own descendants still carry the uncut extent is widened to
+   * it in the parser — `cutBounds` — and one whose descendants are cut too
+   * stays this residual). A RecyclerView with padding and
    * clipToPadding draws a row cut at its padding edge while the row's rect
    * runs on to the view's edge: not flush, not caught either.
    */
@@ -374,9 +357,7 @@ export interface UiNode {
   /**
    * The bounds the tree source dumped for this node, when they were CUT
    * short of its own descendants by something drawn over it, and `rect` is
-   * widened to their extent (2026-10-09, the bug note
-   * docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md):
-   * Android only, set by the uiautomator parser
+   * widened to their extent (the bug note below): Android only, set by the uiautomator parser
    * (adapters/android.ts#uncut, #widenUnderCovers).
    * Compose subtracts what an overlay sibling covers from a node's bounds
    * but not from its descendants': mp-native's Account Detail row under its
@@ -406,13 +387,12 @@ export interface UiNode {
    * what is judged: "its rect was cut here; something is drawn over the
    * rest". Absent on iOS (WDA and idb report frames unclipped) and on every
    * node the parser left as dumped.
+   * docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md
    */
   cutBounds?: Rect;
   /**
    * The side of its container this node lies wholly PAST, when the tree
-   * source dumped its bounds inverted (2026-10-09, docs/bugs/2026-10-09-
-   * android-inverted-uiautomator-bounds-pass-through-as-negative-
-   * heights.md): Android only, set by the uiautomator parser (adapters/
+   * source dumped its bounds inverted (the bug note below): Android only, set by the uiautomator parser (adapters/
    * android.ts#nodeBounds). uiautomator cuts a node's bounds to its
    * container, and a node scrolled wholly past it keeps one edge of each —
    * Settings' `Apps` row under the collapsing app bar dumped
@@ -424,16 +404,16 @@ export interface UiNode {
    * way it went: `top` — clipped out above its scroll container — and
    * `bottom`, `left`, `right` likewise. Read by the wait's hint
    * (interact/resolve.ts#zeroAreaHint), by `scroll_until`, which reads a
-   * node clipped out past its far edge as beyond it (interact/scroll-
-   * rounds.ts#observe), and by the cut-sliver rule, to which a descendant
+   * node clipped out past its far edge as beyond it
+   * (interact/scroll-rounds.ts#observe), and by the cut-sliver rule, to which a descendant
    * clipped out past an edge its ancestor lies flush with is evidence of a
-   * cut there (ui-tree/geometry.ts#evidentCut, code review of round 7 P1). Absent on iOS and on every node dumped the right
-   * way round.
+   * cut there (ui-tree/geometry.ts#evidentCut). Absent on iOS and on every
+   * node dumped the right way round.
+   * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md
    */
   clippedOut?: ClippedSide;
   /**
-   * Set on the ROOT of a tree its source gives as a FLAT LIST (code review
-   * of deep/r5-covers, P1, 2026-10-09): idb's `describe-all`, every element
+   * Set on the ROOT of a tree its source gives as a FLAT LIST: idb's `describe-all`, every element
    * a child of a synthetic 0×0 root (adapters/ios-tree-source.ts#idbTree)
    * in the list's order — no node has a parent of its own, so nothing in
    * the tree says what a node belongs to. Read by ui-tree/draw-order.ts,
@@ -452,8 +432,7 @@ export interface UiNode {
   flatList?: true;
   /**
    * Set on the ROOT of a tree whose source lists a control's minimum TOUCH
-   * TARGET as a wrapper of its own around it (code review of round 6b, P2,
-   * 2026-10-09): uiautomator's (adapters/android.ts#parseUiautomatorXml) —
+   * TARGET as a wrapper of its own around it: uiautomator's (adapters/android.ts#parseUiautomatorXml) —
    * Compose pads a control smaller than 48 dp to a 48-dp touch target, and
    * Google Contacts' Cancel reaches the dump as `container 11,88 132x132` →
    * the label node `other 'Cancel' 44,121 66x66`, `button 22,99 110x110`
@@ -473,7 +452,7 @@ export interface UiNode {
  * field-error pairing feeds WDA's nested tree to its flat rule with it, the
  * text hint flattens with it, ui_snapshot's note counts with it. It lives
  * beside UiNode rather than in a verify/ or adapters/ sibling because all
- * three layers need it and none owns it (review 2026-10-06). It yields nodes
+ * three layers need it and none owns it. It yields nodes
  * only: a walk that needs each node's subtree end in the order
  * (ui-tree/draw-order.ts) or what its ancestors hand down
  * (ui-tree/geometry.ts#clipsOf) recurses on its own.
@@ -512,8 +491,8 @@ export type KeyboardWitness = 'shown' | 'hidden' | 'unknown';
 /**
  * What a platform can say about its on-screen (soft) keyboard — see
  * `KeyboardOracle.state`. Three answers, not "a frame or undefined",
- * because the two callers need different things from the missing frame
- * (2026-10-03): the tap guard only asks "does it cover my point" (hidden and
+ * because the two callers need different things from the missing frame:
+ * the tap guard only asks "does it cover my point" (hidden and
  * unknown both mean "tap as before"), but `dismissKeyboard` must tell "no
  * keyboard — pressing back would NAVIGATE" from "could not tell — keep doing
  * what was always done". One `undefined` would have forced one of them to
@@ -527,8 +506,7 @@ export type SoftKeyboard =
       state: 'shown';
       frame: Rect;
       /**
-       * Rects the keyboard's WINDOW covers beyond `frame`, the inset band
-       * (2026-10-08, docs/bugs/2026-10-05-android-floating-gboard-keyboard.md):
+       * Rects the keyboard's WINDOW covers beyond `frame`, the inset band:
        * a floating Gboard on API 33 keeps only a 132-px collapse strip as its
        * IME inset — `frame` — while its panel, mid-screen, is a second rect of
        * the IME window's touchable region. Never set by `KeyboardOracle.state()`
@@ -540,6 +518,7 @@ export type SoftKeyboard =
        * keyboard whose region IS the band, a region that could not be
        * trusted). Every question a reading answers about a point or a rect
        * tests `frame` AND these.
+       * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
        */
       panels?: readonly Rect[];
     }
@@ -550,21 +529,19 @@ export type SoftKeyboard =
 /**
  * The soft-keyboard oracle: what a platform whose keyboard is a SEPARATE
  * WINDOW — absent from its accessibility tree, hidden by `back` — can tell
- * about it. An optional capability of the adapter (`DeviceAdapter.keyboard`,
- * 2026-10-04), not two methods every adapter must stub: exactly one platform
+ * about it. An optional capability of the adapter (`DeviceAdapter.keyboard`),
+ * not two methods every adapter must stub: exactly one platform
  * answers (Android), and an adapter without the oracle is one whose keyboard,
  * if any, is part of the tree — on iOS its keys are nodes, and the
- * covered-target problem has a different shape: since 2026-10-07 the tree
- * that resolved the target is read for a `KEYBOARD_ROLE` node (the WDA
- * source emits one per on-screen keyboard), a covered tap point is REFUSED
- * unless the config names a dismissal to tap first (stage B, the same day:
- * `app.ios.keyboardDismiss`, a neutral element or the accessory toolbar's
- * button — interact/keyboard.ts#KeyboardDismissal), and no KEY is pressed —
- * there is no non-submitting key to press
- * (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, "Fix (stage A)" and "Fix (stage B)").
- * Until 2026-10-04 both methods sat on `DeviceAdapter`, iOS returned a
- * constant from each without a device query, and the fake carried the
- * simulation of both for a feature one adapter has.
+ * covered-target problem has a different shape: the tree that resolved
+ * the target is read for a `KEYBOARD_ROLE` node (the WDA source emits one
+ * per on-screen keyboard), a covered tap point is REFUSED unless the config
+ * names a dismissal to tap first (`app.ios.keyboardDismiss`, a neutral
+ * element or the accessory toolbar's button —
+ * interact/keyboard.ts#KeyboardDismissal), and no KEY is pressed — there is
+ * no non-submitting key to press (the bug note's "Fix (stage A)" and "Fix
+ * (stage B)").
+ * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
  *
  * Two kinds of keyboard, one fact with two halves — stated in full here,
  * beside the capability; the in-tree dismissal (interact/keyboard-in-tree.ts)
@@ -575,15 +552,14 @@ export type SoftKeyboard =
  * once), the one owner of what to DO about the answers — presses that
  * `back` only through such an adapter, witness-vetoed. Its absence asserts the IN-TREE model (iOS: the keys are
  * nodes): nothing to observe, no `back` to press, and the dismissal after a
- * fill — since stage B, 2026-10-07 — is one tap on a configured element
- * when the tree shows a keyboard band, and NOTHING otherwise. Until that
- * day it was `enter`, pressed blind, which was then measured to SUBMIT the
- * form from the field (K5d in the bug note) — so a NEW adapter that ships
- * without an oracle now gets a dismissal that presses nothing unless its
+ * fill is one tap on a configured element when the tree shows a keyboard
+ * band, and NOTHING otherwise — not `enter`, pressed blind, which was
+ * measured to SUBMIT the form from the field (K5d in the bug note) — so a
+ * NEW adapter that ships without an oracle gets a dismissal that presses nothing unless its
  * tree source marks the band and the config names an element; a platform
  * whose keyboard is a window `back` hides adds the oracle rather than a
- * platform branch in interact/. Not a dismiss-key property on the adapter
- * (judged 2026-10-05): the guard's `back` must stay bound to the window
+ * platform branch in interact/. Not a dismiss-key property on the adapter:
+ * the guard's `back` must stay bound to the window
  * model, or an oracle whose key were the in-tree one would submit forms
  * under a covering keyboard, and "back was pressed (it may have
  * navigated)" would be false.
@@ -596,12 +572,12 @@ export type SoftKeyboard =
  */
 export interface KeyboardOracle {
   /**
-   * Is a soft keyboard on screen, and which rect does it cover? (2026-10-03.)
+   * Is a soft keyboard on screen, and which rect does it cover?
    *
    * Platform knowledge, hence behind the adapter: on Android the keyboard is a
    * separate window that is NOT in the uiautomator tree, so a node under it
    * resolves, settles and reports a rect like any other — and a tap at its
-   * centre presses a keyboard key (measured 2026-10-03, finportal login: the
+   * centre presses a keyboard key (measured on the finportal login: the
    * submit button at (249,1466) under an IME frame starting at y=1285; one
    * stray character went into the password field, nothing was submitted, the
    * tap was reported done). What to DO about it is interact/keyboard-window.ts's
@@ -610,21 +586,21 @@ export interface KeyboardOracle {
   state(): Promise<SoftKeyboard>;
   /**
    * An INDEPENDENT second opinion on "is a soft keyboard shown" — no frame,
-   * a different source than `state()` (2026-10-04). It exists because the
-   * first answer can be stale: measured that day on Android 13, right after
+   * a different source than `state()`. It exists because the
+   * first answer can be stale: measured on Android 13, right after
    * a tap that navigated away the window state still read "shown" with the
    * full frame for a few seconds, while the input method itself already said
    * it was not. It is asked (a reading's `over`, once the frame covers the
    * tap point) immediately before interact/keyboard-window.ts presses
-   * `back` for keyboard reasons — never on an ordinary tap. Since 2026-10-08
-   * also in two places that press nothing: where `state()` read HIDDEN and
+   * `back` for keyboard reasons — never on an ordinary tap. Also in two
+   * places that press nothing: where `state()` read HIDDEN and
    * the caller has no tap point — the post-fill dismissal, and
    * `scroll_until` on a failed or `fully: true` stop (a reading's
    * `unlocated`, the `unlocated` row: window hidden, input method shown,
    * only reported) — and in `scroll_until` before a `shown` band may change
    * its judgement or its stroke (a reading's `corroborated`, the same veto;
    * at most once a round, on every round a band matters — the answer is
-   * never kept). Since 2026-10-09 every one of them asks through a reading
+   * never kept). Every one of them asks through a reading
    * (ui-tree/keyboard-cover.ts#readKeyboard), the one caller of this method,
    * which asks it at most once per reading, relies on the never-throws
    * contract above and has no catch.
@@ -637,8 +613,8 @@ export interface KeyboardOracle {
   witness(): Promise<KeyboardWitness>;
   /**
    * The keyboard WINDOW's touchable region and the input method's word,
-   * read together in ONE call (2026-10-08, the floating-Gboard device check:
-   * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Raw facts, no
+   * read together in ONE call (the floating-Gboard device check, the bug
+   * note on `SoftKeyboard.panels`). Raw facts, no
    * policy: what of the region counts as covered — only beside a `shown`
    * band, only with the input method saying shown, only rects that fit the
    * band's screen, never the band itself — is
@@ -699,7 +675,7 @@ export interface LaunchOptions {
 }
 
 /**
- * What a launch has to say beyond "launched" (2026-10-09). `note` is a
+ * What a launch has to say beyond "launched". `note` is a
  * caveat the caller shows as a `⚠` line — the launch_app reply's second line
  * (mcp/tool-text.ts#launchText), a flow's `⚠ launch` trace line — and is set
  * today by one rule: iOS's foreground wait, when the tree was not seen to be
@@ -715,12 +691,11 @@ export interface DeviceAdapter {
   /**
    * Which backend `uiTree()` actually reads with, when the adapter has one
    * and the distinction exists — the iOS adapter reports its tree source's
-   * kind (idb or wda; always one since 2026-10-08, when the unbound probe
-   * adapter went — discovery.ts); Android has one tree and says nothing.
-   * The adapter is the source of truth here, not averi.yaml: a layer
-   * above that re-derived the kind from the config (2026-10-06, the flow
-   * engine's wait hint) agreed with the registry only as long as nobody
-   * paired a FlowEngine with an adapter built elsewhere.
+   * kind (idb or wda; always one — discovery.ts); Android has one tree and
+   * says nothing. The adapter is the source of truth here, not averi.yaml:
+   * a layer above that re-derived the kind from the config would agree
+   * with the registry only as long as nobody paired a FlowEngine with an
+   * adapter built elsewhere.
    * Diagnostic only — nothing above dispatches on it. Required, not
    * optional, so an implementation or a wrapper that forgets it fails to
    * compile instead of silently losing the hint; `undefined` is the
@@ -741,15 +716,15 @@ export interface DeviceAdapter {
   /**
    * Throws when the platform says nothing was opened — on Android an
    * `am start` refusal (no app's intent filter matches the url, or the
-   * activity refused it; android-start.ts), since 2026-10-07.
+   * activity refused it; android-start.ts).
    */
   openDeepLink(url: string): Promise<void>;
 
   /**
    * PNG bytes. Throws rather than returning anything else: a capture command
    * that exits 0 with no bytes, or with text (`Killed` on a dying emulator), is
-   * a transport error naming the device and command — screenshot-bytes.ts,
-   * since 2026-10-08. verify/capture.ts relies on it (an empty buffer equals
+   * a transport error naming the device and command — screenshot-bytes.ts.
+   * verify/capture.ts relies on it (an empty buffer equals
    * an empty buffer, which its stability wait would read as settled).
    */
   screenshot(): Promise<Buffer>;
@@ -771,15 +746,14 @@ export interface DeviceAdapter {
    * MEMOIZED per adapter — a SUCCESSFUL read; the panel rarely changes
    * under a session — and that is part of the contract, not a detail: the
    * layers above read it freely (per captured frame, per absent check)
-   * instead of caching it themselves. The Verifier and the FlowEngine each
-   * carried a memo of their own until 2026-10-02; both were pass-through
-   * over this one, and both are gone. An adapter that re-read the device on
-   * every call would make every pixel assert poll pay a shell-out.
+   * instead of caching it themselves (the Verifier and the FlowEngine keep
+   * no memo of their own). An adapter that re-read the device on every call
+   * would make every pixel assert poll pay a shell-out.
    *
-   * Two exceptions since the 2026-10-07 parity code review (A3). A FAILED
-   * read is not kept: until then one transient `idb describe` or `wm size`
-   * failure took the witness away for the life of the server; now the next
-   * call asks again (concurrent callers still share one read in flight).
+   * Two exceptions. A FAILED read is not kept: one transient `idb describe`
+   * or `wm size` failure must not take the witness away for the life of the
+   * server; the next call asks again (concurrent callers still share one
+   * read in flight).
    * And `{ fresh: true }` reads the device again and replaces the memo: the
    * screen DOES change under a session — a fold or unfold, `wm size` — and
    * the window-width check (verify/capture.ts#ScreenWitness.judge) re-reads once
@@ -797,19 +771,18 @@ export interface DeviceAdapter {
    * alone, or a focus without typing — interact/fill.ts skips the read-back
    * for it), and the `type` step and the type_text tool pass their text
    * through unexamined. Both adapters return before any device command:
-   * iOS before calling idb, which refuses `ui text ''` (2026-10-07,
-   * docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md — until then
-   * the step threw idb's bare error after the focus tap, and after the
-   * clear); Android before its per-character loop, whose composing-commit
-   * nudge (two DPAD key events and a sleep) otherwise still went out for
-   * nothing (until later that day).
+   * iOS before calling idb, which refuses `ui text ''` (else the step
+   * throws idb's bare error after the focus tap, and after the clear);
+   * Android before its per-character loop, whose composing-commit nudge (two
+   * DPAD key events and a sleep) would otherwise go out for nothing.
+   * docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md
    */
   typeText(text: string): Promise<void>;
   /**
    * Clear up to `count` characters on EACH side of the cursor in the focused
    * field (backspaces then forward-deletes). Position-independent: a tap may
    * leave the cursor anywhere in the text, and neither platform offers a
-   * reliable move-to-end (measured 2026-08-05: iOS taps land the cursor at
+   * reliable move-to-end (measured: iOS taps land the cursor at
    * the glyph, Android MOVE_END left one char behind on the amount field).
    */
   clearText(count: number): Promise<void>;
@@ -820,14 +793,13 @@ export interface DeviceAdapter {
    * where it is part of the tree (iOS). Absent means: no device is queried,
    * the tap guard reads the keyboard from the tree that resolved the target
    * (`KEYBOARD_ROLE`; a covered point is hidden first by a configured
-   * dismissal tap or refused, nothing is pressed — since 2026-10-07, before
-   * that taps were unguarded), and the post-fill dismissal taps a configured
-   * element when the tree shows a band, else nothing (stage B; until then
-   * a blind `enter`, which submitted).
+   * dismissal tap or refused, nothing is pressed), and the post-fill
+   * dismissal taps a configured element when the tree shows a band, else
+   * nothing (never a blind `enter`, which submitted).
    */
   readonly keyboard?: KeyboardOracle;
   /**
-   * The in-tree model's one sentence (2026-10-07): why THIS adapter cannot
+   * The in-tree model's one sentence: why THIS adapter cannot
    * hide a soft keyboard that covers a target, and what was measured to work
    * instead. Set only by an adapter WITHOUT the oracle (iOS: `IosAdapter`),
    * quoted verbatim — in parentheses, after "this adapter cannot hide it on
@@ -844,13 +816,13 @@ export interface DeviceAdapter {
   /**
    * How fast a finger may move — in screens per second, the screen's LONG
    * side — for a stroke to DRAG this platform's scroll views about its own
-   * length rather than fling them on (2026-10-09, docs/bugs/2026-10-09-
-   * scroll-until-fling-skips-target-in-lazy-list.md). `scroll_until` sizes
+   * length rather than fling them on. `scroll_until` sizes
    * each stroke's duration from it (interact/swipe.ts#dragMs); absent, the
    * adapter's own default duration is used, as before. A platform fact, so
    * the adapter's: the fling is the platform's scroll physics, and the
    * scroll is platform-agnostic. Set by Android only — the reasons for iOS
    * are on `IosAdapter`'s absence of it (adapters/ios.ts#swipe).
+   * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
    */
   readonly dragSpeed?: number;
 

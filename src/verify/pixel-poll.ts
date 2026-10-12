@@ -12,66 +12,57 @@ import { formatSeconds } from '../util/duration.js';
 import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } from './poll-verdict.js';
 
 /**
- * The pixel poll: what a polling pixel assert does, owned once.
- *
- * Until 2026-10-06 the color and ocr asserts each hand-wired the same round
- * inside `Verifier.poll`: find the element (first occurrence wins), check
- * there was time left, capture with the round's tree and deadline, gate on
- * stability, gate on decode, and only then measure — with a per-assert
- * `PixelPoll` (now `PixelPollMemory`) remembering across rounds what the
- * timeout should say. Two nested loops, two budgets, a deadline threaded inward, copied once per
- * assert, and the invariants that make the result trustworthy written as
- * comments at both call sites. A pixel assert is now a description (the
- * Verifier's) and a `measure` (the assert's); everything between is here.
+ * The pixel poll: what a polling pixel assert does, owned once. A pixel
+ * assert is a description (the Verifier's) and a `measure` (the assert's);
+ * everything between is here — the color and ocr asserts share one round,
+ * one budget and one deadline, and the invariants that make the result
+ * trustworthy are written here once.
  *
  * What this module owns:
  * - the round's ORDER: tree read (the tree poll's) → find → deadline check →
- *   soft-keyboard check (2026-10-06, below) → system bands and covers check
- *   (round 8, below; both `overElement`) → capture with that tree and the deadline → stability
- *   gate → decode gate → measure. A round that begins
- *   past the deadline takes no screenshot: the overrun of a slow tree read is
- *   never compounded by a stability budget.
+ *   what lies over the element (`overElement`: the soft keyboard first, then
+ *   the system bands, a cut and the app's covers) → capture with that tree
+ *   and the deadline → stability gate → decode gate → measure. A round that
+ *   begins past the deadline takes no screenshot and queries nothing: the
+ *   overrun of a slow tree read is never compounded by a stability budget.
  * - the two gates: `measure` sees only a SETTLED, DECODED frame. A moving
  *   frame is a miss with the reason, never a sample — the deadline, not a
- *   moving frame, decides (2026-10-05); one capture (`unjudged`) is no verdict
- *   and says nothing; an undecodable png is a miss that fails closed, and the
- *   poll keeps going because the capture may have raced a transition.
- *   A capture the ADAPTER refuses is not a miss either (2026-10-08): since
- *   the adapters refuse an empty or non-PNG capture as a transport error
+ *   moving frame, decides; one capture (`unjudged`) is no verdict and says
+ *   nothing; an undecodable png is a miss that fails closed, and the poll
+ *   keeps going because the capture may have raced a transition.
+ * - the final misses. A capture the ADAPTER refuses is not a miss: the
+ *   adapters refuse an empty or non-PNG capture as a transport error
  *   (adapters/screenshot-bytes.ts), `captureFrame` throws for a dead device,
  *   and that ends THIS assert at once — no polling to the deadline: a device
  *   that cannot capture will not answer the next round either, and the
  *   timeout would only bury the transport's own words — as a fail-closed
- *   failure quoting the adapter's first line (`screenshot failed: …`).
- *   The assert RESOLVES, it does not reject: `assertAll` goes on to the next
+ *   failure quoting the adapter's first line (`screenshot failed: …`). The
+ *   assert RESOLVES, it does not reject: `assertAll` goes on to the next
  *   assert (a tree assert on the same dead device fails on its own, "not
  *   found … (last UI tree read failed: …)"), so a `verify` leg keeps its
  *   trace and results and a flow's `assert:` step fails with this reason.
- *   (Until a review the same day the throw went through the tree poll and
- *   rejected the whole batch.) Only a png that came back and does not
- *   decode is a miss, and the poll goes on. The same exit is open to a
- *   `measure` since 2026-10-08: a verdict it marks `final`
- *   (poll-verdict.ts) ends the assert the same way with its own sentence —
- *   the ocr assert's, for a recognizer that will never read (no `swiftc`,
- *   a recognizer that did not compile).
+ *   Only a png that came back and does not decode is a miss, and the poll
+ *   goes on. A `measure` verdict marked `final` (poll-verdict.ts) ends the
+ *   assert the same way with its own sentence — the ocr assert's, for a
+ *   recognizer that will never read (no `swiftc`, a recognizer that did not
+ *   compile).
  * - the memory and the wording at the deadline (`PixelPollMemory`, private).
  *
- * Since 2026-10-06 the round hands the capture the first match's rect as its
- * `region`, so "settled" means the ELEMENT'S pixels held still across two
- * captures (verify/capture.ts's header has the rule and its whole-screen
- * fallback). For a pixel assert, then, "the screen did not settle: N
- * captures, each different from the last" USUALLY means the element's region
- * kept changing — a spinner or a fade inside the measured rect — and hiding
- * a status-bar clock or a caret elsewhere will not cure it; until that date
- * it could mean either. The exception is the capture's fallback: when the
- * region cannot be checked — the png scale carries an error, the rect lands
- * nowhere on the png (an element scrolled off-screen), a capture did not
- * decode, two captures differ in size — the verdict is still the WHOLE
- * screen's, and a live clock elsewhere still reads "did not settle". The
- * sentence does not say which; a `ui_snapshot` of the element's rect does.
- * The sentence itself is unchanged: it is the capture's,
- * the baseline assert and the tools' `⚠ frame:` note quote it too, and the
- * captures it counts WERE each different from the last.
+ * The round hands the capture the first match's rect as its `region`, so
+ * "settled" means the ELEMENT'S pixels held still across two captures
+ * (verify/capture.ts's header has the rule and its whole-screen fallback).
+ * For a pixel assert, then, "the screen did not settle: N captures, each
+ * different from the last" USUALLY means the element's region kept
+ * changing — a spinner or a fade inside the measured rect — and hiding a
+ * status-bar clock or a caret elsewhere will not cure it. The exception is
+ * the capture's fallback: when the region cannot be checked — the png
+ * scale carries an error, the rect lands nowhere on the png (an element
+ * scrolled off-screen), a capture did not decode, two captures differ in
+ * size — the verdict is still the WHOLE screen's, and a live clock
+ * elsewhere still reads "did not settle". The sentence does not say which;
+ * a `ui_snapshot` of the element's rect does. The sentence itself is the
+ * capture's: the baseline assert and the tools' `⚠ frame:` note quote it
+ * too, and the captures it counts WERE each different from the last.
  *
  * A frame that settled over the region ONLY (`settledOver: 'region'`) is
  * measured only when the element's rect this round equals — x, y, width,
@@ -94,158 +85,70 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * whole SCREEN is measured as before: two identical captures already say
  * nothing moved, the element included.
  *
- * Since 2026-10-06 (later that day) a round also asks the adapter's soft-
- * keyboard oracle, when it has one, before it captures anything
- * (docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md).
- * Measured that day on an API 33 emulator: a tap on a field raised the IME
- * over the bottom ~40% of a payment form, uiautomator went on reporting the
- * pinned CONTINUE button at its at-rest rect (the keyboard is a separate
- * window, not in the tree), and a color assert sampled the key faces
- * (`#FFFFFF`) while an ocr assert read the `?123` key ("123") — each reported
- * as the ELEMENT'S colour and copy. Had the expected value happened to be the
- * keyboard's colour — white or light grey, common for a disabled control —
- * the assert would have PASSED on an element the user cannot see. The rule:
- * the oracle says `shown` and its frame overlaps the element's rect by any
- * positive area (`rectsOverlap`; an edge-touching rect is not covered) → the
- * round is a fail-closed MISS that names both rects and nothing is captured;
- * the poll keeps going, so a keyboard that goes away before the deadline
- * costs a round, not the verdict, and once a later query finds the element
- * clear the covered sentence stops being the timeout's wording. `hidden`, `unknown`, a frame elsewhere, or
- * no oracle at all (iOS, whose keyboard is in the tree) → the round proceeds
- * exactly as before. `witness()` is never asked: the witness exists to veto
- * a `back` key press, and nothing is pressed here (since 2026-10-08 the
- * `touchable()` read that follows a shown `state()` carries `mInputShown`
- * too, but only as the admission rule for a floating panel —
- * ui-tree/keyboard-cover.ts#panelsBeyond — never as a veto over the band;
- * the reading's `overlapping`, which this poll asks, never consults the
- * witness) — a stale
- * `shown` costs covered rounds until the window state catches up (seconds,
- * measured on `KeyboardOracle.witness`), within the 12 s pixel default; under
- * a short explicit timeout it fails closed with the covered wording; never a
- * false pass. "Any overlap" is deliberate: the ocr assert crops the whole
- * rect, so any keyboard inside it is read; the colour sampler insets 12%, so
- * a keyboard under only the bottom edge fails closed where colour could have
- * measured — a cost accepted for one rule, and the sentence quotes both rects
- * so the case is plain to diagnose. Residual — the old behaviour returns,
- * silently, when the oracle cannot see the keyboard: a floating or split IME
- * that supplies no insets frame at all (it reads hidden, or a zero-size frame
- * read as unknown — on API 33 a floating Gboard was measured 2026-10-08 to
- * keep a 132-px band, and its panel is now read beside it, `overElement`
- * below; the transient read right after the focus tap was hidden); the API 34+ `type=ime` line is taken from AOSP and has not been
- * captured on a device; a multi-display device reads unknown. The check sits after the deadline check so a round that
- * would capture nothing queries nothing either. Cost: the reading's
- * `overlapping` once per round, on Android only — its adb calls are counted
- * on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the one place they
- * are — against a round of ~2.6–4.3 s there. The verify legs are untouched: their text table already
- * reports this case as OCCLUDED.
- *
- * Since 2026-10-07 an adapter WITHOUT the oracle (iOS: the keyboard is part
- * of the tree) gets the same rule from the round's own tree: the WDA source
- * marks the band the keyboard draws over with `KEYBOARD_ROLE`
- * (adapters/wda-source.ts#keyboardMarks has the rule and the measurements —
- * the band, not the `Keyboard` element's rect, which stops 17–44 pt short of
- * the drawn area), a reading (`ui-tree/keyboard-cover.ts#readKeyboard` —
- * the one switch between the oracle and the tree, shared with the tap
- * guard) reads it, and a band overlapping the element's rect is the same
- * covered miss.
- * No extra read: the tree is the one the round found the element in. An
- * element that IS the keyboard's UI (a key, the toolbar's Done — `ofKeyboard`
- * on its Window) reads as not covered. The remedy sentence differs: with no
- * dismissal on the adapter the miss names the flow's two ways to hide it
- * first (a `tap:` step the author adds on an element that hides it — such
- * as the one configured for the guard, which taps it only before a covered
- * TAP, never before an assert — or `dismissKeyboard: true` on a fill that
- * leaves it up; flow facts, worded here and not borrowed from the guard's
- * refusal, which has its own tap to offer), says the adapter cannot hide
- * the keyboard on its own (`cannotHide`, the one phrase the guard uses) and
- * quotes the adapter's sentence on why and where the dismissal is
- * configured (`DeviceAdapter.keyboardAdvice`) — never `back`. An idb tree
- * marks no band (iOS 27's idb lists the keys and the band, unmarked) and
- * its reading is `unknown`; its band, read by shape, is the same covered
- * miss through the keyboard edge and the element's standing (`overElement`; owner decision D2), with the same remedy.
- *
- * Since round 8 (2026-10-12; docs/bugs/2026-10-10-ios-pixel-asserts-sample-
- * the-chrome-over-their-element.md, the owner's decision: fail closed) a
- * round that found the element clear of the keyboard also asks what ELSE is
- * drawn over it (`overElement`: the element's standing for the pixel assert,
- * ui-tree/standing.ts#Scene.standing, which owns the rule), from the same tree and the device's
- * memoized screen — no extra read: the status band (`DeviceScreen.
- * statusBand`: iOS's top safe-area inset, Android's visible status bar; geometry.ts#belowStatusBand, the
- * tap's rule) and the app's own nodes that hide its PIXELS
- * (ui-tree/draw-order.ts#paintsOver: the tap's covers, `exposure`, with
- * every rule they were taught — a Compose text under its own button, idb's
- * modal listed before the content, WDA's cell backgrounds and a text
- * field's scroll bar, a label on its own field, the floating tab bar's
- * strip — less what takes a touch and hides nothing: the element's own
- * content listed beside it and a clickable layer on its own branch, review
- * of fix/r8-pixel round 1). Measured on the iPhone 17 (round-7 device
- * check): a colour assert on `value_date_select` at 24,30, under the 62-pt
- * band, PASSED on the status bar's `#EFF1F4`, its ocr read the bar's
- * "Contacts"; a label under CONTINUE sampled CONTINUE's `#91919A`, reported
- * as the element's colour. An overlap of the band, or of a cover's reach,
- * with the element's rect thicker than 2 units on its thin side
- * (geometry.ts#PIXEL_OVERLAP_SLACK, the owner's decision) is the miss —
- * never a measurement: it names what lies over it (`the status bar …` with
- * the band's rect, or the cover's role, label, rect and — for a pinned bar
- * — reach) and advises `scroll_until … fully: true` first, which stops only
- * once nothing is drawn over any of it, adding "something in it that lies
- * clear" where a scroll may not cure it. A finding, as the keyboard's: the
+ * WHAT LIES OVER THE ELEMENT (`overElement`), before anything is captured —
+ * a miss naming it, never a measurement, and a finding like any other: the
  * poll goes on, a later round that finds the element clear withdraws it
- * (`uncovered`), and when every round was covered it is the timeout's
- * wording. The keyboard is asked first — its remedy (hide it) is not a
- * scroll. Stricter than the tap, which asks only for a cover at the centre:
- * the sampler and the recognizer read the region — judged over what each
- * reads (`PixelPollSpec.reads`: the colour sampler's 12 %-inset rect, the
- * ocr crop's whole rect; `judgeOver`). The Android navigation band too,
- * named `the navigation bar …`, and an ocr assert's possible cut at it,
- * "scroll it up" — ui-tree/standing.ts#Scene has the rules (owner
- * decisions N-b, N-c). Residuals, stated: an element
- * that reaches into the band by design — a full-bleed header, on iOS and on
- * Android 15+, whose apps draw edge-to-edge (an app bar at 0,0 1080x220
- * under the 66-px band fails a colour assert closed: the owner's decision,
- * code review of round 8, P2 — kept, its advice leading with something in
- * it that lies clear of the band, its title), a screen resized above the
- * keyboard (WDA's `login_screen` 0,0 402x566), a window under an ocr
- * assert — fails closed whatever it shows (a colour assert on a
- * screen-sized one samples 12 % down, below a 62-pt or 66-px band); idb's
- * Application node under a colour assert fails on the content listed over
- * its sample; `scroll_until … fully: true` lets the rest of an element lie under
- * a band (the status bar's or the navigation bar's) once its centre is clear
- * of it, so for such an element only the child advice cures the miss; a
- * whole last row resting flush with the navigation bar in its list fails an
- * ocr assert closed as possibly cut; what a tree does not list (a top
- * bar WDA lists before the scroll view) is no cover here, as for the tap;
- * in idb's flat list a real overlay whose words are all words of the
- * element's label is read as its own content (a toast "Saved" over a card
- * labelled "Saved payments", draw-order.ts#paintsOver); and a CHILDLESS,
- * non-interactive node listed beside the element and laid on it is read
- * as on it by the tap's target rows (`exposure`; a WDA React Native view's
- * labels) — a labelled, childless panel over a 0,225 1080x1995 container
- * is no cover of it (review round 2's probe D3); and a container with
- * children — a dialog's panel — covers only through its content (the
- * tap's `contentFramed` row): its button is named, and its bare
- * background between them is not seen.
- * Cost: the memoized `viewport()`, and walks of the round's tree, no
- * read: `inferScreenSize`'s (the screen's shape, ui-tree/standing.ts#usableScreen),
- * `screenOf`'s when neither the device nor a window vouches for the
- * screen (the last fallback), one `drawOrder` walk (the keyboard edge's,
- * every round that reaches the check), and — on every round the reading
- * leaves clear — the element's `exposure` (the standing's facts) and the
- * clip facts' walks of the whole tree (ui-tree/geometry.ts#clipsOf's own,
- * for an ocr element ending on the navigation bar's top, or a miss's, and
- * on a miss `Clips.inScroller`'s:
- * whether a scroll may cure it), and, unless a
- * band already failed the round, `exposure` once more (`paintsOver`).
+ * (`PixelPollMemory.uncovered`), and when every round was covered it is the
+ * timeout's wording.
+ * - The soft keyboard, first: the round's reading
+ *   (ui-tree/keyboard-cover.ts#readKeyboard — the adapter's oracle when it
+ *   has one, else the round's own tree, shared with the tap guard) asked
+ *   `overlapping`, any positive overlap with the element's rect, never the
+ *   witness; then idb's band, a keyboard line of the element's standing
+ *   (ui-tree/keyboard-cover.ts#keyboardEdge). An element that IS the
+ *   keyboard's UI (a key, the toolbar's Done) reads as not covered. The
+ *   remedy is the adapter's (`keyboardOver`).
+ *   docs/adr/0010-pixel-assert-keyboard-first.md
+ *   docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
+ * - Then the element's standing for the pixel assert
+ *   (ui-tree/standing.ts#Scene.standing, which owns the rule), judged over
+ *   what the measurement reads (`PixelPollSpec.reads`), from the same tree
+ *   and the device's memoized screen — no extra read: a system band past
+ *   the slack, an ocr element's possible cut at the navigation bar, and the
+ *   app's own nodes that hide its PIXELS (ui-tree/draw-order.ts#DrawOrder.paintsOver),
+ *   worded with a remedy (`judgeOver`).
+ *   docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
+ *   docs/adr/0002-pixel-overlap-slack.md
+ *   docs/adr/0003-pixel-cover-exemptions.md
+ *   docs/adr/0009-android-navigation-band.md
+ *   docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md
+ *   docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
+ *
+ * Residuals (one line each; the ADRs above have the rest):
+ * - A keyboard the reading cannot see (a floating or split IME with no insets frame) is measured, as before the check.
+ * - A stale `shown` costs covered rounds until the window state catches up; under a short timeout it fails closed.
+ * - A colour assert fails closed on a keyboard under only its element's bottom edge, which its 12 % inset would skip.
+ * - An element reaching into a band by design (a full-bleed header) fails closed whatever it shows; its advice leads with its title.
+ * - A screen resized above the keyboard, a window under an ocr assert and idb's Application under a colour assert fail closed.
+ * - A whole last row resting flush with the navigation bar in its list fails an ocr assert closed as possibly cut.
+ * - What a tree does not list is no cover; what the pixel-cover exemptions drop is measured as the element (ADR 0003).
+ *
+ * Cost: on Android the reading's `overlapping` once per round — its adb
+ * calls are counted on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the
+ * one place they are — against a round of ~2.6–4.3 s there; on iOS no
+ * extra read, the tree is the one the round found the element in. Then the
+ * memoized `viewport()`, and walks of the round's tree: `inferScreenSize`'s
+ * (the screen's shape, ui-tree/standing.ts#usableScreen), `screenOf`'s when
+ * neither the device nor a window vouches for the screen (the last
+ * fallback), one `drawOrder` walk (the keyboard edge's, every round that
+ * reaches the check), and — on every round the reading leaves clear — the
+ * element's `exposure` (the standing's facts) and the clip facts' walks of
+ * the whole tree (ui-tree/geometry.ts#clipsOf's own, for an ocr element
+ * ending on the navigation bar's top, or a miss's, and on a miss
+ * `Clips.inScroller`'s: whether a scroll may cure it), and, unless a band
+ * already failed the round, `exposure` once more (`paintsOver`). The verify
+ * legs are untouched: their text table already reports a keyboard over an
+ * element as OCCLUDED.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
- * `measure`, which is text-parity.ts#measureOcrAssert since 2026-10-08, as
- * the colour assert's is color-parity.ts#evaluateColorAssert), the scale
- * policy (`measured.scale` may carry a derivation error; both measurements
- * fail closed on it — the parity modules own that, this gates on decode),
- * the description and the `AssertResult` (the Verifier's), the tree poll's
- * loop (ui-tree/read-tree.ts) and the capture's budget (verify/capture.ts).
- * The before/after figures for threading the deadline in stay where they
- * were measured, on `Verifier.poll` (verify/assert.ts).
+ * `measure`, which is text-parity.ts#measureOcrAssert, as the colour
+ * assert's is color-parity.ts#evaluateColorAssert), the scale policy
+ * (`measured.scale` may carry a derivation error; both measurements fail
+ * closed on it — the parity modules own that, this gates on decode), the
+ * description and the `AssertResult` (the Verifier's), the tree poll's loop
+ * (ui-tree/read-tree.ts) and the capture's budget (verify/capture.ts). The
+ * before/after figures for threading the deadline in stay where they were
+ * measured, on `Verifier.poll` (verify/assert.ts).
  */
 
 interface PixelPollSpec {
@@ -253,16 +156,15 @@ interface PixelPollSpec {
   timeoutMs: number;
   /**
    * The pause between rounds and NOTHING else — never forwarded as the
-   * stability delay, which is capture.ts's constant (the 2026-10-05 "one
-   * budget" rule; see the header there for the 300-vs-500 split it closed).
+   * stability delay, which is capture.ts's constant (the "one budget"
+   * rule; see the header there for the 300-vs-500 split it closed).
    */
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
   unchecked: Exclude<Unchecked, 'geometry'>;
   /**
    * The part of the element's rect the measurement reads, in tree units —
-   * where chrome over the element counts (`overElement`; review of
-   * fix/r8-pixel, round 2): the colour assert's sample rect
+   * where chrome over the element counts (`overElement`): the colour assert's sample rect
    * (color-parity.ts#colorSampleRect); the whole rect when omitted, as the
    * ocr assert crops it.
    */
@@ -270,8 +172,8 @@ interface PixelPollSpec {
   /**
    * The measurement reads glyphs (the ocr assert): an element that may be
    * cut at the navigation bar fails closed, where a colour sample of what
-   * shows stays a true measurement (owner decision N-b;
-   * ui-tree/standing.ts#Scene's contract).
+   * shows stays a true measurement (ui-tree/standing.ts#Scene's contract).
+   * docs/adr/0009-android-navigation-band.md
    */
   glyphs?: boolean;
   /**
@@ -286,7 +188,7 @@ interface PixelPollSpec {
 
 /**
  * What a polling pixel assert remembers across the WHOLE poll — one instance
- * per `pollPixels` call (2026-10-05; private here since 2026-10-06). A round
+ * per `pollPixels` call, private to this module. A round
  * that begins past the deadline, or whose one capture the deadline cut
  * before a second (`stability: 'unjudged'`), has nothing to say about the
  * screen: it returns `undefined` so that an earlier round's finding — a
@@ -296,14 +198,14 @@ interface PixelPollSpec {
  * reason, worded fail-closed like every other reason the assert cannot
  * measure past; the capture count it quotes is the most any round took, so a
  * late round the deadline cut short never understates the one that spent the
- * whole budget. Since 2026-10-06 it also remembers where the element was
+ * whole budget. It also remembers where the element was
  * last found, for the rect confirmation a region-only frame needs (header).
  */
 class PixelPollMemory {
   /**
    * Why the LAST round that found the element said nothing, when one did:
    * `cut` — it began past the deadline or its capture was unjudged, so no
-   * settled frame was captured; `unconfirmed` (2026-10-06) — a frame DID
+   * settled frame was captured; `unconfirmed` — a frame DID
    * settle over the element's region, and no earlier read could confirm the
    * rect. Either outranks not-found; each has its own sentence, because
    * "no time to capture a settled frame" is false once one was captured.
@@ -312,10 +214,10 @@ class PixelPollMemory {
   private mostCaptures = 0;
   /**
    * The slowest ROUND of the poll — a tree read and whatever the round then
-   * captured; since 2026-10-06 also the round's soft-keyboard query, tens of
+   * captured, and the round's soft-keyboard query, tens of
    * ms on Android, which the sentence does not name (its wording, "a tree
    * read and its captures", is pinned byte-for-byte across the suite) —
-   * quoted when the budget ran out on a found element (2026-10-06): on the
+   * quoted when the budget ran out on a found element: on the
    * Android emulator one round is ~4.3 s against the caller's budget, and
    * "no time was left" alone reads like a flaky screen.
    * The round, not the read, because either half can be the slow one. A read
@@ -326,8 +228,8 @@ class PixelPollMemory {
   private lastRect: Rect | undefined;
   /**
    * The covered sentence the last covered round recorded, and whether an
-   * oracle answer SINCE then said the keyboard no longer covers the element
-   * (review 2026-10-06). pollTree keeps the last PollMiss detail and is not
+   * oracle answer SINCE then said the keyboard no longer covers the element.
+   * pollTree keeps the last PollMiss detail and is not
    * this module's to change, so a covered miss cannot be withdrawn there;
    * `timeoutDetail` skips it instead when it is still the last detail and a
    * later round saw the element clear — "dismiss the keyboard" is false once
@@ -343,11 +245,10 @@ class PixelPollMemory {
    * A round whose tree does not have the element: forget its rect. "Found at
    * A, gone, back at A" is two appearances, not two reads agreeing — a
    * bottom CTA with the same id at the same rect on consecutive wizard
-   * screens would otherwise be confirmed by the PREVIOUS screen's read
-   * (review 2026-10-06).
+   * screens would otherwise be confirmed by the PREVIOUS screen's read.
    *
    * A round whose tree READ failed never gets here, so "A, read error, A"
-   * still confirms A — a deliberate, recorded decision (2026-10-06), not an
+   * still confirms A — a deliberate, recorded decision, not an
    * oversight: the tree poll (ui-tree/read-tree.ts) owns failed reads and
    * never hands them to the predicate, and forgetting on one would need a
    * round counter here or a change to `pollTree` for every caller. The read
@@ -463,11 +364,12 @@ class PixelPollMemory {
  * the witness (the header says why); then the element's standing for the
  * pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on
  * the usable screen (`judgeOver`), given idb's band as its keyboard line
- * (ui-tree/keyboard-cover.ts#keyboardEdge, owner decision D2 — no reading
- * stands by it: idb's reading is `unknown`), so an element its band meets
- * is the same keyboard miss, quoting the band, and its keys are no covers
- * named instead. `reads`: what the measurement reads (`PixelPollSpec.reads`;
- * the whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert).
+ * (ui-tree/keyboard-cover.ts#keyboardEdge — no reading stands by it:
+ * idb's reading is `unknown`), so an element its band meets is the same
+ * keyboard miss, quoting the band, and its keys are no covers named
+ * instead. `reads`: what the measurement reads (`PixelPollSpec.reads`; the
+ * whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert).
+ * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  *
  * The reading's two rects are in the same units: on Android both are device
  * pixels, read from the same `[l,t][r,b]` notation by the same
@@ -529,34 +431,14 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
 }
 
 /**
- * What is drawn over the element's rect in this round, worded for the miss
- * with its remedy — a system band (the status bar's, then the navigation
- * bar's), the navigation bar's possible cut, then the app's own covers —
- * or undefined when nothing is (the owner's decision: fail closed; the
- * header has the measurements). No keyboard: that is `overElement`'s,
- * first.
- * docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
- * Exported for the fixture sweeps and the wording
- * cases (tests/verify/pixel-chrome.test.ts). `glyphs`: the measurement
- * reads glyphs (the ocr assert).
- */
-export async function chromeOverElement(
-  adapter: Pick<DeviceAdapter, 'viewport'>,
-  tree: UiNode,
-  element: UiNode,
-  reads: Rect = element.rect,
-  { scene = sceneOf(tree), glyphs = false }: { scene?: Scene; glyphs?: boolean } = {},
-): Promise<string | undefined> {
-  return judgeOver(adapter, tree, element, { reads, glyphs, scene });
-}
-
-/**
  * The element's standing for the pixel assert (ui-tree/standing.ts
  * #Scene.standing, which owns the rule: what counts as over what it reads,
- * in which order), worded. The screen is the usable screen's single
- * `oriented` box (ui-tree/standing.ts#usableScreen, which owns the
- * derivation; D6, the standing's residual), with the device's system bands
- * — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
+ * in which order), worded — a system band (the status bar's, then the
+ * navigation bar's), the navigation bar's possible cut, then the app's own
+ * covers, or undefined when nothing is over it (it fails closed, ADR
+ * 0001). The screen is the usable screen's single `oriented` box
+ * (ui-tree/standing.ts#usableScreen, which owns the derivation; D6, ADR
+ * 0012), with the device's system bands — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
  * gesture, so under a rectless root whose largest node is a scroll view's
  * tall content (402x2000 under a 402x874 window) a window-sized element is
@@ -570,38 +452,39 @@ export async function chromeOverElement(
  * (`cut`: the ocr crop would read only what shows — scroll it up).
  *
  * The remedy is `scroll_until … fully: true`; it adds "assert something
- * in it that lies clear of that" (the tap's sliver hint's words, "tap
- * something in it that lies clear of that edge") when a scroll may not
+ * in it that lies clear of that" when a scroll may not
  * cure it: the element lies in no scroll view as far as the tree says
  * (`Clips.inScroller` false — or undefined: idb's flat list has no
  * ancestry, so EVERY idb miss carries the clause), it is laid from the
  * screen's top edge under the status bar, or the cover holds the element
  * whole. Not for an element reaching the screen's bottom under the
- * navigation bar: an edge-to-edge list runs its rows down to it, and a
- * scroll moves them up. For the screen ITSELF — an element screen-sized
+ * navigation bar (ADR 0011). For the screen ITSELF — an element screen-sized
  * (ui-tree/standing.ts#screenSized) — no scroll can cure it, and the
  * remedy leads with the child; so too for an element laid from the
  * screen's top edge at full width, a full-bleed header — iOS's, or
  * Android 15+'s edge-to-edge app bar (`0,0 1080x220` under the 66-px band
- * fails a colour assert closed, the owner's decision) — whose remedy leads
+ * fails a colour assert closed, ADR 0001) — whose remedy leads
  * with "assert something in it that lies clear of that (its title, say)":
  * the title, below the band, is judged on its own and passes. For idb's
  * flat-list root (`covered.overRoot`: its Application node, screen-sized,
  * and never a full-bleed header in a flat list) it says the node named is
  * content drawn over the root's background.
+ * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
+ * docs/adr/0011-no-stuck-clause-at-the-bottom-edge.md
+ * docs/adr/0012-pixel-assert-residuals-d4-d6.md
  */
 async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   tree: UiNode,
   element: UiNode,
-  { reads, glyphs, scene, keyboard }: { reads: Rect; glyphs: boolean; scene: Scene; keyboard?: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, scene, keyboard }: { reads: Rect; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
   const screen = usable.oriented;
-  const purpose = { of: 'pixel', reads, glyphs, ...(keyboard?.line !== undefined && { keyboardTop: keyboard.line }) } as const;
+  const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   const standing = scene.standing(element, { box: screen, boxes: [screen], statusBand: usable.statusBand, navigationBand: usable.navigationBand }, purpose);
   if (standing.kind === 'reachable') return undefined;
-  if (standing.kind === 'underKeyboard' && standing.band !== undefined && keyboard !== undefined) return keyboardOver(element.rect, standing.band, keyboard.remedy);
+  if (standing.kind === 'underKeyboard') return keyboardOver(element.rect, standing.band, keyboard.remedy);
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
   const pinned = scene.clips.inScroller(element) !== true;
@@ -615,36 +498,35 @@ async function judgeOver(
       const bar = standing.bar.edge === 'top' ? 'status bar' : 'navigation bar';
       // Laid from the screen's top edge, under the status bar: a scroll may not move it (a pinned header's place).
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
-      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band ?? screen)}) — ${coverRemedy(never ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
+      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(never ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
     }
-    case 'cut': {
-      // The pixel purpose cuts only at the navigation bar (ui-tree/standing.ts#Scene).
-      if (standing.bar?.edge !== 'bottom') throw new Error('pixel assert: a cut at no navigation bar');
+    case 'cut':
       return (
         `the element may be cut at the navigation bar ${at}, navigation bar from y ${standing.bar.top}): it ends on the bar's top edge, as its scroll container ` +
-        `${rectText(standing.cut.container)} does, so the crop may read only what shows of it — scroll it up: scroll_until the element with \`fully: true\` first and re-run`
+        `${rectText(standing.container)} does, so the crop may read only what shows of it — scroll it up: scroll_until the element with \`fully: true\` first and re-run`
       );
-    }
     case 'covered': {
-      const reach = standing.reach === undefined || sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
+      const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
       const named = `${nodeText(standing.cover).slice(0, -1)}${reach})`;
       const root = standing.overRoot === true ? 'root' : never;
-      return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, standing.reach ?? standing.cover.rect) ? 'stuck' : 'scroll'))}`;
+      return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, standing.reach) ? 'stuck' : 'scroll'))}`;
     }
-    default:
-      throw new Error(`pixel assert: a standing ${standing.kind} the pixel purpose never gives`);
+    default: {
+      // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).
+      const unworded: never = standing;
+      throw new Error(`pixel assert: a standing ${(unworded as { kind: string }).kind} with no sentence`);
+    }
   }
 }
 
 /**
- * What to do about a pixel assert's element under chrome (`judgeOver`), worded as the tap's sliver hint
- * ("tap something in it that lies clear of that edge"): `scroll` — scroll it clear; `stuck` — that, or, when a
+ * What to do about a pixel assert's element under chrome (`judgeOver`): `scroll` — scroll it clear; `stuck` — that, or, when a
  * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
  * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
- * for an element laid from the screen's top edge at full width, a full-bleed header (the owner's decision: an
- * edge-to-edge Android app bar, 0,0 1080x220 under the 66-px band, fails a colour assert closed, and its title, clear
- * of the band, is what to assert); `root` — the screen, for idb's flat-list root,
+ * for an element laid from the screen's top edge at full width, a full-bleed header, whose title, clear of the band,
+ * is what to assert; `root` — the screen, for idb's flat-list root,
  * whose cover is the app's own content laid on its background.
+ * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
 const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): string => {
   const child = 'assert something in it that lies clear of that';
@@ -660,9 +542,8 @@ const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): s
  * at once — a capture the adapter refused (header, "A capture the ADAPTER
  * refuses"), or a `measure` verdict marked `final` (poll-verdict.ts). Private:
  * this module is the one place that turns "final" into control flow; a
- * measurement says it with a value (2026-10-08; until then the refusal had
- * its own `CaptureRefused`). `detail` is already the whole fail-closed
- * sentence.
+ * measurement says it with a value. `detail` is already the whole
+ * fail-closed sentence.
  */
 class FinalMiss {
   constructor(readonly detail: string) {}
@@ -671,7 +552,7 @@ class FinalMiss {
 /**
  * The fail-closed sentence of a refused capture — the pixel asserts' and the baseline diff's. The adapter's
  * sentence ends with a full stop; failClosed drops it (fail-closed.ts) rather than printing
- * `attention.; failing closed` (seen on device, 2026-10-08).
+ * `attention.; failing closed` (seen on device).
  */
 export const screenshotFailed = (reason: string, unchecked: Unchecked): string =>
   failClosed(`screenshot failed: ${reason}`, unchecked);

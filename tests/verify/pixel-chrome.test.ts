@@ -4,9 +4,13 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
-import { sceneOf, treeScreen, usableScreen, type Standing } from '../../src/ui-tree/standing.js';
-import { chromeOverElement } from '../../src/verify/pixel-poll.js';
+import { sceneOf, treeScreen, usableScreen, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
+
+/** What the pixel assert's round says lies over `element` (verify/pixel-poll.ts#overElement), the measurement reading `reads` (its rect when omitted) — with glyphs for the ocr assert. */
+const over = (adapter: Parameters<typeof overElement>[0], tree: UiNode, element: UiNode, reads?: Rect, glyphs = false): Promise<string | undefined> =>
+  overElement(adapter, tree, element, { ...(reads !== undefined && { reads }), glyphs });
 
 const FIXTURES = new URL('../fixtures/', import.meta.url);
 const json = async (file: string) => JSON.parse(await readFile(new URL(file, FIXTURES), 'utf8'));
@@ -28,11 +32,11 @@ async function fixtureTrees(androidBand?: number, androidNavigation?: number): P
 }
 
 /** What a pixel standing says lies over its node: `the status bar`, `the navigation bar`, or the cover as its sentence names it (with its reach when that is not its frame). */
-const overIt = (s: Standing): string => {
+const overIt = (s: PixelStanding): string => {
   if (s.kind === 'systemBar') return s.bar.edge === 'top' ? 'the status bar' : 'the navigation bar';
-  if (s.kind === 'cut') return `cut at the navigation bar, in ${s.cut.container.x},${s.cut.container.y} ${s.cut.container.width}x${s.cut.container.height}`;
+  if (s.kind === 'cut') return `cut at the navigation bar, in ${s.container.x},${s.container.y} ${s.container.width}x${s.container.height}`;
   if (s.kind !== 'covered') return s.kind;
-  const reach = s.reach === undefined || JSON.stringify(s.reach) === JSON.stringify(s.cover.rect) ? '' : `, reaching ${s.reach.x},${s.reach.y} ${s.reach.width}x${s.reach.height}`;
+  const reach = JSON.stringify(s.reach) === JSON.stringify(s.cover.rect) ? '' : `, reaching ${s.reach.x},${s.reach.y} ${s.reach.width}x${s.reach.height}`;
   return `${nodeText(s.cover).slice(0, -1)}${reach})`;
 };
 
@@ -158,7 +162,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
 describe('the 2-unit edge (round 8, the owner\'s decision)', async () => {
   const pos4 = (await json('idb-swift-form-scrolled-under-top-bar.json')).positions.pos4 as { AXLabel?: string; frame: { y: number } }[];
   const formWith = (label: string, y: number) => parseIdbDescribeAll(JSON.stringify(pos4.map((e) => (e.AXLabel === label ? { ...e, frame: { ...e.frame, y } } : e))));
-  const judge = (tree: UiNode, label: string) => chromeOverElement({ viewport: async () => IPHONE }, tree, [...everyNode(tree)].find((n) => n.label === label)!);
+  const judge = (tree: UiNode, label: string) => over({ viewport: async () => IPHONE }, tree, [...everyNode(tree)].find((n) => n.label === label)!);
 
   it('`Payee’s country` 2 pt into CONTINUE is clear; 3 pt in, CONTINUE is named', async () => {
     expect(await judge(formWith('Payee’s country', 730), 'Payee’s country')).toBeUndefined();
@@ -176,7 +180,7 @@ describe('own content and clickable layers count only on the element\'s own bran
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const n = (role: string, r: ReturnType<typeof rect>, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
   const FULL = rect(0, 0, 1080, 2220);
-  const judge = (tree: UiNode, element: UiNode) => chromeOverElement({ viewport: async () => PIXEL_3A }, tree, element);
+  const judge = (tree: UiNode, element: UiNode) => over({ viewport: async () => PIXEL_3A }, tree, element);
 
   it('a clickable layer on the row\'s branch is no cover; a dialog\'s clickable scrim over the screen is', async () => {
     const text = n('text', rect(136, 532, 48, 49), { label: 'LR' });
@@ -212,7 +216,7 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
   const byId = (tree: UiNode, id: string) => [...everyNode(tree)].find((x) => x.identifier === id)!;
   const ANDROID_66: DeviceScreen = { ...PIXEL_3A, statusBand: 66 };
   const judge = (screen: DeviceScreen, tree: UiNode, element: UiNode, reads?: (r: Rect) => Rect) =>
-    chromeOverElement({ viewport: async () => screen }, tree, element, reads?.(element.rect));
+    over({ viewport: async () => screen }, tree, element, reads?.(element.rect));
 
   it('A — idb: a sheet listed after a card, lying inside its rect, is no content of the card (it says nothing the card says)', async () => {
     const tree = idb([
@@ -322,7 +326,7 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
     const window = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 1300)), element, pay] });
     const tree = n('container', rect(0, 0, 0, 0), { children: [window] });
     // Until S3 the tree's screen (screenOf: the 402x1300 content) — the page was no screen-sized element and was offered a scroll.
-    expect(await chromeOverElement(silent, tree, element)).toMatch(
+    expect(await over(silent, tree, element)).toMatch(
       /^button "Pay" \(24,600 354x52\) is drawn over the element \(element 0,40 402x834\) — the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself/,
     );
   });
@@ -330,13 +334,13 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
   it('a tree that vouches for no window (no screen-shaped child: a walked height) still judges on its own screen, with no band', async () => {
     const element = n('container', rect(0, 0, 402, 200), { identifier: 'row' });
     const tree = n('container', rect(0, 0, 0, 0), { children: [n('other', rect(0, 0, 402, 1300), { children: [element] }), n('other', rect(0, 150, 402, 100), { label: 'Bar' })] });
-    expect(await chromeOverElement(silent, tree, element)).toMatch(/^other "Bar" \(0,150 402x100\) is drawn over the element \(element 0,0 402x200\)/);
+    expect(await over(silent, tree, element)).toMatch(/^other "Bar" \(0,150 402x100\) is drawn over the element \(element 0,0 402x200\)/);
   });
 
   it('a banner crowned as the window turns the screen the pixel assert judges its single box over (`oriented`, D6), not the judged panel as built: a landscape box, no band — measured', async () => {
     const banner = n('image', rect(0, 0, 500, 300), { identifier: 'banner' });
     const tree = n('container', rect(0, 0, 0, 0), { children: [banner, n('button', rect(425, 400, 50, 40), { identifier: 'next' })] });
-    expect(await chromeOverElement({ viewport: async () => IPHONE }, tree, banner)).toBeUndefined();
+    expect(await over({ viewport: async () => IPHONE }, tree, banner)).toBeUndefined();
   });
 });
 
@@ -357,22 +361,22 @@ describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () =
   const tree = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 0, 1080, 2220), { children: [bar, list] })] });
 
   it('a colour assert on the bar (0,0 1080x220) fails closed on the band, its advice leading with something in it clear of the band', async () => {
-    expect(await chromeOverElement(adapter, tree, bar, colorSampleRect(bar.rect))).toBe(
+    expect(await over(adapter, tree, bar, colorSampleRect(bar.rect))).toBe(
       'the status bar is drawn over the element (element 0,0 1080x220, status bar 0,0 1080x66) — the capture would show it, not the element — ' +
         'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
     );
-    expect(await chromeOverElement(adapter, tree, bar)).toMatch(/^the status bar is drawn over the element \(element 0,0 1080x220, status bar 0,0 1080x66\) — the capture would show it, not the element — assert something in it/);
+    expect(await over(adapter, tree, bar)).toMatch(/^the status bar is drawn over the element \(element 0,0 1080x220, status bar 0,0 1080x66\) — the capture would show it, not the element — assert something in it/);
   });
 
   it('its title, inside the bar and clear of the band, is judged correctly — nothing over it, for colour and ocr alike', async () => {
-    expect(await chromeOverElement(adapter, tree, title, colorSampleRect(title.rect))).toBeUndefined();
-    expect(await chromeOverElement(adapter, tree, title)).toBeUndefined();
+    expect(await over(adapter, tree, title, colorSampleRect(title.rect))).toBeUndefined();
+    expect(await over(adapter, tree, title)).toBeUndefined();
   });
 
   it('a title laid into the band is named under it, and offered the child too (the bar is in no scroll view)', async () => {
     const high = n('text', rect(48, 30, 400, 70), { label: 'Contacts' });
     const highTree = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 0, 1080, 220), { children: [high] })] });
-    expect(await chromeOverElement(adapter, highTree, high)).toMatch(/^the status bar is drawn over the element \(element 48,30 400x70, status bar 0,0 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
+    expect(await over(adapter, highTree, high)).toMatch(/^the status bar is drawn over the element \(element 48,30 400x70, status bar 0,0 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
   });
 
   it('in idb\'s flat list a full-bleed header is a header, not the root: the cover over it is not called content on the root\'s background', async () => {
@@ -383,7 +387,7 @@ describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () =
     ].map(([type, label, id, x, y, width, height]) => ({ type, AXLabel: label, AXUniqueId: id, AXValue: null, frame: { x, y, width, height } }))));
     const header = [...everyNode(tree)].find((x) => x.identifier === 'header')!;
     // No band here (an app that hides the status bar): the cover alone is judged.
-    expect(await chromeOverElement({ viewport: async () => ({ width: 402, height: 874 }) }, tree, header, colorSampleRect(header.rect))).toBe(
+    expect(await over({ viewport: async () => ({ width: 402, height: 874 }) }, tree, header, colorSampleRect(header.rect))).toBe(
       'button "Close" (300,120 80x44) is drawn over the element (element 0,0 402x200) — the capture would show it, not the element — ' +
         'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
     );
@@ -421,20 +425,20 @@ describe('the Android navigation band (D7)', () => {
   const settings = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 596, 1080, 1558), { identifier: 'list', clipsDescendants: true, children: [n('container', rect(0, 2072, 1080, 82), { children: [title] })] })] });
 
   it('the Settings title flush with the band: an ocr assert fails closed naming the bar and its scroll container — scroll it up; a colour assert measures', async () => {
-    expect(await chromeOverElement(adapter, settings, title, title.rect, { glyphs: true })).toBe(
+    expect(await over(adapter, settings, title, title.rect, true)).toBe(
       'the element may be cut at the navigation bar (element 198,2105 428x49, navigation bar from y 2154): it ends on the bar\'s top edge, as its scroll container ' +
         '0,596 1080x1558 does, so the crop may read only what shows of it — scroll it up: scroll_until the element with `fully: true` first and re-run',
     );
-    expect(await chromeOverElement(adapter, settings, title, colorSampleRect(title.rect))).toBeUndefined();
+    expect(await over(adapter, settings, title, colorSampleRect(title.rect))).toBeUndefined();
   });
 
   it('a row reaching into the band: the bar named with its rect, the remedy a scroll (it lies in a scroll view); pinned in none, the child too', async () => {
     const row = n('container', rect(66, 2152, 948, 68), { identifier: 'row_4' });
     const inList = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 825, 1080, 1395), { clipsDescendants: true, children: [row] })] });
-    expect(await chromeOverElement(adapter, inList, row)).toBe(
+    expect(await over(adapter, inList, row)).toBe(
       'the navigation bar is drawn over the element (element 66,2152 948x68, navigation bar 0,2154 1080x66) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run',
     );
     const pinned = n('container', rect(0, 0, 1080, 2220), { children: [row] });
-    expect(await chromeOverElement(adapter, pinned, row, colorSampleRect(row.rect))).toMatch(/^the navigation bar is drawn over the element \(element 66,2152 948x68, navigation bar 0,2154 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
+    expect(await over(adapter, pinned, row, colorSampleRect(row.rect))).toMatch(/^the navigation bar is drawn over the element \(element 66,2152 948x68, navigation bar 0,2154 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
   });
 });

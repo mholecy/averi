@@ -73,11 +73,11 @@ function describeIntent(intent: LaunchIntent): string {
  * DETECTION is android-start.ts's (runStart); what the refusal means for a
  * launch, and how to recover, is said here.
  *
- * A deliberate exception, 2026-10-03: the two messages below name
+ * A deliberate exception: the two messages below name
  * averi.yaml's `app.android.activity`, the flow step's `activity:` and the
  * `launch_app` tool — the first error strings in adapters/ to speak config
  * and tool vocabulary rather than platform only (the monkey launch's message
- * in `launch` does the same since 2026-10-07). Kept, because that advice is
+ * in `launch` does the same). Kept, because that advice is
  * what makes the message recoverable: the reader's next move is in
  * averi.yaml or in the call, not in adb. Rejected: a typed AmStartError
  * thrown here and translated by the callers — there are two (run/ for
@@ -85,7 +85,7 @@ function describeIntent(intent: LaunchIntent): string {
  * translation sites that must agree. No import crosses the layer — only
  * words do.
  *
- * Why a launch is checked at all (2026-10-03): `adb()` only rejects on a
+ * Why a launch is checked at all: `adb()` only rejects on a
  * non-zero exit, so a launch am refused at exit 0 "succeeded", and the
  * failure surfaced one step later as a wait that timed out on whatever
  * screen happened to be up — far from its cause. With intents scoped to the
@@ -154,7 +154,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * adb call with its own budget: keyboardState (`dumpsys window displays`,
    * the frame) and keyboardWitness (`dumpsys input_method`, the input
    * method's own word). Their measured costs are on those two methods.
-   * Since 2026-10-08 a third, keyboardTouchable (the IME window's touchable
+   * A third, keyboardTouchable (the IME window's touchable
    * region with `mInputShown`, one adb call), asked only once `state()` has
    * read the band up — the floating-Gboard panel.
    */
@@ -165,11 +165,11 @@ export class AndroidAdapter implements DeviceAdapter {
   };
   private readonly exec: ExecFn;
   /**
-   * The device every call targets, as `adb -s <serial>` — required
-   * (2026-10-08): listing devices is discovery.ts's, not an adapter's, so
-   * there is no unbound adapter any more, and with it went adb without `-s`
-   * (whichever single device adb picked), the "the default adb device"
-   * wording and the "more than one device" diagnosis.
+   * The device every call targets, as `adb -s <serial>` — required:
+   * listing devices is discovery.ts's, not an adapter's, so there is no
+   * unbound adapter, no adb without `-s` (whichever single device adb
+   * picked), no "the default adb device" wording and no "more than one
+   * device" diagnosis.
    */
   private readonly serial: string;
   /** What the parser asks before widening a node cut short of its content (types.ts#DrawnOverStrip) — required: the composition root wires it. */
@@ -199,7 +199,7 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * `adb shell <argv>`, the argv delivered to the device command word for
-   * word (2026-10-07): each word quoted for the device's sh by adb-shell.ts,
+   * word: each word quoted for the device's sh by adb-shell.ts,
    * so a deep link's `&`, an extra's space, a typed `$` or `'` reach the
    * command as data and are never run. Every device command in this adapter
    * goes through here, `execOut` (where adb quotes) or `rawShell` — none
@@ -240,7 +240,7 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * Returns once `am start`/monkey has started something — no wait for the
-   * tree to be the app's, unlike iOS (ios-foreground.ts, 2026-10-09). Whether
+   * tree to be the app's, unlike iOS (ios-foreground.ts). Whether
    * uiautomator hands out the previous app's tree for a moment after a
    * switch, as idb does, has not been measured on Android (it dumps the
    * focused window, which may close the gap or not), so nothing waits here
@@ -276,7 +276,7 @@ export class AndroidAdapter implements DeviceAdapter {
       );
       if (outcome.kind === 'refused') {
         // monkey's reason may be on its stdout, which the ExecError's
-        // message drops — so before 2026-10-07 this failed with no reason at
+        // message drops — read here, or this would fail with no reason at
         // all. Not every reason is the package's: monkey itself may have
         // failed to run (android-start.ts lists its lines), and its line says.
         throw new Error(
@@ -303,9 +303,8 @@ export class AndroidAdapter implements DeviceAdapter {
       // NOT listed in `am help` on every Android version, which is why it is
       // spelled out here. Android resolves it against this app's own intent
       // filters, so it reaches whichever activity handles it — the share
-      // target, not the launcher. Decided 2026-10-03; before that this branch
-      // sent a bare implicit intent (`am start -a ACTION`), which the system
-      // may hand to ANOTHER app or answer with a chooser, and a test tool
+      // target, not the launcher. Never a bare implicit intent (`am start -a
+      // ACTION`), which the system may hand to ANOTHER app or answer with a chooser, and a test tool
       // launching "the app" must not end up driving a different one.
       // Never beside `-n`: an explicit component already names the package,
       // and an activity given as a full "other.pkg/Activity" component would
@@ -332,14 +331,14 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   async openDeepLink(url: string): Promise<void> {
-    // The url as ONE word: before 2026-10-07 the device's sh cut it at the
-    // first `&` (and ran the rest), at a space, and expanded `$` — adb-shell.ts.
+    // The url as ONE word: the device's sh would cut it at the first `&`
+    // (and run the rest), at a space, and expand `$` — adb-shell.ts.
     const outcome = await runStart(
       ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url],
       (argv) => this.shell(argv),
     );
     if (outcome.kind === 'refused') {
-      // Until 2026-10-07 this returned, and open_deep_link answered "Opened"
+      // A refusal throws: returning would have open_deep_link answer "Opened"
       // for a url nothing handles (am exits 0 — android-start.ts). Worded,
       // like the launch's message, for every cause am reports: a matching
       // activity may exist and have refused.
@@ -373,9 +372,9 @@ export class AndroidAdapter implements DeviceAdapter {
       } catch (e) {
         // adb itself failing is the OTHER offline shape (exit 255, "device
         // '<id>' not found" / "device offline"); a dump that never returns is
-        // the loaded-host shape (measured 2026-09-17, finportal: 11.4 s at
-        // load avg 28). Diagnose both like a dump that returned nothing, so the
-        // caller never has to read a bare adb error (review 2026-09-18).
+        // the loaded-host shape (measured on finportal: 11.4 s at load avg
+        // 28). Diagnose both like a dump that returned nothing, so the caller
+        // never has to read a bare adb error.
         if (e instanceof ExecError) {
           const last = e.stderr.trim().split('\n').pop() ?? '';
           throw new Error(await this.diagnoseDumpFailure(e.timedOut ? 'timeout' : 'exec-error', last, false), { cause: e });
@@ -390,7 +389,7 @@ export class AndroidAdapter implements DeviceAdapter {
       // single bounded retry with `settle`; pollers do NOT —
       // their own poll interval already is the retry, and a hidden extra
       // second per miss would only shrink the number of probes their deadline
-      // affords (review 2026-09-18).
+      // affords.
       if (opts.settle && NULL_ROOT_RE.test(status) && attempt === 0) {
         await sleep(NULL_ROOT_RETRY_MS);
         continue;
@@ -403,7 +402,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * Turn a dump that produced no XML into a diagnosis the caller can act on.
    *
    * The dump's own text names the automation tool, never the device:
-   * measured 2026-09-17 (mp-native run 5), an emulator dying underneath
+   * measured on mp-native, an emulator dying underneath
    * answered `Killed`, then an empty string, then `null root node` — and adb
    * itself still exited 0 each time, so the ExecError path never fired. Three
    * calls were spent on uiautomator hypotheses before `adb shell wm size`
@@ -428,7 +427,7 @@ export class AndroidAdapter implements DeviceAdapter {
       // A get-state that never answered has no state to quote: its stderr is
       // node's "Command failed: <cmd>" (exec.ts substitutes it for an empty
       // one), and the reply read `adb get-state says "Command failed: …"`
-      // (C5, 2026-10-09). What hangs is adb — its server or this device's
+      // What hangs is adb — its server or this device's
       // transport — so say that, and how to tell which.
       if (e instanceof ExecError && e.timedOut) {
         return `device ${this.serial} is not answering: adb get-state timed out after ${formatSeconds(GET_STATE_TIMEOUT_MS)} — ` +
@@ -485,26 +484,26 @@ export class AndroidAdapter implements DeviceAdapter {
   });
 
   /**
-   * The status band as last READ (2026-10-12): `{ band }` once a
-   * `dumpsys window displays` call answered — `band` undefined when that
-   * dump said no visible bar (hidden, or not one band) — and undefined
-   * while there is no such answer to keep. Its lifetime, the choice stated
-   * (code review of fix/r8-band, round 1): the registry keeps ONE adapter
+   * The system bands as last READ: `{ band }` once a
+   * `dumpsys window displays` call answered — `band` holding each band that
+   * dump said (none for a bar it did not show as one visible band) — and
+   * undefined while there is no such answer to keep. Its lifetime, the
+   * choice stated: the registry keeps ONE adapter
    * per device for the MCP server's life (mcp/registry.ts), so whatever is
    * kept here is kept that long unless something drops it.
    * - A call that FAILED FAST (adb exited non-zero, could not be spawned)
    *   is not an answer: nothing is kept, and the next `viewport()` asks
-   *   again — until one answers. Until that review a failed first read was
-   *   kept as "no band" for the server's life, and a tap under the bar went
-   *   through again. Retried every call, by choice: such a failure costs
+   *   again — until one answers (kept as "no band", a failed first read
+   *   would let a tap under the bar through for the server's life). Retried
+   *   every call, by choice: such a failure costs
    *   milliseconds (adb answers at once), and it is the transient kind — a
    *   device reconnecting, an adb server restarting — whose next call
    *   answers. Each such call judges with no band (fail open).
    * - A call that TIMED OUT (its 2 s budget: a cold or loaded device, a
    *   hung dumpsys) is kept as "no band" (`timedOut`), so it is not paid
    *   again: retried every call, it cost up to 2 s more on each `viewport()`
-   *   — a tap made two such calls, a two-swipe `scroll_until` seven (code
-   *   review of fix/r8-band, round 2). Dropped like an answer, below: the
+   *   — a tap made two such calls, a two-swipe `scroll_until` seven.
+   *   Dropped like an answer, below: the
    *   next `launch` or fresh read asks again. Until then no band (fail
    *   open).
    * - An answer is dropped by `launch` — the foreground app changes there,
@@ -534,7 +533,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * it; `scroll_until` keeps it).
    *
    * Why this memo is written out beside `viewportMemo` rather than folded
-   * into ViewportMemo (code review of round 8, S5, weighed and left): an
+   * into ViewportMemo (weighed and left): an
    * invalidate hook for `launch` would be clean — ViewportMemo's identity
    * check (`#pending === attempt`) already keeps a superseded read from
    * landing, so a `forget()` would do what `#bandEpoch` does — and the
@@ -555,15 +554,14 @@ export class AndroidAdapter implements DeviceAdapter {
   #bandEpoch = 0;
 
   /**
-   * The VISIBLE system status bar's height (types.ts#DeviceScreen.statusBand,
-   * 2026-10-12): `dumpsys window displays`, read by parseStatusBand below —
+   * The VISIBLE system status bar's height (types.ts#DeviceScreen.statusBand):
+   * `dumpsys window displays`, read by parseStatusBand below —
    * the call keyboardState makes, whose cost is written there. An app that
    * draws edge-to-edge (Google Contacts, measured: its list and its
    * collapsing app bar start at y 0) has nodes under the bar, and a tap on
-   * one goes to the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-
-   * treat-the-system-status-bar-as-app-screen.md). Reported whatever the
-   * app: in an app that does not draw under the bar no node lies in the band,
-   * so it changes nothing there.
+   * one goes to the bar. Reported whatever the app: in an app that does not
+   * draw under the bar no node lies in the band, so it changes nothing there.
+   * docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md
    *
    * FAILS OPEN, as keyboardState does: a failed call, or a dump that does not
    * say one visible bar, is no band — the judgements behave as before the
@@ -616,8 +614,8 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * 0.45 screens a second — 999 px/s on the Pixel_3a's 2220-px side, 364
-   * dp/s at its 2.75 density (types.ts#DeviceAdapter.dragSpeed; 2026-10-09,
-   * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md).
+   * dp/s at its 2.75 density (types.ts#DeviceAdapter.dragSpeed).
+   * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
    *
    * Measured: `input swipe 540 1776 540 444 300` — 1332 px in 300 ms, 4440
    * px/s — moved Settings' RecyclerView ≈ 2190 px, more than its 1417-px
@@ -647,7 +645,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * far below the fold takes more strokes. What it buys: no row is carried
    * across the list between two reads.
    *
-   * NET, in one place (code review of fix/r3-scroll): within the unchanged
+   * NET, in one place: within the unchanged
    * 15 s default, Settings' list is reached about 40 % less far — the
    * measured fling runs fit 5 rounds of ≈ 3 s, ≈ 5 × 1332 ≈ 6700 px of
    * finger travel (≈ 6800 px of content once flung, rows skipped); now ≈ 4
@@ -668,13 +666,12 @@ export class AndroidAdapter implements DeviceAdapter {
     // "" types nothing (the DeviceAdapter.typeText contract), on this side
     // too: the loop below already ran zero times for it, but the commit
     // nudge after it — two key events and a sleep for a composition that
-    // does not exist — still went to the device (until 2026-10-07; it was
-    // pinned as a decision when the iOS guard landed, and the review that
-    // day found the contract's "types nothing" was false of it).
+    // does not exist — would still go to the device, and the contract's
+    // "types nothing" would be false of it.
     if (text === '') return;
     // One `input text` call PER CHARACTER, with explicit pacing. Bulk injection
     // races Compose's async text state and silently drops most characters
-    // (measured 2026-08-05 on the login username field: 3 of 11 landed). The adb
+    // (measured on the login username field: 3 of 11 landed). The adb
     // round-trip alone is NOT enough pacing on a loaded emulator — re-measured
     // the same evening after hours of uptime: per-char with no delay landed 5 of
     // 8, per-char with 300ms landed 8/8. 250ms keeps a 12-char value at ~3s.
@@ -682,9 +679,9 @@ export class AndroidAdapter implements DeviceAdapter {
     // Each character is one quoted `shell` word; a space is `input text`'s
     // own `%s`; a control character is refused up front — by interact/
     // first (type-text.ts), here again defensively — see adb-shell.ts.
-    // Defensive only (since the 2026-10-07 code review): it stops a caller
-    // that bypasses interact/. The character set and the words are
-    // input-text.ts's, shared with type-text.ts (code review of round 7).
+    // Defensive only: it stops a caller that bypasses interact/. The
+    // character set and the words are input-text.ts's, shared with
+    // type-text.ts.
     const control = text.match(CONTROL_CHAR_RE);
     if (control !== null) {
       const ch = control[0];
@@ -700,7 +697,7 @@ export class AndroidAdapter implements DeviceAdapter {
     // last injected char in a composition span for seconds, and a BACK or a
     // focus-moving tap discards it — a fixed post-type sleep (tried 500ms) is
     // NOT enough. Moving the cursor left and back right commits the span
-    // deterministically (measured 2026-08-05: verified-8/submitted-7 with the
+    // deterministically (measured: verified-8/submitted-7 with the
     // sleep; 8/8 submitted with the cursor nudge even when BACK follows
     // immediately).
     await this.shell(['input', 'keyevent', '21']); // DPAD_LEFT
@@ -716,7 +713,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * Is the soft keyboard (IME) shown, and which screen rect does it cover?
    * One adb call: `dumpsys window displays`, read by parseImeInsets below.
    *
-   * Why that command — measured 2026-10-03 on emulator-5554 (Pixel_3a, API
+   * Why that command — measured on emulator-5554 (Pixel_3a, API
    * 33, 1080x2220), three to five runs each, wall time of the whole adb call:
    *
    *   dumpsys window displays      15.9 KB    56–96 ms   has the IME InsetsSource line
@@ -731,7 +728,7 @@ export class AndroidAdapter implements DeviceAdapter {
    *   dumpsys input_method        791 KB   276–318 ms   mInputShown, but no frame — and over
    *                                                      the budget on its own
    *
-   * THE COST OF THIS CALL — the one place the figures live (2026-10-03);
+   * THE COST OF THIS CALL — the one place the figures live;
    * every other comment and ARCHITECTURE.md §8 point here:
    *   - from a shell (the table above; process start included): 56–96 ms;
    *   - through this adapter's execFile, eleven runs: 18–37 ms.
@@ -742,7 +739,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * for the frame (two calls, the first alone ~300 ms); the IME window's
    * touchable region (an SkRegion string whose shape differs with a floating
    * or split keyboard, and present while hidden too, as the nav-bar strip)
-   * — rejected as THE frame, still; since 2026-10-08 it is read BESIDE this
+   * — rejected as THE frame, still; it is read BESIDE this
    * one, only once this has said shown, for a floating keyboard's panel
    * (keyboardTouchable, below).
    *
@@ -762,11 +759,11 @@ export class AndroidAdapter implements DeviceAdapter {
   }
 
   /**
-   * The independent witness (2026-10-04): what the input method manager
+   * The independent witness: what the input method manager
    * itself says — `mInputShown=true|false` in `dumpsys input_method` — as
    * opposed to the window manager's insets that keyboardState reads.
    *
-   * Why a second source. Measured that day (Pixel_3a AVD, API 33), right
+   * Why a second source. Measured on the Pixel_3a AVD (API 33), right
    * after a tap that made the app navigate away: `dumpsys window displays`
    * STILL printed `mIsImeShowing=true` and `InsetsSource type=ITYPE_IME
    * frame=[0,1398][1080,2220] … visible=true`, while `dumpsys input_method`
@@ -782,7 +779,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * whether the keyboard covers the tap point).
    *
    * The command filters ON THE DEVICE — the whole dump is 776 KB. THE COST,
-   * the one place the figures live (measured 2026-10-04, emulator-5554,
+   * the one place the figures live (measured on emulator-5554,
    * six runs each, wall time of the spawned adb process, keyboard hidden):
    *   adb shell "dumpsys input_method | grep -m1 mInputShown"   90 bytes   20–32 ms (one 75)
    *   adb shell "dumpsys input_method | grep mInputShown"       90 bytes   55–59 ms
@@ -797,7 +794,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * `-m1` returns, which would read `unknown` and switch the veto off
    * silently. `=` is not a word character, so `mInputShown=` still matches.
    * toybox grep has -w and -m; the `-w` form is UNVERIFIED on a device
-   * (written in a round with no adb access) — the timings above are of the
+   * (written with no adb access) — the timings above are of the
    * plain pattern.
    *
    * Not memoized: the answer changes with every focus, and the registry
@@ -824,9 +821,8 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * The IME window's touchable region, and `mInputShown` beside it, in ONE
-   * adb call (2026-10-08, the floating-Gboard device check —
-   * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md, the three
-   * "Device check" sections; emulator-5554, API 33, 1080x2220). Why: a
+   * adb call (the floating-Gboard device check, the three "Device check"
+   * sections of the bug note below; emulator-5554, API 33, 1080x2220). Why: a
    * floating Gboard keeps an IME inset of only its 132-px collapse strip
    * (`ITYPE_IME frame=[0,2088][1080,2220] visible=true`), so keyboardState's
    * band missed the panel drawn at x 359–1040, y 1269–1912 — a guarded tap on
@@ -843,8 +839,8 @@ export class AndroidAdapter implements DeviceAdapter {
    * ui-tree/keyboard-cover.ts#panelsBeyond, not here.
    *
    * Cost: one adb call running two filtered dumpsys commands on the device
-   * (TOUCHABLE_COMMAND) — UNMEASURED as one command (written in a round with
-   * no adb access); its parts were measured from a shell at 20–32 ms
+   * (TOUCHABLE_COMMAND) — UNMEASURED as one command (written with no adb
+   * access); its parts were measured from a shell at 20–32 ms
    * (`dumpsys input_method | grep -m1 mInputShown`, keyboardWitness) and
    * 76–83 ms (`dumpsys window InputMethod`, the table on keyboardState). Asked
    * per keyboard READ that finds the band up (the tap guard's looks, a pixel
@@ -853,7 +849,8 @@ export class AndroidAdapter implements DeviceAdapter {
    * fail the call: the other half is still read.
    *
    * Never throws: a failed or timed-out call is `{ witness: 'unknown',
-   * region: undefined }` — no panel, the band alone, as before this date.
+   * region: undefined }` — no panel, the band alone.
+   * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
    */
   private async keyboardTouchable(): Promise<KeyboardTouchable> {
     let out: string;
@@ -868,7 +865,7 @@ export class AndroidAdapter implements DeviceAdapter {
   async clearText(count: number): Promise<void> {
     if (count <= 0) return;
     // One keyevent per adb call: batched multi-keycode calls drop events in
-    // the IME queue (measured 2026-08-05 — `input keyevent 67 67 67 67` on
+    // the IME queue (measured: `input keyevent 67 67 67 67` on
     // the amount field landed only 3 of 4). MOVE_END first, then backspaces;
     // a forward-delete pass cleans up in case the cursor did not move.
     await this.shell(['input', 'keyevent', '123']); // KEYCODE_MOVE_END
@@ -881,10 +878,10 @@ export class AndroidAdapter implements DeviceAdapter {
     // so an EMPTY stdout is the one "not running" signal and any ExecError is
     // the TRANSPORT failing — adb timing out under host load, the device
     // offline — i.e. a question that could not be asked, never a dead app
-    // (measured 2026-09-17, finportal: a timed-out adb call here became
+    // (measured on finportal: a timed-out adb call here became
     // `appAlive: false` for an app alive on the expected screen). The exit code
     // cannot carry that distinction: exec.ts substitutes err.message when
-    // stderr is empty, so ExecError.stderr is never blank (review 2026-09-18).
+    // stderr is empty, so ExecError.stderr is never blank.
     //
     // rawShell (the `||` is the point), the name quoted into it — see adb-shell.ts.
     const { stdout } = await this.rawShell(`${shellCommandLine(['pidof', packageName])} || true`);
@@ -944,7 +941,7 @@ const TOUCHABLE_RECT_RE = /\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+
 
 /**
  * The IME window's touchable region out of (a grep of) `dumpsys window
- * InputMethod` (2026-10-08). The shape, measured on API 33:
+ * InputMethod`. The shape, measured on API 33:
  *   touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))   floating Gboard
  *   touchable region=SkRegion((0,1398,1080,2220))                       docked
  * — Skia's region as `(left,top,right,bottom)` per rect, any number of them,
@@ -989,14 +986,13 @@ const DISPLAY_FRAMES_RE = /^[ \t]*DisplayFrames w=(\d+) h=(\d+) r=(\d+)[ \t]*$/g
 /**
  * A screen rect as Android prints it everywhere — `[l,t][r,b]`, in a
  * uiautomator `bounds` attribute and in an InsetsSource `frame=` alike. ONE
- * pattern for both readers (hoisted 2026-10-03: parseImeInsets had grown a
- * second copy to test "is this a frame" before parseBounds read it).
+ * pattern for both readers, so parseImeInsets keeps no second copy to test
+ * "is this a frame" before parseBounds reads it.
  */
 const BOUNDS_PATTERN = String.raw`\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]`;
 const BOUNDS_RE = new RegExp(BOUNDS_PATTERN);
 /**
- * The three tokens of an InsetsSource entry parseImeInsets reads (named
- * 2026-10-03). Each is anchored on BOTH sides — a token starts the entry or
+ * The three tokens of an InsetsSource entry parseImeInsets reads. Each is anchored on BOTH sides — a token starts the entry or
  * follows whitespace, and its value ends at whitespace or the line's end —
  * because the entry is a run of `key=value` words and an unanchored match
  * reads a neighbour: `frame=` is the tail of `visibleFrame=` (API ≤ 33
@@ -1021,14 +1017,14 @@ const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
  * insets the window manager hands to apps, i.e. the screen area the keyboard
  * takes from them, in screen pixels (uiautomator's units):
  *
- *   API 33, shown   (measured 2026-10-03, emulator, Settings search):
+ *   API 33, shown   (measured on the emulator, Settings search):
  *     InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=true insetsRoundedCornerFrame=false
  *   API 33, hidden  (same device):
  *     InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false
  *   API 33, ~0.4 s after `back` hid it (the hide animation still running):
  *     InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visibleFrame=[0,1398][1080,2220] visible=false insetsRoundedCornerFrame=false
- *   API 36, a booted device that has not shown a keyboard yet (measured the
- *   same day): NO ime entry — the list holds only
+ *   API 36, a booted device that has not shown a keyboard yet (measured):
+ *   NO ime entry — the list holds only
  *     InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null
  *   API 34+, shown: `InsetsSource id=… type=ime frame=[l,t][r,b] visible=true …`
  *   — FROM AOSP's InsetsSource.dump, NOT captured on a device (the one API 36
@@ -1043,8 +1039,8 @@ const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
  *   list. The same text recurs as `mSource=InsetsSource …` under each
  *   provider, and `InsetsSourceControl …` is a different object.
  *
- * The second witness, since the review of 2026-10-03: DisplayPolicy's
- * `mIsImeShowing=<bool>` line, printed in the same dump. Measured that day:
+ * The second witness: DisplayPolicy's `mIsImeShowing=<bool>` line,
+ * printed in the same dump. Measured:
  * `mIsImeShowing=true` (with `mImeHeight=756`) beside the shown line on API
  * 33, `mIsImeShowing=false` beside the hidden one, and `mIsImeShowing=false`
  * on the API 36 device with no ime entry. Its value DURING the show/hide
@@ -1105,14 +1101,14 @@ export function parseImeInsets(dump: string): SoftKeyboard {
 
 /**
  * The VISIBLE system status bar's height, in screen pixels, out of `dumpsys
- * window displays` (2026-10-12) — the band at the top of the screen a tap
+ * window displays` — the band at the top of the screen a tap
  * goes to the bar in (types.ts#DeviceScreen.statusBand). The line it reads
  * is the display's InsetsState entry for the status bar, the same list
  * parseImeInsets reads (and with the same anchored tokens):
  *
- *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, measured
- *   2026-10-03, emulator Pixel_3a, 1080x2220; the device check of
- *   2026-10-10 read the same line under Google Contacts):
+ *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, emulator
+ *   Pixel_3a, 1080x2220; a device check read the same line under Google
+ *   Contacts):
  *     InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
  *   API 36 (…-api36-no-ime-source.txt, Pixel_4 AVD, 1080x2280):
  *     InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null
@@ -1120,11 +1116,10 @@ export function parseImeInsets(dump: string): SoftKeyboard {
  * The band is the frame's BOTTOM, of a frame that starts at the screen's
  * top and is not empty. Not measured: a hidden bar (an immersive app) —
  * read by `visible=false`, as a hidden keyboard is, so no band; a
- * landscape screen, whose bar is still at the top (and interact/ cuts no
- * band in landscape — ui-tree/geometry.ts#belowStatusBand, a residual stated there).
+ * landscape screen, whose bar is still at the top (no band is cut in
+ * landscape — a residual of ui-tree/standing.ts#Scene).
  *
- * Never guesses — no band (the judgements fail open, as before 2026-10-12)
- * on: no status-bar entry; one that does not read fully (type, frame,
+ * Never guesses — no band (the judgements fail open) on: no status-bar entry; one that does not read fully (type, frame,
  * visible); a hidden one; an empty frame or one below the top; several
  * entries (one per display) that do not all say the same band — the
  * multi-display case parseImeInsets refuses alike.
@@ -1206,7 +1201,7 @@ interface RawNode {
   class?: string;
   'resource-id'?: string;
   text?: string;
-  /** Not in the API 33 dump (measured 2026-10-09); read when a newer one carries it — see normalizeNode. */
+  /** Not in the API 33 dump (measured); read when a newer one carries it — see normalizeNode. */
   hint?: string;
   'content-desc'?: string;
   focusable?: string;
@@ -1263,7 +1258,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const rawChildren = raw.node === undefined ? [] : Array.isArray(raw.node) ? raw.node : [raw.node];
   // Compose text inputs don't always dump as EditText: a BasicTextField with
   // scroll semantics surfaces as (Horizontal)ScrollView carrying the content
-  // in `text` (measured 2026-08-05, login username field — value came back
+  // in `text` (measured on the login username field — value came back
   // null and fill's clear silently no-oped). A focusable AND long-clickable
   // scroll view is a text input; real scroll containers are neither.
   const composeTextInput =
@@ -1292,14 +1287,14 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   };
   // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
   // .getText() returns the hint while isShowingHintText() — and the API 33
-  // dump has no attribute that says so (measured 2026-10-09, Pixel_3a AVD,
+  // dump has no attribute that says so (measured on the Pixel_3a AVD,
   // Android 13: the Contacts editor's `text="Last name"`, the Settings
-  // search's `text="Search settings"`, both empty; docs/bugs/
-  // 2026-10-09-android-clear-reads-edittext-hint-as-content.md). A dump that
+  // search's `text="Search settings"`, both empty). A dump that
   // DOES name the hint (newer uiautomator builds, the uiautomator2 server's
   // `hint`) hands it to fill as the node's placeholder (UiNode), read
   // opportunistically: no captured dump carries it yet. Compose placeholders
-  // are not dumped as text at all (measured the same day), so need none.
+  // are not dumped as text at all (measured), so need none.
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md
   const hint = isTextInput ? emptyToNull(raw.hint) : null;
   if (hint !== null) node.placeholder = hint;
   if (whole !== undefined) around.grown.set(node, whole);
@@ -1308,9 +1303,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
 
 /**
  * The node's whole extent when uiautomator cut its bounds short of its own
- * descendants (2026-10-09, the bug note
- * docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md):
- * Compose subtracts what an overlay
+ * descendants (the bug note below): Compose subtracts what an overlay
  * sibling drawn over a node covers from that node's bounds, and not from
  * its descendants' — mp-native's Account Detail row under its sticky date
  * header (`0,401 1080x79`) dumps as `row_0 66,480 948x66`, its own label
@@ -1323,12 +1316,11 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
  * label or button, which ARE the row; not a badge or an icon hanging off
  * one side, and not a full-bleed child (a carousel breaking out of a
  * card's padding: counted, it widened the card sideways, and the card's
- * own button no longer spanned it, so its label read covered — code review
- * of fix/r7-bounds P1). And the node grows along y alone, on ONE side: a
+ * own button no longer spanned it, so its label read covered). And the node grows along y alone, on ONE side: a
  * cut leaves the node's other edge where its descendants' is (row_0's
  * bottom, 546; the rows cut at the tab bar, their tops), while a child
- * overflowing both edges (a touch target, an offset) is no cut (code review
- * P3). The residual that rule leaves, stated (review round 2): a node cut
+ * overflowing both edges (a touch target, an offset) is no cut. The
+ * residual that rule leaves, stated: a node cut
  * at BOTH ends — a tall card between a sticky header and a floating tab
  * bar, dumped `66,480 948x1360` over its own `66,420 948x1480` — is not
  * widened either, and reads whole. Vertical only: every cut measured was a list's row under a bar
@@ -1340,8 +1332,9 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
  * was measured inside a scroller only. A node with no area (collapsed, or
  * scrolled off) stays so: widening it would make a target of a node the
  * dump says is not shown. Undefined when nothing grows — a control and its
- * padded touch target lie inside their wrapper (I-1, round 6b: wrapper
- * 132, control 110, label 66), so they never widen it.
+ * padded touch target lie inside their wrapper (measured: wrapper 132,
+ * control 110, label 66), so they never widen it.
+ * docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md
  */
 function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | undefined {
   if (rectArea(rect) === 0) return undefined;
@@ -1392,8 +1385,7 @@ function widenUnderCovers(tree: UiNode, grown: ReadonlyMap<UiNode, Rect>, drawnO
 
 /**
  * A node's bounds as dumped — unless uiautomator dumped them INVERTED, bottom
- * above top or right left of left (2026-10-09, docs/bugs/2026-10-09-android-
- * inverted-uiautomator-bounds-pass-through-as-negative-heights.md: Settings'
+ * above top or right left of left (the bug note below: Settings'
  * rows scrolled under the collapsing app bar, `text="Apps"
  * bounds="[198,297][324,58]"`, `homepage_title` `[66,66][428,44]`). The
  * node is clipped OUT of its container: one edge is the container's (the
@@ -1407,6 +1399,7 @@ function widenUnderCovers(tree: UiNode, grown: ReadonlyMap<UiNode, Rect>, drawnO
  * `clippedOut` (types.ts#UiNode.clippedOut), for the scroll and the wait's
  * hint. Both axes are clamped; the vertical side is the one named when
  * both are inverted.
+ * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md
  */
 function nodeBounds(bounds: string | undefined, parent: Rect | undefined): { rect: Rect; clippedOut?: ClippedSide } {
   const m = bounds?.match(BOUNDS_RE);

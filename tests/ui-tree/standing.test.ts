@@ -1,12 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, rectIntersection, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
-import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
-import type { KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
+import { onScreen, sceneOf, treeScreen, usableScreen, usableScreenOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { el, FakeAdapter, node, screen } from '../helpers/fake.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
@@ -121,6 +121,44 @@ describe('usableScreen — the oriented box: the device screen, turned only when
       children: [node({ role: 'image', rect: box(500, 300) }), node({ role: 'button', rect: { x: 425, y: 400, width: 50, height: 40 } })],
     });
     expect(await usableOf(device(tree, { width: 402, height: 874 }))).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(874, 402), from: 'device' });
+  });
+});
+
+describe('usableScreen — the boxes a point is judged in, by the window\'s own sides (moved from the tap\'s off-screen tests)', () => {
+  /** idb's rectless root over `children`. */
+  const idbRoot = (...children: UiNode[]) => node({ role: 'container', rect: box(0, 0), children });
+  const PORTRAIT = { width: 402, height: 874 };
+  const IPAD = { width: 820, height: 1180 };
+  /** An idb landscape window `w` with a button at 700,100 and, `card`, a card straddling its right edge (the window then unreliable). */
+  const landscape = (w: { width: number; height: number }, card = true) =>
+    idbRoot(node({ role: 'other', rect: { x: 0, y: 0, ...w }, children: [node({ role: 'button', rect: { x: 700, y: 100, width: 100, height: 40 } }), ...(card ? [node({ role: 'other', rect: { x: 820, y: 50, width: 300, height: 200 } })] : [])] }));
+  /** Rows walked to y 2950, `width` wide (no window: a walked width, not a window's). */
+  const walked = (width: number) => idbRoot(...[0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width, height: 50 } })));
+  /** An iPad landscape window with a 2400-wide strip in it. */
+  const ipad = (height: number) => idbRoot(node({ role: 'other', rect: { x: 0, y: 0, width: 1180, height }, children: [node({ role: 'other', rect: { x: 0, y: 600, width: 2400, height: 100 } })] }));
+  it.each([
+    // A turn suggested but witnessed by no window: the box either way up — the tap refuses only a point outside both.
+    ['an idb landscape window a straddling card makes unreliable: either way up', landscape({ width: 874, height: 402 }), PORTRAIT, [box(402, 874), box(874, 402)]],
+    ['an iPad landscape window 1180x820 with a 2400-wide strip: either way up', ipad(820), IPAD, [box(820, 1180), box(1180, 820)]],
+    ['…20 pt short of the panel (1180x800): either way up', ipad(800), IPAD, [box(820, 1180), box(1180, 820)]],
+    ['a walked width (852 on a 393x852 panel): turned, either way up', walked(852), { width: 393, height: 852 }, [box(852, 393), box(393, 852)]],
+    // A landscape idb window a few percent short of the panel still says turned (TURNED_WIDTH_SLACK_PCT, 5 %).
+    ['874x380, unreliable', landscape({ width: 874, height: 380 }), PORTRAIT, [box(402, 874), box(874, 402)]],
+    ['874x380, reliable', landscape({ width: 874, height: 380 }, false), PORTRAIT, [box(874, 402), box(402, 874)]],
+    ['874x390, unreliable', landscape({ width: 874, height: 390 }), PORTRAIT, [box(402, 874), box(874, 402)]],
+    ['852x402 (2.5 % short), unreliable', landscape({ width: 852, height: 402 }), PORTRAIT, [box(402, 874), box(874, 402)]],
+    // No turn suggested: the panel as built alone.
+    ['a witnessed portrait window: the panel alone', node({ role: 'container', rect: box(402, 874), children: [node({ role: 'button', rect: { x: 450, y: 280, width: 100, height: 40 } })] }), PORTRAIT, [box(402, 874)]],
+    ['a portrait idb window a straddling card makes unreliable: no turn', idbRoot(node({ role: 'other', rect: box(402, 874), children: [node({ role: 'other', rect: { x: 300, y: 80, width: 300, height: 200 } })] })), PORTRAIT, [box(402, 874)]],
+    ['a window as wide as the turned panel but TALLER than its short side (874x874): nothing', idbRoot(node({ role: 'other', rect: box(874, 874) })), PORTRAIT, [box(402, 874)]],
+    ['no window, a carousel walked to x 1500: the walk suggests nothing', idbRoot(...[0, 300, 600, 900, 1200].map((x) => node({ role: 'cell', rect: { x, y: 80, width: 300, height: 40 } })), ...[200, 400, 600, 800].map((y) => node({ role: 'text', rect: { x: 0, y, width: 402, height: 40 } }))), PORTRAIT, [box(402, 874)]],
+    ['no window, a walk that happens to measure the panel turned (874x402): still nothing', idbRoot(node({ role: 'cell', rect: { x: 574, y: 80, width: 300, height: 40 } }), node({ role: 'text', rect: { x: 0, y: 362, width: 402, height: 40 } })), PORTRAIT, [box(402, 874)]],
+    ['the stated LOSS: a landscape idb tree with no window and a straddling card — nothing says turned', idbRoot(...[0, 400, 800, 1600, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 874, height: 50 } })), node({ role: 'other', rect: { x: 820, y: 50, width: 300, height: 200 } })), PORTRAIT, [box(402, 874)]],
+    ['an Android top split-screen pane (1080x1000 on 1080x2400): unturned', node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 1000 } }), { width: 1080, height: 2400 }, [box(1080, 2400)]],
+    // A witnessed landscape window: the turned box alone.
+    ['a WDA root 874x402 on a 402x874 panel: turned, witnessed', node({ role: 'container', rect: box(874, 402) }), PORTRAIT, [box(874, 402)]],
+  ] as const)('%s', async (_name, tree, dev, boxes) => {
+    expect((await usableOf(device(tree, dev)))?.boxes).toEqual(boxes);
   });
 });
 
@@ -265,28 +303,30 @@ const idb = (y: number): KeyboardLine => ({ y, source: 'idb-band', witnessed: fa
 const FULLY = { of: 'stop', fully: true } as const;
 
 /** A standing's kind with the fact its sentence quotes, as one plain value. */
-const said = (s: Standing): unknown => {
+const said = (s: Standing | PixelStanding): unknown => {
   switch (s.kind) {
     case 'reachable':
-      return { kind: s.kind, at: s.at, ...(s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
+      return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
     case 'offScreen':
       return { kind: s.kind, at: s.at, visible: s.visible };
     case 'systemBar':
-      return { kind: s.kind, at: s.at, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
+      return { kind: s.kind, at: s.at, bar: s.bar, ...('band' in s && { band: s.band }) };
     case 'clipped':
       return { kind: s.kind, edges: s.edges };
     case 'cut':
-      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }), ...(s.bar !== undefined && { bar: s.bar, container: s.cut.container }) };
+      // The pixel's own cut: at a bar, in the scroller flush with it.
+      if (!('cut' in s)) return { kind: s.kind, bar: s.bar, container: s.container };
+      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }) };
     case 'covered':
       return {
         kind: s.kind,
         cover: s.cover.identifier ?? s.cover.label,
-        ...(s.largest !== undefined && { largest: s.largest }),
-        ...(s.reach !== undefined && { reach: s.reach }),
-        ...(s.overRoot === true && { overRoot: true }),
+        ...('largest' in s && s.largest !== undefined && { largest: s.largest }),
+        ...('reach' in s && { reach: s.reach }),
+        ...('overRoot' in s && s.overRoot === true && { overRoot: true }),
       };
     case 'underKeyboard':
-      return { kind: s.kind, top: s.line.y, source: s.line.source, ...(s.band !== undefined && { band: s.band }) };
+      return { kind: s.kind, top: s.line.y, source: s.line.source, ...('band' in s && { band: s.band }) };
   }
 };
 
@@ -472,8 +512,8 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
 });
 
 /** The pixel assert's purposes over `n`: the ocr crop (the whole rect, read as glyphs) and the colour sample (inset 12 % a side, verify/color-parity.ts#colorSampleRect). */
-const OCR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
-const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): Purpose => {
+const OCR = (n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
+const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => {
   const { x, y, width, height } = n.rect;
   return { of: 'pixel', reads: { x: x + width * 0.12, y: y + height * 0.12, width: width * 0.76, height: height * 0.76 }, glyphs: false, ...(keyboardTop !== undefined && { keyboardTop }) };
 };
@@ -500,11 +540,11 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     ['…its text "Loan repayment" 254,2199 298x21 wholly in the band', () => compose('accountDetailTop'), 'Loan repayment@2199', PIXEL_NAV, OCR, { kind: 'systemBar', at: { x: 403, y: 2210 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…with no navigation band read (an immersive app): measured', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL, OCR, { kind: 'reachable', at: { x: 540, y: 2186 } }],
     // D7 (N-b, owner: ocr only): the Settings title 198,2105 428x49 ends on the band's top, its list too — the crop may read it cut.
-    ['Settings title flush with the band in a list flush with it, ocr: cut at the navigation bar', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, OCR, { kind: 'cut', edge: 'bottom', depth: 49, bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 596, width: 1080, height: 1558 } }],
+    ['Settings title flush with the band in a list flush with it, ocr: cut at the navigation bar', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, OCR, { kind: 'cut', bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 596, width: 1080, height: 1558 } }],
     ['…colour: measured on what shows (D5)', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, COLOUR, { kind: 'reachable', at: { x: 412, y: 2130 } }],
     ['…no navigation band (an immersive app): measured', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL, OCR, { kind: 'reachable', at: { x: 412, y: 2130 } }],
     // Contacts' Create contact: "Add fields" 198,2106 180x48 flush with the form's scroller 0,242 1080x1912, which ends at 2154.
-    ['contactsCreateStaged "Add fields", ocr: cut at the navigation bar', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, OCR, { kind: 'cut', edge: 'bottom', depth: 48, bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 242, width: 1080, height: 1912 } }],
+    ['contactsCreateStaged "Add fields", ocr: cut at the navigation bar', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, OCR, { kind: 'cut', bar: { edge: 'bottom', top: 2154 }, container: { x: 0, y: 242, width: 1080, height: 1912 } }],
     // A non-edge-to-edge app's pinned bottom bar ends at 2154 too, in no scroller: measured.
     ['a pinned bottom bar ending at the band, in no scroller, ocr: measured', async () => parseDump(PINNED_BOTTOM_BAR), 'bottom_bar', PIXEL_NAV, OCR, { kind: 'reachable', at: { x: 540, y: 2077 } }],
     ['…its title flush with it too: measured', async () => parseDump(PINNED_BOTTOM_BAR), 'bar_title', PIXEL_NAV, OCR, { kind: 'reachable', at: { x: 540, y: 2127 } }],
@@ -797,6 +837,298 @@ describe('Scene.standing for the stop — a box that does not start at the origi
     const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'button', identifier: 'row', rect: { x: 24, y: 10, width: 354, height: 52 } })] });
     const shifted = { x: 0, y: 20, width: 402, height: 854 };
     expect(said(sceneOf(t).standing(t.children[0], { box: shifted, boxes: [shifted], statusBand: 62 }, PLAIN))).toEqual({ kind: 'systemBar', at: { x: 201, y: 36 }, bar: { edge: 'top', bottom: 62 } });
+  });
+});
+
+// ─── Rows moved from the verbs' tests (tests/interact/resolve.test.ts, scroll.test.ts, scroll-rounds.test.ts) ──────
+// The geometric enumeration of the tap's and scroll_until's judgement, one row per case: the verbs keep one integration
+// case per refusal class and the sentences; the kind and the point are pinned here, where they are decided.
+
+/** A 402x874 iPhone screen with no status band read (the fakes the moved tap cases ran on). */
+const IPHONE_BARE = { box: box(402, 874), boxes: [box(402, 874)] };
+/** The Pixel_3a as built, no band read. */
+const PIXEL_BARE = { box: box(1080, 2220), boxes: [box(1080, 2220)] };
+/** The tap as interact/resolve.ts#refuseOffScreen asks it: with the tree's own keyboard line (idb's band, ui-tree/keyboard-cover.ts#keyboardEdge) for `n`. */
+const tapOf = (t: UiNode, n: UiNode): TouchPurpose => {
+  const line = keyboardEdge(undefined, sceneOf(t).order, n);
+  return { of: 'tap', ...(line !== undefined && { keyboardTop: line }) };
+};
+/** An idb tree from `frame`-style elements (the idb parser's input). */
+const idbEl = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number, AXUniqueId: string | null = null) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } });
+const idbTree = (...elements: ReturnType<typeof idbEl>[]): UiNode => parseIdbDescribeAll(JSON.stringify(elements));
+const QWERTY = (y: number) => ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((k, i) => idbEl('Button', k, 2 + 40 * i, y, 38, 46));
+/** The idb number-pad fixture, `edit` applied to its nodes. */
+const numberPad = async (edit: (t: UiNode) => void = () => {}): Promise<UiNode> => {
+  const t = await idbAt('idb-swift-form-number-pad.json', 'elements');
+  edit(t);
+  return t;
+};
+/** mp-native's SWIFT form on the Pixel_3a as a synthetic tree: the form's clipping scroller `0,242 1080x1736`, `inside` in it, CONTINUE below. */
+const swiftClipped = (...inside: UiNode[]): UiNode =>
+  node({
+    role: 'container',
+    rect: box(1080, 2220),
+    children: [
+      node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 242, width: 1080, height: 1736 }, children: inside }),
+      node({ role: 'button', label: 'CONTINUE', identifier: 'swift_payment.form.continue_button', rect: { x: 66, y: 1979, width: 948, height: 132 } }),
+    ],
+  });
+/** The "Payment details" toggle (132 px whole) at `y`, `height` of it showing, its button 12 px below its top, cut with it. */
+const toggleAt = (y: number, height: number) =>
+  node({ role: 'container', identifier: 'swift_payment.form.details_toggle', rect: { x: 66, y, width: 948, height }, children: [node({ role: 'button', rect: { x: 66, y: y + 12, width: 948, height: Math.min(108, 1978 - (y + 12)) } })] });
+/** The toggle as dumped on the device: its leaf label, a chevron, its button. */
+const dumpedToggleAt = (y: number, height: number) => {
+  const cut = (top: number, h: number) => ({ x: 66, y: top, width: 948, height: Math.min(h, 1978 - top) });
+  return node({
+    role: 'container',
+    identifier: 'swift_payment.form.details_toggle',
+    rect: { x: 66, y, width: 948, height },
+    children: [node({ role: 'other', label: 'Payment details', rect: cut(y + 12, 108) }), node({ role: 'other', identifier: 'chevron', rect: { x: 926, y: y + 31, width: 88, height: Math.min(66, 1978 - (y + 31)) } }), node({ role: 'button', rect: cut(y + 12, 108) })],
+  });
+};
+/** A tree of `children` on a `root` box. */
+const on = (root: Rect, ...children: UiNode[]) => node({ role: 'container', rect: root, children });
+/** The idb SWIFT form at rest with priority_select at `y` and `height`, and `extra` listed last. */
+const swiftIdbWith = async (y: number, height: number, ...extra: UiNode[]): Promise<UiNode> => {
+  const t = await swiftIdbAt(y);
+  (byId(t, 'swift_payment.form.priority_select') as { rect: Rect }).rect = { ...byId(t, 'swift_payment.form.priority_select').rect, height };
+  t.children.push(...extra);
+  return t;
+};
+
+describe('Scene.standing for the tap — the screen\'s edges, the status band and the keyboard line (moved from the tap\'s tests)', () => {
+  it.each([
+    // Off the screen at every edge (the SWIFT form's street label moved): above the top, a carousel page right of it, one left of it.
+    ['above the top: off the screen', () => on(box(402, 874), node({ identifier: 'n', rect: { x: 42, y: -40, width: 103, height: 20 } })), 'n', IPHONE_BARE, { kind: 'offScreen', at: { x: 94, y: -30 }, visible: 0 }],
+    ['past the right edge', () => on(box(402, 874), node({ identifier: 'n', rect: { x: 450, y: 400, width: 100, height: 20 } })), 'n', IPHONE_BARE, { kind: 'offScreen', at: { x: 500, y: 410 }, visible: 0 }],
+    ['past the left edge', () => on(box(402, 874), node({ identifier: 'n', rect: { x: -200, y: 400, width: 100, height: 20 } })), 'n', IPHONE_BARE, { kind: 'offScreen', at: { x: -150, y: 410 }, visible: 0 }],
+    // The edges: right and bottom exclusive, judged at the point SENT (tapPoint rounds).
+    ['the last column (401,101): on the screen', () => on(box(402, 874), node({ identifier: 'n', rect: { x: 400, y: 100, width: 2, height: 2 } })), 'n', IPHONE_BARE, { kind: 'reachable', at: { x: 401, y: 101 } }],
+    ['the width (402,101): off it', () => on(box(402, 874), node({ identifier: 'n', rect: { x: 401, y: 100, width: 2, height: 2 } })), 'n', IPHONE_BARE, { kind: 'offScreen', at: { x: 402, y: 101 }, visible: 0.5 }],
+    ['the height (101,874): off it', () => on(box(402, 874), node({ identifier: 'n', rect: { x: 100, y: 872, width: 2, height: 4 } })), 'n', IPHONE_BARE, { kind: 'offScreen', at: { x: 101, y: 874 }, visible: 0.5 }],
+    // iOS's status band's edge: a centre at y 61 is under the bar, at y 62 tapped.
+    ['priority_select at 35, its centre (201,61): under the status bar', () => swiftIdbAt(35), 'swift_payment.form.priority_select', IPHONE, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
+    ['…at 36, its centre (201,62): reachable', () => swiftIdbAt(36), 'swift_payment.form.priority_select', IPHONE, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    // No band read (an Android adapter's status bar outside the app's window): the same centre (201,6) is tapped.
+    ['…flung to -20 with no band read: reachable at (201,6)', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE_BARE, { kind: 'reachable', at: { x: 201, y: 6 } }],
+    // A moved tap never lands in the band: the only uncovered piece (30–62) lies in it — covered, nothing of it shows.
+    ['a row 30–100 under a banner at 62–102: covered, its uncovered piece all band', () => swiftIdbWith(30, 70, node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 62, width: 402, height: 40 } })), 'swift_payment.form.priority_select', IPHONE, { kind: 'covered', cover: 'banner' }],
+    // …and the band is cut before the largest piece is chosen: 120–160 below the bar, not the larger 30–90 reaching into it.
+    ['a row 30–160 under a banner at 90–120: moved to the piece below the bar', () => swiftIdbWith(30, 130, node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 90, width: 402, height: 30 } })), 'swift_payment.form.priority_select', IPHONE, { kind: 'reachable', at: { x: 201, y: 140 }, moved: { piece: { x: 24, y: 120, width: 354, height: 40 }, cover: 'banner', aboveKeyboard: false } }],
+    // A landscape box is not cut (an iPhone hides its status bar there): a centre at y 30 is tapped.
+    ['a landscape box with the band read: (400,30) reachable', () => on(box(874, 402), node({ identifier: 'n', rect: { x: 300, y: 10, width: 200, height: 40 } })), 'n', { box: box(874, 402), boxes: [box(874, 402)], statusBand: 62 }, { kind: 'reachable', at: { x: 400, y: 30 } }],
+  ] as const)('%s', async (_name, tree, id, screen, expected) => {
+    const t = await tree();
+    expect(said(sceneOf(t).standing(byId(t, id), screen, TAP))).toEqual(expected);
+  });
+});
+
+describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as the tap asks (its tree\'s own line) (moved from the tap\'s tests)', () => {
+  it.each([
+    // The pinned CONTINUE itself, and the row clear of it (the manual swipe put it at 452): tapped at their centres.
+    ['idb SWIFT form: CONTINUE itself, reachable', () => swiftIdb(), 'swift_payment.form.continue_button', { kind: 'reachable', at: { x: 201, y: 802 } }],
+    ['…priority_select at 452, clear of the bar: reachable', () => swiftIdbAt(452), 'swift_payment.form.priority_select', { kind: 'reachable', at: { x: 201, y: 478 } }],
+    // A label 3 pt below CONTINUE (pressed CONTINUE on the device): CONTINUE reaches the screen's bottom.
+    [
+      'scrolled form pos1, the bank-street label at 42,817 under CONTINUE\'s reach',
+      async () => {
+        const t = await idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos1');
+        (byId(t, 'Payee’s bank street & no.*') as { rect: Rect }).rect = { x: 42, y: 817, width: 186, height: 20 };
+        return t;
+      },
+      'Payee’s bank street & no.*',
+      { kind: 'covered', cover: 'swift_payment.form.continue_button' },
+    ],
+    // A modal listed before the content it is drawn over: the chooser's rows and the picker stand clear; CONTINUE, listed last, still covers.
+    ['idb modal: the chooser\'s own-transfer row, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_own', { kind: 'reachable', at: { x: 201, y: 423 } }],
+    ['…its SWIFT row, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', { kind: 'reachable', at: { x: 201, y: 479 } }],
+    ['…the value-date picker, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'swift_payment.form.value_date_picker', { kind: 'reachable', at: { x: 205, y: 479 } }],
+    ['…behind the picker, Payee’s name under CONTINUE', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'Payee’s name', { kind: 'covered', cover: 'swift_payment.form.continue_button' }],
+    // The number pad up, CONTINUE lifted onto it: value_date_select under it, nothing of it shows above the keyboard; a row under the keys is under the keyboard.
+    ['idb number pad: value_date_select under the lifted CONTINUE, nothing above the keyboard', () => numberPad(), 'swift_payment.form.value_date_select', { kind: 'covered', cover: 'swift_payment.form.continue_button' }],
+    [
+      '…a Fees row 570–630 under the keys: under the keyboard',
+      () => numberPad((t) => t.children.splice(t.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 570, width: 354, height: 60 } }))),
+      'fees',
+      { kind: 'underKeyboard', top: 589, source: 'idb-band' },
+    ],
+    // The owner's decision under D2: a row 520–680 with 362x70 above the band (590), its centre under key K — under the keyboard, never moved.
+    ['a row 520–680, its centre under key K: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('Button', 'Row', 20, 520, 362, 160, 'tall'), idbEl('Button', 'K', 180, 594, 44, 40), ...QWERTY(640), idbEl('Other', null, 0, 590, 402, 284)), 'tall', { kind: 'underKeyboard', top: 590, source: 'idb-band' }],
+    // An app row listed right before the keys, wholly in the band: no key — under the keyboard; a key sharing its row is the keyboard's own.
+    ['a login\'s Sign in at 20,700 362x50 before the keys: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', 'User', 20, 200, 362, 44, 'user'), idbEl('Button', 'Sign in', 20, 700, 362, 50, 'signin'), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'signin', { kind: 'underKeyboard', top: 590, source: 'idb-band' }],
+    ['…its key Q: reachable, the keyboard\'s own', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', 'User', 20, 200, 362, 44, 'user'), idbEl('Button', 'Sign in', 20, 700, 362, 50, 'signin'), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'Q', { kind: 'reachable', at: { x: 21, y: 803 } }],
+    // A field and its placeholder label behind the keyboard (one top and height, overlapping): no keys — under the keyboard.
+    ['a field and its placeholder behind the keyboard: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', null, 42, 700, 318, 20, 'field'), idbEl('StaticText', 'Placeholder', 42, 700, 60, 20), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'field', { kind: 'underKeyboard', top: 590, source: 'idb-band' }],
+    // A bottom sheet's unlabelled background with NO keyboard: no band — the row under Done is moved to its uncovered part.
+    [
+      'a bottom sheet\'s background, no keyboard: moved to the uncovered part',
+      async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('Other', null, 0, 400, 402, 474), idbEl('Button', 'Row', 24, 420, 354, 80, 'row'), idbEl('Button', 'Done', 24, 440, 354, 30)),
+      'row',
+      { kind: 'reachable', at: { x: 201, y: 485 }, moved: { piece: { x: 24, y: 470, width: 354, height: 30 }, cover: 'Done', aboveKeyboard: false } },
+    ],
+  ] as const)('%s', async (_name, tree, id, expected) => {
+    const t = await tree();
+    const n = byId(t, id);
+    expect(said(sceneOf(t).standing(n, IPHONE_BARE, tapOf(t, n)))).toEqual(expected);
+  });
+
+  it.each([
+    ['idb SWIFT form through the parser: priority_select at rest', () => swiftIdb(), 'swift_payment.form.priority_select', { x: 201, y: 797 }],
+    ['idb number pad: value_date_select under the lifted CONTINUE', () => numberPad(), 'swift_payment.form.value_date_select', { x: 201, y: 571 }],
+    ['idb modal: Payee\u2019s name behind the picker', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'Payee\u2019s name', { x: 94, y: 827 }],
+    [
+      'scrolled form pos1: the bank-street label 3 pt under CONTINUE',
+      async () => {
+        const t = await idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos1');
+        (byId(t, 'Payee\u2019s bank street & no.*') as { rect: Rect }).rect = { x: 42, y: 817, width: 186, height: 20 };
+        return t;
+      },
+      'Payee\u2019s bank street & no.*',
+      { x: 135, y: 827 },
+    ],
+  ] as const)('%s: covered by CONTINUE at the centre its refusal quotes', async (_name, tree, id, centre) => {
+    const t = await tree();
+    const n = byId(t, id);
+    const s = sceneOf(t).standing(n, IPHONE_BARE, tapOf(t, n));
+    expect([s.kind, s.facts.centre, s.facts.centreCover?.identifier]).toEqual(['covered', centre, 'swift_payment.form.continue_button']);
+  });
+
+  it('the number pad\'s covered row is judged above the keyboard (its 589–596 strip lies under the band): `aboveKeyboard`, nothing of it shows', async () => {
+    const t = await numberPad();
+    const n = byId(t, 'swift_payment.form.value_date_select');
+    const s = sceneOf(t).standing(n, IPHONE_BARE, tapOf(t, n));
+    expect(s.kind === 'covered' && { aboveKeyboard: s.aboveKeyboard, largest: s.largest }).toEqual({ aboveKeyboard: true, largest: undefined });
+  });
+
+  it.each(['pos1', 'pos2', 'pos3', 'pos4', 'pos5', 'pos6'])('idb, rows scrolled under the top bar, %s: Back and the title stand clear for the tap and the plain stop', async (pos) => {
+    const t = await idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', pos);
+    for (const [id, at] of [['BackButton', { x: 44, y: 84 }], ['swift_payment.form.title', { x: 201, y: 84 }]] as const) {
+      expect([said(sceneOf(t).standing(byId(t, id), IPHONE_BARE, TAP)), said(sceneOf(t).standing(byId(t, id), IPHONE_BARE, PLAIN))]).toEqual([
+        { kind: 'reachable', at },
+        { kind: 'reachable', at },
+      ]);
+    }
+  });
+});
+
+describe('Scene.standing for the tap — the cut sliver\'s edges (synthetic SWIFT form, moved from the tap\'s tests)', () => {
+  it.each([
+    ['the toggle wholly on screen (66,1793 948x132): reachable at its centre', () => swiftClipped(toggleAt(1793, 132)), 'swift_payment.form.details_toggle', { kind: 'reachable', at: { x: 540, y: 1859 } }],
+    ['…its leaf label, the toggle whole: reachable', () => swiftClipped(dumpedToggleAt(1793, 132)), 'Payment details', { kind: 'reachable', at: { x: 540, y: 1859 } }],
+    ['…the cut toggle\'s chevron: the toggle\'s cut, inherited', () => swiftClipped(dumpedToggleAt(1924, 55)), 'chevron', { kind: 'cut', edge: 'bottom', depth: 23, within: { x: 66, y: 1924, width: 948, height: 55 } }],
+    ['a whole button under the minimum touching the edge, its label inside: nothing cut', () => swiftClipped(node({ role: 'button', identifier: 'save', rect: { x: 66, y: 1930, width: 948, height: 48 }, children: [node({ role: 'text', label: 'Save', rect: { x: 480, y: 1942, width: 120, height: 24 } })] })), 'save', { kind: 'reachable', at: { x: 540, y: 1954 } }],
+    [
+      'a whole dense 40-px last row, its 2-px divider flush with its bottom: a divider is no evidence',
+      () => swiftClipped(node({ role: 'button', identifier: 'last_row', rect: { x: 66, y: 1938, width: 948, height: 40 }, children: [node({ role: 'text', label: 'Row', rect: { x: 100, y: 1946, width: 200, height: 24 } }), node({ role: 'other', rect: { x: 66, y: 1976, width: 948, height: 2 } })] })),
+      'last_row',
+      { kind: 'reachable', at: { x: 540, y: 1958 } },
+    ],
+    ['a whole button whose background fills it, at the edge: no evidence of a cut', () => swiftClipped(node({ role: 'button', identifier: 'filled', rect: { x: 66, y: 1923, width: 400, height: 55 }, children: [node({ role: 'other', rect: { x: 66, y: 1923, width: 400, height: 55 } })] })), 'filled', { kind: 'reachable', at: { x: 266, y: 1951 } }],
+    ['a leaf at the edge (the stated residual: a cut leaf reads the same)', () => swiftClipped(node({ role: 'button', identifier: 'leaf', rect: { x: 614, y: 1923, width: 400, height: 55 } })), 'leaf', { kind: 'reachable', at: { x: 814, y: 1951 } }],
+    ['Compose\'s shape: a row cut to 948x33 at the list\'s TOP, its field running on above it', () => swiftClipped(node({ role: 'container', identifier: 'first_name_row', rect: { x: 132, y: 242, width: 948, height: 33 }, children: [node({ role: 'textfield', label: 'First name', rect: { x: 132, y: 115, width: 816, height: 160 } })] })), 'first_name_row', { kind: 'cut', edge: 'top', depth: 33 }],
+    [
+      'Create contact\'s "Company" 176,1373 190x25 flush with the IME-cut form\'s bottom, its field cut there 91 deep: not a sliver',
+      () => {
+        const field = node({ role: 'textfield', rect: { x: 132, y: 1307, width: 816, height: 91 }, children: [node({ role: 'other', rect: { x: 132, y: 1329, width: 816, height: 69 } }), node({ role: 'text', label: 'Company', identifier: 'company', rect: { x: 176, y: 1373, width: 190, height: 25 } }), node({ role: 'other', rect: { x: 176, y: 1340, width: 728, height: 58 } })] });
+        const form = node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 242, width: 1080, height: 1156 }, children: [node({ role: 'container', rect: { x: 132, y: 1307, width: 948, height: 91 }, children: [field, node({ role: 'other', rect: { x: 948, y: 1346, width: 132, height: 52 } })] })] });
+        return on(box(1080, 2220), form);
+      },
+      'company',
+      { kind: 'reachable', at: { x: 271, y: 1386 } },
+    ],
+  ] as const)('%s', (_name, tree, id, expected) => {
+    const t = tree();
+    expect(said(sceneOf(t).standing(byId(t, id), PIXEL_BARE, TAP))).toEqual(expected);
+  });
+
+  it('a cut leaf shows no evidence (the stated residual): the plain stop stops on it', () => {
+    const leaf = node({ role: 'container', identifier: 'details_toggle', rect: { x: 66, y: 1924, width: 948, height: 55 } });
+    const t = swiftClipped(leaf);
+    expect(said(sceneOf(t).standing(leaf, PIXEL_BARE, PLAIN))).toEqual({ kind: 'reachable', at: { x: 540, y: 1952 } });
+  });
+});
+
+describe('Scene.standing — Compose labels under their own control, the bug note\'s snapshots (moved from the tap\'s tests)', () => {
+  it.each([
+    ['login dump', () => parseDump(COMPOSE.login), 'LOGIN', { x: 540, y: 1463 }],
+    ['signIn dump', () => parseDump(COMPOSE.signIn), 'SIGN IN', { x: 541, y: 1869 }],
+    ['discard dump', () => parseDump(COMPOSE.discard), 'DISCARD', { x: 776, y: 1253 }],
+    ['noThanks dump', () => parseDump(COMPOSE.noThanks), 'No thanks', { x: 541, y: 2023 }],
+    ['accountDetailTop', () => compose('accountDetailTop'), 'PAY', { x: 541, y: 716 }],
+    ['accountDetailTop', () => compose('accountDetailTop'), 'PAY ME', { x: 224, y: 716 }],
+    ['accountDetailTop', () => compose('accountDetailTop'), 'SCAN QR', { x: 857, y: 716 }],
+    ['accountDetail', () => compose('accountDetail'), 'PAY', { x: 541, y: 292 }],
+    ['accountDetail, the row cut at the tab bar\'s top', () => compose('accountDetail'), '+493', { x: 782, y: 1836 }],
+    ['contactsSyncPromo', () => compose('contactsSyncPromo'), 'No thanks', { x: 541, y: 2023 }],
+    ['contactsSyncPromo', () => compose('contactsSyncPromo'), 'Sync device and SIM contacts', { x: 540, y: 1891 }],
+    ['contactsCreateStaged', () => compose('contactsCreateStaged'), 'Save', { x: 828, y: 155 }],
+    ['contactsCreateStaged', () => compose('contactsCreateStaged'), 'Add phone', { x: 236, y: 968 }],
+    ['contactsCreateStaged', () => compose('contactsCreateStaged'), 'Add fields', { x: 288, y: 2130 }],
+    ['contactsCreate', () => compose('contactsCreate'), 'Add phone', { x: 236, y: 2114 }],
+    // The ICON buttons: the label node under a control padded on all four sides.
+    ['contactsCreateStaged, icon', () => compose('contactsCreateStaged'), 'Cancel', { x: 77, y: 154 }],
+    ['contactsCreateStaged, icon', () => compose('contactsCreateStaged'), 'More options', { x: 1003, y: 154 }],
+    ['contactsCreateStaged, icon', () => compose('contactsCreateStaged'), 'Delete', { x: 1014, y: 830 }],
+    ['contactsCreate, icon', () => compose('contactsCreate'), 'Cancel', { x: 77, y: 154 }],
+    ['contactsCreate, icon', () => compose('contactsCreate'), 'Delete', { x: 1014, y: 1976 }],
+  ] as const)('%s — "%s": reachable at its centre for the tap and the plain stop', async (_name, tree, label, at) => {
+    const t = await tree();
+    const n = byId(t, label);
+    expect([said(sceneOf(t).standing(n, PIXEL_BARE, TAP)), said(sceneOf(t).standing(n, PIXEL_BARE, PLAIN))]).toEqual([
+      { kind: 'reachable', at },
+      { kind: 'reachable', at },
+    ]);
+  });
+
+  it('accountDetail: a row\'s label node clear of the tab bar is reachable for `fully: true`', async () => {
+    const t = await compose('accountDetail');
+    expect(said(sceneOf(t).standing(byId(t, 'Loan repayment, 04.01.2026, +91.00 EUR'), PIXEL_BARE, FULLY))).toMatchObject({ kind: 'reachable' });
+  });
+});
+
+describe('Scene.standing for the stop — the status band and a keyboard line (moved from scroll_until\'s tests)', () => {
+  it.each([
+    // Only the centre: a row reaching into the band with its centre below it (36–88, centre (201,62)) stops plain AND fully.
+    ['priority_select at 36, plain', () => swiftIdbAt(36), 'swift_payment.form.priority_select', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    ['…fully: true', () => swiftIdbAt(36), 'swift_payment.form.priority_select', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    // No band read (an Android adapter): the row at -20 stops, its centre (201,6) on the screen.
+    ['…at -20 with no band read, plain', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE_BARE, PLAIN, { kind: 'reachable', at: { x: 201, y: 6 } }],
+    // Full-bleed content at the top: the ROUNDED centre decides — 0,0 402x300 and 402x123 (61.5 sent as 62) stop; 402x122 (61) does not.
+    ['a hero 0,0 402x300, fully: true', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 150 } }],
+    ['a hero 0,0 402x123, fully: true', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    ['a hero 0,0 402x124, fully: true', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 124) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    ['a hero 0,0 402x122, fully: true: under the status bar', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 122) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
+  ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
+    const t = await tree();
+    expect(said(sceneOf(t).standing(byId(t, id), screen, purpose))).toEqual(expected);
+  });
+
+  const BAR = (y: number, height: number) => node({ role: 'button', label: 'Bar', identifier: 'bar', rect: { x: 0, y, width: 402, height } });
+  const ROW = (y: number, height: number) => node({ role: 'button', identifier: 'row', rect: { x: 24, y, width: 354, height } });
+  it.each([
+    // A centre under WDA's band (572) stops a plain scroll — the tap's guard hides the keyboard — and a bar there is no cover of it.
+    ['a row 550–610, its centre under the band, a bar at 560–640: plain, reachable', () => on(box(402, 874), ROW(550, 60), BAR(560, 80)), PLAIN, { kind: 'reachable', at: { x: 201, y: 580 } }],
+    ['a row 560–620 under the band, no bar: plain, reachable', () => on(box(402, 874), ROW(560, 60)), PLAIN, { kind: 'reachable', at: { x: 201, y: 590 } }],
+    // A bar under the keyboard is no cover: the frame is the screen above the band.
+    ['a row 400–452, CONTINUE at 780 under the band: fully: true, reachable', () => on(box(402, 874), ROW(400, 52), BAR(780, 44)), FULLY, { kind: 'reachable', at: { x: 201, y: 426 } }],
+  ] as const)('under a witnessed keyboard line at 572: %s', (_name, tree, purpose, expected) => {
+    const t = tree();
+    expect(said(sceneOf(t).standing(byId(t, 'row'), IPHONE, { ...purpose, keyboardTop: wda(572) }))).toEqual(expected);
+  });
+});
+
+describe('Scene.standing — the purpose names the answer\'s union', () => {
+  it('the pixel purpose answers a PixelStanding (its band, bar and reach always there, its own cut at a bar); the tap and the stop a Standing', () => {
+    const root = node({ rect: box(402, 874) });
+    const scene = sceneOf(root);
+    expectTypeOf(scene.standing(root, undefined, { of: 'pixel', reads: root.rect, glyphs: true })).toEqualTypeOf<PixelStanding>();
+    expectTypeOf(scene.standing(root, undefined, PLAIN)).toEqualTypeOf<Standing>();
+    expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<Standing>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'cut' }>['bar']>().toEqualTypeOf<{ readonly edge: 'bottom'; readonly top: number }>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'covered' }>['reach']>().toEqualTypeOf<Rect>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'systemBar' }>['band']>().toEqualTypeOf<Rect>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'underKeyboard' }>['band']>().toEqualTypeOf<Rect>();
+    expectTypeOf<PixelStanding['kind']>().toEqualTypeOf<'reachable' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
   });
 });
 

@@ -9,8 +9,10 @@ import { describe, expect, it } from 'vitest';
  * restating their rules. A pointer whose target was renamed, deleted or
  * never written sends the next reader nowhere, and nothing else notices:
  * the compiler does not read comments. This test resolves every such
- * reference in src/, ARCHITECTURE.md and the skill docs and names each
- * dangling one.
+ * reference in src/, ARCHITECTURE.md, the skill docs and the ADRs
+ * (docs/adr/) and names each
+ * dangling one — an ADR named by its path (`docs/adr/<n>-<title>.md`)
+ * included.
  *
  * A file part resolves when some file under src/ or tests/ ends with it
  * (`capture.ts`, `verify/capture.ts` and `src/verify/capture.ts` all name
@@ -43,6 +45,7 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   'docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md',
   'docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md',
   'docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md',
+  'docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>
@@ -53,7 +56,7 @@ const filesUnder = (dir: string): string[] =>
 
 const SRC = filesUnder('src').filter((f) => f.endsWith('.ts'));
 const TESTS = filesUnder('tests').filter((f) => f.endsWith('.ts'));
-const PROSE = [...SRC, 'ARCHITECTURE.md', ...filesUnder('skill').filter((f) => f.endsWith('.md'))];
+const PROSE = [...SRC, 'ARCHITECTURE.md', ...filesUnder('skill').filter((f) => f.endsWith('.md')), ...filesUnder('docs/adr').filter((f) => f.endsWith('.md'))];
 
 const text = new Map<string, string>();
 const read = (file: string): string => {
@@ -145,5 +148,11 @@ describe('references in the prose', () => {
     // An allow-listed note that is tracked now, or cited nowhere, is a stale line.
     const stale = [...UNDECIDED_BUG_NOTES].filter((note) => tracked.has(note) || !cited.some(({ ref }) => ref === note));
     expect(stale).toEqual([]);
+  });
+
+  it('every docs/adr record named exists', () => {
+    const records = new Set(filesUnder('docs/adr'));
+    const dangling = references(/docs\/adr\/[\w.-]+?\.md/g).filter(({ ref }) => !records.has(ref)).map(({ where, ref }) => `${where}  ${ref}`);
+    expect(dangling).toEqual([]);
   });
 });

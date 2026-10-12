@@ -4,27 +4,20 @@ import { containsPoint, rectsOverlap, rectText } from './geometry.js';
 import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-keyboard.js';
 
 /**
- * ONE reading of the soft keyboard (2026-10-09, the keyboard-reading
- * deepening): every reader of the keyboard — the tap guard's every look
+ * ONE reading of the soft keyboard: every reader of the keyboard — the tap guard's every look
  * and its re-check rounds (interact/keyboard.ts, keyboard-model.ts,
  * keyboard-window.ts), the in-tree model's picker and dismissal
  * (keyboard-in-tree.ts), the window model's post-fill dismissal, the pixel
  * poll's round (verify/pixel-poll.ts) and `scroll_until`'s round
  * (interact/scroll.ts) — asks its question of a `KeyboardReading` built by
  * `readKeyboard` off the tree it already holds, and none of them composes
- * oracle calls, tests rects or applies the veto itself. Until this date
- * the same composition was spelled in five places: `readSoftKeyboard` and
- * `oracleKeyboard` here, `keyboardOver` in the model seam, the re-check
- * loop's three raw oracle calls, `keyboardCorroborated`/`keyboardUnlocated`
- * in keyboard.ts over `windowCorroborated`/`windowUnlocated` in
- * keyboard-window.ts, and each with its own cost table. Here, in ui-tree/,
+ * oracle calls, tests rects or applies the veto itself. Here, in ui-tree/,
  * because the pixel poll (verify/) reads the keyboard too and may not
  * import interact/ (ARCHITECTURE.md §2); the ACTING half — what to do about
  * a covering keyboard — stays interact/keyboard.ts#keyboardModel's, the
  * one switch per layer.
  *
- * THE switch between the two models for READING (review 2026-10-07, moved
- * here from `readSoftKeyboard`): the adapter's oracle when it has one
+ * THE switch between the two models for READING: the adapter's oracle when it has one
  * (`DeviceAdapter.keyboard`, the window model — Android), else the tree the
  * caller holds (the band `KEYBOARD_ROLE` marks, `soft-keyboard.ts#
  * keyboardInTree` — the in-tree model, iOS under WDA; no device is asked).
@@ -53,9 +46,7 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * (verify/pixel-poll.ts#overElement); which nodes are the
  * keyboard's own, under no line, is `keyboardSide`'s.
  *
- * WHAT A READING ASKS, AND WHEN — stated once, here (it replaces the tables
- * that stood on `readSoftKeyboard`, `resolveClearOfKeyboard`, the window
- * guard, the pixel poll and `scroll_until`). Three oracle calls, each at most
+ * WHAT A READING ASKS, AND WHEN — stated once, here. Three oracle calls, each at most
  * ONCE per reading, each memoised on first need, in this order:
  * 1. `state()` — the window state, the band. Asked by every question
  *    (`ofKeyboard` aside), first.
@@ -98,9 +89,9 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  *
  * A reading is of ONE moment: build one per look, per round, per tree, and
  * never hold one across them — it remembers what the oracle answered, and a
- * witness kept past its round is the hazard `scroll_until` was reviewed for
- * twice (2026-10-08: a stale window on one round can be followed by a real
- * keyboard; a confirmed one can be hidden by the scroll itself). The rule is
+ * witness kept past its round is a hazard (a stale window on one round can
+ * be followed by a real keyboard; a confirmed one can be hidden by the
+ * scroll itself). The rule is
  * this doc's, not the type's. Building one is synchronous and asks nothing;
  * no question throws: the oracle's calls never throw (`KeyboardOracle`'s
  * contract), so a failed call is `unknown` — fail open — and so is a reading
@@ -152,12 +143,9 @@ export interface KeyboardCover {
  * wording, for the window model's post-fill dismissal warning
  * (interact/keyboard-window.ts) and for `scroll_until`'s report
  * (interact/scroll-text.ts), which asks the same question at its stop.
- * Here, beside the question, since 2026-10-09 (code review S5): the reading
- * owns the row, and until then scroll-text.ts reached into the tap guard's
- * window model (keyboard-window.ts, re-exported by keyboard.ts) for it.
- * The cause is said as a question. Until the device check of 2026-10-08 it
- * was "a floating keyboard?"; measured that day on API 33, a floating Gboard
- * does NOT read this way (a 132-px band plus its panel, read as `panels` —
+ * Here, beside the question: the reading owns the row.
+ * The cause is said as a question, not "a floating keyboard?": measured on
+ * API 33, a floating Gboard does NOT read this way (a 132-px band plus its panel, read as `panels` —
  * `panelsBeyond` below), and the one window-hidden read seen beside an IME
  * on screen was the panel still coming up, right after the focus tap
  * (whether `mInputShown` was already true then was not captured).
@@ -204,7 +192,7 @@ export interface KeyboardReading {
    */
   corroborated(): Promise<boolean>;
   /**
-   * The `unlocated` row (2026-10-08): the window state reads HIDDEN while
+   * The `unlocated` row: the window state reads HIDDEN while
    * the input method says a keyboard IS shown — one it gives no area
    * (`UNLOCATED_KEYBOARD` above has the sentence and what was measured).
    * Asks the witness only for a hidden reading — a `shown` one has its frame
@@ -218,8 +206,8 @@ export interface KeyboardReading {
    * Is `node` the keyboard's own UI — a key, the AutoFill bar, the
    * accessory toolbar's Done (soft-keyboard.ts#keyboardSideNodes' rule)? By
    * identity, against the tree this reading was built off: one walk, built
-   * on the first call and kept for the reading (2026-10-08: `scroll_until`
-   * asks it of every match each round). Always false on an Android tree,
+   * on the first call and kept for the reading (`scroll_until` asks it of
+   * every match each round). Always false on an Android tree,
    * which carries no mark, and with no tree.
    */
   ofKeyboard(node: UiNode): boolean;
@@ -228,8 +216,7 @@ export interface KeyboardReading {
 }
 
 /**
- * THE veto (2026-10-04), named on 2026-10-08 so its readers share one owner,
- * here since 2026-10-09: an input method that says no keyboard is shown
+ * THE veto, named so its readers share one owner: an input method that says no keyboard is shown
  * DENIES a window state that reports one — that state was measured stale
  * for seconds after a navigating tap (AndroidAdapter's keyboardWitness has
  * the measurement). `unknown` denies nothing: a witness that cannot be asked
@@ -242,8 +229,8 @@ const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden
 
 /**
  * Why `panelsBeyond` refused a region, or part of one — a closed set, one
- * case per rule it applies (code review of round 2, 2026-10-08: until then a
- * free string, so a test or a caller could only match its wording):
+ * case per rule it applies (not a free string, so a test or a caller need
+ * not match its wording):
  * - `unreadable`: the input method answered (the call ran) and the region
  *   line was missing or could not be read whole;
  * - `witness-not-shown`: the region held rects beside the band, but the
@@ -275,12 +262,11 @@ function refusalText(refusal: RegionRefusal): string {
 
 /**
  * Which rects of the keyboard window's touchable region count as covered
- * BESIDE the inset band (2026-10-08, the floating-Gboard device check:
- * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md), and — when the
- * region held something it did NOT admit, or could not be read although
- * the input method answered — why (`refused`, for the one-line notice
- * `withPanels` writes; review 2026-10-08: a device check must be able to
- * tell "no panel" from "a panel refused, and for which reason"). `refused`
+ * BESIDE the inset band (the floating-Gboard device check, the bug note
+ * below), and — when the region held something it did NOT admit, or could
+ * not be read although the input method answered — why (`refused`, for the
+ * one-line notice `withPanels` writes: a device check must be able to tell
+ * "no panel" from "a panel refused, and for which reason"). `refused`
  * is absent for a region that is just the band (docked) and for a call that
  * failed whole (nothing was learned). Measured on API 33 (emulator-5554,
  * 1080x2220): a floating Gboard's band was its 132-px collapse strip
@@ -295,7 +281,7 @@ function refusalText(refusal: RegionRefusal): string {
  *   `mInputShown`) — `hidden` and `unknown` alike admit nothing: this is a
  *   precondition for new evidence, not the veto over a band the window
  *   state already reported (`witnessDenies`), so a witness that cannot be
- *   asked leaves the band alone, as before 2026-10-08;
+ *   asked leaves the band alone;
  * - only a region that holds the band itself, byte for byte — every shown
  *   region measured did; one that does not is not of this moment (the
  *   stale-rotation case) or not of a shape that was measured, and is
@@ -305,17 +291,17 @@ function refusalText(refusal: RegionRefusal): string {
  *   current orientation by construction (a docked or collapsed band runs
  *   the screen's width to its bottom) — and is not the band.
  * Fail open everywhere, as the rest of the reader: an unreadable region
- * (`undefined`) is none. Docked: nothing beyond the band — behaviour
- * unchanged.
+ * (`undefined`) is none. Docked: nothing beyond the band.
+ * docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
  *
- * THE BRITTLE PART (review 2026-10-08): the exact-band test. A floating
+ * THE BRITTLE PART: the exact-band test. A floating
  * keyboard whose region strip is not equal to its inset frame — another
  * navigation mode, a strip that leaves out the nav bar, an IME whose
  * touchable insets differ from its content insets, a band that is not full
  * width (a side nav bar, landscape, a split keyboard), where Skia's region
  * would merge a panel sharing its rows into other rects — has its whole
  * region dropped, and the panel goes back to being invisible: the `d`-key
- * tap of the device check, no worse than before that date. None of these is
+ * tap of the device check, no worse than with no panel read. None of these is
  * measured; each refusal is SAID once (`refused`), so a device check can
  * tell them apart.
  */
@@ -338,41 +324,36 @@ function panelsBeyond(band: Rect, touchable: KeyboardTouchable): { panels: reado
 
 /**
  * The notices `withPanels` has written, per oracle — each distinct one once
- * for each. Per oracle, not per process (2026-10-09): the registry keeps one
+ * for each. Per oracle, not per process: the registry keeps one
  * adapter, so one oracle, for a whole server session, so in production this
  * is still "once per process"; a test that builds its own oracle starts with
- * nothing said, and no longer depends on which test ran first (until that
- * date a module-level `Set` did, and the notice test had to pick a band no
- * other test used). Weak, so an oracle that is gone takes its notices with
+ * nothing said, and does not depend on which test ran first. Weak, so an oracle that is gone takes its notices with
  * it.
  */
 const noticed = new WeakMap<KeyboardOracle, Set<string>>();
 
 /**
- * A shown oracle reading made whole (review 2026-10-08): `touchable()`, and
+ * A shown oracle reading made whole: `touchable()`, and
  * `panelsBeyond` over it, so the reading carries the floating panel as
- * `panels`. Until that review the guard's re-check loop read `state()`
- * alone: a point the first look found under the PANEL read clear on the
- * strip once the witness had said hidden, and the tap went to Gboard's `d`
- * key with a note about a wait.
+ * `panels`. With `state()` alone, a point the first look found under the
+ * PANEL read clear on the strip once the witness had said hidden, and the
+ * tap went to Gboard's `d` key with a note about a wait (measured).
  *
  * A region `panelsBeyond` refused is said ONCE per distinct case and oracle, as a
  * one-line `averi:` notice on stderr — the channel the adapters already use
  * for a non-fatal note (adapters/wda.ts, adapters/ios.ts); stdout is the MCP
  * protocol's. It reaches ONLY the server's stderr — not an MCP tool result,
  * not a flow trace — so a device check that wants to know why a panel was
- * not judged reads the server's log. Nothing else changes: the band alone,
- * as before 2026-10-08.
+ * not judged reads the server's log. Nothing else changes: the band alone.
  *
- * FOLLOW-UP, not done (2026-10-08, review round 1, restated by the code
- * review of round 2 and by the deepening of 2026-10-09): `touchable` carries
+ * FOLLOW-UP, not done: `touchable` carries
  * the input method's own `mInputShown`, read a moment after `state()`. It
  * could seed the reading's witness memo (`readKeyboard`'s `witness`), so
  * that `corroborated` — `scroll_until`'s veto — and `over` on a covered
  * point save their third call; `witnessDenies` would stay the one decider
  * over it, and no caller would change. Not done because TOUCHABLE_COMMAND is
- * UNMEASURED as one command on a device (adapters/android.ts#
- * keyboardTouchable): the veto is the guard against a stale band driving
+ * UNMEASURED as one command on a device (adapters/android.ts#keyboardTouchable):
+ * the veto is the guard against a stale band driving
  * strokes through the next screen and taps through the next screen's keys,
  * and moving its input onto an unmeasured command is a change to check on a
  * device first. The seam for it is here: return the witness beside the
@@ -493,6 +474,7 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
  * under it (interact/keyboard.ts) — true for `window` and `wda`, false for
  * `idb-band`, which no guard acts on: a centre under it is the judgement's
  * to refuse (ui-tree/standing.ts#Scene).
+ * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
 export type KeyboardLine =
   | { readonly y: number; readonly source: 'window' | 'wda'; readonly witnessed: true }

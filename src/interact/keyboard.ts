@@ -33,18 +33,15 @@ export { AfterKeyboardDismissal, KeyboardStateDisagreement } from './keyboard-wi
 export { AfterDismissalTap, KeyboardWithoutDismissal } from './keyboard-in-tree.js';
 
 /**
- * THE one choice between the two models for ACTING (2026-10-07, the
- * keyboard-model review; the reading half's one switch — every look, round
+ * THE one choice between the two models for ACTING (the reading half's one switch — every look, round
  * and dismissal, and the pixel poll's and `scroll_until`'s rounds — is
  * `ui-tree/keyboard-cover.ts#readKeyboard`, one layer down, because the
  * pixel poll reads the keyboard too): an adapter WITH the oracle gets the
  * window model, one without the in-tree model. Whether the adapter HAS an
  * oracle carries the platform fact — `KeyboardOracle` (adapters/types.ts)
  * says what providing one asserts — so no platform test is made here
- * (dropped 2026-10-03, after review: this layer is platform-agnostic,
- * ARCHITECTURE.md §2). Until this date the same question was asked in two
- * more places, inside the guard and inside the dismissal, and each answer
- * re-implemented the shape below around its own decisions.
+ * (this layer is platform-agnostic, ARCHITECTURE.md §2). Asked nowhere else:
+ * neither the guard nor the dismissal asks it again.
  */
 function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
   return adapter.keyboard === undefined ? inTreeModel(adapter) : windowModel(adapter);
@@ -53,18 +50,18 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
 /**
  * resolveSettled, plus the three rules every tap on a resolved node shares,
  * in this order: the point about to be tapped must lie on the screen
- * (2026-10-08 — resolve.ts#refuseOffScreen; an OffScreenRefusal, nothing
- * sent, when it does not), not under the soft keyboard (2026-10-03), and —
- * last, on the node and tree the guard hands back — not under a node of the
- * app drawn over it (2026-10-09 — resolve.ts#aimClearOfChrome: the tap moves
- * to an uncovered piece large enough, said in `moved`, or a CoveredRefusal;
- * since 2026-10-10 first a ClippedRefusal for a target cut to a sliver at its
- * scroll container's edge).
+ * (resolve.ts#refuseOffScreen; an OffScreenRefusal, nothing sent, when it
+ * does not), not under the soft keyboard, and — last, on the node and tree
+ * the guard hands back — not under a node of the app drawn over it
+ * (resolve.ts#aimClearOfChrome: the tap moves to an uncovered piece large
+ * enough, said in `moved`, or a CoveredRefusal; first a ClippedRefusal for
+ * a target cut to a sliver at its scroll container's edge). Where the node
+ * stands is ui-tree/standing.ts#Scene's.
  * The answer carries the point to tap (`ResolvedClear.point`). Used by
  * tapElement (the flow `tap:` step and the MCP `tap` tool) and by
  * fillField's focus tap; there is no third tap on a resolved node.
  *
- * The problem, measured on a device that day (finportal login, Pixel_3a,
+ * The problem, measured on a device (finportal login, Pixel_3a,
  * Android 13): after the password fill the keyboard was up, covering
  * y ≥ 1285; `login_submit` resolved and settled with its centre at
  * (249,1466); the tap pressed a keyboard key — one stray character in the
@@ -72,7 +69,7 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * keyboard is another window: the app's tree neither contains it nor moves
  * out of its way unless the activity resizes. A fill has the same exposure
  * when the NEXT field sits under the keyboard the previous one raised. On
- * iOS (2026-10-07) the keyboard is part of the tree and the measured tap
+ * iOS the keyboard is part of the tree and the measured tap
  * went into the AutoFill bar above its keys.
  *
  * The protocol, the same shape on both models:
@@ -121,15 +118,15 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * non-scrolling login form has nowhere to go); tapping anyway and reporting
  * it (the stray character is already in the field) — which is also why a
  * tap is not sent on ONE sample in which the input method contradicts the
- * window state (b631792 did that for a day): the input method can be the
+ * window state: the input method can be the
  * stale side too (an IME switch or restart, a hide recorded but not yet
- * applied), and then that tap is the stray character. Also rejected, after
- * a day in the tree (2026-10-04 → 2026-10-05): one decision table over all
- * four window-model phases — the dated banner in keyboard-window.ts.
+ * applied), and then that tap is the stray character. Also rejected: one
+ * decision table over all four window-model phases (keyboard-window.ts says
+ * why).
  */
 export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: Target, opts: GuardOptions): Promise<ResolvedClear> {
   const first = await resolveSettled(adapter, target, opts);
-  // The other rule every tap on a resolved node shares (2026-10-08): its
+  // The other rule every tap on a resolved node shares: its
   // point must lie ON the screen (resolve.ts#refuseOffScreen, the reasons
   // there). Asked before the keyboard is, so a target below the fold costs
   // no `back` and no dismissal tap; asked again of the node a guard that
@@ -139,7 +136,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // or from the re-read a refusal makes first.
   const judged = await refuseOffScreen(adapter, target, first.node, first.tree, await usableScreen(adapter, { tree: first.tree }));
   const { screen } = judged;
-  // The LAST rule (2026-10-09): nothing of the app drawn over the point —
+  // The LAST rule: nothing of the app drawn over the point —
   // else an uncovered piece of the target, or a CoveredRefusal — and, first,
   // no target cut to a sliver by its scroll container (a ClippedRefusal)
   // (resolve.ts#aimClearOfChrome, the reasons there). On the node and tree
@@ -193,9 +190,8 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
  * Close the on-screen keyboard after a fill. Called AFTER a fill has
  * returned, never before (dismissing first closes the keyboard the typing
  * needs), and as its own call so the fill's warning is already in the
- * caller's hands if this throws. Moved here from fill.ts on 2026-10-04,
- * because this is where the one `back` lives — fill.ts had kept a second
- * copy of the `unknown → back` rule. The protocol is the model's
+ * caller's hands if this throws. Here because this is where the one `back`
+ * lives: the `unknown → back` rule has one copy. The protocol is the model's
  * (`KeyboardModel.dismiss`, with the reasons): the window model presses
  * `back` unless the state is hidden or the witness denies the keyboard, and
  * confirms nothing; the in-tree model reads one tree, taps the first

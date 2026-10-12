@@ -26,11 +26,8 @@ export interface SideWords {
 }
 
 /**
- * Each EDGE of a rect's words — one table, a field per use (code review of
- * round 8, S6: `REVEALS` here and resolve.ts's `CLIPPED_OUT_WHERE` and
- * `LIES_WHERE` were three switches over the same four sides; `REVEALS` was
- * already one map for what code review of round 7, S7, found spelled three
- * times).
+ * Each EDGE of a rect's words — one table, a field per use, so the four
+ * sides are spelled once (resolve.ts's sentences read it too).
  */
 export const SIDES: Readonly<Record<Edge, SideWords>> = {
   top: { reveals: 'up', past: 'above', lies: 'above' },
@@ -42,7 +39,7 @@ export const SIDES: Readonly<Record<Edge, SideWords>> = {
 /**
  * Which thing `direction` names. A `swipe:` step names the FINGER's movement
  * (swipe up = finger travels up, revealing content below), and so does the
- * MCP `swipe` tool's `direction` (since 2026-10-08; its raw from/to
+ * MCP `swipe` tool's `direction` (its raw from/to
  * coordinates never come through here). A
  * `scroll_until:` names where the CONTENT lies (content below the
  * fold is reached by a finger travelling up). Spelled out at every call site
@@ -91,9 +88,9 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  *     leaves — y 458 of the 572 above the WDA pad, 1118 of the 1398 above
  *     the Android IME, the touch-downs both device checks measured landing
  *     on the content), and never higher than the keyboard-less stroke's
- *     touch-down. The second rule is the 2026-10-08 iOS device check
- *     (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
- *     the stroke over the box above the pad touched down for a content-UP
+ *     touch-down. The second rule is the iOS device check of the note below:
+ *     docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
+ *     The stroke over the box above the pad touched down for a content-UP
  *     scroll at 0.2 of 572 — y 114, in the app's top bar (≈ y 0–116) — and
  *     six swipes moved nothing; by hand `(201,114) → (201,458)` moved
  *     nothing, `(201,160) → (201,458)` moved the row. Keyboard-less it
@@ -112,7 +109,7 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  *     gesture (Android's 838-px stroke moved the Compose form 637 px a
  *     swipe and needed no cut).
  *
- * The strokes this gives (re-measured 2026-10-08 against the tests):
+ * The strokes this gives (as the tests measure them):
  * content down (finger up) is the uncovered box's own — iOS 458 → 114,
  * Android 1118 → 280, both as the device checks ran them; content up
  * (finger down) touches down where it would without a keyboard — iOS
@@ -161,7 +158,7 @@ export const TOUCH_SLOP = 24;
 
 /**
  * The other floor on a shortened stroke, as a fraction of the box's side
- * along it (review round 3): TOUCH_SLOP is a fixed number in tree units,
+ * along it: TOUCH_SLOP is a fixed number in tree units,
  * points on iOS and pixels on Android, so on a dense Android panel twice it
  * is a smaller finger travel than on iOS. 3 % of the side scales with the
  * screen whatever its units: 26 pt of an 874-pt iPhone height (below the
@@ -200,9 +197,8 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
  * the content lies), clear of a cover whose top edge is `coverTop`
  * (`swipeVectorAbove`: a keyboard's, or a node's drawn over the container,
  * `strokeRoom` — the same rule for both, everything below the top covered), its reach scaled by `reach` (`shortenStroke`, along
- * the box's side along the stroke). Why a container (2026-10-09, measured,
- * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-
- * scroll-container.md, the triage of it): Settings' list is
+ * the box's side along the stroke). Why a container (measured, the triage of
+ * the note below): Settings' list is
  * [0,737][1080,2154]; the screen box's content-up stroke touches down at y
  * 444, in the header above the list, and a probe drawn there moves nothing —
  * which the flush check would take for "nothing beyond the edge"; over the
@@ -210,13 +206,11 @@ export function shortenStroke(stroke: Stroke, factor: number, side: number): Str
  * screen's. `maxTravel`, when set, caps the finger's travel (the probe's,
  * scroll-rounds.ts#PROBE_MAX_TRAVEL_FRACTION), never below `shortenStroke`'s
  * floors.
+ * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
  *
- * It judges nothing (deep/r3-scroll, 2026-10-09): until then it took the
- * container and met it with the screen itself, above the keyboard, and fell
- * back to the screen when that left no room — while the round had judged
- * the room over the screen with no keyboard, so a probe the round believed
- * had room was drawn off its container under the IME, moved nothing, and was
- * reported checked. Pure; the driver's one call (interact/scroll.ts) and
+ * It judges nothing: the round decided the box (`strokeRoom`), so a probe
+ * the round believed had room is drawn where the round judged it — never
+ * off its container under the IME. Pure; the driver's one call (interact/scroll.ts) and
  * the test adapter's (tests/helpers/rounds.ts#drawnFor).
  */
 export function scrollStroke(step: { toward: Direction; reach: number; coverTop?: number; box: Rect; maxTravel?: number }): Stroke {
@@ -246,9 +240,8 @@ export const strokeLength = ({ from, to }: Stroke): number => Math.hypot(to.x - 
  * drawn in: `swipeVector` strokes over SWIPE_REACH_FRACTION of the side
  * either way of the centre (60 % of it), so under this the full stroke is
  * shorter than twice TOUCH_SLOP — and `shortenStroke` never lengthens, so
- * its floor would not hold: the "stroke" is a tap (code review of
- * fix/r3-scroll, 2026-10-09: a carousel cut by the list's bottom to a 30-px
- * strip gave a probe (540,1972)→(540,1954), 18 px, a tap on the card, and
+ * its floor would not hold: the "stroke" is a tap (a carousel cut by the
+ * list's bottom to a 30-px strip gave a probe (540,1972)→(540,1954), 18 px, a tap on the card, and
  * "moved nothing" was then reported as checked). 80.
  */
 export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRACTION));
@@ -273,8 +266,7 @@ function roomIn(met: Rect, toward: Direction, coverTop?: number): Rect | undefin
 
 /**
  * The least of a box (its part above the keyboard) a cut for a node over
- * the stroke's TOUCH-DOWN may leave, `overlayTop` (D3, code review of
- * fix/r5-stroke): a third. The floating bar it is for is a strip over the
+ * the stroke's TOUCH-DOWN may leave, `overlayTop`: a third. The floating bar it is for is a strip over the
  * box's bottom — the measured case leaves 290 of 670 (43 %); a node that
  * covers the line from higher than a third of the box down past its 0.8
  * touch-down covers most of it, and is a wrapper the tree cannot say is
@@ -298,7 +290,7 @@ export interface StrokeRoom {
 }
 
 /**
- * THE STROKE BOX's one owner (deep/r3-scroll, 2026-10-09): the first of
+ * THE STROKE BOX's one owner: the first of
  * `candidates` — clipping containers, nearest first — that leaves room for a
  * stroke toward `toward` over the gesture `box` (`screenBox`'s, the box the
  * driver draws in), above a keyboard whose top edge is `coverTop`
@@ -311,21 +303,18 @@ export interface StrokeRoom {
  * Undefined is NO ROOM:
  * what the caller does then is its own — scroll-rounds.ts reports a probe
  * `flush.why: 'room'` and sends none, and draws a stroke toward the target
- * over the screen whole, the stroke as it was before 2026-10-09. Until
- * deep/r3-scroll the round judged room over the screen and the driver again
- * above the keyboard, falling back to the screen; one judgement now, the
- * keyboard in it. No gesture `box` at all (screenBox threw): no room.
+ * over the screen whole. One judgement of room, the keyboard in it. No gesture `box` at all (screenBox threw): no room.
  *
  * `over` gives the rects drawn over a candidate (ui-tree/draw-order.ts
  * #drawnOver, through scroll-rounds.ts#TreeFacts, or as a remembered
- * container carries them, scroll-rounds.ts#StrokeContainer) — the floating tab bar
- * of 2026-10-09 (docs/bugs/2026-10-09-android-scroll-stroke-touches-down-
- * on-floating-tab-bar.md): the list `0,825 1080x1395` ran under the bar's
+ * container carries them, scroll-rounds.ts#StrokeContainer) — the floating
+ * tab bar of the note below: the list `0,825 1080x1395` ran under the bar's
  * host `66,1840 948x248`, the content-down stroke over it touched down at
  * 0.8 of the list, y 1942, on the bar, and the list never moved. Cut above
  * the host it touches down at 1638 (measured: ≤ ~1800 scrolls the list).
  * One judgement for every stroke: the room, the strokes toward the target
  * and the `fully: true` probe all come here. Pure.
+ * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
  */
 export function strokeRoom(
   box: Rect | undefined,
@@ -349,10 +338,9 @@ export function strokeRoom(
 /**
  * The top edge of the highest of `over` — nodes drawn over a stroke
  * container — that the container's stroke box `box` must be cut above
- * for a stroke toward `toward` (2026-10-09, the floating tab bar:
- * `strokeRoom`), or undefined. `box` is judged as the stroke is drawn:
- * above a keyboard whose top edge is `coverTop`, when one is up (code
- * review of fix/r4, P3 — the list `0,825 1080x1395` under a keyboard at
+ * for a stroke toward `toward` (the floating tab bar: `strokeRoom`), or
+ * undefined. `box` is judged as the stroke is drawn: above a keyboard whose
+ * top edge is `coverTop`, when one is up (the list `0,825 1080x1395` under a keyboard at
  * 1300 with a bar `0,1150 1080x150` sitting on it: the bar's top is above
  * the LIST's centre, 1522, so the cut stayed 1300 and the touch-down, 1206,
  * landed on the bar; above the keyboard the box is 825–1300 and the bar
@@ -362,7 +350,7 @@ export function strokeRoom(
  * touches, `swipeVectorAbove`); a content-up stroke touches down at 0.2
  * and only lifts off down there, so a cut would only take a third of its
  * reach (1104 → 1942 would become 1104 → 1638 under the measured bar, more
- * strokes against the 15 s budget) for nothing — review round 1. A
+ * strokes against the 15 s budget) for nothing. A
  * sideways stroke is not cut either: its touch-down lies off the centre
  * line on the box's middle row, which this rule does not model (a
  * carousel under a bar: unmeasured).
@@ -382,8 +370,7 @@ export function strokeRoom(
  * the rule below cuts higher only for a node the finger would land on,
  * and never below a third of the box.
  *
- * And then a node over the TOUCH-DOWN, wherever its top lies (2026-10-09,
- * D3): the stroke's would-be touch-down under the cut so far
+ * And then a node over the TOUCH-DOWN, wherever its top lies: the stroke's would-be touch-down under the cut so far
  * (`fullStroke`, `scrollStroke`'s own) inside a node of `over` is cut
  * above the highest such node, and the touch-down placed again, until it
  * lies on none: a short list `0,1550 1080x670` under the measured bar's
@@ -393,10 +380,10 @@ export function strokeRoom(
  * TOUCH_DOWN_CUT_FLOOR of the box (part above the keyboard) or
  * MIN_STROKE_BOX, none of this rule's cuts is made and the lower-half
  * rule's stands — a partial cut would only shorten a stroke that still
- * lands on a node (code review of fix/r5-stroke). Such a node covers most
+ * lands on a node. Such a node covers most
  * of the box: a transparent wrapper, where the uncut stroke scrolls, or a
  * sheet over the content, where the target the stroke is for lies under it
- * anyway; the stroke is drawn as before, and a fast fail names the node
+ * anyway; the stroke is drawn uncut, and a fast fail names the node
  * (`touchedOn` names a node over the stroked container — a cut to no room
  * would hand the stroke to an outer container or the screen box and lose
  * that sentence). The lower-half rule stays first, so every cut it made is
@@ -437,7 +424,7 @@ function overlayTop(box: Rect, over: readonly Rect[], toward: Direction, coverTo
 /**
  * The floor on a `dragMs` duration: Android's own `input swipe` default
  * (adapters/android.ts#swipe), so a short stroke — a probe, a halved one —
- * is never sent faster than the stroke was before 2026-10-09.
+ * is never sent faster than an undragged stroke.
  */
 export const MIN_DRAG_MS = 300;
 
@@ -445,10 +432,9 @@ export const MIN_DRAG_MS = 300;
  * How long `stroke` must take for the finger to move at `speed` screens a
  * second (the adapter's `dragSpeed`, adapters/types.ts) over `screen`'s
  * long side — never under MIN_DRAG_MS; whole ms, rounded up. `scroll_until`
- * hands it to every stroke on an adapter that has a `dragSpeed` (2026-10-09,
- * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md:
- * 1332 px in 300 ms flung a RecyclerView past the row between two reads).
- * Pure.
+ * hands it to every stroke on an adapter that has a `dragSpeed` (1332 px in
+ * 300 ms flung a RecyclerView past the row between two reads). Pure.
+ * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
  */
 export function dragMs(stroke: Stroke, speed: number, screen: { width: number; height: number }): number {
   const pxPerSecond = speed * Math.max(screen.width, screen.height);
@@ -458,9 +444,8 @@ export function dragMs(stroke: Stroke, speed: number, screen: { width: number; h
 /**
  * The same stroke: the same touch-down and the same lift-off, point for
  * point. For `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#
- * UNMOVED_STROKES_EXHAUST) — until the code review of round 2
- * (2026-10-08) a comparison of `JSON.stringify`ed strokes, which compared
- * their spelling (key order included) rather than their points.
+ * UNMOVED_STROKES_EXHAUST) — points, not the strokes' spelling (a
+ * `JSON.stringify` comparison would read key order too).
  */
 export const sameStroke = (a: Stroke, b: Stroke): boolean =>
   a.from.x === b.from.x && a.from.y === b.from.y && a.to.x === b.to.x && a.to.y === b.to.y;

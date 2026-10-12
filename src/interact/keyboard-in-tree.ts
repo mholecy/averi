@@ -25,7 +25,7 @@ import {
 import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 
 /**
- * The IN-TREE model (iOS under WDA, 2026-10-07): the soft keyboard is part
+ * The IN-TREE model (iOS under WDA): the soft keyboard is part
  * of the accessibility tree — its keys are nodes — and the tree source marks
  * the band it draws over (`KEYBOARD_ROLE`) and the Windows that are its own
  * UI (`ofKeyboard`; adapters/wda-source.ts#keyboardMarks has the rules and
@@ -33,57 +33,58 @@ import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElemen
  * read off the tree that resolved the target (a reading,
  * `ui-tree/keyboard-cover.ts#readKeyboard`, over `ui-tree/soft-keyboard.ts`),
  * and there is no key that hides it without a side effect — the return key
- * and the blind `enter` SUBMIT from the field (K5d, docs/bugs/2026-10-05-ios-
- * tap-lands-on-soft-keyboard.md), so a covered point is refused unless the
- * config names an element to tap first (stage B, the same day). This module
+ * and the blind `enter` SUBMIT from the field (K5d), so a covered point is
+ * refused unless the config names an element to tap first. This module
  * owns everything that follows: the second look that confirms the band, the
  * dismissal picker, the one tap, the confirming looks and the words — one
  * adapter at the seam `keyboard-model.ts` describes, beside the window
  * model. Chosen by `keyboard.ts#keyboardModel` for an adapter WITHOUT the
  * oracle; the platform label is never read. An idb tree marks no band (on
  * iOS 27 it lists the keys, as plain buttons, and the band, as `other`,
- * but no node as `KEYBOARD_ROLE`), so under `treeSource: idb` every look reads `unknown` and the guard is as it
- * was before this model existed — fail open.
+ * but no node as `KEYBOARD_ROLE`), so under `treeSource: idb` every look
+ * reads `unknown` and the guard acts on nothing — fail open (idb's band is a
+ * line the judgements read, never a reading the guard acts on).
+ * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
+ * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
 
 /**
  * How many looks this model takes for the keyboard to be GONE after a
- * dismissal tap (stage B, review round 1): KEYBOARD_HIDE_DELAY_MS was
+ * dismissal tap: KEYBOARD_HIDE_DELAY_MS was
  * measured on Android as the floor of a hide animation, "not the whole
  * wait" — there the settle poll's own reads sit on top of it — and is
  * unmeasured on iOS (the constant's doc), where a hide animation caught
- * mid-way must not fail a fill the blind `enter` used to pass. So after the tap the guard resolves
+ * mid-way must not fail a fill a blind `enter` would pass. So after the tap the guard resolves
  * the target and reads the band up to this many times, KEYBOARD_HIDE_DELAY_MS
  * apart (each look is a settled resolution, two agreeing reads), and
  * `dismissKeyboard` re-reads the tree the same number of times; only the
  * LAST still-covering look refuses. Two, not more: a keyboard still up a
  * second or so after a tap meant to hide it is not animating. The iOS
- * animation's length is still unmeasured (as of 2026-10-08) — the figure is
- * the stage A second look's shape, applied once more — but the stage B
- * device check (2026-10-07, iPhone 17 simulator, WDA source;
- * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, "Device check of
- * the fix (stage B)", B2 and B4b), after both a title tap and the
+ * animation's length is unmeasured — the figure is the second look's shape,
+ * applied once more — but the device check (iPhone 17 simulator, WDA
+ * source; the bug note below, "Device check of the fix (stage B)", B2 and
+ * B4b), after both a title tap and the
  * accessory's Done, three runs of three, observed the band GONE at the
  * first read of the FIRST confirm look (the settled pair, 162/162 in B2) —
  * within the 300 ms pause plus one ~0.55 s read; the second slot was never
  * used, so the figure has headroom there, not a measured margin. The
  * dismissal's one-read looks (`dismiss`) were not reached on the device.
+ * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
  */
 export const KEYBOARD_HIDE_CONFIRM_LOOKS = 2;
 
 /**
  * The in-tree keyboard covers the tap point on two looks and nothing can
  * hide it — the adapter has no means and no configured dismissal is usable
- * (2026-10-07) — or the second look could not resolve the target after the
+ * — or the second look could not resolve the target after the
  * first found it covered (wrapped here, `cause` kept). NOT an AfterKeyboardDismissal —
  * nothing was pressed — and not a disagreement: one source, the tree that
  * resolved the target, read the keyboard over the point twice. A refusal,
  * because the alternative is the harm: the tap presses the keyboard and is
- * reported done (measured that day on the finportal login, 3 of 3 runs —
- * the bug this guards against, docs/bugs/2026-10-05-ios-tap-lands-on-soft-
- * keyboard.md). WHY the adapter cannot hide it on its own is the adapter's
+ * reported done (measured on the finportal login, 3 of 3 runs — the bug
+ * this guards against, cited on the module's header). WHY the adapter cannot hide it on its own is the adapter's
  * sentence (`DeviceAdapter.keyboardAdvice`), quoted in the message; this layer knows
- * only that it has no dismissal to send. Configured dismissals (stage B)
+ * only that it has no dismissal to send. Configured dismissals
  * are tried before this is thrown; their reasons for being passed over are
  * in the message.
  */
@@ -105,7 +106,7 @@ export class KeyboardWithoutDismissal extends KeyboardGuardError implements Refu
 
 /**
  * Anything that went wrong AFTER the in-tree guard tapped a configured
- * dismissal (stage B, 2026-10-07) — the sibling of AfterKeyboardDismissal
+ * dismissal — the sibling of AfterKeyboardDismissal
  * (keyboard-window.ts) for this model: there the irreversible side effect
  * is a `back`, here it is ONE tap on an element the config named (or the
  * accessory toolbar's button). The tap cannot be taken back, and whether it
@@ -143,11 +144,9 @@ const MAY_HAVE_CHANGED = 'That tap may have changed the screen (the keyboard was
  * guard's confirming looks (`Hiding.failed`, the target not coming back or
  * coming back ambiguous) and the post-fill dismissal's confirming reads (a
  * tree read that throws — WDA or idb gone between the tap and the read).
- * Until 2026-10-08 the second had no wrap at all: the read's own error left
- * `dismiss` raw, not a KeyboardGuardError, so the flow engine's
- * `tracingGuardFailure` logged no `⚠ fill` line and the `✗` line never said
- * a tap had been sent (architecture review 2026-10-07, #1 and small
- * correction 12). `did` is the tap as both sentences name it (`tapping
+ * Both are wrapped: a read's own error left raw is not a KeyboardGuardError,
+ * so the flow engine's `tracingGuardFailure` would log no `⚠ fill` line and
+ * the `✗` line would never say a tap had been sent. `did` is the tap as both sentences name it (`tapping
  * <strategy> at (x,y) to hide the soft keyboard …`); `traceLine` is the
  * caller's, since each protocol's trace sentence starts from its own fact.
  * The message is `failedLookMessage`'s shape with MAY_HAVE_CHANGED after
@@ -192,7 +191,7 @@ interface DismissalPick {
  * Every strategy passed over gets a reason (`DismissalPick.skipped`).
  *
  * A `tap` strategy is usable when its target matches a NON-INTERACTIVE node
- * with area (review round 1: the resolution policy prefers the sole
+ * with area (the resolution policy prefers the sole
  * interactive match, so `tap: { text: "Sign in" }` on a screen with a title
  * and a button so labelled would have tapped the BUTTON — the one thing a
  * dismissal must never do; interactive matches are dropped here before any
@@ -203,12 +202,11 @@ interface DismissalPick {
  * (the reading's `ofKeyboard`: a tap on a key or on Done is what `accessory`
  * is for),
  * has its centre clear of the band (a configured element under the keyboard
- * would be the very tap this guard refuses), on screen — `onScreen`
- * (resolve.ts), the tap's own rule since 2026-10-08, over `screen` (the
- * guard's first-look screen; the dismissal's own read): a title scrolled
- * above the viewport is still in the tree, WDA keeps off-screen nodes;
- * until that date this judged the root's rect alone, which `onScreen`
- * still falls back to when there is no screen — and not drawn over by later content
+ * would be the very tap this guard refuses), on screen — the tap's on-screen
+ * point rule (ui-tree/standing.ts#onScreen) over `screen` (the guard's
+ * first-look screen; the dismissal's own read): a title scrolled above the
+ * viewport is still in the tree, WDA keeps off-screen nodes — and not drawn
+ * over by later content
  * (ui-tree/draw-order.ts#shadowing: an alert, a sheet, a navigation bar's
  * label). An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
@@ -292,7 +290,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * Nothing is asked of the device and nothing is pressed, whichever way
      * it goes.
      *
-     * The second look first (review round 1): the settle wait proves the
+     * The second look first: the settle wait proves the
      * TARGET held still across two reads, not the keyboard, and a keyboard
      * still sliding away after the step before (a `tap:` on the title, then
      * at once the submit) reads as covering on one look — so the covering
@@ -307,7 +305,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      *     the keyboard is gone (no band) or still up but no longer over the
      *     target (a band elsewhere: the layout re-flowed).
      *   covering                                  → a dismissal, or refuse (with the band)
-     *     Since stage B (2026-10-07, the same day) the configured
+     *     The configured
      *     dismissals (`GuardOptions.dismissals`, `pickDismissal`) are judged
      *     on this look's tree — the one that just read the keyboard
      *     covering: none usable — KeyboardWithoutDismissal, nothing tapped,
@@ -328,8 +326,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * The dismissal tap is this model's one side effect, as `back` is the
      * window model's: measured non-submitting (a neutral title, the
      * accessory Done), where the keyboard's own return key and the blind
-     * `enter` submit (K5d). Before 2026-10-07 the oracle-less adapter
-     * returned the node unguarded, and the measured tap went into the
+     * `enter` submit (K5d). Unguarded, the measured tap went into the
      * AutoFill bar.
      */
     async guard({ target, opts, point: at, screen, what, covered }: CoveredLook): Promise<{ cleared: ClearedLook } | { hiding: Hiding }> {
@@ -337,7 +334,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       // The target not coming back for the second look (or coming back
       // ambiguous): nothing was pressed, so the screen is as the step found
       // it — but the trace must still show that the first look found the
-      // keyboard over the target (review round 2).
+      // keyboard over the target.
       const saw = `${covered} at (${at.x},${at.y}) on a first look`;
       const second = await lookAgain(
         adapter,
@@ -355,8 +352,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
             { cause: e },
           ),
       );
-      // The two clear rows say different things (review round 1 of the
-      // model split): no band in the tree is "gone"; a band still in the
+      // The two clear rows say different things: no band in the tree is "gone"; a band still in the
       // tree with the target moved out from under it — the keyboard-avoiding
       // layout re-flowed — is "still up", so the note never claims a keyboard
       // left the screen that is still on it.
@@ -427,15 +423,12 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
     },
 
     /**
-     * The dismissal after a fill: ONE tree read and no key — since stage B,
-     * 2026-10-07. Until then it pressed `enter` blind, asking nothing, which
-     * `KeyboardOracle` (adapters/types.ts) recorded as this model's
-     * dismissal; that key was then measured to SUBMIT the finportal login
-     * from the password field (K5d, the bug note), so a
-     * `fill { dismissKeyboard: true }` on iOS was a submit nobody asked for.
-     * A DELIBERATE behaviour change, on purpose in both directions: with a
+     * The dismissal after a fill: ONE tree read and no key. Never a blind
+     * `enter`: that key was measured to SUBMIT the finportal login from the
+     * password field (K5d, the bug note), so a `fill { dismissKeyboard: true }`
+     * on iOS would be a submit nobody asked for. Both directions: with a
      * band in the tree the guard's configured dismissals are tried
-     * (`pickDismissal`, the same rule as the guard's — the first usable one
+     * (`pickDismissal`, which the guard asks too — the first usable one
      * is tapped once, then up to KEYBOARD_HIDE_CONFIRM_LOOKS re-reads,
      * KEYBOARD_HIDE_DELAY_MS before each, confirm the band is gone
      * (`confirmHidden`, shared with the guard), and a band still up on the
@@ -460,7 +453,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * keyboard was left up, so that refusal is not a surprise. A dismissal
      * that WAS tapped and did not hide the keyboard throws
      * (AfterDismissalTap): that is not "nothing done", the screen was touched.
-     * So does a confirming read that throws (2026-10-08, `afterTapFailed`,
+     * So does a confirming read that throws (`afterTapFailed`,
      * the guard's wrap): the tap was sent whatever the read says next.
      */
     async dismiss({ dismissals = [], ambiguous }: DismissOptions): Promise<DismissResult> {
