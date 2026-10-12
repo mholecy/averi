@@ -65,6 +65,16 @@ export interface DeviceScreen {
    * bar stays at the top in landscape, shares as a stated residual.
    */
   statusBand?: number;
+  /**
+   * The TOP edge of the band at the bottom of the screen held upright that
+   * is the system navigation bar's, in the tree's units — Android only
+   * (android.ts#parseNavigationBand: the VISIBLE bar's frame out of the same
+   * `dumpsys window displays` as `statusBand`, ending at the screen's
+   * bottom; 2154 on the measured 1080x2220 emulator). Unset when the bar is
+   * hidden, at the side (landscape: a residual), or the dump does not say.
+   * Data only: nothing judges it yet.
+   */
+  navigationBand?: number;
 }
 
 /**

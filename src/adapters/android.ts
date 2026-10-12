@@ -548,9 +548,9 @@ export class AndroidAdapter implements DeviceAdapter {
    * would change one of the two: the band's lifetime stated above, or the
    * size's on iOS and Android. Neither is this refactor's to change.
    */
-  #band: { band: number | undefined; timedOut?: true } | undefined;
+  #band: { band: SystemBands; timedOut?: true } | undefined;
   /** The band read in flight, shared by concurrent `viewport()` calls. */
-  #bandRead: Promise<number | undefined> | undefined;
+  #bandRead: Promise<SystemBands> | undefined;
   /** Bumped by `launch`: a read that started before it does not keep its answer. */
   #bandEpoch = 0;
 
@@ -569,21 +569,28 @@ export class AndroidAdapter implements DeviceAdapter {
    * say one visible bar, is no band — the judgements behave as before the
    * band existed. Kept or not as `#band` says. The size's own failure is
    * still the screen's.
+   *
+   * The navigation bar's band (types.ts#DeviceScreen.navigationBand) comes
+   * out of the same dump, parseNavigationBand below, judged against
+   * `screen` — the size this read was made beside — and is kept with the
+   * status band: one call, one lifetime.
    */
-  private statusBand(fresh: boolean): Promise<number | undefined> {
+  private systemBands(fresh: boolean, screen: { width: number; height: number }): Promise<SystemBands> {
     if (!fresh && this.#band !== undefined) return Promise.resolve(this.#band.band);
     if (!fresh && this.#bandRead !== undefined) return this.#bandRead;
     const epoch = this.#bandEpoch;
     const read = (async () => {
       try {
         const dump = (await this.shell(['dumpsys', 'window', 'displays'], { timeoutMs: STATUS_BAND_QUERY_TIMEOUT_MS })).stdout.toString('utf8');
-        const band = parseStatusBand(dump);
+        const status = parseStatusBand(dump);
+        const navigation = parseNavigationBand(dump, screen);
+        const band: SystemBands = { ...(status !== undefined && { statusBand: status }), ...(navigation !== undefined && { navigationBand: navigation }) };
         if (epoch === this.#bandEpoch) this.#band = { band };
         return band;
       } catch (e) {
         // A timeout is kept as no band until a launch or a fresh read (`#band`); any other failure keeps nothing.
-        if (e instanceof ExecError && e.timedOut && epoch === this.#bandEpoch) this.#band = { band: undefined, timedOut: true };
-        return undefined;
+        if (e instanceof ExecError && e.timedOut && epoch === this.#bandEpoch) this.#band = { band: {}, timedOut: true };
+        return {};
       }
     })().finally(() => {
       if (this.#bandRead === read) this.#bandRead = undefined;
@@ -594,13 +601,13 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * Screen size in device pixels — the units uiautomator bounds use — and
-   * the status band. The size is memoized (types.ts#viewport); the band is
-   * read after it, kept as `#band` says. `fresh` reads both again.
+   * the system bands (the status bar's, the navigation bar's). The size is
+   * memoized (types.ts#viewport); the bands are read after it, kept as
+   * `#band` says. `fresh` reads both again.
    */
   async viewport(opts?: { fresh?: boolean }): Promise<DeviceScreen> {
     const size = await this.viewportMemo.get(opts);
-    const band = await this.statusBand(opts?.fresh === true);
-    return { ...size, ...(band !== undefined && { statusBand: band }) };
+    return { ...size, ...(await this.systemBands(opts?.fresh === true, size)) };
   }
 
   async longPress(x: number, y: number, durationMs = 800): Promise<void> {
@@ -976,6 +983,8 @@ const INSETS_SOURCE_LINE_RE = /^[ \t]*InsetsSource (.*)$/gm;
 const IME_INSETS_TYPES = new Set(['ITYPE_IME', 'ime']);
 /** The status bar's insets type: `ITYPE_STATUS_BAR` up to Android 13, `statusBars` from 14 (both in the real dumps, tests/fixtures). */
 const STATUS_BAR_INSETS_TYPES = new Set(['ITYPE_STATUS_BAR', 'statusBars']);
+/** The navigation bar's insets type: `ITYPE_NAVIGATION_BAR` up to Android 13 (in the real dumps, tests/fixtures), `navigationBars` from 14. */
+const NAVIGATION_BAR_INSETS_TYPES = new Set(['ITYPE_NAVIGATION_BAR', 'navigationBars']);
 /**
  * A screen rect as Android prints it everywhere — `[l,t][r,b]`, in a
  * uiautomator `bounds` attribute and in an InsetsSource `frame=` alike. ONE
@@ -1129,6 +1138,46 @@ export function parseStatusBand(dump: string): number | undefined {
     const visible = body.match(INSETS_VISIBLE_RE)?.[1];
     const rect = frame === undefined ? undefined : parseBounds(frame);
     entries.add(rect === undefined || visible !== 'true' || rect.y !== 0 || rect.width <= 0 || rect.height <= 0 ? 'none' : rect.height);
+  }
+  const [band] = entries;
+  return entries.size === 1 && band !== 'none' ? band : undefined;
+}
+
+/** The bands `dumpsys window displays` gives the screen (types.ts#DeviceScreen): the status bar's height, the navigation bar's top. */
+type SystemBands = Pick<DeviceScreen, 'statusBand' | 'navigationBand'>;
+
+/**
+ * The VISIBLE navigation bar's TOP, in screen pixels, out of `dumpsys window
+ * displays` (types.ts#DeviceScreen.navigationBand) — the band at the bottom
+ * of the screen held upright that is the system's, not the app's. The line
+ * it reads is the display's InsetsState entry for the navigation bar,
+ * beside the status bar's (parseStatusBand: the same anchored tokens, the
+ * same refusals):
+ *
+ *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, emulator
+ *   Pixel_3a, 1080x2220, gesture navigation):
+ *     InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true insetsRoundedCornerFrame=false
+ *   API 34+: `type=navigationBars` (WindowInsets.Type.toString), unmeasured —
+ *   the API 36 fixture lists no navigation-bar entry at all.
+ *
+ * The band is the frame's TOP, of a frame that is not empty and ENDS AT THE
+ * BOTTOM of `screen` (the size `wm size` reported beside it): a bar at the
+ * side (landscape, 3-button navigation) ends elsewhere, so no band —
+ * portrait only, a residual. Never guesses — no band on: no entry; one that
+ * does not read fully (type, frame, visible); a hidden one (an immersive
+ * app); an empty frame or one short of the bottom; several entries that do
+ * not all say the same band.
+ */
+export function parseNavigationBand(dump: string, screen: { width: number; height: number }): number | undefined {
+  /** What each navigation-bar entry says: its top, or 'none' (hidden, unread, empty, not at the bottom). */
+  const entries = new Set<number | 'none'>();
+  for (const [, body] of dump.matchAll(INSETS_SOURCE_LINE_RE)) {
+    const type = body.match(INSETS_TYPE_RE)?.[1];
+    if (type === undefined || !NAVIGATION_BAR_INSETS_TYPES.has(type)) continue;
+    const frame = body.match(INSETS_FRAME_RE)?.[1];
+    const visible = body.match(INSETS_VISIBLE_RE)?.[1];
+    const rect = frame === undefined ? undefined : parseBounds(frame);
+    entries.add(rect === undefined || visible !== 'true' || rect.y + rect.height !== screen.height || rect.width <= 0 || rect.height <= 0 ? 'none' : rect.y);
   }
   const [band] = entries;
   return entries.size === 1 && band !== 'none' ? band : undefined;

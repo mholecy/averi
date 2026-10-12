@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
-import { AndroidAdapter, parseImeInsets, parseInputShown, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
+import { AndroidAdapter, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE, parseDump, drawnOverStrip } from '../helpers/android-dumps.js';
@@ -1259,7 +1259,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       return { stdout: Buffer.from(full.endsWith('wm size') ? 'Physical size: 1080x2220\n' : dump), stderr: '' };
     };
     const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
-    const screen = { width: 1080, height: 2220, windowsBesideSystemBars: true, statusBand: 66 };
+    const screen = { width: 1080, height: 2220, windowsBesideSystemBars: true, statusBand: 66, navigationBand: 2154 };
     expect(await adapter.viewport()).toEqual(screen);
     expect(await adapter.viewport()).toEqual(screen);
     expect(calls.map((c) => c.full)).toEqual(['adb -s emulator-5554 shell wm size', 'adb -s emulator-5554 shell dumpsys window displays']);
@@ -1382,6 +1382,64 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       throw failure;
     };
     expect(await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).viewport()).toEqual({ width: 1080, height: 2220, windowsBesideSystemBars: true });
+  });
+});
+
+/**
+ * The navigation bar's band (data only: nothing judges it yet; mp-native draws edge-to-edge, and its rows lie in
+ * 2154–2220 under the bar on the measured 1080x2220 emulator): read out of
+ * the same `dumpsys window displays` call as the status band, its TOP, of a visible frame that ends at the screen's
+ * bottom.
+ */
+describe('parseNavigationBand — the visible navigation bar\'s top, out of `dumpsys window displays`', () => {
+  const PIXEL_3A = { width: 1080, height: 2220 };
+  const NAV_33 = (frame: string, visible = 'true') => `        InsetsSource type=ITYPE_NAVIGATION_BAR frame=${frame} visible=${visible} insetsRoundedCornerFrame=false`;
+  const NAV_36 = (frame: string, visible = 'true') =>
+    `        InsetsSource id=ab460001 type=navigationBars frame=${frame} visible=${visible} flags= sideHint=BOTTOM boundingRects=null`;
+  const STATUS_33 = '        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false';
+  const lines = (...l: string[]) => `    mInsetsState:\n${l.join('\n')}\n    InsetsSourceProviders:\n`;
+
+  it('the real API 33 dumps, keyboard hidden and shown: `type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true` reads 2154', async () => {
+    expect(parseNavigationBand(await dumpsys('api33-keyboard-hidden'), PIXEL_3A)).toBe(2154);
+    expect(parseNavigationBand(await dumpsys('api33-keyboard-shown'), PIXEL_3A)).toBe(2154);
+  });
+
+  it('API 14+\'s `type=navigationBars` reads alike; a taller 3-button bar reads its own top; the provider\'s `mSource=` copy is no second entry', () => {
+    expect(parseNavigationBand(lines(STATUS_33, NAV_36('[0,2154][1080,2220]')), PIXEL_3A)).toBe(2154);
+    expect(parseNavigationBand(lines(NAV_36('[0,2094][1080,2220]')), PIXEL_3A)).toBe(2094);
+    expect(parseNavigationBand(`${lines(NAV_33('[0,2154][1080,2220]'))}        mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2000][1080,2220] visible=true\n`, PIXEL_3A)).toBe(2154);
+  });
+
+  it.each([
+    ['the bar hidden (an immersive app): visible=false', lines(STATUS_33, NAV_33('[0,2154][1080,2220]', 'false'))],
+    ['no navigation-bar entry at all (the API 36 fixture lists none)', lines(STATUS_33)],
+    ['an empty dump', ''],
+    ['a frame that does not end at the screen\'s bottom', lines(NAV_33('[0,2088][1080,2154]'))],
+    ['a bar at the side (landscape, 3-button): its frame ends at the bottom of a screen it does not span', lines(NAV_33('[2094,0][2220,1080]'))],
+    ['an entry that does not read fully (no visible=)', '        InsetsSource type=navigationBars frame=[0,2154][1080,2220] flags=\n'],
+    ['a malformed frame', lines('        InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080] visible=true')],
+    ['an empty frame', lines(NAV_36('[0,2220][1080,2220]'))],
+    ['two displays whose bars disagree (2154 and hidden)', lines(NAV_33('[0,2154][1080,2220]')) + lines(NAV_33('[0,2154][1080,2220]', 'false'))],
+  ])('no band on %s', (_name, dump) => {
+    expect(parseNavigationBand(dump, PIXEL_3A)).toBeUndefined();
+  });
+
+  it('the API 36 fixture (a Pixel_4 AVD) lists no navigation bar: no band', async () => {
+    expect(parseNavigationBand(await dumpsys('api36-no-ime-source'), { width: 1080, height: 2280 })).toBeUndefined();
+  });
+
+  it('viewport reports it beside the status band, out of the one `dumpsys window displays` call, memoized with it', async () => {
+    const calls: string[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      return { stdout: Buffer.from(full.endsWith('wm size') ? 'Physical size: 1080x2220\n' : lines(STATUS_33, NAV_33('[0,2154][1080,2220]'))), stderr: '' };
+    };
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+    const screen = { width: 1080, height: 2220, windowsBesideSystemBars: true, statusBand: 66, navigationBand: 2154 };
+    expect(await adapter.viewport()).toEqual(screen);
+    expect(await adapter.viewport()).toEqual(screen);
+    expect(calls).toEqual(['adb -s emulator-5554 shell wm size', 'adb -s emulator-5554 shell dumpsys window displays']);
   });
 });
 
