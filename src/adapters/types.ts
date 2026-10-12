@@ -325,7 +325,7 @@ export interface UiNode {
    * container's edge — measured on the SWIFT form, container
    * `[0,242][1080,1978]`, a 143-px row read `{y:242, height:92}` — and
    * nothing in the rect says the rest exists. Read by
-   * ui-tree/geometry.ts#scrollersOf, which `scroll_until`'s round asks for
+   * ui-tree/geometry.ts#clipsOf, which `scroll_until`'s round asks for
    * each match's such ancestors so a `fully: true` stop flush with one is
    * checked before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
    *
@@ -456,7 +456,7 @@ export interface UiNode {
  * three layers need it and none owns it (review 2026-10-06). It yields nodes
  * only: a walk that needs each node's subtree end in the order
  * (android.ts#widenUnderOverlays, ui-tree/draw-order.ts) or what its
- * ancestors hand down (ui-tree/geometry.ts#scrollersOf) recurses on its own
+ * ancestors hand down (ui-tree/geometry.ts#clipsOf) recurses on its own
  * — the stated exception (code review of round 7, S2).
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {

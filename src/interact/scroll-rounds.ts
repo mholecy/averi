@@ -1,6 +1,6 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, cutSliver, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { clippedEdges, clipsOf, containsPoint, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, visibleFractionInViewport, type Clips, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -145,15 +145,17 @@ interface RoundRead {
 /** What the round asks of a tree that read — derived by `factsOf`, never handed in. */
 interface TreeFacts {
   /**
-   * The rects of a match's ancestors that CLIP it, nearest first
-   * (ui-tree/geometry.ts#scrollersOf) — Android's scroll containers, to
-   * whose edges uiautomator has already cut the match's bounds; empty when
-   * it has none (every node of an iOS tree). For the plain stop's sliver
-   * rule (`judge`, geometry.ts#cutSliver), the `fully: true` stop's flush
-   * check (PROBE_REACH) and the box the strokes are drawn in
-   * (swipe.ts#strokeRoom).
+   * The tree's clipping (ui-tree/geometry.ts#clipsOf), one walk: a match's
+   * ancestors that CLIP it, nearest first (`scrollersOf`) — Android's scroll
+   * containers, to whose edges uiautomator has already cut the match's
+   * bounds; empty when it has none (every node of an iOS tree) — for the
+   * `fully: true` stop's flush check (PROBE_REACH) and the box the strokes
+   * are drawn in (swipe.ts#strokeRoom); and the plain stop's sliver rule
+   * (`judge`, `cutSliver`), which a match inherits from an ancestor cut to a
+   * sliver at the edge it lies flush with (round 8) — each ancestor judged
+   * once a round, whatever the number of matches.
    */
-  scrollersOf: (node: UiNode) => readonly Rect[];
+  clips: Clips;
   /**
    * The largest clipping container (ui-tree/geometry.ts#largestScroller) —
    * the screen's own scroll view, for a stroke while the target's own
@@ -168,7 +170,7 @@ interface TreeFacts {
    * `drawnOver`, what a stroke over it keeps clear of (swipe.ts#strokeRoom
    * cuts the box above them), and `drawnOverAt`, the one a stroke that
    * still touched down on it names (`touchedOn`), asked of the rects
-   * `scrollersOf` and `mainScroller` give, undefined when this tree has no
+   * `clips.scrollersOf` and `mainScroller` give, undefined when this tree has no
    * container with that rect (one remembered from an earlier read: the list
    * has moved since), never any on iOS, which has no clipping container;
    * and idb's keyboard band's top (`keyboardBandTop`), the line the strokes
@@ -197,7 +199,7 @@ interface TreeFacts {
  * keyboard band's top too. Derived ONCE per call of `round`, BEFORE the
  * judgement, and handed to it and along (`ThisRead`) — each fact from one
  * derivation (code review of round 7, S3: the judgement's clipping chains
- * and the band's top were derived beside these, a second `scrollersOf` walk
+ * and the band's top were derived beside these, a second clipping walk
  * and a second walk for the band the draw order had already found). A call
  * that re-enters after an `ask witness` (the ask most re-entries are for,
  * which needs only the judgement), an `ask unlocated` (a `fully: true` or
@@ -210,7 +212,7 @@ interface TreeFacts {
  */
 function factsOf(tree: UiNode): TreeFacts {
   return {
-    scrollersOf: scrollersOf(tree),
+    clips: clipsOf(tree),
     mainScroller: largestScroller(tree),
     drawOrder: drawOrder(tree),
     fingerprint: treeFingerprint(tree),
@@ -333,7 +335,7 @@ export interface Judged {
   shows: number;
   /**
    * Its scroll container cuts it to a sliver the next tap refuses
-   * (ui-tree/geometry.ts#cutSliver, interact/resolve.ts#refuseCutSliver,
+   * (ui-tree/geometry.ts#Clips.cutSliver, interact/resolve.ts#refuseCutSliver,
    * 2026-10-10) — the cut and the minimum it is under; a plain stop does not
    * stop on it (`stops`).
    */
@@ -952,7 +954,7 @@ function strokeTop(cover: Cover | undefined, bandTop: number | undefined): numbe
 function judge(
   found: readonly UiNode[],
   { box: viewport, statusBand }: Pick<JudgingScreen, 'box' | 'statusBand'>,
-  facts: Pick<TreeFacts, 'drawOrder' | 'scrollersOf'> | undefined,
+  facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined,
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
@@ -970,7 +972,7 @@ function judge(
     const centreCover = seen?.centreCover;
     const visible = visibleFractionInViewport(node.rect, frame);
     // The tap's cut-sliver rule, by the same minimum (resolve.ts#refuseCutSliver): what `stops` asks of a plain stop.
-    const cut = seen === undefined || facts === undefined ? undefined : cutSliver(node, facts.scrollersOf(node), seen.minPiece);
+    const cut = seen === undefined || facts === undefined ? undefined : facts.clips.cutSliver(node, seen.minPiece);
     return {
       node,
       visible,
@@ -994,7 +996,7 @@ function judge(
 }
 
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: JudgingScreen, facts: Pick<TreeFacts, 'drawOrder' | 'scrollersOf'> | undefined, fully: boolean): Judged | undefined {
+function judgeOver(found: readonly UiNode[], frame: JudgingScreen, facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined, fully: boolean): Judged | undefined {
   return frame.boxes
     .map((box) => judge(found, { ...frame, box }, facts, fully))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
@@ -1337,7 +1339,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // stale, and may be another list — and the screen's largest scroller is
     // not taken either: a largest scroller with room that is not one of the
     // target's ancestors is a list that cannot hold the target.
-    s.targetContainers = facts.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
+    s.targetContainers = facts.clips.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
@@ -1561,7 +1563,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // `fully: true`, an edge flush with the clipping container: possibly
       // cut there — probe once toward it, or say it could not be checked.
       let flush: Flush | undefined;
-      const chain = fully ? now.facts.scrollersOf(best.node) : [];
+      const chain = fully ? now.facts.clips.scrollersOf(best.node) : [];
       const flushed = flushWith(best.node.rect, chain, s.rules.direction);
       if (flushed !== undefined && 'fills' in flushed) flush = { edges: flushed.fills, container: chain[0], checked: false, why: 'fills' };
       else if (flushed !== undefined) {
