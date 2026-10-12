@@ -819,6 +819,24 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, 'text:"Q"', OPTS)).rejects.toThrow('FakeAdapter: nothing tappable at (21,803)');
   });
 
+  it('idb, a field and its placeholder label listed last behind the keyboard (one top and height, overlapping): no keys — the field is refused under the keyboard, never tapped on it', async () => {
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number, AXUniqueId: string | null = null) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('TextField', null, 42, 700, 318, 20, 'field'),
+        el('StaticText', 'Placeholder', 42, 700, 60, 20),
+        ...['Q', 'W', 'E', 'R'].map((k, i) => el('Button', k, 2 + 40 * i, 780, 38, 46)),
+        el('Other', null, 0, 590, 402, 284),
+      ]),
+    );
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:field', OPTS)).rejects.toThrow('id:field is under the soft keyboard: its centre (201,710)');
+    expect(fake.tapPoints).toEqual([]);
+  });
+
   it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre, as before', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     for (const n of tree.children) if (n.role === 'button' && n.rect.y >= 596) n.rect = { ...n.rect, y: n.rect.y + 30 };

@@ -434,6 +434,32 @@ describe('keyboardEdge — a key of idb\'s band, against an app row listed right
     tree.children.find((n) => n.label === 'Sign in')!.rect = { x: 170, y: 780, width: 220, height: 50 };
     expect(keyboardEdge(undefined, drawOrder(tree), tree.children.find((n) => n.label === 'Sign in'))).toEqual(IDB_590);
   });
+  it('keys tile a row WITHOUT overlapping: a field and its placeholder label behind the keyboard (42,700 318x20 and 42,700 60x20, one top and height), and a button with its same-rect title, are no keys — under the line', async () => {
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('TextField', 'Field', 42, 700, 318, 20),
+        el('StaticText', 'Label', 42, 700, 60, 20),
+        el('Button', 'Go', 20, 740, 362, 30),
+        el('StaticText', 'Go title', 20, 740, 362, 30),
+        ...['Q', 'W', 'E', 'R'].map((k, i) => el('Button', k, 2 + 40 * i, 780, 38, 46)),
+        el('Other', null, 0, 590, 402, 284),
+      ]),
+    );
+    const drawn = drawOrder(tree);
+    for (const label of ['Field', 'Label', 'Go', 'Go title']) expect([label, keyboardEdge(undefined, drawn, tree.children.find((n) => n.label === label))]).toEqual([label, IDB_590]);
+  });
+  it('real keys that overlap their neighbour by 1 pt (rounded frames) stay the keyboard\'s own', async () => {
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([el('Application', 'App', 0, 0, 402, 874), ...['1', '2', '3'].map((k, i) => el('Button', k, 5 + 132 * i, 596, 133, 54)), el('Other', null, 0, 589, 402, 285)]),
+    );
+    const drawn = drawOrder(tree);
+    for (const label of ['1', '2', '3']) expect([label, keyboardEdge(undefined, drawn, tree.children.find((n) => n.label === label))]).toEqual([label, undefined]);
+  });
   it('a key sharing its row (`Q`), and Dictate listed after the background: the keyboard\'s own, under no line', async () => {
     const tree = await login();
     const drawn = drawOrder(tree);

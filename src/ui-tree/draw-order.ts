@@ -1231,20 +1231,25 @@ function keyboardOf(
 
 /**
  * A node of idb's keyboard run that shares its ROW — its top and height —
- * with another node of the run: keys tile the band in rows (the number
- * pad's `1 2 3` at 596, `4 5 6` at 650…; QWERTY's letters), and an app
- * node listed right before the keys, wholly inside the band (a Sign in
- * button behind the keyboard), stands alone on its row. With the
+ * with another node of the run it does not overlap (past
+ * geometry.ts#PIXEL_OVERLAP_SLACK): keys TILE the band in rows, side by
+ * side (the number pad's `1 2 3` at 596, `4 5 6` at 650…; QWERTY's
+ * letters; neighbours' rounded frames overlap by 1 pt at most), while an
+ * app node listed right before the keys, wholly inside the band, stands
+ * alone on its row (a Sign in button behind the keyboard) or shares it
+ * only with a node laid OVER it (a field and its placeholder label, a
+ * button and its title: idb lists both with one top and height). With the
  * background and what is listed after it (Dictate), the keyboard's OWN
  * nodes (`DrawOrder.ofKeyboardBand`). Chosen over a key's size (a space
  * bar is half the screen wide, an app button may be small) and over the
  * list's order alone (the app node is listed in the run). Its errors are
- * the safe way round: a key alone on its row reads as content under the
- * line, so a tap on it is refused; two app nodes side by side behind the
- * keyboard read as keys, a residual (no idb dump has one).
+ * the safe way round, but for the second residual: a key alone on its row
+ * (a lone QuickType suggestion) reads as content under the line, so a tap
+ * on it is refused; two app nodes side by side behind the keyboard, not
+ * overlapping, read as keys (no idb dump has them).
  */
 const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
-  run.some((other) => other !== node && other.rect.y === node.rect.y && other.rect.height === node.rect.height);
+  run.some((other) => other !== node && other.rect.y === node.rect.y && other.rect.height === node.rect.height && !overlapsPastSlack(other.rect, node.rect));
 
 /**
  * The nodes of a flat list PINNED AT ITS BOTTOM, each with the line its

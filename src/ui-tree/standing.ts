@@ -319,6 +319,10 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * - Under idb's band a target whose centre lies under it is refused, even
  *   with a large piece of it above the band: no tap is moved off a centre
  *   the keyboard holds.
+ * - Which nodes of idb's band are the keyboard's own, under no line, is
+ *   read by shape (draw-order.ts#sharesRow): a key alone on its row (a lone
+ *   QuickType suggestion) is refused as content, and two app nodes side by
+ *   side behind the keyboard, not overlapping, are judged as keys.
  */
 export interface Scene {
   /** The tree's draw order (draw-order.ts#drawOrder). */
