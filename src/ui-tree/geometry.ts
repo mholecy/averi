@@ -609,7 +609,7 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
  * `point` lies on the screen but in its status band: inside one of `boxes`,
  * and inside none of them less the band (`belowStatusBand`). The tap's
  * refusal (interact/resolve.ts#refuseOffScreen) and `scroll_until`'s
- * judgement (interact/scroll-rounds.ts#judge) ask it alike.
+ * stop (ui-tree/standing.ts#Scene.standing) ask it alike.
  */
 export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; statusBand?: number }): boolean =>
   screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
@@ -689,8 +689,8 @@ export interface Clips {
    * `evidentCut` when what shows of the node across that edge is under
    * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`)
    * — a sliver a tap is refused on (interact/resolve.ts#refuseCutSliver)
-   * and `scroll_until`'s plain stop does not stop on (scroll-rounds.ts
-   * #stops); undefined otherwise. The one spelling of the rule both ask.
+   * and `scroll_until`'s plain stop does not stop on
+   * (ui-tree/standing.ts#Scene.standing); undefined otherwise. The one spelling of the rule both ask.
    *
    * Or INHERITED (round 8, owner decision, docs/bugs/2026-10-09-android-
    * tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-
@@ -712,8 +712,8 @@ export interface Clips {
    * flush with it).
    *
    * Cost: each node's answer is kept, per minimum, for the life of the
-   * `Clips` — derived once a round for every match (scroll-rounds.ts
-   * #factsOf), once a tap — so an ancestor shared by the matches is judged
+   * `Clips` — derived once a round for every match (the round's scene,
+   * interact/scroll-rounds.ts#factsOf), once a tap — so an ancestor shared by the matches is judged
    * once. An ancestor is judged at all only when the node is flush with an
    * edge it is shallower than the minimum across: a wrapper filling its
    * scroller (flush with all four edges, its subtree the whole list) is
@@ -721,14 +721,25 @@ export interface Clips {
    * walks its subtree per flush edge.
    */
   cutSliver(node: UiNode, minPiece: number): Cut | undefined;
+  /**
+   * Whether the node lies inside something that scrolls — an ancestor that
+   * scroll-containers.ts#scrolls — or undefined when the tree cannot say:
+   * a listing without ancestry (`ancestry` false: idb's flat list), and a
+   * node of another tree. Whether `scroll_until` can move the target out
+   * from under the status bar (interact/resolve.ts#statusBarRemedy, the
+   * pixel assert's remedy). Cost: one walk of the tree, on the first ask.
+   */
+  inScroller(node: UiNode): boolean | undefined;
 }
 
 /**
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
- * the sliver cuts are judged when asked, and kept.
+ * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
+ * tree's nesting is its nodes' ancestry — draw-order.ts#listsAncestry says,
+ * the one reader of the tree's dialect.
  */
-export function clipsOf(tree: UiNode): Clips {
+export function clipsOf(tree: UiNode, { ancestry }: { readonly ancestry: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
   const parents = new Map<UiNode, UiNode>();
   const walk = (n: UiNode, chain: readonly Rect[]): void => {
@@ -767,7 +778,22 @@ export function clipsOf(tree: UiNode): Clips {
     }
     return undefined;
   };
-  return { scrollersOf, cutSliver };
+  let scrolled: Map<UiNode, boolean> | undefined;
+  const inScroller = (node: UiNode): boolean | undefined => {
+    if (!ancestry) return undefined;
+    if (scrolled === undefined) {
+      const found = new Map<UiNode, boolean>();
+      const mark = (n: UiNode, under: boolean): void => {
+        if (!found.has(n)) found.set(n, under);
+        const below = under || scrolls(n);
+        for (const child of n.children) mark(child, below);
+      };
+      mark(tree, false);
+      scrolled = found;
+    }
+    return scrolled.get(node);
+  };
+  return { scrollersOf, cutSliver, inScroller };
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
@@ -832,7 +858,7 @@ export interface Cut {
  * fix/r7-sliver, item 2): a card cut to 50 px at a carousel's right edge is
  * a 50-px sliver whatever its top says. The tap's cut-sliver rule
  * (interact/resolve.ts#refuseCutSliver) and `scroll_until`'s plain stop
- * (interact/scroll-rounds.ts#stops) ask it, against the same minimum.
+ * (ui-tree/standing.ts#Scene.standing) ask it, against the same minimum.
  *
  * What a descendant must show, along the edge's axis:
  * - At ANY edge: it lies more than a pixel PAST the edge. Compose's nodes
@@ -926,28 +952,6 @@ export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefine
     }
   }
   return shallowest;
-}
-
-/**
- * Whether `node` lies inside something that scrolls — an ancestor that
- * scroll-containers.ts#scrolls — or undefined when the tree
- * cannot say: a flat list (`UiNode.flatList`, idb) has no ancestry, and a
- * node of another tree has none here. The tap's status-bar refusal asks it
- * to say whether `scroll_until` can move the target out from under the bar
- * (interact/resolve.ts#statusBarRemedy). One walk, stopping at the node.
- */
-export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined {
-  if (tree.flatList === true) return undefined;
-  const walk = (n: UiNode, scrolled: boolean): boolean | undefined => {
-    if (n === node) return scrolled;
-    const below = scrolled || scrolls(n);
-    for (const child of n.children) {
-      const found = walk(child, below);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  return walk(tree, false);
 }
 
 /**

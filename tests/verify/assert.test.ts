@@ -2155,7 +2155,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
   /** CONTINUE as the miss names it: its frame, and its reach — the pinned bar's, run down to the screen's bottom (draw-order.ts#pinnedReach). */
   const CONTINUE = 'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)';
   const REMEDY = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
-  /** idb's flat list cannot say whether the element scrolls (geometry.ts#insideScroller): the remedy names a child clear of it too. */
+  /** idb's flat list cannot say whether the element scrolls (geometry.ts#Clips.inScroller): the remedy names a child clear of it too. */
   const OR_CHILD = `${REMEDY} — or, if no scroll moves it out from under that, assert something in it that lies clear of that`;
   const IPHONE = { width: 402, height: 874, statusBand: 62 };
   /** The whole screen one colour: what the bar or the button would give the sampler. */

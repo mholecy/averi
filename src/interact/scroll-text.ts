@@ -83,7 +83,7 @@ export interface ScrollUntilResult {
    * Set on a stop with something of the app drawn over part of the element
    * (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-
    * app-chrome.md) — only without `fully: true`, which does not stop so:
-   * its CENTRE is clear (the stop's own rule, scroll-rounds.ts#stops, so a
+   * its CENTRE is clear (the stop's own rule, ui-tree/standing.ts#Scene.standing, so a
    * tap on it lands), but `by` — the one over it drawn on top — hides part
    * of it, and only `shows` of its area is seen. The reply says so, as it
    * says a clip.
@@ -111,17 +111,18 @@ export interface ScrollUntilResult {
  */
 export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): ScrollUntilResult {
   const { judged } = o;
+  const { facts } = judged.standing;
   const keyboard: ScrollUntilResult['keyboard'] =
     judged.under !== undefined ? { state: 'shown', frame: judged.under.topCover } : o.unlocated ? { state: 'unlocated' } : undefined;
-  const by = judged.covers.at(-1);
+  const by = facts.covers.at(-1);
   return {
     swipes: o.swipes,
-    visible: judged.visible,
-    clipped: judged.clipped,
+    visible: facts.visible,
+    clipped: [...facts.clipped],
     ...(keyboard !== undefined && { keyboard }),
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
-    ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: judged.shows } }),
+    ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
   };
 }
 
@@ -131,18 +132,17 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
 /**
  * What of the app is drawn over a judged match, for a failure: `under
  * <cover> at its centre (x,y), drawn over it — N% of it shows` — the cover
- * over its centre when there is one (the point the next tap presses), else
- * the topmost of its covers.
+ * the standing names (ui-tree/standing.ts#Scene.standing), at the centre
+ * when it is the one over it (the point the next tap presses).
  */
-function underText(j: Judged): string {
-  const by = j.centreCover ?? j.covers.at(-1);
-  const under = by === undefined ? 'under something, drawn over it' : drawnOverText(by, j.centreCover === undefined ? undefined : tapPoint(j.node));
-  return `${under} — ${percent(j.shows)}% of it shows`;
+function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): string {
+  const { centreCover, shows } = judged.standing.facts;
+  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
 }
 
-/** A plain stop's sliver (scroll-rounds.ts#stops, 2026-10-10), in the tap's refusal's own words (resolve.ts#cutSliverText). */
-function sliverText(j: Judged & Required<Pick<Judged, 'sliver'>>): string {
-  return cutSliverText(j.sliver.cut, j.node.rect, j.sliver.minPiece);
+/** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (resolve.ts#cutSliverText). */
+function sliverText({ judged, cut, minPiece }: Extract<Shortfall, { of: 'sliver' }>): string {
+  return cutSliverText(cut, judged.node.rect, minPiece);
 }
 
 /**
@@ -294,18 +294,18 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
             `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
         );
       }
-      // Cut to a sliver by its scroll container at the end of the content (2026-10-10, scroll-rounds.ts#stops):
+      // Cut to a sliver by its scroll container at the end of the content (ui-tree/standing.ts#Scene.standing):
       // the rest stays past the container's edge however it is swiped — or the node only reads cut (geometry.ts#evidentCut's residual).
       if (short.of === 'sliver') {
         return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short.judged)} — and the content is exhausted: ` +
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays past its container's edge at the end of the content — a layout ` +
-            `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutRemedy(short.judged.sliver.cut.edge)}). ${last}`,
+            `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutRemedy(short.cut.edge)}). ${last}`,
         );
       }
       if (short.of === 'covered') {
         return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
             `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
         );
@@ -315,17 +315,18 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // does not resize for it keeps its last rows under it. Said as such,
       // with how to hide it; the layout-defect wording only when the
       // keyboard is not the edge in question.
-      if (judged.under !== undefined && judged.clipped.includes('bottom')) {
+      const { clipped, visible } = judged.standing.facts;
+      if (judged.under !== undefined && clipped.includes('bottom')) {
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-            `${describeClip(judged.clipped, judged.visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
+            `${describeClip(clipped, visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
             `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
             `stays clipped with the keyboard down is it a layout defect. ${last}`,
         );
       }
       return new Error(
         `scroll_until ${describe} failed after ${n} — ` +
-          `element is in the viewport but ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)}, ` +
+          `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
           `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
           `The element cannot be fully revealed — that is a layout defect ` +
           `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
@@ -397,19 +398,19 @@ function shortText(short: Shortfall): string {
       return `last UI tree read failed: ${short.error.message}`;
     case 'clipped': {
       const { judged } = short;
-      return `element reached the viewport but stayed ${describeClip(judged.clipped, judged.visible, judged.under?.topCover)} (last rect ${JSON.stringify(judged.node.rect)})`;
+      const { clipped, visible } = judged.standing.facts;
+      return `element reached the viewport but stayed ${describeClip(clipped, visible, judged.under?.topCover)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'covered': {
       const { judged } = short;
-      return `element reached the viewport but stayed ${underText(judged)} (last rect ${JSON.stringify(judged.node.rect)})`;
+      return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'statusBar': {
       const { judged } = short;
       return `element reached the viewport but ${statusBarText(judged, short.band)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'sliver': {
-      const { judged } = short;
-      return `element reached the viewport but stayed ${sliverText(judged)} (last rect ${JSON.stringify(judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(judged.sliver.cut.edge)})`;
+      return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(short.cut.edge)})`;
     }
     case 'absent':
       return `element never appeared in the tree${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;

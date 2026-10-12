@@ -552,7 +552,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   /** mp-native's SWIFT form: the "Payment details" toggle (132 px whole, its button 12 px inside) at 1924 − offset, cut to the form as uiautomator cuts it; strokes on the form move it by the finger's travel, up to `max`. */
   class SwiftForm extends FakeAdapter {
     offset = 0;
-    constructor(readonly max: number, readonly leaf = false) {
+    constructor(readonly max: number, readonly leaf = false, readonly covered = false) {
       super({ s: node({ role: 'container' }) }, 's');
       this.viewportSize = { width: 1080, height: 2220 };
     }
@@ -572,6 +572,8 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
         children: [
           node({ role: 'container', clipsDescendants: true, rect: { ...FORM }, children: [toggle] }),
           node({ role: 'button', label: 'CONTINUE', rect: { x: 66, y: 1979, width: 948, height: 132 } }),
+          // `covered`: a button pinned over the toggle's centre (540,1952) — a covered sliver.
+          ...(this.covered ? [node({ role: 'button', label: 'Help', rect: { x: 400, y: 1900, width: 300, height: 78 } })] : []),
         ],
       });
     }
@@ -624,6 +626,21 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
         'under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
     );
     expect(fake.swipes).toEqual([]);
+  });
+
+  // The stop judges the cover before the cut (ui-tree/standing.ts#Scene.standing): a covered sliver fails naming the cover, not the cut.
+  // Its "that edge" names no edge: the cut is not said — what one precedence for the stop and the tap (cut first) changes.
+  it('a sliver also covered at its centre, stuck at the end of the content: the failure names the cover', async () => {
+    await expect(scrollUntilVisible(new SwiftForm(0, false, true), 'id:details_toggle', FAST)).rejects.toThrow(
+      'failed after 2 swipes — element is in the viewport but under button "Help" (400,1900 300x78) at its centre (540,1952), drawn over it — 69% of it shows — ' +
+        'and the content is exhausted: swiping down no longer moves it, and swiping up would only push it out through that edge. The app draws that over it',
+    );
+  });
+
+  it('a sliver also covered at its centre, at the bound (maxSwipes: 0): what it was short of is the cover', async () => {
+    await expect(scrollUntilVisible(new SwiftForm(1000, false, true), 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
+      'failed after 0 swipes (maxSwipes) — element reached the viewport but stayed under button "Help" (400,1900 300x78) at its centre (540,1952), drawn over it — 69% of it shows (last rect',
+    );
   });
 
   /** A form whose content starts at its top (offset 0 = at rest): a 132-px (or `height`) row at content y `y0`, its child `rel` inside it, cut to the form; strokes move the content, clamped to [0, 3000]. */

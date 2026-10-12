@@ -1,10 +1,9 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
-import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, clipsOf, containsPoint, drawnOverText, higherTop, inStatusBand, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, drawnOverText, higherTop, inStatusBand, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { usableScreen, type UsableScreen } from '../ui-tree/standing.js';
+import { sceneOf, usableScreen, type Scene, type UsableScreen } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -575,11 +574,13 @@ export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a lay
  * as far as the tree knows it (code review of round 6, P1: the refusal had
  * said `scroll_until it first` of a button pinned at the top, which no
  * scroll moves). In a scroll view (`scrolls`, ui-tree/geometry.ts
- * #insideScroller), `scroll_until` moves it out from under the bar; in none,
+ * #Clips.inScroller), `scroll_until` moves it out from under the bar; in none,
  * it is pinned there — a layout that does not keep clear of the bar — and no step
  * reaches it; where the tree cannot say (idb's flat list), both. The
  * refusal stays a refusal either way — the safe direction, and terminal in
- * an `optional:` step (flow/engine.ts).
+ * an `optional:` step (flow/engine.ts). Cost, on the refusal path only:
+ * the clip facts' two walks of the tree (ui-tree/geometry.ts#clipsOf's own
+ * and `Clips.inScroller`'s).
  */
 export function statusBarRemedy(scrolls: boolean | undefined): string {
   const pinned = `no scroll moves it out: ${PINNED_UNDER_STATUS_BAR} — fix the layout, or tap something else`;
@@ -608,7 +609,7 @@ export function statusBarRemedy(scrolls: boolean | undefined): string {
  * `scroll_until … fully: true` (review 2026-10-08, M1: a plain
  * `scroll_until` then stopped on any intersection and handed back the same
  * clipped node); since code review P3 (2026-10-09) a plain one also goes on
- * until the centre is on the screen (scroll-rounds.ts#stops), so either
+ * until the centre is on the screen (ui-tree/standing.ts#Scene.standing), so either
  * agrees with this rule.
  *
  * Before refusing, the device's screen is read AGAIN (`viewport({ fresh:
@@ -651,7 +652,7 @@ export async function refuseOffScreen(
   const judged: Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'> = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
   const what = describeTarget(target);
   if (inStatusBand(at, judged)) {
-    const band = `${underStatusBar(at, judged.statusBand ?? 0)} (rect ${rectText(node.rect)}) — ${statusBarRemedy(insideScroller(tree, node))}`;
+    const band = `${underStatusBar(at, judged.statusBand ?? 0)} (rect ${rectText(node.rect)}) — ${statusBarRemedy(sceneOf(tree).clips.inScroller(node))}`;
     throw new OffScreenRefusal(sent === undefined ? `${what} is ${band}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${band}`);
   }
   const visible = Math.max(...judged.boxes.map((b) => visibleFractionInViewport(node.rect, b)));
@@ -686,7 +687,7 @@ export async function refuseOffScreen(
  * WAS found (an `optional:` tap of it fails the flow, never skipped — see
  * PresentElementRefusal), nothing is moving, and the remedy is in the message —
  * `scroll_until` it, which since the same date keeps scrolling until the
- * centre is clear (interact/scroll-rounds.ts#stops). When the keyboard guard
+ * centre is clear (ui-tree/standing.ts#Scene.standing). When the keyboard guard
  * had already sent something, the HEADLINE says what.
  */
 export class CoveredRefusal extends PresentElementRefusal {}
@@ -719,8 +720,7 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * Judged BEFORE the cover check, so a sliver also covered is refused for
  * its cut, whose remedy is a scroll toward the edge. The remedy is a plain
  * `scroll_until` toward that edge (`cutRemedy`): its plain stop does not
- * stop on such a sliver either (scroll-rounds.ts#stops, code review of
- * fix/r7-sliver, item 1), and its default direction is down, so a cut at the
+ * stop on such a sliver either (ui-tree/standing.ts#Scene.standing), and its default direction is down, so a cut at the
  * bottom needs no direction and the others name theirs — and, for the
  * node that only READS cut (geometry.ts#evidentCut's residual: whole, its
  * own content running to the edge), the way past it: a child, or a
@@ -744,8 +744,8 @@ const OWN_CUT_WAY_PAST = 'if it is whole and only its own content runs to that e
 const INHERITED_CUT_WAY_PAST =
   'if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates';
 
-function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: number, sent?: string): void {
-  const cut = clipsOf(tree).cutSliver(node, minPiece);
+function refuseCutSliver(target: Target, node: UiNode, clips: Scene['clips'], minPiece: number, sent?: string): void {
+  const cut = clips.cutSliver(node, minPiece);
   if (cut === undefined) return;
   const finding = `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
   const what = describeTarget(target);
@@ -855,10 +855,11 @@ export async function aimClearOfChrome(
   const centre = tapPoint(node);
   // Below the status band (ui-tree/geometry.ts#belowStatusBand): a moved tap is never aimed into it.
   const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
-  const order = drawOrder(tree);
+  const scene = sceneOf(tree);
+  const order = scene.order;
   const exposed = order.exposure(node, box);
   // A sliver cut by a clip is refused first, by the minimum a cover's sliver is (refuseCutSliver).
-  refuseCutSliver(target, node, tree, exposed.minPiece, sent);
+  refuseCutSliver(target, node, scene.clips, exposed.minPiece, sent);
   const cover = exposed.centreCover;
   if (cover === undefined) return { point: centre };
   // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.

@@ -15,7 +15,7 @@ import type { UiNode } from '../adapters/types.js';
  *   invented.
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
- *   (geometry.ts#insideScroller), and, for draw order, a node's nearest
+ *   (geometry.ts#Clips.inScroller), and, for draw order, a node's nearest
  *   scroller (`Placed.scroller`), which three target rows read: scrolled
  *   content (draw-order.ts's `scrolledContent` row), `structural`'s wrapper excuse (`holdsWhole`: a wrapper holding
  *   the target's nearest scroller whole) and the scroll indicator (a child
