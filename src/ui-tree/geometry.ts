@@ -1,5 +1,5 @@
 import { clips, scrolls } from './scroll-containers.js';
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -50,9 +50,9 @@ export interface ScreenSize extends ScreenWidth {
    * the window by construction) or a screen-shaped child of a rectless root
    * (`child`: a guessed window, which may be an oversized node crowned as
    * one) — reliable or not; absent when the walk answered, whose height is
-   * a content maximum. Read by interact/swipe.ts#screenBox (2026-10-08, code
-   * review of the off-screen judgement): only a window's own sides may
-   * suggest that the screen is turned, never a walked extent.
+   * a content maximum. Read by ui-tree/standing.ts#usableScreenOf: only a
+   * window's own sides may suggest that the screen is turned, never a walked
+   * extent.
    */
   windowLeg?: 'root' | 'child';
   /**
@@ -352,8 +352,9 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * window? `wm size` and `idb describe` report the panel as built — portrait
  * on a phone — whichever way it is held; the tree's window is laid out as the
  * screen is now. The one owner of "which way does this window say the screen
- * faces" (2026-10-08, for interact/swipe.ts#screenBox, the box a gesture
- * swipes in). Here rather than in verify/scale.ts, where it was written:
+ * faces", for ui-tree/standing.ts#usableScreenOf (the box a gesture swipes
+ * in and every judgement's usable screen). Here rather than in
+ * verify/scale.ts, where it was written:
  * `interact/` may not import `verify/` (ARCHITECTURE.md §2), and the
  * question is rect arithmetic over a tree's size and the device's — the
  * reason the absent-in-viewport rule both engines need lives in this file
@@ -405,7 +406,7 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * screen lands off-centre, not off-screen in the short axis; the tree
  * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
  * refusal (interact/resolve.ts#onScreen) does not take this answer alone —
- * swipe.ts#screenBox says which boxes count (`ScreenBox.boxes`), and a
+ * ui-tree/standing.ts#UsableScreen says which boxes count (`boxes`), and a
  * child window that matches the panel neither way — this crowned node —
  * is no evidence there: the judgement uses the panel as built. A window
  * whose own sides say the panel is turned (its width the long side within
@@ -413,17 +414,17 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * counts the box either way up (the off-screen reviews, 2026-10-08).
  */
 export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {
-  if (!usableScreen(screen)) return false;
+  if (!usableSize(screen)) return false;
   // Only the tree's trustworthy parts vote. A walked height is a content
   // maximum (scale.ts#orient lost the tree's vote to exactly that), so a
   // reliable tree without a window's own height is judged by its WIDTH:
   // wider than the panel as built, within it turned (the split-pane guard is
   // the first half).
-  if (size.reliable && usableScreen(size) && !size.trustworthyHeight) {
+  if (size.reliable && usableSize(size) && !size.trustworthyHeight) {
     return size.width > screen.width * FIT_SLACK && size.width <= screen.height * FIT_SLACK;
   }
   const window: Rect | undefined =
-    size.reliable && usableScreen(size)
+    size.reliable && usableSize(size)
       ? { x: 0, y: 0, width: size.width, height: size.height }
       : screen.windowsBesideSystemBars === true
         ? size.insetWindow
@@ -433,41 +434,6 @@ export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boole
   const fits = (s: { width: number; height: number }): boolean =>
     reach.width <= s.width * FIT_SLACK && reach.height <= s.height * FIT_SLACK;
   return fits({ width: screen.height, height: screen.width }) && !fits(screen);
-}
-
-/**
- * The device's screen as a box in the tree's units, anchored at the origin —
- * the ONE derivation (code review of round 8, S3: interact/swipe.ts#screenBox
- * and verify/pixel-poll.ts#chromeOverElement each wrote it, with different
- * fallbacks; verify/ may not import interact/, so it lives here):
- * - `device` — the size the device reported (`DeviceAdapter.viewport`) when
- *   it is usable, turned when the tree's window says the panel is held
- *   sideways (`windowTurnsScreen`, `size` being the tree's
- *   `inferScreenSize`; no tree, no turn);
- * - `window` — else the tree's window, only when the tree vouches for it:
- *   `reliable` AND a window's own height (`trustworthyHeight` — a walked
- *   height is the lowest content edge, which a scroll view inflates without
- *   limit) and usable. The one fallback rule, the gesture box's: a tree that
- *   cannot vouch for a window is never taken for the screen;
- * - undefined — neither. The caller says what that means: the gesture box
- *   throws (nothing is swiped), the pixel assert judges on the tree's own
- *   screen (`screenOf`, the one draw-order.ts sizes its hosts against —
- *   and with no device, no status band).
- */
-export type DeviceBox =
-  | { readonly from: 'device'; readonly box: Rect; readonly device: DeviceScreen; readonly sideways: boolean }
-  | { readonly from: 'window'; readonly box: Rect };
-
-export function deviceBox(device: DeviceScreen | undefined, size: ScreenSize | undefined): DeviceBox | undefined {
-  if (device !== undefined && usableScreen(device)) {
-    const sideways = size !== undefined && windowTurnsScreen(size, device);
-    const { width, height } = sideways ? { width: device.height, height: device.width } : device;
-    return { from: 'device', box: { x: 0, y: 0, width, height }, device, sideways };
-  }
-  if (size !== undefined && size.reliable && size.trustworthyHeight && usableScreen(size)) {
-    return { from: 'window', box: { x: 0, y: 0, width: size.width, height: size.height } };
-  }
-  return undefined;
 }
 
 // ─── Viewport predicates ─────────────────────────────────────────────────────
@@ -618,7 +584,7 @@ export const higherTop = (a: number | undefined, b: number | undefined): number 
 
 /**
  * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as
- * interact/swipe.ts#JudgingScreen's) at its top when `box` is portrait — the
+ * ui-tree/standing.ts#UsableScreen's) at its top when `box` is portrait — the
  * part of it a point or a rect is judged on screen in; `box` itself with no
  * band, in landscape, or with no screen. `shape` is the screen box the band
  * belongs to when `box` was cut from it (the screen above a keyboard): its

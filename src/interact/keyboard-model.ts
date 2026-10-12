@@ -1,9 +1,10 @@
 import type { DeviceAdapter, Point, Rect } from '../adapters/types.js';
 import { readKeyboard, type Covering, type FrameVerdict, type KeyboardReading, type Uncovered } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import type { UsableScreen } from '../ui-tree/standing.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type TapScreen, type Target } from './resolve.js';
+import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, type SettleOptions, type Target } from './resolve.js';
 
 /**
  * The seam between the two keyboard models (2026-10-07, the keyboard-model
@@ -257,8 +258,8 @@ export interface CoveredLook {
   opts: GuardOptions;
   /** Where the target was on that look. */
   point: Point;
-  /** The screen the first look was judged on (resolve.ts#tapScreen), for a model that judges a point of its own — the in-tree model's dismissal (`onScreen`). */
-  screen: TapScreen | undefined;
+  /** The screen the first look was judged on (ui-tree/standing.ts#usableScreen), for a model that judges a point of its own — the in-tree model's dismissal (`onScreen`). */
+  screen: UsableScreen | undefined;
   /**
    * What the first look's reading said (`readKeyboard(…).over`): the frame
    * (or band, or panel) that covered it, and the input method's word over

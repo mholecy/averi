@@ -59,21 +59,33 @@ export interface DeviceScreen {
    *   the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-
    *   system-status-bar-as-app-screen.md). In an app that keeps clear of
    *   the bar no node lies in the band, so it changes nothing there.
-   * Read by interact/swipe.ts#screenBox, which carries it to the judgements
-   * of a tap point. Cut only from a PORTRAIT box (ui-tree/geometry.ts#belowStatusBand):
+   * Carried to the judgements of a tap point by
+   * ui-tree/standing.ts#UsableScreen. Cut only from a PORTRAIT box (ui-tree/geometry.ts#belowStatusBand):
    * iOS's rule — an iPhone hides its bar in landscape — which Android, whose
    * bar stays at the top in landscape, shares as a stated residual.
    */
   statusBand?: number;
+  /**
+   * The TOP edge of the band at the bottom of the screen held upright that
+   * is the system navigation bar's, in the tree's units — Android only
+   * (android.ts#parseNavigationBand: the VISIBLE bar's frame out of the same
+   * `dumpsys window displays` as `statusBand`, across the bottom of the
+   * display that dump describes; 2154 on the measured 1080x2220 emulator).
+   * Unset when the bar is hidden, at a side, the display is turned
+   * (landscape: a residual), or the dump does not say.
+   * Carried to ui-tree/standing.ts#UsableScreen; nothing judges it yet.
+   */
+  navigationBand?: number;
 }
 
 /**
  * A screen size that can be divided by, or swiped in: finite and positive on
- * both axes. The one spelling of "this size is usable" — verify/scale.ts's
- * witness and interact/swipe.ts's gesture box both read it (until 2026-10-08
- * each had its own copy).
+ * both axes. The one spelling of "this size is usable", read wherever a
+ * size is: verify/scale.ts's witness, ui-tree/standing.ts#usableScreenOf,
+ * ui-tree/geometry.ts#windowTurnsScreen and interact/swipe.ts#screenBox's
+ * refusal.
  */
-export const usableScreen = ({ width, height }: { width: number; height: number }): boolean =>
+export const usableSize = ({ width, height }: { width: number; height: number }): boolean =>
   Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
 
 /**

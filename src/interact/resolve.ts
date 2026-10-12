@@ -4,7 +4,8 @@ import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.j
 import { belowStatusBand, clipsOf, containsPoint, drawnOverText, higherTop, inStatusBand, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { judgingScreen, SIDES, type JudgingScreen } from './swipe.js';
+import { usableScreen, type UsableScreen } from '../ui-tree/standing.js';
+import { SIDES } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -502,27 +503,6 @@ export class PresentElementRefusal extends Error implements RefusedOnPresentElem
  */
 export class OffScreenRefusal extends PresentElementRefusal {}
 
-/** The screen a tap point is judged against: `swipe.ts#judgingScreen` — the box a reply quotes and the boxes that count. */
-export type TapScreen = JudgingScreen;
-
-/**
- * The screen for the on-screen rule: `swipe.ts#judgingScreen`, the one
- * owner of "the device's screen as the tree's coordinates see it" for a
- * judgement — the device's `viewport()` (memoized by the adapter; in the
- * tree's units, px on Android, pt on iOS), turned when `tree`'s window says
- * the screen is held sideways, the tree's window when the device size
- * cannot be read, and the boxes a point may lie in (`ScreenBox.boxes`: the
- * box, or the box either way up when a turn is suggested but not
- * witnessed). `scroll_until`'s stop reads the same, so the two agree.
- *
- * `undefined` — no box at all — leaves the judgement to the tree's root rect
- * (`onScreen`), and with no root rect either the tap goes ahead as it did
- * before the rule existed: the keyboard guard's fail-open rule
- * (keyboard.ts). The rule exists to stop a false "Tapped", and must never
- * be why a tap on a device that could not report its size did not happen.
- */
-export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode): Promise<TapScreen | undefined> => judgingScreen(adapter, { tree });
-
 /**
  * THE on-screen rule for a point about to be tapped (2026-10-08) — the
  * target's centre (`refuseOffScreen`) and a configured keyboard dismissal's
@@ -530,7 +510,11 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * scrolled above the top is still in the tree). One owner since the review
  * of the off-screen refusal: the picker had judged by the root's rect alone.
  *
- * - Inside any of the screen's `boxes` (swipe.ts#ScreenBox.boxes has the
+ * The screen is ui-tree/standing.ts#usableScreen over the tree the tap
+ * was resolved in — the one `scroll_until`'s stop reads too, so the two
+ * agree.
+ *
+ * - Inside any of the screen's `boxes` (ui-tree/standing.ts#UsableScreen has the
  *   rule): the box alone when a window witnessed the orientation; the box
  *   EITHER way up when a window's own sides, or a walked-width turn,
  *   suggest a turn no window witnessed; the panel as built otherwise (review 2026-10-08, B1: refusing on a guessed turn
@@ -542,8 +526,11 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  *   still given up: on a screen whose turn is suggested but not witnessed,
  *   a point inside the other orientation only. The measured case — below
  *   the fold, (94,895) on 402×874 — lies outside both and is refused.
- * - No screen at all: inside the tree's root rect when it has one; with
- *   none, on screen (fail open).
+ * - No screen at all (no usable device size and no window in the tree):
+ *   inside the tree's root rect when it has one; with none, on screen —
+ *   the keyboard guard's fail-open rule (keyboard.ts). The rule exists to
+ *   stop a false "Tapped", and must never be why a tap on a device that
+ *   could not report its size did not happen.
  *
  * - Never in the status band at the top of a portrait box, where the
  *   adapter reports one with the device's screen (`DeviceScreen.statusBand`):
@@ -557,7 +544,7 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
  * a 402-wide screen is judged at 402, off it: that is where the tap would go.
  */
-export function onScreen(point: Point, tree: UiNode, screen: TapScreen | undefined): boolean {
+export function onScreen(point: Point, tree: UiNode, screen: UsableScreen | undefined): boolean {
   if (screen === undefined) return rectArea(tree.rect) === 0 || containsPoint(tree.rect, point);
   return screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 }
@@ -631,7 +618,7 @@ export function statusBarRemedy(scrolls: boolean | undefined): string {
  * 2026-10-08, M3; the same re-read verify/capture.ts makes before refusing a
  * window as wider than the screen). The refusal names the size read again
  * when it differs from the first. A fresh read that FAILS is dropped by the
- * memo (adapters/viewport-memo.ts), so `tapScreen` then asks the device once
+ * memo (adapters/viewport-memo.ts), so `usableScreen` then asks the device once
  * more — one extra read on a refusal path, accepted.
  *
  * A point on the screen but inside the status band (`onScreen`'s band
@@ -649,19 +636,19 @@ export async function refuseOffScreen(
   target: Target,
   node: UiNode,
   tree: UiNode,
-  screen: TapScreen | undefined,
+  screen: UsableScreen | undefined,
   sent?: string,
-): Promise<TapScreen | undefined> {
+): Promise<UsableScreen | undefined> {
   const at = tapPoint(node);
   if (onScreen(at, tree, screen)) return screen;
   try {
     await adapter.viewport({ fresh: true });
   } catch {
-    // An unreadable size is screenBox's to handle (the tree's window stands in).
+    // An unreadable size is the usable screen's to handle (the tree's window stands in).
   }
-  const again = await tapScreen(adapter, tree);
+  const again = await usableScreen(adapter, { tree });
   if (onScreen(at, tree, again)) return again;
-  const judged: TapScreen = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
+  const judged: Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'> = again ?? screen ?? { box: tree.rect, boxes: [tree.rect] };
   const what = describeTarget(target);
   if (inStatusBand(at, judged)) {
     const band = `${underStatusBar(at, judged.statusBand ?? 0)} (rect ${rectText(node.rect)}) — ${statusBarRemedy(insideScroller(tree, node))}`;
@@ -861,7 +848,7 @@ export async function aimClearOfChrome(
   target: Target,
   node: UiNode,
   tree: UiNode,
-  screen: TapScreen | undefined,
+  screen: UsableScreen | undefined,
   keyboardTop: () => Promise<number | undefined>,
   sent?: string,
 ): Promise<Aim> {

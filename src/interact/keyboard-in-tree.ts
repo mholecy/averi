@@ -4,6 +4,7 @@ import { frameText } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
+import { usableScreen, type UsableScreen } from '../ui-tree/standing.js';
 import { sleep } from '../util/sleep.js';
 import {
   confirmHidden,
@@ -21,7 +22,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { describeTarget, findTarget, onScreen, tapScreen, type Ambiguity, type RefusedOnPresentElement, type TapScreen } from './resolve.js';
+import { describeTarget, findTarget, onScreen, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 
 /**
  * The IN-TREE model (iOS under WDA, 2026-10-07): the soft keyboard is part
@@ -220,7 +221,7 @@ async function pickDismissal(
   keyboard: KeyboardReading,
   dismissals: readonly KeyboardDismissal[],
   ambiguous: Ambiguity,
-  screen: TapScreen | undefined,
+  screen: UsableScreen | undefined,
 ): Promise<DismissalPick> {
   const skipped: string[] = [];
   let order: DrawOrder | undefined; // walked once, by the first strategy that gets as far as asking it
@@ -466,7 +467,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       const tree = await adapter.uiTree();
       const keyboard = readKeyboard(adapter, tree);
       if ((await keyboard.anywhere()) !== 'shown') return {};
-      const { picked, skipped } = await pickDismissal(tree, keyboard, dismissals, ambiguous, await tapScreen(adapter, tree));
+      const { picked, skipped } = await pickDismissal(tree, keyboard, dismissals, ambiguous, await usableScreen(adapter, { tree }));
       if (picked === undefined) {
         return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, skipped)} — the next tap under it will be refused` };
       }

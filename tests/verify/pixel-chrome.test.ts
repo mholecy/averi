@@ -294,10 +294,10 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
 });
 
 /**
- * Code review of round 8, S3: the screen a pixel assert judges in is geometry.ts#deviceBox's — the gesture box's
- * derivation. With the device silent, a window the tree vouches for is the screen, not the tree's largest node.
+ * Code review of round 8, S3: the screen a pixel assert judges in is ui-tree/standing.ts#usableScreen's — the gesture
+ * box's derivation. With the device silent, a window the tree vouches for is the screen, not the tree's largest node.
  */
-describe('the screen without the device: the window the tree vouches for (geometry.ts#deviceBox)', () => {
+describe('the screen without the device: the window the tree vouches for (ui-tree/standing.ts#usableScreenOf)', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
   const silent = { viewport: async (): Promise<DeviceScreen> => Promise.reject(new Error('idb describe: no screen_dimensions')) };
@@ -317,6 +317,12 @@ describe('the screen without the device: the window the tree vouches for (geomet
     const element = n('container', rect(0, 0, 402, 200), { identifier: 'row' });
     const tree = n('container', rect(0, 0, 0, 0), { children: [n('other', rect(0, 0, 402, 1300), { children: [element] }), n('other', rect(0, 150, 402, 100), { label: 'Bar' })] });
     expect(await chromeOverElement(silent, tree, element)).toMatch(/^other "Bar" \(0,150 402x100\) is drawn over the element \(element 0,0 402x200\)/);
+  });
+
+  it('a banner crowned as the window turns the screen the pixel assert judges its single box over (`oriented`, D6), not the judged panel as built: a landscape box, no band — measured', async () => {
+    const banner = n('image', rect(0, 0, 500, 300), { identifier: 'banner' });
+    const tree = n('container', rect(0, 0, 0, 0), { children: [banner, n('button', rect(425, 400, 50, 40), { identifier: 'next' })] });
+    expect(await chromeOverElement({ viewport: async () => IPHONE }, tree, banner)).toBeUndefined();
   });
 });
 

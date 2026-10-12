@@ -5,8 +5,9 @@ import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import type { UsableScreen } from '../ui-tree/standing.js';
 import type { WaitEvidence } from './resolve.js';
-import { judgingOf, OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -85,18 +86,18 @@ export interface RoundSeen {
   /** This round's tree read: what it held, or the error that stood in for it (a miss, not a failure — read-tree.ts#readTreeOrError). */
   read: RoundRead | { error: Error };
   /**
-   * This round's swipe.ts#screenBox — ONE read gives both boxes the round
-   * uses, so they can never come from different reads: its `box`, the
-   * GESTURE box the stroke is drawn in, over which the round judges a
+   * This round's usable screen (swipe.ts#screenBox's `usable`) — ONE read gives both boxes the round
+   * uses, so they can never come from different reads: its `oriented` box,
+   * the GESTURE box the stroke is drawn in, over which the round judges a
    * container's room (swipe.ts#strokeRoom) and from which a stroke step's
    * `box` is cut; and, on a round whose tree read, its `boxes`, the frame
-   * the round judges in (`judgingOf` — the tap's screen too). On a round
-   * whose tree did not read it is the device as built and only its `box`
-   * is used: the frame stays the last one. Absent when there is none
+   * the round judges in (the tap's screen too). On a round
+   * whose tree did not read it is the device as built and only its
+   * `oriented` box is used: the frame stays the last one. Absent when there is none
    * (screenBox threw): the frame stays, no container has room, and a stroke
    * step carries no box — the driver throws why.
    */
-  screen?: ScreenBox;
+  screen?: UsableScreen;
   /** The stroke the previous `stroke` step drew, as sent. Required after `stroke`, refused otherwise. */
   drawn?: Stroke;
   /** The answer to `ask witness`: the round's keyboard reading's `corroborated()`. */
@@ -684,6 +685,9 @@ export interface Rounds {
   readonly [opaque]: 'scroll-rounds';
 }
 
+/** The screen a round judges in: the usable screen's judging part (ui-tree/standing.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
+type Frame = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand'>;
+
 /**
  * Everything the scroll remembers between rounds, one record with one
  * writer (`round`). Until 2026-10-09 the motion half was the `Motion` class
@@ -697,19 +701,19 @@ interface State {
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
   readonly owesDrawn: boolean;
   /**
-   * The visibility reference frame (2026-10-08, review of the off-screen tap
-   * refusal, M2): `judgingScreen` over the round's tree — the tap's screen
-   * owner too (resolve.ts#tapScreen), so a stop the scroll calls visible is
+   * The visibility reference frame: the usable screen of the round's tree
+   * (ui-tree/standing.ts#usableScreen, through swipe.ts#screenBox) — the
+   * tap's screen too, so a stop the scroll calls visible is
    * judged on the screen the next tap is judged on, by construction: the
    * box (turned in landscape as the stroke already was; what a failure
-   * quotes) and the boxes that count (`ScreenBox.boxes`: either way up only
+   * quotes) and the boxes that count (`UsableScreen.boxes`: either way up only
    * when a turn is suggested but not witnessed). A round whose tree did not
    * read, or that has no box at all (a 0×0 device and no window), keeps the
    * last frame — the device as built until a round had one. The keyboard
    * cover is cut from the box as chosen: a band is in the tree's
    * coordinates, and above it is the box's width.
    */
-  readonly frame: JudgingScreen;
+  readonly frame: Frame;
   /** Some round matched the target, and how many rounds read a tree — the absence rule's evidence. */
   readonly everFound: boolean;
   readonly treesRead: number;
@@ -949,11 +953,11 @@ function strokeTop(cover: Cover | undefined, bandTop: number | undefined): numbe
  * when the band leaves none — and what is drawn over a node is counted only
  * inside the box it is judged in: a bar under the keyboard covers nothing
  * the round can see. The box comes with its status band, as one judging
- * screen (`JudgingScreen`'s `box` and `statusBand`).
+ * screen (`Frame`'s `box` and `statusBand`).
  */
 function judge(
   found: readonly UiNode[],
-  { box: viewport, statusBand }: Pick<JudgingScreen, 'box' | 'statusBand'>,
+  { box: viewport, statusBand }: Pick<Frame, 'box' | 'statusBand'>,
   facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined,
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
@@ -995,8 +999,8 @@ function judge(
   return scored.sort((a, b) => better(a, b, fully))[0];
 }
 
-/** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: JudgingScreen, facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined, fully: boolean): Judged | undefined {
+/** The whole-screen judgement over every box that counts (`UsableScreen.boxes`): the best-revealed match in any — "either way up" when there are two. */
+function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'drawOrder' | 'clips'> | undefined, fully: boolean): Judged | undefined {
   return frame.boxes
     .map((box) => judge(found, { ...frame, box }, facts, fully))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);
@@ -1480,7 +1484,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const readError = 'error' in seen.read ? seen.read.error : undefined;
   if (read !== undefined) {
     s.treesRead++;
-    if (seen.screen !== undefined) s.frame = judgingOf(seen.screen);
+    if (seen.screen !== undefined) s.frame = seen.screen;
   }
   const found = read?.found ?? [];
   if (found.length > 0) s.everFound = true;
@@ -1531,7 +1535,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // is past the far edge, and the next stroke turns back.
   const judgedFrames: Rect[] =
     cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
-  const gesture = seen.screen?.box;
+  const gesture = seen.screen?.oriented;
   const now: ThisRead | undefined =
     read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, gesture, cover };
   const observed = now === undefined ? undefined : observe(s, current, now, best);

@@ -1,11 +1,12 @@
 import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, containsPoint, deviceBox, inferScreenSize, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect, screenOf } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { treeScreen, usableScreen } from '../ui-tree/standing.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -221,7 +222,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * tap's `contentFramed` row): its button is named, and its bare
  * background between them is not seen.
  * Cost: the memoized `viewport()`, and walks of the round's tree, no
- * read: `inferScreenSize`'s (the screen's shape, geometry.ts#deviceBox),
+ * read: `inferScreenSize`'s (the screen's shape, ui-tree/standing.ts#usableScreen),
  * `screenOf`'s when neither the device nor a window vouches for the
  * screen (the last fallback), `insideScroller`'s down to the element
  * (whether a scroll may cure a miss — asked on every round that reaches
@@ -515,13 +516,10 @@ async function keyboardOverElement(
  * element.md: fail closed). Header, "Since round 8". Exported for the
  * fixture sweeps (tests/verify/pixel-chrome.test.ts).
  *
- * The screen is geometry.ts#deviceBox's, the gesture box's derivation
- * (interact/swipe.ts#screenBox; one owner since the code review of round 8,
- * S3): the device's (`viewport()`, memoized by the adapter, in the tree's
- * units), turned when the tree's window says it is held sideways; else the
- * tree's window when the tree vouches for it (reliable, a window's own
- * height); else the tree's own screen (`screenOf`, what draw-order.ts
- * sizes its hosts against) — and without the device, no band. Until S3 the
+ * The screen is the usable screen's single `oriented` box
+ * (ui-tree/standing.ts#usableScreen, which owns the derivation), else the
+ * tree's own screen (ui-tree/standing.ts#treeScreen) — with no band but the
+ * device's. Until S3 the
  * tree's screen was taken whenever the device was silent, so a rectless
  * root whose largest node is a scroll view's tall content (402x2000 under
  * a 402x874 window) judged the window as no screen-sized element and
@@ -584,11 +582,11 @@ export async function chromeOverElement(
   element: UiNode,
   reads: Rect = element.rect,
 ): Promise<string | undefined> {
-  // The device's screen, turned as the window says, else a window the tree vouches for (geometry.ts#deviceBox, the
-  // gesture box's derivation); with neither, the tree's own screen — and no band, which only the device reports.
-  const found = deviceBox(await adapter.viewport().catch(() => undefined), inferScreenSize(tree));
-  const screen = found?.box ?? screenOf(tree);
-  const below = belowStatusBand(screen, found?.from === 'device' ? found.device : undefined);
+  // The usable screen's single box (ui-tree/standing.ts#usableScreen); with none, the tree's own screen — and no band,
+  // which only the device reports.
+  const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
+  const screen = usable.oriented;
+  const below = belowStatusBand(screen, usable);
   const band: Rect = { ...screen, height: below.y - screen.y };
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.

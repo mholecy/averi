@@ -24,7 +24,7 @@ import {
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { IOS_MIN_STATUS_BAND, iosStatusBand } from '../../src/adapters/ios-status-band.js';
-import { screenBox } from '../../src/interact/swipe.js';
+import { usableScreen } from '../../src/ui-tree/standing.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
@@ -570,7 +570,7 @@ describe('a tap target off the screen (2026-10-08)', () => {
     expect(fake.tapPoints).toEqual([]);
   });
 
-  it('landscape: the screen is the device box TURNED when the tree\'s window is (swipe.ts#screenBox) — x 600 of 874 is on screen', async () => {
+  it('landscape: the screen is the device box TURNED when the tree\'s window is (ui-tree/standing.ts#usableScreen) — x 600 of 874 is on screen', async () => {
     const fake = swiftForm();
     fake.live().rect = { x: 0, y: 0, width: 874, height: 402 }; // the window held sideways; the device reports the panel as built
     fake.live().children[1].rect = { x: 550, y: 100, width: 100, height: 20 };
@@ -1311,7 +1311,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
       // 200x40: not screen-shaped, so it does not discredit the walked width (geometry.ts#walkExtent).
       const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 480, width: 200, height: 40 } })), { width: 393, height: 852 });
-      expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 852, height: 393 }); // the turn this probe is about
+      expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.oriented).toEqual({ x: 0, y: 0, width: 852, height: 393 }); // the turn this probe is about
       await tapElement(fake, 'id:go', OPTS);
       expect(fake.tapPoints).toEqual([{ x: 150, y: 500 }]);
     });
@@ -1421,7 +1421,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       }),
     );
     const fake = ios(tree, PORTRAIT);
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
+    expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
     await expect(tapElement(fake, 'id:next_item', OPTS)).rejects.toThrow('id:next_item is off screen at (450,100) on a 402x874 screen (rect');
     await expect(scrollUntilVisible(fake, 'id:next_item', { maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
     expect(fake.swipes).toHaveLength(1);
@@ -1479,7 +1479,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       const cells = [0, 300, 600, 900, 1200].map((x) => node({ role: 'cell', rect: { x, y: 80, width: 300, height: 40 } }));
       const rows = [200, 400, 600, 800].map((y) => node({ role: 'text', rect: { x: 0, y, width: 402, height: 40 } }));
       const fake = ios(idbRoot(...cells, ...rows, node({ role: 'button', identifier: 'item', rect: { x: 425, y: 80, width: 50, height: 40 } })), PORTRAIT);
-      expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
+      expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
       await expect(tapElement(fake, 'id:item', OPTS)).rejects.toThrow('id:item is off screen at (450,100) on a 402x874 screen (rect');
       await expect(scrollUntilVisible(fake, 'id:item', { maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
       expect(fake.swipes).toHaveLength(1);
@@ -1531,9 +1531,9 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
         idbRoot(node({ role: 'image', rect: { x: 0, y: 0, width: 500, height: 300 } }), node({ role: 'button', identifier: 'next', rect: { x: 425, y: 400, width: 50, height: 40 } })),
         PORTRAIT,
       );
-      const judged = await screenBox(fake, { tree: await fake.uiTree() });
-      expect(judged.box).toEqual({ x: 0, y: 0, width: 874, height: 402 }); // the swipe's accepted cost (geometry.ts#windowTurnsScreen)
-      expect(judged.boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
+      const judged = await usableScreen(fake, { tree: await fake.uiTree() });
+      expect(judged?.oriented).toEqual({ x: 0, y: 0, width: 874, height: 402 }); // the swipe's accepted cost (geometry.ts#windowTurnsScreen)
+      expect(judged?.boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
       await expect(tapElement(fake, 'id:next', OPTS)).rejects.toThrow('id:next is off screen at (450,420) on a 402x874 screen (rect');
     });
 
@@ -1547,7 +1547,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
         bandNode({ x: 0, y: 250, width: 874, height: 152 }),
       );
       const fake = ios(tree, PORTRAIT);
-      expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toHaveLength(2);
+      expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toHaveLength(2);
       const error = await scrollUntilVisible(fake, 'id:pay', { maxSwipes: 0 }).catch((e: unknown) => e);
       expect((error as Error).message).toContain('never intersected the 402x250 screen above the soft keyboard over [0,250][874,402] (last rect');
     });
@@ -1556,7 +1556,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
   it('review round 2 — probe J: on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {
     const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
     const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 580, width: 200, height: 40 } })), { width: 393, height: 852 });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).box).toEqual({ x: 0, y: 0, width: 852, height: 393 });
+    expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.oriented).toEqual({ x: 0, y: 0, width: 852, height: 393 });
     expect(await scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
     await tapElement(fake, 'id:go', OPTS);
     expect(fake.tapPoints).toEqual([{ x: 150, y: 600 }]);
@@ -1575,7 +1575,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
   it('review round 1 (2026-10-08): the turn after a fling is judged in EVERY box that counts — a target beyond the far edge one way up but clipped at both edges the other is not turned for', async () => {
     const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
     const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 300, y: 900, width: 450, height: 40 } })), { width: 393, height: 852 });
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toHaveLength(2);
+    expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toHaveLength(2);
     const swipe = fake.swipe.bind(fake);
     fake.swipe = async (from, to) => {
       await swipe(from, to);
@@ -1703,19 +1703,6 @@ describe('iOS\'s status band (2026-10-09)', () => {
     expect([iosStatusBand({ width: 420, height: 912 }), iosStatusBand({ width: 1024, height: 1366 })]).toEqual([IOS_MIN_STATUS_BAND, IOS_MIN_STATUS_BAND]);
   });
 
-  it('screenBox carries the device\'s band, and only the device\'s: none when the size could not be read and the tree\'s window stands in', async () => {
-    const fake = await swiftForm(771);
-    expect((await screenBox(fake, { tree: undefined })).statusBand).toBe(62);
-    const unread = await swiftForm(771);
-    unread.viewport = async () => {
-      throw new Error('idb describe returned no screen_dimensions');
-    };
-    const window = node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } })] });
-    const judged = await screenBox(unread, { tree: window });
-    expect(judged.box).toEqual({ x: 0, y: 0, width: 402, height: 874 });
-    expect(judged.statusBand).toBeUndefined();
-  });
-
   it('a landscape box is not cut: on a screen held sideways a centre at y 30 is tapped (an iPhone hides its status bar there)', async () => {
     resetLayout();
     const row = node({ role: 'button', identifier: 'row', rect: { x: 300, y: 10, width: 200, height: 40 } });
@@ -1723,7 +1710,7 @@ describe('iOS\'s status band (2026-10-09)', () => {
     fake.platform = 'ios';
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
-    expect((await screenBox(fake, { tree: await fake.uiTree() })).boxes).toEqual([{ x: 0, y: 0, width: 874, height: 402 }]);
+    expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toEqual([{ x: 0, y: 0, width: 874, height: 402 }]);
     await tapElement(fake, 'id:row', OPTS);
     expect(fake.tapPoints).toEqual([{ x: 400, y: 30 }]);
   });

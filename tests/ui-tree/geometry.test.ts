@@ -26,7 +26,6 @@ import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node as fakeNode } from '../helpers/fake.js';
-import { deviceBox, type ScreenSize } from '../../src/ui-tree/geometry.js';
 
 /**
  * Regression cover for docs/bugs/2026-08-26-ios-ocr-crop-scale.md: with a
@@ -717,27 +716,6 @@ describe('subtract, largestRect, rectCentre — the cover arithmetic draw-order.
     expect(largestRect([])).toBeUndefined();
     expect(rectCentre(r(24, 754, 354, 26))).toEqual({ x: 201, y: 767 });
     expect(rectCentre(r(0, 0, 3, 3))).toEqual({ x: 2, y: 2 });
-  });
-});
-
-/** Code review of round 8, S3: the one derivation of the device's screen in the tree's units, read by the gesture box and the pixel assert. */
-describe('deviceBox — the device, turned as the window says; else a window the tree vouches for; else nothing', () => {
-  const size = (width: number, height: number, reliable: boolean, trustworthyHeight: boolean): ScreenSize => ({ width, height, reliable, trustworthyHeight });
-  const PORTRAIT = { width: 1080, height: 2220 };
-  it.each([
-    ['device usable, the window portrait: as built', PORTRAIT, size(1080, 2220, true, true), { from: 'device', box: { x: 0, y: 0, width: 1080, height: 2220 }, sideways: false }],
-    ['device usable, the window landscape: turned', PORTRAIT, size(2220, 1080, true, true), { from: 'device', box: { x: 0, y: 0, width: 2220, height: 1080 }, sideways: true }],
-    ['device usable, no tree: as built', PORTRAIT, undefined, { from: 'device', box: { x: 0, y: 0, width: 1080, height: 2220 }, sideways: false }],
-    ['device unusable (0x0), a window vouched for: the window', { width: 0, height: 0 }, size(402, 874, true, true), { from: 'window', box: { x: 0, y: 0, width: 402, height: 874 } }],
-    ['no device, a window vouched for: the window', undefined, size(402, 874, true, true), { from: 'window', box: { x: 0, y: 0, width: 402, height: 874 } }],
-    ['no device, a walked height (not a window\'s): nothing', undefined, size(402, 1300, true, false), undefined],
-    ['no device, an unreliable window: nothing', undefined, size(402, 874, false, true), undefined],
-    ['no device, no geometry: nothing', undefined, size(0, 0, true, true), undefined],
-    ['neither device nor tree: nothing', undefined, undefined, undefined],
-  ] as const)('%s', (_name, device, tree, expected) => {
-    const got = deviceBox(device, tree);
-    if (expected === undefined) return expect(got).toBeUndefined();
-    expect(got).toMatchObject(expected);
   });
 });
 

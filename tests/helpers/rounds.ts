@@ -3,7 +3,8 @@ import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
-import { scrollStroke, type ScreenBox } from '../../src/interact/swipe.js';
+import { scrollStroke } from '../../src/interact/swipe.js';
+import type { UsableScreen } from '../../src/ui-tree/standing.js';
 import { node } from './fake.js';
 
 /**
@@ -27,8 +28,8 @@ export interface Row {
   found?: readonly UiNode[];
   /** The read failed with this message. */
   error?: string;
-  /** swipe.ts#screenBox's answer this round (`RoundSeen.screen`: the gesture box, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box] }`; `null`: screenBox threw — no box this round, the frame stays. */
-  screen?: ScreenBox | null;
+  /** The usable screen swipe.ts#screenBox gave this round (`RoundSeen.screen`: the gesture box, `oriented`, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box], oriented: box, from: 'device' }`; `null`: screenBox threw — no box this round, the frame stays. */
+  screen?: UsableScreen | null;
   /** The reading's `cover()`: absent for a keyboard hidden or unknown. */
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`; default: no node is the keyboard's. */
@@ -140,7 +141,7 @@ export interface Played {
 export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonly Row[]): Played {
   let state = startRounds(rules, rules.screen);
   const box: Rect = { x: 0, y: 0, ...rules.screen };
-  const asBuilt: ScreenBox = { box, boxes: [box] };
+  const asBuilt: UsableScreen = { box, boxes: [box], oriented: box, from: 'device' };
   const rounds: Played['rounds'] = [];
   let outcome: ScrollOutcome | undefined;
   let stroked: Extract<RoundStep, { do: 'stroke' }> | undefined;

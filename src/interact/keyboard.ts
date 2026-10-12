@@ -1,6 +1,7 @@
 import type { Point, Rect } from '../adapters/types.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { usableScreen } from '../ui-tree/standing.js';
 import { inTreeModel } from './keyboard-in-tree.js';
 import {
   confirmHidden,
@@ -15,7 +16,7 @@ import {
   type ResolvedClear,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
-import { aimClearOfChrome, describeTarget, refuseOffScreen, resolveSettled, tapScreen, type Target } from './resolve.js';
+import { aimClearOfChrome, describeTarget, refuseOffScreen, resolveSettled, type Target } from './resolve.js';
 
 /**
  * The soft-keyboard guard and the post-fill dismissal, written ONCE over
@@ -132,7 +133,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // keyboard-avoiding scroll view scrolls back down). The screen comes from
   // the first read's tree — the orientation does not turn inside one tap —
   // or from the re-read a refusal makes first.
-  const screen = await refuseOffScreen(adapter, target, first.node, first.tree, await tapScreen(adapter, first.tree));
+  const screen = await refuseOffScreen(adapter, target, first.node, first.tree, await usableScreen(adapter, { tree: first.tree }));
   // The LAST rule (2026-10-09): nothing of the app drawn over the point —
   // else an uncovered piece of the target, or a CoveredRefusal — and, first,
   // no target cut to a sliver by its scroll container (a ClippedRefusal)
