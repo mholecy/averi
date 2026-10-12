@@ -10,14 +10,16 @@ the rows scrolled under it hidden. With no scroll-view ancestry, draw order cann
 
 An interim rule said a later node covers only when its top lies at or below the target's. Over six measured scroll
 positions of the SWIFT form (`tests/fixtures/idb-swift-form-scrolled-under-top-bar.json`) it refused Back and the title
-three times, all falsely.
+three times, all falsely. The three refusals came from a floating label, a text field and a helper line, with tops at
+75, 80 and 82, all inside Back's 70–98.
 
 ## Decision
 
 In a flat list (`UiNode.flatList`), the nodes before the first CONTENT node are the bar's. Content listed after them that
 ENDS inside the top bar's band (`FLAT_LIST_TOP_BAR_FRACTION`) is no cover of them.
 
-A menu, sheet or dialog that reaches past the band still covers what it lies on. Between content nodes nothing changes:
+A menu, sheet or dialog that reaches past the band still covers what it lies on. That includes a bar item it starts
+above, which the interim rule had let through. Between content nodes nothing changes:
 the pinned CONTINUE still covers `priority_select`. The row is `draw-order.ts`'s `flatListChrome`, and only the
 `target` question asks it.
 

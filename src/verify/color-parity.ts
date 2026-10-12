@@ -90,7 +90,7 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
 /**
  * The part of an element's rect the sampler reads, in tree units: the rect
  * inset EDGE_INSET a side — what the pixel poll judges chrome over for a
- * colour assert (verify/pixel-poll.ts#overElement, round 8). The png
+ * colour assert (verify/pixel-poll.ts#overElement). The png
  * mapping's rounding is left out (a fraction of a unit). `patches` reads
  * inside it too, but for a rect under ~60 png px a side, whose corner
  * patches' 9-px squares reach a few pixels past the 12 % line.
@@ -250,9 +250,8 @@ const themeOf = (opts: ColorParityOptions): ColorTheme => opts.theme ?? 'light';
 /**
  * The primary-axis tolerance in force: the contract's `tolerance_de`, else
  * the default — and never a non-number. Shared by the comparator and
- * `validateColorContract`. The contract is its only source (2026-10-08; a
- * test-only `toleranceDe` option that production never passed is gone —
- * rect-parity.ts#tolerancesOf has the account).
+ * `validateColorContract`. The contract is its only source: no test-only
+ * option stands beside it (rect-parity.ts#tolerancesOf has the account).
  */
 function toleranceDeOf(contract: LayoutContract): number {
   return positiveTolerance(contract.tolerance_de ?? DEFAULT_TOLERANCE_DE, 'color parity: tolerance_de');
@@ -261,7 +260,7 @@ function toleranceDeOf(contract: LayoutContract): number {
 /**
  * Every problem `compareColorParity` would raise about the CONTRACT's colour
  * fields — no capture, no device — so run/verify.ts can refuse a run before
- * its legs instead of reporting `FAILED:` after them (2026-10-03).
+ * its legs instead of reporting `FAILED:` after them.
  *
  * One owner per rule: the list is produced by the same three functions the
  * comparator reads the fields with (`toleranceDeOf`, `sampleModeOf`,
@@ -395,11 +394,10 @@ function statsFor(platform: Platform, capture: MeasuredFrame): ColorPlatformStat
 
 /**
  * One rect's fill, sampled the ONE way the table row and the single-element
- * assert both sample (2026-10-08, parity review 2026-10-07 P3): scale the
+ * assert both sample: scale the
  * rect into png pixels with the 12% inset, split into patches when asked,
- * take the dominant bucket, and word the caveats. Until that date the chain
- * was written out at both callers, as `sampleCaveats` had been before it
- * (and had drifted). Either the sample with its caveats or why there is
+ * take the dominant bucket, and word the caveats — one chain, where two
+ * copies at the callers had drifted. Either the sample with its caveats or why there is
  * none — `off-png` (the rect lands nowhere on the png: off-screen in this
  * capture) or `empty` (nothing left after inset and clamp) — never both;
  * the callers word the absence, each in its own terms: a MISSING cell in
@@ -611,7 +609,7 @@ export function formatColorParity(r: ColorParityResult): string {
       continue;
     }
     // An implausible scale is no longer judged here: verify/scale.ts puts it
-    // on the scale's own note, printed below (2026-10-07).
+    // on the scale's own note, printed below.
     let line = `${p}: png ${s.pngWidth}x${s.pngHeight}  root ${s.rootWidth}  scale ${s.scale.toFixed(3)}`;
     if (s.translucent) line += '   ! alpha<255 pixels present — alpha ignored, RGB used as stored';
     if (s.note !== undefined) line += `   ! ${s.note}`;

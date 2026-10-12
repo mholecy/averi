@@ -8,20 +8,17 @@ import type { WaitEvidence } from './resolve.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
- * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
- * deepening): `round(state, seen) → { state, step }` — what one read of the
+ * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what one read of the
  * screen means for the scroll, and what to do next. Every rule that compares
  * a read with an earlier one, and every fact the loop carried from round to
  * round, lives here and nowhere else: the confirming reads
  * (SETTLE_CONFIRM_READS), the turn after a fling and its halved reach, the
  * stuck and exhausted tests (UNMOVED_STROKES_EXHAUST, the same stroke
  * twice), the moot band, the cover carried to a round whose tree did not
- * read, the frame kept across such a round, and the deadline. Until that
- * date they were the `Motion` class and eleven `let`s of the loop in
- * interact/scroll.ts, so a rule could be reached only through a scripted
- * FakeAdapter and a regex over the failure; three review rounds' bugs
- * (an unread round's cover, the witness's ordering, the frame across a
- * failed read) were each a diff against three loose variables.
+ * read, the frame kept across such a round, and the deadline — each
+ * reachable by a test without a scripted device. Where the match stands for
+ * the stop (in frame, covered, cut, under a band) is not decided here: that
+ * is ui-tree/standing.ts#Scene.standing's, which this module asks.
  *
  * Pure: no adapter, no clock, no I/O, no exceptions but the protocol's own
  * (below). Deterministic: the same state and seen give the same step, so a
@@ -115,14 +112,11 @@ export interface RoundSeen {
  * to an `ask`, and a reading is never held across rounds (the
  * keyboard-cover.ts doc's rule) — the driver builds one per round.
  *
- * Five fields, since deep/r3-scroll (2026-10-09): until then the driver
- * also handed in four facts derived from the tree — the matches' clipping
+ * Five fields. The facts derived from the tree — the matches' clipping
  * ancestors, the largest clipping container, the tree's fingerprint and
- * whether it showed progress — the last three optional, and an omitted one
- * silently disabled a rule (no fingerprint: the whole-tree exhaustion never
- * fired; a fingerprint without `loading`: a loading list read as
- * exhausted). They are pure functions of the tree, so the round derives
- * them; there is nothing left to forget.
+ * whether it showed progress — are pure functions of the tree, so the round
+ * derives them (`factsOf`): a driver cannot omit one and silently disable a
+ * rule.
  */
 interface RoundRead {
   /**
@@ -216,7 +210,7 @@ function factsOf(tree: UiNode): TreeFacts {
  * applied keyboard, or each box that counts), the gesture box (the round's
  * `RoundSeen.screen` box; undefined when there is none) and the cover the
  * round applied. One value, so the steps after the judgement read the same
- * facts (code review of deep/r3-scroll, S6/S7).
+ * facts.
  */
 interface ThisRead {
   read: RoundRead;
@@ -238,8 +232,7 @@ export type RoundStep =
    * Draw a stroke toward `toward` (where the content lies), its reach scaled
    * by `reach` (swipe.ts#shortenStroke; 1 until the first turn, halved by
    * each), over `box` — kept clear of a cover whose top edge is `coverTop`
-   * when set (swipe.ts#swipeVectorAbove): the keyboard's, or, since
-   * 2026-10-09, a node's drawn over the container's lower part (a floating
+   * when set (swipe.ts#swipeVectorAbove): the keyboard's, or a node's drawn over the container's lower part (a floating
    * tab bar; swipe.ts#strokeRoom decides it with the box) — and hand it
    * back as the next round's `drawn`; swipe.ts#scrollStroke turns the step into points and
    * judges nothing. `box` is DECIDED here (swipe.ts#strokeRoom, over the
@@ -266,10 +259,8 @@ export type RoundStep =
  * what is under it. `above` undefined: the band starts at or above y 0 and
  * leaves nothing (a full-screen extract-mode IME, unmeasured).
  *
- * `topCover` is the HIGHEST covered rect (`KeyboardCover.top`) — named so by the
- * code review of round 2 (it was `band`, and callers read `band.y` as the
- * keyboard's top): since 2026-10-08 not always the inset band: with a
- * floating Gboard (measured that day, API 33) it is the panel,
+ * `topCover` is the HIGHEST covered rect (`KeyboardCover.top`), not always
+ * the inset band: with a floating Gboard (measured on API 33) it is the panel,
  * [359,1269][1040,1912], 681 px wide and mid-screen. The
  * invariant: only its `.y` is meaningful as a cut — the rect need not be
  * full width nor reach the bottom; the rest of it is quoted in messages.
@@ -314,7 +305,7 @@ export interface Judged {
  *   stop judged with no cover under it; `flush` only on a `fully: true`
  *   stop whose edge lies on its clipping container's (PROBE_REACH).
  * - `stuck`: the judged match in the frame but short of the stop (`short`,
- *   `shortOf`: clipped, or since 2026-10-09 under a node of the app) — and
+ *   `shortOf`: clipped, or under a node of the app) — and
  *   UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
  *   layout defect, or the keyboard's edge when it is the bottom clip.
  * - `covered`: a corroborated cover leaves nothing above its top edge;
@@ -337,7 +328,7 @@ export type ScrollOutcome =
        * it neither; `stroked` — swiped earlier in the scroll (a turn), so not
        * tried again; `untried` — no swipe or time was left to try it;
        * `outward` — a sliver stuck on strokes toward its cut edge, which the
-       * other way only pushes out through that edge (2026-10-10), not tried.
+       * other way only pushes out through that edge, not tried.
        */
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
@@ -362,15 +353,14 @@ export type ScrollOutcome =
  * `why`: no swipe or time was left (`budget`); no clipping ancestor from
  * the flush one outward has room for a stroke (`room`: a probe drawn over
  * the screen instead would touch down off the container and move nothing
- * whatever lies beyond — code review round 2, so none is sent); or the
+ * whatever lies beyond, so none is sent); or the
  * probe was drawn under twice TOUCH_SLOP and may have been a tap (`tap`).
  *
- * `fills` (code review of round 3, 2026-10-09): flush with BOTH of its
+ * `fills`: flush with BOTH of its
  * nearest container's `edges` along the scroll, and with ONE edge of no
  * clipping ancestor — a row taller than its list, cut at both ends, reads
  * exactly the list's rect. Never probed (one probe cannot tell which side,
- * if either, is cut), so never checked; until then such a stop was a plain
- * "fully visible", the residual stated only in code.
+ * if either, is cut), so never checked — and never a plain "fully visible".
  */
 export type Flush =
   | ({ edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'tap' }))
@@ -401,11 +391,11 @@ export interface TouchedOn {
  * - `readFailed`: the last tree read failed — quoted, whatever came before;
  * - `clipped`: in the frame but clipped — an edge cut with `fully: true`,
  *   its centre off the screen without (`shortOf`);
- * - `covered` (2026-10-09): in the frame, not clipped so, but a node of the
+ * - `covered`: in the frame, not clipped so, but a node of the
  *   app drawn over it — over any of it with `fully: true`, over its centre
  *   without (`stops`);
  * - `absent`: not in the last tree, and never in the frame before it —
- *   `unsearched` (2026-10-12, round 8's B1 gap) the side the strokes never
+ *   `unsearched` the side the strokes never
  *   read, when there is evidence it is the only one left: a stroke changed
  *   the screen (`State.treeMoved`), then the caller's own strokes no longer
  *   did (`exhausted`, `tree`), and none of them touched down on a node drawn
@@ -419,13 +409,13 @@ export interface TouchedOn {
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
  *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
- *   carried it out and a lazy list dropped it (2026-10-09: "never appeared"
- *   was said of it, with a plain Error, which contradicted itself);
+ *   carried it out and a lazy list dropped it ("never appeared" would be
+ *   false of it);
  * - `offFrame`: in the tree, off the frame judged — `inFrameAfter` when an
  *   earlier read had it in the frame; `cover` the one this round applied,
  *   `eitherWayUp` when the whole-screen judgement ran over both boxes.
  *
- * `past` on `left` and `offFrame` (2026-10-12, round 8's B1 gap): the read
+ * `past` on `left` and `offFrame`: the read
  * that last found it found it wholly beyond the FAR edge of the caller's
  * direction (`State.lastPast`) — the side the strokes push it out through,
  * so the failure names that side and the direction that brings it back,
@@ -456,9 +446,8 @@ export type InFrameShort =
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
- * target to hold still before it is reported unsettled (2026-10-08, the iOS
- * device check of docs/bugs/2026-10-08-scroll-until-ignores-android-soft-
- * keyboard.md). A stop after a stroke is CONFIRMED: one more read after a
+ * target to hold still before it is reported unsettled (the iOS device
+ * check of the note below). A stop after a stroke is CONFIRMED: one more read after a
  * further settle, in which the target's rect is unchanged and the stop
  * still holds. Measured under WDA: the 400 ms settle read caught a
  * SwiftUI form mid-fling with the row inside the viewport — "fully visible
@@ -475,50 +464,51 @@ export type InFrameShort =
  * until its timeout. The confirming reads count against `timeoutMs` (a stop
  * reached at the deadline is reported unsettled, unconfirmed), not against
  * `maxSwipes`: they send nothing.
+ * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
  */
 export const SETTLE_CONFIRM_READS = 3;
 
 /**
  * How many strokes in a row — the same stroke each time — must leave every
  * match where it was before a target in the tree but off the frame is
- * called "content exhausted" (2026-10-08). Measured on Android: the form's
+ * called "content exhausted". Measured on Android: the form's
  * last field, wholly under an IME its container does not resize for,
- * swiped for the whole 15 s. Two, not one (review round 1): a single
+ * swiped for the whole 15 s. Two, not one: a single
  * stroke that moves nothing can be a transient — the first touch
  * dismissing a snackbar, a stale tree read, a stroke drawn whole-screen
  * onto an IME that was still coming up while the witness denied the stale
  * window — after which the next stroke scrolls. Only the same stroke
  * counts twice: a stroke drawn differently (a band applied, the stroke
  * turned round) is a new attempt. The `fully: true` clipped stop's stuck
- * test takes the same two (review round 2), watching the judged match
+ * test takes the same two, watching the judged match
  * alone — a visible clipped match that does not move is the defect it
  * reports. For both, only strokes count: a confirming read sent none.
  *
- * And a target NOT in the tree (2026-10-09, docs/bugs/2026-10-09-scroll-
- * until-fling-skips-target-in-lazy-list.md): the same stroke twice after
+ * And a target NOT in the tree (the note below): the same stroke twice after
  * which the WHOLE tree is unchanged (`TreeFacts.fingerprint`) — content at
  * its end, the target not in it, or no longer: measured, `scroll_until
  * row_40` on a list ending at row_36 swiped 5 times to the 15 s timeout,
- * "never appeared". Now it fails after the two, in the same words, the
+ * "never appeared". It fails after the two, in the same words, the
  * cause saying the screen did not change. The whole tree, not "no match
  * moved" — there is no match to watch. A screen whose TREE changes on its
- * own (a ticking label) never reads unchanged and runs to the bound as
- * before. A spinner does not change the tree — a ProgressBar or a Compose
+ * own (a ticking label) never reads unchanged and runs to the bound. A spinner does not change the tree — a ProgressBar or a Compose
  * indicator dumps a fixed rect and no text — so a list still loading its
- * next page would read exhausted (code review of fix/r3-scroll: "failed
- * after 2 swipes" where the bound used to wait): a round whose tree shows a
+ * next page would read exhausted ("failed after 2 swipes" where the bound
+ * should wait): a round whose tree shows a
  * progress node (`TreeFacts.loading`) does not count as unchanged, and the
  * sentence names loading among the causes. So a screen that ALWAYS shows
  * a progress node (a step indicator, a progress header bar) never fails
- * fast and runs to its bound, as before. Residual: content that loads
+ * fast and runs to its bound. Residual: content that loads
  * with no indicator in the tree (a shimmer drawn as plain views, a
  * silent fetch) can still be called exhausted after the two strokes.
+ * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
 
 /**
- * The flush check's probe (2026-10-09, docs/bugs/2026-10-09-android-scroll-
- * until-fully-trusts-bounds-clipped-to-scroll-container.md): the reach of
+ * The flush check's probe:
+ * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
+ * The reach of
  * the one short stroke a `fully: true` stop is answered with when the
  * judged match's edge along the scroll lies exactly — within a pixel — on
  * its scroll container's edge (`flushEdge`). On Android that is where
@@ -545,8 +535,8 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * when BOTH edges on the axis are flush — the match fills its container,
  * and one probe cannot tell which side, if either, is cut: unless an outer
  * ancestor gives it a one-edge flush (below), such a stop is reported
- * unchecked, `flush.why` `fills` (`Flush`), and the reply says so — it was
- * a plain "fully visible" until the code review of round 3. One probe per candidate stop:
+ * unchecked, `flush.why` `fills` (`Flush`), and the reply says so. One
+ * probe per candidate stop:
  * a probe after which the match is where it was settles it.
  *
  * A quarter of the stroke — over the container, 15 % of its side
@@ -556,7 +546,7 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * cut larger than that is left flush again and probed again. Short so it
  * cannot carry the row out of a container of any ordinary height.
  *
- * Every clipping ancestor, not the nearest alone (code review, 2026-10-09):
+ * Every clipping ancestor, not the nearest alone:
  * the match is flush with one of them on one edge — a card that fills a
  * carousel's height is flush with both of the carousel's edges, but the
  * carousel is cut by the list around it, and the card with it, on the
@@ -565,22 +555,20 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * ancestor, or an outer one, whichever is the first with room for a stroke
  * (swipe.ts#strokeRoom) — a carousel cut to a 30-px strip has none, and a
  * stroke there is a tap on the card — room ABOVE the keyboard the probe
- * keeps clear of (deep/r3-scroll: a list running on under the IME from 58
- * px above it had room on the screen and none above the keyboard; the
- * driver drew the probe over the whole screen, off the list, and reported
- * "nothing of it is cut there"). When no ancestor has room (a lone 79-px
+ * keeps clear of (a list running on under the IME from 58 px above it has
+ * room on the screen and none above the keyboard; a probe over the whole
+ * screen lands off the list and reports "nothing of it is cut there"). When no ancestor has room (a lone 79-px
  * scroller, that list), no probe is sent — over the screen it would touch
  * down off the container and move nothing whatever is cut — and the stop
- * is reported with `flush.checked` false (code review round 2). A probe drawn shorter than twice
+ * is reported with `flush.checked` false. A probe drawn shorter than twice
  * TOUCH_SLOP anyway (a tiny screen) never reports `checked`: it may have
  * been a tap that moved nothing.
  *
- * Residuals, stated (code review): Android's View bounds are cut to every
+ * Residuals, stated: Android's View bounds are cut to every
  * ancestor, not only scrollers, and Compose also subtracts what an overlay
  * sibling covers — a row cut by a pinned bar drawn over the list reads cut
- * at the bar's edge, not flush with any scroller, so it is not probed (that
- * is the pinned-chrome bug, docs/bugs/2026-10-08-tap-and-scroll-until-
- * ignore-pinned-app-chrome.md, out of scope); a RecyclerView with padding
+ * at the bar's edge, not flush with any scroller, so it is not probed (the
+ * bar itself is a cover, ui-tree/standing.ts#Scene's); a RecyclerView with padding
  * and clipToPadding draws a row cut at its padding edge while the row's
  * rect runs to the view's edge — not flush, not probed.
  *
@@ -597,7 +585,7 @@ export const PROBE_REACH = 0.25;
 
 /**
  * The cap on the probe's finger travel, as a fraction of the screen's long
- * side (code review of fix/r3-scroll, 2026-10-09): a probe toward a TOP
+ * side: a probe toward a TOP
  * edge drags the content down, and at the top of a list that is the
  * pull-to-refresh gesture — SwipeRefreshLayout starts a refresh once the
  * finger has pulled 128 dp past the slop (its 64-dp spinner target at a
@@ -651,8 +639,7 @@ type Frame = StandingScreen;
 
 /**
  * Everything the scroll remembers between rounds, one record with one
- * writer (`round`). Until 2026-10-09 the motion half was the `Motion` class
- * and the rest the loop's `let`s.
+ * writer (`round`): the target's motion and the loop's facts alike.
  */
 interface State {
   readonly rules: RoundRules;
@@ -684,8 +671,7 @@ interface State {
   /** The keyboard edge the last round whose tree READ stroked above (`strokeTop`: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
   readonly lastReadEdge: KeyboardLine | undefined;
 
-  // How the target moved, read for read (until 2026-10-09 the `Motion`
-  // class): a swipe that does not move the element is the only honest
+  // How the target moved, read for read: a swipe that does not move the element is the only honest
   // signal that the container has nothing left to scroll — "give it another
   // swipe" against "this element CANNOT be fully revealed" (a real layout
   // defect) or "it is off the frame for good" — and a stop after a stroke
@@ -704,12 +690,11 @@ interface State {
   /**
    * The last read that READ found the target beyond the far edge, after an
    * earlier read saw it short of it — or, on any read, in the frame at that
-   * edge (`observe`'s `atFarEdge`, 2026-10-09): the next stroke turns. Kept across a
+   * edge (`observe`'s `atFarEdge`): the next stroke turns. Kept across a
    * read that failed — that round strokes as the last read round decided,
    * as it keeps that round's stroke box (`lastReadEdge`); cleared by a read
    * that does not find the target — whether to turn then is `dropped`'s
-   * question (2026-10-09; until then such a read meant "a lazy list dropped
-   * it: nothing to turn for", and the strokes went on the caller's way).
+   * question.
    */
   readonly carriedPast: boolean;
   /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke). */
@@ -728,9 +713,9 @@ interface State {
   /**
    * The far edge of the caller's direction when the last read that found
    * the target found it wholly beyond it — dumped clipped out past it, or
-   * past it in every frame, nothing of it in the frame (2026-10-12, round
-   * 8's B1 gap: Settings' `Apps` clipped out above the list, four strokes
-   * down, "off the viewport, or under the soft keyboard … (a fling?)") —
+   * past it in every frame, nothing of it in the frame (Settings' `Apps`
+   * clipped out above the list, four strokes down, read "off the viewport,
+   * or under the soft keyboard … (a fling?)" without it) —
    * undefined when that read had it anywhere else. Kept across reads that
    * do not find it: the failure's `past` (`shortfall`).
    */
@@ -750,7 +735,7 @@ interface State {
   /** The directions the scroll's course strokes were drawn toward (a probe's aside) — whether the other way was ever tried, for the stuck turn. */
   readonly strokedToward: readonly Direction[];
   /**
-   * The stuck turn (2026-10-09, review of the at-the-far-edge turn): the
+   * The stuck turn: the
    * direction the target was stuck in when, the other way never stroked,
    * ONE stroke was drawn back instead of failing — set once, never cleared;
    * once only, as after it both ways were stroked (`strokedToward`). `backPending`: that stroke is the last sent and
@@ -762,8 +747,8 @@ interface State {
    * The target's clipping containers, nearest first, each with what is
    * drawn over it, at the last read that found the target — the candidates
    * the round's stroke picks its container from (swipe.ts#strokeRoom), judged
-   * for the stroke as drawn, `toward` (D1); none of them with room, or none
-   * at all, is the screen box (P5); undefined until a read finds the
+   * for the stroke as drawn, `toward`; none of them with room, or none
+   * at all, is the screen box; undefined until a read finds the
    * target. Kept across reads that do not find it.
    */
   readonly targetContainers: readonly StrokeContainer[] | undefined;
@@ -779,8 +764,7 @@ interface State {
 }
 
 /**
- * A container strokes go over, as one value (review round 1 of
- * fix/r4-stroke: the two were separate fields that had to move together):
+ * A container strokes go over, as one value (the two move together):
  * its rect, and the rects drawn over it (the scene's `order`) at the read
  * that chose it — the stroke box's cut (swipe.ts#strokeRoom). A later read
  * that still holds a container of that rect gives its own; one that does
@@ -802,7 +786,7 @@ const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.scene
  * undefined), the last read round's; once a read found the target, its
  * containers — each cut by what this read draws over it, or by what it
  * carried, when this read has lost its rect — none when it was found in
- * none (the screen box, P5); else the screen's largest scroller, or none.
+ * none (the screen box); else the screen's largest scroller, or none.
  */
 function strokeCandidates(s: State, facts: TreeFacts | undefined): readonly StrokeContainer[] {
   if (facts === undefined) return s.lastCandidates;
@@ -862,11 +846,11 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
 /** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
 function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
   if (shown === undefined) return undefined;
-  // The highest covered rect, not always the inset band (2026-10-08): a
-  // floating Gboard's panel mid-screen above its 132-px strip
-  // (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md) — so a target
+  // The highest covered rect, not always the inset band: a floating
+  // Gboard's panel mid-screen above its 132-px strip — so a target
   // behind it is judged under the cover and the stroke starts above it. Full
   // width above its top, as for any band that does not reach the sides.
+  // docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
   const topCover = shown.top;
   if (topCover.y >= viewport.height) return undefined;
   const line: KeyboardLine = { y: topCover.y, source: shown.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
@@ -874,13 +858,14 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
 }
 
 /**
- * idb's band as a cover the round applies (owner decision D2): its line
+ * idb's band as a cover the round applies: its line
  * (ui-tree/keyboard-cover.ts#keyboardEdge, no reading) as the band's rect —
  * the viewport's width from the line to its bottom, the shape idb's band
  * has (soft-keyboard.ts#flatListKeyboardBand) — with the reading's
  * `remedy`. Applied with no witness: it is read off the very tree being
  * judged, as WDA's band is. None when there is no band, or it lies at or
  * below the viewport's bottom.
+ * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
 function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): Cover | undefined {
   if (line === undefined || line.y >= viewport.y + viewport.height) return undefined;
@@ -894,8 +879,8 @@ function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { 
  * cover's line and idb's band (`TreeFacts.scene`'s draw order) — the band
  * whether or not the round applied it (a moot band changes no judgement,
  * but a stroke on it touches a key: the Contacts form and the SWIFT form's
- * number pad were stroked from y 699,
- * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md).
+ * number pad were stroked from y 699).
+ * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
  * No guard on where the band lies in the gesture box: a top at or below
  * the box's bottom changes no stroke (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
  * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
@@ -948,7 +933,9 @@ function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts
  * The order of two judgements, best first (a comparator): a match that
  * STOPS the round (`stops`) before one that does not — a match showing
  * more but with its centre covered must not hide one the next tap would hit
- * (review round 1) — then the one more of which shows.
+ * — then the one more of which shows (`shows` ranks only; ui-tree/standing.ts
+ * #bandShows says what it counts under the status band).
+ * docs/adr/0008-scroll-until-exposure-box-below-status-band.md
  */
 function better(a: Judged, b: Judged): number {
   return Number(stops(b)) - Number(stops(a)) || b.standing.facts.shows - a.standing.facts.shows;
@@ -996,8 +983,8 @@ const endsClean = (j: Judged | undefined): boolean => j !== undefined && stops(j
  * The two judgements say the same thing about the same node. `clipped` is
  * not compared: the box above a band lies inside the viewport, so the same
  * node scoring the same fraction against both has no area between the
- * band's top and the screen's bottom, and its edges agree (review round 1,
- * 2026-10-08: the comparison was dead — a mutation dropping it survived).
+ * band's top and the screen's bottom, and its edges agree (comparing them
+ * would be dead code).
  */
 const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
   a === undefined || b === undefined ? a === b : a.node === b.node && a.standing.facts.visible === b.standing.facts.visible;
@@ -1043,9 +1030,8 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
 
 /**
  * `beyondFarEdge` in every frame judged — or the target was dumped CLIPPED
- * OUT past that edge of its scroll container (UiNode.clippedOut, 2026-10-09,
- * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-
- * negative-heights.md): uiautomator inverts the bounds of a node scrolled
+ * OUT past that edge of its scroll container (UiNode.clippedOut, the note
+ * below): uiautomator inverts the bounds of a node scrolled
  * wholly past its container, the parser clamps it to zero size AT the
  * container's edge — inside the frame, past neither of its edges — and the
  * mark is all that says which way it went. Settings' `Apps` under the
@@ -1053,10 +1039,11 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * nor in the frame. Beyond, a target a read saw short of the far edge
  * turns the next stroke (`carriedPast`), and one lost after it was there
  * is not `dropped`. Not a stroke turned on the FIRST read (the owner's
- * call, 2026-10-09: iOS parity — a target read wholly beyond the far edge
+ * call, iOS parity — a target read wholly beyond the far edge
  * before any read saw it short is the caller's direction to honour, as
  * `nextStroke` says; a node clipped out has nothing in the frame, so
  * `atFarEdge`, which needs some, never fires for it).
+ * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md
  *
  * Or CUT to a sliver at that edge of its scroll container (`FarFacts
  * .slicedAt`, the standing's `facts.sliver`): the rest of it lies past the far edge as surely as a
@@ -1064,7 +1051,7 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  * inside the frame. A plain stop does not stop on it (`stops`), so without
  * this a 132-px row showing its bottom 40 px at a form's top under a
  * default (down) scroll was pushed out and back until "turned round 3
- * times"; now `atFarEdge` turns the next stroke at once. A sliver at the
+ * times"; `atFarEdge` turns the next stroke at once. A sliver at the
  * NEAR edge is coming in, and the strokes go on.
  */
 function beyondFarEdgeIn(found: FarFacts, direction: Direction, frames: readonly Rect[]): boolean {
@@ -1099,11 +1086,11 @@ const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
  * top is under a bottom bar (CONTINUE at 780, the row at 785; a snackbar;
  * a floating tab bar or a FAB) has the bar over its far edge too — it was
  * turned away from the bar it was about to clear, and bounced for five
- * strokes where one stopped it (review of the first cut, 2026-10-09). A
+ * strokes where one stopped it. A
  * pinned bar sits at the edge it is pinned to, so the half it lies in is
  * that edge's. A cover centred exactly on the middle lies in neither far
  * half: not turned for, either way. Or, in that half, a cover the target
- * shows past only on its far side (`showsOnlyPast`, 2026-10-09): a bar a
+ * shows past only on its far side (`showsOnlyPast`): a bar a
  * few points short of the row's far edge and over the rest of it.
  */
 function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect): boolean {
@@ -1126,8 +1113,8 @@ function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect)
  * frame's `far` edge and the cover's — and some does: the target, cut to
  * the frame, sticks out past the cover's far edge, and the rest of it lies
  * under the cover, across the whole of its width (its height, sideways).
- * The second way `overFarSide` reads a cover over the far side (2026-10-09,
- * the round-6b device check's S-1 residual): Contacts' New Contact under
+ * The second way `overFarSide` reads a cover over the far side (a device
+ * check's residual): Contacts' New Contact under
  * idb, `add url` at `20,78 362x51` under the sheet's `Toolbar` `0,83
  * 402x48` — the bar starts 5 pt BELOW the row's top, so it is not over the
  * row's far edge, and it reaches past its near one; it was stroked the
@@ -1189,7 +1176,7 @@ interface Observed {
  * read followed. Where the target stands against the far edge is recorded
  * HERE, on every read — a stop round strokes nothing, and a target seen
  * short only at a stop the confirming read then lost must still turn the
- * next stroke (review round 2).
+ * next stroke.
  */
 function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
   const { read, facts, frames } = now;
@@ -1198,14 +1185,13 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   const rects = found.map((n) => ({ ...n.rect }));
   const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
   if (current === 'stroke') {
-    // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST,
-    // 2026-10-09): the same streak rule, over the fingerprint.
+    // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST):
+    // the same streak rule, over the fingerprint.
     const treeUnmoved = s.prevFingerprint === fingerprint && !loading;
     if (s.prevFingerprint !== undefined && s.prevFingerprint !== fingerprint) s.treeMoved = true;
     const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
     s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
-    // Every match, not only the judged one, for "exhausted" (review round
-    // 1): with several matches off the frame the judged one is the first
+    // Every match, not only the judged one, for "exhausted": with several matches off the frame the judged one is the first
     // in tree order, which can be a static duplicate (another page, a
     // hidden copy) while the real one moved.
     const allUnmoved = s.prevRects !== undefined && sameRects(s.prevRects, rects);
@@ -1217,8 +1203,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   s.prevRects = rects;
   s.prevFingerprint = fingerprint;
   s.carriedPast = false;
-  // Dropped (2026-10-09, docs/bugs/2026-10-09-scroll-until-fling-skips-
-  // target-in-lazy-list.md): the last read had the target SHORT of the far
+  // Dropped (the lazy-list note, UNMOVED_STROKES_EXHAUST's): the last read had the target SHORT of the far
   // edge of the content's last motion — inside the frame, under the
   // keyboard, or not yet in — and this read, after a stroke or a settle
   // since one, has no match. A lazy list (RecyclerView, LazyColumn) keeps a
@@ -1229,7 +1214,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // the next. It can only have left through the edge the content moved
   // toward: measured, Contacts' `Last name` clipped by the IME, one stroke
   // down, gone, and four more strokes down into the end of the editor.
-  // The strokes now go back (`dropped`, `nextStroke`) — a turn, halving
+  // The strokes go back (`dropped`, `nextStroke`) — a turn, halving
   // the reach like any — until a read finds it.
   if (best === undefined && current !== 'start' && s.lastFound !== undefined && s.lastSent !== undefined) {
     if (!beyondFarEdgeIn(s.lastFound, s.lastSent, s.lastFound.frames)) s.dropped = OPPOSITE[s.lastSent];
@@ -1242,11 +1227,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // the target, with what this read draws over each. Their room is judged
     // in `round`, for the stroke as drawn — `toward`, which a fling past the
     // target or a dropped target turns against the caller's direction, and
-    // with that round's cover (D1, 2026-10-09: judged here for `rules.direction`, a strip whose lower
-    // half a bar covers had no room going down, and the turned content-up
-    // stroke went over the screen box, touching down off the strip that had
-    // room going up). None with room is the screen box (code review of
-    // deep/r3-scroll, P5): the last read's container is not kept — it is
+    // with that round's cover (judged for `rules.direction` alone, a strip
+    // whose lower half a bar covers has no room going down, and the turned
+    // content-up stroke would go over the screen box, touching down off the
+    // strip that has room going up). None with room is the screen box: the last read's container is not kept — it is
     // stale, and may be another list — and the screen's largest scroller is
     // not taken either: a largest scroller with room that is not one of the
     // target's ancestors is a list that cannot hold the target.
@@ -1261,9 +1245,8 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // frame, `offFrame` this read's match at visible 0).
     const { far } = FAR_EDGE[s.rules.direction];
     s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
-    // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
-    // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
-    // band.md): across it — clipped there, or its centre in the status
+    // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md
+    // Or IN the frame at that edge: across it — clipped there, or its centre in the status
     // band, which the frames are cut below — or under something of the app
     // drawn over its far side. Read so before any read saw it short, it
     // was never carried past, so `seenShort` alone never turned it: the
@@ -1300,7 +1283,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
 const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SETTLE_CONFIRM_READS && elapsedMs < s.rules.timeoutMs;
 
 /**
- * The next stroke (2026-10-08, the WDA device check): toward the caller's
+ * The next stroke (the WDA device check): toward the caller's
  * direction — unless the last read that read found a fling carried the
  * target across the frame since a read saw it short of the far edge
  * (`observe`; measured 613 → -357 in one swipe, then five more swipes DOWN
@@ -1309,12 +1292,11 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * next stroke goes the caller's way. A target read wholly beyond the far
  * edge before any read saw it short of it — above the screen on round 0 of
  * a scroll down, and every round after while it stays there — is the
- * caller's direction to honour, as it always was; one any of which lies in
+ * caller's direction to honour; one any of which lies in
  * the frame is not (`atFarEdge`, below). That needs the target to
  * STAY in the tree once off the frame; a lazy list (Android
  * RecyclerView/LazyColumn, iOS List/UITableView under WDA) drops it, and
- * on Android its bounds never pass the list's edge anyway. Since
- * 2026-10-09 a read that LOSES the target it last read short of the far
+ * on Android its bounds never pass the list's edge anyway. A read that LOSES the target it last read short of the far
  * edge of the content's last motion turns the strokes too (`dropped`,
  * recorded in `observe`): back the way the content came, until a read
  * finds it — a turn like this one, the reach halved. What is left: a
@@ -1322,7 +1304,7 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * between two reads — the drag speed, adapters/android.ts#dragSpeed, is
  * what keeps that from happening on Android; iOS strokes at its default).
  *
- * Converging is deliberate (review round 2): every direction change
+ * Converging is deliberate: every direction change
  * halves the reach of every stroke after it (`reach`, applied with
  * swipe.ts#shortenStroke — the touch-down kept, never under twice
  * TOUCH_SLOP nor 3 % of the box's side along it). A fling is the app's: with the measured content-down fling
@@ -1334,7 +1316,7 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * target has passed — and the failure counts the turns.
  *
  * The reach is deliberately NEVER restored after a turn, not even on
- * strokes back toward the caller's direction (review round 3): a turn
+ * strokes back toward the caller's direction: a turn
  * means the target was within one move of the frame and a full stroke
  * just carried it past — the distance left is less than what that stroke
  * moves. Restoring the reach would draw that stroke again and bring the
@@ -1342,14 +1324,11 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * shorter strokes (and spends more of `maxSwipes`) if the target then
  * turns out to be further away than one move.
  *
- * A target IN the frame at the far edge turns the strokes too (2026-10-09,
- * `observe`'s `atFarEdge`): across that edge, its centre in the status
+ * A target IN the frame at the far edge turns the strokes too
+ * (`observe`'s `atFarEdge`): across that edge, its centre in the status
  * band past it, or under a cover over its far side — on the first read as
- * on any. Until that date such a target was stroked on the caller's way,
- * and the comment here called it "a known cost, accepted (code review P7)
- * … extra strokes, never a wrong stop": the strokes were to carry it past
- * the edge, and the turn to follow. At the end of the content no stroke
- * carries it anywhere, so the turn never came — measured, `maxSwipes`, or
+ * on any. Stroked on the caller's way, at the end of the content no stroke
+ * carries it anywhere and the turn never comes — measured, `maxSwipes`, or
  * "content exhausted … a layout defect" for a row one stroke back would
  * have revealed. A target short at the NEAR edge (a pinned bar over a row
  * coming in from below) is stroked on the caller's way. A cover counts
@@ -1407,7 +1386,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // (`stops`), and the rest the steps after the judgement read.
   const facts = read === undefined ? undefined : factsOf(read.tree);
   const whole = judgeOver(found, s.frame, facts, fully);
-  // idb's band (D2), when no reading offers a cover — never both today: idb's reading is always `unknown`.
+  // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
   const band = offered !== undefined || read === undefined || facts === undefined ? undefined : bandCoverOf(keyboardEdge(undefined, facts.scene.order), viewport, read.remedy);
   const applied = offered ?? band;
   let cover: Cover | undefined;
@@ -1419,7 +1398,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a
     // scroll can hide a keyboard (a list that dismisses it on drag) and
-    // leave the window state stale-shown behind it (review 2026-10-08).
+    // leave the window state stale-shown behind it.
     const moot = endsClean(whole) && sameJudgement(whole, covered);
     if (!moot) {
       // idb's band asks no witness: no reading stands by it, nor could deny it (`bandCoverOf`).
@@ -1511,11 +1490,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
             if (seen.corroborated === undefined) return ask('witness');
             if (seen.corroborated) probeCover = offered;
           }
-          // Room judged again ABOVE that keyboard (deep/r3-scroll): a list
+          // Room judged again ABOVE that keyboard: a list
           // running on under the IME may have room on the screen and none
           // above it — the probe would touch down off it and move nothing.
           // Twice only to keep the ask order: no room even over the whole
-          // screen is `room` with no witness asked, as it was.
+          // screen is `room` with no witness asked.
           const over = roomOver(strokeTop(probeCover, now.facts.scene)?.y);
           if (over === undefined) flush = { edge, container, ...noRoom };
           else {
@@ -1536,7 +1515,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     }
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
-    // The stuck turn (2026-10-09, review of the at-the-far-edge turn): the
+    // The stuck turn: the
     // far-edge reading (`observe`'s `atFarEdge`) turns a target short at the
     // edge the strokes push it out through, but not one whose shortfall no
     // edge test sees — measured shape: from -20, `direction: "up"` flung the
@@ -1551,10 +1530,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Cost: one stroke on every real defect (a row under a pinned bar at
     // the end of the content), and the stroke may move the row the wrong
     // way — after which the strokes go the caller's way again, and a second
-    // stuck is declared as before. Not when that stroke would pass the
+    // stuck is declared. Not when that stroke would pass the
     // bound: the stuck sentence beats "maxSwipes".
-    // Not for a sliver stuck on strokes toward its cut edge (2026-10-10,
-    // code review round 2 of fix/r7-sliver): the content is exhausted where
+    // Not for a sliver stuck on strokes toward its cut edge: the content is exhausted where
     // the rest of it lies, and a stroke the other way only pushes it out
     // through that edge — measured on the fake, a whole 50-px row at a
     // list's top, its image flush with that top (geometry.ts#evidentCut's
@@ -1578,12 +1556,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const evidence: WaitEvidence = { sighted: s.everFound, treesRead: s.treesRead, readError };
   // A keyboard that leaves nothing above it: nothing but its own UI can be
   // judged, and no stroke can start on the content — fail now, naming it,
-  // rather than swipe on keys (review 2026-10-08: until then this fell
-  // back to the whole screen and reported a bare "fully visible").
+  // rather than swipe on keys or fall back to the whole screen and report a
+  // bare "fully visible".
   if (cover !== undefined && cover.above === undefined) return stop(s, { kind: 'covered', swipes: s.swipes, cover, viewport, evidence });
   // In the tree, off the frame, and the last UNMOVED_STROKES_EXHAUST
-  // strokes — the same stroke — moved no match (2026-10-08, the Android
-  // device check: the form's last field, wholly under an IME its
+  // strokes — the same stroke — moved no match (the Android device check:
+  // the form's last field, wholly under an IME its
   // container does not resize for, swiped for the whole 15 s): fail now
   // with the stop bound's own words — they already name the keyboard and
   // the way to hide it. See `observe` for what counts.
@@ -1621,7 +1599,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // than stroke through the keyboard it last saw.
   const { toward, reach, turn } = nextStroke(s);
   // Over the target's scroll containers once a read has placed it in
-  // them, else the screen's largest (2026-10-09; swipe.ts#strokeRoom): the
+  // them, else the screen's largest (swipe.ts#strokeRoom): the
   // stroke touches down on what scrolls, and its length is that
   // container's 60 %, never the screen's — a 1417-px list is not stroked
   // 1332 px. A round whose tree did not read keeps the last read round's
@@ -1629,21 +1607,19 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const candidates = strokeCandidates(s, now?.facts);
   s.lastCandidates = candidates;
   // The latest cut read for the target's containers is the one a later read
-  // that has lost a rect falls back to — not the oldest (review round 2).
+  // that has lost a rect falls back to — not the oldest.
   if (s.targetContainers !== undefined && now !== undefined) s.targetContainers = candidates;
   // The container and the box, decided once, for this stroke's `toward`
-  // (swipe.ts#strokeRoom; D1, 2026-10-09: the container is judged for the
-  // stroke drawn over it, not for the caller's direction): the first
-  // candidate with room, met with the gesture box above the stroke's cover
-  // — the keyboard's, or what is drawn over the container (2026-10-09, the
-  // floating tab bar; a round whose tree did not read keeps the last read
+  // (swipe.ts#strokeRoom; the container is judged for the stroke drawn over
+  // it, not for the caller's direction): the first candidate with room, met
+  // with the gesture box above the stroke's cover — the keyboard's, or what
+  // is drawn over the container (the floating tab bar; a round whose tree did not read keeps the last read
   // round's, as its keyboard) — or the gesture box whole when none has room
-  // (P5), under the keyboard alone — a stroke toward the target is still
+  // under the keyboard alone — a stroke toward the target is still
   // worth drawing over the screen; a probe never comes here. Judged EVERY
   // round, with that round's gesture box and cover, not once at the read
   // that found the target: a strip the IME left no room in at that read is
-  // stroked once the IME is gone, the target's nearest container (code
-  // review of fix/r5-stroke). `over` is looked up by the candidate's own
+  // stroked once the IME is gone, the target's nearest container. `over` is looked up by the candidate's own
   // rect object — strokeRoom hands back the one it was given — so nested
   // containers of equal rects keep their own.
   const kept = (now === undefined ? s.lastReadEdge : strokeTop(cover, now.facts.scene))?.y;
@@ -1701,15 +1677,15 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
 
 /**
  * The node drawn over its container that the last stroke touched down on,
- * when the strokes ended exhausted (2026-10-09, docs/bugs/2026-10-09-
- * android-scroll-stroke-touches-down-on-floating-tab-bar.md): the last of
+ * when the strokes ended exhausted (the floating tab bar's note, below):
+ * the last of
  * what is drawn over it — the one drawn on top — that contains the stroke's
  * touch-down, in the tree that read unchanged (`TreeFacts.scene`'s
  * `order.drawnOverAt`, which leaves out a wrapper holding the container whole).
  * A gesture belongs to the view the finger first touches (swipe.ts#swipeVectorAbove), so such a node took
  * the strokes — MAY have: the tree does not say whether a node takes touches
  * (ui-tree/draw-order.ts), so the sentence names it first and keeps the
- * other causes after it (review round 1) — and "content exhausted" alone
+ * other causes after it — and "content exhausted" alone
  * would send the reader the wrong way: the measured fast fail said so of a
  * list with 34 more rows. The stroke
  * box is cut above what is drawn over a container's lower half or over
@@ -1717,11 +1693,12 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, room: StrokeRoom, maxT
  * model — a floating header a content-up stroke touches down on, a node
  * beside a sideways stroke's centre, a node over nearly all of the box that
  * a cut would leave no room above. Undefined when the stroke went over
- * the gesture box whole (no container to be drawn over: the screen box,
- * P5), when this tree holds no container of the remembered rect (the list
+ * the gesture box whole (no container to be drawn over: the screen box),
+ * when this tree holds no container of the remembered rect (the list
  * moved; the stroke was still cut by the overlays kept with it,
  * `StrokeContainer`), or when it touched down on nothing drawn over its
  * container. One scan of the tree, at the stop only.
+ * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
  */
 function touchedOn(s: State, facts: TreeFacts): TouchedOn | undefined {
   const { strokeWithin: container, lastDrawn } = s;
@@ -1746,8 +1723,7 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
 
 /**
  * What the round at a bound read and judged, as `shortfall` reads it — one
- * value (code review of round 8, S8: they travelled as five of its seven
- * positional parameters).
+ * value.
  */
 interface BoundRound {
   /** Why this round's tree did not read, if it did not. */
@@ -1764,8 +1740,7 @@ interface BoundRound {
 
 /**
  * What the target was short of at a bound (`by`). In the frame on an
- * earlier read and not on this one: "never" would be false (review round
- * 1) — a fling carried it off, or a lazy list dropped it once it scrolled
+ * earlier read and not on this one: "never" would be false — a fling carried it off, or a lazy list dropped it once it scrolled
  * away. Last found beyond the far edge, the side (`Shortfall.past`); never
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).

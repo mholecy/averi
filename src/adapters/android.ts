@@ -485,26 +485,26 @@ export class AndroidAdapter implements DeviceAdapter {
   });
 
   /**
-   * The status band as last READ (2026-10-12): `{ band }` once a
-   * `dumpsys window displays` call answered — `band` undefined when that
-   * dump said no visible bar (hidden, or not one band) — and undefined
-   * while there is no such answer to keep. Its lifetime, the choice stated
-   * (code review of fix/r8-band, round 1): the registry keeps ONE adapter
+   * The system bands as last READ: `{ band }` once a
+   * `dumpsys window displays` call answered — `band` holding each band that
+   * dump said (none for a bar it did not show as one visible band) — and
+   * undefined while there is no such answer to keep. Its lifetime, the
+   * choice stated: the registry keeps ONE adapter
    * per device for the MCP server's life (mcp/registry.ts), so whatever is
    * kept here is kept that long unless something drops it.
    * - A call that FAILED FAST (adb exited non-zero, could not be spawned)
    *   is not an answer: nothing is kept, and the next `viewport()` asks
-   *   again — until one answers. Until that review a failed first read was
-   *   kept as "no band" for the server's life, and a tap under the bar went
-   *   through again. Retried every call, by choice: such a failure costs
+   *   again — until one answers (kept as "no band", a failed first read
+   *   would let a tap under the bar through for the server's life). Retried
+   *   every call, by choice: such a failure costs
    *   milliseconds (adb answers at once), and it is the transient kind — a
    *   device reconnecting, an adb server restarting — whose next call
    *   answers. Each such call judges with no band (fail open).
    * - A call that TIMED OUT (its 2 s budget: a cold or loaded device, a
    *   hung dumpsys) is kept as "no band" (`timedOut`), so it is not paid
    *   again: retried every call, it cost up to 2 s more on each `viewport()`
-   *   — a tap made two such calls, a two-swipe `scroll_until` seven (code
-   *   review of fix/r8-band, round 2). Dropped like an answer, below: the
+   *   — a tap made two such calls, a two-swipe `scroll_until` seven.
+   *   Dropped like an answer, below: the
    *   next `launch` or fresh read asks again. Until then no band (fail
    *   open).
    * - An answer is dropped by `launch` — the foreground app changes there,
@@ -534,7 +534,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * it; `scroll_until` keeps it).
    *
    * Why this memo is written out beside `viewportMemo` rather than folded
-   * into ViewportMemo (code review of round 8, S5, weighed and left): an
+   * into ViewportMemo (weighed and left): an
    * invalidate hook for `launch` would be clean — ViewportMemo's identity
    * check (`#pending === attempt`) already keeps a superseded read from
    * landing, so a `forget()` would do what `#bandEpoch` does — and the
@@ -555,15 +555,14 @@ export class AndroidAdapter implements DeviceAdapter {
   #bandEpoch = 0;
 
   /**
-   * The VISIBLE system status bar's height (types.ts#DeviceScreen.statusBand,
-   * 2026-10-12): `dumpsys window displays`, read by parseStatusBand below —
+   * The VISIBLE system status bar's height (types.ts#DeviceScreen.statusBand):
+   * `dumpsys window displays`, read by parseStatusBand below —
    * the call keyboardState makes, whose cost is written there. An app that
    * draws edge-to-edge (Google Contacts, measured: its list and its
    * collapsing app bar start at y 0) has nodes under the bar, and a tap on
-   * one goes to the bar (docs/bugs/2026-10-10-android-tap-and-scroll-until-
-   * treat-the-system-status-bar-as-app-screen.md). Reported whatever the
-   * app: in an app that does not draw under the bar no node lies in the band,
-   * so it changes nothing there.
+   * one goes to the bar. Reported whatever the app: in an app that does not
+   * draw under the bar no node lies in the band, so it changes nothing there.
+   * docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md
    *
    * FAILS OPEN, as keyboardState does: a failed call, or a dump that does not
    * say one visible bar, is no band — the judgements behave as before the
@@ -1105,14 +1104,14 @@ export function parseImeInsets(dump: string): SoftKeyboard {
 
 /**
  * The VISIBLE system status bar's height, in screen pixels, out of `dumpsys
- * window displays` (2026-10-12) — the band at the top of the screen a tap
+ * window displays` — the band at the top of the screen a tap
  * goes to the bar in (types.ts#DeviceScreen.statusBand). The line it reads
  * is the display's InsetsState entry for the status bar, the same list
  * parseImeInsets reads (and with the same anchored tokens):
  *
- *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, measured
- *   2026-10-03, emulator Pixel_3a, 1080x2220; the device check of
- *   2026-10-10 read the same line under Google Contacts):
+ *   API 33 (tests/fixtures/dumpsys-window-displays-api33-*.txt, emulator
+ *   Pixel_3a, 1080x2220; a device check read the same line under Google
+ *   Contacts):
  *     InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
  *   API 36 (…-api36-no-ime-source.txt, Pixel_4 AVD, 1080x2280):
  *     InsetsSource id=ab460000 type=statusBars frame=[0,0][1080,66] visible=true flags= sideHint=TOP boundingRects=null
@@ -1120,11 +1119,10 @@ export function parseImeInsets(dump: string): SoftKeyboard {
  * The band is the frame's BOTTOM, of a frame that starts at the screen's
  * top and is not empty. Not measured: a hidden bar (an immersive app) —
  * read by `visible=false`, as a hidden keyboard is, so no band; a
- * landscape screen, whose bar is still at the top (and interact/ cuts no
- * band in landscape — ui-tree/geometry.ts#belowStatusBand, a residual stated there).
+ * landscape screen, whose bar is still at the top (no band is cut in
+ * landscape — a residual of ui-tree/standing.ts#Scene).
  *
- * Never guesses — no band (the judgements fail open, as before 2026-10-12)
- * on: no status-bar entry; one that does not read fully (type, frame,
+ * Never guesses — no band (the judgements fail open) on: no status-bar entry; one that does not read fully (type, frame,
  * visible); a hidden one; an empty frame or one below the top; several
  * entries (one per display) that do not all say the same band — the
  * multi-display case parseImeInsets refuses alike.

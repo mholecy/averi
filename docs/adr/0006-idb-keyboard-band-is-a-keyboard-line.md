@@ -26,6 +26,9 @@ against it:
   keyboard) wins over story 12 (move to the uncovered piece).
 - **The plain stop.** A centre under the line is not reachable.
 - **The pixel assert.** An element whose rect meets the band at all is the keyboard miss, quoting the band (ADR 0010).
+- **The stroke.** A `scroll_until` stroke stays above the band even when the band changes no judgement
+  (`scroll-rounds.ts#strokeTop`). A stroke on the band touches a key: the Contacts form and the SWIFT form's number pad
+  were both stroked from y 699.
 - **No key named as a cover.** The keyboard's own nodes lie under no line (ADR 0007).
 
 ## Residuals accepted

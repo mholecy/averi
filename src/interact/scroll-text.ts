@@ -9,23 +9,19 @@ import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Jud
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
- * Every sentence `scroll_until` says (2026-10-09, the scroll-rounds
- * deepening): the reply for a stop (`describeScrollResult`, over the result
+ * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
  * `scrollResult` makes of a `visible` outcome) and the failure for every
  * other outcome (`scrollFailure`, one switch over its kind) — rendered here
  * and nowhere else, from interact/scroll-rounds.ts#ScrollOutcome, which
- * carries exactly the facts each sentence quotes. Pure. Until that date the
- * failures were spelled inline in the loop of interact/scroll.ts, the bound's
- * as a chain of nested ternaries, so a sentence could be pinned only through
- * a scripted device; now each is a function of a literal.
+ * carries exactly the facts each sentence quotes. Pure: each sentence is a
+ * function of a literal, pinned without a scripted device.
  */
 
 /**
  * What the scroll actually achieved — not just how many swipes it took.
  *
- * `swipes` alone was the old return, and it made the tool unable to tell the
- * truth: the stop condition is INTERSECTION, so a row clipped at the viewport
- * edge stops the loop and used to be reported as a bare "visible". The caller's
+ * `swipes` alone could not tell the truth: a stop can leave a row clipped at
+ * the viewport edge, which a bare "visible" would hide. The caller's
  * very next step is normally an assert or a screenshot on that rect, i.e. the
  * one operation a clipped rect silently corrupts.
  */
@@ -37,22 +33,21 @@ export interface ScrollUntilResult {
   clipped: Edge[];
   /**
    * The soft keyboard at the stop, when it changed what the result means
-   * (2026-10-08) — absent when none was read, so a run without a keyboard
+   * — absent when none was read, so a run without a keyboard
    * reports what it always did:
    * - `shown`: the stop was judged against the screen ABOVE `frame` (the
    *   highest covered rect, `Cover.topCover`: the band, or a floating
    *   panel above it), not the whole screen, and that changed it — the
-   *   part under it is not visible, whatever the tree says
-   *   (docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md).
+   *   part under it is not visible, whatever the tree says.
+   *   docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
    *   Only where the band changed the stop: a clip at its edge, or — when
    *   several nodes match — a different match judged (one under the band
-   *   loses to one above it), which can be a clean "fully visible" (round 3
-   *   of the review, 2026-10-08); a band that changes nothing is not applied.
+   *   loses to one above it), which can be a clean "fully visible"; a band that changes nothing is not applied.
    *   The band is a reading's the witness stood by, or — `source:
    *   'idb-band'`, present only then — idb's band, read off the tree by its
    *   shape (ui-tree/keyboard-cover.ts#keyboardEdge): a keyboard LINE no
-   *   reading says is shown, judged against all the same (owner decision
-   *   D2);
+   *   reading says is shown, judged against all the same;
+   *   docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
    * - `unlocated`: the window model's `unlocated` row — the input method
    *   says a keyboard is shown, the window state gives it no area (one still
    *   coming up? not measured — ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD; a
@@ -64,7 +59,7 @@ export interface ScrollUntilResult {
   keyboard?: { state: 'shown'; frame: Rect; source?: 'idb-band' } | { state: 'unlocated' };
   /**
    * `false` when the stop was reached after a stroke and no read confirmed
-   * it held still (2026-10-08, review round 1): the target still moved on
+   * it held still: the target still moved on
    * each of SETTLE_CONFIRM_READS confirming reads (an animated row? a long
    * fling), or the stop came at the deadline. Absent on a settled stop — a
    * run that settles reports what it always did. The reply says so.
@@ -72,7 +67,7 @@ export interface ScrollUntilResult {
   settled?: false;
   /**
    * Set on a `fully: true` stop whose edge along the scroll lies exactly on
-   * its scroll container's edge (2026-10-09, Android only:
+   * its scroll container's edge (Android only:
    * interact/scroll-rounds.ts#PROBE_REACH) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
    * `checked`: a probe swipe toward that edge moved nothing, so nothing
@@ -80,18 +75,18 @@ export interface ScrollUntilResult {
    * #Flush): no swipe or time left, no container with room for a probe, a
    * probe short enough to be a tap, or — `fills`, with both `edges` and no
    * one `edge` — it fills its nearest container along the scroll, which no
-   * probe can check (code review of round 3, 2026-10-09); the reply says it
+   * probe can check; the reply says it
    * may be cut. Absent otherwise.
    */
   flush?: Flush;
   /**
    * Set on a stop with something of the app drawn over part of the element
-   * (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-
-   * app-chrome.md) — only without `fully: true`, which does not stop so:
+   * — only without `fully: true`, which does not stop so:
    * its CENTRE is clear (the stop's own rule, ui-tree/standing.ts#Scene.standing, so a
    * tap on it lands), but `by` — the one over it drawn on top — hides part
    * of it, and only `shows` of its area is seen. The reply says so, as it
    * says a clip.
+   * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    */
   covered?: { by: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; shows: number };
 }
@@ -99,7 +94,7 @@ export interface ScrollUntilResult {
 /**
  * Deliberately NOT on ScrollUntilResult: whether the content is exhausted.
  * It is learnt only by spending swipes and seeing the rects not move — the
- * `fully: true` path at a clipped stop, and (since 2026-10-08) any path
+ * `fully: true` path at a clipped stop, and any path
  * whose target is in the tree but off the frame — and wherever it is
  * learnt the answer is "yes, and here is the throw". A returned result
  * would therefore carry a constitutionally `false` field. Establishing it
@@ -186,7 +181,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
     return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}`;
   }
-  // Partly under something of the app (2026-10-09): a plain stop, its centre
+  // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.
   const covered =
     r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
@@ -206,7 +201,7 @@ function flushText(flush: ScrollUntilResult['flush']): string {
   if ('edges' in flush) {
     // The usual benign case named, so the reader weighs the warning: a card
     // as tall as its horizontal carousel inside a vertical list fills the
-    // carousel (verification round of fix/r3-cr, 2026-10-09).
+    // carousel.
     return (
       `; but it fills its scroll container (${rectText(flush.container)}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
       `the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — ${cut}; ` +
@@ -272,7 +267,7 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  * through resolve.ts#absenceError — ElementNotFoundError only when no read
  * at any swipe held a match and the last read succeeded, so an `optional:`
  * scroll_until to an element not on this screen is skipped "(not present)"
- * like a tap or a fill would be (2026-10-08). `describe` is the target as
+ * like a tap or a fill would be. `describe` is the target as
  * the caller spelled it (resolve.ts#describeTarget).
  */
 export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
@@ -340,7 +335,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       );
     }
     case 'covered': {
-      // The absence rule holds here too (review 2026-10-08): a target no
+      // The absence rule holds here too: a target no
       // read has matched is ElementNotFoundError, so an `optional:` step is
       // skipped "(not present)" — with the keyboard named, since no swipe
       // could look further.
@@ -374,12 +369,12 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
 function boundText(by: BoundBy, swipes: number): string {
   switch (by.of) {
     case 'exhausted': {
-      // `tree` (2026-10-09): there is no match to watch, so the sentence
-      // says what was watched — the whole screen. `touched` (2026-10-09, the
+      // `tree`: there is no match to watch, so the sentence
+      // says what was watched — the whole screen. `touched` (the
       // floating tab bar): the strokes touched down on a node drawn over the
       // list, so THAT is named first — not led by "content exhausted", which
       // a flow reads as "the list ends" — and the other causes after it: the
-      // tree cannot say the node takes touches (review round 1).
+      // tree cannot say the node takes touches.
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
       const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken`;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${by.unchanged === 'tree' ? 'did not change the screen' : 'did not move it'}: ${why})`;
@@ -398,7 +393,7 @@ function touchedText({ at, on, container }: TouchedOn): string {
   return `they touched down at ${at.x},${at.y} on ${on.role}${label}${id} at ${rectText(on.rect)}, drawn over the list ${rectText(container)}, which may have taken them`;
 }
 
-/** What the target was short of at the bound — the one switch that was a chain of nested ternaries in the loop until 2026-10-09. */
+/** What the target was short of at the bound — one switch over the shortfall. */
 function shortText(short: Shortfall): string {
   switch (short.of) {
     case 'readFailed':
@@ -424,10 +419,9 @@ function shortText(short: Shortfall): string {
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':
-      // 2026-10-09: it WAS in the tree — "never appeared" (the bug note's
-      // third observation) was false, and its class (a plain Error, the
-      // element was sighted) already said so. Last seen past the far edge
-      // (2026-10-12, round 8's B1 gap): where, not a guess.
+      // It WAS in the tree — "never appeared" would be false, and its class
+      // (a plain Error, the element was sighted) says so. Last seen past the
+      // far edge: where, not a guess.
       if (short.past !== undefined) {
         return `element was in the tree ${whenInFrame(short.inTreeAfter)}, ${pastText(short.past)}, never in the viewport, and is no longer in the tree (a lazy list drops what scrolls away) — ${revealText(short.past.side)}`;
       }

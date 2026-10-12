@@ -13,15 +13,11 @@ import { SIDES } from './swipe.js';
  * resolve, tap, fill, scroll, swipe — written once for both callers, the flow
  * engine's steps and the MCP tools.
  *
- * Before 2026-10-03 this logic lived in flow/engine.ts (as private methods
- * and exported free functions) and in ui-tree/tap-element.ts, and the two
- * callers had two resolution policies for the same user operation: a flow
- * `tap:` waited for a zero-area-filtered, rect-stable node and preferred the
- * interactive match, while the MCP `tap` tool read the tree once, kept
- * zero-area nodes and threw on ambiguity. The engine re-stated the zero-area
- * filter three times. The deletion test on the old shape: delete the
- * engine's settledNode and the MCP tools' resolveOne and the policy reappears
- * in every caller — which is what makes it a module, not a helper.
+ * One resolution policy for the same user operation, whichever caller asks:
+ * a flow `tap:` and the MCP `tap` tool both wait for a zero-area-filtered,
+ * rect-stable node and prefer the interactive match. The deletion test:
+ * delete this module and the policy reappears in every caller — which is
+ * what makes it a module, not a helper.
  *
  * Layering: interact sits between flow and verify (ARCHITECTURE.md §2). It
  * imports ui-tree, adapters and util only; it knows no averi.yaml type (the
@@ -50,7 +46,7 @@ export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
  * interactive one wins (preferInteractive, with its note). `chosen` when
  * that leaves one node — the node a tap acts on whatever its Ambiguity —
  * else the `survivors`: none, or several for the Ambiguity to decide.
- * One owner since code review P2 (2026-10-09): `resolveNow` and
+ * One owner: `resolveNow` and
  * `scroll_until`'s judgement (`matchesToJudge`) both read it.
  */
 export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: string } | { survivors: UiNode[] } {
@@ -61,14 +57,13 @@ export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: st
 }
 
 /**
- * The matches `scroll_until` judges (interact/scroll.ts, code review P2,
- * 2026-10-09): the one a tap would act on when the preference picks one
- * (`preferred`) — so the stop and the next tap judge the SAME node by
- * construction — else every match, as found. Until then the scroll judged
- * every match and stopped on the one more of which showed: an id on a
- * container and on its button stopped on the container ("PARTLY UNDER …,
- * its centre clear"), and the tap that followed acted on the button and
- * was refused under the bar. With several matches and no preference the
+ * The matches `scroll_until` judges (interact/scroll.ts): the one a tap
+ * would act on when the preference picks one (`preferred`) — so the stop and
+ * the next tap judge the SAME node by construction — else every match, as
+ * found. Judging every match and stopping on the one more of which shows
+ * stopped on a container whose id its button shares ("PARTLY UNDER …, its
+ * centre clear"), and the tap that followed acted on the button and was
+ * refused under the bar. With several matches and no preference the
  * scroll still judges them all (the MCP tap refuses such a selector; the
  * flow's `ambiguous: 'first'` tap takes the first — a stop on another is
  * the residual, stated).
@@ -88,8 +83,8 @@ export interface Resolved {
 
 /**
  * The default budget for "appear and hold still": the flow engine's tap
- * budget (config.ts documents it as 5 s on a `tap:` step), and since
- * 2026-10-03 the MCP tap/type_text tools' too. Named once, here, because the
+ * budget (config.ts documents it as 5 s on a `tap:` step), and the MCP
+ * tap/type_text tools' too. Named once, here, because the
  * wait is this module's.
  */
 export const DEFAULT_SETTLE_TIMEOUT_MS = 5_000;
@@ -107,14 +102,14 @@ export const DEFAULT_POLL_MS = 500;
  *   against a known app, and a flow that must not guess can say `role:`.
  * - `'refuse'`: throw, naming the candidates. The MCP tools' policy: an
  *   agent typing a password into `role:textfield` on a two-field login must
- *   be stopped, not told "Filled" with the choice buried in parentheses
- *   (review 2026-10-03). The wording is the pre-interact `resolveOne` one
- *   plus a recovery line saying how to narrow the selector.
+ *   be stopped, not told "Filled" with the choice buried in parentheses.
+ *   The wording names the candidates, plus a recovery line saying how to
+ *   narrow the selector.
  */
 export type Ambiguity = 'first' | 'refuse';
 
 /**
- * The `'refuse'` mode's error, as a class of its own (2026-10-03) so a caller
+ * The `'refuse'` mode's error, as a class of its own so a caller
  * that adds context to a failed resolution can tell a refusal — whose FIRST
  * line is the finding and must stay the headline — from a timeout, without
  * reading the message. Same message, same `Error` to everyone else.
@@ -122,23 +117,20 @@ export type Ambiguity = 'first' | 'refuse';
 export class AmbiguityRefusal extends Error {}
 
 /**
- * The target was never there (2026-10-08): no round of the wait that threw
+ * The target was never there: no round of the wait that threw
  * it resolved the target at all — every tree that was read lacked an
  * actionable match. The one fact about an element that only this module
  * knows, as a class of its own so a caller that must tell "absent" from
  * "found, then something went wrong" reads it instead of guessing.
  *
  * Its one reader is the flow engine's `optional:` block, the only place
- * where absence is not a failure. Until this class it deduced absence from
- * missing evidence — its own presence poll for a tap, and for every other
- * step "any error but the one class known to have found the element" — so a
- * fill whose field was found and tapped, but whose text never landed, was
- * logged "skipped step (not present)", and every new failure-after-finding
- * needed one more `instanceof` there. Now an optional step is "(not
+ * where absence is not a failure. Absence deduced from missing evidence
+ * would log a fill whose field was found and tapped, but whose text never
+ * landed, as "skipped step (not present)". An optional step is "(not
  * present)" exactly when this is what it threw, and anything else is
  * skipped with its own headline — save an error carrying the
- * RefusedOnPresentElement marker (`isRefusedOnPresentElement`, since
- * 2026-10-09), which fails the flow.
+ * RefusedOnPresentElement marker (`isRefusedOnPresentElement`), which fails
+ * the flow.
  *
  * Deliberately narrow:
  * - A wait whose LAST read failed does not throw it — neither one that read
@@ -159,7 +151,7 @@ export class AmbiguityRefusal extends Error {}
  *
  * Same message shape as every poll timeout (pollTimeoutMessage); same
  * `Error` to every caller that does not ask — the MCP tools print the
- * message as before.
+ * message unchanged.
  */
 export class ElementNotFoundError extends Error {}
 
@@ -210,7 +202,7 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
 }
 
 /**
- * A settled resolution, with the tree it came from (2026-10-07): the second
+ * A settled resolution, with the tree it came from: the second
  * of the two reads that agreed on the rect, the whole of it. The keyboard
  * guard (keyboard.ts) reads the soft keyboard off it on a platform whose
  * keyboard is in the tree — the one reading that costs no device read,
@@ -229,9 +221,9 @@ export interface ResolvedSettled extends Resolved {
  * The rect comparison restarts whenever a round finds nothing: a node that
  * vanishes and returns has to prove it holds still again.
  *
- * Throws the shared poll-timeout wording, in one of two sentences since
- * 2026-10-08 — until then both read "(visible and settled)", so an element
- * that was never on screen looked like one that would not stop moving:
+ * Throws the shared poll-timeout wording, in one of two sentences, so an
+ * element that was never on screen does not look like one that would not
+ * stop moving:
  * - no round resolved the target: ElementNotFoundError, "…waiting for element
  *   X to appear" (when the last read succeeded; see ElementNotFoundError for why
  *   a wait whose last read failed is a plain Error with the same wording);
@@ -241,15 +233,13 @@ export interface ResolvedSettled extends Resolved {
  *   reads)".
  * - the last tree read resolved it after a read that did not (or as the
  *   first read): a run of ONE sighting, with no second read within the
- *   budget to compare it with (2026-10-09, docs/bugs/2026-10-09-hold-still-
- *   timeout-after-one-read-blames-a-moving-element.md: WDA's start-up,
- *   ≈4–5 s, spent the 5 s budget inside the first read of a static title;
- *   code review of round 7: a target seen, gone, then seen again on a slow
- *   last read is the same shape). One more read is taken past the deadline
+ *   budget to compare it with (WDA's start-up, ≈4–5 s, spent the 5 s budget
+ *   inside the first read of a static title; a target seen, gone, then seen
+ *   again on a slow last read is the same shape). One more read is taken past the deadline
  *   — the slack pollTree's last round already has: the same rect settles
  *   it, a different one is the movement above, worded as such ("never at
  *   the same position in two consecutive reads": the late read and the one
- *   before it disagreed — reviewed and kept, code review of round 7 D2).
+ *   before it disagreed — kept so on purpose).
  *   Otherwise a plain Error that
  *   says what happened, never that two reads disagreed: "…to hold still
  *   (found once, but no second read came within the budget to confirm its
@@ -259,6 +249,7 @@ export interface ResolvedSettled extends Resolved {
  *   had seen it too.
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
+ * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
  */
 export async function resolveSettled(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
@@ -331,7 +322,7 @@ export interface WaitEvidence {
 }
 
 /**
- * THE rule for when a wait that gave up is absence (2026-10-08, one owner
+ * THE rule for when a wait that gave up is absence (one owner
  * for resolveSettled, resolvePresent and scroll.ts's scroll_until):
  * ElementNotFoundError when no round matched the target, at least one tree
  * was read and the last read succeeded; a plain Error with the same
@@ -345,15 +336,14 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
 /**
  * A wait that never resolved its target, worded for what it waited for —
  * nothing about settling. `zeroHint`: the last tree read matched the
- * target, but only with zero-area nodes (2026-10-08,
- * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md: idb reports a
- * node scrolled above the top of a scroll view as 0×0, and the wait read
+ * target, but only with zero-area nodes (idb reports a node scrolled above the top of a scroll view as 0×0, and the wait read
  * "to appear" for a node the snapshot showed). The hint says so beneath the
  * headline (pollTimeoutMessage drops it when the last read failed). Still
  * absence for ElementNotFoundError's purpose — nothing was ever ACTIONABLE,
  * and a collapsed view, the case the zero-area rule was written for, carries
  * its id at 0×0 too, which is why the hint names both (`zeroAreaHint`
  * words it, and names the side when Android dumped them clipped out).
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
  */
 function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string): Error {
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint), {
@@ -369,8 +359,7 @@ export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, 
  * Where a node read wholly past `side` lies — `clipped out above its scroll
  * container` when Android dumped it so (UiNode.clippedOut), `above the
  * viewport` when its rect lies there — the one wording of it, for this
- * wait's hint and `scroll_until`'s failure (scroll-text.ts, 2026-10-12,
- * round 8's B1 gap).
+ * wait's hint and `scroll_until`'s failure (scroll-text.ts).
  */
 export function pastSideText(side: Edge, clippedOut: boolean): string {
   return clippedOut ? `clipped out ${SIDES[side].past} its scroll container` : `${SIDES[side].past} the viewport`;
@@ -389,7 +378,7 @@ export function untriedSideText(side: Edge): string {
  * resolveNow's filter, the reason it answered `undefined` — or undefined
  * when it matched nothing (or something resolveNow took). When every such
  * match was dumped clipped out of its scroll container (Android's inverted
- * bounds, adapters/types.ts#UiNode.clippedOut, 2026-10-09: Settings' `Apps`
+ * bounds, adapters/types.ts#UiNode.clippedOut: Settings' `Apps`
  * under the collapsing app bar read "0×0" for a `126x-239` node), it says
  * where, and the direction that scrolls it back when they agree; else
  * ZERO_AREA_HINT.
@@ -411,10 +400,10 @@ function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
  * sighting. Throws ElementNotFoundError (or, when the last read failed, a plain
  * Error) in resolveSettled's never-found wording.
  *
- * The flow engine's optional tap is its caller (2026-10-08, moved here from
- * the engine's own presence poll so the "found" fact has one owner): its
- * budget bounds the presence check only, because a settle needs two reads
- * and one Android dump alone can outlast the optional budget (2026-08-19).
+ * The flow engine's optional tap is its caller (here, so the "found" fact
+ * has one owner): its budget bounds the presence check only, because a
+ * settle needs two reads and one Android dump alone can outlast the
+ * optional budget.
  * pollTree always completes one read before its deadline is checked, so a
  * budget shorter than one read still gets one honest look.
  */
@@ -442,7 +431,7 @@ export async function resolvePresent(
 
 /**
  * The typed marker for "the target was FOUND, and this module refused to tap
- * it" (2026-10-09): the element resolved — it is in the tree, on the screen
+ * it": the element resolved — it is in the tree, on the screen
  * the author meant — on every look the refusal rests on, and a rule of this
  * module, not its absence, is why nothing was tapped. Carried by:
  * - PresentElementRefusal's subclasses, the tap rules on a resolved node:
@@ -455,12 +444,12 @@ export async function resolvePresent(
  *   KeyboardWithoutDismissal (keyboard-in-tree.ts) — but not the latter when
  *   its second look did not resolve the target again (its flag is false).
  *
- * Its one reader is the flow engine's `optional:` block
- * (docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md,
- * item 3): an optional step is skipped only when its element is absent, and
+ * Its one reader is the flow engine's `optional:` block (the bug note's
+ * item 3, below): an optional step is skipped only when its element is absent, and
  * one refused on a present element FAILS the flow — the interstitial is
  * there, and skipping it ran the flow on into the ladder's destructive rung
  * (on iOS the same with the keyboard up over LOGIN and no dismissal).
+ * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md
  *
  * Deliberately NOT carried by:
  * - AmbiguityRefusal: a selector finding, and a flow resolves with `'first'`
@@ -487,16 +476,16 @@ export class PresentElementRefusal extends Error implements RefusedOnPresentElem
 
 /**
  * The target resolved and settled, but the point a tap on it would press —
- * its centre, `tapPoint` — lies outside the screen (2026-10-08,
- * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md). Measured on
+ * its centre, `tapPoint` — lies outside the screen. Measured on
  * iOS 27 (idb, 402×874 pt): the tree lists a scroll view's content below the
  * fold with its real rects (y 885, y 1157), the tap went to (94,895), landed
  * nowhere, and the reply said "Tapped" — the next `type_text` typed into the
  * field that still had focus. The target itself is never tapped.
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
  *
  * A class of its own, like AmbiguityRefusal, because it is neither of the
  * wait's failures: the element WAS found (never ElementNotFoundError — an
- * `optional:` tap of it is not skipped since 2026-10-09: it fails the flow,
+ * `optional:` tap of it is not skipped: it fails the flow,
  * see PresentElementRefusal), and nothing is moving. The remedy is in the
  * message: scroll it in first. When the keyboard guard had already sent
  * something (a `back`, a dismissal tap), the HEADLINE says what — the one
@@ -600,10 +589,9 @@ const onTheScreen = (s: Standing): boolean => s.kind !== 'offScreen' && s.kind !
  * the centre), and the visible part of such a node is a sliver at a screen
  * edge — on iOS the bottom one is the home indicator's gesture zone, the top
  * the status bar — where a tap is least likely to reach the element. Its
- * remedy is `scroll_until … fully: true`: a plain `scroll_until` that
- * stopped on any intersection handed back the same clipped node; a plain
- * one now goes on until the centre is on the screen, so either agrees with
- * this rule.
+ * remedy is `scroll_until … fully: true`; a plain `scroll_until` stops only
+ * with the centre on the screen too (the standing's one rule), so either
+ * agrees with this rule.
  *
  * Before refusing, the device's screen is read AGAIN (`usableScreen`'s
  * `fresh`, once, on this path only — the clear path costs nothing new):
@@ -668,46 +656,40 @@ export async function refuseOffScreen(
 /**
  * The target resolved, settled, lies on screen and clear of the soft
  * keyboard, but the point a tap on it would press — its centre — lies under
- * a node drawn over it, and no piece of it large enough to aim at shows
- * (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
- * chrome.md). Measured on mp-native's SWIFT form, both iOS tree sources:
+ * a node drawn over it, and no piece of it large enough to aim at shows.
+ * Measured on mp-native's SWIFT form, both iOS tree sources:
  * `priority_select` at `24,771 354x52`, its centre (201,797) on the pinned
  * CONTINUE bar `24,780 354x44`; "Tapped" pressed the (disabled) bar, and an
  * enabled one would have submitted the payment form. Nothing is tapped.
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  *
  * A class of its own, like OffScreenRefusal and for its reasons: the element
  * WAS found (an `optional:` tap of it fails the flow, never skipped — see
  * PresentElementRefusal), nothing is moving, and the remedy is in the message —
- * `scroll_until` it, which since the same date keeps scrolling until the
- * centre is clear (ui-tree/standing.ts#Scene.standing). When the keyboard guard
+ * `scroll_until` it, which keeps scrolling until the centre is clear
+ * (ui-tree/standing.ts#Scene.standing). When the keyboard guard
  * had already sent something, the HEADLINE says what.
  */
 export class CoveredRefusal extends PresentElementRefusal {}
 
 /**
  * The target resolved, settled, lies on screen, but it is CUT to a sliver by
- * its scroll container's edge (2026-10-10, docs/bugs/2026-10-09-android-tap-
- * on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md,
- * owner decision: refuse). Measured on mp-native's SWIFT form (Android): the
- * "Payment details" toggle, 132 px tall, read `66,1924 948x55` at the form's
- * bottom edge (1978); the tap went to (540,1952), "Tapped" was reported, and
+ * its scroll container's edge (the owner's decision: refuse). Measured on
+ * mp-native's SWIFT form (Android): the "Payment details" toggle, 132 px
+ * tall, read `66,1924 948x55` at the form's bottom edge (1978); the tap went to (540,1952), "Tapped" was reported, and
  * the section did not expand — nor for hand taps on the strip. Nothing is
  * tapped. The covered sliver's sibling (CoveredRefusal): what shows is cut
  * by a clip, not by a node drawn over it, and refused by the same minimum.
+ * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
  */
 export class ClippedRefusal extends PresentElementRefusal {}
 
 /**
  * The tap's refusal of a node cut to a sliver (ui-tree/standing.ts
- * #Scene.standing's `cut`: EVIDENTLY cut at a clipping ancestor's edge —
- * geometry.ts#Clips.cutSliver, flush with it within a pixel, its own content
- * running on past it, the shallowest such edge — and what shows of it
- * across that edge under `minPiece`, draw-order.ts#MIN_TAP_PIECE_FRACTION,
- * the minimum that already refuses a sliver left by a cover, 65 px on the
- * Pixel_3a). A node that merely touches the edge with nothing of it shown
- * cut — a whole button at a form's end — is tapped as before; so is a node
- * deep enough across the edge, at its centre. A sliver also covered is
- * refused for its cut (the standing's order), whose remedy names the edge.
+ * #Scene.standing's `cut`; geometry.ts#Clips.cutSliver owns what counts as
+ * cut, and draw-order.ts#MIN_TAP_PIECE_FRACTION the minimum). A sliver also
+ * covered is refused for its cut, whose remedy names the edge.
+ * docs/adr/0005-cut-before-cover.md
  *
  * The remedy is a plain `scroll_until` toward that edge (`cutRemedy`): its
  * plain stop does not stop on such a sliver either, and its default
@@ -716,9 +698,9 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * (geometry.ts#evidentCut's residual: whole, its own content running to the
  * edge), the way past it: a child, or a coordinate tap — a child that lies
  * CLEAR of that edge: one flush with it inside a sliver cut there is refused
- * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured
- * at 35d5997, the toggle's leaf label "Payment details", tapped as the hint
- * then said, did nothing) — whose own way past names what it lies in:
+ * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured:
+ * the toggle's leaf label "Payment details", tapped as a child, did
+ * nothing) — whose own way past names what it lies in:
  * something in THAT clear of the edge. Only nodes under a clipping ancestor
  * (UiNode.clipsDescendants, Android's) are cut: an iOS tree has none, so
  * this never refuses there.
@@ -742,8 +724,7 @@ const cutFinding = (cut: Cut, shown: Rect, minPiece: number): string =>
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
  * part…`. Said by the tap's refusal
  * (`aimClearOfChrome`) and by `scroll_until`'s sliver failures
- * (scroll-text.ts) — one wording, where two had drifted apart ("to a
- * 948x55 part, 55 deep across it").
+ * (scroll-text.ts) — one wording.
  */
 export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
   const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;
@@ -777,15 +758,14 @@ export interface Aim {
 /**
  * The flow trace's line for a tap that `Aim.moved`: `<what> tapped at
  * (201,767) — its centre …` — beside the clause it completes, so the clause
- * and its subject are worded in one place (code review S6; the fill's
+ * and its subject are worded in one place (the fill's
  * focus tap says it as `focus tap …`, interact/fill-text.ts#focusTapNote,
  * and the MCP reply as `Tapped <selector> …`, mcp/tool-text.ts#tapText).
  */
 export const movedTapText = (what: string, moved: string): string => `${what} tapped ${moved}`;
 
 /**
- * THE chrome check for a point about to be tapped on a resolved node (the
- * bug note's owner decision 1), after the on-screen rule (`refuseOffScreen`,
+ * THE chrome check for a point about to be tapped on a resolved node, after the on-screen rule (`refuseOffScreen`,
  * whose `judged` it reads): where the node stands for a tap
  * (ui-tree/standing.ts#Scene.standing, `{ of: 'tap' }`) — a ClippedRefusal
  * for a target its scroll container cuts to a sliver (`cutFinding`); its
@@ -804,11 +784,9 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * as there). The keyboard line comes in two parts
  * (ui-tree/keyboard-cover.ts#keyboardEdge, which merges them):
  * - the tree's own — idb's band — free, so `judged` was already asked with
- *   it (`refuseOffScreen`): no reading stands by it and no guard acts on it,
- *   so a centre under it is `underKeyboard`, refused here with the
- *   keyboard's remedy (`keyboard.remedy`, the reading's) — measured, a
- *   centre in the number pad's strip 589–596 between the band's top and the
- *   keys lay under no key and was tapped, on the keyboard;
+ *   it (`refuseOffScreen`); a centre under it is `underKeyboard`, refused
+ *   here with the keyboard's remedy (`keyboard.remedy`, the reading's) —
+ *   docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  * - a reading's (`keyboard.line`: the top of a cover the input method stands
  *   by, or WDA's band) — the soft keyboard is no cover node (Android lists
  *   none, and a band is believed only with its input method's word), so it
@@ -818,17 +796,15 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  *   touchable region and the witness, with the keyboard shown; nothing more
  *   with it hidden — the guard's first reading is reused).
  * A key of idb's band is the keyboard's own UI and under no band line, as
- * a WDA key is under no reading's.
+ * a WDA key is under no reading's (docs/adr/0007-idb-keyboard-key-row-tiling.md).
  *
- * Only nodes of the tree cover (decision 4): a top bar the tree lists
- * before the form — WDA's, idb's (only its button and title) — is not
- * inferred, so a row scrolled up under it is tapped at its centre as
- * before the check existed (the status bar is off the screen, above).
- * The other way round — a row scrolled under the bar read as drawn over
- * BackButton and the title, under idb, whose list is flat — is judged by
- * chrome before content (ui-tree/draw-order.ts's `flatListChrome` row,
- * device check C3-3: in idb's list the bar's items come before the form's
- * rows, and a row listed after them is no cover of them).
+ * Only nodes of the tree cover: a top bar the tree lists before the form —
+ * WDA's, idb's (only its button and title) — is not inferred, so a row
+ * scrolled up under it is tapped at its centre (the status bar is off the
+ * screen, above). The other way round — BackButton and the title under
+ * idb's flat list — is chrome before content (ui-tree/draw-order.ts's
+ * `flatListChrome` row).
+ * docs/adr/0004-flat-list-chrome-before-content.md
  */
 export async function aimClearOfChrome(
   target: Target,

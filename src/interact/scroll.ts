@@ -29,7 +29,7 @@ export interface ScrollOptions {
 }
 
 /**
- * What a scroll needs of a device (2026-10-09): the tree, the screen's size,
+ * What a scroll needs of a device: the tree, the screen's size,
  * the stroke and how fast it may be drawn (`dragSpeed`), and the keyboard's oracle and advice for the round's reading
  * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
  * adapter can scroll, and a reader sees what a scroll can touch. Every
@@ -42,7 +42,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * Swipe until the element is present AND visibly inside the viewport
  * (ARCHITECTURE.md §4, C1). Throws with a diagnosis of the last tree.
  *
- * THE DRIVER (2026-10-09, the scroll-rounds deepening): the production
+ * THE DRIVER: the production
  * adapter of interact/scroll-rounds.ts#round. It owns every I/O of the
  * scroll — the tree read, the judging screen, the round's keyboard reading
  * and its two questions, the stroke's box and points, the swipe, the
@@ -58,11 +58,11 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * a scroll container with no clearance for the floating bottom-nav bar can
  * never fully reveal its last row, however far it scrolls. Default stays
  * `false`: the stop condition is unchanged, only the REPORT gains the truth.
- * Since 2026-10-09 both bars also count what the app draws over the element
- * (ui-tree/standing.ts#Scene.standing, docs/bugs/2026-10-08-tap-and-scroll-until-
- * ignore-pinned-app-chrome.md): `fully: true` with nothing drawn over any of
- * it, the default with nothing drawn over its centre — the point the next
- * tap presses.
+ * Both bars also count what the app draws over the element
+ * (ui-tree/standing.ts#Scene.standing owns the rule): `fully: true` with
+ * nothing drawn over any of it, the default with nothing drawn over its
+ * centre — the point the next tap presses.
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  *
  * Every match is judged, not only the actionable one: an id can sit on a
  * container and its child, and the MOST revealed of the two is the honest
@@ -73,7 +73,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * quoted at the stop.
  *
  * The one stop that is absence — no read, at any swipe, held a match, and
- * the last read succeeded — throws ElementNotFoundError (2026-10-08; the
+ * the last read succeeded — throws ElementNotFoundError (the
  * rule's one owner is resolve.ts's absenceError) with the same "element
  * never appeared in the tree" wording,
  * so an `optional:` scroll_until to an element that is not on this screen
@@ -81,9 +81,9 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * (found but clipped or off the viewport, a failed last read, content that
  * ran out) stays a plain Error: the element was there, or nobody could see.
  *
- * The soft keyboard (2026-10-08,
- * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md):
- * measured on Android, an element wholly under the IME was "fully visible
+ * The soft keyboard:
+ * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
+ * Measured on Android, an element wholly under the IME was "fully visible
  * after 0 swipes", and with the IME up a content-down stroke — through the
  * screen centre, its start at y ≈ 1776 of 2220 — began on a key and scrolled
  * nothing for 15 s; the same on iOS 27 with the pad up (y ≈ 699 of 874). So
@@ -95,16 +95,16 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * shown keyboard (scroll-rounds.ts#coverOf): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke keeps clear of it
  * (`swipeVectorAbove`: the whole screen's stroke, its point on or near the
- * keyboard pulled up — since the iOS device check, below), so it starts on
+ * keyboard pulled up — the iOS device check, below), so it starts on
  * the content. The keyboard's own nodes (a key
  * as the target) are judged against the whole screen, as a reading reads
  * them `unknown` for a subject. `hidden`, `unknown`: the whole screen,
- * as before — the guard's fail-open rule; an unread tree strokes in the box
- * the last read round's band left (review 2026-10-08), the stop already
- * quoting the read error. Landscape: since 2026-10-08 the judgement, the
+ * the guard's fail-open rule; an unread tree strokes in the box
+ * the last read round's band left, the stop already
+ * quoting the read error. Landscape: the judgement, the
  * band's `above` box and the stroke all use the round's `screenBox` box —
  * turned when the tree's window says so — the screen the tap's on-screen
- * rule judges too (ui-tree/standing.ts#usableScreen); the band's frame is
+ * rule judges too (ui-tree/standing.ts#usableScreen owns it); the band's frame is
  * the oracle's or the tree's, in the tree's coordinates already. The
  * whole-screen judgement runs over the usable screen's `boxes`, the tap's
  * own — both ways up (the better of the two) only when a turn is
@@ -116,11 +116,11 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * differ, or the round ends in a stroke or a failure rather than a clean
  * stop — and only once the input method has not denied it
  * (the reading's `corroborated`: the guard's veto, its one owner
- * `witnessDenies` in ui-tree/keyboard-cover.ts). Review 2026-10-08: the window state was measured
+ * `witnessDenies` in ui-tree/keyboard-cover.ts). The window state was measured
  * stale for seconds after a navigating tap, and a phantom band would score
  * an on-screen target 0, send a stroke through the next screen and report
  * a keyboard that is gone. The witness is asked on EVERY round a band
- * matters and its answer is not kept (review 2026-10-08, two rounds): a
+ * matters and its answer is not kept: a
  * stale window on round 0 can be followed by a real keyboard — a new
  * screen that auto-focuses a field — and a confirmed keyboard can be hidden
  * by the scroll itself (a list that dismisses it on drag) and leave the
@@ -153,9 +153,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * under it there fails the same way after the two swipes that did not move
  * it (below), not at the timeout.
  *
- * The device check of that fix (2026-10-08, the note's two "Device check"
- * sections, and review round 1) found three more things, each fixed where
- * it lives:
+ * The device check of that fix (the note's two "Device check" sections)
+ * found three more things, each fixed where it lives:
  * - The stroke (`swipeVectorAbove`): drawn over the box above the keyboard,
  *   a content-up stroke touched down in the app's top bar and moved nothing
  *   under WDA. It is still the uncovered box's stroke, its touch-down never
@@ -174,20 +173,21 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   stroke round (scroll-rounds.ts#nextStroke), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
  *   moved nothing), and every turn halves the reach of the strokes after it
- *   (review round 2: equal flings both ways ping-ponged to `maxSwipes`).
- *   Since 2026-10-09 a target a lazy list dropped right after a read had it
+ *   (equal flings both ways ping-ponged to `maxSwipes`).
+ *   A target a lazy list dropped right after a read had it
  *   short of the far edge turns the strokes back too
  *   (scroll-rounds.ts#observe, `dropped`). A failure counts the turns, and
  *   one after the target was in the frame — or only in the tree — says so
  *   rather than "never".
- * - The fling itself (2026-10-09, docs/bugs/2026-10-09-scroll-until-fling-
- *   skips-target-in-lazy-list.md): a 1332-px Android stroke in 300 ms moved
+ * - The fling itself:
+ *   docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
+ *   A 1332-px Android stroke in 300 ms moved
  *   Settings' 1417-px list ≈ 2190 px, so a row could pass from below it to
  *   above it between two reads, in none — `Display` two rows below the fold
- *   was never reached. Each stroke is now drawn over the target's scroll
+ *   was never reached. Each stroke is drawn over the target's scroll
  *   container (the screen's largest before the target is read in one;
  *   the round decides the box, swipe.ts#strokeRoom, above the keyboard
- *   and, since 2026-10-09, for content below, above a node drawn over the
+ *   and, for content below, above a node drawn over the
  *   container's lower part — a floating tab bar took the touch-down),
  *   its length the container's, and on an adapter
  *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
@@ -200,13 +200,12 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   remedy), cause "the last 2 … did not move it: content exhausted, or the
  *   swipes were not taken" — measured on Android, the form's last field
  *   under the IME swiped for the whole 15 s. The `fully: true` clipped
- *   stop's stuck test takes the same two identical strokes (review round 2;
- *   it watches the judged match alone — a visible clipped match that does
+ *   stop's stuck test takes the same two identical strokes (it watches the judged match alone — a visible clipped match that does
  *   not move is the defect it reports). For both, only strokes count: a
  *   confirming read sent none.
  *
- * Android's clipped bounds (2026-10-09, docs/bugs/2026-10-09-android-
- * scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md):
+ * Android's clipped bounds:
+ * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
  * uiautomator cuts each node's bounds to its scroll container, so a row
  * half behind a pinned bar read whole and `fully: true` said "fully visible
  * after 0 swipes". Each round hands the reducer its tree, from which it
@@ -227,8 +226,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * (the reading's `unlocated`); when it says shown, the report says the keyboard
  * could not be placed.
  * Nothing is judged against it — there is no frame — and nothing is
- * pressed. Not on a default clean stop (review 2026-10-08: a witness query
- * on every one buys a sentence nobody acts on).
+ * pressed. Not on a default clean stop: a witness query on every one buys a
+ * sentence nobody acts on.
  */
 export async function scrollUntilVisible(
   adapter: ScrollAdapter,
@@ -331,7 +330,7 @@ export async function scrollUntilVisible(
       // judges nothing). No box: this round had no screen box to stroke in.
       // `toward` names where the CONTENT lies — the finger moves the other
       // way (content below → finger up). See swipeVector. Under a cover the
-      // stroke is `swipeVectorAbove` (2026-10-08, the iOS device check): the
+      // stroke is `swipeVectorAbove` (the iOS device check): the
       // uncovered box's stroke, its touch-down never inside the keyboard
       // clearance nor higher than without a keyboard — the stroke over the
       // box above it alone touched down in the app's top bar for a
@@ -340,11 +339,11 @@ export async function scrollUntilVisible(
       // round's. A 0×0 viewport does not throw above (pre-existing): the
       // stroke then falls back to the tree's window while the stop still
       // judges against 0×0.
-      // Drawn at the adapter's drag speed when it has one (Android, since
-      // 2026-10-09: adapters/android.ts#dragSpeed has the measured fling and
+      // Drawn at the adapter's drag speed when it has one (Android:
+      // adapters/android.ts#dragSpeed has the measured fling and
       // the time it costs), so one stroke moves the content about its own
       // length and a row cannot cross the list between two reads; else at
-      // the adapter's default duration, as before (iOS).
+      // the adapter's default duration (iOS).
       const { box } = step;
       if (box === undefined || screen === undefined) throw noBox;
       drawn = scrollStroke({ ...step, box });

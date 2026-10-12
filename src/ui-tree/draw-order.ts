@@ -18,7 +18,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * transparent overlay smaller than the screen reads as drawn, and a label
  * inside a sheet that does not contain the point does not. "Later in
  * pre-order = drawn later" is measured on WDA trees (Windows by level) and
- * on Compose (the floating tab bar, 2026-10-09); for classic Android Views
+ * on Compose (the floating tab bar); for classic Android Views
  * uiautomator's sibling order is the accessibility child order, which
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
@@ -35,15 +35,15 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * - `drawnOverAt(container, point)` — the exhausted stop's sentence
  *   (scroll-rounds.ts#touchedOn): which of those a stroke's touch-down hit
  *   (`drawnOver`'s column).
- * - `exposure(node, within)` — a TARGET's chrome (2026-10-09, docs/bugs/
- *   2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): what is
+ * - `exposure(node, within)` — a TARGET's chrome: what is
  *   drawn over a node about to be tapped or scrolled to — a pinned CTA bar,
  *   a floating tab bar, a top bar laid after the form — what of it still
  *   shows, and where a tap on it should go (interact/resolve.ts#
  *   aimClearOfChrome for the tap and the fill's focus tap,
  *   standing.ts#Scene.standing for `scroll_until`'s stop).
- * - `paintsOver(node, within)` — a pixel assert's chrome (round 8,
- *   2026-10-12, ui-tree/standing.ts#Scene.standing's pixel purpose): which of
+ *   docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
+ * - `paintsOver(node, within)` — a pixel assert's chrome
+ *   (ui-tree/standing.ts#Scene.standing's pixel purpose): which of
  *   `exposure`'s covers hide PIXELS of the node, not only the touch —
  *   `exposure` less the node's own content listed beside it, a clickable
  *   layer with nothing drawn, and an overlap no thicker than an edge
@@ -57,9 +57,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * they differ the row says why. Only nodes of the tree are covers: what a
  * tree does not list (the translucent top bar idb gives as its button and
  * title only, a top bar WDA lists BEFORE the scroll view it is drawn over)
- * is not inferred — the bug note's decision 4; the status bar (iOS's; Android's since 2026-10-12) is no
- * cover but off the screen, cut out of `within` by the caller
- * (geometry.ts#belowStatusBand). Knows no
+ * is not inferred — the bug note's decision 4; the status bar (iOS's and
+ * Android's) is no cover but a system band, cut out of `within` by
+ * ui-tree/standing.ts#Scene. Knows no
  * platform commands; the platform shapes are in the rows, each with the
  * device tree it was measured on, and the marks of a source it reads are
  * on the tree's root (`UiNode.flatList`, `UiNode.paddedTouchTargets`). The
@@ -137,9 +137,8 @@ export interface DrawOrder {
   coversOf(node: UiNode, region: Rect): readonly UiNode[];
   /**
    * The TOP EDGE of idb's soft keyboard band (`keyboardOf`, over
-   * soft-keyboard.ts#flatListKeyboardBand), or undefined — round 7,
-   * 2026-10-10 (docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
-   * soft-keyboard.md, and M-1.4's "354x7 part shows" inside the band). A
+   * soft-keyboard.ts#flatListKeyboardBand), or undefined (a stroke started
+   * on the keys, and a "354x7 part shows" was read inside the band). A
    * LINE, deliberately, and nothing more: not a reading of the keyboard
    * (soft-keyboard.ts#keyboardInTree stays `unknown` on an idb tree, and
    * with it every `shown`/`hidden` question of keyboard-cover.ts#readKeyboard
@@ -151,6 +150,7 @@ export interface DrawOrder {
    * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
    * always undefined here. Read off the band this draw order already found
    * for its own rows, not by a second walk of the tree.
+   * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
    */
   readonly keyboardBandTop: number | undefined;
   /**
@@ -164,11 +164,11 @@ export interface DrawOrder {
   /**
    * The covers of `exposure(node, within)` that hide PIXELS of `node` —
    * what a colour sample or an ocr crop of its rect would read instead of
-   * it (round 8, 2026-10-12; ui-tree/standing.ts#Scene.standing's pixel purpose) — in
+   * it (ui-tree/standing.ts#Scene.standing's pixel purpose) — in
    * `exposure`'s order, each with its reach. `exposure` answers where a
    * TOUCH goes, so it counts what takes the touch and draws nothing; three
-   * of its covers are left out here (review of fix/r8-pixel, round 1, a
-   * sweep of every node of every fixture):
+   * of its covers are left out here (found by a sweep of every node of
+   * every fixture):
    * - the node's OWN CONTENT listed beside it: a cover whose reach lies
    *   wholly inside the node's rect, when it hangs off one of the node's
    *   own branches (`ownBranch`) — WDA's React Native `login_username_field`
@@ -178,12 +178,9 @@ export interface DrawOrder {
    *   something and nothing the node does not (`wordsOf`: idb lists a
    *   container with its children's text) — idb's account card and its
    *   "Accounting Balance, 2 000, ,00, CZK" text; a sheet listed after a
-   *   card and inside its rect says other words and still counts (review
-   *   of fix/r8-pixel, round 2, probe A: until then the rect alone decided
-   *   in a flat list, and a colour assert on the card PASSED on the
-   *   sheet). Residual, stated (review round 3): a real overlay in a flat
-   *   list whose words are all words of the element's label is dropped as
-   *   its content — a toast "Saved" over a card labelled "Saved payments".
+   *   card and inside its rect says other words and still counts (the rect
+   *   alone would let a colour assert on the card PASS on the sheet). The
+   *   words rule's residual is the ADR's (below).
    *   The REACH, not the frame: CONTINUE's frame lies inside a
    *   52-pt row it hangs over (`Payee's country` at 24,776,
    *   idb-swift-form-scrolled-under-top-bar pos6), and its reach, run down
@@ -193,7 +190,7 @@ export interface DrawOrder {
    *   (`ownBranch`; never in a flat list, which gives no branches to tell
    *   a row's layer from a sheet's scrim) — Compose's card `button (66,275
    *   948x330)` listed after `text "1,121"` and the row buttons after
-   *   every "LR" avatar (round-5 snapshot accountDetail*): the ripple's
+   *   every "LR" avatar (snapshot accountDetail*): the ripple's
    *   touch target, drawn transparent;
    * - an overlap no thicker than `PIXEL_OVERLAP_SLACK` on its thin side
    *   (geometry.ts#overlapsPastSlack; the owner's decision): idb's `text
@@ -204,8 +201,8 @@ export interface DrawOrder {
    * the screen: a row, a card, a form's card. A cover met only at a larger
    * ancestor (a title in the navigation bar over a row of the form, a
    * dialog's scrim, a FAB in Compose's 90 % content container over a row
-   * of its list — review round 2, probe B2: "not screen-sized", 90 %, let
-   * that FAB through) is another layer of the screen, and still counts.
+   * of its list: "not screen-sized", 90 %, would let that FAB through) is
+   * another layer of the screen, and still counts.
    * What stays: CONTINUE over a row, the floating tab bar and its strip, a
    * title laid over a scrolled row, a sheet or a dialog over anything.
    * Judged over `within` as `exposure` is: the caller passes the part of
@@ -213,24 +210,10 @@ export interface DrawOrder {
    * inset rect), and the 2-unit edge is measured against the node's rect
    * inside it.
    *
-   * THE OWNER'S DECISION (2026-10-12, code review of round 8, P1): the
-   * owner's ruling on fix/r8-pixel was the 2-unit edge alone; the other
-   * three exemptions — own content (with `ownBranch`'s half-screen shared
-   * branch, OWN_BRANCH_SCREEN_FRACTION), the clickable layer, and the flat
-   * list's words rule (`wordsOf`) — went past it, and are APPROVED with
-   * their residuals, each a cover read as none, so a colour or ocr assert
-   * measures the cover's pixels as the element's:
-   * - in idb's flat list, a real overlay whose words are all words of the
-   *   element's label is read as its own content — a toast "Saved" over a
-   *   card labelled "Saved payments";
-   * - a dialog's bare background is not seen when the element is bigger
-   *   than its panel: a container with children covers only through its
-   *   content (`exposure`'s `contentFramed` row), so its button is named
-   *   and the panel between its children is not;
-   * - a childless, labelled panel laid inside the element (listed beside
-   *   it, non-interactive) is read as on it by the target rows — a
-   *   labelled, childless panel over a 0,225 1080x1995 container is no
-   *   cover of it (review round 2's probe D3).
+   * The three exemptions and their residuals (each a cover read as none,
+   * so a colour or ocr assert measures the cover's pixels as the element's)
+   * are the owner's decision:
+   * docs/adr/0003-pixel-cover-exemptions.md
    */
   paintsOver(node: UiNode, within: Rect): readonly PixelCover[];
 }
@@ -246,13 +229,13 @@ export interface PixelCover {
  * for a tap to be moved to it (`Exposure.tapAt`), as a fraction of the
  * screen's shorter side: 24 pt on the 402-pt iPhone 17, 65 px on the
  * 1080-px Pixel_3a — about a fingertip, Apple's 44-pt target halved. Chosen
- * against the measured strips (docs/bugs/2026-10-08-tap-and-scroll-until-
- * ignore-pinned-app-chrome.md), each of which must be refused: the 9-pt and
+ * against the measured strips, each of which must be refused: the 9-pt and
  * 17-pt tops of `priority_select` above the CONTINUE bar (iOS, idb and WDA)
  * and the 38-px bottom border of Contacts' First name below the top app bar
  * (Android) — a tap into a sliver that thin lands on the bar's edge as often
  * as on the row. Scaled by the screen, not fixed, because the tree's units
  * are points on iOS and pixels on Android.
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  */
 export const MIN_TAP_PIECE_FRACTION = 0.06;
 
@@ -462,7 +445,7 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
 /**
  * How far a label may overhang the text input it lies in and still be read
  * as that field's (`fieldOf`, the `ownControl` row), on every side, in the
- * tree's units: 2 — the owner's decision of round 7, "up to 1–2 pt";
+ * tree's units: 2 — the owner's decision, "up to 1–2 pt";
  * measured, the SWIFT form's `Payee’s name` `42,446 103x22` over its
  * `textfield 42,447 318x20`, 1 pt above and below. In pixels on Android, so
  * there a third of that — stricter, the safe direction.
@@ -513,8 +496,7 @@ const NOT_DRAWN = {
    * excused (a spacer, an empty Box — empty area). A Compose tree is all
    * `container`/`other` (adapters/android.ts maps `android.view.View` so),
    * so a structural role is no evidence of nothing drawn: measured on
-   * mp-native's Account Detail (2026-10-09, docs/bugs/2026-10-09-android-
-   * scroll-stroke-touches-down-on-floating-tab-bar.md) the floating tab
+   * mp-native's Account Detail (the bug note below), the floating tab
    * bar's host — an unlabelled `container` `66,1840 948x248` after the
    * list `0,825 1080x1395` — took the touch-down at y 1857 above its tabs
    * (a Material Surface swallows touches through its whole rect). The tree
@@ -523,11 +505,11 @@ const NOT_DRAWN = {
    * never under half of it, or a third for one over the touch-down
    * (interact/swipe.ts#overlayTop, TOUCH_DOWN_CUT_FLOOR) — never a stroke
    * off the list.
+   * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
    *
    * `target`: `drawnOver`'s rule — the Compose tab-bar host is the measured
    * cover of the rows beneath it (Account Detail, the same note; the bars
-   * in docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
-   * are wrapped the same way) — and ALSO excused: an unlabelled, unvalued
+   * of the pinned-chrome note are wrapped the same way) — and ALSO excused: an unlabelled, unvalued
    * structural node whose rect holds the target's WHOLE rect. Such a
    * wrapper after the target in pre-order — WDA lays a screen's content in
    * `Other` frames the screen's size or the form's, Windows after Windows —
@@ -535,15 +517,13 @@ const NOT_DRAWN = {
    * judged by itself, as the point question judges every structural node.
    * Not the point question's blanket excuse: a wrapper only PARTLY over the
    * target is a bar's frame, the case the tab-bar host measured. And not
-   * every wrapper holding the target (review round 1): the measured host
+   * every wrapper holding the target: the measured host
    * `66,1840 948x248` holds a small target in a row at y 1845–1875 whole,
    * above its tabs — the band where the touch-down at 1857 was swallowed.
    * So the wrapper must also be the screen's size (`SCREEN_SIZED_FRACTION`,
    * a Window's `Other`) or hold the target's scroll view whole (the form's
    * frame) — a bar holds neither (`holdsWhole`).
-   * And, since round 7 (docs/bugs/2026-10-09-ios-wda-cell-background-and-
-   * textfield-scroll-bar-read-as-covers.md), an unlabelled, unvalued one
-   * and with no identifier, whose every descendant is an EMPTY FRAME
+   * And an unlabelled, unvalued one with no identifier, whose every descendant is an EMPTY FRAME
    * (`framesOnly`), as `itemlessToolbar` judges a toolbar: it carries
    * nothing drawable. Measured under WDA on Settings › General › Language &
    * Region (iOS 27): a grouped cell `container LOCALE 'Region, Slovakia'
@@ -560,6 +540,8 @@ const NOT_DRAWN = {
    * unlabelled frames no longer cover the switcher they lie in), reads as
    * drawing nothing — a false "clear"; WDA gives such a node no trait that
    * tells it from the cell's background.
+   * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
+   * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   structural: {
     shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
@@ -574,8 +556,7 @@ const NOT_DRAWN = {
    * draws through its content, which is walked. A childless one draws
    * itself (a full-screen image or text).
    *
-   * `shadowing`: a NON-INTERACTIVE one only (docs/bugs/2026-10-08-wda-
-   * dismissal-shadowed-by-fullscreen-swiftui-toolbar.md): WDA gives a
+   * `shadowing`: a NON-INTERACTIVE one only (the bug note below): WDA gives a
    * SwiftUI pushed screen's toolbar host as `toolbar 'Toolbar'` with the
    * screen's full frame AFTER the title in pre-order; it draws nothing over
    * the title, yet every `keyboardDismiss` tap on that screen was refused
@@ -591,6 +572,7 @@ const NOT_DRAWN = {
    * post-fill `dismiss()` path is reported as `hiddenBy: tapping <title>`.
    * "Has children" is a weak signal: the measured toolbar's only child is
    * an empty container.
+   * docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md
    *
    * `drawnOver`: whatever its interactivity — the row was taken over from
    * `shadowing`'s without the interactive exception, and no measurement
@@ -610,8 +592,8 @@ const NOT_DRAWN = {
    * whatever its size, covers a point only through its descendants, never
    * through its own frame — the screen-sized host rule without the size.
    *
-   * `shadowing` (2026-10-08, the device check at e9e6509 of the toolbar
-   * host bug): with the toolbar host excused, the next node after the title
+   * `shadowing` (measured on the device with the toolbar host's rule
+   * above): with the toolbar host excused, the next node after the title
    * in pre-order — the form's `scrollable 0 0 402 512`, 58 % of the screen,
    * so no host by size — covered the title at (201,84) and the dismissal
    * was refused "covered by scrollable"; its frame runs under the
@@ -627,8 +609,7 @@ const NOT_DRAWN = {
    * its content is the only part of it that can be judged. Rejected:
    * `webview` (it paints its page itself and its accessibility children are
    * sparse, so its frame IS its surface), `toolbar` under the screen size
-   * (the input-accessory bar draws an opaque 48-pt bar, measured
-   * 2026-10-07), and any non-interactive parent ("judge only by leaves",
+   * (the input-accessory bar draws an opaque 48-pt bar, measured), and any non-interactive parent ("judge only by leaves",
    * which would drop a smaller card or sheet whose background is the
    * cover). What still covers: its content at the point, a childless
    * scrollable, an interactive node of any role. Accepted trade-off, this
@@ -659,7 +640,7 @@ const NOT_DRAWN = {
    * SCROLLED CONTENT: a node inside something that scrolls
    * (scroll-containers.ts#scrolls) that does not hold the target, in the
    * target's own screen — scroller and target are not two stacked screens
-   * (`stackedScreens`). `target` only (2026-10-09): an iOS form scrolls UNDER its
+   * (`stackedScreens`). `target` only: an iOS form scrolls UNDER its
    * translucent top bar, and WDA lists the bar's BackButton and Save
    * BEFORE the scroll view (the `contentFramed` row's measurement), so
    * every row scrolled up under the bar follows the bar's buttons in
@@ -719,46 +700,20 @@ const NOT_DRAWN = {
    * on the root), a node at or after the list's first CONTENT node that
    * ends inside the top bar's band (`barLine`), over a target listed before
    * that node — the top bar's (`firstContent`, `contentFrom`).
-   * `target` only: chrome before content, the owner's decision of 2026-10-09
-   * on device check C3-3 (docs/bugs/2026-10-08-tap-and-scroll-until-
-   * ignore-pinned-app-chrome.md), replacing the interim `flatListAbove`.
+   * `target` only: chrome before content, the owner's decision — the bar's
+   * items are listed before the content, and content listed after them that
+   * ENDS inside the bar's band (`barLine`, `FLAT_LIST_TOP_BAR_FRACTION`) is
+   * no cover of them; between content nodes this row changes nothing (the
+   * pinned CONTINUE still covers `priority_select`: content over content is
+   * `flatListReadingOrder`'s). The measured shapes, the rule it replaced and
+   * its residuals are the ADR's.
+   * docs/adr/0004-flat-list-chrome-before-content.md
    *
-   * Measured (tests/fixtures/idb-swift-form-scrolled-under-top-bar.json,
-   * six scroll positions of mp-native's SWIFT form): idb lists the
-   * Application `0,0 402x874`, then the top bar — `button 'Back'` `30,70
-   * 28x28`, the title `136,74 130x20` — then every form row in reading
-   * order, then the pinned CONTINUE; a screenshot shows the bar opaque, Back
-   * and the title drawn in full and the rows scrolled under it hidden. idb's
-   * list is flat, so `scrolledContent` cannot tell a row of the form from
-   * the bar over it, and every row follows the bar's items in the list. The
-   * interim rule (a later node covers only when its top lies at or below
-   * the target's) refused Back and the title at 3 of 6 positions — a
-   * floating label, a textfield, a helper line with its top at 75, 80 or 82,
-   * inside Back's 70–98 — all three false. Here the bar's items are listed
-   * before the content, and content listed after them is no cover of them,
-   * wherever its top lies; between content nodes this row changes nothing —
-   * the pinned CONTINUE, listed after the rows, still covers
-   * `priority_select` (content over content is `flatListReadingOrder`'s).
-   * Only content that ENDS inside the bar's band (`barLine`,
-   * `FLAT_LIST_TOP_BAR_FRACTION`) is excused — a row scrolled under the bar
-   * lies in it (the measured IBAN at 75–95, `will_remain` at 80–95), while a
-   * menu, a sheet or a dialog listed after the content reaches past it and
-   * covers what it lies on, the bar's items too (review of fix/r6-ios-top,
-   * MAJOR 1: on a screen with no bar the first rows inside the band are read
-   * as the bar's, and a menu `150,70 240x130` listed last over Row1 `0,62
-   * 402x44` read "clear" until the menu had to reach past the band).
-   *
-   * Residuals, stated: content listed after the bar that really is drawn
-   * over it and ends inside the band — a small popover or tooltip over a
-   * bar item, or over a first row read as the bar's — is not seen (a false
-   * "clear": the tap may press it). A node of the bar listed after
-   * the first content node (`firstContent`'s misses) still meets content as
-   * content: a row scrolled under it reads as cover — a false refusal, the
-   * safe direction. Improved on the interim rule: a sheet laid over a bar
-   * item it starts above is a cover again whenever it reaches past the band
-   * (over a CONTENT target listed before it, it is not — the reading-order
-   * break, `flatListReadingOrder`). WDA's nested tree and Android's never
-   * meet this row: neither is marked.
+   * Measured besides (tests/fixtures/idb-swift-form-scrolled-under-top-bar.json):
+   * a row scrolled under the bar lies in the band (IBAN at 75–95,
+   * `will_remain` at 80–95); on a screen with no bar the first rows inside
+   * the band are read as the bar's, and a menu `150,70 240x130` listed last
+   * over Row1 `0,62 402x44` covers only because it reaches past the band.
    */
   flatListChrome: {
     target: ({ node, at }, { target, contentFrom, barLine }) => target.at < contentFrom && at >= contentFrom && node.rect.y + node.rect.height <= barLine,
@@ -771,10 +726,10 @@ const NOT_DRAWN = {
    * where idb resumes listing another container in reading order
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
    * its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) or a
-   * floating tab bar's item (`tabBarsOf`, round 7). `target`
-   * only: the owner's decision of 2026-10-09 on docs/bugs/2026-10-09-ios-
-   * idb-modal-listed-before-content-reads-covered-by-the-content-behind-
-   * it.md, a regression of `flatListChrome`.
+   * floating tab bar's item (`tabBarsOf`). `target`
+   * only: the owner's decision on the bug note below, a regression of
+   * `flatListChrome`.
+   * docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md
    *
    * Measured (tests/fixtures/idb-modal-listed-before-content.json): idb
    * lists mp-native's payment-type chooser — a card drawn over the dimmed
@@ -789,16 +744,15 @@ const NOT_DRAWN = {
    * `row_own` the break is `filter_icon` (358 < 397), for `row_swift` it
    * comes at once, for the SWIFT form's value-date picker
    * (`56,291 298x375`, listed after the title, before every row) the
-   * debit row at 150 breaks it. Round 5's interim rule (a later node
-   * covers only when its top lies at or below the target's) was not
+   * debit row at 150 breaks it. A top-at-or-below rule (a later node
+   * covers only when its top lies at or below the target's) is not
    * enough: `date_header_0`'s top 399 lies below `row_own`'s 397. Between
    * the target and the break nothing changes: the pinned CONTINUE, listed
    * last after `priority_select`, still covers it, as a node listed after
    * a row and starting at or below it covers it (a footer's text in a
    * row). Nodes of no area never break (idb lists a 0×0 field).
    *
-   * The bottom chrome is no break and never past one (review of
-   * fix/r6b-idb, HIGH 1): CONTINUE starts above a label lying under it
+   * The bottom chrome is no break and never past one: CONTINUE starts above a label lying under it
    * (`42,807`) and covers it down to the screen's bottom; idb marks no
    * keyboard node, so its keys, listed last, are the only covers of the
    * rows under it, and a bar between the form and the keys (CONTINUE lifted
@@ -809,7 +763,7 @@ const NOT_DRAWN = {
    * Android shape put in a flat list — tests/ui-tree/draw-order.test.ts; in
    * the 69 device dumps only a pinned CONTINUE and the keyboard's background
    * enclose a later-listed target), nor one ending
-   * inside the top bar's band (`barLine`; review MEDIUM: Contacts' New
+   * inside the top bar's band (`barLine`: Contacts' New
    * Contact lists `Toolbar 0,83 402x48` last, over `add birthday 20,109`
    * scrolled under it) — each a cover candidate in its own right. Bar items
    * are `flatListChrome`'s and never break: a menu listed after the content
@@ -838,25 +792,25 @@ const NOT_DRAWN = {
    * ON THE TARGET: a NON-INTERACTIVE SIBLING of the target, narrower than
    * it, whose centre lies on it — and, in idb's flat list (`UiNode.flatList`),
    * which REPEATS the target: its identifier, or its text (label or value)
-   * equal to the target's label, placeholder or value. `target` only
-   * (2026-10-09): idb's list is FLAT
+   * equal to the target's label, placeholder or value. `target` only:
+   * idb's list is FLAT
    * (adapters/ios-tree-source.ts#parseIdbDescribeAll), so a field's own
    * floating label comes after the field as its sibling, never as its
    * descendant — measured on mp-native's SWIFT form
-   * (tests/helpers/fake.ts#idbFloatingLabelFake, docs/bugs/2026-10-08-ios-
-   * fill-unverified-reports-filled-and-cleared.md): the label `42,372
+   * (tests/helpers/fake.ts#idbFloatingLabelFake, the bug note below): the label `42,372
    * 120x18` lies on the empty input `26,366 350x30`, both carrying the
    * identifier `TextFieldWithComponentStyle` (iOS gives a field's title and
    * error labels the field's identifier — interact/resolve.ts#resolveNow);
    * a tap there focuses the field. Without this row `scroll_until … fully:
    * true` would never stop on such a field.
+   * docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md
    *
    * A sibling, not any node: the label of a bar drawn over a large row (the
    * Compose tab's `Home` text inside the row's rect) is part of a cover,
    * not of the target — a bar's text has the bar for its parent. Its centre
-   * on the target, not its whole rect (review round 1): an outlined field's
+   * on the target, not its whole rect: an outlined field's
    * floating label straddles the field's top border — and only that
-   * border: its bottom may not pass the target's (review round 2: a pinned
+   * border: its bottom may not pass the target's (a pinned
    * footer's text straddling a row's BOTTOM edge is the bug's own shape).
    * Narrower: a full-width sibling over a row is a sticky section header.
    * An interactive one (a clear button) still covers, at its own rect.
@@ -867,14 +821,13 @@ const NOT_DRAWN = {
    * excused here whatever it says.
    *
    * Under idb the sibling guard is void — its list makes every node a
-   * sibling of every other — so there the repetition is the evidence
-   * (code review of deep/r5-covers, P4): without it a pinned footer's text
+   * sibling of every other — so there the repetition is the evidence: without it a pinned footer's text
    * `16,785 200x30` inside a row `0,760 402x60` read "fully visible", and
    * the tap pressed the footer. idb's floating label repeats the field's
    * identifier; text that names something else — a total, a section title
-   * — covers. Only there (verification of P4): asked of every tree, it made
+   * — covers. Only there: asked of every tree, it would make
    * the RN screen's own text a cover of `placeholder_screen`, and
-   * `scroll_until` to it never stopped. In a nested tree a pinned footer's
+   * `scroll_until` to it would never stop. In a nested tree a pinned footer's
    * text has the footer, or the screen outside the row's scroll view, for
    * its parent, so the sibling guard already rejects it. Residual, stated:
    * a text laid on a target in the target's own parent with no wrapper of
@@ -884,9 +837,7 @@ const NOT_DRAWN = {
    * RecyclerView and a TextView, a Scaffold whose bottom bar is a bare
    * Text, `fully` asked of the list): same shape, same answer as before.
    *
-   * And what such a sibling holds (`ownContent`; 2026-10-09, docs/bugs/
-   * 2026-10-09-android-compose-button-text-refused-as-under-its-own-
-   * button.md): a
+   * And what such a sibling holds (`ownContent`; the bug note below): a
    * NON-INTERACTIVE node lying WHOLLY inside a CHILDLESS target, whose
    * parent is a sibling drawn on it — one wrapper down, the
    * measured depth; deeper still covers.
@@ -894,7 +845,7 @@ const NOT_DRAWN = {
    * label node, an RN view under WDA) has no other; a target with children
    * has its content as them, and a sibling's subtree beside it is the
    * stated residual above at one remove — the Compose tab-bar host drawn on
-   * its list (a sweep at dd50327 found the host already excused there) is
+   * its list (a fixture sweep finds the host already excused there) is
    * not extended to its tabs. Measured on
    * mp-native's Account Detail (Compose): `container row_N` → the label
    * node `other 'Loan repayment, 17.12.2025, +493.00 EUR' 66,951 948x143`,
@@ -909,6 +860,7 @@ const NOT_DRAWN = {
    * outside the target, anything under a sibling that is not drawn on it
    * (a full-width header's text). A flat list has no nesting, so idb never
    * meets it.
+   * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md
    */
   onTarget: {
     target: (placed, about) => drawnOn(placed, about) || ownContent(placed, about),
@@ -922,9 +874,8 @@ const NOT_DRAWN = {
    * centred on the target (`paddedOn`); or a TEXT INPUT holding the target's
    * centre, the target overhanging it by at most `LABEL_OVERHANG`
    * (`fieldOf`, below); the parent not the screen's size
-   * (`screenSized`), nor the control. `target` only (2026-10-09,
-   * docs/bugs/2026-10-09-android-compose-button-text-refused-
-   * as-under-its-own-button.md — a regression of this column's first round):
+   * (`screenSized`), nor the control. `target` only (the bug note above,
+   * `onTarget`'s, a regression of this column's first form):
    * a Compose `Button` reaches uiautomator as a wrapper holding its label
    * text and, AFTER it, an unlabelled clickable `button` — mp-native's
    * `container 44,1397 992x132` → `text 'LOGIN' 481,1438 118x49`, `button
@@ -933,8 +884,8 @@ const NOT_DRAWN = {
    * defect, and an `optional:` tap skipped. A tap at the label's centre lands
    * on the button — what the caller means.
    *
-   * The two shapes are the round-5 ui_snapshots' (tests/fixtures/android-
-   * ui-snapshot-compose.json; every node there under a later unlabelled
+   * The two shapes are the ui_snapshots' (tests/fixtures/android-ui-snapshot-compose.json;
+   * every node there under a later unlabelled
    * interactive sibling is one of them). A TEXT button or a list row: the
    * control has its wrapper's x and width, and is inset only vertically —
    * Compose's minimum-touch-target padding, by a share that varies: LOGIN
@@ -946,8 +897,8 @@ const NOT_DRAWN = {
    * row's `button` IS the row, and stays whole where uiautomator cuts the
    * row's container at the list's edge or the floating tab bar's (`66,1784
    * 948x56` holding a `button 66,1784 948x143`), so this shape's control is
-   * not held to lie within its parent, nor to any height. An ICON button
-   * (2026-10-09, round 6b): Contacts' Cancel, More options and Delete —
+   * not held to lie within its parent, nor to any height. An ICON button:
+   * Contacts' Cancel, More options and Delete —
    * `container 11,88 132x132` → the label node `other 'Cancel' 44,121
    * 66x66`, `button 22,99 110x110` — the control is inset 11 px on ALL
    * four sides (a 40-dp IconButton padded to its 48-dp touch target at
@@ -961,21 +912,20 @@ const NOT_DRAWN = {
    * control's. Not excused: a control padded differently per axis (a
    * 40×24-dp one: 4 dp and 12 dp; not measured); an icon button CUT by a
    * list's or scroll view's edge, whose insets are then uneven (`button
-   * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, as
-   * at round 6, the safe direction; nor one spanning its wrapper's height
+   * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, the
+   * safe direction; nor one spanning its wrapper's height
    * only (a tall narrow one). And only on a tree whose source lists a
    * control's touch target as its wrapper (`UiNode.paddedTouchTargets`,
-   * uiautomator's root; code review of round 6b, P2): the shape was
+   * uiautomator's root): the shape was
    * measured there alone. No other mark tells uiautomator's tree from
    * WDA's — `clipsDescendants` is a node's, absent on an Android screen with
    * no scroller, and `ofKeyboard` comes only with a keyboard — so the source
    * marks its root, as idb's does `flatList`. Under WDA and idb an
    * unlabelled button padded evenly over a centred text stays a cover (a
    * false refusal, the safe direction). The width shape (`spansWidth`) is
-   * asked of every tree, as at round 6.
+   * asked of every tree.
    *
-   * What still covers: a pinned CTA in the SAME parent as a text (review of
-   * fix/r6: a classic View's `Button "LOG IN" 40,1150 1000x130` over "Forgot
+   * What still covers: a pinned CTA in the SAME parent as a text (a classic View's `Button "LOG IN" 40,1150 1000x130` over "Forgot
    * password?" in its 1080-wide ConstraintLayout with the keyboard up,
    * `Button "CONTINUE"` over the terms text, a sheet's `Button "PAY"` over
    * its fee) — labelled, inset from its layout's sides and not evenly on all
@@ -1004,9 +954,8 @@ const NOT_DRAWN = {
    * clickable overlay laid with an even margin over a centred text in its
    * card (the margin at most half the overlay's side).
    *
-   * And a THIRD shape, the text input over its own label (round 7, the
-   * owner's decision; docs/bugs/2026-10-09-ios-wda-cell-background-and-
-   * textfield-scroll-bar-read-as-covers.md): an unlabelled, unvalued text
+   * And a THIRD shape, the text input over its own label (the owner's
+   * decision; the bug note below): an unlabelled, unvalued text
    * input that holds the label's centre, the label overhanging it by at
    * most `LABEL_OVERHANG` on any side (`fieldOf`) — neither spanning its
    * parent nor padded in it. Measured under WDA on the SWIFT form: `container
@@ -1024,6 +973,7 @@ const NOT_DRAWN = {
    * is then not its placeholder — a residual, stated: a placeholder label
    * WDA keeps listing over a filled field is refused); any other control
    * of that shape (a button).
+   * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   ownControl: {
     target: (placed, { target, screenArea, paddedTouchTargets }) =>
@@ -1043,7 +993,7 @@ const NOT_DRAWN = {
    * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
    * child of a node that scrolls (scroll-containers.ts#scrolls) or of a text input
    * (`INPUT_ROLE`) and holds nothing but empty frames
-   * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
+   * (`emptyFrame`). `target` only: WDA lists
    * a UIScrollView's two indicators LAST among its children, after every
    * row — `Other 'Vertical scroll bar, 2 pages' 369,62 30x456` and
    * `Other 'Horizontal scroll bar, 1 page' 0,485 402x30`, each labelled and
@@ -1056,8 +1006,7 @@ const NOT_DRAWN = {
    * `other`, an unmapped type that may be a control — with no identifier
    * and no content but frames; a sticky header carries its text.
    *
-   * A text input's too (round 7, docs/bugs/2026-10-09-ios-wda-cell-
-   * background-and-textfield-scroll-bar-read-as-covers.md): a UITextField
+   * A text input's too (the bug note below): a UITextField
    * scrolls its text, and WDA lists its indicator as its child — the SWIFT
    * form's `textfield 42,447 318x20` → `Other 'Horizontal scroll bar, 1
    * page' 42,454 318x10` → a bare thumb `45,461 309x3` — which refused `tap
@@ -1066,6 +1015,7 @@ const NOT_DRAWN = {
    * and its parent's role, never by its label: WDA's label follows the
    * device's language. A labelled `container` of that shape under any other
    * interactive parent (a button) still covers.
+   * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   scrollIndicator: {
     target: ({ node, parent }) =>
@@ -1079,7 +1029,7 @@ const NOT_DRAWN = {
 
   /**
    * THE TARGET'S OWN FRAME: a node whose rect IS the target's. `target`
-   * only (2026-10-09): a node laid exactly over another, edge for edge, is
+   * only: a node laid exactly over another, edge for edge, is
    * the same element listed again — idb's flat list repeats an element and
    * its accessibility twin at one frame (the fill's `sameField` twins,
    * tests/interact/fill.test.ts) — or a wrapper of the target's size, not a
@@ -1099,8 +1049,7 @@ const NOT_DRAWN = {
    * `other` to every type they do NOT map — a SegmentedControl, Stepper,
    * SearchField — so an unlabelled `other` may be a control and is an item.
    *
-   * `shadowing` (docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-
-   * keyboard-dismissal.md): measured under WDA on the stock Contacts "New
+   * `shadowing` (the bug note below): measured under WDA on the stock Contacts "New
    * Contact" sheet (UIKit, iPhone 17, iOS 27): after the title `text 'New
    * Contact' 149 89 104 22` come the form's `scrollable 0 62 402 812`
    * (the `contentFramed` row) and two `toolbar 'Toolbar'`s, `0 83 402 48`
@@ -1126,6 +1075,7 @@ const NOT_DRAWN = {
    * itemless toolbar (none measured) is excused like any other: the
    * `keyboard` row counts for this question, and the band — which contains
    * the accessory slot — still catches a point there.
+   * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md
    *
    * `drawnOver`: not excused — no measurement asked it (no WDA tree has a
    * clipping container).
@@ -1201,7 +1151,7 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
 /**
  * The bottom of the screen a flat list's pinned bar lies in (`bottomPinned`),
  * as a fraction of the screen's height: 6 %, 52 pt of the 874-pt iPhone 17.
- * Measured (round-6 device check, H-1): the SWIFT form's pinned CONTINUE
+ * Measured: the SWIFT form's pinned CONTINUE
  * `24,780 354x44` ends at 824, 50 pt above the screen's bottom — the home
  * indicator's safe area and the bar's margin; the floating tab bar idb lists
  * on Account Detail (`37,755 82x64`, bottom 819, 55 pt) lies outside it.
@@ -1211,7 +1161,7 @@ export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 /**
  * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): the band
  * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
- * rule and its measurements there, moved there in round 7), with its top
+ * rule and its measurements there), with its top
  * for the keyboard edge (`DrawOrder.keyboardBandTop`), with the run of
  * nodes it holds as `keys` (bottom chrome, drawn over what lies under
  * them) and of those the keyboard's `own` (`sharesRow`,
@@ -1234,19 +1184,15 @@ function keyboardOf(
  * with another node of the run it does not overlap (past
  * geometry.ts#PIXEL_OVERLAP_SLACK): keys TILE the band in rows, side by
  * side (the number pad's `1 2 3` at 596, `4 5 6` at 650…; QWERTY's
- * letters; neighbours' rounded frames overlap by 1 pt at most), while an
- * app node listed right before the keys, wholly inside the band, stands
- * alone on its row (a Sign in button behind the keyboard) or shares it
- * only with a node laid OVER it (a field and its placeholder label, a
- * button and its title: idb lists both with one top and height). With the
- * background and what is listed after it (Dictate), the keyboard's OWN
- * nodes (`DrawOrder.ofKeyboardBand`). Chosen over a key's size (a space
- * bar is half the screen wide, an app button may be small) and over the
- * list's order alone (the app node is listed in the run). Its errors are
- * the safe way round, but for the second residual: a key alone on its row
- * (a lone QuickType suggestion) reads as content under the line, so a tap
- * on it is refused; two app nodes side by side behind the keyboard, not
- * overlapping, read as keys (no idb dump has them).
+ * letters), while an app node listed right before the keys, wholly inside
+ * the band, stands alone on its row (a Sign in button behind the keyboard)
+ * or shares it only with a node laid OVER it (a field and its placeholder
+ * label, a button and its title: idb lists both with one top and height).
+ * With the background and what is listed after it (Dictate), the
+ * keyboard's OWN nodes (`DrawOrder.ofKeyboardBand`). Why tiling, and its
+ * residuals (a lone key read as content, two app nodes side by side read
+ * as keys), are the owner's decision:
+ * docs/adr/0007-idb-keyboard-key-row-tiling.md
  */
 const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
   run.some((other) => other !== node && other.rect.y === node.rect.y && other.rect.height === node.rect.height && !overlapsPastSlack(other.rect, node.rect));
@@ -1267,8 +1213,7 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * reaches the keyboard's top. Measured: run2-ios #250, CONTINUE `24,512
  * 354x44` (bottom 556, 33 pt above the keyboard at 589), listed after the
  * form and before the keys — the SHAPE; its reach down to the keyboard's
- * top is INFERRED, not measured by a tap (kept by the owner, code review of
- * round 6b P4): checked on the screenshot `run2-ios/img-253-0.png`, the
+ * top is INFERRED, not measured by a tap (kept by the owner): checked on the screenshot `run2-ios/img-253-0.png`, the
  * lifted bar's background between it and the keys; no tap below a lifted
  * bar's frame has been sent. Residual, stated (as before this rule): the
  * last row of a list that ends inside the band, with nothing listed after
@@ -1293,12 +1238,12 @@ function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnTy
 
 /**
  * A FLOATING TAB BAR's reach ABOVE its items, as a fraction of their height
- * (`tabBarsOf`, `exposure`): 0.2 — the owner's decision (round 7, docs/bugs/
- * 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-
- * tap.md), unit-free, so the same in points and in pixels. Measured on
- * mp-native's Account Detail (iPhone 17, idb and WDA alike): the bar's pill
- * starts ≈12 pt above its 64-pt items (`run9-ios/img-374-0.png`, 743 against
- * 755) and is no node of either tree; 0.2 × 64, rounded, is 13.
+ * (`tabBarsOf`, `exposure`): 0.2 — the owner's decision, unit-free, so
+ * the same in points and in pixels. Measured on mp-native's Account Detail
+ * (iPhone 17, idb and WDA alike): the bar's pill starts ≈12 pt above its
+ * 64-pt items (`run9-ios/img-374-0.png`, 743 against 755) and is no node of
+ * either tree; 0.2 × 64, rounded, is 13.
+ * docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md
  */
 export const TAB_BAR_REACH_FRACTION = 0.2;
 
@@ -1327,7 +1272,7 @@ interface TabBar {
 
 /**
  * The FLOATING TAB BARS of a tree, read by their shape, asked of every tree
- * (the owner's decision, round 7): at least `TAB_BAR_MIN_ITEMS` INTERACTIVE
+ * (the owner's decision): at least `TAB_BAR_MIN_ITEMS` INTERACTIVE
  * siblings of one rect's y and height, no two overlapping, together
  * spanning `TAB_BAR_WIDTH_FRACTION` of the screen's width, ending on the
  * screen and inside its bottom `TAB_BAR_BOTTOM_FRACTION`; the keyboard's
@@ -1338,10 +1283,9 @@ interface TabBar {
  * the list, since idb lists it in reading order, FIRST; in a nested tree
  * (WDA, uiautomator) only over what is listed before it, since that order
  * IS the draw order: an action sheet listed after the bar is drawn over it,
- * and its Cancel `8,782 386x57` is tapped at its centre (review of
- * fix/r7-covers: order-blind, the bar moved it to a 29x37 piece).
- * Measured (docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-
- * buttons-takes-a-rows-tap.md): idb lists mp-native's four tab items
+ * and its Cancel `8,782 386x57` is tapped at its centre (order-blind, the
+ * bar would move it to a 29x37 piece).
+ * Measured (the bug note on TAB_BAR_REACH_FRACTION): idb lists mp-native's four tab items
  * `37,755 82x64` … `283,755 82x64` FIRST, then the content; WDA the row,
  * then the four buttons; neither lists the pill the bar draws from ≈743
  * down, over `transactions.list.row_3 24,721 354x52` — its centre (201,747)
@@ -1424,8 +1368,7 @@ function readingBreak(order: readonly Placed[], target: Placed, contentFrom: num
  * (`DrawOrder.paintsOver`, `ownBranch`): one component — a row, a card, a
  * form's card (RN's `login_card`, 370x400 of 402x874, 0.42 of the screen)
  * — and not a screen's content area (Compose's `accounts.detail.container`,
- * 0,225 1080x1995, 0.899, where a FAB over a row is chrome; review of
- * fix/r8-pixel, round 2, probe B2). The measured margin: 0.42 below the
+ * 0,225 1080x1995, 0.899, where a FAB over a row is chrome). The measured margin: 0.42 below the
  * line, 0.899 above it; nothing measured lies between.
  */
 const OWN_BRANCH_SCREEN_FRACTION = 0.5;
@@ -1473,11 +1416,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
    * Where a cover of a target presses (`exposure`): its rect — or, for a node
    * pinned at a flat list's bottom (`bottomPinned`), its rect run down to the
    * screen's bottom edge — or a bar lifted onto idb's keyboard down to the
-   * keyboard's top (inferred from H-1 and checked on the screenshot
-   * `run2-ios/img-253-0.png` — the lifted bar's background between it and the
-   * keys — not measured by a tap; code review of round 6b P4) — across its
-   * own x-range. Measured (round-6 device check, H-1,
-   * `run8-ios/img-147-0.png`): with the SWIFT form's `Payee’s bank street &
+   * keyboard's top (inferred from the measurement below and checked on the
+   * screenshot `run2-ios/img-253-0.png` — the lifted bar's background between
+   * it and the keys — not measured by a tap; kept by the owner) — across its
+   * own x-range. Measured (`run8-ios/img-147-0.png`): with the SWIFT form's `Payee’s bank street &
    * no.` label at `42,817 186x20`, 3 pt below CONTINUE's frame `24,780
    * 354x44`, a tap at (135,827) opened SUMMARY — CONTINUE's hit area reaches
    * below its accessibility frame, and the bar's opaque background, which idb
