@@ -1686,7 +1686,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, readError, found, best, viewport, cover, by),
+      short: shortfall(s, { readError, found, best, viewport, cover }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1825,6 +1825,24 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
 }
 
 /**
+ * What the round at a bound read and judged, as `shortfall` reads it — one
+ * value (code review of round 8, S8: they travelled as five of its seven
+ * positional parameters).
+ */
+interface BoundRound {
+  /** Why this round's tree did not read, if it did not. */
+  readonly readError: Error | undefined;
+  /** The target's matches in this round's tree. */
+  readonly found: readonly UiNode[];
+  /** The best of them as judged (`judge`), if any. */
+  readonly best: Judged | undefined;
+  /** The frame it was judged in — the screen box (`State.frame`) — which an `offFrame` failure quotes. */
+  readonly viewport: Rect;
+  /** The keyboard cover applied to that frame, if any — quoted with it. */
+  readonly cover: Cover | undefined;
+}
+
+/**
  * What the target was short of at a bound (`by`). In the frame on an
  * earlier read and not on this one: "never" would be false (review round
  * 1) — a fling carried it off, or a lazy list dropped it once it scrolled
@@ -1832,7 +1850,7 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined, by: BoundBy): Shortfall {
+function shortfall(s: State, { readError, found, best, viewport, cover }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
   const left = s.inFrameAfter;
