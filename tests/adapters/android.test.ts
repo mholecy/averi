@@ -1218,14 +1218,33 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
 
   // Code review of fix/r8-band, round 1, MAJOR-1: the registry keeps one adapter per device for the server's life,
   // and a failed first read was kept as "no band" — a cold device's 2 s timeout switched N1's fix off for good.
-  it('a FAILED band read is not kept: the next viewport() asks again, and the first answer is kept', async () => {
-    let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
+  it('a band read that FAILED FAST (adb exits non-zero) is not kept: the next viewport() asks again, and the first answer is kept', async () => {
+    let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', 1, 'error: closed');
     const { adapter, reads } = scripted(() => answer);
     expect((await adapter.viewport()).statusBand).toBeUndefined(); // fail open
     answer = lines(STATUS_33('[0,0][1080,66]'));
     expect((await adapter.viewport()).statusBand).toBe(66);
     expect((await adapter.viewport()).statusBand).toBe(66);
     expect(reads).toHaveLength(2); // the failure, the answer — then kept
+  });
+
+  // Code review of fix/r8-band, round 2: retried every call, a hung dumpsys cost up to 2 s on each viewport().
+  it('a band read that TIMED OUT is kept as no band: the next viewport() makes no dumpsys call — until launch, or a fresh read', async () => {
+    let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
+    const { adapter, reads } = scripted(() => answer);
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // fail open
+    answer = lines(STATUS_33('[0,0][1080,66]'));
+    expect((await adapter.viewport()).statusBand).toBeUndefined();
+    expect(reads).toHaveLength(1); // not asked again
+    await adapter.launch('com.google.android.contacts');
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    expect(reads).toHaveLength(2);
+    answer = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
+    await adapter.viewport({ fresh: true });
+    answer = lines(STATUS_33('[0,0][1080,66]'));
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // the fresh read timed out: kept as none
+    expect((await adapter.viewport({ fresh: true })).statusBand).toBe(66);
+    expect(reads).toHaveLength(4);
   });
 
   it('an ANSWER of no band (the bar hidden) is kept, like a band — and launch drops either, so the next viewport() reads it again', async () => {

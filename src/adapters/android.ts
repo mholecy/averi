@@ -489,14 +489,21 @@ export class AndroidAdapter implements DeviceAdapter {
    * (code review of fix/r8-band, round 1): the registry keeps ONE adapter
    * per device for the MCP server's life (mcp/registry.ts), so whatever is
    * kept here is kept that long unless something drops it.
-   * - A call that FAILED (adb exit, the 2 s budget on a cold or loaded
-   *   device) is not an answer: nothing is kept, and the next `viewport()`
-   *   asks again — until one answers. Until that review a failed first read
-   *   was kept as "no band" for the server's life, and a tap under the bar
-   *   went through again. The cost: while the call keeps failing, every
-   *   `viewport()` (each tap's on-screen rule, each `scroll_until` round)
-   *   spends one more call, up to its 2 s budget, and judges with no band
-   *   (fail open).
+   * - A call that FAILED FAST (adb exited non-zero, could not be spawned)
+   *   is not an answer: nothing is kept, and the next `viewport()` asks
+   *   again — until one answers. Until that review a failed first read was
+   *   kept as "no band" for the server's life, and a tap under the bar went
+   *   through again. Retried every call, by choice: such a failure costs
+   *   milliseconds (adb answers at once), and it is the transient kind — a
+   *   device reconnecting, an adb server restarting — whose next call
+   *   answers. Each such call judges with no band (fail open).
+   * - A call that TIMED OUT (its 2 s budget: a cold or loaded device, a
+   *   hung dumpsys) is kept as "no band" (`timedOut`), so it is not paid
+   *   again: retried every call, it cost up to 2 s more on each `viewport()`
+   *   — a tap made two such calls, a two-swipe `scroll_until` seven (code
+   *   review of fix/r8-band, round 2). Dropped like an answer, below: the
+   *   next `launch` or fresh read asks again. Until then no band (fail
+   *   open).
    * - An answer is dropped by `launch` — the foreground app changes there,
    *   and with it whether the bar shows (an immersive app hides it) — and
    *   replaced by `viewport({ fresh: true })`: the tap's refusal path
@@ -516,8 +523,14 @@ export class AndroidAdapter implements DeviceAdapter {
    * - SHOWN since an answer that found none: no band until the next launch
    *   or fresh read — a point under the bar is judged on the screen, as
    *   before the band existed (fail open).
+   * And a launch's own: the band is read at the first `viewport()` after
+   * `launch`, which may come right after it — while the app's STARTING
+   * window shows, before an app that hides the bar in onCreate (or later)
+   * has hidden it. The band then read is the starting window's bar: stale
+   * as above, so it errs toward a refusal (the tap's fresh re-read corrects
+   * it; `scroll_until` keeps it).
    */
-  #band: { band: number | undefined } | undefined;
+  #band: { band: number | undefined; timedOut?: true } | undefined;
   /** The band read in flight, shared by concurrent `viewport()` calls. */
   #bandRead: Promise<number | undefined> | undefined;
   /** Bumped by `launch`: a read that started before it does not keep its answer. */
@@ -549,8 +562,10 @@ export class AndroidAdapter implements DeviceAdapter {
         const band = parseStatusBand(dump);
         if (epoch === this.#bandEpoch) this.#band = { band };
         return band;
-      } catch {
-        return undefined; // not an answer: nothing kept, the next viewport() asks again
+      } catch (e) {
+        // A timeout is kept as no band until a launch or a fresh read (`#band`); any other failure keeps nothing.
+        if (e instanceof ExecError && e.timedOut && epoch === this.#bandEpoch) this.#band = { band: undefined, timedOut: true };
+        return undefined;
       }
     })().finally(() => {
       if (this.#bandRead === read) this.#bandRead = undefined;
