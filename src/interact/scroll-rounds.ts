@@ -257,7 +257,8 @@ export type RoundStep =
   | { do: 'stop'; outcome: ScrollOutcome };
 
 /**
- * A shown soft keyboard as the round may apply it (2026-10-08): its frame,
+ * A shown soft keyboard as the round may apply it (2026-10-08) — a
+ * reading's cover (`coverOf`), or idb's band (`bandCoverOf`): its frame,
  * the part of the screen it leaves — everything above its TOP edge, full
  * width — and what the adapter can do about it. Above the top edge, not
  * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
@@ -900,8 +901,8 @@ function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { 
  * but a stroke on it touches a key: the Contacts form and the SWIFT form's
  * number pad were stroked from y 699,
  * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md).
- * No guard on where the band lies in the gesture box: a top at or below the box's bottom changes no stroke
- * (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
+ * No guard on where the band lies in the gesture box: a top at or below
+ * the box's bottom changes no stroke (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
  * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
  * the band starts below the top bar's line, a fifth of the screen down.
  */
@@ -968,8 +969,8 @@ function stops(j: Judged): boolean {
  * rule the stuck and the bound sentences read, the standing's kind as
  * their sentences group it: a cut edge (`fully: true`), a centre off the
  * screen or one under idb's band (`underKeyboard` with something in the
- * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`; a centre in a system band (the status bar's, the
- * navigation bar's) `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
+ * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`;
+ * a centre in a system band (the status bar's, the navigation bar's) `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
  * `sliver`; anything of the app drawn over it `covered`, naming the cover
  * the standing names. Asked only of a match with something in the frame
  * that does not stop the round: a match that stops it is reported before
