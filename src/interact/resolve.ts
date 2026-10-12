@@ -532,7 +532,7 @@ export const tapScreen = (adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode
  * - On iOS, never in the status band at the top of a portrait box
  *   (adapters/ios-status-band.ts, reported with the device's screen, 2026-10-09: a tap at (201,6) went to the
  *   status bar, which scrolled the form to its top): that band is off the
- *   screen for a tap (swipe.ts#inStatusBand words the refusal).
+ *   screen for a tap (ui-tree/geometry.ts#inStatusBand words the refusal).
  *
  * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
  * a 402-wide screen is judged at 402, off it: that is where the tap would go.
@@ -800,7 +800,7 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * (the band's background is none, draw-order's `structural` row) is tapped
  * as before.
  *
- * The box is cut below iOS's status band (swipe.ts#belowStatusBand,
+ * The box is cut below iOS's status band (ui-tree/geometry.ts#belowStatusBand,
  * 2026-10-09) before a piece is chosen, as above a keyboard: a moved tap
  * never lands on the status bar. Its centre is never there — the on-screen
  * rule refused that first.
@@ -824,7 +824,7 @@ export async function aimClearOfChrome(
   sent?: string,
 ): Promise<Aim> {
   const centre = tapPoint(node);
-  // Below iOS's status band (swipe.ts#belowStatusBand): a moved tap is never aimed into it.
+  // Below iOS's status band (ui-tree/geometry.ts#belowStatusBand): a moved tap is never aimed into it.
   const box = belowStatusBand(screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect), screen);
   const order = drawOrder(tree);
   const exposed = order.exposure(node, box);
