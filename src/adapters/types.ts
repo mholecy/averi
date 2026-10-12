@@ -748,7 +748,7 @@ export interface DeviceAdapter {
    * call asks again (concurrent callers still share one read in flight).
    * And `{ fresh: true }` reads the device again and replaces the memo: the
    * screen DOES change under a session — a fold or unfold, `wm size` — and
-   * the window-width check (verify/capture.ts#witnessedWindow) re-reads once
+   * the window-width check (verify/capture.ts#ScreenWitness.judge) re-reads once
    * before refusing a window as wider than the screen, instead of refusing
    * until the server restarts.
    */

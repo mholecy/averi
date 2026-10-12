@@ -161,8 +161,9 @@ export type WindowWidth =
       /**
        * Set when the refusal is the device screen's — a window wider than the
        * side it faces — so a FRESH read of the screen may lift it (a fold, an
-       * unfold or `wm size` since the memoized read): verify/capture.ts#
-       * witnessedWindow re-reads once and judges again before reporting it.
+       * unfold or `wm size` since the memoized read):
+       * verify/capture.ts#ScreenWitness.judge re-reads once and judges again
+       * before reporting it.
        */
       widerThanScreen?: true;
     };
@@ -279,7 +280,7 @@ const TREE_WIDTH_UNWITNESSED =
  * server restarted, because `viewport()` was memoized for the adapter's
  * life; a wider-than-screen refusal now carries `widerThanScreen` and its
  * caller re-reads the screen once (`viewport({ fresh: true })`) and judges
- * again (capture.ts#witnessedWindow). Not measured: a real foldable, an
+ * again (capture.ts#ScreenWitness.judge). Not measured: a real foldable, an
  * Android letterboxed or freeform window (refused as a CONTENT width — it
  * starts inset by design, and portrait-shaped or past the bar bound),
  * iPad Stage Manager, an Android landscape window beside a 3-button nav bar
@@ -310,7 +311,7 @@ export function windowWidth(
   const agrees = (side: number): boolean => (Math.abs(size.width - side) / side) * 100 <= SCREEN_AGREEMENT_PCT;
   const on = `on a ${screen.width}x${screen.height} DEVICE screen`;
   // No remedy for a changed screen here: the caller re-reads the screen
-  // before reporting this (capture.ts#witnessedWindow) and says what the
+  // before reporting this (capture.ts#ScreenWitness.judge) and says what the
   // re-read found.
   const tooWide = (bound: string): WindowWidth => ({
     error:

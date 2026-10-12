@@ -133,9 +133,7 @@ export interface DrawOrder {
    * (`UiNode.flatList`, idb's mark) is read: WDA marks its band itself
    * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
    * always undefined here. Read off the band this draw order already found
-   * for its own rows (code review of round 7, S3: until then
-   * soft-keyboard.ts#keyboardBandTop walked the tree for it again, once per
-   * `scroll_until` round and once per moved tap).
+   * for its own rows, not by a second walk of the tree.
    */
   readonly keyboardBandTop: number | undefined;
   /**

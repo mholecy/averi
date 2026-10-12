@@ -13,7 +13,7 @@ import type { DeviceScreen } from './types.js';
  * - `{ fresh: true }` starts a new read and makes it the memo: the screen can
  *   change under a session (a fold or unfold, `wm size`), and the one caller
  *   that needs to know — the window-width check, before refusing a window as
- *   wider than the screen (verify/capture.ts#witnessedWindow) — asks for it.
+ *   wider than the screen (verify/capture.ts#ScreenWitness.judge) — asks for it.
  */
 export class ViewportMemo {
   #pending: Promise<DeviceScreen> | undefined;
