@@ -47,9 +47,11 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * Position — the line nothing may be aimed, stroked or measured under — is
  * `keyboardEdge`'s (below): a corroborated reading's line (`readingLine`)
  * and idb's band merged in one place, read by the tap
- * (interact/resolve.ts#aimClearOfChrome), `scroll_until`'s round
- * (interact/scroll-rounds.ts#strokeTop, `bandCoverOf`) and the pixel poll
- * (verify/pixel-poll.ts#keyboardOverElement).
+ * (interact/resolve.ts#refuseOffScreen for its first ask, #aimClearOfChrome
+ * for the lazy one), `scroll_until`'s round (interact/scroll-rounds.ts
+ * #round, its judgement and its strokes) and the pixel poll
+ * (verify/pixel-poll.ts#keyboardOverElement); which nodes are the
+ * keyboard's own, under no line, is `keyboardSide`'s.
  *
  * WHAT A READING ASKS, AND WHEN — stated once, here (it replaces the tables
  * that stood on `readSoftKeyboard`, `resolveClearOfKeyboard`, the window
@@ -492,11 +494,9 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
  * `idb-band`, which no guard acts on: a centre under it is the judgement's
  * to refuse (ui-tree/standing.ts#Scene).
  */
-export interface KeyboardLine {
-  readonly y: number;
-  readonly source: 'window' | 'wda' | 'idb-band';
-  readonly witnessed: boolean;
-}
+export type KeyboardLine =
+  | { readonly y: number; readonly source: 'window' | 'wda'; readonly witnessed: true }
+  | { readonly y: number; readonly source: 'idb-band'; readonly witnessed: false };
 
 /**
  * The line a reading stands by: the top of everything a SHOWN keyboard
@@ -534,3 +534,23 @@ export function keyboardEdge(reading: KeyboardLine | undefined, order: Pick<Draw
   const band: KeyboardLine | undefined = top === undefined || (subject !== undefined && order.ofKeyboardBand(subject)) ? undefined : { y: top, source: 'idb-band', witnessed: false };
   return higher(reading, band);
 }
+
+/**
+ * Which nodes are the keyboard's OWN UI, under no keyboard line: the
+ * reading's (`KeyboardReading.ofKeyboard`, WDA's marks) and idb's band's
+ * (draw-order.ts#DrawOrder.ofKeyboardBand: its background, the keys that
+ * share a row, what is listed after the background) — for a reader judging
+ * many nodes under one line (`scroll_until`'s round).
+ */
+export function keyboardSide(ofKeyboard: (node: UiNode) => boolean, order: Pick<DrawOrder, 'ofKeyboardBand'>): (node: UiNode) => boolean {
+  return (node) => ofKeyboard(node) || order.ofKeyboardBand(node);
+}
+
+/**
+ * The band a line marks on `screen`: the screen's width, from the line to
+ * the screen's bottom — idb's band's own shape (soft-keyboard.ts
+ * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
+ * sentence quotes for it (the pixel assert's keyboard miss, `scroll_until`'s
+ * cover).
+ */
+export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });

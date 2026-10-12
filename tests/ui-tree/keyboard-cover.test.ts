@@ -404,6 +404,43 @@ describe('keyboardEdge — a corroborated reading, idb\'s band, both, neither', 
   });
 });
 
+/**
+ * Which nodes of idb's band are the keyboard's OWN (exempt from its line): the keys tile the band in rows, so a key
+ * shares its row (top and height) with another node of the run, or is listed after the band's background (Dictate);
+ * an app row listed right before the keys, wholly inside the band, stands alone on its row and is under the line.
+ */
+describe('keyboardEdge — a key of idb\'s band, against an app row listed right before the keys', () => {
+  const login = async () => {
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
+    return parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('TextField', 'User', 20, 200, 362, 44),
+        el('Button', 'Sign in', 20, 700, 362, 50),
+        ...['Q', 'W', 'E', 'R'].map((k, i) => el('Button', k, 2 + 40 * i, 780, 38, 46)),
+        el('Other', null, 0, 590, 402, 284),
+        el('Button', 'Dictate', 325, 805, 68, 69),
+      ]),
+    );
+  };
+  const IDB_590: KeyboardLine = { y: 590, source: 'idb-band', witnessed: false };
+  it('Sign in at 20,700 362x50, listed right before the keys and alone on its row: under the band line', async () => {
+    const tree = await login();
+    expect(keyboardEdge(undefined, drawOrder(tree), tree.children.find((n) => n.label === 'Sign in'))).toEqual(IDB_590);
+  });
+  it('a row is its top AND its height: an app button at the keys\' top but taller (170,780 220x50 beside keys 46 tall) is no key', async () => {
+    const tree = await login();
+    tree.children.find((n) => n.label === 'Sign in')!.rect = { x: 170, y: 780, width: 220, height: 50 };
+    expect(keyboardEdge(undefined, drawOrder(tree), tree.children.find((n) => n.label === 'Sign in'))).toEqual(IDB_590);
+  });
+  it('a key sharing its row (`Q`), and Dictate listed after the background: the keyboard\'s own, under no line', async () => {
+    const tree = await login();
+    const drawn = drawOrder(tree);
+    for (const label of ['Q', 'R', 'Dictate']) expect([label, keyboardEdge(undefined, drawn, tree.children.find((n) => n.label === label))]).toEqual([label, undefined]);
+  });
+});
+
 describe('readingLine — a reading\'s line, only when it stands by a shown cover', () => {
   const BAND = { x: 0, y: 1285, width: 1080, height: 935 };
   it('the window model, corroborated: the cover\'s top, `window`, witnessed', async () => {

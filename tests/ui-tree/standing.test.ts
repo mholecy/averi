@@ -675,6 +675,24 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
     expect(s.kind === 'covered' && s.aboveKeyboard).toBe(true);
     expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: idb(589) }))).toEqual({ kind: 'covered', cover: 'swift_payment.form.continue_button' });
   });
+  it('the owner\'s decision: a centre under the band is refused even with a large piece above it — a row 520–680 (centre (201,600) under key `K`), 362x70 of it above the band: moved without the line, under the keyboard with it', () => {
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number, AXUniqueId: string | null = null) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } });
+    const t = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('Button', 'Row', 20, 520, 362, 160, 'tall'),
+        el('Button', 'K', 180, 594, 44, 40),
+        ...['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((k, i) => el('Button', k, 2 + 40 * i, 640, 38, 46)),
+        el('Other', null, 0, 590, 402, 284),
+      ]),
+    );
+    const row = byId(t, 'tall');
+    const without = sceneOf(t).standing(row, IPHONE, TAP);
+    expect(without.kind === 'reachable' && without.moved !== undefined).toBe(true);
+    const s = sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: idb(590) });
+    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 590, source: 'idb-band' });
+    expect(s.facts.screen).toEqual({ x: 0, y: 62, width: 402, height: 528 });
+  });
   it('a centre above the line and clear: reachable at it, whatever lies under the line', async () => {
     const { t } = await pad(545);
     const iban = byId(t, 'IBAN*');

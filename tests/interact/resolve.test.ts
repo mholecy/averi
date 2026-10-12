@@ -773,11 +773,50 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(refused).rejects.toBeInstanceOf(CoveredRefusal);
     await expect(refused).rejects.toThrow(
       'id:swift_payment.form.value_date_select is under the soft keyboard: its centre (201,591) lies below the keyboard\'s top edge at y 589, where a tap presses the keyboard — ' +
-        'scroll_until it first, or hide the keyboard first (tap a neutral element such as the screen title — a tap: step in a flow); this adapter cannot hide it on its own (tap the title); nothing was tapped',
+        'scroll_until it first, or hide the keyboard (tap a neutral element such as the screen title — a tap: step in a flow); this adapter cannot hide it on its own (tap the title); nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([]);
     // Sent to the key's centre (the fake has no reaction scripted for a key, and says so — the tap was not refused).
     await expect(tapElement(fake, 'text:"5"', OPTS)).rejects.toThrow('FakeAdapter: nothing tappable at (204,677)');
+  });
+
+  it('idb, the owner\'s decision under D2: a row 520–680 with 362x70 of it above the band (590) and its centre (201,600) under key `K` is refused under the keyboard — never moved to the piece above it', async () => {
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number, AXUniqueId: string | null = null) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('Button', 'Row', 20, 520, 362, 160, 'tall'),
+        el('Button', 'K', 180, 594, 44, 40),
+        ...['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((k, i) => el('Button', k, 2 + 40 * i, 640, 38, 46)),
+        el('Other', null, 0, 590, 402, 284),
+      ]),
+    );
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:tall', OPTS)).rejects.toThrow(
+      "id:tall is under the soft keyboard: its centre (201,600) lies below the keyboard's top edge at y 590, where a tap presses the keyboard — scroll_until it first, or hide the keyboard",
+    );
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('idb, an app row listed right before the keys, wholly inside the band (a login\'s Sign in at 20,700 362x50, keys at 780): no key — refused under the keyboard, never tapped on it; a key sharing its row is tapped', async () => {
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number, AXUniqueId: string | null = null) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } });
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        el('Application', 'App', 0, 0, 402, 874),
+        el('TextField', 'User', 20, 200, 362, 44, 'user'),
+        el('Button', 'Sign in', 20, 700, 362, 50, 'signin'),
+        ...['Q', 'W', 'E', 'R'].map((k, i) => el('Button', k, 2 + 40 * i, 780, 38, 46)),
+        el('Other', null, 0, 590, 402, 284),
+      ]),
+    );
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    await expect(tapElement(fake, 'id:signin', OPTS)).rejects.toThrow('id:signin is under the soft keyboard: its centre (201,725)');
+    expect(fake.tapPoints).toEqual([]);
+    await expect(tapElement(fake, 'text:"Q"', OPTS)).rejects.toThrow('FakeAdapter: nothing tappable at (21,803)');
   });
 
   it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre, as before', async () => {

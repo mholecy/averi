@@ -1,7 +1,6 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
-import type { DrawOrder } from '../ui-tree/draw-order.js';
-import { keyboardEdge, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import { bandRect, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
@@ -257,8 +256,7 @@ export type RoundStep =
   | { do: 'stop'; outcome: ScrollOutcome };
 
 /**
- * A shown soft keyboard as the round may apply it (2026-10-08) — a
- * reading's cover (`coverOf`), or idb's band (`bandCoverOf`): its frame,
+ * A shown soft keyboard as the round may apply it — a reading's cover (`coverOf`), or idb's band (`bandCoverOf`): its frame,
  * the part of the screen it leaves — everything above its TOP edge, full
  * width — and what the adapter can do about it. Above the top edge, not
  * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
@@ -683,10 +681,8 @@ interface State {
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   readonly lastCover: Cover | undefined;
   readonly coveredRounds: number;
-  /** The cover the last round whose tree READ applied — undefined when that round applied none — for the stroke of a round whose tree did not read. */
-  readonly lastReadCover: Cover | undefined;
-  /** The draw order of the last tree that READ, for idb's band line (`strokeTop`) of the stroke of a round whose tree did not read — kept as `lastReadCover` is. */
-  readonly lastReadBand: Pick<DrawOrder, 'keyboardBandTop' | 'ofKeyboardBand'> | undefined;
+  /** The keyboard edge the last round whose tree READ stroked above (`strokeTop`: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
+  readonly lastReadEdge: KeyboardLine | undefined;
 
   // How the target moved, read for read (until 2026-10-09 the `Motion`
   // class): a swipe that does not move the element is the only honest
@@ -710,7 +706,7 @@ interface State {
    * earlier read saw it short of it — or, on any read, in the frame at that
    * edge (`observe`'s `atFarEdge`, 2026-10-09): the next stroke turns. Kept across a
    * read that failed — that round strokes as the last read round decided,
-   * as it keeps that round's stroke box (`lastReadCover`); cleared by a read
+   * as it keeps that round's stroke box (`lastReadEdge`); cleared by a read
    * that does not find the target — whether to turn then is `dropped`'s
    * question (2026-10-09; until then such a read meant "a lazy list dropped
    * it: nothing to turn for", and the strokes went on the caller's way).
@@ -771,7 +767,7 @@ interface State {
    * target. Kept across reads that do not find it.
    */
   readonly targetContainers: readonly StrokeContainer[] | undefined;
-  /** The candidates the last read that read judged its stroke's container from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry (kept as the keyboard's cover is, `lastReadCover`). */
+  /** The candidates the last read that read judged its stroke's container from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry (kept as the keyboard's edge is, `lastReadEdge`). */
   readonly lastCandidates: readonly StrokeContainer[];
   /** The container the last stroke SENT was drawn in, a probe's included — undefined when it went over the gesture box whole — for `touchedOn`. */
   readonly strokeWithin: Rect | undefined;
@@ -829,8 +825,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     treesRead: 0,
     lastCover: undefined,
     coveredRounds: 0,
-    lastReadCover: undefined,
-    lastReadBand: undefined,
+    lastReadEdge: undefined,
     since: 'start',
     prevRects: undefined,
     prevBest: undefined,
@@ -889,7 +884,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
  */
 function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): Cover | undefined {
   if (line === undefined || line.y >= viewport.y + viewport.height) return undefined;
-  const topCover = { x: viewport.x, y: line.y, width: viewport.width, height: viewport.y + viewport.height - line.y };
+  const topCover = bandRect(line, viewport);
   return { topCover, above: line.y <= 0 ? undefined : { width: viewport.width, height: line.y }, remedy, line };
 }
 
@@ -906,8 +901,8 @@ function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { 
  * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
  * the band starts below the top bar's line, a fifth of the screen down.
  */
-function strokeTop(cover: Cover | undefined, band: Pick<DrawOrder, 'keyboardBandTop' | 'ofKeyboardBand'> | undefined): number | undefined {
-  return band === undefined ? cover?.line.y : keyboardEdge(cover?.line, band)?.y;
+function strokeTop(cover: Cover | undefined, scene: Scene): KeyboardLine | undefined {
+  return keyboardEdge(cover?.line, scene.order);
 }
 
 /**
@@ -1414,13 +1409,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const whole = judgeOver(found, s.frame, facts, fully);
   // idb's band (D2), when no reading offers a cover — never both today: idb's reading is always `unknown`.
   const band = offered !== undefined || read === undefined || facts === undefined ? undefined : bandCoverOf(keyboardEdge(undefined, facts.scene.order), viewport, read.remedy);
+  const applied = offered ?? band;
   let cover: Cover | undefined;
   let best = whole;
-  if ((offered ?? band) !== undefined && read !== undefined && facts !== undefined) {
-    const applied = (offered ?? band)!;
+  if (applied !== undefined && read !== undefined && facts !== undefined) {
     // The keyboard's own UI is judged against the whole screen: the reading's (WDA's marks), and idb's band's own nodes.
-    const keyboardSide = (n: UiNode): boolean => read.ofKeyboard(n) || facts.scene.order.ofKeyboardBand(n);
-    const covered = judge(found, s.frame, facts, fully, { cover: applied, keyboardSide });
+    const covered = judge(found, s.frame, facts, fully, { cover: applied, keyboardSide: keyboardSide(read.ofKeyboard, facts.scene.order) });
     // Moot: the round stops cleanly either way, on the same judgement — the
     // band changes nothing, and is neither asked about nor reported.
     // Otherwise the witness is asked THIS round, never remembered: a
@@ -1445,11 +1439,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     s.lastCover = cover;
     s.coveredRounds++;
   }
-  if (read !== undefined) s.lastReadCover = cover;
-  // idb's keyboard band, read off this round's tree — the line the strokes
-  // stay above whether or not the round applied it (`strokeTop`); a round
-  // whose tree did not read keeps the last read round's, as its cover.
-  if (facts !== undefined) s.lastReadBand = facts.scene.order;
+  // The line this read's strokes stay above — its cover's and idb's band,
+  // whether or not the round applied the band (`strokeTop`); a round whose
+  // tree did not read keeps the last read round's, as its cover.
+  if (read !== undefined && facts !== undefined) s.lastReadEdge = strokeTop(cover, facts.scene);
   // The frames this round judged in — the screen above an applied keyboard,
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
@@ -1523,7 +1516,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           // above it — the probe would touch down off it and move nothing.
           // Twice only to keep the ask order: no room even over the whole
           // screen is `room` with no witness asked, as it was.
-          const over = roomOver(strokeTop(probeCover, s.lastReadBand));
+          const over = roomOver(strokeTop(probeCover, now.facts.scene)?.y);
           if (over === undefined) flush = { edge, container, ...noRoom };
           else {
             const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
@@ -1624,10 +1617,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // Toward the caller's direction, or back after a fling past the target,
   // the reach halved per turn so the scroll converges (`nextStroke`). A
   // round whose tree did not read has no reading of its own and keeps the
-  // cover of the last round that DID read — none if that round applied
-  // none — rather than stroke through the keyboard it last saw.
+  // keyboard edge of the last round that DID read (`lastReadEdge`) rather
+  // than stroke through the keyboard it last saw.
   const { toward, reach, turn } = nextStroke(s);
-  const strokeCover = read === undefined ? s.lastReadCover : cover;
   // Over the target's scroll containers once a read has placed it in
   // them, else the screen's largest (2026-10-09; swipe.ts#strokeRoom): the
   // stroke touches down on what scrolls, and its length is that
@@ -1654,7 +1646,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // review of fix/r5-stroke). `over` is looked up by the candidate's own
   // rect object — strokeRoom hands back the one it was given — so nested
   // containers of equal rects keep their own.
-  const kept = strokeTop(strokeCover, s.lastReadBand);
+  const kept = (now === undefined ? s.lastReadEdge : strokeTop(cover, now.facts.scene))?.y;
   const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, kept, (w) => candidates.find((c) => c.rect === w)?.over);
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;

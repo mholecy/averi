@@ -2,7 +2,7 @@ import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, type DeviceAdapter, 
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { belowStatusBand, containsPoint, nodeText, overlapsPastSlack, rectCentre, rectsOverlap, rectText, rectWithin, sameRect, screenOf } from '../ui-tree/geometry.js';
 import { listsAncestry } from '../ui-tree/draw-order.js';
-import { keyboardEdge, readKeyboard } from '../ui-tree/keyboard-cover.js';
+import { bandRect, keyboardEdge, readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -514,8 +514,7 @@ async function keyboardOverElement(
   if (frame !== undefined) return { frame, remedy: keyboard.remedy };
   const line = keyboardEdge(undefined, scene.order, element);
   if (line === undefined) return undefined;
-  const screen = screenOf(tree);
-  const band = { x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y };
+  const band = bandRect(line, screenOf(tree));
   return rectsOverlap(element.rect, band) ? { frame: band, remedy: keyboard.remedy } : undefined;
 }
 

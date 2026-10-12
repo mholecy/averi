@@ -154,8 +154,8 @@ export interface DrawOrder {
    */
   readonly keyboardBandTop: number | undefined;
   /**
-   * Is `node` part of idb's keyboard band — its background or a node of
-   * the run listed beside it (`keyboardOf`'s keys, Dictate included)? The
+   * Is `node` idb's keyboard's OWN — its band's background, a key
+   * (`sharesRow`), or a node listed after the background (Dictate)? The
    * keyboard's own UI on a flat list, as `UiNode.ofKeyboard` marks it on
    * WDA's tree: under no band line (ui-tree/keyboard-cover.ts#keyboardEdge's
    * `subject`). Always false on a tree with no band.
@@ -1213,12 +1213,38 @@ export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
  * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
  * rule and its measurements there, moved there in round 7), with its top
  * for the keyboard edge (`DrawOrder.keyboardBandTop`), with the run of
- * nodes it holds as the keys (`DrawOrder.ofKeyboardBand`).
+ * nodes it holds as `keys` (bottom chrome, drawn over what lies under
+ * them) and of those the keyboard's `own` (`sharesRow`,
+ * `DrawOrder.ofKeyboardBand`).
  */
-function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
+function keyboardOf(
+  order: readonly Placed[],
+  screen: Rect,
+  barLine: number,
+): { readonly top: number; readonly keys: ReadonlySet<Placed>; readonly own: ReadonlySet<UiNode> } | undefined {
   const band = flatListKeyboardBand(order.map((p) => p.node), screen, barLine);
-  return band === undefined ? undefined : { top: band.top, keys: new Set(order.slice(band.from, band.to)) };
+  if (band === undefined) return undefined;
+  const run = order.slice(band.from, band.to).map((p) => p.node);
+  const background = order[band.at].node;
+  return { top: band.top, keys: new Set(order.slice(band.from, band.to)), own: new Set(run.filter((n, i) => n === background || band.from + i > band.at || sharesRow(n, run))) };
 }
+
+/**
+ * A node of idb's keyboard run that shares its ROW — its top and height —
+ * with another node of the run: keys tile the band in rows (the number
+ * pad's `1 2 3` at 596, `4 5 6` at 650…; QWERTY's letters), and an app
+ * node listed right before the keys, wholly inside the band (a Sign in
+ * button behind the keyboard), stands alone on its row. With the
+ * background and what is listed after it (Dictate), the keyboard's OWN
+ * nodes (`DrawOrder.ofKeyboardBand`). Chosen over a key's size (a space
+ * bar is half the screen wide, an app button may be small) and over the
+ * list's order alone (the app node is listed in the run). Its errors are
+ * the safe way round: a key alone on its row reads as content under the
+ * line, so a tap on it is refused; two app nodes side by side behind the
+ * keyboard read as keys, a residual (no idb dump has one).
+ */
+const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
+  run.some((other) => other !== node && other.rect.y === node.rect.y && other.rect.height === node.rect.height);
 
 /**
  * The nodes of a flat list PINNED AT ITS BOTTOM, each with the line its
@@ -1504,7 +1530,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
 
   const api: DrawOrder = {
     keyboardBandTop: keyboard?.top,
-    ofKeyboardBand: (node) => keyboard !== undefined && [...keyboard.keys].some((p) => p.node === node),
+    ofKeyboardBand: (node) => keyboard?.own.has(node) === true,
     paintsOver(node, box) {
       const target = placesOf(node)[0];
       if (target === undefined) return [];

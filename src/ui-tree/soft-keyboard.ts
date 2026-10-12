@@ -70,7 +70,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * keyboard on screen, cut the strokes and the taps there); the keyboard is
  * that node and the run of nodes listed beside it (before and after, in the
  * list's order) lying wholly inside it — `from` to `to`, the walk indexes
- * of that run (`to` exclusive). The last node listed with that shape is
+ * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
  * ui_snapshot replies (code review of round 7, MAJOR 1): the 14 with a
@@ -87,7 +87,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * background listed after its buttons (no idb dump has either), reads as a
  * band — its top then ends the strokes and cuts a moved tap, the safe way.
  */
-export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, barLine: number): { readonly top: number; readonly from: number; readonly to: number } | undefined {
+export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, barLine: number): { readonly top: number; readonly from: number; readonly to: number; readonly at: number } | undefined {
   const bottom = screen.y + screen.height;
   for (let back = nodes.length - 1; back > 0; back--) {
     const node = nodes[back];
@@ -99,7 +99,7 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
     if (from === back) continue; // no key listed before it: a sheet's background, not a keyboard's
     let to = back + 1;
     while (inside(nodes[to])) to++;
-    return { top: band.y, from, to };
+    return { top: band.y, from, to, at: back };
   }
   return undefined;
 }

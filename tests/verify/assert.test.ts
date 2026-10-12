@@ -2400,6 +2400,29 @@ describe('pixel asserts under idb\'s keyboard band (D2)', async () => {
     const c = await new Verifier(fake, FAST).assert({ element: { id: 'swift_payment.form.value_date_select' }, color: { expected: '#FFFFFF' } });
     expect(c.detail).toBe(`the soft keyboard covers the element (element 24,565 354x52, keyboard 0,589 402x285) — ${KEYBOARD_REMEDY}`);
   });
+  it('an app row listed right before the keys, wholly inside the band (Sign in at 20,700 362x50, keys at 780): the keyboard\'s miss, never measured', async () => {
+    const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number, AXUniqueId: string | null = null) => ({ type, AXLabel, AXUniqueId, AXValue: null, frame: { x, y, width, height } });
+    const fake = new FakeAdapter(
+      {
+        form: parseIdbDescribeAll(
+          JSON.stringify([
+            el('Application', 'App', 0, 0, 402, 874),
+            el('Button', 'Sign in', 20, 700, 362, 50, 'signin'),
+            ...['Q', 'W', 'E', 'R'].map((k, i) => el('Button', k, 2 + 40 * i, 780, 38, 46)),
+            el('Other', null, 0, 590, 402, 284),
+          ]),
+        ),
+      },
+      'form',
+    );
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.keyboardAdvice = 'ADVICE';
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    fake.nextScreenshot = png(402, 874, (p) => p.data.fill(255));
+    const c = await new Verifier(fake, FAST).assert({ element: { id: 'signin' }, color: { expected: '#FFFFFF' } });
+    expect(c.detail).toBe(`the soft keyboard covers the element (element 20,700 362x50, keyboard 0,590 402x284) — ${KEYBOARD_REMEDY}`);
+  });
   it('a key itself is the keyboard\'s own UI: measured', async () => {
     const fake = pad(545);
     const c = await new Verifier(fake, FAST).assert({ element: { text: '5' }, color: { expected: '#FFFFFF' } });

@@ -1078,6 +1078,18 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(await scrollUntilVisible(fake, 'text:"5"', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 
+  it('D2: a stop judged above idb\'s band says so — `keyboard` shown with the band\'s rect, `source: \'idb-band\'` (no reading says it is shown)', async () => {
+    const { tree, street } = await numberPad();
+    street.rect = { x: 0, y: 560, width: 20, height: 40 }; // 560–600, centre (10,580) above the band and left of CONTINUE's reach, its bottom under the band
+    const fake = idbForm(tree, street, 589);
+    expect(await scrollUntilVisible(fake, 'text:"Payee’s street"', FAST)).toEqual({
+      swipes: 0,
+      visible: 29 / 40,
+      clipped: ['bottom'],
+      keyboard: { state: 'shown', frame: { x: 0, y: 589, width: 402, height: 285 }, source: 'idb-band' },
+    });
+  });
+
   it('Contacts\' New Contact with QWERTY up (the band `other 0,590 402x284`, Dictate after it): `add url` at 20,902 is stroked toward from above the keys', async () => {
     const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
     const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
@@ -1148,10 +1160,12 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(banded).toEqual(await strokes(false));
   });
 
-  it('the fully: true flush probe keeps above the band too (code review of round 7, MINOR 2; synthetic — idb lists no clipping container): a row flush with its list\'s bottom, the pad up (keys "1" and "3" clear of the stroke\'s line) — the probe touches down above 589, not in the band at 759', async () => {
+  it('the fully: true flush probe keeps above the band too (synthetic — idb lists no clipping container): a row flush with its short list\'s bottom at the band\'s top, the list too short for a probe, so it is drawn over the outer list running under the band (keys "1" and "3" clear of the stroke\'s line) — the probe touches down above 589, not in the band', async () => {
     const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
-    const row = node({ role: 'button', identifier: 'row', rect: r(0, 834, 402, 40) });
-    const list = node({ role: 'container', rect: r(0, 300, 402, 574), clipsDescendants: true, children: [row] });
+    // The row lies wholly above the band (owner decision D2: a stop under it is no stop).
+    const row = node({ role: 'button', identifier: 'row', rect: r(0, 549, 402, 40) });
+    const inner = node({ role: 'container', rect: r(0, 529, 402, 60), clipsDescendants: true, children: [row] });
+    const list = node({ role: 'container', rect: r(0, 300, 402, 574), clipsDescendants: true, children: [inner] });
     const keys = [5, 270].map((x, i) => node({ role: 'button', label: String(2 * i + 1), rect: r(x, 596, 132, 54) }));
     const tree = node({ role: 'container', rect: r(0, 0, 0, 0), flatList: true, children: [node({ role: 'other', label: 'App', rect: r(0, 0, 402, 874) }), list, ...keys, node({ role: 'other', rect: r(0, 589, 402, 285) })] });
     const fake = new FakeAdapter({ s: tree }, 's');
@@ -1159,7 +1173,7 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
-    expect(result.flush).toEqual({ edge: 'bottom', container: list.rect, checked: true });
+    expect(result.flush).toEqual({ edge: 'bottom', container: inner.rect, checked: true });
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 532 }, to: { x: 201, y: 484 } }]);
   });
 

@@ -759,11 +759,13 @@ export function cutRemedy(edge: Edge): string {
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
 }
 
-/** How to hide a keyboard a tap refused a centre under, by what the adapter can hide it with (the reading's `KeyboardRemedy`). */
-const hideFirst = ({ dismissal, advice }: KeyboardRemedy): string =>
-  dismissal === 'back'
-    ? 'hide the keyboard first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow)'
-    : `hide the keyboard first (tap a neutral element such as the screen title — a tap: step in a flow); ${cannotHide(advice)}`;
+/**
+ * How to hide a keyboard a tap refused a centre under: only a line no guard
+ * acts on is refused (`underKeyboard`), idb's band, whose adapter has no
+ * key that hides it (`KeyboardRemedy.dismissal` is `none`) — so the way is a
+ * tap the author adds, and the adapter's `advice`.
+ */
+const hideIt = ({ advice }: KeyboardRemedy): string => `hide the keyboard (tap a neutral element such as the screen title — a tap: step in a flow); ${cannotHide(advice)}`;
 
 /** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
 export interface Aim {
@@ -869,7 +871,7 @@ export async function aimClearOfChrome(
       throw new CoveredRefusal(
         refusal(
           `under the soft keyboard: its centre (${centre.x},${centre.y}) lies below the keyboard's top edge at y ${standing.line.y}, where a tap presses the keyboard — ` +
-            `scroll_until it first, or ${hideFirst(keyboard.remedy)}`,
+            `scroll_until it first, or ${hideIt(keyboard.remedy)}`,
         ),
       );
     default:
