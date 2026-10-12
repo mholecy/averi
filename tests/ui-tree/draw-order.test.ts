@@ -1329,6 +1329,21 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen).toMatchObject({ covers: [], tapAt: { point: { x: 48, y: 90 }, moved: false } });
     });
 
+    it('a web view is the nearest scroller of what it holds, for `structural`\'s wrapper excuse too: an unlabelled wrapper listed after a link, holding the link\'s web view whole (inside a scroll view), is no cover of it', () => {
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 300, 200, 30) });
+      const page = uiNode({ role: 'webview', rect: rect(0, 200, 402, 400), children: [link] });
+      const wrapper = uiNode({ role: 'container', rect: rect(0, 150, 402, 500), children: [uiNode({ role: 'text', label: 'Footer', rect: rect(16, 620, 200, 20) })] });
+      const tree = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [page, wrapper] })] });
+      expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([]);
+    });
+
+    it('…and for the scroll-indicator row: an indicator-shaped `container` (a child of the web view holding only empty frames) over a link is no cover of it', () => {
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 300, 200, 30) });
+      const bar = uiNode({ role: 'container', label: 'Vertical scroll bar, 2 pages', rect: rect(10, 290, 380, 50), children: [uiNode({ role: 'container', rect: rect(380, 300, 3, 30) })] });
+      const tree = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [link, bar] })] });
+      expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([]);
+    });
+
     it('a link under a sticky element of ITS OWN web page still has that element over it', () => {
       const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 100, 200, 30) });
       const sticky = uiNode({ role: 'text', label: 'Contents', rect: rect(0, 90, 402, 40) });

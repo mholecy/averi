@@ -377,9 +377,10 @@ export interface UiNode {
    * Widened only along y, on one side, to descendants with the node's
    * exact x and width, cut to the nearest clipping ancestor
    * (`clipsDescendants`), and only where something is drawn over the strip
-   * gained, as the draw order judges it for this node as a target
-   * (DrawnOverStrip) — so never under a screen-sized wrapper with nothing of
-   * its own there (a snackbar host) or a bare structural node; a control
+   * gained, as draw order's target column judges it for this node
+   * (DrawnOverStrip; every excuse of that column applies — e.g. never under a
+   * screen-sized wrapper with nothing of its own there, a snackbar host, nor
+   * a bare structural node or a childless scrim); a control
    * padded inside its wrapper (`paddedTouchTargets`), a full-bleed child and
    * a child overflowing both edges never widen it either. Residuals,
    * stated: a node cut at BOTH ends (a tall card between a sticky header and
@@ -480,7 +481,8 @@ export function* everyNode(root: UiNode): Generator<UiNode> {
  * so the parser is handed it, required — the composition root
  * (mcp/registry.ts) and the test helper wire it. Dependency inversion with
  * ONE implementation, not a seam: there is no second judgement to plug in,
- * and a parser-side fallback would be one.
+ * and a parser-side fallback would be one. The judge sees the rects as
+ * dumped, and is discarded before any rect changes.
  */
 export type DrawnOverStrip = (root: UiNode) => (node: UiNode, strip: Rect) => boolean;
 

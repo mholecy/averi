@@ -31,6 +31,11 @@ describe('clips and scrolls — the two scroll-container facts, by node shape', 
     ['Compose scroller (a View, the flag alone)', parsedAndroid('<node class="android.view.View" scrollable="true" bounds="[0,200][1080,2000]"><node class="android.widget.TextView" text="Row" bounds="[0,200][1080,300]" /></node>'), { clips: true, scrolls: true }],
     ['Android WebView, no flag', parsedAndroid('<node class="android.webkit.WebView" scrollable="false" bounds="[0,200][1080,2000]" />'), { clips: false, scrolls: true }],
     ['a text field carrying the flag (a Compose text input dumped as a ScrollView)', node({ role: 'textfield', clipsDescendants: true }), { clips: true, scrolls: true }],
+    [
+      'a Compose text input dumped as a ScrollView (focusable, long-clickable, scrollable="true"), as the parser reads it',
+      parsedAndroid('<node class="android.widget.ScrollView" focusable="true" long-clickable="true" scrollable="true" text="user" bounds="[40,260][1040,400]" />'),
+      { clips: true, scrolls: true },
+    ],
     ['a plain container', node({ role: 'container' }), { clips: false, scrolls: false }],
   ];
 
@@ -50,6 +55,7 @@ describe('clips and scrolls — the two scroll-container facts, by node shape', 
       ['container', true],
       ['webview', false],
     ]);
+    expect([ROWS[9][1].role, ROWS[9][1].clipsDescendants]).toEqual(['textfield', true]);
   });
 });
 

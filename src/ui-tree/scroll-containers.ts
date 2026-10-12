@@ -15,8 +15,11 @@ import type { UiNode } from '../adapters/types.js';
  *   invented.
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
- *   (geometry.ts#insideScroller), and whether a node is scrolled content or
- *   a scroll indicator for draw order. A node that clips scrolls (Android's
+ *   (geometry.ts#insideScroller), and, for draw order, a node's nearest
+ *   scroller (`Placed.scroller`), which three target rows read: scrolled
+ *   content, `structural`'s wrapper excuse (`holdsWhole`: a wrapper holding
+ *   the target's nearest scroller whole) and the scroll indicator (a child
+ *   of a node that scrolls). A node that clips scrolls (Android's
  *   flag means "scrolls now"); so does a node of a `SCROLLING_ROLES` role,
  *   with or without the flag: a scroll view, and a web view, whose page
  *   scrolls under its frame. A classic Android list whose content fits

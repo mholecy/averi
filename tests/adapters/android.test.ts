@@ -228,6 +228,23 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(rowOf(rowWith('', tabHost))).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
   });
 
+  it('every target-column excuse applies, those measured on iOS too: a childless full-screen scrim listed after the list widens nothing, nor a classic list sheet (a RecyclerView) whose rows lie on the strip — its rows are another scroller\'s content, its frame no surface', () => {
+    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="scrim" bounds="[0,0][1080,2220]" />'))).not.toHaveProperty('cutBounds');
+    const sheet = `<node class="androidx.recyclerview.widget.RecyclerView" resource-id="sheet" scrollable="false" bounds="[0,1520][1080,2220]">
+  <node class="android.widget.TextView" resource-id="sheet_row" text="Share" bounds="[0,1540][1080,1700]" />
+</node>`;
+    expect(rowOf(rowWith('', sheet))).not.toHaveProperty('cutBounds');
+  });
+
+  it('the strip is judged with the dump\'s mark in place (paddedTouchTargets): a label cut short of its text whose own icon button, padded evenly in their wrapper and centred on it, lies on the strip is not widened under its own control', () => {
+    const t = rowWith(`
+ <node class="android.view.View" resource-id="wrapper" bounds="[100,1000][400,1300]">
+  <node class="android.view.View" resource-id="label" bounds="[150,1100][350,1200]"><node class="android.widget.TextView" text="Edit" bounds="[150,1050][350,1200]" /></node>
+  <node class="android.widget.Button" bounds="[150,1050][350,1250]" />
+ </node>`, '');
+    expect([...everyNode(t)].find((n) => n.identifier === 'label')).not.toHaveProperty('cutBounds');
+  });
+
   it('the residual, pinned (permanent): the NEXT row of the same list, listed after the row and lying on the strip its touch target overflows into, is drawn there exactly as a sticky header is — the row is widened as if cut', () => {
     const t = rowWith('<node class="android.view.View" resource-id="next" content-desc="Next" bounds="[66,1550][1014,1700]" />', '');
     expect(rowOf(t)).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
