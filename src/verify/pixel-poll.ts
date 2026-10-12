@@ -1,12 +1,12 @@
 import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, containsPoint, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, nodeText, overlapsPastSlack, rectCentre, rectsOverlap, rectText, rectWithin, sameRect, screenOf } from '../ui-tree/geometry.js';
 import { listsAncestry } from '../ui-tree/draw-order.js';
-import { readKeyboard } from '../ui-tree/keyboard-cover.js';
+import { bandRect, keyboardEdge, readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, treeScreen, usableScreen } from '../ui-tree/standing.js';
+import { sceneOf, treeScreen, usableScreen, type Scene } from '../ui-tree/standing.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -162,8 +162,8 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * quotes the adapter's sentence on why and where the dismissal is
  * configured (`DeviceAdapter.keyboardAdvice`) — never `back`. An idb tree
  * marks no band (iOS 27's idb lists the keys and the band, unmarked) and
- * reads `unknown`: the pre-2026-10-07 behaviour,
- * silently, as the Android residuals above.
+ * its reading is `unknown`; its band, read by shape, is the same covered
+ * miss through the keyboard edge (`keyboardOverElement`; owner decision D2), with the same remedy.
  *
  * Since round 8 (2026-10-12; docs/bugs/2026-10-10-ios-pixel-asserts-sample-
  * the-chrome-over-their-element.md, the owner's decision: fail closed) a
@@ -208,8 +208,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * Application node under a colour assert fails on the content listed over
  * its sample; `scroll_until … fully: true` lets the rest of an element lie under
  * the band once its centre is below it, so for such an element only the
- * child advice cures the miss; under idb a keyboard's keys are nodes like
- * any other and are named as the cover; what a tree does not list (a top
+ * child advice cures the miss; what a tree does not list (a top
  * bar WDA lists before the scroll view) is no cover here, as for the tap;
  * in idb's flat list a real overlay whose words are all words of the
  * element's label is read as its own content (a toast "Saved" over a card
@@ -496,16 +495,27 @@ class PixelPollMemory {
  * per such round, the figures on AndroidAdapter's keyboardTouchable), and an
  * element under it is the same covered miss, quoting the panel's rect —
  * the band first, then the panels: the first that overlaps is the frame the
- * miss quotes.
+ * miss quotes. And idb's band (owner decision D2: ui-tree/keyboard-cover.ts
+ * #keyboardEdge, which no reading stands by — idb's reading is `unknown`):
+ * an element overlapping it is the same miss, quoting the band — the tree's
+ * screen's width from its line to the screen's bottom, the band's own
+ * shape — with the reading's remedy; its keys are no covers named instead,
+ * and an element in a gap between them never measures keyboard pixels. A
+ * node of the band itself (a key) is the keyboard's own UI, measured.
  */
 async function keyboardOverElement(
   adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
+  scene: Scene,
 ): Promise<{ frame: Rect; remedy: KeyboardRemedy } | undefined> {
   const keyboard = readKeyboard(adapter, tree);
   const frame = await keyboard.overlapping(element.rect, element);
-  return frame === undefined ? undefined : { frame, remedy: keyboard.remedy };
+  if (frame !== undefined) return { frame, remedy: keyboard.remedy };
+  const line = keyboardEdge(undefined, scene.order, element);
+  if (line === undefined) return undefined;
+  const band = bandRect(line, screenOf(tree));
+  return rectsOverlap(element.rect, band) ? { frame: band, remedy: keyboard.remedy } : undefined;
 }
 
 /**
@@ -581,6 +591,7 @@ export async function chromeOverElement(
   tree: UiNode,
   element: UiNode,
   reads: Rect = element.rect,
+  scene: Scene = sceneOf(tree),
 ): Promise<string | undefined> {
   // The usable screen's single box (ui-tree/standing.ts#usableScreen); with none, the tree's own screen — and no band,
   // which only the device reports.
@@ -590,7 +601,6 @@ export async function chromeOverElement(
   const band: Rect = { ...screen, height: below.y - screen.y };
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
-  const scene = sceneOf(tree);
   const pinned = scene.clips.inScroller(element) !== true;
   // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
   // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
@@ -676,10 +686,12 @@ export async function pollPixels(
     const { rect } = found[0];
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
-    const keyboard = await keyboardOverElement(adapter, tree, found[0]);
+    // One scene of the tree for both checks (ui-tree/standing.ts#sceneOf): its draw order derived once.
+    const scene = sceneOf(tree);
+    const keyboard = await keyboardOverElement(adapter, tree, found[0], scene);
     if (keyboard !== undefined) return memory.covered(rect, keyboard.frame, keyboard.remedy);
     // After the keyboard, which has its own remedy: the status band, then what of the app is drawn over it (round 8).
-    const over = await chromeOverElement(adapter, tree, found[0], spec.reads?.(rect));
+    const over = await chromeOverElement(adapter, tree, found[0], spec.reads?.(rect), scene);
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".

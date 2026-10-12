@@ -1,4 +1,5 @@
 import { rectArea, sameRect, type DeviceAdapter, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
+import type { DrawOrder } from './draw-order.js';
 import { containsPoint, rectsOverlap, rectText } from './geometry.js';
 import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-keyboard.js';
 
@@ -32,6 +33,25 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * a rule for their disagreement), and an adapter without one asks no device.
  * The tree is still read with an oracle for one thing — which nodes are the
  * keyboard's own UI (`ofKeyboard`), which on Android is none.
+ *
+ * EVERY KEYBOARD SOURCE, and who reads it:
+ * - the Android window model (the oracle: the inset band, a floating
+ *   Gboard's panels, the input method's word) — a reading;
+ * - WDA's in-tree band (`KEYBOARD_ROLE`, `ofKeyboard` marks,
+ *   soft-keyboard.ts#keyboardInTree) — a reading;
+ * - idb's band, read by its shape (soft-keyboard.ts#flatListKeyboardBand,
+ *   draw-order.ts#DrawOrder.keyboardBandTop) — a POSITION and nothing more,
+ *   never a reading: an idb reading stays `unknown`, so the guard and the
+ *   in-tree dismissal press nothing there (K5d).
+ * State — shown, hidden, covering a point — is asked of a reading only.
+ * Position — the line nothing may be aimed, stroked or measured under — is
+ * `keyboardEdge`'s (below): a corroborated reading's line (`readingLine`)
+ * and idb's band merged in one place, read by the tap
+ * (interact/resolve.ts#refuseOffScreen for its first ask, #aimClearOfChrome
+ * for the lazy one), `scroll_until`'s round (interact/scroll-rounds.ts
+ * #round, its judgement and its strokes) and the pixel poll
+ * (verify/pixel-poll.ts#keyboardOverElement); which nodes are the
+ * keyboard's own, under no line, is `keyboardSide`'s.
  *
  * WHAT A READING ASKS, AND WHEN — stated once, here (it replaces the tables
  * that stood on `readSoftKeyboard`, `resolveClearOfKeyboard`, the window
@@ -456,3 +476,81 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
     remedy,
   };
 }
+
+// ─── The keyboard edge ───────────────────────────────────────────────────────
+
+/**
+ * A soft keyboard's top edge as a LINE nothing may be aimed or stroked
+ * under, with where it came from:
+ * - `window` — the Android window model's cover (the inset band, or a
+ *   floating panel above it), the input method standing by it;
+ * - `wda` — the band WDA marks in the tree (`KEYBOARD_ROLE`), read off the
+ *   very tree being judged;
+ * - `idb-band` — idb's band, read by its shape (draw-order.ts
+ *   #DrawOrder.keyboardBandTop), a position and nothing more: no reading
+ *   says the keyboard is shown (`keyboardInTree` stays `unknown`, K5d).
+ * `witnessed`: a reading stands by it, so the tap's guard acts on a point
+ * under it (interact/keyboard.ts) — true for `window` and `wda`, false for
+ * `idb-band`, which no guard acts on: a centre under it is the judgement's
+ * to refuse (ui-tree/standing.ts#Scene).
+ */
+export type KeyboardLine =
+  | { readonly y: number; readonly source: 'window' | 'wda'; readonly witnessed: true }
+  | { readonly y: number; readonly source: 'idb-band'; readonly witnessed: false };
+
+/**
+ * The line a reading stands by: the top of everything a SHOWN keyboard
+ * covers (`cover().top`, a floating panel above the band included) when
+ * the reading is `corroborated` — else none. `window` on the oracle's model,
+ * `wda` on the in-tree one (its remedy says which). Costs what `cover` and
+ * `corroborated` cost (the module doc); asked by the tap only when its
+ * centre is covered (interact/resolve.ts#aimClearOfChrome). `scroll_until`
+ * asks the same two through its round's protocol instead
+ * (interact/scroll-rounds.ts#Cover).
+ */
+export async function readingLine(reading: KeyboardReading): Promise<KeyboardLine | undefined> {
+  const cover = await reading.cover();
+  if (cover === undefined || !(await reading.corroborated())) return undefined;
+  return { y: cover.top.y, source: reading.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
+}
+
+/** The higher of two lines (the smaller y), either of which may be absent; a tie keeps `a`. */
+const higher = (a: KeyboardLine | undefined, b: KeyboardLine | undefined): KeyboardLine | undefined => (a === undefined ? b : b === undefined || a.y <= b.y ? a : b);
+
+/**
+ * THE keyboard edge — the one merge of every keyboard source into the line
+ * the tap, `scroll_until` and the pixel assert judge and stroke against: a
+ * reading's line (`readingLine`, or the cover `scroll_until`'s round
+ * applied) and idb's band line (`order.keyboardBandTop`, its one reader),
+ * the higher of the two. Never both today — idb's reading is always
+ * `unknown`, and only idb's flat list has a band — kept for a source that
+ * one day gives both. `subject`, when given: a node of idb's band itself
+ * (`order.ofKeyboardBand` — a key, the band's background) is under no band
+ * line, as a node of WDA's keyboard (`KeyboardReading.ofKeyboard`) is under
+ * no reading's: a tap on a key is the thing the user does.
+ */
+export function keyboardEdge(reading: KeyboardLine | undefined, order: Pick<DrawOrder, 'keyboardBandTop' | 'ofKeyboardBand'>, subject?: UiNode): KeyboardLine | undefined {
+  const top = order.keyboardBandTop;
+  const band: KeyboardLine | undefined = top === undefined || (subject !== undefined && order.ofKeyboardBand(subject)) ? undefined : { y: top, source: 'idb-band', witnessed: false };
+  return higher(reading, band);
+}
+
+/**
+ * Which nodes are the keyboard's OWN UI, under no keyboard line: the
+ * reading's (`KeyboardReading.ofKeyboard`, WDA's marks) and idb's band's
+ * (draw-order.ts#DrawOrder.ofKeyboardBand: its background, the keys that
+ * share a row, what is listed after the background) — for a reader judging
+ * many nodes under one line (`scroll_until`'s round).
+ */
+export function keyboardSide(ofKeyboard: (node: UiNode) => boolean, order: Pick<DrawOrder, 'ofKeyboardBand'>): (node: UiNode) => boolean {
+  return (node) => ofKeyboard(node) || order.ofKeyboardBand(node);
+}
+
+/**
+ * The band a line marks on `screen`: the screen's width, from the line to
+ * the screen's bottom — idb's band's own shape (soft-keyboard.ts
+ * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
+ * sentence quotes for it (the pixel assert's keyboard miss, `scroll_until`'s
+ * cover).
+ */
+export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });

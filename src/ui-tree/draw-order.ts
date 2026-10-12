@@ -144,17 +144,23 @@ export interface DrawOrder {
    * (soft-keyboard.ts#keyboardInTree stays `unknown` on an idb tree, and
    * with it every `shown`/`hidden` question of keyboard-cover.ts#readKeyboard
    * and the in-tree dismissal — a blind key there was measured to submit,
-   * K5d). Two readers, and only these: `scroll_until`'s stroke box ends
-   * above it (no touch-down on a key — interact/scroll-rounds.ts#strokeTop),
-   * and the tap's chrome check cuts its box above it before a piece is
-   * chosen (no piece, no "part that shows", inside the band —
-   * interact/resolve.ts#aimClearOfChrome). Only a FLAT LIST
+   * K5d). One reader: ui-tree/keyboard-cover.ts#keyboardEdge, the one
+   * merge of every keyboard source into the line the tap, `scroll_until` and
+   * the pixel assert judge and stroke against. Only a FLAT LIST
    * (`UiNode.flatList`, idb's mark) is read: WDA marks its band itself
    * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
    * always undefined here. Read off the band this draw order already found
    * for its own rows, not by a second walk of the tree.
    */
   readonly keyboardBandTop: number | undefined;
+  /**
+   * Is `node` idb's keyboard's OWN — its band's background, a key
+   * (`sharesRow`), or a node listed after the background (Dictate)? The
+   * keyboard's own UI on a flat list, as `UiNode.ofKeyboard` marks it on
+   * WDA's tree: under no band line (ui-tree/keyboard-cover.ts#keyboardEdge's
+   * `subject`). Always false on a tree with no band.
+   */
+  ofKeyboardBand(node: UiNode): boolean;
   /**
    * The covers of `exposure(node, within)` that hide PIXELS of `node` —
    * what a colour sample or an ocr crop of its rect would read instead of
@@ -1206,13 +1212,44 @@ export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
  * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): the band
  * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
  * rule and its measurements there, moved there in round 7), with its top
- * for the stroke box and the tap's chrome check (`DrawOrder.keyboardBandTop`),
- * with the run of nodes it holds as the keys.
+ * for the keyboard edge (`DrawOrder.keyboardBandTop`), with the run of
+ * nodes it holds as `keys` (bottom chrome, drawn over what lies under
+ * them) and of those the keyboard's `own` (`sharesRow`,
+ * `DrawOrder.ofKeyboardBand`).
  */
-function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
+function keyboardOf(
+  order: readonly Placed[],
+  screen: Rect,
+  barLine: number,
+): { readonly top: number; readonly keys: ReadonlySet<Placed>; readonly own: ReadonlySet<UiNode> } | undefined {
   const band = flatListKeyboardBand(order.map((p) => p.node), screen, barLine);
-  return band === undefined ? undefined : { top: band.top, keys: new Set(order.slice(band.from, band.to)) };
+  if (band === undefined) return undefined;
+  const run = order.slice(band.from, band.to).map((p) => p.node);
+  const background = order[band.at].node;
+  return { top: band.top, keys: new Set(order.slice(band.from, band.to)), own: new Set(run.filter((n, i) => n === background || band.from + i > band.at || sharesRow(n, run))) };
 }
+
+/**
+ * A node of idb's keyboard run that shares its ROW — its top and height —
+ * with another node of the run it does not overlap (past
+ * geometry.ts#PIXEL_OVERLAP_SLACK): keys TILE the band in rows, side by
+ * side (the number pad's `1 2 3` at 596, `4 5 6` at 650…; QWERTY's
+ * letters; neighbours' rounded frames overlap by 1 pt at most), while an
+ * app node listed right before the keys, wholly inside the band, stands
+ * alone on its row (a Sign in button behind the keyboard) or shares it
+ * only with a node laid OVER it (a field and its placeholder label, a
+ * button and its title: idb lists both with one top and height). With the
+ * background and what is listed after it (Dictate), the keyboard's OWN
+ * nodes (`DrawOrder.ofKeyboardBand`). Chosen over a key's size (a space
+ * bar is half the screen wide, an app button may be small) and over the
+ * list's order alone (the app node is listed in the run). Its errors are
+ * the safe way round, but for the second residual: a key alone on its row
+ * (a lone QuickType suggestion) reads as content under the line, so a tap
+ * on it is refused; two app nodes side by side behind the keyboard, not
+ * overlapping, read as keys (no idb dump has them).
+ */
+const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
+  run.some((other) => other !== node && other.rect.y === node.rect.y && other.rect.height === node.rect.height && !overlapsPastSlack(other.rect, node.rect));
 
 /**
  * The nodes of a flat list PINNED AT ITS BOTTOM, each with the line its
@@ -1498,6 +1535,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
 
   const api: DrawOrder = {
     keyboardBandTop: keyboard?.top,
+    ofKeyboardBand: (node) => keyboard?.own.has(node) === true,
     paintsOver(node, box) {
       const target = placesOf(node)[0];
       if (target === undefined) return [];

@@ -990,7 +990,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
  * idb's keyboard band in the stroke box (round 7, 2026-10-10; docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
  * soft-keyboard.md): idb marks no keyboard node, so the reading saw none and every stroke was `201 699 201 175` — a
  * touch-down on the keys (`Z X C V`, `5`), the form never scrolled, and the reply said "content exhausted". The band's
- * TOP (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop) now ends the stroke box; nothing else about the keyboard is read.
+ * line (ui-tree/keyboard-cover.ts#keyboardEdge) now ends the stroke box, and (owner decision D2) the judgement is made above it.
  */
 describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
   const NO_STROKE_ON_KEYS = 'never on the keys';
@@ -1020,7 +1020,8 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     const { tree, street } = await numberPad();
     const fake = idbForm(tree, street, 589);
     const result = await scrollUntilVisible(fake, 'text:"Payee’s street"', FAST);
-    expect(result).toMatchObject({ swipes: 1, visible: 1 });
+    // Two strokes (D2): after one, at 585, its centre (94,595) lies under the band, between its top and the keys — no stop there.
+    expect(result).toMatchObject({ swipes: 2, visible: 1 });
     expect(result).not.toHaveProperty('keyboard');
     expect(fake.swipes.every(({ from }) => from.y < 589), NO_STROKE_ON_KEYS).toBe(true);
     expect(fake.swipes[0]).toEqual({ from: { x: 201, y: 472 }, to: { x: 201, y: 118 } }); // as WDA draws it over its own band (573): `201 459 201 115`
@@ -1039,6 +1040,54 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     await scrollUntilVisible(fake, 'text:"Payee\u2019s street"', FAST);
     expect(fake.swipes.length).toBeGreaterThan(1);
     expect(fake.swipes[1]).toEqual({ from: { x: 201, y: 472 }, to: { x: 201, y: 118 } }); // round 1, unread
+  });
+
+  it('D2: a row whose centre (201,591) lies in the 589–596 strip between the band\'s top and the keys (under no key) is no plain stop — the band is a keyboard line: stroked from above the keys until its centre clears the band', async () => {
+    const { tree, street } = await numberPad();
+    street.rect = { ...street.rect, y: 581 }; // centre (94,591)
+    const fake = idbForm(tree, street, 589);
+    const result = await scrollUntilVisible(fake, 'text:"Payee’s street"', FAST);
+    expect(result).toMatchObject({ swipes: 1, visible: 1 });
+    expect(fake.swipes).toEqual([{ from: { x: 201, y: 472 }, to: { x: 201, y: 118 } }]);
+  });
+
+  it('D2: with the content exhausted and the row still under the band, the failure names the soft keyboard and how to hide it — never a key as its cover', async () => {
+    const { tree, street } = await numberPad();
+    street.rect = { ...street.rect, y: 630 }; // under key `4`/`5`, centre (94,640)
+    const fake = idbForm(tree, street, 0); // no stroke moves it
+    fake.keyboardAdvice = 'tap the title';
+    const error = await scrollUntilVisible(fake, 'text:"Payee’s street"', { ...FAST, maxSwipes: 2 }).catch((e: unknown) => e as Error);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('never intersected the 402x589 screen above the soft keyboard over [0,589][402,874]');
+    expect((error as Error).message).toContain('this adapter cannot hide it on its own (tap the title)');
+    expect((error as Error).message).not.toMatch(/button "[0-9]"/);
+  });
+
+  it('D2: a row partly above the band with its centre under it, the content exhausted: clipped at the keyboard\'s edge, the keyboard named — the stop that is not one has a shortfall', async () => {
+    const { tree, street } = await numberPad();
+    street.rect = { ...street.rect, y: 575, height: 40 }; // 575–615, centre (94,595) under the band, 14 pt above it
+    const fake = idbForm(tree, street, 0); // no stroke moves it
+    const error = await scrollUntilVisible(fake, 'text:"Payee’s street"', { ...FAST, maxSwipes: 3 }).catch((e: unknown) => e as Error);
+    expect((error as Error).message).toMatch(/^scroll_until text:"Payee’s street" failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 35% of it is in the viewport above the soft keyboard over \[0,589\]\[402,874\], and the content is exhausted[\s\S]*The soft keyboard covers the rest — to reach it with the keyboard down, hide it first \(tap a neutral element/);
+  });
+
+  it('D2: a key of the band is the keyboard\'s own UI, judged on the whole screen — `scroll_until` on key `5` stops at once', async () => {
+    const { tree } = await numberPad();
+    const five = tree.children.find((n) => n.label === '5')!;
+    const fake = idbForm(tree, five, 589);
+    expect(await scrollUntilVisible(fake, 'text:"5"', FAST)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
+  it('D2: a stop judged above idb\'s band says so — `keyboard` shown with the band\'s rect, `source: \'idb-band\'` (no reading says it is shown)', async () => {
+    const { tree, street } = await numberPad();
+    street.rect = { x: 0, y: 560, width: 20, height: 40 }; // 560–600, centre (10,580) above the band and left of CONTINUE's reach, its bottom under the band
+    const fake = idbForm(tree, street, 589);
+    expect(await scrollUntilVisible(fake, 'text:"Payee’s street"', FAST)).toEqual({
+      swipes: 0,
+      visible: 29 / 40,
+      clipped: ['bottom'],
+      keyboard: { state: 'shown', frame: { x: 0, y: 589, width: 402, height: 285 }, source: 'idb-band' },
+    });
   });
 
   it('Contacts\' New Contact with QWERTY up (the band `other 0,590 402x284`, Dictate after it): `add url` at 20,902 is stroked toward from above the keys', async () => {
@@ -1111,10 +1160,12 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(banded).toEqual(await strokes(false));
   });
 
-  it('the fully: true flush probe keeps above the band too (code review of round 7, MINOR 2; synthetic — idb lists no clipping container): a row flush with its list\'s bottom, the pad up (keys "1" and "3" clear of the stroke\'s line) — the probe touches down above 589, not in the band at 759', async () => {
+  it('the fully: true flush probe keeps above the band too (synthetic — idb lists no clipping container): a row flush with its short list\'s bottom at the band\'s top, the list too short for a probe, so it is drawn over the outer list running under the band (keys "1" and "3" clear of the stroke\'s line) — the probe touches down above 589, not in the band', async () => {
     const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
-    const row = node({ role: 'button', identifier: 'row', rect: r(0, 834, 402, 40) });
-    const list = node({ role: 'container', rect: r(0, 300, 402, 574), clipsDescendants: true, children: [row] });
+    // The row lies wholly above the band (owner decision D2: a stop under it is no stop).
+    const row = node({ role: 'button', identifier: 'row', rect: r(0, 549, 402, 40) });
+    const inner = node({ role: 'container', rect: r(0, 529, 402, 60), clipsDescendants: true, children: [row] });
+    const list = node({ role: 'container', rect: r(0, 300, 402, 574), clipsDescendants: true, children: [inner] });
     const keys = [5, 270].map((x, i) => node({ role: 'button', label: String(2 * i + 1), rect: r(x, 596, 132, 54) }));
     const tree = node({ role: 'container', rect: r(0, 0, 0, 0), flatList: true, children: [node({ role: 'other', label: 'App', rect: r(0, 0, 402, 874) }), list, ...keys, node({ role: 'other', rect: r(0, 589, 402, 285) })] });
     const fake = new FakeAdapter({ s: tree }, 's');
@@ -1122,7 +1173,7 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
-    expect(result.flush).toEqual({ edge: 'bottom', container: list.rect, checked: true });
+    expect(result.flush).toEqual({ edge: 'bottom', container: inner.rect, checked: true });
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 532 }, to: { x: 201, y: 484 } }]);
   });
 

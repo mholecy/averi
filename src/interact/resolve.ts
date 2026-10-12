@@ -1,9 +1,11 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { drawnOverText, higherTop, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { drawnOverText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { keyboardEdge, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { sceneOf, usableScreen, type Scene, type Standing, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
+import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -562,19 +564,20 @@ export function systemBarRemedy(edge: SystemBar['edge'], scrolls: boolean | unde
   return `if it lies in a scroll view, scroll_until it first, to move it out from under the bar; if not, ${pinned}`;
 }
 
-/** The tap's purpose (ui-tree/standing.ts#Purpose), without a keyboard line: the first ask. */
-const TAP = { of: 'tap' } as const;
-
 /**
  * A tap's judgement of a resolved node: the usable screen it was judged on
  * (the first look's, or the one read again before a refusal), the scene of
  * the tree the node is in, and where the node stands for a tap there
- * (ui-tree/standing.ts#Scene.standing, judged without the keyboard).
+ * (ui-tree/standing.ts#Scene.standing) — judged with the keyboard line the
+ * tree alone gives (`keyboard`: idb's band, ui-tree/keyboard-cover.ts
+ * #keyboardEdge with no reading — free, no device asked), never yet with a
+ * reading's (`aimClearOfChrome` asks that lazily).
  */
 export interface TapJudgement {
   readonly screen: UsableScreen | undefined;
   readonly scene: Scene;
   readonly standing: Standing;
+  readonly keyboard: KeyboardLine | undefined;
 }
 
 /** A standing the on-screen rule lets through: anything but a centre off the screen or under a system bar. */
@@ -628,11 +631,14 @@ export async function refuseOffScreen(
   sent?: string,
 ): Promise<TapJudgement> {
   const scene = sceneOf(tree);
-  const first = scene.standing(node, screen, TAP);
-  if (onTheScreen(first)) return { screen, scene, standing: first };
+  // The first ask: the tree's own keyboard line (idb's band) and no reading's.
+  const keyboard = keyboardEdge(undefined, scene.order, node);
+  const tap = { of: 'tap', ...(keyboard !== undefined && { keyboardTop: keyboard }) } as const;
+  const first = scene.standing(node, screen, tap);
+  if (onTheScreen(first)) return { screen, scene, standing: first, keyboard };
   const again = await usableScreen(adapter, { tree }, { fresh: true });
-  const second = scene.standing(node, again, TAP);
-  if (onTheScreen(second)) return { screen: again, scene, standing: second };
+  const second = scene.standing(node, again, tap);
+  if (onTheScreen(second)) return { screen: again, scene, standing: second, keyboard };
   // Refused on the screen read again; on the first look's when none could be read again.
   const [judged, standing] = again === undefined && screen !== undefined ? [screen, first] : [again ?? { box: tree.rect, boxes: [tree.rect] }, second];
   const what = describeTarget(target);
@@ -753,6 +759,14 @@ export function cutRemedy(edge: Edge): string {
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
 }
 
+/**
+ * How to hide a keyboard a tap refused a centre under: only a line no guard
+ * acts on is refused (`underKeyboard`), idb's band, whose adapter has no
+ * key that hides it (`KeyboardRemedy.dismissal` is `none`) — so the way is a
+ * tap the author adds, and the adapter's `advice`.
+ */
+const hideIt = ({ advice }: KeyboardRemedy): string => `hide the keyboard (tap a neutral element such as the screen title — a tap: step in a flow); ${cannotHide(advice)}`;
+
 /** Where a tap on a resolved node goes: its centre, or — `moved`, the sentence saying why — the centre of an uncovered piece of it. */
 export interface Aim {
   point: Point;
@@ -787,23 +801,24 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * Judged in the screen box that holds the centre, less the system bands, so
  * a moved tap never lands on the status bar or the navigation bar (the
  * tree's root rect, or the node's own, when there is no screen — fail open,
- * as there). The soft keyboard is no cover node — Android lists none, and a
- * band is believed only with its input method's word
- * (ui-tree/keyboard-cover.ts) — so it is asked for ONLY when the centre is
- * covered (`keyboardTop`: the top of a band the input method stands by, or
- * undefined), and the standing asked again with that line: a piece under
- * the keyboard is never aimed at. Its cost is the reading's, on that path
- * only (on Android the touchable region and the witness, with the keyboard
- * shown; nothing more with it hidden — the guard's first reading is
- * reused). Under idb, whose reading is always `unknown`, the line is the
- * top of idb's keyboard band in the tree instead
- * (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop, read off the scene's
- * draw order; the higher of the two when both read): M-1.4's refusal said
- * "only a 354x7 part of it shows" of `value_date_select`'s strip 589–596,
- * under the band, between the lifted CONTINUE's reach and the keys. A line
- * only: the guard still reads no keyboard on idb, and a centre clear of
- * every node (the band's background is none, draw-order's `structural`
- * row) is tapped as before.
+ * as there). The keyboard line comes in two parts
+ * (ui-tree/keyboard-cover.ts#keyboardEdge, which merges them):
+ * - the tree's own — idb's band — free, so `judged` was already asked with
+ *   it (`refuseOffScreen`): no reading stands by it and no guard acts on it,
+ *   so a centre under it is `underKeyboard`, refused here with the
+ *   keyboard's remedy (`keyboard.remedy`, the reading's) — measured, a
+ *   centre in the number pad's strip 589–596 between the band's top and the
+ *   keys lay under no key and was tapped, on the keyboard;
+ * - a reading's (`keyboard.line`: the top of a cover the input method stands
+ *   by, or WDA's band) — the soft keyboard is no cover node (Android lists
+ *   none, and a band is believed only with its input method's word), so it
+ *   is asked for ONLY when the centre is covered, and the standing asked
+ *   again with the merged line: a piece under the keyboard is never aimed
+ *   at. Its cost is the reading's, on that path only (on Android the
+ *   touchable region and the witness, with the keyboard shown; nothing more
+ *   with it hidden — the guard's first reading is reused).
+ * A key of idb's band is the keyboard's own UI and under no band line, as
+ * a WDA key is under no reading's.
  *
  * Only nodes of the tree cover (decision 4): a top bar the tree lists
  * before the form — WDA's, idb's (only its button and title) — is not
@@ -819,7 +834,7 @@ export async function aimClearOfChrome(
   target: Target,
   node: UiNode,
   judged: TapJudgement,
-  keyboardTop: () => Promise<number | undefined>,
+  keyboard: { readonly line: () => Promise<KeyboardLine | undefined>; readonly remedy: KeyboardRemedy },
   sent?: string,
 ): Promise<Aim> {
   const what = describeTarget(target);
@@ -827,9 +842,10 @@ export async function aimClearOfChrome(
   let standing = judged.standing;
   if (standing.kind === 'cut') throw new ClippedRefusal(refusal(cutFinding(standing.cut, node.rect, standing.minPiece)));
   if (standing.facts.centreCover !== undefined) {
-    // The higher of the two — never both today: idb's reading is always `unknown`, and a band only idb's flat list has.
-    const top = higherTop(await keyboardTop(), judged.scene.order.keyboardBandTop);
-    if (top !== undefined) standing = judged.scene.standing(node, judged.screen, { of: 'tap', keyboardTop: top });
+    const line = keyboardEdge(await keyboard.line(), judged.scene.order, node);
+    if (line !== undefined && (line.y !== judged.keyboard?.y || line.source !== judged.keyboard.source)) {
+      standing = judged.scene.standing(node, judged.screen, { of: 'tap', keyboardTop: line });
+    }
   }
   const { centre } = standing.facts;
   switch (standing.kind) {
@@ -851,6 +867,13 @@ export async function aimClearOfChrome(
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       throw new CoveredRefusal(refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — scroll_until it first`));
     }
+    case 'underKeyboard':
+      throw new CoveredRefusal(
+        refusal(
+          `under the soft keyboard: its centre (${centre.x},${centre.y}) lies below the keyboard's top edge at y ${standing.line.y}, where a tap presses the keyboard — ` +
+            `scroll_until it first, or ${hideIt(keyboard.remedy)}`,
+        ),
+      );
     default:
       throw new Error(`tap: a standing ${standing.kind} after the on-screen rule passed`);
   }

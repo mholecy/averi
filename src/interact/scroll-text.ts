@@ -47,7 +47,12 @@ export interface ScrollUntilResult {
    *   Only where the band changed the stop: a clip at its edge, or — when
    *   several nodes match — a different match judged (one under the band
    *   loses to one above it), which can be a clean "fully visible" (round 3
-   *   of the review, 2026-10-08); a band that changes nothing is not applied;
+   *   of the review, 2026-10-08); a band that changes nothing is not applied.
+   *   The band is a reading's the witness stood by, or — `source:
+   *   'idb-band'`, present only then — idb's band, read off the tree by its
+   *   shape (ui-tree/keyboard-cover.ts#keyboardEdge): a keyboard LINE no
+   *   reading says is shown, judged against all the same (owner decision
+   *   D2);
    * - `unlocated`: the window model's `unlocated` row — the input method
    *   says a keyboard is shown, the window state gives it no area (one still
    *   coming up? not measured — ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD; a
@@ -56,7 +61,7 @@ export interface ScrollUntilResult {
    *   could be judged against it and the report says so
    *   (the reading's `unlocated`, ui-tree/keyboard-cover.ts). Only on a clean `fully: true` stop.
    */
-  keyboard?: { state: 'shown'; frame: Rect } | { state: 'unlocated' };
+  keyboard?: { state: 'shown'; frame: Rect; source?: 'idb-band' } | { state: 'unlocated' };
   /**
    * `false` when the stop was reached after a stroke and no read confirmed
    * it held still (2026-10-08, review round 1): the target still moved on
@@ -107,13 +112,18 @@ export interface ScrollUntilResult {
  * The result a `visible` outcome reports — `keyboard` and `settled` present
  * only when set, so a run without a keyboard, or one that settled, reports
  * what it always did. `shown` only when THIS stop was judged under a band
- * the witness stood by this round — never a band checked on an earlier one.
+ * this round applied — a reading's the witness stood by, or idb's band
+ * (`source: 'idb-band'`) — never a band checked on an earlier one.
  */
 export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): ScrollUntilResult {
   const { judged } = o;
   const { facts } = judged.standing;
   const keyboard: ScrollUntilResult['keyboard'] =
-    judged.under !== undefined ? { state: 'shown', frame: judged.under.topCover } : o.unlocated ? { state: 'unlocated' } : undefined;
+    judged.under !== undefined
+      ? { state: 'shown', frame: judged.under.topCover, ...(judged.under.line.source === 'idb-band' && { source: 'idb-band' as const }) }
+      : o.unlocated
+        ? { state: 'unlocated' }
+        : undefined;
   const by = facts.covers.at(-1);
   return {
     swipes: o.swipes,

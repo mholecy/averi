@@ -100,7 +100,7 @@ Failure lines:
 
 ### iOS (`treeSource: idb`, the default)
 
-idb's tree cannot say whether the keyboard is up, so averi never hides it there and presses nothing. It does see where the keyboard's background starts. `scroll_until` starts its swipes above it, and a tap moved off covered chrome never lands inside it. A refusal then says `nothing of it shows above the soft keyboard`. Hide the keyboard yourself (tap a neutral title), then retry.
+idb's tree cannot say whether the keyboard is up, so averi never hides it there and presses nothing. It does see where the keyboard's background starts, and treats everything below that line as under the keyboard. `scroll_until` starts its swipes above it and does not stop on an element whose centre lies below it. A tap on such an element is refused with `is under the soft keyboard: its centre … lies below the keyboard's top edge`, and a tap moved off covered chrome never lands inside it (`nothing of it shows above the soft keyboard`). A `color` or `ocr` assert on an element that reaches below the line fails with `the soft keyboard covers the element`. A key itself can still be tapped when it shares its row with other keys; a key alone on its row (a lone QuickType suggestion such as `Passwords`) is refused like content. Two app elements side by side behind the keyboard, not overlapping, are taken for keys and are not refused. Hide the keyboard yourself (tap a neutral title), then retry.
 
 ## Screenshots, pixels and visual checks
 

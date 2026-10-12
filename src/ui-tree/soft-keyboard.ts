@@ -20,9 +20,9 @@ import { rectWithin } from './geometry.js';
  * adapter can do about a covering keyboard (`KeyboardRemedy`, `cannotHide`),
  * the lowest layer every sentence that says so imports. Since round 7
  * (2026-10-10) it also reads idb's keyboard band, which carries no mark, by
- * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a TOP
- * EDGE only (draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard
- * shown.
+ * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a
+ * LINE only (keyboard-cover.ts#keyboardEdge, over
+ * draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard shown.
  */
 
 /**
@@ -59,7 +59,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * here from ui-tree/draw-order.ts (round 7, 2026-10-10), where
  * `keyboardOf` still reads it for `flatListReadingOrder` and `bottomPinned`
  * unchanged, and for its top (`DrawOrder.keyboardBandTop`, the one way the
- * stroke box and the tap's chrome check know it). idb marks no keyboard node, so its keys — plain `button`s
+ * keyboard edge knows it, keyboard-cover.ts#keyboardEdge). idb marks no keyboard node, so its keys — plain `button`s
  * listed LAST — are the only covers of the rows under it. Its background is
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the
@@ -70,7 +70,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * keyboard on screen, cut the strokes and the taps there); the keyboard is
  * that node and the run of nodes listed beside it (before and after, in the
  * list's order) lying wholly inside it — `from` to `to`, the walk indexes
- * of that run (`to` exclusive). The last node listed with that shape is
+ * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
  * ui_snapshot replies (code review of round 7, MAJOR 1): the 14 with a
@@ -87,7 +87,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * background listed after its buttons (no idb dump has either), reads as a
  * band — its top then ends the strokes and cuts a moved tap, the safe way.
  */
-export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, barLine: number): { readonly top: number; readonly from: number; readonly to: number } | undefined {
+export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, barLine: number): { readonly top: number; readonly from: number; readonly to: number; readonly at: number } | undefined {
   const bottom = screen.y + screen.height;
   for (let back = nodes.length - 1; back > 0; back--) {
     const node = nodes[back];
@@ -99,7 +99,7 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
     if (from === back) continue; // no key listed before it: a sheet's background, not a keyboard's
     let to = back + 1;
     while (inside(nodes[to])) to++;
-    return { top: band.y, from, to };
+    return { top: band.y, from, to, at: back };
   }
   return undefined;
 }

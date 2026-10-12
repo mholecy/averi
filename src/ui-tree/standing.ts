@@ -18,6 +18,7 @@ import {
   type Edge,
   type ScreenSize,
 } from './geometry.js';
+import type { KeyboardLine } from './keyboard-cover.js';
 import type { TreeRead } from './read-tree.js';
 import { tapPoint } from './selectors.js';
 
@@ -228,18 +229,23 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   `offScreen`; its centre in a system band — `systemBar`, the top's
  *   before the bottom's; cut to a sliver at its scroll container's edge
  *   (`Clips.cutSliver` by the exposure's minimum piece) — `cut`; drawn over
- *   — `covered`; else `reachable` (the keyboard, last, is the caller's: the
- *   tap's guard, the stop's line). Off the screen and in a band are
+ *   — `covered`; its centre under a keyboard line no guard acts on
+ *   (`witnessed: false`, idb's band) — `underKeyboard`; else `reachable`.
+ *   Under a witnessed line (the window's, WDA's) the guard acts, not the
+ *   judgement: the tap's guard has already looked at the centre, and the
+ *   stop's is the next tap's. Off the screen and in a band are
  *   mutually exclusive — a centre in a band lies inside a box — so their
  *   order is moot. Cut before cover: a covered sliver is reported cut at a
  *   named edge, whose remedy is a scroll toward it.
  * - `facts.screen` is the frame judged: the stop's box cut above its
- *   keyboard line; the tap's box less the system bands.
+ *   keyboard line; the tap's box less the system bands, cut above a line no
+ *   guard acts on.
  * - What each verb counts:
  *   - the stop (`{ of: 'stop' }`) judges in its frame — the box, cut above
  *     `keyboardTop` when given (the box's width, from its top down to the
  *     line; a line at or above its top leaves nothing: no exposure is
- *     asked, nothing shows). Plain: a sliver is cut, and only a cover over
+ *     asked, nothing shows) — `underKeyboard` too when nothing of it lies
+ *     above any line. Plain: a sliver is cut, and only a cover over
  *     the centre covers. `fully`: no cut — a stop flush with a clipping
  *     container is scroll_until's flush probe's
  *     (interact/scroll-rounds.ts#PROBE_REACH) — and any cover covers (the
@@ -251,9 +257,10 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *     both its sides reach the minimum (draw-order.ts#Exposure.tapAt) —
  *     `reachable`, `moved`; else `covered`, with the largest piece. The
  *     piece is chosen above `keyboardTop` when given: a moved tap is never
- *     aimed under the keyboard. The tap asks without it first, and again
- *     with it only when the centre is covered, so the keyboard is read only
- *     then (interact/resolve.ts#aimClearOfChrome).
+ *     aimed under the keyboard. The tap asks with the tree's own line first
+ *     (idb's band, free), and again with a reading's merged in only when the
+ *     centre is covered, so the keyboard is read only then
+ *     (interact/resolve.ts#aimClearOfChrome).
  * - `facts` are the judgement's inputs, whatever the kind: what a caller's
  *   motion and sentences read (scroll_until's best-so-far, its far-edge
  *   turn and its failure text).
@@ -264,8 +271,13 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   any intersection reported a row under a pinned CONTINUE bar "fully
  *   visible after 0 swipes"; one with its centre past the screen's edge
  *   ("visible … CLIPPED 40%") handed the tap an off-screen refusal.
- * - On the SCREEN, not the frame cut above a keyboard: a centre under the
- *   keyboard stops, and the tap's keyboard guard hides the keyboard.
+ * - On the SCREEN, not the frame cut above a keyboard: a centre under a
+ *   witnessed keyboard stops, and the tap's keyboard guard hides the
+ *   keyboard. Under idb's band no guard acts (an idb reading is `unknown`,
+ *   K5d): a centre there — in the number pad's strip 589–596 between the
+ *   band's top and the keys, or under a key — was stopped on and tapped,
+ *   pressing the keyboard, so it is `underKeyboard` for both verbs, never a
+ *   key named as a cover (owner decision D2).
  * - A centre in a system band is off the screen for a tap and for both
  *   stops — measured: one stroke flung `priority_select` to `24,-20` and
  *   the plain stop stopped with its centre at (201,6), where the tap
@@ -304,6 +316,13 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * - On a screen whose turn is suggested but witnessed by no window (two
  *   `boxes`), the tap accepts a point that lies only in the other
  *   orientation.
+ * - Under idb's band a target whose centre lies under it is refused, even
+ *   with a large piece of it above the band: no tap is moved off a centre
+ *   the keyboard holds.
+ * - Which nodes of idb's band are the keyboard's own, under no line, is
+ *   read by shape (draw-order.ts#sharesRow): a key alone on its row (a lone
+ *   QuickType suggestion) is refused as content, and two app nodes side by
+ *   side behind the keyboard, not overlapping, are judged as keys.
  */
 export interface Scene {
   /** The tree's draw order (draw-order.ts#drawOrder). */
@@ -315,10 +334,11 @@ export interface Scene {
 
 /**
  * What a verb means to do with the node — `scroll_until`'s stop, `fully` or
- * plain, or a tap — and the top of a soft keyboard the caller applies, if
- * any (`Scene`'s contract says how each verb applies it).
+ * plain, or a tap — and the soft keyboard's line the caller applies, if any
+ * (ui-tree/keyboard-cover.ts#keyboardEdge builds it; `Scene`'s contract
+ * says how each verb applies it, and what `witnessed` changes).
  */
-export type Purpose = { readonly of: 'stop'; readonly fully: boolean; readonly keyboardTop?: number } | { readonly of: 'tap'; readonly keyboardTop?: number };
+export type Purpose = { readonly of: 'stop'; readonly fully: boolean; readonly keyboardTop?: KeyboardLine } | { readonly of: 'tap'; readonly keyboardTop?: KeyboardLine };
 
 /** The screen a standing is judged on: the usable screen's boxes and its system bands. */
 export type StandingScreen = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand' | 'navigationBand'>;
@@ -335,7 +355,7 @@ export type SystemBar = { readonly edge: 'top'; readonly bottom: number } | { re
 export interface StandingFacts {
   /** The point a tap presses (selectors.ts#tapPoint). */
   readonly centre: Point;
-  /** The frame judged in: the stop's box, cut above the keyboard line when one applies (no height when it leaves nothing); the tap's box less the system bands. */
+  /** The frame judged in: the stop's box, cut above the keyboard line when one applies (no height when it leaves nothing); the tap's box less the system bands, cut above a line no guard acts on. */
   readonly screen: Rect;
   /** The fraction of the node inside the frame, covers or not. */
   readonly visible: number;
@@ -363,7 +383,8 @@ export type Standing = { readonly facts: StandingFacts } & (
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
   /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
   | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
-  | { readonly kind: 'underKeyboard'; readonly top: number }
+  /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it). */
+  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine }
 );
 
 /** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
@@ -447,8 +468,9 @@ const chosenBox = (centre: Point, screen: StandingScreen | undefined, tree: UiNo
 /**
  * THE ORDER (`Scene`'s contract), once for both verbs, after what only the
  * stop judges first: off the screen, a system band, cut, covered (`cover`:
- * the verb's answer when something is drawn over it, else undefined) — else
- * reachable at the centre.
+ * the verb's answer when something is drawn over it, else undefined), the
+ * centre under `keyboard` (a line no guard acts on) — else reachable at the
+ * centre.
  */
 function ordered(
   facts: StandingFacts,
@@ -456,12 +478,17 @@ function ordered(
   offScreenVisible: number,
   cut: Cut | undefined,
   cover: () => Standing | undefined,
+  keyboard: KeyboardLine | undefined,
 ): Standing {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
   if (place !== 'on') return { facts, kind: 'systemBar', at: facts.centre, bar: place };
   if (cut !== undefined && facts.minPiece !== undefined) return { facts, kind: 'cut', cut, minPiece: facts.minPiece };
-  return cover() ?? { facts, kind: 'reachable', at: facts.centre };
+  return cover() ?? (keyboard !== undefined && facts.centre.y >= keyboard.y ? { facts, kind: 'underKeyboard', line: keyboard } : { facts, kind: 'reachable', at: facts.centre });
 }
+
+/** `box` cut above a keyboard line — the box's width, from its top down to the line (no height for a line at or above its top); `box` itself with no line or one at or below its bottom. */
+const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
+  line === undefined || line.y >= box.y + box.height ? box : { ...box, height: Math.max(0, line.y - box.y) };
 
 /** The facts of a node judged in `frame`, from its exposure there. */
 function factsIn({ scene, node, centre }: Judged, frame: Rect): { facts: StandingFacts; seen: Exposure } {
@@ -483,38 +510,46 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect): { facts: Standin
 }
 
 /** The stop's standing (`Scene`'s contract). */
-function stopStanding(judged: Judged, box: Rect, fully: boolean, keyboardTop: number | undefined): Standing {
+function stopStanding(judged: Judged, box: Rect, fully: boolean, line: KeyboardLine | undefined): Standing {
   const { node, centre, place } = judged;
-  if (keyboardTop !== undefined && keyboardTop <= box.y) {
+  if (line !== undefined && line.y <= box.y) {
     const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
-    return { facts, kind: 'underKeyboard', top: keyboardTop };
+    return { facts, kind: 'underKeyboard', line };
   }
-  const { facts } = factsIn(judged, keyboardTop === undefined ? { ...box } : { ...box, height: keyboardTop - box.y });
+  const { facts } = factsIn(judged, line === undefined ? { ...box } : { ...box, height: line.y - box.y });
   if (facts.visible === 0) {
-    if (keyboardTop !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, kind: 'underKeyboard', top: keyboardTop };
+    if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, kind: 'underKeyboard', line };
     return { facts, kind: 'offScreen', at: centre, visible: 0 };
   }
   if (fully && facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
   const cover = fully && facts.covers.length > 0 ? (facts.centreCover ?? facts.covers[facts.covers.length - 1]) : facts.centreCover;
-  return ordered(facts, place, facts.visible, fully ? undefined : facts.sliver, () =>
-    cover === undefined ? undefined : { facts, kind: 'covered', cover, aboveKeyboard: keyboardTop !== undefined },
+  return ordered(
+    facts,
+    place,
+    facts.visible,
+    fully ? undefined : facts.sliver,
+    () => (cover === undefined ? undefined : { facts, kind: 'covered', cover, aboveKeyboard: line !== undefined }),
+    line?.witnessed === false ? line : undefined,
   );
 }
 
-/** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands, the piece above `keyboardTop`. */
-function tapStanding(judged: Judged, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, keyboardTop: number | undefined): Standing {
+/** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
+function tapStanding(judged: Judged, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
   const { scene, node, place } = judged;
   const box = lessSystemBands(chosen, bands);
-  const { facts, seen } = factsIn(judged, box);
+  const within = aboveLine(box, line);
+  const unwitnessed = line?.witnessed === false ? line : undefined;
+  const frame = unwitnessed === undefined ? box : within;
+  const { facts, seen } = factsIn(judged, frame);
   const offScreenVisible = boxes.length === 0 ? 0 : Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
-  return ordered(facts, place, offScreenVisible, facts.sliver, () => {
-    const cover = seen.centreCover;
-    if (cover === undefined) return undefined;
-    const within = keyboardTop === undefined || keyboardTop >= box.y + box.height ? box : { ...box, height: Math.max(0, keyboardTop - box.y) };
+  const cover = (): Standing | undefined => {
+    const over = seen.centreCover;
+    if (over === undefined) return undefined;
     const aboveKeyboard = within !== box;
-    const piece = aboveKeyboard ? scene.order.exposure(node, within) : seen;
-    if (piece.tapAt === undefined) return { facts, kind: 'covered', cover, ...(piece.largest !== undefined && { largest: piece.largest }), aboveKeyboard };
+    const piece = within === frame ? seen : scene.order.exposure(node, within);
+    if (piece.tapAt === undefined) return { facts, kind: 'covered', cover: over, ...(piece.largest !== undefined && { largest: piece.largest }), aboveKeyboard };
     if (!piece.tapAt.moved) return { facts, kind: 'reachable', at: piece.tapAt.point };
-    return { facts, kind: 'reachable', at: piece.tapAt.point, moved: { piece: piece.tapAt.piece, cover, aboveKeyboard } };
-  });
+    return { facts, kind: 'reachable', at: piece.tapAt.point, moved: { piece: piece.tapAt.piece, cover: over, aboveKeyboard } };
+  };
+  return ordered(facts, place, offScreenVisible, facts.sliver, cover, unwitnessed);
 }
