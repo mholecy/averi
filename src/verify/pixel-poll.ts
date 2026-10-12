@@ -1,4 +1,4 @@
-import { rectIntersection, usableScreen, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, usableScreen, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { belowStatusBand, containsPoint, inferScreenSize, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect, screenOf, windowTurnsScreen } from '../ui-tree/geometry.js';
@@ -205,7 +205,17 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * the band once its centre is below it, so for such an element only the
  * child advice cures the miss; under idb a keyboard's keys are nodes like
  * any other and are named as the cover; what a tree does not list (a top
- * bar WDA lists before the scroll view) is no cover here, as for the tap.
+ * bar WDA lists before the scroll view) is no cover here, as for the tap;
+ * in idb's flat list a real overlay whose words are all words of the
+ * element's label is read as its own content (a toast "Saved" over a card
+ * labelled "Saved payments", draw-order.ts#paintsOver); and a CHILDLESS,
+ * non-interactive node listed beside the element and laid on it is read
+ * as on it by the tap's target rows (`exposure`; a WDA React Native view's
+ * labels) — a labelled, childless panel over a 0,225 1080x1995 container
+ * is no cover of it (review round 2's probe D3); and a container with
+ * children — a dialog's panel — covers only through its content (the
+ * tap's `contentFramed` row): its button is named, and its bare
+ * background between them is not seen.
  * Cost: one `drawOrder` walk of the round's tree and the memoized
  * `viewport()`.
  *
@@ -507,9 +517,10 @@ async function keyboardOverElement(
  * are the PIXEL covers (ui-tree/draw-order.ts#paintsOver, judged in the
  * screen below the band): `exposure`'s — the tap's — less what takes a
  * touch and hides nothing (the element's own content listed beside it, a
- * clickable layer), and every one that meets the element's rect counts,
- * not only one over its centre as for a tap: the sampler and the
- * recognizer read the region, not a point. Either meets the element only
+ * clickable layer), and every one that meets what the assert reads
+ * (`reads`: the colour sampler's inset rect, the ocr crop's whole rect)
+ * counts, not only one over its centre as for a tap: the sampler and the
+ * recognizer read a region, not a point. Either meets the element only
  * past an edge's thickness (geometry.ts#overlapsPastSlack, 2 units, the
  * owner's decision — for the band too: a row whose top lies 2 pt into it
  * is antialiasing, not the bar). Named: the one on top at the element's
@@ -539,7 +550,11 @@ async function keyboardOverElement(
  * view as far as the tree says (`insideScroller` false — or undefined:
  * idb's flat list has no ancestry, so EVERY idb miss carries the clause),
  * it starts at the screen's top edge under the band (a full-bleed header),
- * or the cover holds the element whole.
+ * or the cover holds the element whole. For the screen ITSELF — an element
+ * screen-sized, or spanning the screen's top edge at full width — no scroll
+ * can cure it, and the remedy leads with the child (review round 3); for
+ * idb's flat-list root (its Application node, screen-sized) it says the
+ * node named is content drawn over the root's background.
  */
 export async function chromeOverElement(
   adapter: Pick<DeviceAdapter, 'viewport'>,
@@ -557,8 +572,13 @@ export async function chromeOverElement(
   const at = `(element ${rectText(element.rect)}`;
   // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
   const pinned = insideScroller(tree, element) !== true;
+  // No scroll ever moves the screen itself out from under anything: a screen-sized element, or one spanning the screen's top edge.
+  const screenItself =
+    rectArea(element.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION ||
+    (element.rect.y <= screen.y && element.rect.x <= screen.x && element.rect.x + element.rect.width >= screen.x + screen.width);
+  const never = screenItself ? 'never' : undefined;
   if (band.height > 0 && overlapsPastSlack(reads, band)) {
-    return `the status bar is drawn over the element ${at}, status bar ${rectText(band)}) — ${coverRemedy(pinned || element.rect.y <= screen.y)}`;
+    return `the status bar is drawn over the element ${at}, status bar ${rectText(band)}) — ${coverRemedy(never ?? (pinned || element.rect.y <= screen.y ? 'stuck' : 'scroll'))}`;
   }
   // Only the part of the screen below the band that the measurement reads: what lies over the rest of the element is never sampled.
   const covers = drawOrder(tree).paintsOver(element, rectIntersection(below, reads) ?? { ...reads, width: 0, height: 0 });
@@ -567,13 +587,25 @@ export async function chromeOverElement(
   if (cover === undefined) return undefined;
   const reach = sameRect(cover.reach, cover.node.rect) ? '' : `, reaching ${rectText(cover.reach)}`;
   const named = `${nodeText(cover.node).slice(0, -1)}${reach})`;
-  return `${named} is drawn over the element ${at}) — ${coverRemedy(pinned || rectWithin(element.rect, cover.reach))}`;
+  // In idb's flat list the screen-sized node is the root (the Application): everything listed after it is content on its background.
+  const root = screenItself && tree.flatList === true ? 'root' : never;
+  return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, cover.reach) ? 'stuck' : 'scroll'))}`;
 }
 
-/** What to do about a pixel assert's element under chrome (`chromeOverElement`): scroll it clear — and, when a scroll may not cure it, `stuck`, assert something in it that lies clear (worded as the tap's sliver hint, "tap something in it that lies clear of that edge"). */
-const coverRemedy = (stuck: boolean): string =>
-  'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run' +
-  (stuck ? ' — or, if no scroll moves it out from under that, assert something in it that lies clear of that' : '');
+/**
+ * What to do about a pixel assert's element under chrome (`chromeOverElement`), worded as the tap's sliver hint
+ * ("tap something in it that lies clear of that edge"): `scroll` — scroll it clear; `stuck` — that, or, when a
+ * scroll may not cure it, assert something in it that lies clear; `never` — the element is the screen itself
+ * (screen-sized, or spanning its top edge), which no scroll moves, so only the child; `root` — the same, for idb's
+ * flat-list root, whose cover is the app's own content laid on its background.
+ */
+const coverRemedy = (kind: 'scroll' | 'stuck' | 'never' | 'root'): string => {
+  const child = 'assert something in it that lies clear of that';
+  if (kind === 'root') return `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${child}`;
+  if (kind === 'never') return `the capture would show it, not the element; no scroll moves the screen itself out from under that — ${child}`;
+  const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
+  return kind === 'stuck' ? `${scroll} — or, if no scroll moves it out from under that, ${child}` : scroll;
+};
 
 /**
  * A miss no later round can change, carried out of the tree poll to end it

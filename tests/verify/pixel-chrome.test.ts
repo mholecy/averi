@@ -259,4 +259,35 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
     expect(await judge(PIXEL_3A, tree, row)).toMatch(/^container "Bar" \(0,686 1080x200\) is drawn over the element/);
     expect(await judge(PIXEL_3A, tree, row, colorSampleRect)).toBeUndefined();
   });
+
+  it('the screen itself — screen-sized, or spanning the top edge at full width — is never cured by a scroll: the remedy leads with something in it; idb\'s root says the cover is content on its background', async () => {
+    const NEVER = 'the capture would show it, not the element; no scroll moves the screen itself out from under that — assert something in it that lies clear of that';
+    const win = n('container', rect(0, 0, 402, 874), { identifier: 'screen' });
+    expect(await judge(IPHONE, n('application', rect(0, 0, 402, 874), { children: [win] }), win)).toBe(
+      `the status bar is drawn over the element (element 0,0 402x874, status bar 0,0 402x62) — ${NEVER}`,
+    );
+    const header = n('container', rect(0, 0, 402, 116), { identifier: 'header' });
+    const scrolled = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 874), { children: [header] })] });
+    expect(await judge(IPHONE, scrolled, header, colorSampleRect)).toBe(`the status bar is drawn over the element (element 0,0 402x116, status bar 0,0 402x62) — ${NEVER}`);
+    // Screen-sized below the bar (Android's content view, 97 % of the screen) under a dialog: the screen too.
+    // (The dialog's panel covers through its content, its button here — the tap's `contentFramed` row; a childless, non-interactive sibling laid on the element is read as on it — both stated residuals.)
+    const content = n('container', rect(0, 66, 1080, 2154), { identifier: 'content', children: [n('text', rect(66, 300, 900, 100), { label: 'Body' })] });
+    const dialog = n('container', rect(90, 400, 900, 1200), { label: 'Dialog', children: [n('button', rect(100, 1450, 880, 120), { label: 'OK' })] });
+    const withDialog = n('container', rect(0, 0, 1080, 2220), { children: [content, dialog] });
+    expect(await judge(PIXEL_3A, withDialog, content, colorSampleRect)).toBe(`button "OK" (100,1450 880x120) is drawn over the element (element 0,66 1080x2154) — ${NEVER}`);
+    // …a row in the same scroll view is scrolled clear as before.
+    const row = n('container', rect(24, 30, 354, 52), { identifier: 'row' });
+    const rowTree = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 874), { children: [row] })] });
+    expect(await judge(IPHONE, rowTree, row, colorSampleRect)).toBe(
+      'the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run',
+    );
+    const tree = idb([
+      ['Application', 'app', null, 0, 0, 402, 874],
+      ['Button', 'Pay', null, 24, 400, 354, 52],
+    ]);
+    const app = [...everyNode(tree)].find((x) => x.label === 'app')!;
+    expect(await judge(IPHONE, tree, app, colorSampleRect)).toBe(
+      'button "Pay" (24,400 354x52) is drawn over the element (element 0,0 402x874) — that is content drawn over the root\'s background, which the capture would show, not the root; no scroll moves it — assert something in it that lies clear of that',
+    );
+  });
 });

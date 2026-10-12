@@ -158,7 +158,10 @@ export interface DrawOrder {
    *   card and inside its rect says other words and still counts (review
    *   of fix/r8-pixel, round 2, probe A: until then the rect alone decided
    *   in a flat list, and a colour assert on the card PASSED on the
-   *   sheet). The REACH, not the frame: CONTINUE's frame lies inside a
+   *   sheet). Residual, stated (review round 3): a real overlay in a flat
+   *   list whose words are all words of the element's label is dropped as
+   *   its content — a toast "Saved" over a card labelled "Saved payments".
+   *   The REACH, not the frame: CONTINUE's frame lies inside a
    *   52-pt row it hangs over (`Payee's country` at 24,776,
    *   idb-swift-form-scrolled-under-top-bar pos6), and its reach, run down
    *   to the screen's bottom, does not;
@@ -1300,10 +1303,11 @@ function readingBreak(order: readonly Placed[], target: Placed, contentFrom: num
  * The largest share of the screen's area the branch a node and a cover of
  * it share may have for the cover to be the node's own content or layer
  * (`DrawOrder.paintsOver`, `ownBranch`): one component — a row, a card, a
- * form's card (RN's `login_card`, 370x400 of 402x874, 42 %) — and not a
- * screen's content area (Compose's `accounts.detail.container`, 0,225
- * 1080x1995, 90 %, where a FAB over a row is chrome; review of
- * fix/r8-pixel, round 2, probe B2).
+ * form's card (RN's `login_card`, 370x400 of 402x874, 0.42 of the screen)
+ * — and not a screen's content area (Compose's `accounts.detail.container`,
+ * 0,225 1080x1995, 0.899, where a FAB over a row is chrome; review of
+ * fix/r8-pixel, round 2, probe B2). The measured margin: 0.42 below the
+ * line, 0.899 above it; nothing measured lies between.
  */
 const OWN_BRANCH_SCREEN_FRACTION = 0.5;
 
