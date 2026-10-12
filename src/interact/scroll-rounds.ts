@@ -324,7 +324,7 @@ export interface Judged {
    */
   centreOnScreen: boolean;
   /**
-   * The height of iOS's status band (swipe.ts#belowStatusBand, 2026-10-09),
+   * The height of the status band (swipe.ts#belowStatusBand, 2026-10-09),
    * set only when its centre lies on the screen but inside that band — so
    * not `centreOnScreen`; the failure quotes it (`shortOf`'s `statusBar`).
    */
@@ -956,7 +956,7 @@ function judge(
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
+  // The screen below the status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
   const band = { boxes: [viewport], statusBand };
   const screen: Rect = belowStatusBand(viewport, band);
   const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
@@ -1023,9 +1023,10 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * stop, "visible … CLIPPED 40%", and the next tap was refused off screen
  * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
  * keyboard — a centre under the band stops as before, and the tap's
- * keyboard guard hides the keyboard. On iOS a centre inside the status
- * band is off the screen (`Judged.bandOverCentre`, adapters/ios-status-
- * band.ts, 2026-10-09) — measured, one stroke flung `priority_select` to
+ * keyboard guard hides the keyboard. A centre inside the status band is
+ * off the screen (`Judged.bandOverCentre`; iOS's, adapters/ios-status-
+ * band.ts, 2026-10-09; Android's since 2026-10-12, android.ts
+ * #parseStatusBand) — measured, one stroke flung `priority_select` to
  * `24,-20` and the plain stop stopped with its centre at (201,6), where the
  * tap pressed the status bar — for both stops: `fully: true` asks the
  * centre to be on the screen too (an unclipped rect's centre always is,
@@ -1060,7 +1061,7 @@ function stops(j: Judged, fully: boolean): boolean {
  * with `fully: true`, or without it the centre off the screen; else
  * `covered` — something of the app drawn over it (over its centre, without
  * `fully`). With `fully: true` a cut edge leads, as it always has. A centre
- * on the screen but in iOS's status band is `statusBar` (2026-10-09): the
+ * on the screen but in the status band is `statusBar` (2026-10-09): the
  * sentence names the status bar, never a clip or a layout defect. Without
  * `fully`, a centre under nothing on a sliver its scroll container cuts it
  * to is `sliver` (2026-10-10, `stops`).
@@ -1349,7 +1350,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
     // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
-    // band.md): across it — clipped there, or its centre in iOS's status
+    // band.md): across it — clipped there, or its centre in the status
     // band, which the frames are cut below — or under something of the app
     // drawn over its far side. Read so before any read saw it short, it
     // was never carried past, so `seenShort` alone never turned it: the
@@ -1429,7 +1430,7 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * turns out to be further away than one move.
  *
  * A target IN the frame at the far edge turns the strokes too (2026-10-09,
- * `observe`'s `atFarEdge`): across that edge, its centre in iOS's status
+ * `observe`'s `atFarEdge`): across that edge, its centre in the status
  * band past it, or under a cover over its far side — on the first read as
  * on any. Until that date such a target was stroked on the caller's way,
  * and the comment here called it "a known cost, accepted (code review P7)
@@ -1524,7 +1525,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
-  // Below iOS's status band: a target whose centre a fling carried into it
+  // Below the status band: a target whose centre a fling carried into it
   // is past the far edge, and the next stroke turns back.
   const judgedFrames: Rect[] =
     cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));

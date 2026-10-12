@@ -236,7 +236,7 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
-/** `its centre stays under iOS's status bar at (201,53), in the top 62 pt …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
+/** `its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
 const statusBarText = (judged: Judged, band: number): string => `its centre stays ${underStatusBar(tapPoint(judged.node), band)}`;
 
 /** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
@@ -279,7 +279,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // stays over it at the end of the content: no clearance for a pinned
       // bar. Led by the cover whenever that is what it is short of — a plain
       // stop's centre under a bar, however clipped (code review S1).
-      // Its centre under iOS's status bar at the end of the content (2026-10-09): no defect of the app's — the
+      // Its centre under the status bar at the end of the content (2026-10-09): no defect of the app's — the
       // point a tap presses is the status bar's, and no swipe that way moves it out. The other way may; a target
       // pinned there moves neither way (code review of round 6, P1), which is said rather than promised away.
       // The other way tried (2026-10-09, scroll-rounds.ts#round's stuck turn): "try direction" would send the

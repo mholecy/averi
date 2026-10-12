@@ -505,12 +505,14 @@ export interface ScreenBox {
    */
   boxes: Rect[];
   /**
-   * The device's `DeviceScreen.statusBand` (iOS only — adapters/ios-status-
-   * band.ts): the band at the top of a PORTRAIT box whose points a
-   * judgement counts as OFF the screen — the point a tap presses, and
-   * `scroll_until`'s stop on it (`belowStatusBand` cuts it). Absent on
-   * Android, and when the device size could not be read (the tree's window
-   * stands in, and the judgement fails open as the rest of that path does).
+   * The device's `DeviceScreen.statusBand` (adapters/ios-status-band.ts on
+   * iOS; on Android since 2026-10-12, android.ts#parseStatusBand): the band
+   * at the top of a PORTRAIT box whose points a judgement counts as OFF the
+   * screen — the point a tap presses, and `scroll_until`'s stop on it
+   * (`belowStatusBand` cuts it). Absent when Android's bar is hidden or its
+   * dump unread, and when the device size could not be read (the tree's
+   * window stands in, and the judgement fails open as the rest of that path
+   * does).
    */
   statusBand?: number;
 }
@@ -528,9 +530,14 @@ export interface JudgingScreen {
 /**
  * `box` less the screen's status band (`JudgingScreen.statusBand`) at its
  * top when `box` is portrait — the part of it a point or a rect is judged
- * on screen in; `box` itself on Android, in landscape, or with no screen.
+ * on screen in; `box` itself with no band, in landscape, or with no screen.
  * `shape` is the screen box the band belongs to when `box` was cut from it
  * (the screen above a keyboard): its shape, not the cut's, says portrait.
+ *
+ * Portrait only is iOS's rule (an iPhone hides its status bar in
+ * landscape). Residual, stated (2026-10-12): Android keeps its status bar
+ * at the top in landscape too, and a point under it there is judged on the
+ * screen, as before Android reported a band.
  */
 export function belowStatusBand(box: Rect, screen: Pick<JudgingScreen, 'statusBand'> | undefined, shape: { width: number; height: number } = box): Rect {
   const band = screen?.statusBand ?? 0;

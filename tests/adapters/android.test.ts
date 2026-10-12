@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
-import { AndroidAdapter, parseImeInsets, parseInputShown, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
+import { AndroidAdapter, parseImeInsets, parseInputShown, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
@@ -1123,6 +1123,185 @@ describe('AndroidAdapter.keyboard.state — is a soft keyboard shown, and which 
   // The guard driven end to end through this adapter — the adb call order of
   // a dismissal and of the stale-window wait — is tests/integration/android-keyboard.test.ts
   // (moved 2026-10-04: it pinned interact/'s cadence from the adapter's test file).
+});
+
+/**
+ * The system status bar's band (2026-10-12, docs/bugs/2026-10-10-android-tap-
+ * and-scroll-until-treat-the-system-status-bar-as-app-screen.md): Google
+ * Contacts draws edge-to-edge, and with its app bar collapsed uiautomator
+ * dumps `text 'All contacts' 149,0 213x6` under the status bar — a tap at
+ * (256,3) went to the status bar. The adapter reports the VISIBLE status
+ * bar's height as `DeviceScreen.statusBand`, read out of the same
+ * `dumpsys window displays` the keyboard state reads, with the screen size.
+ */
+describe('AndroidAdapter.viewport — the status band, out of `dumpsys window displays`', () => {
+  const STATUS_33 = (frame: string, visible = 'true') => `        InsetsSource type=ITYPE_STATUS_BAR frame=${frame} visible=${visible} insetsRoundedCornerFrame=false`;
+  const STATUS_36 = (frame: string, visible = 'true') =>
+    `        InsetsSource id=ab460000 type=statusBars frame=${frame} visible=${visible} flags= sideHint=TOP boundingRects=null`;
+  const NAV_33 = '        InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true insetsRoundedCornerFrame=false';
+  const lines = (...l: string[]) => `    mInsetsState:\n${l.join('\n')}\n    InsetsSourceProviders:\n`;
+
+  it('the real dumps: API 33 `type=ITYPE_STATUS_BAR frame=[0,0][1080,66]` and API 36 `type=statusBars frame=[0,0][1080,66]` both read 66', async () => {
+    expect(parseStatusBand(await dumpsys('api33-keyboard-hidden'))).toBe(66);
+    expect(parseStatusBand(await dumpsys('api33-keyboard-shown'))).toBe(66);
+    expect(parseStatusBand(await dumpsys('api36-no-ime-source'))).toBe(66);
+  });
+
+  it('the band is the frame\'s bottom — a taller bar (a display cutout) is read as it is; the provider\'s `mSource=InsetsSource …` copy is not a second entry', () => {
+    expect(parseStatusBand(lines(STATUS_36('[0,0][1080,145]'), NAV_33))).toBe(145);
+    expect(parseStatusBand(`${lines(STATUS_33('[0,0][1080,66]'))}        mSource=InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,99] visible=true\n`)).toBe(66);
+  });
+
+  it.each([
+    ['the bar hidden (an immersive or full-screen app): visible=false', lines(STATUS_33('[0,0][1080,66]', 'false'), NAV_33)],
+    ['no status-bar entry at all', lines(NAV_33)],
+    ['an empty dump', ''],
+    ['an entry that does not read fully (no visible=)', '        InsetsSource type=statusBars frame=[0,0][1080,66] flags=\n'],
+    ['an empty frame', lines(STATUS_36('[0,0][0,0]'))],
+    ['a frame that does not start at the screen\'s top', lines(STATUS_36('[0,2154][1080,2220]'))],
+    ['two displays whose bars disagree (66 and hidden)', lines(STATUS_33('[0,0][1080,66]')) + lines(STATUS_33('[0,0][1080,66]', 'false'))],
+    ['two displays whose bars disagree (66 and 80)', lines(STATUS_36('[0,0][1080,66]')) + lines(STATUS_36('[0,0][1920,80]'))],
+  ])('no band — fail open, as before the band existed — on %s', (_name, dump) => {
+    expect(parseStatusBand(dump)).toBeUndefined();
+  });
+
+  it('two displays whose bars agree read as the one band', () => {
+    expect(parseStatusBand(lines(STATUS_33('[0,0][1080,66]')) + lines(STATUS_33('[0,0][1080,66]')))).toBe(66);
+  });
+
+  it('viewport reads wm size, then `dumpsys window displays` with a 2 s budget, and reports the band with the screen — both memoized', async () => {
+    const dump = await dumpsys('api33-keyboard-hidden');
+    const calls: { full: string; timeoutMs?: number }[] = [];
+    const fn: ExecFn = async (cmd, args, opts) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push({ full, timeoutMs: opts?.timeoutMs });
+      return { stdout: Buffer.from(full.endsWith('wm size') ? 'Physical size: 1080x2220\n' : dump), stderr: '' };
+    };
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const screen = { width: 1080, height: 2220, windowsBesideSystemBars: true, statusBand: 66 };
+    expect(await adapter.viewport()).toEqual(screen);
+    expect(await adapter.viewport()).toEqual(screen);
+    expect(calls.map((c) => c.full)).toEqual(['adb -s emulator-5554 shell wm size', 'adb -s emulator-5554 shell dumpsys window displays']);
+    expect(calls[1].timeoutMs).toBe(2_000);
+  });
+
+  it('viewport({ fresh: true }) reads the band again: a status bar an app has hidden since the first read is gone from the memo', async () => {
+    let hidden = false;
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      const out = full.endsWith('wm size') ? 'Physical size: 1080x2220\n' : lines(STATUS_33('[0,0][1080,66]', String(!hidden)));
+      return { stdout: Buffer.from(out), stderr: '' };
+    };
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    hidden = true;
+    expect((await adapter.viewport()).statusBand).toBe(66); // memoized
+    expect(await adapter.viewport({ fresh: true })).toEqual({ width: 1080, height: 2220, windowsBesideSystemBars: true });
+  });
+
+  /** An adb whose status-bar answer is `bar()` — a dump line, or an error to throw — counting the band reads. */
+  const scripted = (bar: () => string | Error) => {
+    const reads: string[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.endsWith('wm size')) return { stdout: Buffer.from('Physical size: 1080x2220\n'), stderr: '' };
+      if (full.endsWith('dumpsys window displays')) {
+        reads.push(full);
+        const answer = bar();
+        if (answer instanceof Error) throw answer;
+        return { stdout: Buffer.from(answer), stderr: '' };
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    return { adapter: new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), reads };
+  };
+
+  // Code review of fix/r8-band, round 1, MAJOR-1: the registry keeps one adapter per device for the server's life,
+  // and a failed first read was kept as "no band" — a cold device's 2 s timeout switched N1's fix off for good.
+  it('a band read that FAILED FAST (adb exits non-zero) is not kept: the next viewport() asks again, and the first answer is kept', async () => {
+    let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', 1, 'error: closed');
+    const { adapter, reads } = scripted(() => answer);
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // fail open
+    answer = lines(STATUS_33('[0,0][1080,66]'));
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    expect(reads).toHaveLength(2); // the failure, the answer — then kept
+  });
+
+  // Code review of fix/r8-band, round 2: retried every call, a hung dumpsys cost up to 2 s on each viewport().
+  it('a band read that TIMED OUT is kept as no band: the next viewport() makes no dumpsys call — until launch, or a fresh read', async () => {
+    let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
+    const { adapter, reads } = scripted(() => answer);
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // fail open
+    answer = lines(STATUS_33('[0,0][1080,66]'));
+    expect((await adapter.viewport()).statusBand).toBeUndefined();
+    expect(reads).toHaveLength(1); // not asked again
+    await adapter.launch('com.google.android.contacts');
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    expect(reads).toHaveLength(2);
+    answer = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
+    await adapter.viewport({ fresh: true });
+    answer = lines(STATUS_33('[0,0][1080,66]'));
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // the fresh read timed out: kept as none
+    expect((await adapter.viewport({ fresh: true })).statusBand).toBe(66);
+    expect(reads).toHaveLength(4);
+  });
+
+  it('an ANSWER of no band (the bar hidden) is kept, like a band — and launch drops either, so the next viewport() reads it again', async () => {
+    let hidden = true;
+    const { adapter, reads } = scripted(() => lines(STATUS_33('[0,0][1080,66]', String(!hidden))));
+    expect((await adapter.viewport()).statusBand).toBeUndefined();
+    hidden = false;
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // kept: no launch, no fresh read
+    expect(reads).toHaveLength(1);
+    await adapter.launch('com.google.android.contacts');
+    expect((await adapter.viewport()).statusBand).toBe(66);
+    hidden = true;
+    await adapter.launch('com.example.player');
+    expect((await adapter.viewport()).statusBand).toBeUndefined();
+    expect(reads).toHaveLength(3);
+  });
+
+  it('a band read in flight when launch runs keeps no answer: the next viewport() reads the new app\'s bar', async () => {
+    let release: (out: string) => void = () => {};
+    let reads = 0;
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.endsWith('wm size')) return { stdout: Buffer.from('Physical size: 1080x2220\n'), stderr: '' };
+      if (full.endsWith('dumpsys window displays')) {
+        reads++;
+        if (reads === 1) return { stdout: Buffer.from(await new Promise<string>((r) => (release = r))), stderr: '' };
+        return { stdout: Buffer.from(lines(STATUS_33('[0,0][1080,66]', 'false'))), stderr: '' };
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const before = adapter.viewport();
+    await vi.waitFor(() => expect(reads).toBe(1));
+    await adapter.launch('com.example.player');
+    release(lines(STATUS_33('[0,0][1080,66]'))); // the previous app's bar, answered after the launch
+    expect((await before).statusBand).toBe(66);
+    expect((await adapter.viewport()).statusBand).toBeUndefined(); // read again: the player hides it
+    expect(reads).toBe(2);
+  });
+
+  it('concurrent viewport() calls share one band read', async () => {
+    const { adapter, reads } = scripted(() => lines(STATUS_36('[0,0][1080,66]')));
+    const screens = await Promise.all([adapter.viewport(), adapter.viewport(), adapter.viewport()]);
+    expect(screens.map((sc) => sc.statusBand)).toEqual([66, 66, 66]);
+    expect(reads).toHaveLength(1);
+  });
+
+  it.each([
+    ['adb exits non-zero', execErrorLikeExec('adb shell dumpsys window displays', 1, "error: device 'emulator-5554' not found")],
+    ['the call times out', execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true })],
+  ])('a failing band read does not fail the screen — %s → the size, no band', async (_name, failure) => {
+    const fn: ExecFn = async (cmd, args) => {
+      if ([cmd, ...args].join(' ').endsWith('wm size')) return { stdout: Buffer.from('Physical size: 1080x2220\n'), stderr: '' };
+      throw failure;
+    };
+    expect(await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).viewport()).toEqual({ width: 1080, height: 2220, windowsBesideSystemBars: true });
+  });
 });
 
 describe('AndroidAdapter.keyboard.witness — the input method\'s own word, asked before a keyboard back', () => {
