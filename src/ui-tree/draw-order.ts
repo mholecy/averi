@@ -664,7 +664,9 @@ const NOT_DRAWN = {
    * the content of a scroller in a LATER screen — an RN transparent Modal
    * presented over the screen (a later screen-sized layer, in the same
    * window or another), a full-screen sheet's list, a later window under
-   * the parser's 0×0 root — over a target of the screen beneath. Two
+   * the parser's 0×0 root (an assumption: uiautomator's z-order across
+   * several windows is not measured, no fixture has one) — over a target of
+   * the screen beneath. Two
    * stacked screens, not a bar over its screen's content: below the node
    * holding both, the scroller lies in a screen-sized layer AND the target
    * does. The logged WDA form (the bar, then a full-screen content
@@ -672,7 +674,15 @@ const NOT_DRAWN = {
    * no screen, so Back stays tapped. Residuals, stated: a bar nested in a
    * full-screen host of its own, beside the content's full-screen layer,
    * reads as two screens and its button is covered by rows scrolled under
-   * it (no logged tree has that shape); a web view whose frame is under
+   * it (whether real bars nest so is unmeasured); a later layer under 90 %
+   * of the screen with no screen-sized wrapper — a medium sheet, a
+   * popover's table — reads as the same screen, its rows excused; so does a
+   * target that is itself a direct child of the node holding both (no
+   * layer of its own below it); Compose flattens layout-only Boxes, so an
+   * in-window overlay often has no layer node at all; a scroller nested
+   * inside the target's own scroller (a sticky chip row) is "another"
+   * scroller, so its content is excused where a row of the same scroll
+   * view would cover; a web view whose frame is under
    * the screen's size (above a tab bar, beside a toolbar) under a
    * translucent bar covers the bar's buttons through its own FRAME,
    * whatever this row says of its content — `contentFramed` rejects a web

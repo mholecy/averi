@@ -1377,7 +1377,12 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree).exposure(pay, rect(0, 0, 1080, 2220)).covers).toEqual([row]);
     });
 
-    /** The logged WDA SWIFT form (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md): the bar, then a full-screen content container holding the scroller. */
+    /**
+     * The WDA SWIFT form: a full-screen content container holding the scroller, a later sibling of the title's ancestor, as
+     * the log of docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md shows; the bar branch's rects are
+     * not logged, and are reconstructed from a real SwiftUI WDA capture (wda-source-skeleton-login.json's
+     * `NavigationStackHosting 0,62 402x44`, bar-sized).
+     */
     const swiftForm = (scroller: UiNode, barHost: (bar: UiNode) => UiNode = (bar) => bar) => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
       const bar = uiNode({ role: 'other', rect: rect(0, 62, 402, 54), children: [back, uiNode({ role: 'text', label: 'SWIFT PAYMENT', rect: rect(135, 73, 131, 22) })] });
@@ -1394,7 +1399,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       }
     });
 
-    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back (the logged tree shows no such host)', () => {
+    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back (whether real bars nest so is unmeasured)', () => {
       const text = iban();
       const { tree, back } = swiftForm(uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [text] }), (bar) => uiNode({ role: 'other', rect: IPHONE, children: [bar] }));
       expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([text]);
@@ -1406,6 +1411,20 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const form = uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [iban()] });
       const tree = uiNode({ role: 'application', rect: IPHONE, children: [host, form] });
       expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([]);
+    });
+
+    it('the scroller itself counts as the later screen: a full-screen scroll view directly under the node holding both, over a button in that node\'s full-screen screen layer, covers it through its row', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 690, 402, 60) });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [pay] }), uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([row]);
+    });
+
+    it('the residual, stated: a screen-sized TARGET directly under the node holding both is no screen layer of its own — a later full-screen layer\'s scroller content over it is excused, as the same screen', () => {
+      const backdrop = uiNode({ role: 'button', label: 'Dismiss', rect: IPHONE });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 690, 402, 60) });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [backdrop, uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] })] });
+      expect(drawOrder(tree).exposure(backdrop, IPHONE).covers).not.toContain(row);
     });
 
     it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text', () => {
