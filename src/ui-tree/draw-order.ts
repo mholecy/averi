@@ -1,6 +1,7 @@
-import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
+import { clips, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
 /**
@@ -22,8 +23,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Five questions, one per caller, read from three columns of `NOT_DRAWN`
- * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s):
+ * Six questions, one per caller, read from three columns of `NOT_DRAWN`
+ * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
+ * `coversOf` reads `exposure`'s):
  * - `shadowing(node, point)` — the tap guard's dismissal picker
  *   (interact/keyboard-in-tree.ts#pickDismissal): is a configured dismissal
  *   target drawn over at its tap point?
@@ -46,6 +48,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   `exposure` less the node's own content listed beside it, a clickable
  *   layer with nothing drawn, and an overlap no thicker than an edge
  *   (`PixelCover`'s doc has the rules and the measured shapes).
+ * - `coversOf(node, region)` — the uiautomator parser's widening, through
+ *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
+ *   drawn over the strip a node cut short of its own content would gain?
  *
  * The three columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -80,7 +85,7 @@ export interface DrawOrder {
    * after the container's subtree whose rect meets the container's with
    * area and that draws (`NOT_DRAWN`'s `drawnOver` column) — never an
    * ancestor or a descendant: its own rows scroll with it. The container is
-   * found by its rect: the outermost clipping node (`clipsDescendants`)
+   * found by its rect: the outermost node that clips (scroll-containers.ts#clips)
    * with that rect outside the keyboard, since the round carries containers
    * as rects (geometry.ts#clipsOf's `scrollersOf`, #largestScroller). UNDEFINED when this
    * tree has no such container (a rect of another read — the list has moved
@@ -117,6 +122,19 @@ export interface DrawOrder {
    */
   exposure(node: UiNode, within: Rect): Exposure;
   /**
+   * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
+   * node after `node`'s subtree (its first place in the tree, as
+   * `exposure`) whose rect meets `region` with area and that draws for a
+   * target (`NOT_DRAWN`'s `target` column, judged with `node` as the
+   * target). Unlike `exposure`, `region` may lie anywhere — outside `node`'s
+   * own rect too: the uiautomator parser asks it of the strip a node cut
+   * short of its own content would gain (adapters/android.ts#widenUnderCovers,
+   * through types.ts#DrawnOverStrip). Rects as the tree gives them — no
+   * flat-list reach, no tab-bar item listed before the node: a nested tree's
+   * order is its draw order. Empty for a node not in this tree.
+   */
+  coversOf(node: UiNode, region: Rect): readonly UiNode[];
+  /**
    * The TOP EDGE of idb's soft keyboard band (`keyboardOf`, over
    * soft-keyboard.ts#flatListKeyboardBand), or undefined — round 7,
    * 2026-10-10 (docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
@@ -133,9 +151,7 @@ export interface DrawOrder {
    * (`UiNode.flatList`, idb's mark) is read: WDA marks its band itself
    * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
    * always undefined here. Read off the band this draw order already found
-   * for its own rows (code review of round 7, S3: until then
-   * soft-keyboard.ts#keyboardBandTop walked the tree for it again, once per
-   * `scroll_until` round and once per moved tap).
+   * for its own rows, not by a second walk of the tree.
    */
   readonly keyboardBandTop: number | undefined;
   /**
@@ -283,7 +299,7 @@ interface Placed {
   end: number;
   /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`) or its band (`KEYBOARD_ROLE`, the tree source's mark — inside the keyboard's Window on WDA). */
   readonly inKeyboard: boolean;
-  /** Its nearest ancestor that scrolls (`scrolls`), if any. */
+  /** Its nearest ancestor that scrolls (scroll-containers.ts#scrolls), if any. */
   readonly scroller: Placed | undefined;
   /** Its parent; undefined for the root. */
   readonly parent: Placed | undefined;
@@ -336,20 +352,36 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
   rectWithin(target.node.rect, node.rect) &&
   (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
-/** `inner` lies in `outer`'s subtree (or is it). */
-const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
+/** Some node from `from` up to, not including, `above` `fillsScreen`: a screen-sized layer around `from` below `above`. */
+const screenLayerBelow = (from: Placed | undefined, above: Placed, screenArea: number): boolean => {
+  for (let p = from; p !== undefined && p !== above; p = p.parent) if (fillsScreen(p.node.rect, screenArea)) return true;
+  return false;
+};
 
 /**
- * A node whose content scrolls under what is around it: a scroll view
- * (`CONTENT_FRAMED_ROLES` — iOS) or a clipping container
- * (`UiNode.clipsDescendants` — Android's scrollers, Compose's included).
+ * `scroller` and `target` lie in two STACKED SCREENS (the `scrolledContent`
+ * row): below the nearest node holding both, each lies in a screen-sized
+ * layer of its own — the later one, the scroller's, drawn over the earlier
+ * (an RN transparent Modal presented over the screen, a full-screen sheet)
+ * — or that node is a root of no area, the parser's holder of several
+ * WINDOWS, each drawn over the ones before it.
  */
-const scrolls = (n: UiNode): boolean => CONTENT_FRAMED_ROLES.has(n.role) || n.clipsDescendants === true;
+const stackedScreens = (scroller: Placed, target: Placed, screenArea: number): boolean => {
+  let both = scroller.parent;
+  while (both !== undefined && !within(target, both)) both = both.parent;
+  if (both === undefined) return false;
+  if (both.parent === undefined && rectArea(both.node.rect) === 0) return true;
+  return screenLayerBelow(scroller, both, screenArea) && screenLayerBelow(target.parent, both, screenArea);
+};
+
+/** `inner` lies in `outer`'s subtree (or is it). */
+const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
 
 /**
  * The roles whose frame is not a surface: a node of one, non-interactive and
  * with children, covers a point only through its content (the
  * `contentFramed` row). One role, deliberately — see the rejected ones there.
+ * A draw rule, not a scroll predicate (scroll-containers.ts says why).
  */
 const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 
@@ -617,9 +649,10 @@ const NOT_DRAWN = {
   },
 
   /**
-   * SCROLLED CONTENT: a node inside a scroll view (`scrolls`: a
-   * `scrollable`, or a clipping container — Android's) that does not hold
-   * the target. `target` only (2026-10-09): an iOS form scrolls UNDER its
+   * SCROLLED CONTENT: a node inside something that scrolls
+   * (scroll-containers.ts#scrolls) that does not hold the target, in the
+   * target's own screen — scroller and target are not two stacked screens
+   * (`stackedScreens`). `target` only (2026-10-09): an iOS form scrolls UNDER its
    * translucent top bar, and WDA lists the bar's BackButton and Save
    * BEFORE the scroll view (the `contentFramed` row's measurement), so
    * every row scrolled up under the bar follows the bar's buttons in
@@ -627,10 +660,36 @@ const NOT_DRAWN = {
    * one tap that leaves the screen. Content cannot be drawn over what lies
    * outside its scroll view's frame on top of it; the scroll view itself
    * is judged by `contentFramed`. A row of the SAME scroll view as the
-   * target (a sticky section header over a row) still covers. Residual,
-   * stated: a scroll view really drawn over another part of the screen (a
-   * bottom sheet's list over a form) hides nothing through its rows here —
-   * only its frame, or a non-scrolling node of the sheet, can cover. The
+   * target (a sticky section header over a row) still covers, and so does
+   * the content of a scroller in a LATER screen — an RN transparent Modal
+   * presented over the screen (a later screen-sized layer, in the same
+   * window or another), a full-screen sheet's list, a later window under
+   * the parser's 0×0 root (an assumption: uiautomator's z-order across
+   * several windows is not measured, no fixture has one) — over a target of
+   * the screen beneath. Two
+   * stacked screens, not a bar over its screen's content: below the node
+   * holding both, the scroller lies in a screen-sized layer AND the target
+   * does. The logged WDA form (the bar, then a full-screen content
+   * container holding the scroll view, its sibling) has the bar's branch
+   * no screen, so Back stays tapped. Residuals, stated: a bar nested in a
+   * full-screen host of its own, beside the content's full-screen layer,
+   * reads as two screens and its button is covered by rows scrolled under
+   * it (whether real bars nest so is unmeasured); a later layer under 90 %
+   * of the screen with no screen-sized wrapper — a medium sheet, a
+   * popover's table — reads as the same screen, its rows excused; so does a
+   * target that is itself a direct child of the node holding both (no
+   * layer of its own below it); Compose flattens layout-only Boxes, so an
+   * in-window overlay often has no layer node at all; a scroller nested
+   * inside the target's own scroller (a sticky chip row) is "another"
+   * scroller, so its content is excused where a row of the same scroll
+   * view would cover; a web view whose frame is under
+   * the screen's size (above a tab bar, beside a toolbar) under a
+   * translucent bar covers the bar's buttons through its own FRAME,
+   * whatever this row says of its content — `contentFramed` rejects a web
+   * view on purpose. And a scroll view drawn over another part of the SAME
+   * screen (a bottom sheet's list laid in the screen's own layer, over a
+   * form) hides nothing through its rows — only its frame, or a
+   * non-scrolling node of the sheet, can cover. The
    * point and the container questions never ask it: the dismissal picker's
    * title IS such a target, and its `contentFramed` row was measured with
    * a row under the title still covering (accepted there as a false
@@ -642,7 +701,10 @@ const NOT_DRAWN = {
    * bar.
    */
   scrolledContent: {
-    target: ({ scroller }, { target }) => scroller !== undefined && !within(target, scroller),
+    target: ({ scroller }, { target, screenArea }) => {
+      if (scroller === undefined || within(target, scroller)) return false;
+      return !stackedScreens(scroller, target, screenArea);
+    },
   },
 
   /**
@@ -972,7 +1034,7 @@ const NOT_DRAWN = {
 
   /**
    * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
-   * child of a scroll view (`scrolls`) or of a text input
+   * child of a node that scrolls (scroll-containers.ts#scrolls) or of a text input
    * (`INPUT_ROLE`) and holds nothing but empty frames
    * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
    * a UIScrollView's two indicators LAST among its children, after every
@@ -1383,6 +1445,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
+  /** What the `target` column knows of `target`: the tree's facts, and where its reading order breaks. */
+  const asTarget = (target: Placed): SeenFor => ({ ...seen, target, flatList, contentFrom, barLine, readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets });
   /** Every place of `node` in the walk — the same object may sit at several (`shadowing`'s rule). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
@@ -1394,7 +1458,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
   const outOfDrawnOver = NOT_DRAWN.keyboard.drawnOver;
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
-    const found = order.find((p) => p.node.clipsDescendants === true && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
+    const found = order.find((p) => clips(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p, 'drawnOver') ? [p.node] : []));
   };
@@ -1442,10 +1506,16 @@ export function drawOrder(tree: UiNode): DrawOrder {
     drawnOverAt(container, point) {
       return (drawnOver(container) ?? []).filter((n) => containsPoint(n.rect, point) && !rectWithin(container, n.rect)).at(-1);
     },
+    coversOf(node, region) {
+      const places = placesOf(node);
+      if (places.length === 0) return [];
+      const about = asTarget(places[0]);
+      return laterThan(places, (p) => rectIntersection(p.node.rect, region) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
+    },
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : asTarget(places[0]);
       /** The tab bar `p` is an item of, when `node` lies outside it (`tabBarsOf`): a target wholly in the items' box is the bar's own. */
       const floatsOver = (p: Placed): TabBar | undefined => {
         const bar = tabItems.get(p);
@@ -1494,3 +1564,14 @@ export function drawOrder(tree: UiNode): DrawOrder {
   };
   return api;
 }
+
+/**
+ * The one implementation of the uiautomator parser's port
+ * (adapters/types.ts#DrawnOverStrip): one draw order of the tree as read,
+ * asked `coversOf` the strip for each node — a strip is drawn over when any
+ * node draws there for that node as a target.
+ */
+export const drawnOverStrip: DrawnOverStrip = (root) => {
+  const order = drawOrder(root);
+  return (node, strip) => order.coversOf(node, strip).length > 0;
+};

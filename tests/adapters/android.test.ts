@@ -4,8 +4,8 @@ import { tapElement } from '../../src/interact/tap.js';
 import { AndroidAdapter, parseImeInsets, parseInputShown, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
-import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
-import { everyNode, type UiNode } from '../../src/adapters/types.js';
+import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE, parseDump, drawnOverStrip } from '../helpers/android-dumps.js';
+import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
@@ -42,7 +42,7 @@ const UIAUTOMATOR_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?
 UI hierchary dumped to: /dev/tty`;
 
 describe('parseUiautomatorXml', () => {
-  const tree = parseUiautomatorXml(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
+  const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
 
   it('normalizes roles, identifiers, labels and bounds', () => {
     expect(tree.role).toBe('container');
@@ -76,7 +76,7 @@ describe('parseUiautomatorXml', () => {
     <node index="1" text="" resource-id="app:id/real_scroller" class="android.widget.HorizontalScrollView" package="app" content-desc="" focusable="false" long-clickable="false" scrollable="true" bounds="[0,700][1080,900]"/>
   </node>
 </hierarchy>`;
-    const t = parseUiautomatorXml(composeXml);
+    const t = parseDump(composeXml);
     expect(t.children[0]).toMatchObject({
       role: 'textfield',
       identifier: 'login.username.input',
@@ -87,7 +87,7 @@ describe('parseUiautomatorXml', () => {
 
   it('marks a node uiautomator dumps scrollable="true" as clipping its descendants — a Compose scroller keeps its role (container), only the flag says it scrolls; scrollable="false" and absent are not marked', () => {
     // 2026-10-09, docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md: the SWIFT form's scroller.
-    const t = parseUiautomatorXml(`<hierarchy rotation="0">
+    const t = parseDump(`<hierarchy rotation="0">
 <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
   <node class="android.view.View" scrollable="true" bounds="[0,242][1080,1978]">
     <node class="android.view.View" resource-id="app:id/fees_select" bounds="[66,242][1014,334]" />
@@ -124,7 +124,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
   </node>
 </node>
 </hierarchy>`;
-  const tree = parseUiautomatorXml(ACCOUNT_DETAIL);
+  const tree = parseDump(ACCOUNT_DETAIL);
   const byIdIn = (t: UiNode, id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
   const byId = (id: string) => byIdIn(tree, id);
   const PIXEL = { x: 0, y: 0, width: 1080, height: 2220 };
@@ -155,7 +155,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     const fake = new FakeAdapter({ list: tree }, 'list');
     await tapElement(fake, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(fake.taps).toHaveLength(1);
-    const thin = parseUiautomatorXml(ACCOUNT_DETAIL.replace('bounds="[66,480][1014,546]"', 'bounds="[66,516][1014,546]"').replace('[0,401][1080,480]', '[0,401][1080,516]'));
+    const thin = parseDump(ACCOUNT_DETAIL.replace('bounds="[66,480][1014,546]"', 'bounds="[66,516][1014,546]"').replace('[0,401][1080,480]', '[0,401][1080,516]'));
     expect(byIdIn(thin, 'transactions.list.row_0').rect).toEqual({ x: 66, y: 403, width: 948, height: 143 });
     const refused = new FakeAdapter({ list: thin }, 'list');
     const error = await tapElement(refused, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 }).catch((e: unknown) => e);
@@ -164,13 +164,13 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(refused.taps).toEqual([]);
   });
 
-  /** A list holding `rows`, and — when `overlay` — a bar listed after it over the whole list, as a sticky header or a tab bar is drawn over the rows it cuts. */
+  /** A list holding `rows`, and — when `overlay` — a bar listed after it over the whole list, drawing (it says something), as a sticky header or a tab bar is drawn over the rows it cuts. */
   const listOf = (rows: string, overlay: boolean) =>
-    parseUiautomatorXml(`<hierarchy rotation="0">
+    parseDump(`<hierarchy rotation="0">
 <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
   <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">${rows}</node>
   <node class="android.view.View" resource-id="unscrolled" bounds="[66,2100][1014,2150]"><node class="android.widget.Button" bounds="[66,2050][1014,2150]" /></node>
-  ${overlay ? '<node class="android.view.View" resource-id="overlay" bounds="[0,400][1080,2000]" />' : ''}
+  ${overlay ? '<node class="android.view.View" resource-id="overlay" content-desc="Header" bounds="[0,400][1080,2000]" />' : ''}
 </node>
 </hierarchy>`);
   const ROWS = `
@@ -184,7 +184,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     <node class="android.view.View" resource-id="top_cut_row" bounds="[66,430][1014,470]"><node class="android.widget.Button" bounds="[66,380][1014,470]" /></node>
     <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>`;
 
-  it('under a node listed after it: a row whose own button has its exact x and width and reaches past ONE edge is widened along y — no other shape is', () => {
+  it('under a node drawn after it: a row whose own button has its exact x and width and reaches past ONE edge is widened along y — no other shape is', () => {
     const t = listOf(ROWS, true);
     const of = (id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
     expect(of('cut_row')).toMatchObject({ rect: { x: 66, y: 1450, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
@@ -206,8 +206,73 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect([...everyNode(listOf(ROWS, false))].filter((n) => 'cutBounds' in n)).toEqual([]);
   });
 
+  /** One row of a list cut 50 px short of its own button's bottom (1550 of 1600), and `after` listed after the list. */
+  const rowWith = (inList: string, after: string) =>
+    parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1500][1014,1600]" /></node>${inList}
+</node>${after}
+</node></hierarchy>`);
+  const rowOf = (t: UiNode) => [...everyNode(t)].find((n) => n.identifier === 'row')!;
+
+  it('the parser widens only where the draw order says something is drawn over the strip: a screen-sized snackbar host listed after the list, its snackbar elsewhere, draws nothing there — the row stays as dumped and ui_snapshot shows no cutBounds', () => {
+    const t = rowWith('', `<node class="android.view.View" resource-id="host" bounds="[0,0][1080,2220]"><node class="android.view.View" resource-id="snack" content-desc="Saved" bounds="[30,2050][1050,2180]" /></node>`);
+    expect(rowOf(t).rect).toEqual({ x: 66, y: 1500, width: 948, height: 50 });
+    expect(rowOf(t)).not.toHaveProperty('cutBounds');
+  });
+
+  it('…nor a bare structural overlay (childless, nothing said, only an id) — and the same overlay saying something, or a host whose tab lies on the strip, still widens it', () => {
+    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="overlay" bounds="[0,1540][1080,2000]" />'))).not.toHaveProperty('cutBounds');
+    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="overlay" content-desc="Banner" bounds="[0,1540][1080,2000]" />'))).toHaveProperty('cutBounds');
+    const tabHost = '<node class="android.view.View" bounds="[0,0][1080,2220]"><node class="android.view.View" resource-id="tabs" bounds="[66,1550][1014,1800]"><node class="android.view.View" content-desc="Home" bounds="[100,1560][300,1700]" /></node></node>';
+    expect(rowOf(rowWith('', tabHost))).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
+  it('every target-column excuse applies, those measured on iOS too: a childless full-screen scrim listed after the list widens nothing, nor a classic list sheet (a RecyclerView) whose rows lie on the strip — its rows are another scroller\'s content, its frame no surface', () => {
+    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="scrim" bounds="[0,0][1080,2220]" />'))).not.toHaveProperty('cutBounds');
+    const sheet = `<node class="androidx.recyclerview.widget.RecyclerView" resource-id="sheet" scrollable="false" bounds="[0,1520][1080,2220]">
+  <node class="android.widget.TextView" resource-id="sheet_row" text="Share" bounds="[0,1540][1080,1700]" />
+</node>`;
+    expect(rowOf(rowWith('', sheet))).not.toHaveProperty('cutBounds');
+  });
+
+  it('the strip is judged with the dump\'s mark in place (paddedTouchTargets): a label cut short of its text whose own icon button, padded evenly in their wrapper and centred on it, lies on the strip is not widened under its own control', () => {
+    const t = rowWith(`
+ <node class="android.view.View" resource-id="wrapper" bounds="[100,1000][400,1300]">
+  <node class="android.view.View" resource-id="label" bounds="[150,1100][350,1200]"><node class="android.widget.TextView" text="Edit" bounds="[150,1050][350,1200]" /></node>
+  <node class="android.widget.Button" bounds="[150,1050][350,1250]" />
+ </node>`, '');
+    expect([...everyNode(t)].find((n) => n.identifier === 'label')).not.toHaveProperty('cutBounds');
+  });
+
+  it('the residual, pinned (permanent): the NEXT row of the same list, listed after the row and lying on the strip its touch target overflows into, is drawn there exactly as a sticky header is — the row is widened as if cut', () => {
+    const t = rowWith('<node class="android.view.View" resource-id="next" content-desc="Next" bounds="[66,1550][1014,1700]" />', '');
+    expect(rowOf(t)).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
+  it('the parser asks the port it is handed, once per dump, with the tree as read and each candidate\'s gained strip — and widens exactly where it answers yes', () => {
+    const xml = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1500][1014,1600]" /></node>
+</node></node></hierarchy>`;
+    const asked: { root: UiNode; node: string | null; strip: Rect }[] = [];
+    const marked: (true | undefined)[] = [];
+    const judge = (answer: boolean) => (root: UiNode) => {
+      marked.push(root.paddedTouchTargets);
+      return (node: UiNode, strip: Rect) => {
+        asked.push({ root, node: node.identifier, strip });
+        return answer;
+      };
+    };
+    const no = parseUiautomatorXml(xml, judge(false));
+    expect(rowOf(no)).not.toHaveProperty('cutBounds');
+    expect(asked).toEqual([{ root: no, node: 'row', strip: { x: 66, y: 1550, width: 948, height: 50 } }]);
+    expect(rowOf(parseUiautomatorXml(xml, judge(true)))).toHaveProperty('cutBounds');
+    expect(marked).toEqual([true, true]); // one tree per dump, the root's mark set before the judge reads it
+  });
+
   it('the residual, pinned (review round 2): a card cut at BOTH ends — between the sticky header and the floating tab bar, dumped 66,480 948x1360 over its own 66,420 948x1480 — is not widened and reads whole', () => {
-    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,401][1080,2154]">
  <node class="android.view.View" resource-id="card" bounds="[66,480][1014,1840]"><node class="android.widget.Button" bounds="[66,420][1014,1900]" /></node>
  <node class="android.view.View" resource-id="date_header_0" bounds="[0,401][1080,480]" />
@@ -221,7 +286,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
   });
 
   it('code review P1: a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {
-    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
  <node class="android.view.View" resource-id="card" bounds="[66,500][1014,900]">
   <node class="android.widget.TextView" text="Pay now" bounds="[100,520][980,600]" />
@@ -237,7 +302,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
   });
 
   it('code review P3: a full-width child overflowing its row by 10 px each side does not widen the row over the next one — row_a is not covered by row_b', () => {
-    const t = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
  <node class="android.view.View" resource-id="row_a" bounds="[0,600][1080,705]">
   <node class="android.view.View" content-desc="A" clickable="true" bounds="[0,590][1080,716]" />
@@ -268,7 +333,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     };
     const widened: string[] = [];
     for (const [screen, dumped] of Object.entries(fixture.screens)) {
-      const parsed = parseUiautomatorXml(`<hierarchy rotation="0">${toXml(dumped)}</hierarchy>`);
+      const parsed = parseDump(`<hierarchy rotation="0">${toXml(dumped)}</hierarchy>`);
       const before = [...everyNode(dumped)];
       const after = [...everyNode(parsed)];
       expect(after).toHaveLength(before.length);
@@ -302,7 +367,7 @@ describe('parseUiautomatorXml — bounds dumped inverted are a node clipped out 
   </node>
 </node>
 </hierarchy>`;
-  const tree = parseUiautomatorXml(SETTINGS);
+  const tree = parseDump(SETTINGS);
   const byLabel = (label: string) => [...everyNode(tree)].find((n) => n.label === label)!;
 
   it('clamped to zero size at the container\'s edge, the side it lies past kept: above (Apps, its summary, the title under the app bar), below (System), right of', () => {
@@ -343,7 +408,7 @@ describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
     <node index="4" text="x" hint="" resource-id="app:id/blank_hint" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,550]"/>
   </node>
 </hierarchy>`;
-  const [measured, hinted, filled, textView, blankHint] = parseUiautomatorXml(xml).children;
+  const [measured, hinted, filled, textView, blankHint] = parseDump(xml).children;
 
   it('the measured API 33 shape: the hint is the value, and nothing says so', () => {
     expect(measured).toMatchObject({ role: 'textfield', value: 'Last name' });
@@ -365,7 +430,7 @@ describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
 describe('AndroidAdapter interactions', () => {
   it('drags at 0.45 screens a second (types.ts#dragSpeed, 2026-10-09): the duration a caller passes reaches `input swipe`; none passed is still 300 ms', async () => {
     const { fn, calls } = fakeExec({});
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     expect(adapter.dragSpeed).toBe(0.45);
     await adapter.swipe({ x: 540, y: 1871 }, { x: 540, y: 1021 }, 851);
     await adapter.swipe({ x: 540, y: 1776 }, { x: 540, y: 444 });
@@ -377,7 +442,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('uiTree strips the trailing uiautomator status line', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
-    const tree = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree();
+    const tree = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree();
     expect(tree.children).toHaveLength(3);
   });
 
@@ -407,7 +472,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('offline device: leads with adb get-state, keeps the dump text as evidence', async () => {
       const { fn, calls } = scripted(['Killed'], offline);
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /device emulator-5554 is not reachable: adb get-state says "device offline".*uiautomator dump returned no XML: Killed/s,
       );
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(1); // no retry on Killed
@@ -416,7 +481,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('empty dump on an offline device is the same diagnosis', async () => {
       const { fn } = scripted([''], offline);
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /is not reachable: adb get-state says "device offline"/,
       );
     });
@@ -426,7 +491,7 @@ describe('AndroidAdapter interactions', () => {
         ['ERROR: null root node returned by UiTestAutomationBridge.', UIAUTOMATOR_XML],
         'device',
       );
-      const tree = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree({ settle: true });
+      const tree = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree({ settle: true });
       expect(tree.children).toHaveLength(3);
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
       expect(calls.some((c) => c.endsWith('get-state'))).toBe(false);
@@ -434,7 +499,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('null root node twice on a reachable device with settle: classified as settling', async () => {
       const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree({ settle: true })).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree({ settle: true })).rejects.toThrow(
         /device emulator-5554 is still settling.*retried once after 1 s\)/s,
       );
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
@@ -442,7 +507,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('null root node WITHOUT settle (a poller): one dump, no hidden retry, still classified', async () => {
       const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /is still settling.*read once/s,
       );
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(1);
@@ -456,7 +521,7 @@ describe('AndroidAdapter interactions', () => {
         if (full.includes('uiautomator dump')) throw new ExecError(full, null, '', true);
         return { stdout: Buffer.from('device\n'), stderr: '' };
       };
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /device emulator-5554 is reachable but SLOW: uiautomator dump timed out after 15 s/,
       );
       expect(calls.at(-1)).toBe('adb -s emulator-5554 get-state');
@@ -473,7 +538,7 @@ describe('AndroidAdapter interactions', () => {
         calls.push(full);
         throw execErrorLikeExec(full, null, '', { timedOut: true });
       };
-      const err = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree().then(() => undefined, (e: Error) => e);
+      const err = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree().then(() => undefined, (e: Error) => e);
       expect(err?.message).toBe(
         'device emulator-5554 is not answering: adb get-state timed out after 5 s — the adb server or this ' +
           "device's transport is hung, not the app. Run `adb devices`: if it hangs too, `adb kill-server && " +
@@ -490,7 +555,7 @@ describe('AndroidAdapter interactions', () => {
         if (full.includes('uiautomator dump')) return { stdout: Buffer.from('Killed'), stderr: '' };
         throw execErrorLikeExec(full, null, '', { timedOut: true });
       };
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /^device emulator-5554 is not answering: adb get-state timed out after 5 s — .*\(uiautomator dump returned no XML: Killed\)$/s,
       );
     });
@@ -503,7 +568,7 @@ describe('AndroidAdapter interactions', () => {
         if (full.includes('uiautomator dump')) return { stdout: Buffer.from('Killed'), stderr: '' };
         throw execErrorLikeExec(full, 1, '');
       };
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /^device emulator-5554 is not reachable: adb get-state says "Command failed: adb -s emulator-5554 get-state"/,
       );
     });
@@ -513,7 +578,7 @@ describe('AndroidAdapter interactions', () => {
         const full = [cmd, ...args].join(' ');
         throw new ExecError(full, full.includes('get-state') ? 1 : 255, "error: device 'emulator-5554' not found");
       };
-      const err = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree().then(() => undefined, (e: Error) => e);
+      const err = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree().then(() => undefined, (e: Error) => e);
       expect(err?.message).toMatch(/device emulator-5554 is not reachable: adb get-state says "device 'emulator-5554' not found"/);
       expect(err?.message).toContain('adb could not run uiautomator dump');
       expect(err?.cause).toBeInstanceOf(ExecError);
@@ -521,7 +586,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('Killed on a reachable device: the dump died on the guest, device still named', async () => {
       const { fn } = scripted(['Killed'], 'device');
-      await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree()).rejects.toThrow(
         /returned no XML: Killed — adb get-state says "device", so the dump itself died on the guest/,
       );
     });
@@ -535,42 +600,42 @@ describe('AndroidAdapter interactions', () => {
 
     it('asks with `pidof <pkg> || true` and reads NOT running from an empty stdout, exit 0', async () => {
       const { fn, calls } = fakeExec({});
-      expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('md.bank.app')).toBe(false);
+      expect(await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('md.bank.app')).toBe(false);
       expect(calls).toEqual(['adb -s e shell pidof md.bank.app || true']);
     });
     it('a pid on stdout is running', async () => {
       const { fn } = fakeExec({ 'adb -s e shell pidof': '22698\n' });
-      expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('md.bank.app')).toBe(true);
+      expect(await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('md.bank.app')).toBe(true);
     });
     it('a non-zero exit shaped like exec.ts emits it propagates — it is the transport, not the app', async () => {
       const fn = throwing(realShape('adb -s e shell pidof x || true', 1, ''));
-      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/Command failed/);
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/Command failed/);
     });
     it('a timeout propagates (device under load is not a dead app)', async () => {
       const fn = throwing(realShape('adb -s e shell pidof x || true', null, '', { timedOut: true }));
-      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/timed out/);
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/timed out/);
     });
     it('an adb-level error propagates (offline device is not a dead app)', async () => {
       const fn = throwing(realShape('adb -s e shell pidof x || true', 1, 'error: device offline'));
-      await expect(new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/device offline/);
+      await expect(new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/device offline/);
     });
     // Quoted, no longer refused — see adb-shell.ts; pinned through a real sh in adb-shell.test.ts.
     it('quotes a package name that could escape the shell, rather than refusing it', async () => {
       const { fn, calls } = fakeExec({});
-      expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x; rm -rf /')).toBe(false);
+      expect(await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x; rm -rf /')).toBe(false);
       expect(calls).toEqual(["adb -s e shell pidof 'x; rm -rf /' || true"]);
     });
   });
 
   it('tapElement resolves a selector and taps the rect center', async () => {
     const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
-    await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:pin_key_2', { ambiguous: 'refuse' });
+    await tapElement(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), 'id:pin_key_2', { ambiguous: 'refuse' });
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 540 1350');
   });
 
   it('typeText sends one input-text call per character (bulk injection drops chars on Compose fields)', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('a $b');
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('a $b');
     expect(calls).toEqual([
       'adb -s emulator-5554 shell input text a',
       'adb -s emulator-5554 shell input text %s',
@@ -591,13 +656,13 @@ describe('AndroidAdapter interactions', () => {
   // corrected later that day: the contract says "" types nothing on both.
   it('typeText with an empty string sends nothing: neither a character nor the commit nudge', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('');
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('');
     expect(calls).toEqual([]);
   });
 
   it('launch with clearState clears app data first', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn })
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn })
       .launch('md.bank.app', { clearState: true });
     expect(calls[0]).toBe('adb -s emulator-5554 shell pm clear md.bank.app');
     expect(calls[1]).toContain('monkey -p md.bank.app');
@@ -605,7 +670,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('launch with an activity uses am start -n, not monkey (monkey may pick LeakCanary)', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn })
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn })
       .launch('md.bank.app', { activity: '.MainActivity' });
     expect(calls).toEqual([
       'adb -s emulator-5554 shell am start -n md.bank.app/.MainActivity',
@@ -614,14 +679,14 @@ describe('AndroidAdapter interactions', () => {
 
   it('launch passes a full pkg/Activity component through unchanged', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn })
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn })
       .launch('md.bank.app', { activity: 'md.bank.app/md.bank.ShareActivity' });
     expect(calls[0]).toBe('adb -s emulator-5554 shell am start -n md.bank.app/md.bank.ShareActivity');
   });
 
   it('launch with an intent builds am start action/data/type/categories/extras', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).launch('md.bank.app', {
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).launch('md.bank.app', {
       activity: '.ShareActivity',
       intent: {
         action: 'android.intent.action.SEND',
@@ -651,7 +716,7 @@ describe('AndroidAdapter interactions', () => {
         if (reply instanceof Error) throw reply;
         return { stdout: Buffer.from(reply.stdout ?? ''), stderr: reply.stderr ?? '' };
       };
-      return { adapter: new AndroidAdapter({ serial: 'e', exec: fn }), argvs };
+      return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }), argvs };
     };
     const UNRESOLVED =
       'Error: Activity not started, unable to resolve Intent { act=android.intent.action.SEND typ=text/plain flg=0x10000000 pkg=md.bank.app }';
@@ -789,7 +854,7 @@ describe('AndroidAdapter interactions', () => {
         if (answer instanceof Error) throw answer;
         return { stdout: Buffer.from(answer.stdout ?? ''), stderr: answer.stderr ?? '' };
       };
-      return new AndroidAdapter({ serial: 'e', exec: fn });
+      return new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn });
     };
     const messageOf = (starting: Promise<unknown>) => starting.then(() => 'resolved', (e: Error) => e.message);
     const UNRESOLVED_VIEW =
@@ -841,7 +906,7 @@ describe('AndroidAdapter interactions', () => {
     const { fn, calls } = fakeExec({
       'adb -s emulator-5554 shell wm size': 'Physical size: 1080x2280\nOverride size: 1000x2000\n',
     });
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     const screen = { width: 1000, height: 2000, windowsBesideSystemBars: true };
     expect(await adapter.viewport()).toEqual(screen);
     expect(await adapter.viewport()).toEqual(screen);
@@ -854,7 +919,7 @@ describe('AndroidAdapter interactions', () => {
   it('viewport does not memoize a FAILED read: the next call asks wm size again, and its success is kept', async () => {
     const responses: Record<string, string> = { 'adb -s emulator-5554 shell wm size': 'error: device offline\n' };
     const { fn, calls } = fakeExec(responses);
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     await expect(adapter.viewport()).rejects.toThrow(/Cannot parse wm size output/);
     responses['adb -s emulator-5554 shell wm size'] = 'Physical size: 1080x2400\n';
     expect(await adapter.viewport()).toMatchObject({ width: 1080, height: 2400 });
@@ -865,7 +930,7 @@ describe('AndroidAdapter interactions', () => {
   it('viewport({ fresh: true }) reads wm size again and replaces the memo — a `wm size` override since the first read', async () => {
     const responses: Record<string, string> = { 'adb -s emulator-5554 shell wm size': 'Physical size: 1080x2220\nOverride size: 720x1600\n' };
     const { fn, calls } = fakeExec(responses);
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     expect(await adapter.viewport()).toMatchObject({ width: 720, height: 1600 });
     responses['adb -s emulator-5554 shell wm size'] = 'Physical size: 1080x2220\n';
     expect(await adapter.viewport()).toMatchObject({ width: 720, height: 1600 }); // memoized
@@ -876,7 +941,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('clearText moves to end, then one keyevent per call (batches drop events in the IME queue)', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).clearText(2);
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).clearText(2);
     expect(calls).toEqual([
       'adb -s emulator-5554 shell input keyevent 123', // MOVE_END
       'adb -s emulator-5554 shell input keyevent 67',
@@ -888,7 +953,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('clearText(0) is a no-op', async () => {
     const { fn, calls } = fakeExec({});
-    await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).clearText(0);
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).clearText(0);
     expect(calls).toHaveLength(0);
   });
 });
@@ -912,7 +977,7 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
         return 0 as unknown as NodeJS.Timeout;
       }) as typeof setTimeout);
 
-      await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('abc');
+      await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('abc');
       spy.mockRestore();
 
       // Three characters paced at 250ms, then the DPAD nudge settle at 150ms.
@@ -940,7 +1005,7 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
         return 0 as unknown as NodeJS.Timeout;
       }) as typeof setTimeout);
 
-      await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).typeText('');
+      await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('');
       spy.mockRestore();
 
       expect(waits).toEqual([]);
@@ -1102,7 +1167,7 @@ describe('AndroidAdapter.keyboard.state — is a soft keyboard shown, and which 
       calls.push({ full: [cmd, ...args].join(' '), timeoutMs: opts?.timeoutMs });
       return { stdout: Buffer.from(dump), stderr: '' };
     };
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     expect((await adapter.keyboard.state()).state).toBe('shown');
     expect(calls).toEqual([{ full: 'adb -s emulator-5554 shell dumpsys window displays', timeoutMs: 2_000 }]);
     await adapter.keyboard.state();
@@ -1117,7 +1182,7 @@ describe('AndroidAdapter.keyboard.state — is a soft keyboard shown, and which 
     const fn: ExecFn = async () => {
       throw failure;
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.state()).resolves.toEqual({ state: 'unknown' });
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).keyboard.state()).resolves.toEqual({ state: 'unknown' });
   });
 
   // The guard driven end to end through this adapter — the adb call order of
@@ -1177,7 +1242,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       calls.push({ full, timeoutMs: opts?.timeoutMs });
       return { stdout: Buffer.from(full.endsWith('wm size') ? 'Physical size: 1080x2220\n' : dump), stderr: '' };
     };
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     const screen = { width: 1080, height: 2220, windowsBesideSystemBars: true, statusBand: 66 };
     expect(await adapter.viewport()).toEqual(screen);
     expect(await adapter.viewport()).toEqual(screen);
@@ -1192,7 +1257,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       const out = full.endsWith('wm size') ? 'Physical size: 1080x2220\n' : lines(STATUS_33('[0,0][1080,66]', String(!hidden)));
       return { stdout: Buffer.from(out), stderr: '' };
     };
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     expect((await adapter.viewport()).statusBand).toBe(66);
     hidden = true;
     expect((await adapter.viewport()).statusBand).toBe(66); // memoized
@@ -1213,7 +1278,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       }
       return { stdout: Buffer.alloc(0), stderr: '' };
     };
-    return { adapter: new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), reads };
+    return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), reads };
   };
 
   // Code review of fix/r8-band, round 1, MAJOR-1: the registry keeps one adapter per device for the server's life,
@@ -1275,7 +1340,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       }
       return { stdout: Buffer.alloc(0), stderr: '' };
     };
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     const before = adapter.viewport();
     await vi.waitFor(() => expect(reads).toBe(1));
     await adapter.launch('com.example.player');
@@ -1300,7 +1365,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
       if ([cmd, ...args].join(' ').endsWith('wm size')) return { stdout: Buffer.from('Physical size: 1080x2220\n'), stderr: '' };
       throw failure;
     };
-    expect(await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).viewport()).toEqual({ width: 1080, height: 2220, windowsBesideSystemBars: true });
+    expect(await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).viewport()).toEqual({ width: 1080, height: 2220, windowsBesideSystemBars: true });
   });
 });
 
@@ -1338,7 +1403,7 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
       calls.push({ cmd, args, timeoutMs: opts?.timeoutMs });
       return { stdout: Buffer.from(INPUT_SHOWN_LINE(true)), stderr: '' };
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('shown');
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('shown');
     expect(calls).toEqual([
       // ONE argument after `shell`: the device's sh runs the pipe; -w matches the name as a whole word.
       { cmd: 'adb', args: ['-s', 'emulator-5554', 'shell', 'dumpsys input_method | grep -m1 -w mInputShown'], timeoutMs: 2_000 },
@@ -1349,7 +1414,7 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
     const outputs = [INPUT_SHOWN_LINE(false), INPUT_SHOWN_LINE(true)];
     let n = 0;
     const fn: ExecFn = async () => ({ stdout: Buffer.from(outputs[n++]), stderr: '' });
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     expect([await adapter.keyboard.witness(), await adapter.keyboard.witness()]).toEqual(['hidden', 'shown']);
     expect(n).toBe(2);
   });
@@ -1363,7 +1428,7 @@ describe('AndroidAdapter.keyboard.witness — the input method\'s own word, aske
     const fn: ExecFn = async () => {
       throw failure;
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('unknown');
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).keyboard.witness()).resolves.toBe('unknown');
   });
 });
 
@@ -1414,7 +1479,7 @@ describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable regi
       calls.push({ cmd, args, timeoutMs: opts?.timeoutMs });
       return { stdout: Buffer.from(GBOARD.floating.touchable), stderr: '' };
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.touchable()).resolves.toEqual({
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).keyboard.touchable()).resolves.toEqual({
       witness: 'shown',
       region: [GBOARD_PANEL, GBOARD_STRIP],
     });
@@ -1429,7 +1494,7 @@ describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable regi
 
   it('either half alone is read: the witness without a region, the region without a witness', async () => {
     const answer = async (out: string) =>
-      new AndroidAdapter({ serial: 'emulator-5554', exec: async () => ({ stdout: Buffer.from(out), stderr: '' }) }).keyboard.touchable();
+      new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: async () => ({ stdout: Buffer.from(out), stderr: '' }) }).keyboard.touchable();
     await expect(answer(INPUT_SHOWN_LINE(false))).resolves.toEqual({ witness: 'hidden', region: undefined });
     await expect(answer('  touchable region=SkRegion((0,2088,1080,2220))\n')).resolves.toEqual({ witness: 'unknown', region: [GBOARD_STRIP] });
   });
@@ -1442,7 +1507,7 @@ describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable regi
     const fn: ExecFn = async () => {
       throw failure;
     };
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).keyboard.touchable()).resolves.toEqual({ witness: 'unknown', region: undefined });
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).keyboard.touchable()).resolves.toEqual({ witness: 'unknown', region: undefined });
   });
 });
 
@@ -1457,7 +1522,7 @@ describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', 
 
   it('passes a capture that starts with the PNG signature through unchanged', async () => {
     const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': PNG_HEAD });
-    const shot = await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot();
+    const shot = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot();
     expect(shot.equals(PNG_HEAD)).toBe(true);
     expect(calls).toEqual(['adb -s emulator-5554 exec-out screencap -p']);
   });
@@ -1465,14 +1530,14 @@ describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', 
   it('the signature alone — exactly 8 bytes — is enough; 7 of them is not', async () => {
     const signature = PNG_HEAD.subarray(0, 8);
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': signature });
-    expect((await new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot()).equals(signature)).toBe(true);
+    expect((await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot()).equals(signature)).toBe(true);
     const short = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': signature.subarray(0, 7) });
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: short.fn }).screenshot()).rejects.toThrow(/returned 7 bytes starting ".PNG/);
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: short.fn }).screenshot()).rejects.toThrow(/returned 7 bytes starting ".PNG/);
   });
 
   it('an empty capture (exit 0, no bytes) is a transport error naming the device and the command', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': Buffer.alloc(0) });
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
       '`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG, though the ' +
         'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
         'screen. Re-check `adb devices` and retry; if it repeats, the emulator, not the app, needs attention.',
@@ -1481,7 +1546,7 @@ describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', 
 
   it('text on stdout (`Killed`, the measured dying-guest shape) is refused too, quoting what came back', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': 'Killed\n' });
-    await expect(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
       /^`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 7 bytes starting "Killed" — not a PNG/,
     );
   });

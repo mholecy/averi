@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
@@ -9,6 +8,7 @@ import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { accessoryDismissButton, flatListKeyboardBand, keyboardInTree } from '../../src/ui-tree/soft-keyboard.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node, screen } from '../helpers/fake.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 // The tree's own marks (ui-tree/soft-keyboard.ts). The reading built over
 // them — the switch between the oracle and the tree, the floating panel,
@@ -140,7 +140,7 @@ describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing 
     nested.rect = r(0, 0, 402, 874);
     expect(keyboardBandTop(nested)).toBeUndefined();
     expect(keyboardBandTop(parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-keyboard.json', import.meta.url), 'utf8')))).toBeUndefined();
-    expect(keyboardBandTop(parseUiautomatorXml(CLASSIC_VIEWS.loginImeUp))).toBeUndefined();
+    expect(keyboardBandTop(parseDump(CLASSIC_VIEWS.loginImeUp))).toBeUndefined();
   });
 
   it('a band top is not a keyboard reading: keyboardInTree still says `unknown` of both idb keyboards — the in-tree dismissal presses nothing there (K5d)', async () => {

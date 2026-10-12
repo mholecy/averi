@@ -1,13 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node as uiNode } from '../helpers/fake.js';
 
@@ -339,6 +338,68 @@ describe('drawnOverAt — the node drawn over a container at a touch-down (the e
 
   it('undefined when this tree holds no container of that rect (the list moved)', () => {
     expect(drawOrder(tree(host)).drawnOverAt(rect(0, 401, 1080, 1819), { x: 540, y: 1857 })).toBeUndefined();
+  });
+});
+
+describe('coversOf — what is drawn over a region of a node as a target, wherever the region lies (the uiautomator parser\'s widening)', () => {
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const LIST = rect(0, 401, 1080, 1753);
+  /** Account Detail's row_0 as dumped (cut at its sticky header's bottom, 480), and the strip its own content says it reaches above that. */
+  const row = () => uiNode({ role: 'container', identifier: 'row_0', rect: rect(66, 480, 948, 66), children: [uiNode({ role: 'button', rect: rect(66, 403, 948, 143) })] });
+  const STRIP = rect(66, 403, 948, 77);
+  /** The Android screen: a list holding `inList`, then `after` listed after it; the source's mark on the root, as the parser sets it. */
+  const screen = (inList: UiNode[], ...after: UiNode[]) =>
+    uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), paddedTouchTargets: true, children: [uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: inList }), ...after] });
+  const header = () => uiNode({ role: 'container', identifier: 'date_header_0', rect: rect(0, 401, 1080, 79), children: [uiNode({ role: 'text', label: '17.07.2026', rect: rect(66, 415, 220, 50) })] });
+
+  it('a region OUTSIDE the node\'s rect: the sticky header listed after the row, with its text, is drawn over the strip — where exposure, cut to the row\'s own rect, sees nothing', () => {
+    const r = row();
+    const h = header();
+    const order = drawOrder(screen([r, h]));
+    expect(order.coversOf(r, STRIP)).toEqual([h, h.children[0]]);
+    expect(order.exposure(r, rect(0, 0, 1080, 2220)).covers).toEqual([]);
+  });
+
+  it('only what meets the region with area, and only what is listed after the node: the header listed BEFORE the row covers nothing; a region clear of it neither', () => {
+    const r = row();
+    const h = header();
+    expect(drawOrder(screen([h, r])).coversOf(r, STRIP)).toEqual([]);
+    expect(drawOrder(screen([r, h])).coversOf(r, rect(66, 546, 948, 40))).toEqual([]);
+    expect(drawOrder(screen([r, h])).coversOf(r, rect(66, 480, 948, 0))).toEqual([]);
+  });
+
+  it('a screen-sized host listed after it (a Compose snackbar host) draws nothing there — its snackbar elsewhere neither', () => {
+    const r = row();
+    const snackbar = uiNode({ role: 'container', label: 'Saved', rect: rect(30, 2050, 1020, 130) });
+    const host = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [snackbar] });
+    expect(drawOrder(screen([r], host)).coversOf(r, STRIP)).toEqual([]);
+  });
+
+  it('the TARGET column, not the container one: a layer the list\'s size listed after it, holding the row\'s list whole, its button elsewhere (a FAB host), draws nothing on the strip', () => {
+    const r = row();
+    const fab = uiNode({ role: 'button', label: 'Add', rect: rect(900, 2000, 120, 120) });
+    const layer = uiNode({ role: 'container', rect: LIST, children: [fab] });
+    const order = drawOrder(screen([r], layer));
+    expect(order.coversOf(r, STRIP)).toEqual([]);
+    expect(order.drawnOver(LIST)).toContain(layer); // drawn over the list as a container: the column coversOf does not read
+  });
+
+  it('a bare structural overlay — childless, no label, no value, only an id — draws nothing either', () => {
+    const r = row();
+    expect(drawOrder(screen([r], uiNode({ role: 'other', identifier: 'overlay', rect: LIST }))).coversOf(r, STRIP)).toEqual([]);
+  });
+
+  it('the same overlay saying something is drawn: a label, or a child that draws', () => {
+    const r = row();
+    const labelled = uiNode({ role: 'other', identifier: 'overlay', label: 'Header', rect: LIST });
+    expect(drawOrder(screen([r], labelled)).coversOf(r, STRIP)).toEqual([labelled]);
+    const tab = uiNode({ role: 'container', label: 'Home', rect: rect(102, 410, 219, 60) });
+    const host = uiNode({ role: 'container', identifier: 'tabs', rect: rect(66, 400, 948, 100), children: [tab] });
+    expect(drawOrder(screen([r], host)).coversOf(r, STRIP)).toEqual([host, tab]);
+  });
+
+  it('a node of another tree has no covers', () => {
+    expect(drawOrder(screen([row(), header()])).coversOf(row(), STRIP)).toEqual([]);
   });
 });
 
@@ -1259,6 +1320,136 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen).toMatchObject({ covers: [], tapAt: { point: { x: 44, y: 84 }, moved: false } });
     });
 
+    it('a navigation bar\'s Back with a web page scrolled under the bar (WDA lists the bar first): the page\'s link is no cover of it — a web view scrolls', () => {
+      const back = uiNode({ role: 'button', label: 'Back', rect: rect(8, 70, 80, 40) });
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 72, 200, 30) });
+      const bar = uiNode({ role: 'other', label: 'NavigationBar', rect: rect(0, 62, 402, 54), children: [back] });
+      const page = uiNode({ role: 'webview', rect: IPHONE, children: [link] });
+      const seen = drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [bar, page] })).exposure(back, IPHONE);
+      expect(seen).toMatchObject({ covers: [], tapAt: { point: { x: 48, y: 90 }, moved: false } });
+    });
+
+    it('a web view is the nearest scroller of what it holds, for `structural`\'s wrapper excuse too: an unlabelled wrapper listed after a link, holding the link\'s web view whole (inside a scroll view), is no cover of it', () => {
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 300, 200, 30) });
+      const page = uiNode({ role: 'webview', rect: rect(0, 200, 402, 400), children: [link] });
+      const wrapper = uiNode({ role: 'container', rect: rect(0, 150, 402, 500), children: [uiNode({ role: 'text', label: 'Footer', rect: rect(16, 620, 200, 20) })] });
+      const tree = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [page, wrapper] })] });
+      expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([]);
+    });
+
+    it('…and for the scroll-indicator row: an indicator-shaped `container` (a child of the web view holding only empty frames) over a link is no cover of it', () => {
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 300, 200, 30) });
+      const bar = uiNode({ role: 'container', label: 'Vertical scroll bar, 2 pages', rect: rect(10, 290, 380, 50), children: [uiNode({ role: 'container', rect: rect(380, 300, 3, 30) })] });
+      const tree = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [link, bar] })] });
+      expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([]);
+    });
+
+    it('scrolled content excuses only within the target\'s own screen: a full-screen web view in a LATER screen-sized layer (an RN transparent Modal\'s window) covers a native button of the screen beneath with its text', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const terms = uiNode({ role: 'text', label: 'Terms and conditions', rect: rect(16, 690, 370, 80) });
+      const tree = uiNode({
+        role: 'application',
+        rect: IPHONE,
+        children: [uiNode({ role: 'other', rect: IPHONE, children: [pay] }), uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [terms] })] })],
+      });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([terms]);
+    });
+
+    it('…and so does a native list in a later screen-sized layer (a full-screen sheet\'s rows over the screen beneath)', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 690, 402, 60) });
+      const tree = uiNode({
+        role: 'application',
+        rect: IPHONE,
+        children: [uiNode({ role: 'other', rect: IPHONE, children: [pay] }), uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] })],
+      });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([row]);
+    });
+
+    it('…and two WINDOWS under the parser\'s 0×0 root are stacked too, whatever their size: a later window\'s list covers a button of the earlier window', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 1700, 1000, 120) });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 1680, 1080, 160) });
+      const tree = uiNode({
+        role: 'container',
+        rect: rect(0, 0, 0, 0),
+        children: [uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [pay] }), uiNode({ role: 'scrollable', rect: rect(0, 1200, 1080, 1020), children: [row] })],
+      });
+      expect(drawOrder(tree).exposure(pay, rect(0, 0, 1080, 2220)).covers).toEqual([row]);
+    });
+
+    /**
+     * The WDA SWIFT form: a full-screen content container holding the scroller, a later sibling of the title's ancestor, as
+     * the log of docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md shows; the bar branch's rects are
+     * not logged, and are reconstructed from a real SwiftUI WDA capture (wda-source-skeleton-login.json's
+     * `NavigationStackHosting 0,62 402x44`, bar-sized).
+     */
+    const swiftForm = (scroller: UiNode, barHost: (bar: UiNode) => UiNode = (bar) => bar) => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const bar = uiNode({ role: 'other', rect: rect(0, 62, 402, 54), children: [back, uiNode({ role: 'text', label: 'SWIFT PAYMENT', rect: rect(135, 73, 131, 22) })] });
+      const content = uiNode({ role: 'container', rect: IPHONE, children: [scroller] });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [barHost(bar), content] })] })] });
+      return { tree, back };
+    };
+    const iban = () => uiNode({ role: 'text', label: 'IBAN*', rect: rect(42, 75, 120, 20) });
+
+    it('the logged WDA nesting: the scroller in a full-screen content container, a later SIBLING of the bar — Back is tapped, with a scroll view or a full-screen web view as the scroller', () => {
+      for (const scroller of [uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [iban()] }), uiNode({ role: 'webview', rect: IPHONE, children: [iban()] })]) {
+        const { tree, back } = swiftForm(scroller);
+        expect(drawOrder(tree).exposure(back, IPHONE)).toMatchObject({ covers: [], tapAt: { moved: false } });
+      }
+    });
+
+    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back (whether real bars nest so is unmeasured)', () => {
+      const text = iban();
+      const { tree, back } = swiftForm(uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [text] }), (bar) => uiNode({ role: 'other', rect: IPHONE, children: [bar] }));
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([text]);
+    });
+
+    it('both sides must be screens: Back in a full-screen host, the form beside that host in no screen-sized layer of its own — still the same screen, Back is tapped', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const host = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'other', rect: rect(0, 62, 402, 54), children: [back] })] });
+      const form = uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [iban()] });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [host, form] });
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([]);
+    });
+
+    it('the scroller itself counts as the later screen: a full-screen scroll view directly under the node holding both, over a button in that node\'s full-screen screen layer, covers it through its row', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 690, 402, 60) });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [pay] }), uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([row]);
+    });
+
+    it('the residual, stated: a screen-sized TARGET directly under the node holding both is no screen layer of its own — a later full-screen layer\'s scroller content over it is excused, as the same screen', () => {
+      const backdrop = uiNode({ role: 'button', label: 'Dismiss', rect: IPHONE });
+      const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 690, 402, 60) });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [backdrop, uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] })] });
+      expect(drawOrder(tree).exposure(backdrop, IPHONE).covers).not.toContain(row);
+    });
+
+    it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const terms = uiNode({ role: 'text', label: 'Terms and conditions', rect: rect(16, 690, 370, 80) });
+      const screen = uiNode({ role: 'other', rect: IPHONE, children: [pay] });
+      const modal = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [terms] })] })] });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', label: 'window', rect: IPHONE, children: [screen, modal] })] });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([terms]);
+    });
+
+    it('the residual, stated: a web view under the screen\'s size (above a tab bar) under a translucent bar covers Back through its own FRAME — its content excused, its frame no content-framed surface', () => {
+      const back = uiNode({ role: 'button', label: 'Back', rect: rect(8, 70, 80, 40) });
+      const bar = uiNode({ role: 'other', label: 'NavigationBar', rect: rect(0, 62, 402, 54), children: [back] });
+      const page = uiNode({ role: 'webview', rect: rect(0, 0, 402, 780), children: [uiNode({ role: 'link', label: 'Read more', rect: rect(16, 72, 200, 30) })] });
+      expect(drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [bar, page] })).exposure(back, IPHONE).covers).toEqual([page]);
+    });
+
+    it('a link under a sticky element of ITS OWN web page still has that element over it', () => {
+      const link = uiNode({ role: 'link', label: 'Read more', rect: rect(16, 100, 200, 30) });
+      const sticky = uiNode({ role: 'text', label: 'Contents', rect: rect(0, 90, 402, 40) });
+      const tree = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [link, sticky] })] });
+      expect(drawOrder(tree).exposure(link, IPHONE).covers).toEqual([sticky]);
+    });
+
     it('a row under a sticky header of ITS OWN scroll view still has the header over it', () => {
       const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 100, 402, 52) });
       const header = uiNode({ role: 'text', label: 'Section', rect: rect(0, 90, 402, 30) });
@@ -1301,7 +1492,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
 describe('exposure — a Compose label\'s own control, a row\'s own content (2026-10-09)', () => {
   const PIXEL = rect(0, 0, 1080, 2220);
   const parse = (xml: string) => {
-    const tree = parseUiautomatorXml(xml);
+    const tree = parseDump(xml);
     const find = (p: (n: UiNode) => boolean) => [...everyNode(tree)].find(p)!;
     return { tree, find, order: drawOrder(tree) };
   };
@@ -1542,7 +1733,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       it('through the WDA parser: no tree it gives carries the mark', async () => {
         const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-keyboard.json', import.meta.url), 'utf8'));
         expect([...everyNode(tree)].some((n) => n.paddedTouchTargets === true)).toBe(false);
-        expect(parseUiautomatorXml(COMPOSE.login).paddedTouchTargets).toBe(true);
+        expect(parseDump(COMPOSE.login).paddedTouchTargets).toBe(true);
       });
 
       it('a centred dialog-like overlay in a screen-sized parent, padded evenly, still covers', () => {
@@ -1587,7 +1778,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     });
 
     it('…and only of a CHILDLESS target: the list holding the rows, with the tab bar\'s host drawn on it as its sibling, still has the tab and its label over it', () => {
-      const tree = parseUiautomatorXml(COMPOSE.accountDetail);
+      const tree = parseDump(COMPOSE.accountDetail);
       const list = [...everyNode(tree)].find((n) => n.clipsDescendants === true)!;
       const covers = drawOrder(tree).exposure(list, PIXEL).covers;
       expect(covers.map((n) => n.identifier ?? n.label)).toEqual(['nav.tab_home', 'Home']);

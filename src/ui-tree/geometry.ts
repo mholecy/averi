@@ -1,3 +1,4 @@
+import { clips, scrolls } from './scroll-containers.js';
 import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableScreen, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
@@ -766,7 +767,7 @@ export function clipsOf(tree: UiNode): Clips {
   const parents = new Map<UiNode, UiNode>();
   const walk = (n: UiNode, chain: readonly Rect[]): void => {
     if (chain.length > 0) chains.set(n, chain);
-    const below = n.clipsDescendants === true ? [n.rect, ...chain] : chain;
+    const below = clips(n) ? [n.rect, ...chain] : chain;
     for (const child of n.children) {
       if (below.length > 0) parents.set(child, n);
       walk(child, below);
@@ -962,21 +963,18 @@ export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefine
 }
 
 /**
- * Whether `node` lies inside something that scrolls — an ancestor of role
- * `scrollable` (a ScrollView, Table or CollectionView) or `webview` (a
- * WKWebView's page scrolls) — or undefined when the tree cannot say: a flat list (`UiNode.flatList`, idb)
- * has no ancestry, and a node of another tree has none here. The tap's
- * status-bar refusal asks it to say whether `scroll_until` can move the
- * target out from under the bar (interact/resolve.ts#statusBarRemedy, code
- * review of round 6, P1). One walk, stopping at the node. Android's band
- * too since 2026-10-12, so Android's mark of a node that scrolls now
- * (`clipsDescendants`: a Compose list has no `scrollable` role) counts.
+ * Whether `node` lies inside something that scrolls — an ancestor that
+ * scroll-containers.ts#scrolls — or undefined when the tree
+ * cannot say: a flat list (`UiNode.flatList`, idb) has no ancestry, and a
+ * node of another tree has none here. The tap's status-bar refusal asks it
+ * to say whether `scroll_until` can move the target out from under the bar
+ * (interact/resolve.ts#statusBarRemedy). One walk, stopping at the node.
  */
 export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined {
   if (tree.flatList === true) return undefined;
   const walk = (n: UiNode, scrolled: boolean): boolean | undefined => {
     if (n === node) return scrolled;
-    const below = scrolled || n.role === 'scrollable' || n.role === 'webview' || n.clipsDescendants === true;
+    const below = scrolled || scrolls(n);
     for (const child of n.children) {
       const found = walk(child, below);
       if (found !== undefined) return found;
@@ -988,7 +986,7 @@ export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined 
 
 /**
  * The largest node of the tree that clips its descendants
- * (`clipsDescendants`, by area), as its rect — the screen's own scroll
+ * (scroll-containers.ts#clips, by area), as its rect — the screen's own scroll
  * view, which `scroll_until` strokes over while the target's own container
  * is not known yet (2026-10-09; interact/scroll-rounds.ts#TreeFacts
  * .mainScroller). Largest, not first: a carousel above a page's list is
@@ -997,7 +995,7 @@ export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined 
 export function largestScroller(tree: UiNode): Rect | undefined {
   let best: Rect | undefined;
   for (const n of everyNode(tree)) {
-    if (n.clipsDescendants === true && rectArea(n.rect) > (best === undefined ? 0 : rectArea(best))) best = n.rect;
+    if (clips(n) && rectArea(n.rect) > (best === undefined ? 0 : rectArea(best))) best = n.rect;
   }
   return best === undefined ? undefined : { ...best };
 }

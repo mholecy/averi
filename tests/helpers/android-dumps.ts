@@ -1,3 +1,18 @@
+import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import type { UiNode } from '../../src/adapters/types.js';
+import { drawnOverStrip } from '../../src/ui-tree/draw-order.js';
+
+/**
+ * The uiautomator parser's port as production wires it (mcp/registry.ts):
+ * the UI-tree layer's draw order judges what is drawn over a node's gained
+ * strip (adapters/types.ts#DrawnOverStrip). For every test that builds an
+ * AndroidAdapter or parses a dump.
+ */
+export { drawnOverStrip };
+
+/** `parseUiautomatorXml` with the port production wires — what a test parses a dump with. */
+export const parseDump = (xml: string): UiNode => parseUiautomatorXml(xml, drawnOverStrip);
+
 /**
  * The line `adb shell "dumpsys input_method | grep -m1 mInputShown"` prints —
  * real, emulator-5554 (API 33), 2026-10-04 (false); true was observed on the
