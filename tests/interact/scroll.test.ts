@@ -531,7 +531,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
     const error = await scrollUntilVisible(fake, 'text:"row_40"', { fully: true, maxSwipes: 6, timeoutMs: 15_000, settleMs: 1 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect((error as Error).message).toBe(
-      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
+      'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree — if it lies above, try direction: "up"',
     );
   });
 
@@ -865,7 +865,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     const error = (await scrollUntilVisible(fake, 'id:hero', FAST).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
     expect(fake.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
-    expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
+    expect(error.message).toContain("its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
@@ -877,7 +877,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     const error = (await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
     expect(error).toBeInstanceOf(Error);
     expect(fake.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
-    expect(error.message).toContain("its centre stays under iOS's status bar at (201,53), in the top 62 pt of the screen, where a tap goes to the status bar");
+    expect(error.message).toContain("its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), where a tap goes to the status bar");
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
@@ -889,7 +889,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     const short = still({ x: 0, y: 0, width: 402, height: 122 });
     const error = (await scrollUntilVisible(short, 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
     expect(short.swipes.map(fingerWay)).toEqual(PINNED_STROKES);
-    expect(error.message).toContain("its centre stays under iOS's status bar at (201,61), in the top 62 pt of the screen");
+    expect(error.message).toContain("its centre stays under the status bar at (201,61), in the top 62 of the screen (tree units)");
   });
 
   // Until docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md the
@@ -898,9 +898,9 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   // and then says it is pinned. `direction: "up"` from the start: up twice, once down, the same sentence.
   it('a screen that does not scroll, the target under the bar (24,10 354x52): both directions are swiped before it is called pinned — no "try direction"', async () => {
     const pinned =
-      "its centre stays under iOS's status bar at (201,36), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted: " +
+      "its centre stays under the status bar at (201,36), in the top 62 of the screen (tree units), where a tap goes to the status bar, and the content is exhausted: " +
       'swiping up no longer moves it out from under the status bar, nor does swiping down — ' +
-      'it is pinned under the status bar (a layout that ignores the safe area?), and no step taps it.';
+      'it is pinned under the status bar (a layout that does not keep clear of it?), and no step taps it.';
     for (const direction of ['down', 'up'] as const) {
       const fake = still({ x: 24, y: 10, width: 354, height: 52 });
       const error = (await scrollUntilVisible(fake, 'id:hero', { ...FAST, direction }).catch((e: unknown) => e)) as Error;

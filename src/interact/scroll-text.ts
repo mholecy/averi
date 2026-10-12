@@ -4,8 +4,8 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, cutRemedy, cutSliverText, PINNED_UNDER_STATUS_BAR, underStatusBar } from './resolve.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { absenceError, cutRemedy, cutSliverText, pastSideText, PINNED_UNDER_STATUS_BAR, revealText, underStatusBar, untriedSideText } from './resolve.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
@@ -236,7 +236,7 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
 
-/** `its centre stays under iOS's status bar at (201,53), in the top 62 pt …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
+/** `its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), …` — the tap refusal's clause for the same point (resolve.ts#underStatusBar). */
 const statusBarText = (judged: Judged, band: number): string => `its centre stays ${underStatusBar(tapPoint(judged.node), band)}`;
 
 /** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
@@ -279,7 +279,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // stays over it at the end of the content: no clearance for a pinned
       // bar. Led by the cover whenever that is what it is short of — a plain
       // stop's centre under a bar, however clipped (code review S1).
-      // Its centre under iOS's status bar at the end of the content (2026-10-09): no defect of the app's — the
+      // Its centre under the status bar at the end of the content (2026-10-09): no defect of the app's — the
       // point a tap presses is the status bar's, and no swipe that way moves it out. The other way may; a target
       // pinned there moves neither way (code review of round 6, P1), which is said rather than promised away.
       // The other way tried (2026-10-09, scroll-rounds.ts#round's stuck turn): "try direction" would send the
@@ -412,20 +412,28 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${sliverText(judged)} (last rect ${JSON.stringify(judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(judged.sliver.cut.edge)})`;
     }
     case 'absent':
-      return 'element never appeared in the tree';
+      return `element never appeared in the tree${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':
       // 2026-10-09: it WAS in the tree — "never appeared" (the bug note's
       // third observation) was false, and its class (a plain Error, the
-      // element was sighted) already said so.
+      // element was sighted) already said so. Last seen past the far edge
+      // (2026-10-12, round 8's B1 gap): where, not a guess.
+      if (short.past !== undefined) {
+        return `element was in the tree ${whenInFrame(short.inTreeAfter)}, ${pastText(short.past)}, never in the viewport, and is no longer in the tree (a lazy list drops what scrolls away) — ${revealText(short.past.side)}`;
+      }
       return `element was in the tree ${whenInFrame(short.inTreeAfter)} (off the viewport, or under the soft keyboard), never in the viewport, and is no longer in the tree — a swipe carried it out (a fling?) and a lazy list drops what scrolls away`;
     case 'offFrame': {
       const offFrame = `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
       const rect = `(last rect ${JSON.stringify(short.rect)})`;
+      const past = short.past !== undefined ? ` — it lay ${pastText(short.past)}: ${revealText(short.past.side)}` : '';
       return short.inFrameAfter !== undefined
-        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, off ${offFrame} at the last read ${rect}`
-        : `element in tree but never intersected ${offFrame} ${rect}`;
+        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, off ${offFrame} at the last read ${rect}${past}`
+        : `element in tree but never intersected ${offFrame} ${rect}${past}`;
     }
   }
 }
+
+/** Where a target last read past the far edge lay: `clipped out above its scroll container, past the edge the swipes push it out through`. */
+const pastText = ({ side, clippedOut }: PastSide): string => `${pastSideText(side, clippedOut)}, past the edge the swipes push it out through`;

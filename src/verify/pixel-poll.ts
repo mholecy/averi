@@ -169,7 +169,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * round that found the element clear of the keyboard also asks what ELSE is
  * drawn over it (`chromeOverElement`), from the same tree and the device's
  * memoized screen — no extra read: the status band (`DeviceScreen.
- * statusBand`, iOS's top safe-area inset; geometry.ts#belowStatusBand, the
+ * statusBand`: iOS's top safe-area inset, Android's visible status bar; geometry.ts#belowStatusBand, the
  * tap's rule) and the app's own nodes that hide its PIXELS
  * (ui-tree/draw-order.ts#paintsOver: the tap's covers, `exposure`, with
  * every rule they were taught — a Compose text under its own button, idb's
@@ -493,7 +493,7 @@ async function keyboardOverElement(
  * screen (`screenOf`) when the device size cannot be read or is unusable —
  * and then no band. The band is `DeviceScreen.statusBand` at the top of a
  * portrait screen (geometry.ts#belowStatusBand — the tap's and
- * `scroll_until`'s rule; iOS only until Android reports one). The covers
+ * `scroll_until`'s rule; iOS's, and Android's visible status bar since fix/r8-band). The covers
  * are the PIXEL covers (ui-tree/draw-order.ts#paintsOver, judged in the
  * screen below the band): `exposure`'s — the tap's — less what takes a
  * touch and hides nothing (the element's own content listed beside it, a

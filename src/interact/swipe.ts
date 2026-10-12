@@ -505,12 +505,14 @@ export interface ScreenBox {
    */
   boxes: Rect[];
   /**
-   * The device's `DeviceScreen.statusBand` (iOS only — adapters/ios-status-
-   * band.ts): the band at the top of a PORTRAIT box whose points a
-   * judgement counts as OFF the screen — the point a tap presses, and
-   * `scroll_until`'s stop on it (ui-tree/geometry.ts#belowStatusBand cuts it). Absent on
-   * Android, and when the device size could not be read (the tree's window
-   * stands in, and the judgement fails open as the rest of that path does).
+   * The device's `DeviceScreen.statusBand` (adapters/ios-status-band.ts on
+   * iOS; on Android since 2026-10-12, android.ts#parseStatusBand): the band
+   * at the top of a PORTRAIT box whose points a judgement counts as OFF the
+   * screen — the point a tap presses, and `scroll_until`'s stop on it
+   * (ui-tree/geometry.ts#belowStatusBand cuts it). Absent when Android's bar is hidden or its
+   * dump unread, and when the device size could not be read (the tree's
+   * window stands in, and the judgement fails open as the rest of that path
+   * does).
    */
   statusBand?: number;
 }

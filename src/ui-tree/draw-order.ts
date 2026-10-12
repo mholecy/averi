@@ -52,7 +52,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * they differ the row says why. Only nodes of the tree are covers: what a
  * tree does not list (the translucent top bar idb gives as its button and
  * title only, a top bar WDA lists BEFORE the scroll view it is drawn over)
- * is not inferred — the bug note's decision 4; iOS's status bar is no
+ * is not inferred — the bug note's decision 4; the status bar (iOS's; Android's since 2026-10-12) is no
  * cover but off the screen, cut out of `within` by the caller
  * (geometry.ts#belowStatusBand). Knows no
  * platform commands; the platform shapes are in the rows, each with the

@@ -324,7 +324,7 @@ export interface Judged {
    */
   centreOnScreen: boolean;
   /**
-   * The height of iOS's status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09),
+   * The height of the status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09),
    * set only when its centre lies on the screen but inside that band — so
    * not `centreOnScreen`; the failure quotes it (`shortOf`'s `statusBar`).
    */
@@ -440,7 +440,18 @@ export interface TouchedOn {
  * - `covered` (2026-10-09): in the frame, not clipped so, but a node of the
  *   app drawn over it — over any of it with `fully: true`, over its centre
  *   without (`stops`);
- * - `absent`: not in the last tree, and never in the frame before it;
+ * - `absent`: not in the last tree, and never in the frame before it —
+ *   `unsearched` (2026-10-12, round 8's B1 gap) the side the strokes never
+ *   read, when there is evidence it is the only one left: a stroke changed
+ *   the screen (`State.treeMoved`), then the caller's own strokes no longer
+ *   did (`exhausted`, `tree`), and none of them touched down on a node drawn
+ *   over the list — the content ran to its end the caller's way, every row
+ *   on that side through the tree, so a target this list holds lies on the
+ *   side it started from. Without that (maxSwipes, the deadline: more may
+ *   lie ahead; a screen no stroke ever changed: the swipes may not have
+ *   been taken) nothing is guessed. Every stroke of a scroll that never
+ *   found its target goes the caller's way (a turn needs a sighting), so
+ *   the other side was never stroked;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
  *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
@@ -449,14 +460,28 @@ export interface TouchedOn {
  * - `offFrame`: in the tree, off the frame judged — `inFrameAfter` when an
  *   earlier read had it in the frame; `cover` the one this round applied,
  *   `eitherWayUp` when the whole-screen judgement ran over both boxes.
+ *
+ * `past` on `left` and `offFrame` (2026-10-12, round 8's B1 gap): the read
+ * that last found it found it wholly beyond the FAR edge of the caller's
+ * direction (`State.lastPast`) — the side the strokes push it out through,
+ * so the failure names that side and the direction that brings it back,
+ * not "off the viewport, or under the soft keyboard … (a fling?)". Only
+ * while no stroke was drawn that way (`strokedToward`): once one was — a
+ * turn — that direction was tried, and the turn's own sentence says why.
  */
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
   | InFrameShort
-  | { of: 'absent' }
+  | { of: 'absent'; unsearched?: Edge }
   | { of: 'gone'; inFrameAfter: number }
-  | { of: 'left'; inTreeAfter: number }
-  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean };
+  | { of: 'left'; inTreeAfter: number; past?: PastSide }
+  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide };
+
+/** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
+export interface PastSide {
+  side: Edge;
+  clippedOut: boolean;
+}
 
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
 export type InFrameShort =
@@ -735,6 +760,16 @@ interface State {
   readonly probe: { rect: Rect; edge: Edge } | undefined;
   /** The swipe count at the last read that had the target in the tree at all — for "was in the tree … then left it". */
   readonly inTreeAfter: number | undefined;
+  /**
+   * The far edge of the caller's direction when the last read that found
+   * the target found it wholly beyond it — dumped clipped out past it, or
+   * past it in every frame, nothing of it in the frame (2026-10-12, round
+   * 8's B1 gap: Settings' `Apps` clipped out above the list, four strokes
+   * down, "off the viewport, or under the soft keyboard … (a fling?)") —
+   * undefined when that read had it anywhere else. Kept across reads that
+   * do not find it: the failure's `past` (`shortfall`).
+   */
+  readonly lastPast: PastSide | undefined;
   /** The direction of the last stroke SENT, a probe included — the way the content last moved, for `dropped`. */
   readonly lastSent: Direction | undefined;
   /** The last read that read: the judged match's rect and the frames it was judged in — undefined when it found no match. */
@@ -773,6 +808,8 @@ interface State {
   readonly strokeWithin: Rect | undefined;
   /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
   readonly prevFingerprint: string | undefined;
+  /** A read after a stroke found the whole tree changed from the read before — the content moved at least once (`Shortfall.absent`'s `unsearched`: not a screen no stroke ever changed). */
+  readonly treeMoved: boolean;
   readonly treeUnmovedStrokes: number;
 }
 
@@ -841,6 +878,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     inFrameAfter: undefined,
     probe: undefined,
     inTreeAfter: undefined,
+    lastPast: undefined,
     lastSent: undefined,
     lastFound: undefined,
     dropped: undefined,
@@ -852,6 +890,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     strokeWithin: undefined,
     prevFingerprint: undefined,
     treeUnmovedStrokes: 0,
+    treeMoved: false,
   };
   return state as unknown as Rounds;
 }
@@ -917,7 +956,7 @@ function judge(
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  // The screen below iOS's status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
+  // The screen below the status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
   const band = { boxes: [viewport], statusBand };
   const screen: Rect = belowStatusBand(viewport, band);
   const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {
@@ -984,9 +1023,10 @@ function better(a: Judged, b: Judged, fully: boolean): number {
  * stop, "visible … CLIPPED 40%", and the next tap was refused off screen
  * (resolve.ts#refuseOffScreen); the screen, not the frame cut above a
  * keyboard — a centre under the band stops as before, and the tap's
- * keyboard guard hides the keyboard. On iOS a centre inside the status
- * band is off the screen (`Judged.bandOverCentre`, adapters/ios-status-
- * band.ts, 2026-10-09) — measured, one stroke flung `priority_select` to
+ * keyboard guard hides the keyboard. A centre inside the status band is
+ * off the screen (`Judged.bandOverCentre`; iOS's, adapters/ios-status-
+ * band.ts, 2026-10-09; Android's since 2026-10-12, android.ts
+ * #parseStatusBand) — measured, one stroke flung `priority_select` to
  * `24,-20` and the plain stop stopped with its centre at (201,6), where the
  * tap pressed the status bar — for both stops: `fully: true` asks the
  * centre to be on the screen too (an unclipped rect's centre always is,
@@ -1021,7 +1061,7 @@ function stops(j: Judged, fully: boolean): boolean {
  * with `fully: true`, or without it the centre off the screen; else
  * `covered` — something of the app drawn over it (over its centre, without
  * `fully`). With `fully: true` a cut edge leads, as it always has. A centre
- * on the screen but in iOS's status band is `statusBar` (2026-10-09): the
+ * on the screen but in the status band is `statusBar` (2026-10-09): the
  * sentence names the status bar, never a clip or a layout defect. Without
  * `fully`, a centre under nothing on a sliver its scroll container cuts it
  * to is `sliver` (2026-10-10, `stops`).
@@ -1248,6 +1288,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST,
     // 2026-10-09): the same streak rule, over the fingerprint.
     const treeUnmoved = s.prevFingerprint === fingerprint && !loading;
+    if (s.prevFingerprint !== undefined && s.prevFingerprint !== fingerprint) s.treeMoved = true;
     const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
     s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
     // Every match, not only the judged one, for "exhausted" (review round
@@ -1302,9 +1343,14 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // way up but across both edges the other is not turned for. Or dumped
     // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
     const beyond = beyondFarEdgeIn(farFacts(best), s.rules.direction, frames);
+    // Kept whatever the target showed: only a read with none of it in the
+    // frame reaches the failure's `past` (`left` needs it never in the
+    // frame, `offFrame` this read's match at visible 0).
+    const { far } = FAR_EDGE[s.rules.direction];
+    s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // Or IN the frame at that edge (2026-10-09, docs/bugs/2026-10-09-ios-
     // scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-
-    // band.md): across it — clipped there, or its centre in iOS's status
+    // band.md): across it — clipped there, or its centre in the status
     // band, which the frames are cut below — or under something of the app
     // drawn over its far side. Read so before any read saw it short, it
     // was never carried past, so `seenShort` alone never turned it: the
@@ -1384,7 +1430,7 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * turns out to be further away than one move.
  *
  * A target IN the frame at the far edge turns the strokes too (2026-10-09,
- * `observe`'s `atFarEdge`): across that edge, its centre in iOS's status
+ * `observe`'s `atFarEdge`): across that edge, its centre in the status
  * band past it, or under a cover over its far side — on the first read as
  * on any. Until that date such a target was stroked on the caller's way,
  * and the comment here called it "a known cost, accepted (code review P7)
@@ -1479,7 +1525,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
-  // Below iOS's status band: a target whose centre a fling carried into it
+  // Below the status band: a target whose centre a fling carried into it
   // is past the far edge, and the next stroke turns back.
   const judgedFrames: Rect[] =
     cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
@@ -1638,7 +1684,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, readError, found, best, viewport, cover),
+      short: shortfall(s, readError, found, best, viewport, cover, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1777,18 +1823,26 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
 }
 
 /**
- * What the target was short of at a bound. In the frame on an earlier read
- * and not on this one: "never" would be false (review round 1) — a fling
- * carried it off, or a lazy list dropped it once it scrolled away.
+ * What the target was short of at a bound (`by`). In the frame on an
+ * earlier read and not on this one: "never" would be false (review round
+ * 1) — a fling carried it off, or a lazy list dropped it once it scrolled
+ * away. Last found beyond the far edge, the side (`Shortfall.past`); never
+ * found, the side left unread when the strokes ran to the end of the
+ * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined): Shortfall {
+function shortfall(s: State, readError: Error | undefined, found: readonly UiNode[], best: Judged | undefined, viewport: Rect, cover: Cover | undefined, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.visible > 0) return shortOf(best, s.rules.fully);
   const left = s.inFrameAfter;
+  const past = s.lastPast !== undefined && !s.strokedToward.includes(REVEALS[s.lastPast.side]) ? s.lastPast : undefined;
   if (found.length === 0) {
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };
-    return s.inTreeAfter !== undefined ? { of: 'left', inTreeAfter: s.inTreeAfter } : { of: 'absent' };
+    if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
+    // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
+    const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
+    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[s.rules.direction].far }) };
   }
+  // In the tree: `judge` scores every match, so this read judged one and `past` is this read's.
   return {
     of: 'offFrame',
     rect: (best?.node ?? found[0]).rect,
@@ -1796,5 +1850,6 @@ function shortfall(s: State, readError: Error | undefined, found: readonly UiNod
     viewport,
     ...(cover !== undefined && { cover }),
     eitherWayUp: s.frame.boxes.length > 1 && cover?.above === undefined,
+    ...(past !== undefined && { past }),
   };
 }

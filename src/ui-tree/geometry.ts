@@ -583,10 +583,15 @@ export const higherTop = (a: number | undefined, b: number | undefined): number 
 /**
  * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as
  * interact/swipe.ts#JudgingScreen's) at its top when `box` is portrait — the
- * part of it a point or a rect is judged on screen in; `box` itself on
- * Android, in landscape, or with no screen. `shape` is the screen box the
- * band belongs to when `box` was cut from it (the screen above a keyboard):
- * its shape, not the cut's, says portrait. Here since round 8 (2026-10-12),
+ * part of it a point or a rect is judged on screen in; `box` itself with no
+ * band, in landscape, or with no screen. `shape` is the screen box the band
+ * belongs to when `box` was cut from it (the screen above a keyboard): its
+ * shape, not the cut's, says portrait.
+ *
+ * Portrait only is iOS's rule (an iPhone hides its status bar in
+ * landscape). Residual, stated (2026-10-12): Android keeps its status bar
+ * at the top in landscape too, and a point under it there is judged on the
+ * screen, as before Android reported a band. Here since round 8 (2026-10-12),
  * moved from interact/swipe.ts with `inStatusBand`: rect arithmetic, and
  * the pixel asserts (verify/pixel-poll.ts), which may not import interact/,
  * ask where the band lies too.
@@ -846,14 +851,15 @@ export function cutSliver(node: UiNode, chain: readonly Rect[], minPiece: number
  * has no ancestry, and a node of another tree has none here. The tap's
  * status-bar refusal asks it to say whether `scroll_until` can move the
  * target out from under the bar (interact/resolve.ts#statusBarRemedy, code
- * review of round 6, P1). One walk, stopping at the node. iOS only, as
- * the band is: `clipsDescendants` (Android's mark) is deliberately not read.
+ * review of round 6, P1). One walk, stopping at the node. Android's band
+ * too since 2026-10-12, so Android's mark of a node that scrolls now
+ * (`clipsDescendants`: a Compose list has no `scrollable` role) counts.
  */
 export function insideScroller(tree: UiNode, node: UiNode): boolean | undefined {
   if (tree.flatList === true) return undefined;
   const walk = (n: UiNode, scrolled: boolean): boolean | undefined => {
     if (n === node) return scrolled;
-    const below = scrolled || n.role === 'scrollable' || n.role === 'webview';
+    const below = scrolled || n.role === 'scrollable' || n.role === 'webview' || n.clipsDescendants === true;
     for (const child of n.children) {
       const found = walk(child, below);
       if (found !== undefined) return found;

@@ -12,9 +12,9 @@
  *
  * Here, in the adapter layer, because it is a fact of the iOS DEVICE: the
  * iOS adapter reports it with the screen (`DeviceScreen.statusBand`,
- * ios.ts#viewport), Android reports none (its status bar lies outside the
- * app's window, so outside every rect its tree gives), and interact/ only
- * reads it — the one source of truth.
+ * ios.ts#viewport) and interact/ only reads it — the one source of truth.
+ * Android reports its own since 2026-10-12, read off the device rather than
+ * a table (android.ts#parseStatusBand).
  */
 
 /**
