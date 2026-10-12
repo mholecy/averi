@@ -44,7 +44,9 @@ A full-bleed header still fails closed. This covers iOS's header and Android 15+
 
 ## Bug note
 
-The round's note on the measurement is not tracked yet. The measurements are recorded above.
+docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
+
+This note is not tracked yet. The measurements are recorded above.
 
 ## Where
 

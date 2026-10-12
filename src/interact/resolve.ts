@@ -796,7 +796,8 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  *   touchable region and the witness, with the keyboard shown; nothing more
  *   with it hidden — the guard's first reading is reused).
  * A key of idb's band is the keyboard's own UI and under no band line, as
- * a WDA key is under no reading's (docs/adr/0007-idb-keyboard-key-row-tiling.md).
+ * a WDA key is under no reading's.
+ * docs/adr/0007-idb-keyboard-key-row-tiling.md
  *
  * Only nodes of the tree cover: a top bar the tree lists before the form —
  * WDA's, idb's (only its button and title) — is not inferred, so a row

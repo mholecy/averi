@@ -334,7 +334,7 @@ describe('rectWithin — rect-in-rect, edges included (touchedOn\'s wrapper rule
   });
 });
 
-describe('containsPoint — the tap guard\'s point-in-rect, here since 2026-10-07', () => {
+describe('containsPoint — the tap guard\'s point-in-rect', () => {
   const rect = { x: 10, y: 20, width: 30, height: 40 }; // x 10..39, y 20..59
   it('left and top edges inclusive, right and bottom exclusive', () => {
     expect(containsPoint(rect, { x: 10, y: 20 })).toBe(true); // top-left corner

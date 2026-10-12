@@ -45,6 +45,7 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   'docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md',
   'docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md',
   'docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md',
+  'docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>

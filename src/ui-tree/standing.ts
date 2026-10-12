@@ -332,7 +332,7 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
  *
- * Residuals (docs/adr/0012-pixel-assert-residuals-d4-d6.md for D4–D6):
+ * Residuals (D4–D6 are ADR 0012's):
  * - D4: the pixel assert reads the device's size from the memo, never
  *   afresh: after a fold or a `wm size` change it judges the old box, and
  *   draws idb's band on it.
@@ -341,6 +341,7 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * - D6: the pixel assert judges one box, `oriented`: the other orientation
  *   of a turn suggested but not witnessed is never judged; landscape is
  *   unmeasured.
+ *   docs/adr/0012-pixel-assert-residuals-d4-d6.md
  * - `fully` judges a system band at the centre only: the rest of the node
  *   may lie in the band, and a pixel assert on it fails closed (the parity's
  *   pixel-only exemption).
@@ -348,6 +349,8 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
  *   is read on portrait phones only (adapters/android.ts#parseNavigationBand).
+ * - Android keeps its status bar at the top in landscape: a point under it
+ *   there is judged on the screen.
  * - On a turn suggested but witnessed by no window, the tap accepts a point
  *   that lies only in the other orientation.
  * - Under idb's band a target whose centre lies under it is refused, even
@@ -425,7 +428,7 @@ export interface StandingFacts {
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
-  /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind — never judged for the pixel (D5, docs/adr/0012-pixel-assert-residuals-d4-d6.md). */
+  /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind — never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
 }
 
@@ -713,7 +716,8 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   const below = belowStatusBand(box, bands);
   // Only the part of the box below the band that the measurement reads: what lies over the rest of the node is never sampled.
   const read = rectIntersection(below, purpose.reads) ?? { ...purpose.reads, width: 0, height: 0 };
-  // No sliver: the pixel assert measures a container-cut node on what shows (D5, docs/adr/0012-pixel-assert-residuals-d4-d6.md).
+  // No sliver: the pixel assert measures a container-cut node on what shows (D5).
+  // docs/adr/0012-pixel-assert-residuals-d4-d6.md
   const { facts } = factsIn(judged, below, read, { sliver: false });
   const flush = purpose.glyphs ? cutAtNavigationBar(node, box, bands, scene) : undefined;
   const cover = (): PixelStanding | undefined => {
@@ -743,7 +747,7 @@ export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >=
 
 /**
  * The node's cut at the navigation bar, as the tree can tell it (N-b,
- * docs/adr/0009-android-navigation-band.md): its bottom flush, within a unit, with the band's top
+ * ADR 0009): its bottom flush, within a unit, with the band's top
  * (geometry.ts#flushEdges' unit), inside a clipping scroller
  * (`Clips.scrollersOf`) whose bottom is flush with it too — uiautomator cut
  * it at the window's visible frame and left no evidence (no `cutBounds`,
@@ -751,6 +755,7 @@ export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >=
  * app's pinned bottom bar, ending at the band's top) is whole. Only on a
  * portrait box with a band (`systemBands`). The scroller's rect, or
  * undefined.
+ * docs/adr/0009-android-navigation-band.md
  */
 function cutAtNavigationBar(node: UiNode, box: Rect, bands: StandingScreen | undefined, scene: Pick<Scene, 'clips'>): Rect | undefined {
   const { bottom } = systemBands(box, bands);

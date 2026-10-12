@@ -15,7 +15,7 @@ decision:
 
 ## Decision
 
-- **N-a.** The tap and both stops refuse a centre inside the band, whatever the navigation mode (gesture or three
+- **N-a.** The tap refuses, and neither stop stops on, a centre inside the band, whatever the navigation mode (gesture or three
   buttons). The tree cannot tell the modes apart without one more device read. The remedy is "scroll_until it first";
   for a node in no scroll view the finding is "pinned under the navigation bar". `fully:` is blocked too, because both
   stops use one centre rule, as for the status band. The order is off screen, then the system bands (top, then bottom),
@@ -35,7 +35,11 @@ decision:
   - a display whose natural rotation is landscape, such as a tablet held portrait.
 - The flush cut is read by shape. A whole last row resting flush with the bar fails an ocr assert closed too.
 - The band is kept until a launch or a fresh read, as the status band is.
+- The in-tree keyboard dismissal picker inherits the band's point rule (`ui-tree/standing.ts#onScreen`). This is inert:
+  Android never reaches the picker.
 
 ## Bug note
 
-The navigation-band note is not tracked yet. The measurements are recorded above.
+docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md
+
+This note is not tracked yet. The measurements are recorded above.

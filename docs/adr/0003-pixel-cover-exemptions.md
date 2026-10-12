@@ -36,4 +36,6 @@ Each residual is a cover read as none, so a colour or ocr assert measures the co
 
 ## Bug note
 
-No tracked note. The measured shapes are kept on `draw-order.ts#DrawOrder.paintsOver`.
+docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
+
+This note is not tracked yet. The measured shapes are kept on `draw-order.ts#DrawOrder.paintsOver`.

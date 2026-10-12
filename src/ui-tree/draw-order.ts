@@ -496,7 +496,7 @@ const NOT_DRAWN = {
    * excused (a spacer, an empty Box — empty area). A Compose tree is all
    * `container`/`other` (adapters/android.ts maps `android.view.View` so),
    * so a structural role is no evidence of nothing drawn: measured on
-   * mp-native's Account Detail (the bug note below), the floating tab
+   * mp-native's Account Detail (the floating-tab-bar stroke note below), the floating tab
    * bar's host — an unlabelled `container` `66,1840 948x248` after the
    * list `0,825 1080x1395` — took the touch-down at y 1857 above its tabs
    * (a Material Surface swallows touches through its whole rect). The tree
@@ -797,7 +797,7 @@ const NOT_DRAWN = {
    * (adapters/ios-tree-source.ts#parseIdbDescribeAll), so a field's own
    * floating label comes after the field as its sibling, never as its
    * descendant — measured on mp-native's SWIFT form
-   * (tests/helpers/fake.ts#idbFloatingLabelFake, the bug note below): the label `42,372
+   * (tests/helpers/fake.ts#idbFloatingLabelFake, the fill-unverified note below): the label `42,372
    * 120x18` lies on the empty input `26,366 350x30`, both carrying the
    * identifier `TextFieldWithComponentStyle` (iOS gives a field's title and
    * error labels the field's identifier — interact/resolve.ts#resolveNow);

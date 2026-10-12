@@ -15,10 +15,17 @@ edge.
 
 ## Decision
 
-Every verb judges in one order: off the screen, then the system bands (top, then bottom), then cut, then covered, then
-under the keyboard. The verbs are the tap, both stops and the pixel assert, and the order is written once at
-`ui-tree/standing.ts#Scene`. A covered sliver is reported as a cut at a named edge, with the direction of the scroll
-that reveals it. The tap and `scroll_until` share the sentence (`interact/resolve.ts#cutSliverText`).
+The tap and the plain stop judge in one order: off the screen, then the system bands (top, then bottom), then cut,
+then covered, then under the keyboard. The order is written once at `ui-tree/standing.ts#Scene`. A covered sliver is
+reported as a cut at a named edge, with the direction of the scroll that reveals it. The tap and `scroll_until` share
+the sentence (`interact/resolve.ts#cutSliverText`).
+
+The other purposes share that order but judge less or more in it:
+
+- **The `fully` stop judges no sliver.** A stop flush with a clipping container is the flush probe's to check
+  (`scroll-rounds.ts#PROBE_REACH`), so the cut step never applies to it.
+- **The pixel assert judges the keyboard first** (ADR 0010). It never judges off the screen, and its only cut is at the
+  navigation bar, for the ocr reader (ADR 0009, N-b).
 
 ## Residuals accepted
 
@@ -27,3 +34,6 @@ that reveals it. The tap and `scroll_until` share the sentence (`interact/resolv
 ## Bug note
 
 docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
+docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
+
+The second note is not tracked yet.

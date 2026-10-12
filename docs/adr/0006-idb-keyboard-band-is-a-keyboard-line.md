@@ -24,7 +24,7 @@ against it:
   even when a large piece of the target shows above the band (owner decision, 2026-10-12): the tap is never moved to
   that piece. That matches WDA without a configured dismissal. For a line no guard stands by, story 6 (no tap to the
   keyboard) wins over story 12 (move to the uncovered piece).
-- **The plain stop.** A centre under the line is not reachable.
+- **Both stops.** A centre under the line is not reachable, plain or `fully`.
 - **The pixel assert.** An element whose rect meets the band at all is the keyboard miss, quoting the band (ADR 0010).
 - **The stroke.** A `scroll_until` stroke stays above the band even when the band changes no judgement
   (`scroll-rounds.ts#strokeTop`). A stroke on the band touches a key: the Contacts form and the SWIFT form's number pad
@@ -40,3 +40,6 @@ against it:
 ## Bug note
 
 docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
+docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
+
+The second note is not tracked yet.

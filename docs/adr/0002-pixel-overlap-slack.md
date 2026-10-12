@@ -32,4 +32,6 @@ It does not apply to the keyboard's own region. Any overlap there fails the asse
 
 ## Bug note
 
-No tracked note. The measurements are recorded above.
+docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
+
+This note is not tracked yet. The measurements are recorded above.
