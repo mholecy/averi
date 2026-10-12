@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { clipPathsOf, containsPoint, cutSliver, drawnOverText, higherTop, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { clipsOf, containsPoint, drawnOverText, higherTop, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
@@ -692,7 +692,7 @@ export class ClippedRefusal extends PresentElementRefusal {}
 /**
  * THE cut-sliver rule for a node about to be tapped (2026-10-10, the bug
  * note above ClippedRefusal): refuse when the node is EVIDENTLY cut at a
- * clipping ancestor's edge (ui-tree/geometry.ts#cutSliver over
+ * clipping ancestor's edge (ui-tree/geometry.ts#Clips.cutSliver over
  * #evidentCut — flush with it within a pixel, its own content running on
  * past it; the shallowest such edge) and what shows of it across that edge
  * is under `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION,
@@ -711,7 +711,7 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * own content running to the edge), the way past it: a child, or a
  * coordinate tap (code review round 3) — a child that lies CLEAR of that
  * edge (round 8): one flush with it inside a sliver cut there is refused
- * too (geometry.ts#cutSliver's inherited cut, `Cut.within`; measured at
+ * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured at
  * 35d5997, the toggle's leaf label "Payment details", tapped as the hint
  * then said, did nothing). Only nodes under a
  * clipping ancestor (UiNode.clipsDescendants, Android's) are asked: an iOS
@@ -719,11 +719,11 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * check rather than beside the on-screen rule (keyboard.ts) because the
  * minimum is the draw order's and the node judged must be the one the
  * guard hands back — the chrome check already has both. Cost: one walk of
- * the tree for the clip path (geometry.ts#clipPathsOf), and a subtree per
- * flush edge of the node and of each ancestor on it.
+ * the tree (geometry.ts#clipsOf), and a subtree per flush edge of the node
+ * and of each ancestor shallower than the minimum it inherits through.
  */
 function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: number, sent?: string): void {
-  const cut = cutSliver(node, clipPathsOf(tree)(node), minPiece);
+  const cut = clipsOf(tree).cutSliver(node, minPiece);
   if (cut === undefined) return;
   const finding =
     `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} ` +
@@ -733,7 +733,7 @@ function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: n
 }
 
 /**
- * THE sentence for a node cut to a sliver (`cutSliver`'s answer, `cut`, of a
+ * THE sentence for a node cut to a sliver (`Clips.cutSliver`'s answer, `cut`, of a
  * node whose rect is `shown`): `cut at its scroll container's bottom edge
  * (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across
  * that edge, under the 65 a tap needs`; a cut inherited from what the node

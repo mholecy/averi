@@ -211,7 +211,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * half behind a pinned bar read whole and `fully: true` said "fully visible
  * after 0 swipes". Each round hands the reducer its tree, from which it
  * reads every match's nearest clipping ancestors (ui-tree/geometry.ts
- * #scrollersOf, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
+ * #clipsOf, `Clips.scrollersOf`, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
  * one of them is answered with one short probe toward that edge, drawn over
  * a container with room for it above the keyboard (scroll-rounds.ts
  * #PROBE_REACH has the rule and its cost; swipe.ts#strokeRoom the box).
