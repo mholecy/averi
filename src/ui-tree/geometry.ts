@@ -608,6 +608,23 @@ export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; sta
   screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
+ * How thick, in tree units (points on iOS, pixels on Android), an overlap
+ * may be on its thin side and still say nothing about a pixel assert's
+ * element — the owner's decision (round 8, 2026-10-12): tree frames are
+ * whole units, so a neighbour laid flush can share an edge's antialiasing
+ * and no more. Measured: idb's `text "Amount*"` (42,283 51x15) under
+ * `text "Value*"` at y 296, and a `Payee's country` row ending 2 pt into
+ * CONTINUE — 2 pt each, neither hiding the element.
+ */
+export const PIXEL_OVERLAP_SLACK = 2;
+
+/** `a` and `b` share area thicker than PIXEL_OVERLAP_SLACK on its thin side — what a pixel assert counts as one hiding the other (ui-tree/draw-order.ts#paintsOver, and the status band, verify/pixel-poll.ts). */
+export const overlapsPastSlack = (a: Rect, b: Rect): boolean => {
+  const shared = rectIntersection(a, b);
+  return shared !== undefined && Math.min(shared.width, shared.height) > PIXEL_OVERLAP_SLACK;
+};
+
+/**
  * A rect's side: one a rect extends past (`clippedEdges`), or lies flush with
  * (`flushEdges`) — adapters/types.ts#ClippedSide, the side a node dumped
  * inverted lies past, re-exported under the name ui-tree asks it by (code

@@ -5,7 +5,7 @@ import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
-import { KEYBOARD_ROLE } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 import { OcrUnavailableError } from '../../src/verify/ocr.js';
@@ -2152,8 +2152,11 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
 describe('pixel asserts under chrome drawn over the element (round 8)', async () => {
   const FORM = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
   const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')).screens as Record<string, unknown[]>;
-  const CONTINUE = 'button "Continue to summary" (24,780 354x44)';
+  /** CONTINUE as the miss names it: its frame, and its reach — the pinned bar's, run down to the screen's bottom (draw-order.ts#pinnedReach). */
+  const CONTINUE = 'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)';
   const REMEDY = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
+  /** idb's flat list cannot say whether the element scrolls (geometry.ts#insideScroller): the remedy names a child clear of it too. */
+  const OR_CHILD = `${REMEDY} — or, if no scroll moves it out from under that, assert a child of it that lies clear of it`;
   const IPHONE = { width: 402, height: 874, statusBand: 62 };
   /** The whole screen one colour: what the bar or the button would give the sampler. */
   const solid = (hex: string) =>
@@ -2189,7 +2192,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     fake.nextScreenshot = solid('#EFF1F4');
     const c = await new Verifier(fake, FAST).assert({ element: { id: 'swift_payment.form.value_date_select' }, color: { expected: '#FDFDFD', deltaE: 8, sample: 'dominant' } });
     expect(c.pass).toBe(false);
-    expect(c.detail).toBe(`the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — ${REMEDY}; failing closed, color unchecked`);
+    expect(c.detail).toBe(`the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — ${OR_CHILD}; failing closed, color unchecked`);
     expect(fake.screenshots).toHaveLength(0);
 
     // …and the ocr assert does not read the bar's breadcrumb as the element's copy.
@@ -2197,7 +2200,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     const { probe, engine } = engineReading('Contacts');
     const o = await new Verifier(ocr, { ...FAST, ocr: { engine } }).assert({ element: { id: 'swift_payment.form.value_date_select' }, ocr: { text: 'Value date' } });
     expect(o.pass).toBe(false);
-    expect(o.detail).toBe(`the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — ${REMEDY}; failing closed, rendered text unchecked`);
+    expect(o.detail).toBe(`the status bar is drawn over the element (element 24,30 354x52, status bar 0,0 402x62) — ${OR_CHILD}; failing closed, rendered text unchecked`);
     expect(probe.recognized).toBe(0);
   });
 
@@ -2206,14 +2209,14 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     fake.nextScreenshot = solid('#91919A');
     const c = await new Verifier(fake, FAST).assert({ element: { text: 'Message for my bank' }, color: { expected: '#91919A' } });
     expect(c.pass).toBe(false);
-    expect(c.detail).toBe(`${CONTINUE} is drawn over the element (element 42,778 160x20) — ${REMEDY}; failing closed, color unchecked`);
+    expect(c.detail).toBe(`${CONTINUE} is drawn over the element (element 42,778 160x20) — ${OR_CHILD}; failing closed, color unchecked`);
     expect(fake.screenshots).toHaveLength(0);
 
     const ocr = swiftForm(MESSAGE);
     const { probe, engine } = engineReading('Message for my bank');
     const o = await new Verifier(ocr, { ...FAST, ocr: { engine } }).assert({ element: { text: 'Message for my bank' }, ocr: { text: 'Message for my bank' } });
     expect(o.pass).toBe(false);
-    expect(o.detail).toBe(`${CONTINUE} is drawn over the element (element 42,778 160x20) — ${REMEDY}; failing closed, rendered text unchecked`);
+    expect(o.detail).toBe(`${CONTINUE} is drawn over the element (element 42,778 160x20) — ${OR_CHILD}; failing closed, rendered text unchecked`);
     expect(probe.recognized).toBe(0);
   });
 
@@ -2237,6 +2240,27 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect(o.pass).toBe(false);
     expect(o.detail).toBe(`text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 24,70 354x30) — ${REMEDY}; failing closed, rendered text unchecked`);
     expect(probe.recognized).toBe(0);
+  });
+
+  it('the remedy names a child clear of it where no scroll may cure it: the same row in no scroll view (pinned under the bar), or a cover that holds the element whole', async () => {
+    resetLayout();
+    const full = { x: 0, y: 0, width: 402, height: 874 };
+    const title = node({ role: 'text', label: 'SWIFT PAYMENT', rect: { x: 135, y: 73, width: 131, height: 22 } });
+    const bar = node({ role: 'other', rect: { x: 0, y: 62, width: 402, height: 54 }, children: [title] });
+    const judged = async (row: UiNode, inScrollView: boolean) => {
+      const tree = node({ role: 'application', rect: full, children: [inScrollView ? node({ role: 'scrollable', rect: full, children: [row] }) : row, bar] });
+      const fake = new FakeAdapter({ s: tree }, 's');
+      fake.platform = 'ios';
+      fake.keyboard = undefined;
+      fake.viewportSize = { ...IPHONE };
+      return (await new Verifier(fake, FAST).assert({ element: { id: 'row_label' }, color: { expected: '#FFFFFF' } })).detail;
+    };
+    expect(await judged(node({ role: 'text', identifier: 'row_label', rect: { x: 24, y: 70, width: 354, height: 30 } }), false)).toBe(
+      `text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 24,70 354x30) — ${OR_CHILD}; failing closed, color unchecked`,
+    );
+    expect(await judged(node({ role: 'text', identifier: 'row_label', rect: { x: 150, y: 76, width: 60, height: 16 } }), true)).toBe(
+      `text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 150,76 60x16) — ${OR_CHILD}; failing closed, color unchecked`,
+    );
   });
 
   it('a container element: its own descendants are never covers — measured as before', async () => {

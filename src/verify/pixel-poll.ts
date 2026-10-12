@@ -1,7 +1,7 @@
-import { usableScreen, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, SCREEN_SIZED_FRACTION, usableScreen, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { belowStatusBand, inferScreenSize, nodeText, rectsOverlap, rectText, sameRect, screenOf, windowTurnsScreen } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, inferScreenSize, insideScroller, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect, screenOf, windowTurnsScreen } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
@@ -170,35 +170,42 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * drawn over it (`chromeOverElement`), from the same tree and the device's
  * memoized screen — no extra read: the status band (`DeviceScreen.
  * statusBand`, iOS's top safe-area inset; geometry.ts#belowStatusBand, the
- * tap's rule) and the app's own nodes drawn over it (ui-tree/draw-order.ts
- * #exposure, the tap's and `scroll_until`'s covers, with every rule they
- * were taught — a Compose text under its own button, idb's modal listed
- * before the content, WDA's cell backgrounds and a text field's scroll bar,
- * a label on its own field, the floating tab bar's strip — so what is no
- * cover of a tap is no cover here). Measured on the iPhone 17 (round-7
- * device check): a colour assert on `value_date_select` at 24,30, under the
- * 62-pt band, PASSED on the status bar's `#EFF1F4`, its ocr read the bar's
+ * tap's rule) and the app's own nodes that hide its PIXELS
+ * (ui-tree/draw-order.ts#paintsOver: the tap's covers, `exposure`, with
+ * every rule they were taught — a Compose text under its own button, idb's
+ * modal listed before the content, WDA's cell backgrounds and a text
+ * field's scroll bar, a label on its own field, the floating tab bar's
+ * strip — less what takes a touch and hides nothing: the element's own
+ * content listed beside it and a clickable layer on its own branch, review
+ * of fix/r8-pixel round 1). Measured on the iPhone 17 (round-7 device
+ * check): a colour assert on `value_date_select` at 24,30, under the 62-pt
+ * band, PASSED on the status bar's `#EFF1F4`, its ocr read the bar's
  * "Contacts"; a label under CONTINUE sampled CONTINUE's `#91919A`, reported
- * as the element's colour. Any positive-area overlap of the band, or of a
- * cover's reach, with the element's rect is the miss — the keyboard's rule,
- * for the same reason (the ocr assert crops the whole rect) — never a
- * measurement: it names what lies over it (`the status bar …` with the
- * band's rect, or the cover's role, label and rect, `nodeText`) and advises
- * `scroll_until … fully: true` first, which stops only once nothing is
- * drawn over any of it. A finding, as the keyboard's: the poll goes on, a
- * later round that finds the element clear withdraws it (`uncovered`), and
- * when every round was covered it is the timeout's wording. The keyboard is
- * asked first — its remedy (hide it) is not a scroll. Stricter than the tap,
- * which asks only for a cover at the centre: the sampler and the recognizer
- * read the region. Residuals, stated: an element that legitimately reaches
- * into the band — a full-bleed header, a screen-sized container — fails
- * closed on iOS whatever it shows (assert a child below the band instead);
- * `scroll_until … fully: true` lets the rest of an element lie under the
- * band once its centre is below it, so for such an element the advice does
- * not cure the miss; under idb a keyboard's keys are nodes like any other
- * and are named as the cover; what a tree does not list (a top bar WDA lists
- * before the scroll view) is no cover here, as for the tap. Cost: one
- * `drawOrder` walk of the round's tree and the memoized `viewport()`.
+ * as the element's colour. An overlap of the band, or of a cover's reach,
+ * with the element's rect thicker than 2 units on its thin side
+ * (geometry.ts#PIXEL_OVERLAP_SLACK, the owner's decision) is the miss —
+ * never a measurement: it names what lies over it (`the status bar …` with
+ * the band's rect, or the cover's role, label, rect and — for a pinned bar
+ * — reach) and advises `scroll_until … fully: true` first, which stops only
+ * once nothing is drawn over any of it, adding "a child of it that lies
+ * clear" where a scroll may not cure it. A finding, as the keyboard's: the
+ * poll goes on, a later round that finds the element clear withdraws it
+ * (`uncovered`), and when every round was covered it is the timeout's
+ * wording. The keyboard is asked first — its remedy (hide it) is not a
+ * scroll. Stricter than the tap, which asks only for a cover at the centre:
+ * the sampler and the recognizer read the region. A screen-sized element is
+ * not judged (`chromeOverElement`). Residuals, stated: an element that
+ * reaches into the band by design but is short of the screen's size — a
+ * full-bleed header, a screen resized above the keyboard (WDA's
+ * `login_screen` 0,0 402x566), a sheet's scrim — fails closed whatever it
+ * shows; `scroll_until … fully: true` lets the rest of an element lie under
+ * the band once its centre is below it, so for such an element only the
+ * child advice cures the miss; under idb a keyboard's keys are nodes like
+ * any other and are named as the cover; what a tree does not list (a top
+ * bar WDA lists before the scroll view) is no cover here, as for the tap;
+ * an ocr assert on a screen-sized element reads whatever chrome lies over
+ * it. Cost: one `drawOrder` walk of the round's tree and the memoized
+ * `viewport()`.
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
  * `measure`, which is text-parity.ts#measureOcrAssert since 2026-10-08, as
@@ -384,12 +391,13 @@ class PixelPollMemory {
    * (round 8, 2026-10-12; `chromeOverElement`): a miss naming it, never a
    * measurement — what would be sampled is the cover. Remembered as the
    * keyboard's covered miss is, so a later round that finds the element
-   * clear withdraws it (`uncovered`). The remedy is the one that moves an
-   * element out from under a pinned bar: `scroll_until` with `fully: true`,
-   * which stops only once nothing is drawn over any of it.
+   * clear withdraws it (`uncovered`). `reason` is `chromeOverElement`'s,
+   * remedy included: `scroll_until` with `fully: true`, which stops only
+   * once nothing is drawn over any of it, and a child clear of it when no
+   * scroll may cure it.
    */
-  drawnOver(over: string): PollVerdict {
-    return this.coveredMiss(`${over} — the capture would show it, not the element; scroll_until the element with \`fully: true\` first and re-run`);
+  drawnOver(reason: string): PollVerdict {
+    return this.coveredMiss(reason);
   }
 
   private coveredMiss(reason: string): PollVerdict {
@@ -473,41 +481,81 @@ async function keyboardOverElement(
 
 /**
  * What is drawn over the element's rect in this round, worded for the miss
- * — the status band first, then the app's own covers — or undefined when
- * nothing is (round 8, 2026-10-12, the owner's decision on docs/bugs/
- * 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md:
- * fail closed). Header, "Since round 8".
+ * with its remedy — the status band first, then the app's own covers — or
+ * undefined when nothing is (round 8, 2026-10-12, the owner's decision on
+ * docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-
+ * element.md: fail closed). Header, "Since round 8". Exported for the
+ * fixture sweeps (tests/verify/pixel-chrome.test.ts).
  *
  * The screen is the device's (`viewport()`, memoized by the adapter, in the
  * tree's units), turned when the tree's window says it is held sideways
  * (geometry.ts#windowTurnsScreen, the gesture box's rule); the tree's
  * screen (`screenOf`) when the device size cannot be read or is unusable —
- * and then no band. The band is `DeviceScreen.statusBand` at the top of a portrait
- * screen (geometry.ts#belowStatusBand — the tap's and `scroll_until`'s
- * rule; iOS only today): any positive-area overlap with the element's rect
- * is the miss, as for the keyboard. The covers are the tap's
- * (ui-tree/draw-order.ts#exposure, judged in the screen below the band):
- * EVERY cover that meets the element's rect counts, not only one over its
- * centre as for a tap — the sampler and the recognizer read the region,
- * not a point. Named: the one on top at the centre, else the last listed
- * (drawn on top). Its own descendants are never covers (`exposure` leaves
- * a node's subtree out), so a container's children do not fail it.
+ * and then no band. The band is `DeviceScreen.statusBand` at the top of a
+ * portrait screen (geometry.ts#belowStatusBand — the tap's and
+ * `scroll_until`'s rule; iOS only until Android reports one). The covers
+ * are the PIXEL covers (ui-tree/draw-order.ts#paintsOver, judged in the
+ * screen below the band): `exposure`'s — the tap's — less what takes a
+ * touch and hides nothing (the element's own content listed beside it, a
+ * clickable layer), and every one that meets the element's rect counts,
+ * not only one over its centre as for a tap: the sampler and the
+ * recognizer read the region, not a point. Either meets the element only
+ * past an edge's thickness (geometry.ts#overlapsPastSlack, 2 units, the
+ * owner's decision — for the band too: a row whose top lies 2 pt into it
+ * is antialiasing, not the bar). Named: the one on top at the element's
+ * centre, else the last listed (drawn on top), with its reach when that is
+ * not its frame (a pinned bar's, run down to the screen's bottom). Its own
+ * descendants are never covers (`exposure` leaves a node's subtree out).
+ *
+ * A SCREEN-SIZED element (its area at least `SCREEN_SIZED_FRACTION` of the
+ * screen's — a window, `android:id/content`, an app's root view) is judged
+ * clear of both: the status bar and the app's bars lie over part of every
+ * such node by design (all seven round-5 Compose snapshots' root
+ * containers under a 66-px Android band, the tab bar over them; every WDA
+ * window under iOS's band), the colour sampler's 12 % inset keeps the
+ * sample well inside it, and failing them would only say "the screen has
+ * chrome". Residual: an ocr assert on one crops the whole rect and reads
+ * the chrome's text with the element's. A large node short of that share
+ * still fails closed — a sheet's scrim (0,0 1080x1087 under an Android
+ * band), a top app bar laid edge to edge under the status bar (0,0
+ * 1080x242), RN's `placeholder_screen` (0,116 402x758) under the debugger
+ * banner — and the remedy names a child clear of it.
+ *
+ * The remedy is `scroll_until … fully: true`; it adds "assert a child of
+ * it that lies clear of it" when a scroll may not cure it (review of
+ * fix/r8-pixel, round 1): the element lies in no scroll view as far as the
+ * tree says (`insideScroller` false — or undefined, idb), it starts at the
+ * screen's top edge under the band (a full-bleed header), or the cover
+ * holds the element whole.
  */
-async function chromeOverElement(adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode, element: UiNode): Promise<string | undefined> {
+export async function chromeOverElement(adapter: Pick<DeviceAdapter, 'viewport'>, tree: UiNode, element: UiNode): Promise<string | undefined> {
   const read = await adapter.viewport().catch(() => undefined);
   const device = read !== undefined && usableScreen(read) ? read : undefined;
   const turned = device !== undefined && windowTurnsScreen(inferScreenSize(tree), device);
   const screen: Rect =
     device === undefined ? screenOf(tree) : { x: 0, y: 0, width: turned ? device.height : device.width, height: turned ? device.width : device.height };
+  // A screen-sized element is the screen's own background: chrome lies over part of it by design (doc above).
+  if (rectArea(element.rect) >= rectArea(screen) * SCREEN_SIZED_FRACTION) return undefined;
   const below = belowStatusBand(screen, device);
   const band: Rect = { ...screen, height: below.y - screen.y };
-  if (band.height > 0 && rectsOverlap(element.rect, band)) {
-    return `the status bar is drawn over the element (element ${rectText(element.rect)}, status bar ${rectText(band)})`;
+  const at = `(element ${rectText(element.rect)}`;
+  const pinned = insideScroller(tree, element) !== true;
+  if (band.height > 0 && overlapsPastSlack(element.rect, band)) {
+    return `the status bar is drawn over the element ${at}, status bar ${rectText(band)}) — ${coverRemedy(pinned || element.rect.y <= screen.y)}`;
   }
-  const { covers, centreCover } = drawOrder(tree).exposure(element, below);
-  const cover = centreCover ?? covers.at(-1);
-  return cover === undefined ? undefined : `${nodeText(cover)} is drawn over the element (element ${rectText(element.rect)})`;
+  const covers = drawOrder(tree).paintsOver(element, below);
+  const centre = rectCentre(element.rect);
+  const cover = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
+  if (cover === undefined) return undefined;
+  const reach = sameRect(cover.reach, cover.node.rect) ? '' : `, reaching ${rectText(cover.reach)}`;
+  const named = `${nodeText(cover.node).slice(0, -1)}${reach})`;
+  return `${named} is drawn over the element ${at}) — ${coverRemedy(pinned || rectWithin(element.rect, cover.reach))}`;
 }
+
+/** What to do about a pixel assert's element under chrome (`chromeOverElement`): scroll it clear — and, when a scroll may not cure it, `stuck`, assert a child of it that lies clear. */
+const coverRemedy = (stuck: boolean): string =>
+  'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run' +
+  (stuck ? ' — or, if no scroll moves it out from under that, assert a child of it that lies clear of it' : '');
 
 /**
  * A miss no later round can change, carried out of the tree poll to end it
