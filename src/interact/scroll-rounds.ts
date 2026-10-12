@@ -1,12 +1,12 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, cutSliver, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { belowStatusBand, clippedEdges, containsPoint, cutSliver, flushEdges, higherTop, inStatusBand, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { WaitEvidence } from './resolve.js';
-import { belowStatusBand, inStatusBand, judgingOf, OPPOSITE, REVEALS, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
+import { judgingOf, OPPOSITE, REVEALS, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type JudgingScreen, type ScreenBox, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function (2026-10-09, the scroll-rounds
@@ -324,7 +324,7 @@ export interface Judged {
    */
   centreOnScreen: boolean;
   /**
-   * The height of iOS's status band (swipe.ts#belowStatusBand, 2026-10-09),
+   * The height of iOS's status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09),
    * set only when its centre lies on the screen but inside that band — so
    * not `centreOnScreen`; the failure quotes it (`shortOf`'s `statusBar`).
    */
@@ -917,7 +917,7 @@ function judge(
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
-  // The screen below iOS's status band (swipe.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
+  // The screen below iOS's status band (ui-tree/geometry.ts#belowStatusBand, 2026-10-09): the point a tap presses is off the screen there.
   const band = { boxes: [viewport], statusBand };
   const screen: Rect = belowStatusBand(viewport, band);
   const centreFacts = (node: UiNode): Pick<Judged, 'centreOnScreen' | 'bandOverCentre'> => {

@@ -508,7 +508,7 @@ export interface ScreenBox {
    * The device's `DeviceScreen.statusBand` (iOS only — adapters/ios-status-
    * band.ts): the band at the top of a PORTRAIT box whose points a
    * judgement counts as OFF the screen — the point a tap presses, and
-   * `scroll_until`'s stop on it (`belowStatusBand` cuts it). Absent on
+   * `scroll_until`'s stop on it (ui-tree/geometry.ts#belowStatusBand cuts it). Absent on
    * Android, and when the device size could not be read (the tree's window
    * stands in, and the judgement fails open as the rest of that path does).
    */
@@ -524,29 +524,6 @@ export interface JudgingScreen {
   boxes: Rect[];
   statusBand?: number;
 }
-
-/**
- * `box` less the screen's status band (`JudgingScreen.statusBand`) at its
- * top when `box` is portrait — the part of it a point or a rect is judged
- * on screen in; `box` itself on Android, in landscape, or with no screen.
- * `shape` is the screen box the band belongs to when `box` was cut from it
- * (the screen above a keyboard): its shape, not the cut's, says portrait.
- */
-export function belowStatusBand(box: Rect, screen: Pick<JudgingScreen, 'statusBand'> | undefined, shape: { width: number; height: number } = box): Rect {
-  const band = screen?.statusBand ?? 0;
-  if (band <= 0 || shape.height <= shape.width) return box;
-  const top = Math.max(box.y, band);
-  return { ...box, y: top, height: Math.max(0, box.y + box.height - top) };
-}
-
-/**
- * `point` lies on the screen but in its status band: inside one of `boxes`,
- * and inside none of them less the band (`belowStatusBand`). The tap's
- * refusal (resolve.ts#refuseOffScreen) and `scroll_until`'s judgement
- * (scroll-rounds.ts#judge) ask it alike.
- */
-export const inStatusBand = (point: Point, screen: Pick<JudgingScreen, 'boxes' | 'statusBand'>): boolean =>
-  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
  * `screenBox` for a JUDGEMENT rather than a gesture — the one try/catch the

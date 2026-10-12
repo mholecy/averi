@@ -482,7 +482,7 @@ export function absentFromViewport(
  *
  * The viewport is anchored at the origin unless it says otherwise (`x`,
  * `y`: a box that starts lower — iOS's screen below its status band,
- * interact/swipe.ts#belowStatusBand).
+ * belowStatusBand, below).
  */
 export function visibleFractionInViewport(
   rect: Rect,
@@ -579,6 +579,33 @@ export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2
  * top and idb's keyboard band's.
  */
 export const higherTop = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b));
+
+/**
+ * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as
+ * interact/swipe.ts#JudgingScreen's) at its top when `box` is portrait — the
+ * part of it a point or a rect is judged on screen in; `box` itself on
+ * Android, in landscape, or with no screen. `shape` is the screen box the
+ * band belongs to when `box` was cut from it (the screen above a keyboard):
+ * its shape, not the cut's, says portrait. Here since round 8 (2026-10-12),
+ * moved from interact/swipe.ts with `inStatusBand`: rect arithmetic, and
+ * the pixel asserts (verify/pixel-poll.ts), which may not import interact/,
+ * ask where the band lies too.
+ */
+export function belowStatusBand(box: Rect, screen: { statusBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
+  const band = screen?.statusBand ?? 0;
+  if (band <= 0 || shape.height <= shape.width) return box;
+  const top = Math.max(box.y, band);
+  return { ...box, y: top, height: Math.max(0, box.y + box.height - top) };
+}
+
+/**
+ * `point` lies on the screen but in its status band: inside one of `boxes`,
+ * and inside none of them less the band (`belowStatusBand`). The tap's
+ * refusal (interact/resolve.ts#refuseOffScreen) and `scroll_until`'s
+ * judgement (interact/scroll-rounds.ts#judge) ask it alike.
+ */
+export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; statusBand?: number }): boolean =>
+  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
 
 /**
  * A rect's side: one a rect extends past (`clippedEdges`), or lies flush with

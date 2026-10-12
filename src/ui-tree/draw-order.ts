@@ -48,7 +48,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * title only, a top bar WDA lists BEFORE the scroll view it is drawn over)
  * is not inferred — the bug note's decision 4; iOS's status bar is no
  * cover but off the screen, cut out of `within` by the caller
- * (interact/swipe.ts#belowStatusBand). Knows no
+ * (geometry.ts#belowStatusBand). Knows no
  * platform commands; the platform shapes are in the rows, each with the
  * device tree it was measured on, and the marks of a source it reads are
  * on the tree's root (`UiNode.flatList`, `UiNode.paddedTouchTargets`). The

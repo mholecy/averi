@@ -1,10 +1,10 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, cutSliver, drawnOverText, higherTop, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { belowStatusBand, containsPoint, cutSliver, drawnOverText, higherTop, inStatusBand, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
+import { judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
