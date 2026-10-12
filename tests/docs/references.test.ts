@@ -65,19 +65,30 @@ const read = (file: string): string => {
 const escape = (s: string): string => s.replace(/[$]/g, '\\$');
 /** A member (method, property, field, object-literal key) declared at the start of its line. */
 const MEMBER = (name: string): string => `^\\s*(?:(?:private|protected|public|static|readonly|async|get|set|override)\\s+)*\\*?${escape(name)}\\??\\s*[(:<=]`;
-/** A top-level declaration, a re-export, or a member declared at the start of its line. */
-const declares = (source: string, name: string): boolean =>
-  new RegExp(
-    `\\b(?:function\\*?|const|let|var|class|interface|type|enum)\\s+${escape(name)}\\b` + `|export\\s*\\{[^}]*\\b${escape(name)}\\b` + `|${MEMBER(name)}`,
-    'm',
-  ).test(source);
-const declaresMember = (source: string, name: string): boolean => new RegExp(MEMBER(name), 'm').test(source);
+/** Where `source` declares `name` — top level, re-exported, or a member at the start of its line — or -1. */
+const declaredAt = (source: string, name: string): number =>
+  source.search(
+    new RegExp(
+      `\\b(?:function\\*?|const|let|var|class|interface|type|enum)\\s+${escape(name)}\\b` + `|export\\s*\\{[^}]*\\b${escape(name)}\\b` + `|${MEMBER(name)}`,
+      'm',
+    ),
+  );
 
 /** A reference into tests/ resolves against the tests, any other against src/. */
 function resolves(file: string, symbol: string): boolean {
   const [head, ...members] = symbol.split('.');
   const pool = file.startsWith('tests/') ? TESTS : SRC;
-  return pool.some((f) => (f === file || f.endsWith(`/${file}`)) && declares(read(f), head) && members.every((m) => declaresMember(read(f), m)));
+  // Each member is declared inside what it is a member of: after it, before the next top-level declaration.
+  return pool.some((f) => {
+    if (f !== file && !f.endsWith(`/${file}`)) return false;
+    const source = read(f);
+    const at = declaredAt(source, head);
+    if (at < 0) return false;
+    const rest = source.slice(at);
+    const end = rest.slice(1).search(/^(?:export\s|function\s|const\s|let\s|class\s|interface\s|type\s)/m);
+    const body = end < 0 ? rest : rest.slice(0, end + 1);
+    return members.every((m) => declaredAt(body, m) >= 0);
+  });
 }
 
 /**
@@ -108,14 +119,14 @@ function references(pattern: RegExp): { where: string; ref: string; groups: stri
 describe('references in the prose', () => {
   it('every file.ts#symbol names a symbol its file declares — and every bare #symbol continuing a list after one (`a.ts#x`, `#y`)', () => {
     // A trailing dot ends the sentence, not the symbol. A bare `#y` resolves against the last file named before it on its line;
-    // one after `](` is a markdown anchor, and one with no file before it on the line is not a reference.
+    // one after `](` or `(` is an anchor or an aside, and one with no file before it on the line is not a reference.
     const dangling = PROSE.flatMap((file) =>
       logicalLines(file).flatMap(({ line, text }) => {
         let last: string | undefined;
         const out: string[] = [];
         for (const m of text.matchAll(/([\w./-]+\.ts)?(?<![\w\]]\(|\])#([A-Za-z_$][\w$]*(?:\.[\w$]+)*)/g)) {
           const bare = m[1] === undefined;
-          if (bare && (last === undefined || !/[\s`(/,]/.test(text[m.index - 1] ?? ''))) continue;
+          if (bare && (last === undefined || !/[\s`/,]/.test(text[m.index - 1] ?? ''))) continue;
           const owner = m[1] ?? last!;
           last = owner;
           if (!resolves(owner, m[2])) out.push(`${file}:${line}  ${bare ? `${owner} … ${m[0]}` : m[0]}`);
