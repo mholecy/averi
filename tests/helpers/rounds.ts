@@ -34,6 +34,8 @@ export interface Row {
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`; default: no node is the keyboard's. */
   ofKeyboard?: (node: UiNode) => boolean;
+  /** The reading's `remedy`; default the cover's, else the in-tree model's (`none`, no advice). */
+  remedy?: KeyboardRemedy;
   /** Every match's nearest clipping scroll container — shorthand for `scrollers: [scroller]`. */
   scroller?: Rect;
   /** Every match's clipping ancestors, nearest first — clipping nodes the matches are put inside; default none (an iOS tree, or a match with no clipping ancestor). */
@@ -151,7 +153,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       read:
         row.error !== undefined
           ? { error: new Error(row.error) }
-          : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), ...(row.cover && { cover: row.cover }) },
+          : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), remedy: row.remedy ?? row.cover?.remedy ?? { dismissal: 'none' }, ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
       ...(row.screen !== null && { screen: row.screen ?? asBuilt }),
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),

@@ -762,6 +762,24 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(fake.tapPoints).toEqual([]);
   });
 
+  it('idb, D2: a row whose centre (201,591) lies in the number pad\'s 589–596 strip, under no key, is UNDER THE KEYBOARD — refused with the keyboard\'s remedy, nothing tapped (it was tapped at its centre, on the keyboard); a key itself (`5`) is the keyboard\'s own UI and is tapped', async () => {
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    tree.children.find((n) => n.identifier === 'swift_payment.form.value_date_select')!.rect = { x: 24, y: 565, width: 354, height: 52 };
+    const fake = new FakeAdapter({ form: tree }, 'form');
+    fake.keyboard = undefined;
+    fake.keyboardAdvice = 'tap the title';
+    fake.viewportSize = { width: 402, height: 874 };
+    const refused = tapElement(fake, 'id:swift_payment.form.value_date_select', OPTS);
+    await expect(refused).rejects.toBeInstanceOf(CoveredRefusal);
+    await expect(refused).rejects.toThrow(
+      'id:swift_payment.form.value_date_select is under the soft keyboard: its centre (201,591) lies below the keyboard\'s top edge at y 589, where a tap presses the keyboard — ' +
+        'scroll_until it first, or hide the keyboard first (tap a neutral element such as the screen title — a tap: step in a flow); this adapter cannot hide it on its own (tap the title); nothing was tapped',
+    );
+    expect(fake.tapPoints).toEqual([]);
+    // Sent to the key's centre (the fake has no reaction scripted for a key, and says so — the tap was not refused).
+    await expect(tapElement(fake, 'text:"5"', OPTS)).rejects.toThrow('FakeAdapter: nothing tappable at (204,677)');
+  });
+
   it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre, as before', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     for (const n of tree.children) if (n.role === 'button' && n.rect.y >= 596) n.rect = { ...n.rect, y: n.rect.y + 30 };

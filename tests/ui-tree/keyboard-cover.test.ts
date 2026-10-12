@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import { KEYBOARD_ROLE, type KeyboardTouchable, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
-import { readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
+import { keyboardEdge, readingLine, readKeyboard, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
+import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, recorded, screen, type FakeKeyboard } from '../helpers/fake.js';
 
@@ -364,5 +365,62 @@ describe('the keyboard window\'s region, read only once the band is up — the f
       expect(await readKeyboard(fake).cover()).toBeUndefined();
       expect(calls(oracle)).toEqual([1, 0, 0]);
     }
+  });
+});
+
+/**
+ * The keyboard edge: the top edge nothing may be aimed or stroked under — a corroborated reading's cover top
+ * (`readingLine`), idb's band line (`DrawOrder.keyboardBandTop`), or the higher of the two — with its source.
+ */
+describe('keyboardEdge — a corroborated reading, idb\'s band, both, neither', () => {
+  const window = (y: number): KeyboardLine => ({ y, source: 'window', witnessed: true });
+  const IDB_589: KeyboardLine = { y: 589, source: 'idb-band', witnessed: false };
+  /** A draw order that read idb's band at `top` (or none), and whose band holds `keys`. */
+  const order = (top: number | undefined, ...keys: UiNode[]) => ({ keyboardBandTop: top, ofKeyboardBand: (n: UiNode) => keys.includes(n) });
+  it.each([
+    ['a corroborated reading only: its line', window(1285), order(undefined), window(1285)],
+    ['idb\'s band only: its line, no reading stands by it', undefined, order(589), IDB_589],
+    ['both, the band higher: the band\'s', window(600), order(589), IDB_589],
+    ['both, the reading higher: the reading\'s', window(500), order(589), window(500)],
+    ['neither: none', undefined, order(undefined), undefined],
+  ] as const)('%s', (_name, reading, drawn, expected) => {
+    expect(keyboardEdge(reading, drawn)).toEqual(expected);
+  });
+  it('a subject of the band itself (one of idb\'s keys) is under no band line — the reading\'s still holds', () => {
+    const key = node({ role: 'button', label: 'Q', rect: { x: 4, y: 600, width: 36, height: 46 } });
+    expect(keyboardEdge(undefined, order(589, key), key)).toBeUndefined();
+    expect(keyboardEdge(window(1285), order(589, key), key)).toEqual(window(1285));
+    expect(keyboardEdge(undefined, order(589, key), node({ role: 'button', label: 'row' }))).toEqual(IDB_589);
+  });
+  it('over a parsed idb number pad (run2-ios #250): the band at 589, its key `5` exempt', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
+    const five = tree.children.find((n) => n.label === '5')!;
+    const drawn = drawOrder(tree);
+    expect(keyboardEdge(undefined, drawn)).toEqual(IDB_589);
+    expect(keyboardEdge(undefined, drawn, five)).toBeUndefined();
+    expect(keyboardEdge(undefined, drawn, tree.children[1])).toEqual(IDB_589);
+  });
+});
+
+describe('readingLine — a reading\'s line, only when it stands by a shown cover', () => {
+  const BAND = { x: 0, y: 1285, width: 1080, height: 935 };
+  it('the window model, corroborated: the cover\'s top, `window`, witnessed', async () => {
+    expect(await readingLine(readKeyboard(withOracle({ state: 'shown', frame: BAND }, 'shown').fake))).toEqual({ y: 1285, source: 'window', witnessed: true });
+  });
+  it('the window model, its witness denying the band: none', async () => {
+    expect(await readingLine(readKeyboard(withOracle({ state: 'shown', frame: BAND }, 'hidden').fake))).toBeUndefined();
+  });
+  it('the window model, hidden: none', async () => {
+    expect(await readingLine(readKeyboard(withOracle({ state: 'hidden' }).fake))).toBeUndefined();
+  });
+  it('the in-tree model (WDA\'s marked band): `wda`, witnessed — read off the very tree', async () => {
+    const tree = screen(node({ role: KEYBOARD_ROLE, rect: { x: 0, y: 539, width: 402, height: 335 } }));
+    expect(await readingLine(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toEqual({ y: 539, source: 'wda', witnessed: true });
+  });
+  it('the in-tree model with no mark (every idb tree): none — idb\'s band is `keyboardEdge`\'s, never the reading\'s (K5d)', async () => {
+    const tree = screen(node({ role: 'other', rect: { x: 0, y: 589, width: 402, height: 285 } }));
+    expect(await readingLine(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toBeUndefined();
   });
 });

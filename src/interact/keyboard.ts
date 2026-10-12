@@ -1,5 +1,5 @@
 import type { Point, Rect } from '../adapters/types.js';
-import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
+import { readingLine, readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { usableScreen } from '../ui-tree/standing.js';
 import { inTreeModel } from './keyboard-in-tree.js';
@@ -147,11 +147,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // keyboard is read for it only when the centre is covered, off `reading` —
   // the look's own, so what it already asked is not asked again.
   const aimed = async (r: ClearedLook, reading: KeyboardReading, now: TapJudgement, sent?: string): Promise<ResolvedClear> => {
-    const keyboardTop = async () => {
-      const cover = await reading.cover();
-      return cover !== undefined && (await reading.corroborated()) ? cover.top.y : undefined;
-    };
-    const { point, moved } = await aimClearOfChrome(target, r.node, now, keyboardTop, sent);
+    const { point, moved } = await aimClearOfChrome(target, r.node, now, { line: () => readingLine(reading), remedy: reading.remedy }, sent);
     return { node: r.node, note: r.note, ...(r.keyboardHidden !== undefined && { keyboardHidden: r.keyboardHidden }), point, ...(moved !== undefined && { moved }) };
   };
   // After the guard: `sent` only when something WAS sent (the hiding path);

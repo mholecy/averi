@@ -297,6 +297,7 @@ export async function scrollUntilVisible(
           tree,
           found,
           ofKeyboard: reading.ofKeyboard,
+          remedy: reading.remedy,
           ...(cover !== undefined && { cover }),
         },
         elapsedMs: 0,

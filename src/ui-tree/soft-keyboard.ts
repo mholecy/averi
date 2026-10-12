@@ -20,9 +20,9 @@ import { rectWithin } from './geometry.js';
  * adapter can do about a covering keyboard (`KeyboardRemedy`, `cannotHide`),
  * the lowest layer every sentence that says so imports. Since round 7
  * (2026-10-10) it also reads idb's keyboard band, which carries no mark, by
- * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a TOP
- * EDGE only (draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard
- * shown.
+ * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a
+ * LINE only (keyboard-cover.ts#keyboardEdge, over
+ * draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard shown.
  */
 
 /**
@@ -59,7 +59,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * here from ui-tree/draw-order.ts (round 7, 2026-10-10), where
  * `keyboardOf` still reads it for `flatListReadingOrder` and `bottomPinned`
  * unchanged, and for its top (`DrawOrder.keyboardBandTop`, the one way the
- * stroke box and the tap's chrome check know it). idb marks no keyboard node, so its keys — plain `button`s
+ * keyboard edge knows it, keyboard-cover.ts#keyboardEdge). idb marks no keyboard node, so its keys — plain `button`s
  * listed LAST — are the only covers of the rows under it. Its background is
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the

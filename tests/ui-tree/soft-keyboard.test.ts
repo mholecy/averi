@@ -96,8 +96,8 @@ describe('accessoryDismissButton — the input-accessory toolbar\'s trailing but
 
 /**
  * idb's keyboard band, by its shape (round 7, 2026-10-10: moved from ui-tree/draw-order.ts's private `keyboardOf`, whose
- * own pins stay in tests/ui-tree/draw-order.test.ts). Known outside draw-order as a TOP EDGE only — for the stroke box
- * and the tap's chrome cut — never as "the keyboard is shown": the in-tree reading stays `unknown` on idb (K5d).
+ * own pins stay in tests/ui-tree/draw-order.test.ts). Known outside draw-order as a LINE only — the keyboard edge
+ * (ui-tree/keyboard-cover.ts#keyboardEdge) — never as "the keyboard is shown": the in-tree reading stays `unknown` on idb (K5d).
  */
 describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing more (round 7)', () => {
   /** Read off the draw order since the code review of round 7 (S3): `DrawOrder.keyboardBandTop`, the one derivation. */

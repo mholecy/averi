@@ -6,7 +6,6 @@ import {
   clipsOf,
   containsPoint,
   flushEdges,
-  higherTop,
   inferScreenSize,
   intersectsViewport,
   rectArea,
@@ -530,16 +529,6 @@ describe('Clips.cutSliver at any depth — clippedOut evidence at each edge, par
   it('stated residual: a WHOLE 50-px row at rest at the list\'s top with a child laid out wholly above it (a hidden swipe-action view) reads cut, 50 deep', () => {
     const xml = dump(row('row', '[0,297][1080,347]', text('[40,305][400,340]'), '<node class="android.widget.TextView" resource-id="a:id/hidden" text="x" bounds="[40,297][400,250]"/>'));
     expect(cutOf(xml, 'row')).toEqual({ edge: 'top', container: { x: 0, y: 297, width: 1080, height: 1857 }, depth: 50 });
-  });
-});
-
-describe('higherTop — the higher of two top edges, either unknown (code review of round 7, S5)', () => {
-  it('the smaller y of two; the one known; undefined when neither is', () => {
-    expect(higherTop(600, 589)).toBe(589);
-    expect(higherTop(589, 600)).toBe(589);
-    expect(higherTop(589, undefined)).toBe(589);
-    expect(higherTop(undefined, 590)).toBe(590);
-    expect(higherTop(undefined, undefined)).toBeUndefined();
   });
 });
 

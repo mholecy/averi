@@ -144,17 +144,23 @@ export interface DrawOrder {
    * (soft-keyboard.ts#keyboardInTree stays `unknown` on an idb tree, and
    * with it every `shown`/`hidden` question of keyboard-cover.ts#readKeyboard
    * and the in-tree dismissal — a blind key there was measured to submit,
-   * K5d). Two readers, and only these: `scroll_until`'s stroke box ends
-   * above it (no touch-down on a key — interact/scroll-rounds.ts#strokeTop),
-   * and the tap's chrome check cuts its box above it before a piece is
-   * chosen (no piece, no "part that shows", inside the band —
-   * interact/resolve.ts#aimClearOfChrome). Only a FLAT LIST
+   * K5d). One reader: ui-tree/keyboard-cover.ts#keyboardEdge, the one
+   * merge of every keyboard source into the line the tap, `scroll_until` and
+   * the pixel assert judge and stroke against. Only a FLAT LIST
    * (`UiNode.flatList`, idb's mark) is read: WDA marks its band itself
    * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
    * always undefined here. Read off the band this draw order already found
    * for its own rows, not by a second walk of the tree.
    */
   readonly keyboardBandTop: number | undefined;
+  /**
+   * Is `node` part of idb's keyboard band — its background or a node of
+   * the run listed beside it (`keyboardOf`'s keys, Dictate included)? The
+   * keyboard's own UI on a flat list, as `UiNode.ofKeyboard` marks it on
+   * WDA's tree: under no band line (ui-tree/keyboard-cover.ts#keyboardEdge's
+   * `subject`). Always false on a tree with no band.
+   */
+  ofKeyboardBand(node: UiNode): boolean;
   /**
    * The covers of `exposure(node, within)` that hide PIXELS of `node` —
    * what a colour sample or an ocr crop of its rect would read instead of
@@ -1206,8 +1212,8 @@ export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
  * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): the band
  * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
  * rule and its measurements there, moved there in round 7), with its top
- * for the stroke box and the tap's chrome check (`DrawOrder.keyboardBandTop`),
- * with the run of nodes it holds as the keys.
+ * for the keyboard edge (`DrawOrder.keyboardBandTop`), with the run of
+ * nodes it holds as the keys (`DrawOrder.ofKeyboardBand`).
  */
 function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined {
   const band = flatListKeyboardBand(order.map((p) => p.node), screen, barLine);
@@ -1498,6 +1504,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
 
   const api: DrawOrder = {
     keyboardBandTop: keyboard?.top,
+    ofKeyboardBand: (node) => keyboard !== undefined && [...keyboard.keys].some((p) => p.node === node),
     paintsOver(node, box) {
       const target = placesOf(node)[0];
       if (target === undefined) return [];

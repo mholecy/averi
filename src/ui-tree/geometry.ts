@@ -573,16 +573,6 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
 /**
- * The HIGHER of two top edges a box is cut above (the smaller y), either of
- * which may be unknown — undefined only when both are. The one spelling
- * (code review of round 7, S5) of what the tap's chrome check
- * (interact/resolve.ts#aimClearOfChrome) and `scroll_until`'s stroke box
- * (interact/scroll-rounds.ts#strokeTop) each wrote out: a keyboard cover's
- * top and idb's keyboard band's.
- */
-export const higherTop = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b));
-
-/**
  * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as
  * ui-tree/standing.ts#UsableScreen's) at its top when `box` is portrait — the
  * part of it a point or a rect is judged on screen in; `box` itself with no
