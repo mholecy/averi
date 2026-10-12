@@ -222,9 +222,12 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * background between them is not seen.
  * Cost: the memoized `viewport()`, and walks of the round's tree, no
  * read: `inferScreenSize`'s (the screen's shape, geometry.ts#deviceBox),
- * `insideScroller`'s down to the element (whether a scroll may cure a
- * miss — asked every round, a miss or not), and, unless the band already
- * failed the round, one `drawOrder` walk (`paintsOver`).
+ * `screenOf`'s when neither the device nor a window vouches for the
+ * screen (the last fallback), `insideScroller`'s down to the element
+ * (whether a scroll may cure a miss — asked on every round that reaches
+ * the chrome check, a miss or not: the element found, the keyboard not
+ * already failing the round), and, unless the band already failed the
+ * round, one `drawOrder` walk (`paintsOver`).
  *
  * What it refuses: the recognizer (closed over by the ocr assert's
  * `measure`, which is text-parity.ts#measureOcrAssert since 2026-10-08, as

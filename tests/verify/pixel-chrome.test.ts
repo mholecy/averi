@@ -260,7 +260,7 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
     expect(await judge(PIXEL_3A, tree, row, colorSampleRect)).toBeUndefined();
   });
 
-  it('the screen itself — screen-sized, or spanning the top edge at full width — is never cured by a scroll: the remedy leads with something in it; idb\'s root says the cover is content on its background', async () => {
+  it('neither the screen itself (screen-sized) nor a full-bleed header (laid from the top edge at full width) is cured by a scroll: each remedy leads with something in it, the header\'s naming its title; idb\'s root says the cover is content on its background', async () => {
     const NEVER = 'the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself out from under it';
     const HEADER = 'the capture would show it, not the element — assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it';
     const win = n('container', rect(0, 0, 402, 874), { identifier: 'screen' });
