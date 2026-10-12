@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { absenceVerdict, presenceVerdict } from '../../src/ui-tree/verdict.js';
 import { node } from '../helpers/fake.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * The bare-tree rule against what the three sources REALLY return, run
@@ -58,7 +58,7 @@ describe('isBareTree: the empty / unrendered trees each source emits ARE bare', 
   });
 
   it('Android, launching: the decor chain with android:id/content and the bar backgrounds (ids stripped to "content" etc.)', () => {
-    expect(isBareTree(parseUiautomatorXml(androidXml('')))).toBe(true);
+    expect(isBareTree(parseDump(androidXml('')))).toBe(true);
   });
 
   it('a lone spinner or splash image is a loading screen', () => {
@@ -114,7 +114,7 @@ describe('isBareTree: loaded screens are NOT bare', () => {
     expect(isBareTree(idb(ax('Button', 'Log in', { x: 20, y: 500, width: 362, height: 44 }, 'login_button'), ax('StaticText', 'Welcome back', { x: 20, y: 100, width: 200, height: 20 })))).toBe(false);
   });
   it('Android: the decor chain with one TextView', () => {
-    expect(isBareTree(parseUiautomatorXml(androidXml(
+    expect(isBareTree(parseDump(androidXml(
       '<node index="0" text="Enter your PIN" resource-id="" class="android.widget.TextView" package="md.bank.app" content-desc="" bounds="[100,400][980,480]"/>',
     )))).toBe(false);
   });
@@ -156,12 +156,12 @@ describe('isBareTree: loaded screens are NOT bare', () => {
     ))).toBe(false);
   });
   it('Android Flutter: android.view.View with a content-desc', () => {
-    expect(isBareTree(parseUiautomatorXml(androidXml(
+    expect(isBareTree(parseDump(androidXml(
       '<node index="0" text="" resource-id="" class="android.view.View" package="md.bank.app" content-desc="Log in" bounds="[60,1600][1020,1740]"/>',
     )))).toBe(false);
   });
   it('Android Compose: a merged clickable View carrying text', () => {
-    expect(isBareTree(parseUiautomatorXml(androidXml(
+    expect(isBareTree(parseDump(androidXml(
       '<node index="0" text="Log in" resource-id="" class="android.view.View" package="md.bank.app" content-desc="" bounds="[60,1600][1020,1740]"/>',
     )))).toBe(false);
   });
@@ -278,7 +278,7 @@ describe('isBareTree: a status bar is not a reason to call a loaded screen bare'
 
   it('the band is skipped only when it holds a clock: content at the top of a screen with no clock still counts (test fakes, an edge-to-edge Android app)', () => {
     expect(isBareTree(idb(ax('StaticText', 'Accounts', { x: 16, y: 20, width: 200, height: 30 })))).toBe(false);
-    expect(isBareTree(parseUiautomatorXml(androidXml(
+    expect(isBareTree(parseDump(androidXml(
       '<node index="0" text="Settings" resource-id="" class="android.widget.TextView" package="md.bank.app" content-desc="" bounds="[48,40][600,140]"/>',
     )))).toBe(false);
     // A time BELOW the band is the app's text, not a status bar.
@@ -286,7 +286,7 @@ describe('isBareTree: a status bar is not a reason to call a loaded screen bare'
   });
 
   it('the Android decor is bare as before (it holds no clock, so neither clause applies)', () => {
-    expect(isBareTree(parseUiautomatorXml(androidXml('')))).toBe(true);
+    expect(isBareTree(parseDump(androidXml('')))).toBe(true);
   });
 
   it('a status-bar clock in other locales (inferred): the WHOLE label is a time — 6:29, Finnish 18.29, Arabic-Indic digits, "6:29 PM", "6:29 p.m.", 下午6:29; not a price, a date or a title', () => {

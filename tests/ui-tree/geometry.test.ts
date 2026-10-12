@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
@@ -25,7 +24,7 @@ import {
 } from '../../src/ui-tree/geometry.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node as fakeNode } from '../helpers/fake.js';
 import { deviceBox, type ScreenSize } from '../../src/ui-tree/geometry.js';
 
@@ -484,7 +483,7 @@ describe('evidentCut — clippedOut evidence at each edge, parsed (verification 
   const dump = (inner: string, list = '[0,297][1080,2154]') =>
     `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"><node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="a:id/list" bounds="${list}">${inner}</node></node></hierarchy>`;
   const cutOf = (xml: string, id: string) => {
-    const tree = parseUiautomatorXml(xml);
+    const tree = parseDump(xml);
     const find = (n: UiNode): UiNode | undefined => (n.identifier === id ? n : n.children.map(find).find(Boolean));
     const n = find(tree)!;
     return evidentCut(n, clipsOf(tree).scrollersOf(n));
@@ -502,7 +501,7 @@ describe('evidentCut — clippedOut evidence at each edge, parsed (verification 
   });
   it('stated residual: a text dumped inverted on BOTH axes is clippedOut \'top\' (the parser\'s `vertical ?? sideways`), so the card\'s left cut is missed', () => {
     const xml = dump(row('card', '[0,400][40,700]', text('[0,450][-100,440]')), carousel);
-    expect([...everyNode(parseUiautomatorXml(xml))].find((n) => n.label === 'Apps')?.clippedOut).toBe('top');
+    expect([...everyNode(parseDump(xml))].find((n) => n.label === 'Apps')?.clippedOut).toBe('top');
     expect(cutOf(xml, 'card')).toBeUndefined();
   });
   it('stated residual: a WHOLE 50-px row at rest at the list\'s top with a child laid out wholly above it (a hidden swipe-action view) reads cut, 50 deep', () => {
@@ -666,13 +665,13 @@ describe('insideScroller — some ancestor scrolls (scroll-containers.ts#scrolls
   });
 
   it('Android Compose: a row of the flagged list is inside (a Compose scroller has no scrollable role); the tab bar after it is not', () => {
-    const tree = parseUiautomatorXml(COMPOSE.accountDetail);
+    const tree = parseDump(COMPOSE.accountDetail);
     expect(insideScroller(tree, find(tree, (n) => n.identifier === 'transactions.list.row_2'))).toBe(true);
     expect(insideScroller(tree, find(tree, (n) => n.identifier === 'nav.tab_home'))).toBe(false);
   });
 
   it('a classic Android list whose content fits (scrollable="false") still counts: it is a scroll view', () => {
-    const tree = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    const tree = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
       <node class="android.widget.ListView" scrollable="false" bounds="[0,200][1080,900]">
         <node class="android.widget.TextView" resource-id="row" text="Only row" bounds="[0,200][1080,350]" />
       </node></node></hierarchy>`);
@@ -695,7 +694,7 @@ describe('insideScroller — some ancestor scrolls (scroll-containers.ts#scrolls
     const flat = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
     expect(flat.flatList).toBe(true);
     expect(insideScroller(flat, flat.children[flat.children.length - 1])).toBeUndefined();
-    expect(insideScroller(parseUiautomatorXml(COMPOSE.accountDetail), fakeNode({}))).toBeUndefined();
+    expect(insideScroller(parseDump(COMPOSE.accountDetail), fakeNode({}))).toBeUndefined();
   });
 });
 

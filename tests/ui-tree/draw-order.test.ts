@@ -1,13 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node as uiNode } from '../helpers/fake.js';
 
@@ -339,6 +338,68 @@ describe('drawnOverAt — the node drawn over a container at a touch-down (the e
 
   it('undefined when this tree holds no container of that rect (the list moved)', () => {
     expect(drawOrder(tree(host)).drawnOverAt(rect(0, 401, 1080, 1819), { x: 540, y: 1857 })).toBeUndefined();
+  });
+});
+
+describe('coversOf — what is drawn over a region of a node as a target, wherever the region lies (the uiautomator parser\'s widening)', () => {
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const LIST = rect(0, 401, 1080, 1753);
+  /** Account Detail's row_0 as dumped (cut at its sticky header's bottom, 480), and the strip its own content says it reaches above that. */
+  const row = () => uiNode({ role: 'container', identifier: 'row_0', rect: rect(66, 480, 948, 66), children: [uiNode({ role: 'button', rect: rect(66, 403, 948, 143) })] });
+  const STRIP = rect(66, 403, 948, 77);
+  /** The Android screen: a list holding `inList`, then `after` listed after it; the source's mark on the root, as the parser sets it. */
+  const screen = (inList: UiNode[], ...after: UiNode[]) =>
+    uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), paddedTouchTargets: true, children: [uiNode({ role: 'container', rect: LIST, clipsDescendants: true, children: inList }), ...after] });
+  const header = () => uiNode({ role: 'container', identifier: 'date_header_0', rect: rect(0, 401, 1080, 79), children: [uiNode({ role: 'text', label: '17.07.2026', rect: rect(66, 415, 220, 50) })] });
+
+  it('a region OUTSIDE the node\'s rect: the sticky header listed after the row, with its text, is drawn over the strip — where exposure, cut to the row\'s own rect, sees nothing', () => {
+    const r = row();
+    const h = header();
+    const order = drawOrder(screen([r, h]));
+    expect(order.coversOf(r, STRIP)).toEqual([h, h.children[0]]);
+    expect(order.exposure(r, rect(0, 0, 1080, 2220)).covers).toEqual([]);
+  });
+
+  it('only what meets the region with area, and only what is listed after the node: the header listed BEFORE the row covers nothing; a region clear of it neither', () => {
+    const r = row();
+    const h = header();
+    expect(drawOrder(screen([h, r])).coversOf(r, STRIP)).toEqual([]);
+    expect(drawOrder(screen([r, h])).coversOf(r, rect(66, 546, 948, 40))).toEqual([]);
+    expect(drawOrder(screen([r, h])).coversOf(r, rect(66, 480, 948, 0))).toEqual([]);
+  });
+
+  it('a screen-sized host listed after it (a Compose snackbar host) draws nothing there — its snackbar elsewhere neither', () => {
+    const r = row();
+    const snackbar = uiNode({ role: 'container', label: 'Saved', rect: rect(30, 2050, 1020, 130) });
+    const host = uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [snackbar] });
+    expect(drawOrder(screen([r], host)).coversOf(r, STRIP)).toEqual([]);
+  });
+
+  it('the TARGET column, not the container one: a layer the list\'s size listed after it, holding the row\'s list whole, its button elsewhere (a FAB host), draws nothing on the strip', () => {
+    const r = row();
+    const fab = uiNode({ role: 'button', label: 'Add', rect: rect(900, 2000, 120, 120) });
+    const layer = uiNode({ role: 'container', rect: LIST, children: [fab] });
+    const order = drawOrder(screen([r], layer));
+    expect(order.coversOf(r, STRIP)).toEqual([]);
+    expect(order.drawnOver(LIST)).toContain(layer); // drawn over the list as a container: the column coversOf does not read
+  });
+
+  it('a bare structural overlay — childless, no label, no value, only an id — draws nothing either', () => {
+    const r = row();
+    expect(drawOrder(screen([r], uiNode({ role: 'other', identifier: 'overlay', rect: LIST }))).coversOf(r, STRIP)).toEqual([]);
+  });
+
+  it('the same overlay saying something is drawn: a label, or a child that draws', () => {
+    const r = row();
+    const labelled = uiNode({ role: 'other', identifier: 'overlay', label: 'Header', rect: LIST });
+    expect(drawOrder(screen([r], labelled)).coversOf(r, STRIP)).toEqual([labelled]);
+    const tab = uiNode({ role: 'container', label: 'Home', rect: rect(102, 410, 219, 60) });
+    const host = uiNode({ role: 'container', identifier: 'tabs', rect: rect(66, 400, 948, 100), children: [tab] });
+    expect(drawOrder(screen([r], host)).coversOf(r, STRIP)).toEqual([host, tab]);
+  });
+
+  it('a node of another tree has no covers', () => {
+    expect(drawOrder(screen([row(), header()])).coversOf(row(), STRIP)).toEqual([]);
   });
 });
 
@@ -1317,7 +1378,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
 describe('exposure — a Compose label\'s own control, a row\'s own content (2026-10-09)', () => {
   const PIXEL = rect(0, 0, 1080, 2220);
   const parse = (xml: string) => {
-    const tree = parseUiautomatorXml(xml);
+    const tree = parseDump(xml);
     const find = (p: (n: UiNode) => boolean) => [...everyNode(tree)].find(p)!;
     return { tree, find, order: drawOrder(tree) };
   };
@@ -1558,7 +1619,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
       it('through the WDA parser: no tree it gives carries the mark', async () => {
         const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-keyboard.json', import.meta.url), 'utf8'));
         expect([...everyNode(tree)].some((n) => n.paddedTouchTargets === true)).toBe(false);
-        expect(parseUiautomatorXml(COMPOSE.login).paddedTouchTargets).toBe(true);
+        expect(parseDump(COMPOSE.login).paddedTouchTargets).toBe(true);
       });
 
       it('a centred dialog-like overlay in a screen-sized parent, padded evenly, still covers', () => {
@@ -1603,7 +1664,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     });
 
     it('…and only of a CHILDLESS target: the list holding the rows, with the tab bar\'s host drawn on it as its sibling, still has the tab and its label over it', () => {
-      const tree = parseUiautomatorXml(COMPOSE.accountDetail);
+      const tree = parseDump(COMPOSE.accountDetail);
       const list = [...everyNode(tree)].find((n) => n.clipsDescendants === true)!;
       const covers = drawOrder(tree).exposure(list, PIXEL).covers;
       expect(covers.map((n) => n.identifier ?? n.label)).toEqual(['nav.tab_home', 'Home']);

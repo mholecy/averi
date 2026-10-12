@@ -5,6 +5,7 @@ import { createIosTreeSource } from '../adapters/ios-tree-source.js';
 import { androidUnusable, listAndroidDevices, listIosDevices } from '../adapters/discovery.js';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
+import { drawnOverStrip } from '../ui-tree/draw-order.js';
 
 /**
  * An Android device adb lists but averi cannot drive, named for a refusal:
@@ -57,10 +58,12 @@ export const defaultDiscovery: DeviceDiscovery = discoveryWith();
  * Exported for its tests: the registry's own tests inject a factory, so this
  * is the one piece of wiring they cannot see (review 2026-10-02). Which
  * backend serves a kind is NOT decided here — adapters/ios-tree-source.ts
- * owns that (review 2026-10-03); this only hands it the bound device id.
+ * owns that (review 2026-10-03); this only hands it the bound device id —
+ * and, to Android's parser, the draw order's judgement it asks before
+ * widening a node (adapters/types.ts#DrawnOverStrip).
  */
 export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
-  if (platform === 'android') return new AndroidAdapter({ serial: deviceId });
+  if (platform === 'android') return new AndroidAdapter({ serial: deviceId, drawnOverStrip });
   // The registry hands over the resolved kind (kindFor); the fallback only
   // serves a direct caller of the factory, and names the same default.
   return new IosAdapter({

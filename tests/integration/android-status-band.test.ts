@@ -5,6 +5,7 @@ import type { ExecFn } from '../../src/adapters/exec.js';
 import { OffScreenRefusal } from '../../src/interact/resolve.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { tapElement } from '../../src/interact/tap.js';
+import { drawnOverStrip } from '../helpers/android-dumps.js';
 
 /**
  * Android's status band END TO END through the real AndroidAdapter over a
@@ -64,7 +65,7 @@ const adapterOver = async (xml: string | ((offset: number) => string)) => {
     if (full.includes('dumpsys input_method')) return out('  mInputShown=false\n');
     return out('');
   };
-  return { adapter: new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), calls };
+  return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), calls };
 };
 
 const OPTS = { ambiguous: 'refuse' as const, pollMs: 1, timeoutMs: 50 };

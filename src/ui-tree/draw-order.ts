@@ -1,4 +1,4 @@
-import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, scrolls } from './scroll-containers.js';
@@ -23,8 +23,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Five questions, one per caller, read from three columns of `NOT_DRAWN`
- * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s):
+ * Six questions, one per caller, read from three columns of `NOT_DRAWN`
+ * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
+ * `coversOf` reads `exposure`'s):
  * - `shadowing(node, point)` — the tap guard's dismissal picker
  *   (interact/keyboard-in-tree.ts#pickDismissal): is a configured dismissal
  *   target drawn over at its tap point?
@@ -47,6 +48,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   `exposure` less the node's own content listed beside it, a clickable
  *   layer with nothing drawn, and an overlap no thicker than an edge
  *   (`PixelCover`'s doc has the rules and the measured shapes).
+ * - `coversOf(node, region)` — the uiautomator parser's widening, through
+ *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
+ *   drawn over the strip a node cut short of its own content would gain?
  *
  * The three columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -117,6 +121,19 @@ export interface DrawOrder {
    * not in this tree has no covers.
    */
   exposure(node: UiNode, within: Rect): Exposure;
+  /**
+   * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
+   * node after `node`'s subtree (its first place in the tree, as
+   * `exposure`) whose rect meets `region` with area and that draws for a
+   * target (`NOT_DRAWN`'s `target` column, judged with `node` as the
+   * target). Unlike `exposure`, `region` may lie anywhere — outside `node`'s
+   * own rect too: the uiautomator parser asks it of the strip a node cut
+   * short of its own content would gain (adapters/android.ts#widenUnderCovers,
+   * through types.ts#DrawnOverStrip). Rects as the tree gives them — no
+   * flat-list reach, no tab-bar item listed before the node: a nested tree's
+   * order is its draw order. Empty for a node not in this tree.
+   */
+  coversOf(node: UiNode, region: Rect): readonly UiNode[];
   /**
    * The TOP EDGE of idb's soft keyboard band (`keyboardOf`, over
    * soft-keyboard.ts#flatListKeyboardBand), or undefined — round 7,
@@ -1375,6 +1392,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
 
   const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
+  /** What the `target` column knows of `target`: the tree's facts, and where its reading order breaks. */
+  const asTarget = (target: Placed): SeenFor => ({ ...seen, target, flatList, contentFrom, barLine, readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets });
   /** Every place of `node` in the walk — the same object may sit at several (`shadowing`'s rule). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
@@ -1434,10 +1453,16 @@ export function drawOrder(tree: UiNode): DrawOrder {
     drawnOverAt(container, point) {
       return (drawnOver(container) ?? []).filter((n) => containsPoint(n.rect, point) && !rectWithin(container, n.rect)).at(-1);
     },
+    coversOf(node, region) {
+      const places = placesOf(node);
+      if (places.length === 0) return [];
+      const about = asTarget(places[0]);
+      return laterThan(places, (p) => rectIntersection(p.node.rect, region) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
+    },
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
-      const about: SeenFor | undefined = places.length === 0 ? undefined : { ...seen, target: places[0], flatList, contentFrom, barLine, readingBreak: readingBreak(order, places[0], contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets };
+      const about: SeenFor | undefined = places.length === 0 ? undefined : asTarget(places[0]);
       /** The tab bar `p` is an item of, when `node` lies outside it (`tabBarsOf`): a target wholly in the items' box is the bar's own. */
       const floatsOver = (p: Placed): TabBar | undefined => {
         const bar = tabItems.get(p);
@@ -1486,3 +1511,14 @@ export function drawOrder(tree: UiNode): DrawOrder {
   };
   return api;
 }
+
+/**
+ * The one implementation of the uiautomator parser's port
+ * (adapters/types.ts#DrawnOverStrip): one draw order of the tree as read,
+ * asked `coversOf` the strip for each node — a strip is drawn over when any
+ * node draws there for that node as a target.
+ */
+export const drawnOverStrip: DrawnOverStrip = (root) => {
+  const order = drawOrder(root);
+  return (node, strip) => order.coversOf(node, strip).length > 0;
+};

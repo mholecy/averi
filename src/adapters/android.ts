@@ -7,7 +7,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -172,10 +172,13 @@ export class AndroidAdapter implements DeviceAdapter {
    * wording and the "more than one device" diagnosis.
    */
   private readonly serial: string;
+  /** What the parser asks before widening a node cut short of its content (types.ts#DrawnOverStrip) — required: the composition root wires it. */
+  private readonly drawnOverStrip: DrawnOverStrip;
 
-  constructor(opts: { serial: string; exec?: ExecFn }) {
+  constructor(opts: { serial: string; exec?: ExecFn; drawnOverStrip: DrawnOverStrip }) {
     this.serial = opts.serial;
     this.exec = opts.exec ?? defaultExec;
+    this.drawnOverStrip = opts.drawnOverStrip;
   }
 
   /**
@@ -380,7 +383,7 @@ export class AndroidAdapter implements DeviceAdapter {
         throw e;
       }
       const xmlEnd = raw.lastIndexOf('>');
-      if (xmlEnd !== -1) return parseUiautomatorXml(raw.slice(0, xmlEnd + 1));
+      if (xmlEnd !== -1) return parseUiautomatorXml(raw.slice(0, xmlEnd + 1), this.drawnOverStrip);
       const status = raw.trim().slice(0, 200);
       // "null root node" is uiautomator saying the app has no window to dump YET
       // (cold launch, ~2-3 s; mid-animation). The one-shot MCP tools opt into a
@@ -1146,7 +1149,13 @@ interface RawNode {
   node?: RawNode | RawNode[];
 }
 
-export function parseUiautomatorXml(xml: string): UiNode {
+/**
+ * A uiautomator dump as a normalized tree. `drawnOverStrip` judges whether a
+ * node cut short of its own content lies under something drawn there
+ * (`widenUnderCovers`) — the UI-tree layer's draw order, handed in
+ * (types.ts#DrawnOverStrip).
+ */
+export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip): UiNode {
   const parsed = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
@@ -1157,20 +1166,21 @@ export function parseUiautomatorXml(xml: string): UiNode {
   // An arrow, not `roots.map(normalizeNode)`: map would hand its index in as `around`.
   const grown = new Map<UiNode, Rect>();
   const children = roots.map((root) => normalizeNode(root, { grown }));
-  widenUnderOverlays(children, grown);
   // The source's mark (types.ts#UiNode.paddedTouchTargets): Compose lists a control's touch target as its wrapper.
-  if (children.length === 1) return { ...children[0], paddedTouchTargets: true };
-  return {
-    role: 'container', label: null, identifier: null, value: null,
-    rect: zeroRect(), children, paddedTouchTargets: true,
-  };
+  // Set before the widening: the draw order judging it reads the mark.
+  const tree: UiNode =
+    children.length === 1
+      ? { ...children[0], paddedTouchTargets: true }
+      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true };
+  widenUnderCovers(tree, grown, drawnOverStrip);
+  return tree;
 }
 
 /**
  * Where a node lies in the dump: its parent's rect as normalized, and its
  * nearest clipping ancestor's (`UiNode.clipsDescendants`), when it has them;
  * and the dump's `grown` — each node `uncut` would widen, with the rect,
- * applied by `widenUnderOverlays` once the whole tree is read.
+ * applied by `widenUnderCovers` once the whole tree is read.
  */
 interface Around {
   parent?: Rect;
@@ -1230,15 +1240,16 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
 
 /**
  * The node's whole extent when uiautomator cut its bounds short of its own
- * descendants (2026-10-09, docs/bugs/2026-10-09-android-fully-trusts-row-
- * bounds-cut-at-a-sticky-header.md): Compose subtracts what an overlay
+ * descendants (2026-10-09, the bug note
+ * docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md):
+ * Compose subtracts what an overlay
  * sibling drawn over a node covers from that node's bounds, and not from
  * its descendants' — mp-native's Account Detail row under its sticky date
  * header (`0,401 1080x79`) dumps as `row_0 66,480 948x66`, its own label
  * and button as `66,403 948x143`, the row's true rect. The cut rect lies
  * whole in the list and clear of the header, so it read "fully visible".
- * Only a CANDIDATE here: `widenUnderOverlays` widens it when a node drawn
- * after it lies on the strip gained.
+ * Only a CANDIDATE here: `widenUnderCovers` widens it when something is
+ * drawn over the strip gained.
  *
  * Only descendants with the node's EXACT x and width count — a row's own
  * label or button, which ARE the row; not a badge or an icon hanging off
@@ -1284,34 +1295,25 @@ function uncut(rect: Rect, children: readonly UiNode[], clip: Rect): Rect | unde
 
 /**
  * Widen each `grown` node whose gained strip — the part of the grown rect
- * outside the dumped one — a node listed AFTER it meets (code review of
- * fix/r7-bounds P3): the overlay that cut it, drawn after it in the dump's
- * order, lies there — row_0's sticky header, the floating tab bar over the
- * rows cut at it. A strip nothing later meets is the node's own overflow,
- * and widening it would make the node overlap what it does not. Judged on
+ * outside the dumped one — something is drawn over, as the UI-tree layer's
+ * draw order judges it for that node as a target (`drawnOverStrip`,
+ * types.ts#DrawnOverStrip): the overlay that cut it lies there — row_0's
+ * sticky header, the floating tab bar over the rows cut at it. A strip
+ * nothing draws over is the node's own overflow, and widening it would make
+ * the node overlap what it does not — so a screen-sized host listed after it
+ * (a snackbar host) or a bare structural overlay widens nothing. Judged on
  * the dumped rects, every decision before any is applied; the dumped rect
- * is kept as `cutBounds` (types.ts#UiNode.cutBounds). The residual, stated:
- * a node overflowing one edge into the next row listed after it (a touch
- * target running into it), or into a screen-sized wrapper listed after it
- * (a snackbar host), reads like a cut and is widened under that node.
+ * is kept as `cutBounds` (types.ts#UiNode.cutBounds, which states the
+ * residual: the next row of the same list is drawn over the strip exactly
+ * as a sticky header is).
  */
-function widenUnderOverlays(roots: readonly UiNode[], grown: ReadonlyMap<UiNode, Rect>): void {
+function widenUnderCovers(tree: UiNode, grown: ReadonlyMap<UiNode, Rect>, drawnOverStrip: DrawnOverStrip): void {
   if (grown.size === 0) return;
-  // A walk of its own, not types.ts#everyNode (the one pre-order walk that yields nodes only): "listed AFTER it" needs each node's subtree END
-  // in the order, which a generator of nodes does not give. One walk builds both the order and that index (code review of round 7, S2).
-  const order: UiNode[] = [];
-  const after = new Map<UiNode, number>(); // each node's index past its own subtree
-  const walk = (node: UiNode): void => {
-    order.push(node);
-    for (const child of node.children) walk(child);
-    after.set(node, order.length);
-  };
-  for (const root of roots) walk(root);
+  const drawnOver = drawnOverStrip(tree);
   const widen = [...grown].filter(([node, whole]) => {
     const strip: Rect =
       whole.y < node.rect.y ? { ...whole, height: node.rect.y - whole.y } : { ...whole, y: node.rect.y + node.rect.height, height: whole.y + whole.height - (node.rect.y + node.rect.height) };
-    for (let i = after.get(node) ?? order.length; i < order.length; i++) if (rectIntersection(order[i].rect, strip) !== undefined) return true;
-    return false;
+    return drawnOver(node, strip);
   });
   for (const [node, whole] of widen) {
     node.cutBounds = node.rect;

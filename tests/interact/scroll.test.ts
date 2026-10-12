@@ -5,8 +5,8 @@ import { tapElement } from '../../src/interact/tap.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { flingCarry, LazyList } from '../helpers/lazy-list.js';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -486,9 +486,8 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
     );
   });
 
-  it('the parser marks the container: a scrollable="true" Compose View (role container) clips — the SWIFT dump, end to end through parseUiautomatorXml', async () => {
-    const { parseUiautomatorXml } = await import('../../src/adapters/android.js');
-    const tree = parseUiautomatorXml(`<hierarchy rotation="0">
+  it('the parser marks the container: a scrollable="true" Compose View (role container) clips — the SWIFT dump, end to end through the parser', async () => {
+    const tree = parseDump(`<hierarchy rotation="0">
 <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
   <node class="android.view.View" resource-id="swift_payment.form.top_bar" bounds="[0,0][1080,242]" />
   <node class="android.view.View" scrollable="true" bounds="[0,242][1080,1978]">
@@ -673,7 +672,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   });
 
   it('a classic-View row cut to 33 px at the list\'s TOP, its texts dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER): their clippedOut is the evidence — the plain stop does not stop on it', async () => {
-    const fake = new FakeAdapter({ s: parseUiautomatorXml(SETTINGS_ROW_SLIVER) }, 's');
+    const fake = new FakeAdapter({ s: parseDump(SETTINGS_ROW_SLIVER) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     await expect(scrollUntilVisible(fake, 'id:apps_row', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
       "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's top edge (container 0,297 1080x1857)",

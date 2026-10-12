@@ -26,8 +26,7 @@ import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { IOS_MIN_STATUS_BAND, iosStatusBand } from '../../src/adapters/ios-status-band.js';
 import { screenBox } from '../../src/interact/swipe.js';
 import { tapElement } from '../../src/interact/tap.js';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 
@@ -907,7 +906,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
 describe('a Compose label under its own control (2026-10-09)', () => {
   const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
   const compose = (xml: string) => {
-    const fake = new FakeAdapter({ s: parseUiautomatorXml(xml) }, 's');
+    const fake = new FakeAdapter({ s: parseDump(xml) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     return fake;
   };
@@ -1161,7 +1160,7 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
   });
 
   it('a classic-View row cut to 33 px at the list\'s TOP whose texts were dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER) — their clippedOut is the evidence: refused, nothing tapped', async () => {
-    const fake = new FakeAdapter({ s: parseUiautomatorXml(SETTINGS_ROW_SLIVER) }, 's');
+    const fake = new FakeAdapter({ s: parseDump(SETTINGS_ROW_SLIVER) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     await expect(tapElement(fake, 'id:apps_row', OPTS)).rejects.toThrow(
       "id:apps_row is cut at its scroll container's top edge (container 0,297 1080x1857); only a 1080x33 part of it shows, 33 deep across that edge, under the 65 a tap needs — scroll_until it with direction: up first",

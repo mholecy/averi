@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { shellCommandLine, shellQuote } from '../../src/adapters/adb-shell.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { deviceShExec, runOnDeviceSh } from '../helpers/device-sh.js';
+import { drawnOverStrip } from '../helpers/android-dumps.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -113,13 +114,13 @@ describe('AndroidAdapter — every user value reaches the device command as one 
   it('openDeepLink: a url with `&`, `;`, `$` and a space arrives whole, and nothing else runs', async () => {
     const { fn, commands } = deviceShExec();
     const url = "app://login?a=1&b=2;echo x $HOME 'q'";
-    await new AndroidAdapter({ serial: 'e', exec: fn }).openDeepLink(url);
+    await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).openDeepLink(url);
     expect(commands).toEqual([['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url]]);
   });
 
   it('launch: intent data and extras (keys and values) arrive whole', async () => {
     const { fn, commands } = deviceShExec();
-    await new AndroidAdapter({ serial: 'e', exec: fn }).launch('md.bank.app', {
+    await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).launch('md.bank.app', {
       intent: {
         action: 'android.intent.action.VIEW',
         data: 'bank://pay?to=a b&amount=1;id',
@@ -135,7 +136,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
 
   it('launch with clearState, terminate and the monkey launch go through the same quoting', async () => {
     const { fn, commands } = deviceShExec();
-    const adapter = new AndroidAdapter({ serial: 'e', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn });
     await adapter.launch('odd pkg;x', { clearState: true });
     await adapter.terminate('odd pkg;x');
     expect(commands).toEqual([
@@ -147,7 +148,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
 
   it('typeText: each character, metacharacters included, is one `input text` word; a space is input\'s %s', async () => {
     const { fn, commands } = deviceShExec();
-    await new AndroidAdapter({ serial: 'e', exec: fn }).typeText("a '\\$;`\"!^");
+    await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).typeText("a '\\$;`\"!^");
     expect(commands).toEqual([
       ['input', 'text', 'a'],
       ['input', 'text', '%s'],
@@ -174,7 +175,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     'typeText refuses %s before sending anything — input text would make it a key (ENTER submits)',
     async (_name, text, shown, remedy) => {
       const { fn, commands } = deviceShExec();
-      const typing = new AndroidAdapter({ serial: 'e', exec: fn }).typeText(text);
+      const typing = new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).typeText(text);
       await expect(typing).rejects.toThrow(`typeText cannot type ${shown} on Android`);
       await expect(typing).rejects.toThrow(remedy);
       expect(commands).toEqual([]);
@@ -188,14 +189,14 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     ['ab\x07cd', /`input text` may send it as a key event\. Type the text/],
   ])('typeText on %j says what `input text` would do with it — ENTER only for a newline or a return', async (text, said) => {
     const { fn } = deviceShExec();
-    const message = ((await new AndroidAdapter({ serial: 'e', exec: fn }).typeText(text).catch((e: unknown) => e)) as Error).message;
+    const message = ((await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).typeText(text).catch((e: unknown) => e)) as Error).message;
     expect(message).toMatch(said);
     if (text.includes('\x07')) expect(message).not.toMatch(/ENTER \(|newline/);
   });
 
   it('isAppRunning: the package name is quoted INTO the rawShell line — pidof gets one word, the `|| true` still runs', async () => {
     const { fn, commands, adbArgv } = deviceShExec();
-    expect(await new AndroidAdapter({ serial: 'e', exec: fn }).isAppRunning('x; echo injected')).toBe(false);
+    expect(await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x; echo injected')).toBe(false);
     expect(commands).toEqual([['pidof', 'x; echo injected']]);
     expect(adbArgv).toEqual([['-s', 'e', 'shell', "pidof 'x; echo injected' || true"]]);
   });
@@ -209,7 +210,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     const { fn, commands } = deviceShExec((argv) =>
       argv[1] === 'screencap' ? { stdout: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) } : {},
     );
-    const adapter = new AndroidAdapter({ serial: 'e', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn });
     await adapter['execOut'](['uiautomator', 'dump', "/sdcard/a b&c;'d'.xml"]);
     await adapter.screenshot();
     expect(commands).toEqual([
@@ -220,7 +221,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
 
   it('the keyboard witness stays a rawShell line: its pipe runs on the device, not as words to dumpsys', async () => {
     const { fn, commands } = deviceShExec();
-    await new AndroidAdapter({ serial: 'e', exec: fn }).keyboard?.witness();
+    await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).keyboard?.witness();
     // dumpsys's own record went into the pipe, so only grep's reaches stdout —
     // which is what a pipe is. Quoted as words, dumpsys would get `|` and grep's flags.
     expect(commands).toEqual([['grep', '-m1', '-w', 'mInputShown']]);

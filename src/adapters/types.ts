@@ -360,9 +360,10 @@ export interface UiNode {
   /**
    * The bounds the tree source dumped for this node, when they were CUT
    * short of its own descendants by something drawn over it, and `rect` is
-   * widened to their extent (2026-10-09, docs/bugs/2026-10-09-android-fully-
-   * trusts-row-bounds-cut-at-a-sticky-header.md): Android only, set by the
-   * uiautomator parser (adapters/android.ts#uncut, #widenUnderOverlays).
+   * widened to their extent (2026-10-09, the bug note
+   * docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md):
+   * Android only, set by the uiautomator parser
+   * (adapters/android.ts#uncut, #widenUnderCovers).
    * Compose subtracts what an overlay sibling covers from a node's bounds
    * but not from its descendants': mp-native's Account Detail row under its
    * sticky date header (`0,401 1080x79`) dumped as `66,480 948x66` while its
@@ -375,14 +376,20 @@ export interface UiNode {
    * and a rect assert measures the whole row, not the strip that showed.
    * Widened only along y, on one side, to descendants with the node's
    * exact x and width, cut to the nearest clipping ancestor
-   * (`clipsDescendants`), and only where a node listed after it lies on the
-   * strip gained — the overlay; a control padded inside its wrapper
-   * (`paddedTouchTargets`), a full-bleed child and a child overflowing both
-   * edges never widen it — nor, the residual, a node cut at BOTH ends (a
-   * tall card between a sticky header and a floating tab bar reads whole);
-   * and a node overflowing one edge into the next row, or into a
-   * screen-sized wrapper (a snackbar host), listed after it is widened as
-   * if cut. Kept so `ui_snapshot` shows what was dumped beside
+   * (`clipsDescendants`), and only where something is drawn over the strip
+   * gained, as the draw order judges it for this node as a target
+   * (DrawnOverStrip) — so never under a screen-sized wrapper with nothing of
+   * its own there (a snackbar host) or a bare structural node; a control
+   * padded inside its wrapper (`paddedTouchTargets`), a full-bleed child and
+   * a child overflowing both edges never widen it either. Residuals,
+   * stated: a node cut at BOTH ends (a tall card between a sticky header and
+   * a floating tab bar) is not widened and reads whole; and, permanently, a
+   * node whose touch target overflows one edge into the NEXT row of its
+   * list is widened as if cut — in one dump the next row and a sticky
+   * header are the same shape (siblings in the list, listed after the node,
+   * drawing on the strip), and only a second read (did it move with the
+   * scroll?) could tell them apart, which is `scroll_until`'s to make, not
+   * the parser's. Kept so `ui_snapshot` shows what was dumped beside
    * what is judged: "its rect was cut here; something is drawn over the
    * rest". Absent on iOS (WDA and idb report frames unclipped) and on every
    * node the parser left as dumped.
@@ -455,14 +462,27 @@ export interface UiNode {
  * beside UiNode rather than in a verify/ or adapters/ sibling because all
  * three layers need it and none owns it (review 2026-10-06). It yields nodes
  * only: a walk that needs each node's subtree end in the order
- * (android.ts#widenUnderOverlays, ui-tree/draw-order.ts) or what its
- * ancestors hand down (ui-tree/geometry.ts#clipsOf) recurses on its own
- * — the stated exception (code review of round 7, S2).
+ * (ui-tree/draw-order.ts) or what its ancestors hand down
+ * (ui-tree/geometry.ts#clipsOf) recurses on its own.
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {
   yield root;
   for (const child of root.children) yield* everyNode(child);
 }
+
+/**
+ * Is anything drawn over `strip` of `node`? Asked of one tree, `root`, as
+ * the tree source read it, for each node it asks about: the uiautomator
+ * parser widens a node cut short of its own content only under something
+ * drawn over the strip it would gain (android.ts#parseUiautomatorXml,
+ * `UiNode.cutBounds`). What draws is the UI-tree layer's judgement
+ * (ui-tree/draw-order.ts#drawnOverStrip), which an adapter may not import;
+ * so the parser is handed it, required — the composition root
+ * (mcp/registry.ts) and the test helper wire it. Dependency inversion with
+ * ONE implementation, not a seam: there is no second judgement to plug in,
+ * and a parser-side fallback would be one.
+ */
+export type DrawnOverStrip = (root: UiNode) => (node: UiNode, strip: Rect) => boolean;
 
 /**
  * Selector strings resolved against the normalized tree, e.g.

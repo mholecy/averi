@@ -1,11 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { clips, scrolls } from '../../src/ui-tree/scroll-containers.js';
-import { COMPOSE } from '../helpers/android-dumps.js';
+import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
@@ -14,7 +13,7 @@ const text = (file: string) => readFile(new URL(file, FIXTURES), 'utf8');
 
 /** The one node a uiautomator dump of `inner` (under a screen-sized frame) makes of it. */
 const parsedAndroid = (inner: string): UiNode => {
-  const root = parseUiautomatorXml(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">${inner}</node></hierarchy>`);
+  const root = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">${inner}</node></hierarchy>`);
   return root.children[0];
 };
 
@@ -63,7 +62,7 @@ async function everyFixtureTree(): Promise<[string, UiNode][]> {
   for (const [k, v] of Object.entries(JSON.parse(await text('idb-modal-listed-before-content.json')).screens)) trees.push([`idb-modal ${k}`, parseIdbDescribeAll(JSON.stringify(v))]);
   for (const [k, v] of Object.entries(JSON.parse(await text('idb-swift-form-scrolled-under-top-bar.json')).positions)) trees.push([`idb-top-bar ${k}`, parseIdbDescribeAll(JSON.stringify(v))]);
   for (const [k, v] of Object.entries(JSON.parse(await text('android-ui-snapshot-compose.json')).screens)) trees.push([`android ${k}`, v as UiNode]);
-  for (const [k, xml] of Object.entries({ ...COMPOSE, ...CLASSIC_VIEWS, SETTINGS_ROW_SLIVER })) trees.push([`uiautomator ${k}`, parseUiautomatorXml(xml)]);
+  for (const [k, xml] of Object.entries({ ...COMPOSE, ...CLASSIC_VIEWS, SETTINGS_ROW_SLIVER })) trees.push([`uiautomator ${k}`, parseDump(xml)]);
   return trees;
 }
 

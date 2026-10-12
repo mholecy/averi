@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { tapElement } from '../../src/interact/tap.js';
-import { GBOARD, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
+import { GBOARD, INPUT_SHOWN_LINE, drawnOverStrip } from '../helpers/android-dumps.js';
 
 /**
  * The soft-keyboard guard driven END TO END through the real AndroidAdapter
@@ -62,7 +62,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
-    const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
+    const { note } = await tapElement(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 });
     // The witness is asked ONCE, right before the key, and not again for the check after it.
     expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 249 1766']);
     expect(note).toBe('the soft keyboard covered id:login_submit; hidden before tapping');
@@ -88,7 +88,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
-    const { note } = await tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
+    const { note } = await tapElement(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), 'id:home_tile', { ambiguous: 'refuse', pollMs: 1 });
     expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, query, touchable, witness, query, dump, dump, 'adb -s emulator-5554 shell input tap 249 1466']);
     expect(note).toBe('the window state reported a soft keyboard over id:home_tile that the input method denied; waited 1000ms for it to clear');
   });
@@ -114,7 +114,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
-    const adapter = new AndroidAdapter({ serial: 'emulator-5554', exec: fn });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     const { note } = await tapElement(adapter, 'id:message_for_payee_input', { ambiguous: 'refuse', pollMs: 1 });
     // Until 2026-10-08: [dump, dump, wmSize, query, tap 540 1586] — Gboard's `d` key, typed into the IBAN field.
     expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 540 1586']);
@@ -140,7 +140,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       if (full === wmSize) return out(PHYSICAL);
       return out('');
     };
-    await expect(tapElement(new AndroidAdapter({ serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 })).rejects.toThrow(
+    await expect(tapElement(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), 'id:login_submit', { ambiguous: 'refuse', pollMs: 1 })).rejects.toThrow(
       'id:login_submit is off screen at (249,2366) on a 1080x2220 screen (rect 99,2300 300x132)',
     );
     expect(calls).toEqual([dump, dump, wmSize, band, wmSize, band]);

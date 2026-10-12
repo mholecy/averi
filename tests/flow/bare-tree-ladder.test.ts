@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 // every poll cadence collapses to one event-loop turn; deadlines are
 // Date.now-based and still fire.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
@@ -15,6 +14,7 @@ import { EngineSession } from '../../src/flow/launch.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * The ladder against a cold launch's BARE trees (docs/bugs/2026-10-06-second-
@@ -88,9 +88,9 @@ const androidXml = (content: string) => `<?xml version='1.0' encoding='UTF-8' st
 </hierarchy>`;
 
 /** The measured decor: the window chain down to android:id/content, empty — what the second look read for +5.3…+13.8 s. */
-const ANDROID_DECOR = parseUiautomatorXml(androidXml(''));
+const ANDROID_DECOR = parseDump(androidXml(''));
 /** The RN login screen as uiautomator dumps it: testID `login_screen` as the resource-id, a field and a button inside. */
-const ANDROID_LOGIN = parseUiautomatorXml(
+const ANDROID_LOGIN = parseDump(
   androidXml(`
           <node index="0" text="" resource-id="login_screen" class="android.view.ViewGroup" package="${PKG}" content-desc="" bounds="[0,128][1080,2274]">
             <node index="0" text="" resource-id="login_username" class="android.widget.EditText" package="${PKG}" content-desc="" bounds="[60,900][1020,1040]"/>
@@ -98,7 +98,7 @@ const ANDROID_LOGIN = parseUiautomatorXml(
           </node>`),
 );
 /** A RENDERED screen that is not the state: the logged-in home, a tab bar button. */
-const ANDROID_HOME = parseUiautomatorXml(
+const ANDROID_HOME = parseDump(
   androidXml(`
           <node index="0" text="Prehľad" resource-id="nav.tab_overview" class="android.widget.Button" package="${PKG}" content-desc="" bounds="[0,2100][360,2274]"/>`),
 );
@@ -348,7 +348,7 @@ flows:
       - tap: { id: later }
 `);
   /** A rendered rating prompt with its "later" button. */
-  const ANDROID_PROMPT = parseUiautomatorXml(
+  const ANDROID_PROMPT = parseDump(
     androidXml(`
           <node index="0" text="Ohodnoťte nás" resource-id="prompt" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,700][1020,840]"/>
           <node index="1" text="Neskôr" resource-id="later" class="android.widget.Button" package="${PKG}" content-desc="" bounds="[60,1400][1020,1540]"/>`),
@@ -538,7 +538,7 @@ flows:
         'decide this — the screen had not rendered by the deadline; compare with screenshot, and a longer timeout may be all it needs)',
     });
     // Bare, then a rendered screen SHOWING the modal: the verdict is the last tree's — "still visible", not could-not-verify.
-    const modal = parseUiautomatorXml(
+    const modal = parseDump(
       androidXml(`<node index="0" text="Nová verzia" resource-id="some_modal" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,900][1020,1040]"/>`),
     );
     const shown = timeline((ms) => (ms < 20 ? ANDROID_DECOR : modal));
