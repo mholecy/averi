@@ -578,7 +578,9 @@ export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a lay
  * it is pinned there — a layout that does not keep clear of the bar — and no step
  * reaches it; where the tree cannot say (idb's flat list), both. The
  * refusal stays a refusal either way — the safe direction, and terminal in
- * an `optional:` step (flow/engine.ts).
+ * an `optional:` step (flow/engine.ts). Cost, on the refusal path only:
+ * the clip facts' two walks of the tree (ui-tree/geometry.ts#clipsOf's own
+ * and `Clips.inScroller`'s).
  */
 export function statusBarRemedy(scrolls: boolean | undefined): string {
   const pinned = `no scroll moves it out: ${PINNED_UNDER_STATUS_BAR} — fix the layout, or tap something else`;
@@ -607,7 +609,7 @@ export function statusBarRemedy(scrolls: boolean | undefined): string {
  * `scroll_until … fully: true` (review 2026-10-08, M1: a plain
  * `scroll_until` then stopped on any intersection and handed back the same
  * clipped node); since code review P3 (2026-10-09) a plain one also goes on
- * until the centre is on the screen (scroll-rounds.ts#stops), so either
+ * until the centre is on the screen (ui-tree/standing.ts#Scene.standing), so either
  * agrees with this rule.
  *
  * Before refusing, the device's screen is read AGAIN (`viewport({ fresh:
@@ -685,7 +687,7 @@ export async function refuseOffScreen(
  * WAS found (an `optional:` tap of it fails the flow, never skipped — see
  * PresentElementRefusal), nothing is moving, and the remedy is in the message —
  * `scroll_until` it, which since the same date keeps scrolling until the
- * centre is clear (interact/scroll-rounds.ts#stops). When the keyboard guard
+ * centre is clear (ui-tree/standing.ts#Scene.standing). When the keyboard guard
  * had already sent something, the HEADLINE says what.
  */
 export class CoveredRefusal extends PresentElementRefusal {}
@@ -718,8 +720,7 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * Judged BEFORE the cover check, so a sliver also covered is refused for
  * its cut, whose remedy is a scroll toward the edge. The remedy is a plain
  * `scroll_until` toward that edge (`cutRemedy`): its plain stop does not
- * stop on such a sliver either (scroll-rounds.ts#stops, code review of
- * fix/r7-sliver, item 1), and its default direction is down, so a cut at the
+ * stop on such a sliver either (ui-tree/standing.ts#Scene.standing), and its default direction is down, so a cut at the
  * bottom needs no direction and the others name theirs — and, for the
  * node that only READS cut (geometry.ts#evidentCut's residual: whole, its
  * own content running to the edge), the way past it: a child, or a

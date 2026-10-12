@@ -195,7 +195,7 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * Contract of `standing(node, screen, purpose)`:
  * - Judged in `screen.box` alone (a caller judging in several boxes asks
  *   once a box and keeps the best), cut above `screen.keyboardTop` when
- *   given — full width, from the box's origin; a line at or above the top
+ *   given — the box's width, from its top down to the line; a line at or above its top
  *   leaves nothing: no exposure is asked, nothing shows.
  * - `facts` are the judgement's inputs, whatever the kind: what a caller's
  *   motion and sentences read (scroll_until's best-so-far, its far-edge
@@ -285,6 +285,7 @@ export interface StandingFacts {
 export type Standing = { readonly facts: StandingFacts } & (
   | { readonly kind: 'reachable'; readonly at: Point }
   | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number }
+  /** `band`: the status band's bottom line, from the screen's top (UsableScreen.statusBand). */
   | { readonly kind: 'statusBand'; readonly at: Point; readonly band: number }
   | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
@@ -315,11 +316,11 @@ function stopStanding(scene: Scene, node: UiNode, { box, statusBand, keyboardTop
   const below = belowStatusBand(box, band);
   const onScreen = containsPoint(below, centre);
   const inBand = inStatusBand(centre, band);
-  if (keyboardTop !== undefined && keyboardTop <= 0) {
-    const facts: StandingFacts = { centre, screen: { x: 0, y: 0, width: box.width, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
+  if (keyboardTop !== undefined && keyboardTop <= box.y) {
+    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
     return { facts, kind: 'underKeyboard', top: keyboardTop };
   }
-  const frame: Rect = keyboardTop === undefined ? { ...box } : { x: 0, y: 0, width: box.width, height: keyboardTop };
+  const frame: Rect = keyboardTop === undefined ? { ...box } : { ...box, height: keyboardTop - box.y };
   const seen = scene.order.exposure(node, frame);
   const visible = visibleFractionInViewport(node.rect, frame);
   const sliver = scene.clips.cutSliver(node, seen.minPiece);
@@ -342,7 +343,7 @@ function stopStanding(scene: Scene, node: UiNode, { box, statusBand, keyboardTop
   const clear = fully ? facts.clipped.length === 0 && facts.covers.length === 0 : facts.centreCover === undefined && sliver === undefined;
   if (onScreen && clear) return { facts, kind: 'reachable', at: centre };
   if (fully && facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
-  if (inBand) return { facts, kind: 'statusBand', at: centre, band: below.y - box.y };
+  if (inBand) return { facts, kind: 'statusBand', at: centre, band: below.y };
   if (!onScreen) return { facts, kind: 'offScreen', at: centre, visible };
   if (!fully && facts.centreCover === undefined && sliver !== undefined) return { facts, kind: 'cut', cut: sliver, minPiece: seen.minPiece };
   return { facts, kind: 'covered', cover: facts.centreCover ?? facts.covers[facts.covers.length - 1] };

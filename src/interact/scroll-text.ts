@@ -83,7 +83,7 @@ export interface ScrollUntilResult {
    * Set on a stop with something of the app drawn over part of the element
    * (2026-10-09, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-
    * app-chrome.md) — only without `fully: true`, which does not stop so:
-   * its CENTRE is clear (the stop's own rule, scroll-rounds.ts#stops, so a
+   * its CENTRE is clear (the stop's own rule, ui-tree/standing.ts#Scene.standing, so a
    * tap on it lands), but `by` — the one over it drawn on top — hides part
    * of it, and only `shows` of its area is seen. The reply says so, as it
    * says a clip.
@@ -132,14 +132,12 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
 /**
  * What of the app is drawn over a judged match, for a failure: `under
  * <cover> at its centre (x,y), drawn over it — N% of it shows` — the cover
- * over its centre when there is one (the point the next tap presses), else
- * the topmost of its covers.
+ * the standing names (ui-tree/standing.ts#Scene.standing), at the centre
+ * when it is the one over it (the point the next tap presses).
  */
-function underText(j: Judged): string {
-  const { centreCover, covers, shows } = j.standing.facts;
-  const by = centreCover ?? covers.at(-1);
-  const under = by === undefined ? 'under something, drawn over it' : drawnOverText(by, centreCover === undefined ? undefined : tapPoint(j.node));
-  return `${under} — ${percent(shows)}% of it shows`;
+function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): string {
+  const { centreCover, shows } = judged.standing.facts;
+  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
 }
 
 /** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (resolve.ts#cutSliverText). */
@@ -296,7 +294,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
             `swiping ${o.lastStroke} no longer moves it out from under the status bar${other}${last}`,
         );
       }
-      // Cut to a sliver by its scroll container at the end of the content (2026-10-10, scroll-rounds.ts#stops):
+      // Cut to a sliver by its scroll container at the end of the content (ui-tree/standing.ts#Scene.standing):
       // the rest stays past the container's edge however it is swiped — or the node only reads cut (geometry.ts#evidentCut's residual).
       if (short.of === 'sliver') {
         return new Error(
@@ -307,7 +305,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       }
       if (short.of === 'covered') {
         return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(judged)} — and the content is exhausted: ` +
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
             `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
         );
@@ -405,7 +403,7 @@ function shortText(short: Shortfall): string {
     }
     case 'covered': {
       const { judged } = short;
-      return `element reached the viewport but stayed ${underText(judged)} (last rect ${JSON.stringify(judged.node.rect)})`;
+      return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'statusBar': {
       const { judged } = short;

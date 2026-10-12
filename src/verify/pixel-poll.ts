@@ -1,6 +1,7 @@
 import { rectArea, rectIntersection, SCREEN_SIZED_FRACTION, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { belowStatusBand, containsPoint, nodeText, overlapsPastSlack, rectCentre, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
+import { listsAncestry } from '../ui-tree/draw-order.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
@@ -223,8 +224,8 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * Cost: the memoized `viewport()`, and walks of the round's tree, no
  * read: `inferScreenSize`'s (the screen's shape, ui-tree/standing.ts#usableScreen),
  * `screenOf`'s when neither the device nor a window vouches for the
- * screen (the last fallback), the clip facts' walk of the whole tree
- * (ui-tree/geometry.ts#Clips.inScroller: whether a scroll may cure a miss — asked on every round that reaches
+ * screen (the last fallback), the clip facts' two walks of the whole tree
+ * (ui-tree/geometry.ts#clipsOf's own and `Clips.inScroller`'s: whether a scroll may cure a miss — asked on every round that reaches
  * the chrome check, a miss or not: the element found, the keyboard not
  * already failing the round), and, unless the band already failed the
  * round, one `drawOrder` walk (`paintsOver`).
@@ -606,8 +607,8 @@ export async function chromeOverElement(
   if (cover === undefined) return undefined;
   const reach = sameRect(cover.reach, cover.node.rect) ? '' : `, reaching ${rectText(cover.reach)}`;
   const named = `${nodeText(cover.node).slice(0, -1)}${reach})`;
-  // In idb's flat list the screen-sized node is the root (the Application): everything listed after it is content on its background.
-  const root = screenSized && tree.flatList === true ? 'root' : never;
+  // In a listing without ancestry (idb's flat list) the screen-sized node is the root (the Application): everything listed after it is content on its background.
+  const root = screenSized && !listsAncestry(tree) ? 'root' : never;
   return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, cover.reach) ? 'stuck' : 'scroll'))}`;
 }
 

@@ -1402,7 +1402,8 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
  * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
  * tree's dialect is read here and nowhere else outside draw order — what
  * geometry.ts#clipsOf's `inScroller` asks it, through
- * ui-tree/standing.ts#sceneOf.
+ * ui-tree/standing.ts#sceneOf, and the pixel assert's root remedy
+ * (verify/pixel-poll.ts#chromeOverElement).
  */
 export function listsAncestry(tree: UiNode): boolean {
   return tree.flatList !== true;

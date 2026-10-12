@@ -445,7 +445,7 @@ export interface PastSide {
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
 export type InFrameShort =
   | { of: 'clipped'; judged: Judged }
-  | { of: 'covered'; judged: Judged }
+  | { of: 'covered'; judged: Judged; cover: UiNode }
   | { of: 'statusBar'; judged: Judged; band: number }
   | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
@@ -955,24 +955,27 @@ function stops(j: Judged): boolean {
  * their sentences group it: a cut edge (`fully: true`) or a centre off the
  * screen is `clipped`; a centre in the status band `statusBar`, never a
  * clip or a layout defect; a sliver its scroll container cuts it to
- * `sliver`; anything of the app drawn over it `covered`. Asked only of a
- * match with something in the frame — a reachable one (a stop the bound
- * overtook) reads `covered`, as before the standing existed.
+ * `sliver`; anything of the app drawn over it `covered`, naming the cover
+ * the standing names. Asked only of a match with something in the frame
+ * that does not stop the round: a match that stops it is reported before
+ * any stuck or bound test, and one under the keyboard has nothing in the
+ * frame — either is a broken invariant, and throws.
  */
 function shortOf(j: Judged): InFrameShort {
   const s = j.standing;
   switch (s.kind) {
     case 'clipped':
     case 'offScreen':
-    case 'underKeyboard':
       return { of: 'clipped', judged: j };
     case 'statusBand':
       return { of: 'statusBar', judged: j, band: s.band };
     case 'cut':
       return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
     case 'covered':
+      return { of: 'covered', judged: j, cover: s.cover };
     case 'reachable':
-      return { of: 'covered', judged: j };
+    case 'underKeyboard':
+      throw new Error(`scroll round: no shortfall for a match standing ${s.kind} (a stop is reported first; under the keyboard nothing is in the frame)`);
   }
 }
 
