@@ -407,20 +407,18 @@ class PixelPollMemory {
   }
 
   /**
-   * Something of the app, or the status band, is drawn over the element
-   * (round 8, 2026-10-12; `chromeOverElement`): a miss naming it, never a
-   * measurement — what would be sampled is the cover. Remembered as the
-   * keyboard's covered miss is, so a later round that finds the element
-   * clear withdraws it (`uncovered`). `reason` is `chromeOverElement`'s,
-   * remedy included: `scroll_until` with `fully: true`, which stops only
-   * once nothing is drawn over any of it, and something in it clear of that when no
-   * scroll may cure it.
+   * Something is over the element, worded with its remedy: the keyboard
+   * (`covered`, which words it), or — round 8, 2026-10-12 — something of the
+   * app or the status band (`chromeOverElement`'s sentence, which the round
+   * hands in whole: `scroll_until` with `fully: true`, which stops only once
+   * nothing is drawn over any of it, and something in it clear of that when
+   * no scroll may cure it). A miss naming it, never a measurement — what
+   * would be sampled is the cover — and remembered, so a later round that
+   * finds the element clear withdraws it (`uncovered`). (Until the code
+   * review of round 8, S7, the chrome's miss went through a `drawnOver`
+   * that only called this.)
    */
-  drawnOver(reason: string): PollVerdict {
-    return this.coveredMiss(reason);
-  }
-
-  private coveredMiss(reason: string): PollVerdict {
+  coveredMiss(reason: string): PollVerdict {
     const detail = failClosed(reason, this.unchecked);
     this.lastCovered = detail;
     this.coverCleared = false;
@@ -662,7 +660,7 @@ export async function pollPixels(
     if (keyboard !== undefined) return memory.covered(rect, keyboard.frame, keyboard.remedy);
     // After the keyboard, which has its own remedy: the status band, then what of the app is drawn over it (round 8).
     const over = await chromeOverElement(adapter, tree, found[0], spec.reads?.(rect));
-    if (over !== undefined) return memory.drawnOver(over);
+    if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
     const frame = await captureFrame(adapter, { tree, deadline, region: rect }).catch((e: unknown) => {
