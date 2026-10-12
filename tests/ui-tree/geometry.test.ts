@@ -4,6 +4,7 @@ import { parseUiautomatorXml } from '../../src/adapters/android.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
+  clipPathsOf,
   containsPoint,
   cutSliver,
   evidentCut,
@@ -519,11 +520,106 @@ describe('higherTop — the higher of two top edges, either unknown (code review
 
 describe('cutSliver — evidentCut under the minimum piece', () => {
   const form = { x: 0, y: 242, width: 1080, height: 1736 };
+  const formNode = { ...node(form), clipsDescendants: true as const };
   const toggle = (height: number) => node({ x: 66, y: 1979 - height, width: 948, height }, null, [node({ x: 66, y: 1979 - height + 12, width: 948, height: height - 13 })]);
   it('64 deep under a 65 minimum is a sliver; 65 is not; no evidence, none', () => {
-    expect(cutSliver(toggle(64), [form], 65)).toEqual({ edge: 'bottom', container: form, depth: 64 });
-    expect(cutSliver(toggle(65), [form], 65)).toBeUndefined();
-    expect(cutSliver(node({ x: 66, y: 1924, width: 948, height: 55 }), [form], 65)).toBeUndefined();
+    expect(cutSliver(toggle(64), [formNode], 65)).toEqual({ edge: 'bottom', container: form, depth: 64 });
+    expect(cutSliver(toggle(65), [formNode], 65)).toBeUndefined();
+    expect(cutSliver(node({ x: 66, y: 1924, width: 948, height: 55 }), [formNode], 65)).toBeUndefined();
+  });
+});
+
+describe('clipPathsOf — each node\'s ancestors up to its outermost clipping one, nearest first (round 8)', () => {
+  const rect = (y: number, height: number) => ({ x: 0, y, width: 1080, height });
+  it('the path through plain containers to the outermost clip; none above it, none for a node outside or of another read; scrollersOf reads the clipping ones off it', () => {
+    const label = node(rect(1936, 42), 'label');
+    const toggle = node(rect(1924, 55), 'toggle', [label]);
+    const form = { ...node(rect(242, 1736), 'form', [toggle]), clipsDescendants: true as const };
+    const page = node(rect(0, 2220), 'page', [form]);
+    const root = node(rect(0, 2220), null, [page, node(rect(0, 100), 'bar')]);
+    const of = clipPathsOf(root);
+    expect(of(label)).toEqual([toggle, form]);
+    expect(of(toggle)).toEqual([form]);
+    expect([of(form), of(page), of(root.children[1]), of(node(rect(1936, 42)))]).toEqual([[], [], [], []]);
+    expect(scrollersOf(root)(label)).toEqual([form.rect]);
+  });
+});
+
+/**
+ * Round 8 (owner decision, the A2 residual of the device check at 35d5997): a node flush with the edge an ancestor of it is cut
+ * to a sliver at inherits the cut — the measured toggle's leaf label "Payment details" was tapped and nothing expanded.
+ */
+describe('cutSliver — inherited from an ancestor cut to a sliver at the edge the node lies flush with (round 8)', () => {
+  const form = { x: 0, y: 242, width: 1080, height: 1736 };
+  /** The node `n` inside `parent` inside the form, as the tree has them; cutSliver asked of `n` over its clip path. */
+  const sliverOf = (n: UiNode, parent: UiNode, minPiece = 65) => {
+    const formNode = { ...node(form, 'form', [parent]), clipsDescendants: true as const };
+    return cutSliver(n, clipPathsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [formNode]))(n), minPiece);
+  };
+  // As dumped at 35d5997: details_toggle 66,1924 948x55; children other 'Payment details' 66,1936 948x42, other 926,1955 88x23, button 66,1936 948x42.
+  const label = () => node({ x: 66, y: 1936, width: 948, height: 42 }, 'label');
+  const chevron = () => node({ x: 926, y: 1955, width: 88, height: 23 }, 'chevron');
+  const toggleOf = (...children: UiNode[]) => node({ x: 66, y: 1924, width: 948, height: 55 }, 'toggle', children);
+
+  it('the measured leaf label 66,1936 948x42 and the chevron 926,1955 88x23, flush with the form\'s bottom in the cut toggle: slivers too, within the toggle', () => {
+    const l = label();
+    const c = chevron();
+    const toggle = toggleOf(l, c, node({ x: 66, y: 1936, width: 948, height: 42 }));
+    expect(sliverOf(l, toggle)).toEqual({ edge: 'bottom', container: form, depth: 42, within: { x: 66, y: 1924, width: 948, height: 55 } });
+    expect(sliverOf(c, toggle)).toEqual({ edge: 'bottom', container: form, depth: 23, within: { x: 66, y: 1924, width: 948, height: 55 } });
+    expect(sliverOf(l, toggle, 56)?.depth).toBe(42); // the toggle a sliver by a pixel
+    expect(sliverOf(l, toggle, 55)).toBeUndefined(); // the toggle as deep as the minimum: no sliver to inherit
+  });
+
+  it('a child of the cut toggle that lies clear of the edge (more than a pixel short of it) shows whole inside the strip: not inherited', () => {
+    const clear = node({ x: 100, y: 1936, width: 300, height: 40 }, 'clear'); // bottom 1976, 2 px short of 1978
+    expect(sliverOf(clear, toggleOf(clear, node({ x: 66, y: 1936, width: 948, height: 42 })))).toBeUndefined();
+    const flush = node({ x: 100, y: 1936, width: 300, height: 41 }, 'flush'); // bottom 1977, within a pixel
+    expect(sliverOf(flush, toggleOf(flush, node({ x: 66, y: 1936, width: 948, height: 42 })))?.edge).toBe('bottom');
+  });
+
+  it('a child flush with the cut but as deep as the minimum across it (laid out past the toggle\'s top, Compose-style): not a sliver, whatever its toggle', () => {
+    const deep = node({ x: 66, y: 1913, width: 948, height: 65 }, 'deep'); // 1913–1978: 65 deep
+    expect(sliverOf(deep, toggleOf(deep, node({ x: 66, y: 1936, width: 948, height: 42 })))).toBeUndefined();
+    const shallower = node({ x: 66, y: 1914, width: 948, height: 64 }, 'shallower');
+    expect(sliverOf(shallower, toggleOf(shallower, node({ x: 66, y: 1936, width: 948, height: 42 })))?.depth).toBe(64);
+  });
+
+  it('a child flush with ANOTHER edge of the form (its left) inside the toggle cut at the bottom: not inherited — the edge must be the cut\'s', () => {
+    const left = node({ x: 0, y: 1930, width: 200, height: 30 }, 'left'); // flush with the form's left, 18 px short of its bottom
+    const toggle = node({ x: 0, y: 1924, width: 1080, height: 55 }, 'toggle', [left, node({ x: 0, y: 1936, width: 1080, height: 42 })]);
+    expect(sliverOf(toggle, node({ x: 0, y: 1924, width: 1080, height: 55 }, 'wrap', [toggle]))?.edge).toBe('bottom');
+    expect(sliverOf(left, toggle)).toBeUndefined();
+  });
+
+  it('a parent at the edge that is not EVIDENTLY cut (a whole button, its background filling it): its flush child is not refused', () => {
+    const background = node({ x: 66, y: 1923, width: 400, height: 55 }, 'bg');
+    expect(sliverOf(background, node({ x: 66, y: 1923, width: 400, height: 55 }, 'filled', [background]))).toBeUndefined();
+  });
+
+  it('A2.4\'s shape — Create contact\'s field cut by the IME-resized form DEEPER than the minimum (132,1307 816x91), its label "Company" 176,1373 190x25 flush with the cut: not inherited', () => {
+    const imeForm = { x: 0, y: 242, width: 1080, height: 1156 }; // bottom 1398
+    const company = node({ x: 176, y: 1373, width: 190, height: 25 }, 'company');
+    const field = node({ x: 132, y: 1307, width: 816, height: 91 }, 'field', [node({ x: 132, y: 1329, width: 816, height: 69 }), company, node({ x: 176, y: 1340, width: 728, height: 58 })]);
+    const row = node({ x: 132, y: 1307, width: 948, height: 91 }, 'row', [field]);
+    const list = { ...node(imeForm, 'form', [row]), clipsDescendants: true as const };
+    const path = clipPathsOf(node({ x: 0, y: 0, width: 1080, height: 2220 }, null, [list]));
+    expect(evidentCut(field, path(field).filter((n) => n.clipsDescendants === true).map((n) => n.rect))?.depth).toBe(91); // cut, but deep enough
+    expect(cutSliver(company, path(company), 65)).toBeUndefined();
+  });
+
+  it('the NEAREST sliver ancestor is named — a button in the toggle before the toggle', () => {
+    const leaf = node({ x: 80, y: 1960, width: 100, height: 18 }, 'leaf');
+    const button = node({ x: 66, y: 1950, width: 948, height: 28 }, 'button', [leaf]); // itself a sliver inside the toggle
+    const toggle = toggleOf(node({ x: 66, y: 1936, width: 948, height: 42 }), button);
+    expect(sliverOf(leaf, toggle)).toEqual({ edge: 'bottom', container: form, depth: 18, within: { x: 66, y: 1950, width: 948, height: 28 } });
+  });
+  it('a wrapper with no evidence of its own, flush in the cut toggle, is a sliver by inheritance — and hands it on: its filling leaf names it', () => {
+    const leaf = node({ x: 66, y: 1950, width: 948, height: 28 }, 'leaf');
+    const wrapper = node({ x: 66, y: 1950, width: 948, height: 28 }, 'wrapper', [leaf]);
+    const toggle = toggleOf(node({ x: 66, y: 1936, width: 948, height: 42 }), wrapper);
+    expect(sliverOf(wrapper, toggle)?.within).toEqual({ x: 66, y: 1924, width: 948, height: 55 });
+    expect(sliverOf(leaf, toggle)?.within).toEqual({ x: 66, y: 1950, width: 948, height: 28 });
   });
 });
 

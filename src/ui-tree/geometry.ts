@@ -610,13 +610,41 @@ export function clippedEdges(
 }
 
 /**
+ * Each node's CLIP PATH: its ancestors, NEAREST FIRST, up to and including
+ * the outermost one that clips it (adapters/types.ts#UiNode.clipsDescendants:
+ * Android's `scrollable="true"`, whose descendants' bounds uiautomator has
+ * already cut to it); empty for a node with no clipping ancestor, which is
+ * every node of an iOS tree. One walk of the tree when called; the answer is
+ * a lookup by node identity, so it is asked of nodes of THIS tree (a node of
+ * another read answers empty). The ancestors between the node and its
+ * clipping ones are what the cut-sliver rule inherits a cut through
+ * (`cutSliver`, round 8: a label flush with the edge its toggle is cut to a
+ * sliver at); `scrollersOf` reads the clipping ones off it. Cost: one
+ * pre-order walk and an array per node under a clip.
+ */
+export function clipPathsOf(tree: UiNode): (node: UiNode) => readonly UiNode[] {
+  const paths = new Map<UiNode, readonly UiNode[]>();
+  const walk = (n: UiNode, path: readonly UiNode[]): void => {
+    if (path.length > 0) paths.set(n, path);
+    const below = path.length > 0 || n.clipsDescendants === true ? [n, ...path] : path;
+    for (const child of n.children) walk(child, below);
+  };
+  walk(tree, []);
+  return (node) => paths.get(node) ?? [];
+}
+
+/** The rects of the ancestors on a clip path (`clipPathsOf`) that clip — the path's chain, nearest first, as `scrollersOf` gives it. */
+export function clipChain(path: readonly UiNode[]): Rect[] {
+  return path.filter((n) => n.clipsDescendants === true).map((n) => n.rect);
+}
+
+/**
  * Each node's ancestors that CLIP it — every node marked `clipsDescendants`
- * above it (adapters/types.ts#UiNode.clipsDescendants: Android's
- * `scrollable="true"`, whose descendants' bounds uiautomator has already
- * cut to it), NEAREST FIRST, as their rects; empty for a node with none,
- * which is every node of an iOS tree (2026-10-09). One walk of the tree
- * when called; the answer is a lookup by node identity, so it is asked of
- * nodes of THIS tree (a node of another read answers empty). `scroll_until`'s
+ * above it, NEAREST FIRST, as their rects (`clipChain` of its clip path,
+ * `clipPathsOf`); empty for a node with none, which is every node of an iOS
+ * tree (2026-10-09). One walk of the tree when called; the answer is
+ * a lookup by node identity, so it is asked of nodes of THIS tree (a node of
+ * another read answers empty). `scroll_until`'s
  * round asks it of each match (interact/scroll-rounds.ts#TreeFacts), to tell a `fully:
  * true` stop whose edge sits exactly on a clipping ancestor's — possibly
  * cut there — from one inside them all (interact/scroll-rounds.ts
@@ -626,17 +654,11 @@ export function clippedEdges(
  * the carousel's edges — one probe cannot tell — while the carousel itself
  * is cut by the vertical list around it, and the card's rect with it; the
  * cut is on the outer edge, and the outer list is the one to stroke. Cost:
- * one pre-order walk and an array per clipped node, shared along a branch.
+ * `clipPathsOf`'s walk, and an array per call.
  */
 export function scrollersOf(tree: UiNode): (node: UiNode) => readonly Rect[] {
-  const chains = new Map<UiNode, readonly Rect[]>();
-  const walk = (n: UiNode, chain: readonly Rect[]): void => {
-    if (chain.length > 0) chains.set(n, chain);
-    const below = n.clipsDescendants === true ? [n.rect, ...chain] : chain;
-    for (const child of n.children) walk(child, below);
-  };
-  walk(tree, []);
-  return (node) => chains.get(node) ?? [];
+  const pathOf = clipPathsOf(tree);
+  return (node) => clipChain(pathOf(node));
 }
 
 /**
@@ -676,6 +698,13 @@ export interface Cut {
   readonly container: Rect;
   /** The node's extent across `edge` — its height at the top or bottom, its width at a side: what of it shows that way. */
   readonly depth: number;
+  /**
+   * The rect of the nearest ancestor whose cut the node inherits
+   * (`cutSliver`, round 8): the node lies flush with `edge` inside it, and
+   * IT is a sliver cut there — `66,1924 948x55`, the toggle the label `66,1936 948x42`
+   * lies in. Absent for a cut the node's own content evidences.
+   */
+  readonly within?: Rect;
 }
 
 /**
@@ -730,7 +759,9 @@ export interface Cut {
  * one scrolled to the end — and the tree does not say which.
  *
  * Unknowable, stated: a cut node with no descendants (a leaf, or a Compose
- * node whose text is merged into it) shows no evidence and reads whole; so
+ * node whose text is merged into it) shows no evidence and reads whole —
+ * unless what it lies in is a sliver cut at the edge it is flush with
+ * (`cutSliver`'s inherited cut, round 8); so
  * does a classic View cut at a horizontal scroller's side (its children cut
  * with it, never past — unless one lies wholly past it, dumped inverted:
  * then its `clippedOut` is the evidence), and so does a node whose
@@ -788,11 +819,49 @@ export function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefine
  * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`) —
  * a sliver a tap is refused on (interact/resolve.ts#refuseCutSliver) and
  * `scroll_until`'s plain stop does not stop on (scroll-rounds.ts#stops);
- * undefined otherwise. The one spelling of the rule both ask.
+ * undefined otherwise. The one spelling of the rule both ask, over the
+ * node's clip path (`clipPathsOf`).
+ *
+ * Or INHERITED (round 8, owner decision, docs/bugs/2026-10-09-android-tap-
+ * on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md,
+ * "re-run at 35d5997"): a node flush within a pixel with an edge whose
+ * ancestor — on its path, below the container of that edge — is itself a
+ * sliver cut at that edge of that container, nearest such ancestor first,
+ * and the node's own depth across it under the minimum too (`Cut.within`
+ * the ancestor's rect). Measured: the toggle `66,1924 948x55` is refused at
+ * the form's bottom, and its leaf label "Payment details" `66,1936 948x42`,
+ * which has no content of its own to evidence the cut (`evidentCut`'s
+ * "Unknowable"), was tapped at (540,1957) and nothing expanded — the
+ * toggle's refusal had pointed at it ("tap a child of it"). A child that
+ * lies clear of the edge is not refused: it shows whole inside the strip.
+ * Nor is a node flush with the edge of an ancestor cut there DEEPER than the
+ * minimum (Create contact's IME-cut field `132,1307 816x91`, its label
+ * "Company" `176,1373 190x25` on the cut: tapped, and it focused the field)
+ * or one that is not evidently cut at all (a whole button at a form's end,
+ * its background flush with it). Cost: `evidentCut` once for the node and
+ * once for each ancestor on its path — a subtree walk per flush edge, so
+ * an ancestor flush with its container (the content filling a scroller)
+ * walks its whole subtree; for a node under a clip only.
  */
-export function cutSliver(node: UiNode, chain: readonly Rect[], minPiece: number): Cut | undefined {
-  const cut = evidentCut(node, chain);
-  return cut !== undefined && cut.depth < minPiece ? cut : undefined;
+export function cutSliver(node: UiNode, path: readonly UiNode[], minPiece: number): Cut | undefined {
+  const nodes = [node, ...path];
+  const cuts: (Cut | undefined)[] = [];
+  // A sliver of an ancestor below that edge's container, `n` (at `i`) flush with the same edge and under the minimum across it too.
+  const inherited = (n: UiNode, i: number): Cut | undefined => {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const cut = cuts[j];
+      if (cut === undefined || !flushEdges(n.rect, cut.container).includes(cut.edge)) continue;
+      const depth = cut.edge === 'top' || cut.edge === 'bottom' ? n.rect.height : n.rect.width;
+      if (depth < minPiece) return { edge: cut.edge, container: cut.container, depth, within: { ...nodes[j].rect } };
+    }
+    return undefined;
+  };
+  // Outermost first, each once, so an ancestor's own or inherited cut is known before the nodes below it ask.
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const own = evidentCut(nodes[i], clipChain(nodes.slice(i + 1)));
+    cuts[i] = own !== undefined && own.depth < minPiece ? own : inherited(nodes[i], i);
+  }
+  return cuts[0];
 }
 
 /**

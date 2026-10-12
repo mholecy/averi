@@ -1,6 +1,6 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
-import { clippedEdges, containsPoint, cutSliver, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { clipChain, clipPathsOf, clippedEdges, containsPoint, cutSliver, flushEdges, higherTop, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -148,12 +148,18 @@ interface TreeFacts {
    * The rects of a match's ancestors that CLIP it, nearest first
    * (ui-tree/geometry.ts#scrollersOf) — Android's scroll containers, to
    * whose edges uiautomator has already cut the match's bounds; empty when
-   * it has none (every node of an iOS tree). For the plain stop's sliver
-   * rule (`judge`, geometry.ts#cutSliver), the `fully: true` stop's flush
-   * check (PROBE_REACH) and the box the strokes are drawn in
-   * (swipe.ts#strokeRoom).
+   * it has none (every node of an iOS tree) — `clipPathOf`'s clipping
+   * nodes. For the `fully: true` stop's flush check (PROBE_REACH) and the
+   * box the strokes are drawn in (swipe.ts#strokeRoom).
    */
   scrollersOf: (node: UiNode) => readonly Rect[];
+  /**
+   * A match's ancestors up to its outermost clipping one, nearest first
+   * (ui-tree/geometry.ts#clipPathsOf) — for the plain stop's sliver rule
+   * (`judge`, geometry.ts#cutSliver), which a node inherits from an
+   * ancestor cut to a sliver at the edge it lies flush with (round 8).
+   */
+  clipPathOf: (node: UiNode) => readonly UiNode[];
   /**
    * The largest clipping container (ui-tree/geometry.ts#largestScroller) —
    * the screen's own scroll view, for a stroke while the target's own
@@ -209,8 +215,10 @@ interface TreeFacts {
  * a pure walk of an in-memory tree beside a device read.
  */
 function factsOf(tree: UiNode): TreeFacts {
+  const clipPathOf = clipPathsOf(tree);
   return {
-    scrollersOf: scrollersOf(tree),
+    scrollersOf: (node) => clipChain(clipPathOf(node)),
+    clipPathOf,
     mainScroller: largestScroller(tree),
     drawOrder: drawOrder(tree),
     fingerprint: treeFingerprint(tree),
@@ -913,7 +921,7 @@ function strokeTop(cover: Cover | undefined, bandTop: number | undefined): numbe
 function judge(
   found: readonly UiNode[],
   { box: viewport, statusBand }: Pick<JudgingScreen, 'box' | 'statusBand'>,
-  facts: Pick<TreeFacts, 'drawOrder' | 'scrollersOf'> | undefined,
+  facts: Pick<TreeFacts, 'drawOrder' | 'clipPathOf'> | undefined,
   fully: boolean,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
@@ -931,7 +939,7 @@ function judge(
     const centreCover = seen?.centreCover;
     const visible = visibleFractionInViewport(node.rect, frame);
     // The tap's cut-sliver rule, by the same minimum (resolve.ts#refuseCutSliver): what `stops` asks of a plain stop.
-    const cut = seen === undefined || facts === undefined ? undefined : cutSliver(node, facts.scrollersOf(node), seen.minPiece);
+    const cut = seen === undefined || facts === undefined ? undefined : cutSliver(node, facts.clipPathOf(node), seen.minPiece);
     return {
       node,
       visible,
@@ -955,7 +963,7 @@ function judge(
 }
 
 /** The whole-screen judgement over every box that counts (`ScreenBox.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: JudgingScreen, facts: Pick<TreeFacts, 'drawOrder' | 'scrollersOf'> | undefined, fully: boolean): Judged | undefined {
+function judgeOver(found: readonly UiNode[], frame: JudgingScreen, facts: Pick<TreeFacts, 'drawOrder' | 'clipPathOf'> | undefined, fully: boolean): Judged | undefined {
   return frame.boxes
     .map((box) => judge(found, { ...frame, box }, facts, fully))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best, fully) < 0) ? j : best), undefined);

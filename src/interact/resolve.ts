@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { drawOrder } from '../ui-tree/draw-order.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import { containsPoint, cutSliver, drawnOverText, higherTop, insideScroller, rectText, scrollersOf, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { clipPathsOf, containsPoint, cutSliver, drawnOverText, higherTop, insideScroller, rectText, visibleFractionInViewport, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { belowStatusBand, inStatusBand, judgingScreen, REVEALS, type JudgingScreen } from './swipe.js';
@@ -709,20 +709,25 @@ export class ClippedRefusal extends PresentElementRefusal {}
  * bottom needs no direction and the others name theirs — and, for the
  * node that only READS cut (geometry.ts#evidentCut's residual: whole, its
  * own content running to the edge), the way past it: a child, or a
- * coordinate tap (code review round 3). Only nodes under a
+ * coordinate tap (code review round 3) — a child that lies CLEAR of that
+ * edge (round 8): one flush with it inside a sliver cut there is refused
+ * too (geometry.ts#cutSliver's inherited cut, `Cut.within`; measured at
+ * 35d5997, the toggle's leaf label "Payment details", tapped as the hint
+ * then said, did nothing). Only nodes under a
  * clipping ancestor (UiNode.clipsDescendants, Android's) are asked: an iOS
  * tree has none, so this never refuses there. Applied inside the chrome
  * check rather than beside the on-screen rule (keyboard.ts) because the
  * minimum is the draw order's and the node judged must be the one the
  * guard hands back — the chrome check already has both. Cost: one walk of
- * the tree for the ancestor chain, and the node's subtree per flush edge.
+ * the tree for the clip path (geometry.ts#clipPathsOf), and a subtree per
+ * flush edge of the node and of each ancestor on it.
  */
 function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: number, sent?: string): void {
-  const cut = cutSliver(node, scrollersOf(tree)(node), minPiece);
+  const cut = cutSliver(node, clipPathsOf(tree)(node), minPiece);
   if (cut === undefined) return;
   const finding =
     `${cutSliverText(cut, node.rect, minPiece)} — ${cutRemedy(cut.edge)} ` +
-    `(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it, or tap by coordinates)`;
+    `(if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)`;
   const what = describeTarget(target);
   throw new ClippedRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
 }
@@ -731,14 +736,18 @@ function refuseCutSliver(target: Target, node: UiNode, tree: UiNode, minPiece: n
  * THE sentence for a node cut to a sliver (`cutSliver`'s answer, `cut`, of a
  * node whose rect is `shown`): `cut at its scroll container's bottom edge
  * (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across
- * that edge, under the 65 a tap needs`. Said by the tap's refusal
+ * that edge, under the 65 a tap needs`; a cut inherited from what the node
+ * lies in (`Cut.within`, round 8) says so after the container — `…(container
+ * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
+ * part…`. Said by the tap's refusal
  * (`refuseCutSliver`) and by `scroll_until`'s sliver failures
  * (scroll-text.ts) — one wording since the code review of round 7 (S8),
  * where the two had drifted apart ("to a 948x55 part, 55 deep across it").
  */
 export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
+  const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;
   return (
-    `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)}); only a ${shown.width}x${shown.height} part of it shows, ` +
+    `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)})${within}; only a ${shown.width}x${shown.height} part of it shows, ` +
     `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
   );
 }

@@ -565,7 +565,8 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
       };
       const y = 1924 - this.offset;
       const button = node({ role: 'button', rect: cut(y + 12, 108, 1978) });
-      const toggle = node({ role: 'container', identifier: 'details_toggle', rect: cut(y, 132, 1979), children: this.leaf ? [] : [button] });
+      const label = node({ role: 'other', label: 'Payment details', rect: cut(y + 12, 108, 1978) }); // its leaf label, as dumped at 35d5997
+      const toggle = node({ role: 'container', identifier: 'details_toggle', rect: cut(y, 132, 1979), children: this.leaf ? [] : [label, button] });
       return node({
         role: 'container',
         rect: { x: 0, y: 0, width: 1080, height: 2220 },
@@ -592,6 +593,22 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     // …where the tap then goes, at its centre, refused nothing.
     await tapElement(fake, 'id:details_toggle', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
     expect(fake.tapPoints).toEqual([{ x: 540, y: 990 }]);
+  });
+
+  it('the toggle\'s leaf label "Payment details" 66,1936 948x42, flush with the cut the toggle is a sliver at (round 8): the plain stop scrolls on for it too, and the tap then goes through', async () => {
+    const fake = new SwiftForm(1000);
+    fake.tap = async (x, y) => {
+      fake.tapPoints.push({ x, y });
+    };
+    expect(await scrollUntilVisible(fake, 'label:"Payment details"', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    await tapElement(fake, 'label:"Payment details"', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
+    expect(fake.tapPoints).toEqual([{ x: 540, y: 990 }]);
+  });
+
+  it('the toggle\'s leaf label at the bound (maxSwipes: 0): the failure names the toggle it lies in', async () => {
+    await expect(scrollUntilVisible(new SwiftForm(1000), 'label:"Payment details"', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
+      "stayed cut at its scroll container's bottom edge (container 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42 part of it shows, 42 deep across that edge, under the 65 a tap needs",
+    );
   });
 
   it('no room to scroll it in (the content ends there): fails naming the cut, not "visible"', async () => {
