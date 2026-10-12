@@ -1,6 +1,7 @@
 import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
+import { clips, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
 /**
@@ -80,7 +81,7 @@ export interface DrawOrder {
    * after the container's subtree whose rect meets the container's with
    * area and that draws (`NOT_DRAWN`'s `drawnOver` column) — never an
    * ancestor or a descendant: its own rows scroll with it. The container is
-   * found by its rect: the outermost clipping node (`clipsDescendants`)
+   * found by its rect: the outermost node that clips (scroll-containers.ts#clips)
    * with that rect outside the keyboard, since the round carries containers
    * as rects (geometry.ts#clipsOf's `scrollersOf`, #largestScroller). UNDEFINED when this
    * tree has no such container (a rect of another read — the list has moved
@@ -281,7 +282,7 @@ interface Placed {
   end: number;
   /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`) or its band (`KEYBOARD_ROLE`, the tree source's mark — inside the keyboard's Window on WDA). */
   readonly inKeyboard: boolean;
-  /** Its nearest ancestor that scrolls (`scrolls`), if any. */
+  /** Its nearest ancestor that scrolls (scroll-containers.ts#scrolls), if any. */
   readonly scroller: Placed | undefined;
   /** Its parent; undefined for the root. */
   readonly parent: Placed | undefined;
@@ -338,16 +339,10 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
 const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
 
 /**
- * A node whose content scrolls under what is around it: a scroll view
- * (`CONTENT_FRAMED_ROLES` — iOS) or a clipping container
- * (`UiNode.clipsDescendants` — Android's scrollers, Compose's included).
- */
-const scrolls = (n: UiNode): boolean => CONTENT_FRAMED_ROLES.has(n.role) || n.clipsDescendants === true;
-
-/**
  * The roles whose frame is not a surface: a node of one, non-interactive and
  * with children, covers a point only through its content (the
  * `contentFramed` row). One role, deliberately — see the rejected ones there.
+ * A draw rule, not a scroll predicate (scroll-containers.ts says why).
  */
 const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 
@@ -615,9 +610,8 @@ const NOT_DRAWN = {
   },
 
   /**
-   * SCROLLED CONTENT: a node inside a scroll view (`scrolls`: a
-   * `scrollable`, or a clipping container — Android's) that does not hold
-   * the target. `target` only (2026-10-09): an iOS form scrolls UNDER its
+   * SCROLLED CONTENT: a node inside something that scrolls
+   * (scroll-containers.ts#scrolls) that does not hold the target. `target` only (2026-10-09): an iOS form scrolls UNDER its
    * translucent top bar, and WDA lists the bar's BackButton and Save
    * BEFORE the scroll view (the `contentFramed` row's measurement), so
    * every row scrolled up under the bar follows the bar's buttons in
@@ -970,7 +964,7 @@ const NOT_DRAWN = {
 
   /**
    * A SCROLL INDICATOR: a `container` (WDA's `Other`) that is a direct
-   * child of a scroll view (`scrolls`) or of a text input
+   * child of a node that scrolls (scroll-containers.ts#scrolls) or of a text input
    * (`INPUT_ROLE`) and holds nothing but empty frames
    * (`emptyFrame`). `target` only (review round 1, 2026-10-09): WDA lists
    * a UIScrollView's two indicators LAST among its children, after every
@@ -1392,7 +1386,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
   const outOfDrawnOver = NOT_DRAWN.keyboard.drawnOver;
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
-    const found = order.find((p) => p.node.clipsDescendants === true && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
+    const found = order.find((p) => clips(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p, 'drawnOver') ? [p.node] : []));
   };
