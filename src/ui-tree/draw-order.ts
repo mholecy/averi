@@ -43,7 +43,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   aimClearOfChrome for the tap and the fill's focus tap,
  *   standing.ts#Scene.standing for `scroll_until`'s stop).
  * - `paintsOver(node, within)` — a pixel assert's chrome (round 8,
- *   2026-10-12, verify/pixel-poll.ts#chromeOverElement): which of
+ *   2026-10-12, ui-tree/standing.ts#Scene.standing's pixel purpose): which of
  *   `exposure`'s covers hide PIXELS of the node, not only the touch —
  *   `exposure` less the node's own content listed beside it, a clickable
  *   layer with nothing drawn, and an overlap no thicker than an edge
@@ -164,7 +164,7 @@ export interface DrawOrder {
   /**
    * The covers of `exposure(node, within)` that hide PIXELS of `node` —
    * what a colour sample or an ocr crop of its rect would read instead of
-   * it (round 8, 2026-10-12; verify/pixel-poll.ts#chromeOverElement) — in
+   * it (round 8, 2026-10-12; ui-tree/standing.ts#Scene.standing's pixel purpose) — in
    * `exposure`'s order, each with its reach. `exposure` answers where a
    * TOUCH goes, so it counts what takes the touch and draws nothing; three
    * of its covers are left out here (review of fix/r8-pixel, round 1, a
@@ -1439,8 +1439,8 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
  * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
  * tree's dialect is read here and nowhere else outside draw order — what
  * geometry.ts#clipsOf's `inScroller` asks it, through
- * ui-tree/standing.ts#sceneOf, and the pixel assert's root remedy
- * (verify/pixel-poll.ts#chromeOverElement).
+ * ui-tree/standing.ts#sceneOf, and the pixel standing's flat-list root
+ * (ui-tree/standing.ts#Standing, `covered.overRoot`).
  */
 export function listsAncestry(tree: UiNode): boolean {
   return tree.flatList !== true;

@@ -50,7 +50,7 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * (interact/resolve.ts#refuseOffScreen for its first ask, #aimClearOfChrome
  * for the lazy one), `scroll_until`'s round (interact/scroll-rounds.ts
  * #round, its judgement and its strokes) and the pixel poll
- * (verify/pixel-poll.ts#keyboardOverElement); which nodes are the
+ * (verify/pixel-poll.ts#overElement); which nodes are the
  * keyboard's own, under no line, is `keyboardSide`'s.
  *
  * WHAT A READING ASKS, AND WHEN — stated once, here (it replaces the tables
@@ -545,12 +545,3 @@ export function keyboardEdge(reading: KeyboardLine | undefined, order: Pick<Draw
 export function keyboardSide(ofKeyboard: (node: UiNode) => boolean, order: Pick<DrawOrder, 'ofKeyboardBand'>): (node: UiNode) => boolean {
   return (node) => ofKeyboard(node) || order.ofKeyboardBand(node);
 }
-
-/**
- * The band a line marks on `screen`: the screen's width, from the line to
- * the screen's bottom — idb's band's own shape (soft-keyboard.ts
- * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
- * sentence quotes for it (the pixel assert's keyboard miss, `scroll_until`'s
- * cover).
- */
-export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });

@@ -90,7 +90,7 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
 /**
  * The part of an element's rect the sampler reads, in tree units: the rect
  * inset EDGE_INSET a side — what the pixel poll judges chrome over for a
- * colour assert (verify/pixel-poll.ts#chromeOverElement, round 8). The png
+ * colour assert (verify/pixel-poll.ts#overElement, round 8). The png
  * mapping's rounding is left out (a fraction of a unit). `patches` reads
  * inside it too, but for a rect under ~60 png px a side, whose corner
  * patches' 9-px squares reach a few pixels past the 12 % line.

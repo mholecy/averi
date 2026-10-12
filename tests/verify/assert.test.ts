@@ -2292,6 +2292,22 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect([colour.pass, colour.detail]).toEqual([true, expect.stringContaining('sampled #FFFFFF')]);
   });
 
+  it('the Android navigation band (D7): the Settings title flush with it fails an ocr assert closed, nothing recognized — a colour assert on it is measured', async () => {
+    resetLayout();
+    const title = node({ role: 'text', identifier: 'title', label: 'Sound & vibration', rect: { x: 198, y: 2105, width: 428, height: 49 } });
+    const list = node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 596, width: 1080, height: 1558 }, children: [node({ rect: { x: 0, y: 2072, width: 1080, height: 82 }, children: [title] })] });
+    const android = new FakeAdapter({ s: node({ rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [list] }) }, 's');
+    android.viewportSize = { width: 1080, height: 2220, statusBand: 66, navigationBand: 2154 };
+    android.nextScreenshot = png(1080, 2220);
+    const { probe, engine } = engineReading('Sound & vibration');
+    const o = await new Verifier(android, { ...FAST, ocr: { engine } }).assert({ element: { id: 'title' }, ocr: { text: 'Sound & vibration' } });
+    expect(o.pass).toBe(false);
+    expect(o.detail).toMatch(/^the element may be cut at the navigation bar \(element 198,2105 428x49, navigation bar from y 2154\): .* — scroll it up: .*; failing closed, rendered text unchecked$/);
+    expect(probe.recognized).toBe(0);
+    const c = await new Verifier(android, FAST).assert({ element: { id: 'title' }, color: { expected: '#FFFFFF' } });
+    expect(c.detail).toContain('sampled #FFFFFF');
+  });
+
   it('a container element: its own descendants are never covers — measured as before', async () => {
     resetLayout();
     const card = node({

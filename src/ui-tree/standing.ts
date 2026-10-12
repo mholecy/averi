@@ -1,4 +1,4 @@
-import { rectArea, usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { drawOrder, listsAncestry, type DrawOrder, type Exposure } from './draw-order.js';
 import {
   aboveNavigationBand,
@@ -9,6 +9,8 @@ import {
   inferScreenSize,
   inNavigationBand,
   inStatusBand,
+  overlapsPastSlack,
+  rectCentre,
   SCREEN_AGREEMENT_PCT,
   screenOf,
   visibleFractionInViewport,
@@ -29,7 +31,7 @@ import { tapPoint } from './selectors.js';
  * on-screen rule (`onScreen`, which the in-tree keyboard dismissal picker
  * asks too, interact/keyboard-in-tree.ts), `scroll_until`'s stop
  * (interact/scroll-rounds.ts, over the screen interact/scroll.ts reads each
- * round), the pixel assert (verify/pixel-poll.ts#chromeOverElement) and, for
+ * round), the pixel assert (verify/pixel-poll.ts#overElement) and, for
  * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and
  * its throw over it and judges nothing).
  *
@@ -57,8 +59,8 @@ import { tapPoint } from './selectors.js';
  * - `statusBand`, `navigationBand` — the device's system bands
  *   (adapters/types.ts#DeviceScreen), carried only when the device's size
  *   is the screen: with the tree's window standing in, no band (the
- *   judgements fail open, as the rest of that path does). The tap and the
- *   stop judge both (`Scene`); the pixel assert the status band only.
+ *   judgements fail open, as the rest of that path does). The tap, the
+ *   stop and the pixel assert judge both (`Scene`).
  *
  * Residuals:
  * - A landscape tree with NO window at all (idb with no Application node)
@@ -208,8 +210,8 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  * THE SCENE of one tree: its draw order (draw-order.ts) and its clip facts
  * (geometry.ts#clipsOf), each derived once, on first use — and the
  * STANDING of a node in it: where the node stands on a screen for what a
- * verb means to do with it, one ordered judgement for the tap and for
- * `scroll_until`'s stop.
+ * verb means to do with it, one ordered judgement for the tap,
+ * `scroll_until`'s stop and the pixel assert.
  *
  * Contract of `standing(node, screen, purpose)`:
  * - The point judged is the node's centre as a tap sends it
@@ -222,7 +224,7 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   several boxes asks once a box and keeps the best). With no screen, the
  *   tree's root rect is the one box, and a root of no area leaves every
  *   point on the screen (fail open).
- * - THE ORDER, once for both verbs — after what only the stop judges first
+ * - THE ORDER, once for every verb — after what only the stop judges first
  *   (nothing of it in its frame: `underKeyboard` when a keyboard line
  *   applies and the node is in the box, else `offScreen`; with `fully`, a
  *   frame edge it runs past: `clipped`): its centre off the screen —
@@ -237,9 +239,34 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   mutually exclusive — a centre in a band lies inside a box — so their
  *   order is moot. Cut before cover: a covered sliver is reported cut at a
  *   named edge, whose remedy is a scroll toward it.
- * - `facts.screen` is the frame judged: the stop's box cut above its
- *   keyboard line; the tap's box less the system bands, cut above a line no
- *   guard acts on.
+ * - THE PIXEL ASSERT (`{ of: 'pixel' }`) judges a REGION, not a point, in
+ *   `screen.box` alone (verify/pixel-poll.ts hands it the usable screen's
+ *   `oriented` box: D6) — the same order, its place a region's: under the
+ *   band `keyboardTop` marks (`bandRect`) when the node's rect meets it at
+ *   all — `underKeyboard`, before the system bands, its remedy (hide it)
+ *   being no scroll; what it `reads` overlapping a system band past
+ *   PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack, the owner's 2-unit
+ *   edge), the status band's before the navigation band's — `systemBar`,
+ *   with the band's rect; never `offScreen` (it never judged that). Cut only at the
+ *   navigation bar and only for a reader of `glyphs` (owner decision N-b):
+ *   its bottom flush (±1) with the band's top inside a clipping scroller
+ *   flush with it too (`cutAtNavigationBar`) — `cut`, with the bar; a
+ *   colour sample of what shows of a cut node is measured (D5). Covered by
+ *   a PIXEL cover (draw-order.ts#DrawOrder.paintsOver: `exposure`'s less
+ *   what takes a touch and hides nothing) meeting what it reads below the
+ *   status band, any of them, not only one over the centre: the one on top
+ *   at its centre, else the last drawn, with its `reach` — and `overRoot`
+ *   when the node is a flat list's screen-sized root (draw-order.ts
+ *   #listsAncestry, read here so the pixel assert does not). Its
+ *   `keyboardTop` is idb's band only (the pixel poll asks the reading's
+ *   frame itself, before).
+ * - `facts.screen` is the frame judged, per purpose: the stop's box cut
+ *   above its keyboard line; the tap's box less the system bands, cut above
+ *   a line no guard acts on; the pixel's box less the status band. The
+ *   covers (`facts.covers`, `reaches`, `shows`, `centreCover`) are judged in
+ *   it below the status band (D3 for the stop) — the pixel's only where that
+ *   meets what it reads, as `exposure`'s touch covers (the kind names the
+ *   pixel cover).
  * - What each verb counts:
  *   - the stop (`{ of: 'stop' }`) judges in its frame — the box, cut above
  *     `keyboardTop` when given (the box's width, from its top down to the
@@ -297,14 +324,37 @@ const sameSides = (a: { width: number; height: number }, b: { width: number; hei
  *   centre is always on the screen; the stop handed back the very strip the
  *   tap refuses, and a tap on it was reported done and did nothing.
  *   Scrolling on reveals it.
+ * - The pixel assert's region: a colour sample or an ocr crop reads every
+ *   pixel of what it reads, not a point — measured, a colour assert under
+ *   the 62-pt band passed on the status bar's colour and one under
+ *   CONTINUE sampled CONTINUE's. At the navigation bar, Account Detail's
+ *   rows in 2154–2220 were measured on the bar's pixels, and Settings'
+ *   title `198,2105 428x49`, flush with the bar's top in a list flush with
+ *   it, was read as the cut "Colnd & vibration" (uiautomator left no
+ *   evidence of the cut); its colour, on the clean strip, is true.
  * The owner's decisions for the centre and the covers:
  * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
  *
  * Residuals:
- * - The stop's frame is not cut below the status band: a node lying only in
- *   the band counts as a cover for `fully` and lowers `shows`.
- * - Both system bands are cut from a PORTRAIT box only. Android keeps its
+ * - D4: the pixel assert reads the device's size from the memo, never
+ *   afresh (the tap's `fresh` re-read is the tap's alone): after a fold or
+ *   a `wm size` change it judges the old box.
+ * - D5: a node its scroll container cuts is measured by the pixel assert
+ *   on what shows of it — the ocr crop at the navigation bar aside (the
+ *   owner's N-b) — so a cut text can be read as its visible strip.
+ * - D6: the pixel assert judges one box, the `oriented` one: on a screen
+ *   whose turn is suggested but not witnessed (two `boxes`), the other
+ *   orientation is never judged, and landscape is unmeasured.
+ * - `fully` judges a system band at the centre only, the pixel assert over
+ *   what it reads: a `fully` stop leaves the rest of a node in a band, and
+ *   a pixel assert on it fails closed until something in it clear of the
+ *   band is asserted instead (the pixel-only exemption of the parity).
+ * - The navigation bar's cut is read by shape (a node and its scroller
+ *   flush with the band): a whole last row resting flush with it fails an
+ *   ocr assert closed too.
+ * - Both system bands are cut from a PORTRAIT box only (for the pixel
+ *   assert too, N-c). Android keeps its
  *   status bar at the top in landscape (a point under it there is judged on
  *   the screen), and its navigation bar moves to a side, where nothing
  *   reads it (adapters/android.ts#parseNavigationBand reads no band on a
@@ -334,11 +384,24 @@ export interface Scene {
 
 /**
  * What a verb means to do with the node — `scroll_until`'s stop, `fully` or
- * plain, or a tap — and the soft keyboard's line the caller applies, if any
+ * plain, a tap, or the pixel assert's read (`PixelPurpose`) — and the soft
+ * keyboard's line the caller applies, if any
  * (ui-tree/keyboard-cover.ts#keyboardEdge builds it; `Scene`'s contract
  * says how each verb applies it, and what `witnessed` changes).
  */
-export type Purpose = { readonly of: 'stop'; readonly fully: boolean; readonly keyboardTop?: KeyboardLine } | { readonly of: 'tap'; readonly keyboardTop?: KeyboardLine };
+export type Purpose =
+  | { readonly of: 'stop'; readonly fully: boolean; readonly keyboardTop?: KeyboardLine }
+  | { readonly of: 'tap'; readonly keyboardTop?: KeyboardLine }
+  | PixelPurpose;
+
+/**
+ * The pixel assert's purpose (`Scene`'s contract): `reads`, the part of the
+ * node's rect its measurement reads (the colour sampler's inset rect,
+ * verify/color-parity.ts#colorSampleRect, or the ocr crop's whole rect);
+ * `glyphs`, whether it reads glyphs (the ocr assert), which a cut at the
+ * node's edge garbles where a colour sample of what shows stays true.
+ */
+export type PixelPurpose = { readonly of: 'pixel'; readonly reads: Rect; readonly glyphs: boolean; readonly keyboardTop?: KeyboardLine };
 
 /** The screen a standing is judged on: the usable screen's boxes and its system bands. */
 export type StandingScreen = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand' | 'navigationBand'>;
@@ -355,13 +418,17 @@ export type SystemBar = { readonly edge: 'top'; readonly bottom: number } | { re
 export interface StandingFacts {
   /** The point a tap presses (selectors.ts#tapPoint). */
   readonly centre: Point;
-  /** The frame judged in: the stop's box, cut above the keyboard line when one applies (no height when it leaves nothing); the tap's box less the system bands, cut above a line no guard acts on. */
+  /**
+   * The frame judged in, per purpose: the stop's box, cut above the keyboard line when one applies (no height when it
+   * leaves nothing); the tap's box less the system bands, cut above a line no guard acts on; the pixel's box less the
+   * status band.
+   */
   readonly screen: Rect;
   /** The fraction of the node inside the frame, covers or not. */
   readonly visible: number;
   /** The frame's edges the node extends past (geometry.ts#clippedEdges). */
   readonly clipped: readonly Edge[];
-  /** draw-order.ts#Exposure's, inside the frame: the covers, where each presses, the one over the centre, and what shows. */
+  /** draw-order.ts#Exposure's, inside the frame below the status band (the pixel's: where that meets what it reads): the covers, where each presses, the one over the centre, and what shows. */
   readonly covers: readonly UiNode[];
   readonly reaches: readonly Rect[];
   readonly centreCover?: UiNode;
@@ -378,13 +445,19 @@ export type Standing = { readonly facts: StandingFacts } & (
   | { readonly kind: 'reachable'; readonly at: Point; readonly moved?: { readonly piece: Rect; readonly cover: UiNode; readonly aboveKeyboard: boolean } }
   /** `visible`: the most of the node inside any box judged. */
   | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number }
-  | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar }
+  /** `band` (the pixel's): the band's rect on the box, which what it reads overlaps. */
+  | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band?: Rect }
   | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
-  | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
-  /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
-  | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
-  /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it). */
-  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine }
+  /** `bar` (the pixel's): the system bar whose edge the cut lies on — `cut.container` the scroller flush with it. */
+  | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number; readonly bar?: SystemBar }
+  /**
+   * `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a
+   * keyboard line (never, for the pixel). The pixel's: `reach`, where the cover presses (its rect, or a pinned bar's
+   * reach); `overRoot`, the node is a flat list's screen-sized root and the cover the app's content listed on it.
+   */
+  | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean; readonly reach?: Rect; readonly overRoot?: true }
+  /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it); `band` (the pixel's): the band the line marks on the box, which the node's rect meets. */
+  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine; readonly band?: Rect }
 );
 
 /** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
@@ -400,10 +473,15 @@ export function sceneOf(tree: UiNode): Scene {
     },
     standing: (node, screen, purpose) => {
       const centre = tapPoint(node);
+      if (purpose.of === 'pixel') {
+        const box = screen?.box ?? screenOf(tree);
+        const judged: Judged = { scene, node, centre, place: regionPlace(node.rect, purpose, box, screen) };
+        return pixelStanding(judged, box, screen, purpose, !listsAncestry(tree));
+      }
       const boxes = screen === undefined ? rootBoxes(tree) : purpose.of === 'stop' ? [screen.box] : screen.boxes;
       const judged: Judged = { scene, node, centre, place: placeOf(centre, boxes, screen) };
       return purpose.of === 'stop'
-        ? stopStanding(judged, screen?.box ?? tree.rect, purpose.fully, purpose.keyboardTop)
+        ? stopStanding(judged, screen?.box ?? tree.rect, screen, purpose.fully, purpose.keyboardTop)
         : tapStanding(judged, chosenBox(centre, screen, tree, node), boxes ?? [], screen, purpose.keyboardTop);
     },
   };
@@ -441,8 +519,12 @@ interface Judged {
   readonly place: Place;
 }
 
-/** Where a point lies: on the screen, in a system band, or off it. */
-type Place = 'on' | 'off' | SystemBar;
+/**
+ * Where a point or a region lies: on the screen, off it, in a system band
+ * (`band`, the band's rect, for a region), or — a region only — under the
+ * band a keyboard line marks.
+ */
+type Place = 'on' | 'off' | { readonly bar: SystemBar; readonly band?: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /** The no-screen boxes: the tree's root rect, or none (undefined) when it has no area — every point on the screen. */
 const rootBoxes = (tree: UiNode): Rect[] | undefined => (rectArea(tree.rect) > 0 ? [tree.rect] : undefined);
@@ -456,18 +538,60 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Pick<S
   if (boxes === undefined || boxes.some((box) => containsPoint(lessSystemBands(box, bands), point))) return 'on';
   // The bands only: `bands` may be a whole screen, whose own `boxes` must not stand in for the ones judged (the stop's box alone).
   const judged = { boxes, statusBand: bands?.statusBand, navigationBand: bands?.navigationBand };
-  if (inStatusBand(point, judged)) return { edge: 'top', bottom: bands?.statusBand ?? 0 };
-  if (inNavigationBand(point, judged)) return { edge: 'bottom', top: bands?.navigationBand ?? 0 };
+  if (inStatusBand(point, judged)) return { bar: { edge: 'top', bottom: bands?.statusBand ?? 0 } };
+  if (inNavigationBand(point, judged)) return { bar: { edge: 'bottom', top: bands?.navigationBand ?? 0 } };
   return 'off';
 }
+
+/**
+ * Where the pixel assert's region lies (`Scene`'s contract): under the band
+ * `purpose.keyboardTop` marks on `box` when the node's rect meets it at
+ * all; else in the status band, then the navigation band, when what it
+ * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
+ * else on the screen — never off it (`Scene`'s contract).
+ */
+function regionPlace(rect: Rect, { reads, keyboardTop }: PixelPurpose, box: Rect, bands: StandingScreen | undefined): Place {
+  if (keyboardTop !== undefined) {
+    const band = bandRect(keyboardTop, box);
+    if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
+  }
+  const { top, bottom } = systemBands(box, bands);
+  if (top !== undefined && overlapsPastSlack(reads, top)) return { bar: { edge: 'top', bottom: bands?.statusBand ?? 0 }, band: top };
+  if (bottom !== undefined && overlapsPastSlack(reads, bottom)) return { bar: { edge: 'bottom', top: bands?.navigationBand ?? 0 }, band: bottom };
+  return 'on';
+}
+
+/** The system bands' rects on `box`, each only where it has height (portrait, and a band read): the status band at its top, the navigation band at its bottom. */
+function systemBands(box: Rect, bands: Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined): { top?: Rect; bottom?: Rect } {
+  const below = belowStatusBand(box, bands);
+  // Below the status band, as the tap's box (`lessSystemBands`): a navigation band reaching above it fails open.
+  const above = aboveNavigationBand(below, bands, box);
+  const bottomTop = above.y + above.height;
+  return {
+    ...(below.y > box.y && { top: { ...box, height: below.y - box.y } }),
+    ...(bottomTop < box.y + box.height && { bottom: { ...box, y: bottomTop, height: box.y + box.height - bottomTop } }),
+  };
+}
+
+/**
+ * The band a keyboard line marks on `screen`: the screen's width, from the
+ * line to the screen's bottom — idb's band's own shape (soft-keyboard.ts
+ * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
+ * sentence quotes for it (the pixel assert's keyboard miss, through
+ * `underKeyboard`; `scroll_until`'s cover, interact/scroll-rounds.ts
+ * #bandCoverOf, on the box its round judges in).
+ */
+export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });
 
 /** The tap's box: the box that holds the centre, else the first; with no screen the tree's root rect, or the node's own when the root has no area. */
 const chosenBox = (centre: Point, screen: StandingScreen | undefined, tree: UiNode, node: UiNode): Rect =>
   screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect);
 
 /**
- * THE ORDER (`Scene`'s contract), once for both verbs, after what only the
- * stop judges first: off the screen, a system band, cut, covered (`cover`:
+ * THE ORDER (`Scene`'s contract), once for every verb, after what only the
+ * stop judges first: off the screen, under a keyboard's band (a region's
+ * place only), a system band, cut (`cutAt`: the bar it lies at, the
+ * pixel's), covered (`cover`:
  * the verb's answer when something is drawn over it, else undefined), the
  * centre under `keyboard` (a line no guard acts on) — else reachable at the
  * centre.
@@ -479,10 +603,12 @@ function ordered(
   cut: Cut | undefined,
   cover: () => Standing | undefined,
   keyboard: KeyboardLine | undefined,
+  cutAt?: SystemBar,
 ): Standing {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
-  if (place !== 'on') return { facts, kind: 'systemBar', at: facts.centre, bar: place };
-  if (cut !== undefined && facts.minPiece !== undefined) return { facts, kind: 'cut', cut, minPiece: facts.minPiece };
+  if (place !== 'on' && 'keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
+  if (place !== 'on') return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
+  if (cut !== undefined && facts.minPiece !== undefined) return { facts, kind: 'cut', cut, minPiece: facts.minPiece, ...(cutAt !== undefined && { bar: cutAt }) };
   return cover() ?? (keyboard !== undefined && facts.centre.y >= keyboard.y ? { facts, kind: 'underKeyboard', line: keyboard } : { facts, kind: 'reachable', at: facts.centre });
 }
 
@@ -491,8 +617,8 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
   line === undefined || line.y >= box.y + box.height ? box : { ...box, height: Math.max(0, line.y - box.y) };
 
 /** The facts of a node judged in `frame`, from its exposure there. */
-function factsIn({ scene, node, centre }: Judged, frame: Rect): { facts: StandingFacts; seen: Exposure } {
-  const seen = scene.order.exposure(node, frame);
+function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = frame): { facts: StandingFacts; seen: Exposure } {
+  const seen = scene.order.exposure(node, exposed);
   const sliver = scene.clips.cutSliver(node, seen.minPiece);
   const facts: StandingFacts = {
     centre,
@@ -510,13 +636,20 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect): { facts: Standin
 }
 
 /** The stop's standing (`Scene`'s contract). */
-function stopStanding(judged: Judged, box: Rect, fully: boolean, line: KeyboardLine | undefined): Standing {
+function stopStanding(judged: Judged, box: Rect, bands: StandingScreen | undefined, fully: boolean, line: KeyboardLine | undefined): Standing {
   const { node, centre, place } = judged;
   if (line !== undefined && line.y <= box.y) {
     const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
     return { facts, kind: 'underKeyboard', line };
   }
-  const { facts } = factsIn(judged, line === undefined ? { ...box } : { ...box, height: line.y - box.y });
+  const frame = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
+  // Its covers below the status band (D3), as the tap's and the pixel's: what lies only in the band hides nothing the bar
+  // does not — nor lowers what shows: the node's own part in the band still counts, so a match seen only there still
+  // outranks one off the frame (interact/scroll-rounds.ts#better).
+  const exposed = belowStatusBand(frame, bands, box);
+  const cut = factsIn(judged, frame, exposed).facts;
+  const inBand = cut.visible - visibleFractionInViewport(node.rect, exposed);
+  const facts: StandingFacts = inBand === 0 ? cut : { ...cut, shows: cut.shows + inBand };
   if (facts.visible === 0) {
     if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, kind: 'underKeyboard', line };
     return { facts, kind: 'offScreen', at: centre, visible: 0 };
@@ -552,4 +685,49 @@ function tapStanding(judged: Judged, chosen: Rect, boxes: readonly Rect[], bands
     return { facts, kind: 'reachable', at: piece.tapAt.point, moved: { piece: piece.tapAt.piece, cover: over, aboveKeyboard } };
   };
   return ordered(facts, place, offScreenVisible, facts.sliver, cover, unwitnessed);
+}
+
+/**
+ * The pixel assert's standing (`Scene`'s contract): judged in `box` less the
+ * status band, its covers where that meets what it reads; its place a
+ * region's (`regionPlace`); cut only at the navigation bar, flush, for a
+ * reader of glyphs (`cutAtNavigationBar`); covered by a PIXEL cover
+ * (draw-order.ts#paintsOver) — the one on top at its centre, else the last
+ * drawn. `flat`: the tree lists no ancestry (draw-order.ts#listsAncestry).
+ */
+function pixelStanding(judged: Judged, box: Rect, bands: StandingScreen | undefined, purpose: PixelPurpose, flat: boolean): Standing {
+  const { scene, node, place } = judged;
+  const below = belowStatusBand(box, bands);
+  // Only the part of the box below the band that the measurement reads: what lies over the rest of the node is never sampled.
+  const read = rectIntersection(below, purpose.reads) ?? { ...purpose.reads, width: 0, height: 0 };
+  const { facts } = factsIn(judged, below, read);
+  const flush = purpose.glyphs ? cutAtNavigationBar(node, box, bands, scene.clips) : undefined;
+  const cover = (): Standing | undefined => {
+    const covers = scene.order.paintsOver(node, read);
+    const centre = rectCentre(node.rect);
+    const over = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
+    if (over === undefined) return undefined;
+    const overRoot = flat && rectArea(node.rect) >= rectArea(box) * SCREEN_SIZED_FRACTION;
+    return { facts, kind: 'covered', cover: over.node, aboveKeyboard: false, reach: over.reach, ...(overRoot && { overRoot: true as const }) };
+  };
+  return ordered(facts, place, facts.visible, flush, cover, undefined, flush === undefined ? undefined : { edge: 'bottom', top: bands?.navigationBand ?? 0 });
+}
+
+/**
+ * The node's cut at the navigation bar, as the tree can tell it (owner
+ * decision N-b): its bottom flush, within a unit, with the band's top
+ * (geometry.ts#flushEdges' unit), inside a clipping scroller
+ * (`Clips.scrollersOf`) whose bottom is flush with it too — uiautomator cut
+ * it at the window's visible frame and left no evidence (no `cutBounds`,
+ * no content past the edge). A node in no such scroller (a non-edge-to-edge
+ * app's pinned bottom bar, ending at the band's top) is whole. Only on a
+ * portrait box with a band (`systemBands`).
+ */
+function cutAtNavigationBar(node: UiNode, box: Rect, bands: StandingScreen | undefined, clips: Clips): Cut | undefined {
+  const { bottom } = systemBands(box, bands);
+  if (bottom === undefined) return undefined;
+  const on = (y: number) => Math.abs(y - bottom.y) <= 1;
+  if (!on(node.rect.y + node.rect.height)) return undefined;
+  const container = clips.scrollersOf(node).find((c) => on(c.y + c.height));
+  return container === undefined ? undefined : { edge: 'bottom', container: { ...container }, depth: node.rect.height };
 }

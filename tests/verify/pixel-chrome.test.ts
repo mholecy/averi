@@ -4,6 +4,7 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
+import { sceneOf, treeScreen, usableScreen, type Standing } from '../../src/ui-tree/standing.js';
 import { chromeOverElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 
@@ -13,7 +14,7 @@ const IPHONE: DeviceScreen = { width: 402, height: 874, statusBand: 62 };
 const PIXEL_3A: DeviceScreen = { width: 1080, height: 2220 };
 
 /** Every real tree the suite holds, with the screen its device reported. */
-async function fixtureTrees(androidBand?: number): Promise<[string, UiNode, DeviceScreen][]> {
+async function fixtureTrees(androidBand?: number, androidNavigation?: number): Promise<[string, UiNode, DeviceScreen][]> {
   const trees: [string, UiNode, DeviceScreen][] = [];
   for (const file of (await readdir(FIXTURES)).filter((f) => f.startsWith('wda-source')).sort()) {
     trees.push([file, parseWdaSource(await readFile(new URL(file, FIXTURES), 'utf8')), IPHONE]);
@@ -22,24 +23,37 @@ async function fixtureTrees(androidBand?: number): Promise<[string, UiNode, Devi
   trees.push(['idb-swift-form-number-pad', parseIdbDescribeAll(JSON.stringify((await json('idb-swift-form-number-pad.json')).elements)), IPHONE]);
   for (const [k, v] of Object.entries((await json('idb-modal-listed-before-content.json')).screens)) trees.push([`idb-modal ${k}`, parseIdbDescribeAll(JSON.stringify(v)), IPHONE]);
   for (const [k, v] of Object.entries((await json('idb-swift-form-scrolled-under-top-bar.json')).positions)) trees.push([`idb-top-bar ${k}`, parseIdbDescribeAll(JSON.stringify(v)), IPHONE]);
-  for (const [k, v] of Object.entries((await json('android-ui-snapshot-compose.json')).screens)) trees.push([`android ${k}`, { ...(v as UiNode), paddedTouchTargets: true }, { ...PIXEL_3A, ...(androidBand !== undefined && { statusBand: androidBand }) }]);
+  for (const [k, v] of Object.entries((await json('android-ui-snapshot-compose.json')).screens)) trees.push([`android ${k}`, { ...(v as UiNode), paddedTouchTargets: true }, { ...PIXEL_3A, ...(androidBand !== undefined && { statusBand: androidBand }), ...(androidNavigation !== undefined && { navigationBand: androidNavigation }) }]);
   return trees;
 }
 
+/** What a pixel standing says lies over its node: `the status bar`, `the navigation bar`, or the cover as its sentence names it (with its reach when that is not its frame). */
+const overIt = (s: Standing): string => {
+  if (s.kind === 'systemBar') return s.bar.edge === 'top' ? 'the status bar' : 'the navigation bar';
+  if (s.kind === 'cut') return `cut at the navigation bar, in ${s.cut.container.x},${s.cut.container.y} ${s.cut.container.width}x${s.cut.container.height}`;
+  if (s.kind !== 'covered') return s.kind;
+  const reach = s.reach === undefined || JSON.stringify(s.reach) === JSON.stringify(s.cover.rect) ? '' : `, reaching ${s.reach.x},${s.reach.y} ${s.reach.width}x${s.reach.height}`;
+  return `${nodeText(s.cover).slice(0, -1)}${reach})`;
+};
+
 /**
  * Every node of area — not only the labelled or interactive ones (review of fix/r8-pixel, round 1) — judged by
- * chromeOverElement: the misses, one line each, `<fixture>: <element> — <what is drawn over it>`.
+ * its standing for the pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on the screen the assert
+ * judges in (the usable screen's `oriented` box, else the tree's own): the misses, one line each, `<fixture>:
+ * <element> — <what lies over it>`.
  */
-async function sweep(androidBand?: number, reads: (r: Rect) => Rect = (r) => r): Promise<{ judged: number; misses: string[] }> {
+async function sweep(androidBand?: number, reads: (r: Rect) => Rect = (r) => r, androidNavigation?: number): Promise<{ judged: number; misses: string[] }> {
   const misses: string[] = [];
   let judged = 0;
-  for (const [name, tree, screen] of await fixtureTrees(androidBand)) {
-    const adapter = { viewport: async () => screen };
+  for (const [name, tree, device] of await fixtureTrees(androidBand, androidNavigation)) {
+    const usable = (await usableScreen({ viewport: async () => device }, { tree })) ?? treeScreen(tree);
+    const screen = { box: usable.oriented, boxes: [usable.oriented], statusBand: usable.statusBand, navigationBand: usable.navigationBand };
+    const scene = sceneOf(tree);
     for (const n of everyNode(tree)) {
       if (n === tree || n.ofKeyboard === true || !(n.rect.width * n.rect.height > 0)) continue;
       judged++;
-      const over = await chromeOverElement(adapter, tree, n, reads(n.rect));
-      if (over !== undefined) misses.push(`${name}: ${nodeText(n)} — ${over.slice(0, over.indexOf(' — '))}`);
+      const s = scene.standing(n, screen, { of: 'pixel', reads: reads(n.rect), glyphs: reads === OCR });
+      if (s.kind !== 'reachable') misses.push(`${name}: ${nodeText(n)} — ${overIt(s)}`);
     }
   }
   return { judged, misses };
@@ -49,7 +63,7 @@ async function sweep(androidBand?: number, reads: (r: Rect) => Rect = (r) => r):
 const coversNamed = (misses: readonly string[]): Record<string, number> => {
   const named: Record<string, number> = {};
   for (const m of misses) {
-    const what = m.slice(m.indexOf(' — ') + 3).replace(/ is drawn over the element .*/, '');
+    const what = m.slice(m.indexOf(' — ') + 3);
     if (!what.startsWith('the status bar')) named[what] = (named[what] ?? 0) + 1;
   }
   return named;
@@ -63,7 +77,7 @@ const coversNamed = (misses: readonly string[]): Record<string, number> => {
  */
 const OCR = (r: Rect): Rect => r; // the ocr assert reads the whole rect
 
-describe('chromeOverElement over every fixture node (round 8)', () => {
+describe('Scene.standing for the pixel assert over every fixture node (round 8)', () => {
   it('the ocr reader (the whole rect): the covers named are chrome only — nothing that takes a touch and hides no pixel', async () => {
     const { judged, misses } = await sweep(undefined, OCR);
     expect(judged).toBe(1820);
@@ -82,7 +96,7 @@ describe('chromeOverElement over every fixture node (round 8)', () => {
       'text "Phone (Mobile)" (176,725 233x44)': 1,
     });
     // Every iOS window and screen-sized root reaches into the band: an ocr crop of it would read the clock.
-    expect(misses.filter((m) => m.includes('the status bar is drawn over'))).toHaveLength(190);
+    expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(190);
   });
 
   it('the colour reader (the rect inset 12 % a side): the same chrome, and a screen-sized root under the content listed over it', async () => {
@@ -106,7 +120,7 @@ describe('chromeOverElement over every fixture node (round 8)', () => {
       'other "More" (830,1926 77x77)': 9,
       'text "Create contact" (154,115 407x77)': 2,
     });
-    expect(misses.filter((m) => m.includes('the status bar is drawn over'))).toHaveLength(24);
+    expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(24);
   });
 
   it('the reviewer\'s false covers stay gone for both readers: own content beside the element, a clickable layer, a 2-pt edge', async () => {
@@ -125,13 +139,13 @@ describe('chromeOverElement over every fixture node (round 8)', () => {
       expect(over('button "Payee’s country" (24,730 354x52)')).toEqual([]);
       // …and what is chrome still is: CONTINUE's frame inside a 52-pt row it hangs over, its reach not.
       expect(over('button "Payee’s country" (24,776 354x52)')).toEqual([
-        expect.stringContaining('button "Continue to summary" (24,780 354x44, reaching 24,780 354x94) is drawn over the element'),
+        expect.stringContaining('— button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)'),
       ]);
     }
   });
 
   it('with a 66-px Android status band (fix/r8-band): an ocr crop of a root reads the bar and fails; a colour sample of one starts 12 % down and only the two top bars laid under the bar fail', async () => {
-    const androidBand = (misses: readonly string[]) => misses.filter((m) => m.startsWith('android') && m.includes('the status bar is drawn over')).map((m) => m.slice(0, m.indexOf(' — ')));
+    const androidBand = (misses: readonly string[]) => misses.filter((m) => m.startsWith('android') && m.endsWith(' — the status bar')).map((m) => m.slice(0, m.indexOf(' — ')));
     const ocr = androidBand((await sweep(66, OCR)).misses);
     expect(ocr).toHaveLength(61);
     expect(ocr).toContain('android contactsSyncPromo: other "Close sheet" (0,0 1080x1087)');
@@ -373,5 +387,54 @@ describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () =
       'button "Close" (300,120 80x44) is drawn over the element (element 0,0 402x200) — the capture would show it, not the element — ' +
         'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
     );
+  });
+});
+
+/**
+ * D7 (N-b, the owner's decision): the Android navigation band reaches the pixel assert. What it reads overlapping the
+ * band past the 2-px edge fails closed for either reader; an element that may be cut at the bar — its bottom on the
+ * band's top, in a clipping scroller ending there too — fails an ocr assert closed, while a colour sample of what
+ * shows is measured (D5).
+ */
+describe('the Android navigation band (D7)', () => {
+  const NAV = 2154;
+  const navigation = (misses: readonly string[]) => misses.filter((m) => m.startsWith('android') && / — (the navigation bar|cut at the navigation bar)/.test(m)).map((m) => m.replace(/^android /, ''));
+
+  it('over every fixture node, with the band at 2154: the edge-to-edge Account Detail\'s rows lying in 2154–2220, and Contacts\' "Add fields" cut at it for the ocr reader only', async () => {
+    const ocr = navigation((await sweep(66, OCR, NAV)).misses);
+    const colour = navigation((await sweep(66, colorSampleRect, NAV)).misses);
+    // The ocr crop reads the whole rect: the content containers running to the screen's bottom, and the three nodes ending flush with the form's scroller at 2154.
+    expect([ocr.length, colour.length]).toEqual([39, 24]);
+    expect(ocr).toContain('accountDetailTop: container id:transactions.list.row_4 (66,2152 948x68) — the navigation bar');
+    expect(ocr).toContain('accountDetailTop: text "Loan repayment" (254,2199 298x21) — the navigation bar');
+    expect(ocr).toContain('contactsCreateStaged: text "Add fields" (198,2106 180x48) — cut at the navigation bar, in 0,242 1080x1912');
+    expect(colour.filter((m) => m.includes('cut at the navigation bar'))).toEqual([]);
+    // Without the band (an immersive app, a dump that does not say): nothing of it.
+    expect(navigation((await sweep(66, OCR)).misses)).toEqual([]);
+  });
+
+  const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
+  const adapter = { viewport: async (): Promise<DeviceScreen> => ({ ...PIXEL_3A, statusBand: 66, navigationBand: NAV }) };
+  /** The triage's Settings shape: the list 0,596 1080x1558 (clipping) ending at the band, its last row's title 198,2105 428x49 flush with it. */
+  const title = n('text', rect(198, 2105, 428, 49), { label: 'Sound & vibration' });
+  const settings = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 596, 1080, 1558), { identifier: 'list', clipsDescendants: true, children: [n('container', rect(0, 2072, 1080, 82), { children: [title] })] })] });
+
+  it('the Settings title flush with the band: an ocr assert fails closed naming the bar and its scroll container — scroll it up; a colour assert measures', async () => {
+    expect(await chromeOverElement(adapter, settings, title, title.rect, { glyphs: true })).toBe(
+      'the element may be cut at the navigation bar (element 198,2105 428x49, navigation bar from y 2154): it ends on the bar\'s top edge, as its scroll container ' +
+        '0,596 1080x1558 does, so the crop may read only what shows of it — scroll it up: scroll_until the element with `fully: true` first and re-run',
+    );
+    expect(await chromeOverElement(adapter, settings, title, colorSampleRect(title.rect))).toBeUndefined();
+  });
+
+  it('a row reaching into the band: the bar named with its rect, the remedy a scroll (it lies in a scroll view); pinned in none, the child too', async () => {
+    const row = n('container', rect(66, 2152, 948, 68), { identifier: 'row_4' });
+    const inList = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 825, 1080, 1395), { clipsDescendants: true, children: [row] })] });
+    expect(await chromeOverElement(adapter, inList, row)).toBe(
+      'the navigation bar is drawn over the element (element 66,2152 948x68, navigation bar 0,2154 1080x66) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run',
+    );
+    const pinned = n('container', rect(0, 0, 1080, 2220), { children: [row] });
+    expect(await chromeOverElement(adapter, pinned, row, colorSampleRect(row.rect))).toMatch(/^the navigation bar is drawn over the element \(element 66,2152 948x68, navigation bar 0,2154 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
   });
 });
