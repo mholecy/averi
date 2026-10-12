@@ -352,11 +352,26 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
   rectWithin(target.node.rect, node.rect) &&
   (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
-/** `placed`'s nearest ancestor that `fillsScreen` — the window or host layer it lives in — if any. */
-const screenLayerOf = (placed: Placed, screenArea: number): Placed | undefined => {
-  let layer = placed.parent;
-  while (layer !== undefined && !fillsScreen(layer.node.rect, screenArea)) layer = layer.parent;
-  return layer;
+/** Some node from `from` up to, not including, `above` `fillsScreen`: a screen-sized layer around `from` below `above`. */
+const screenLayerBelow = (from: Placed | undefined, above: Placed, screenArea: number): boolean => {
+  for (let p = from; p !== undefined && p !== above; p = p.parent) if (fillsScreen(p.node.rect, screenArea)) return true;
+  return false;
+};
+
+/**
+ * `scroller` and `target` lie in two STACKED SCREENS (the `scrolledContent`
+ * row): below the nearest node holding both, each lies in a screen-sized
+ * layer of its own — the later one, the scroller's, drawn over the earlier
+ * (an RN transparent Modal presented over the screen, a full-screen sheet)
+ * — or that node is a root of no area, the parser's holder of several
+ * WINDOWS, each drawn over the ones before it.
+ */
+const stackedScreens = (scroller: Placed, target: Placed, screenArea: number): boolean => {
+  let both = scroller.parent;
+  while (both !== undefined && !within(target, both)) both = both.parent;
+  if (both === undefined) return false;
+  if (both.parent === undefined && rectArea(both.node.rect) === 0) return true;
+  return screenLayerBelow(scroller, both, screenArea) && screenLayerBelow(target.parent, both, screenArea);
 };
 
 /** `inner` lies in `outer`'s subtree (or is it). */
@@ -636,9 +651,8 @@ const NOT_DRAWN = {
   /**
    * SCROLLED CONTENT: a node inside something that scrolls
    * (scroll-containers.ts#scrolls) that does not hold the target, in the
-   * target's own screen — the scroller's nearest screen-sized ancestor
-   * (`screenLayerOf`: the window or host layer it lives in) holds the
-   * target too. `target` only (2026-10-09): an iOS form scrolls UNDER its
+   * target's own screen — scroller and target are not two stacked screens
+   * (`stackedScreens`). `target` only (2026-10-09): an iOS form scrolls UNDER its
    * translucent top bar, and WDA lists the bar's BackButton and Save
    * BEFORE the scroll view (the `contentFramed` row's measurement), so
    * every row scrolled up under the bar follows the bar's buttons in
@@ -647,14 +661,24 @@ const NOT_DRAWN = {
    * outside its scroll view's frame on top of it; the scroll view itself
    * is judged by `contentFramed`. A row of the SAME scroll view as the
    * target (a sticky section header over a row) still covers, and so does
-   * the content of a scroller in a LATER screen-sized layer — an RN
-   * transparent Modal's window holding a full-screen web view, a
-   * full-screen sheet's list — over a target of the screen beneath. Where
-   * no screen-sized ancestor holds the scroller (a tree with no window or
-   * host layer around it), nothing is excused: the safe direction.
-   * Residual, stated: a scroll view drawn over another part of the SAME
+   * the content of a scroller in a LATER screen — an RN transparent Modal
+   * presented over the screen (a later screen-sized layer, in the same
+   * window or another), a full-screen sheet's list, a later window under
+   * the parser's 0×0 root — over a target of the screen beneath. Two
+   * stacked screens, not a bar over its screen's content: below the node
+   * holding both, the scroller lies in a screen-sized layer AND the target
+   * does. The logged WDA form (the bar, then a full-screen content
+   * container holding the scroll view, its sibling) has the bar's branch
+   * no screen, so Back stays tapped. Residuals, stated: a bar nested in a
+   * full-screen host of its own, beside the content's full-screen layer,
+   * reads as two screens and its button is covered by rows scrolled under
+   * it (no logged tree has that shape); a web view whose frame is under
+   * the screen's size (above a tab bar, beside a toolbar) under a
+   * translucent bar covers the bar's buttons through its own FRAME,
+   * whatever this row says of its content — `contentFramed` rejects a web
+   * view on purpose. And a scroll view drawn over another part of the SAME
    * screen (a bottom sheet's list laid in the screen's own layer, over a
-   * form) hides nothing through its rows here — only its frame, or a
+   * form) hides nothing through its rows — only its frame, or a
    * non-scrolling node of the sheet, can cover. The
    * point and the container questions never ask it: the dismissal picker's
    * title IS such a target, and its `contentFramed` row was measured with
@@ -669,8 +693,7 @@ const NOT_DRAWN = {
   scrolledContent: {
     target: ({ scroller }, { target, screenArea }) => {
       if (scroller === undefined || within(target, scroller)) return false;
-      const layer = screenLayerOf(scroller, screenArea);
-      return layer !== undefined && within(target, layer);
+      return !stackedScreens(scroller, target, screenArea);
     },
   },
 

@@ -1366,7 +1366,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([row]);
     });
 
-    it('…and where no screen-sized ancestor holds the scroller (a dump of two windows under a 0×0 root), its content is not excused: the safe direction', () => {
+    it('…and two WINDOWS under the parser\'s 0×0 root are stacked too, whatever their size: a later window\'s list covers a button of the earlier window', () => {
       const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 1700, 1000, 120) });
       const row = uiNode({ role: 'button', label: 'Share', rect: rect(0, 1680, 1080, 160) });
       const tree = uiNode({
@@ -1375,6 +1375,53 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         children: [uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [pay] }), uiNode({ role: 'scrollable', rect: rect(0, 1200, 1080, 1020), children: [row] })],
       });
       expect(drawOrder(tree).exposure(pay, rect(0, 0, 1080, 2220)).covers).toEqual([row]);
+    });
+
+    /** The logged WDA SWIFT form (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md): the bar, then a full-screen content container holding the scroller. */
+    const swiftForm = (scroller: UiNode, barHost: (bar: UiNode) => UiNode = (bar) => bar) => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const bar = uiNode({ role: 'other', rect: rect(0, 62, 402, 54), children: [back, uiNode({ role: 'text', label: 'SWIFT PAYMENT', rect: rect(135, 73, 131, 22) })] });
+      const content = uiNode({ role: 'container', rect: IPHONE, children: [scroller] });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [barHost(bar), content] })] })] });
+      return { tree, back };
+    };
+    const iban = () => uiNode({ role: 'text', label: 'IBAN*', rect: rect(42, 75, 120, 20) });
+
+    it('the logged WDA nesting: the scroller in a full-screen content container, a later SIBLING of the bar — Back is tapped, with a scroll view or a full-screen web view as the scroller', () => {
+      for (const scroller of [uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [iban()] }), uiNode({ role: 'webview', rect: IPHONE, children: [iban()] })]) {
+        const { tree, back } = swiftForm(scroller);
+        expect(drawOrder(tree).exposure(back, IPHONE)).toMatchObject({ covers: [], tapAt: { moved: false } });
+      }
+    });
+
+    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back (the logged tree shows no such host)', () => {
+      const text = iban();
+      const { tree, back } = swiftForm(uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [text] }), (bar) => uiNode({ role: 'other', rect: IPHONE, children: [bar] }));
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([text]);
+    });
+
+    it('both sides must be screens: Back in a full-screen host, the form beside that host in no screen-sized layer of its own — still the same screen, Back is tapped', () => {
+      const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
+      const host = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'other', rect: rect(0, 62, 402, 54), children: [back] })] });
+      const form = uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [iban()] });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [host, form] });
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([]);
+    });
+
+    it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text', () => {
+      const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+      const terms = uiNode({ role: 'text', label: 'Terms and conditions', rect: rect(16, 690, 370, 80) });
+      const screen = uiNode({ role: 'other', rect: IPHONE, children: [pay] });
+      const modal = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [terms] })] })] });
+      const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', label: 'window', rect: IPHONE, children: [screen, modal] })] });
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([terms]);
+    });
+
+    it('the residual, stated: a web view under the screen\'s size (above a tab bar) under a translucent bar covers Back through its own FRAME — its content excused, its frame no content-framed surface', () => {
+      const back = uiNode({ role: 'button', label: 'Back', rect: rect(8, 70, 80, 40) });
+      const bar = uiNode({ role: 'other', label: 'NavigationBar', rect: rect(0, 62, 402, 54), children: [back] });
+      const page = uiNode({ role: 'webview', rect: rect(0, 0, 402, 780), children: [uiNode({ role: 'link', label: 'Read more', rect: rect(16, 72, 200, 30) })] });
+      expect(drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [bar, page] })).exposure(back, IPHONE).covers).toEqual([page]);
     });
 
     it('a link under a sticky element of ITS OWN web page still has that element over it', () => {
