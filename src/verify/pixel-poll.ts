@@ -5,7 +5,8 @@ import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboa
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, screenSized, treeScreen, usableScreen, type Scene } from '../ui-tree/standing.js';
+import { sceneOf, screenSized, type Scene } from '../ui-tree/standing.js';
+import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -128,7 +129,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * one place they are — against a round of ~2.6–4.3 s there; on iOS no
  * extra read, the tree is the one the round found the element in. Then the
  * memoized `viewport()`, and walks of the round's tree: `inferScreenSize`'s
- * (the screen's shape, ui-tree/standing.ts#usableScreen), `screenOf`'s when
+ * (the screen's shape, ui-tree/usable-screen.ts#usableScreen), `screenOf`'s when
  * neither the device nor a window vouches for the screen (the last
  * fallback), one `drawOrder` walk (the keyboard edge's, every round that
  * reaches the check), and — on every round the reading leaves clear — the
@@ -437,8 +438,8 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * navigation bar's), the navigation bar's possible cut, then the app's own
  * covers, or undefined when nothing is over it (it fails closed, ADR
  * 0001). The screen is the usable screen's single `oriented` box
- * (ui-tree/standing.ts#usableScreen, which owns the derivation; D6, ADR
- * 0012), with the device's system bands — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
+ * (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; D6, ADR
+ * 0012), with the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#treeScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
  * gesture, so under a rectless root whose largest node is a scroll view's
  * tall content (402x2000 under a 402x874 window) a window-sized element is

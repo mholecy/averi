@@ -4,7 +4,8 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
-import { sceneOf, treeScreen, usableScreen, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { sceneOf, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 
@@ -312,10 +313,10 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
 });
 
 /**
- * Code review of round 8, S3: the screen a pixel assert judges in is ui-tree/standing.ts#usableScreen's — the gesture
+ * Code review of round 8, S3: the screen a pixel assert judges in is ui-tree/usable-screen.ts#usableScreen's — the gesture
  * box's derivation. With the device silent, a window the tree vouches for is the screen, not the tree's largest node.
  */
-describe('the screen without the device: the window the tree vouches for (ui-tree/standing.ts#usableScreenOf)', () => {
+describe('the screen without the device: the window the tree vouches for (ui-tree/usable-screen.ts#usableScreenOf)', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
   const silent = { viewport: async (): Promise<DeviceScreen> => Promise.reject(new Error('idb describe: no screen_dimensions')) };

@@ -58,7 +58,7 @@ export interface DeviceScreen {
    *   went to the bar. In an app that keeps clear of the bar no node lies in
    *   the band, so it changes nothing there.
    *   docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md
-   * Carried to the judgements by ui-tree/standing.ts#UsableScreen, which
+   * Carried to the judgements by ui-tree/usable-screen.ts#UsableScreen, which
    * says how it is cut (ui-tree/standing.ts#Scene).
    */
   statusBand?: number;
@@ -71,7 +71,7 @@ export interface DeviceScreen {
    * Unset when the bar is hidden, at a side, the display is turned
    * (landscape: a residual) or naturally landscape (a tablet), or the dump
    * does not say.
-   * Carried to ui-tree/standing.ts#UsableScreen, where the judgements read
+   * Carried to ui-tree/usable-screen.ts#UsableScreen, where the judgements read
    * it (ui-tree/standing.ts#Scene).
    */
   navigationBand?: number;
@@ -80,7 +80,7 @@ export interface DeviceScreen {
 /**
  * A screen size that can be divided by, or swiped in: finite and positive on
  * both axes. The one spelling of "this size is usable", read wherever a
- * size is: verify/scale.ts's witness, ui-tree/standing.ts#usableScreenOf,
+ * size is: verify/scale.ts's witness, ui-tree/usable-screen.ts#usableScreenOf,
  * ui-tree/geometry.ts#windowTurnsScreen and interact/swipe.ts#screenBox's
  * refusal.
  */

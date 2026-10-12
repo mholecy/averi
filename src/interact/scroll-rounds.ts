@@ -3,7 +3,8 @@ import { belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersectio
 import { keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
+import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
@@ -634,7 +635,7 @@ export interface Rounds {
   readonly [opaque]: 'scroll-rounds';
 }
 
-/** The screen a round judges in: the usable screen's judging part (ui-tree/standing.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
+/** The screen a round judges in: the usable screen's judging part (ui-tree/usable-screen.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
 type Frame = StandingScreen;
 
 /**
@@ -650,7 +651,7 @@ interface State {
   readonly owesDrawn: boolean;
   /**
    * The visibility reference frame: the usable screen of the round's tree
-   * (ui-tree/standing.ts#usableScreen, through swipe.ts#screenBox) — the
+   * (ui-tree/usable-screen.ts#usableScreen, through swipe.ts#screenBox) — the
    * tap's screen too, so a stop the scroll calls visible is
    * judged on the screen the next tap is judged on, by construction: the
    * box (turned in landscape as the stroke already was; what a failure

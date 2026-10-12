@@ -4,7 +4,8 @@ import { drawnOverText, rectText, type Cut, type Edge } from '../ui-tree/geometr
 import { keyboardEdge, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { sceneOf, usableScreen, type Scene, type Standing, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
+import { sceneOf, type Scene, type Standing, type SystemBar } from '../ui-tree/standing.js';
+import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 

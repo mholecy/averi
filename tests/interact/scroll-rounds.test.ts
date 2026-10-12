@@ -6,7 +6,7 @@ import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
 import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Played, type Row } from '../helpers/rounds.js';
-import type { UsableScreen } from '../../src/ui-tree/standing.js';
+import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
@@ -967,7 +967,7 @@ describe('round — the flush check across nested clipping containers, and a pro
 
   it('room is judged over the GESTURE box the stroke would be drawn in, not the judged frame: a landscape window crowned as a child turns the gesture box but not the frame — a container below the turned box\'s bottom has no room there, so no probe', () => {
     const PORTRAIT: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
-    const screen: UsableScreen = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/standing.ts#UsableScreen: turned gesture, panel as built judged
+    const screen: UsableScreen = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/usable-screen.ts#UsableScreen: turned gesture, panel as built judged
     const LOW: Rect = { x: 0, y: 1100, width: 1080, height: 600 };
     const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 1100, width: 948, height: 143 }, 'row')], scroller: LOW, screen }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);

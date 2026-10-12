@@ -61,7 +61,7 @@ describe('swipeScreen — one table, two meanings', () => {
   });
 });
 
-/** The box's derivation is ui-tree/standing.ts#usableScreenOf's (tests/ui-tree/standing.test.ts); what stays here is the swipe drawn over it, its note and its throw. */
+/** The box's derivation is ui-tree/usable-screen.ts#usableScreenOf's (tests/ui-tree/standing.test.ts); what stays here is the swipe drawn over it, its note and its throw. */
 describe('screenBox — the device screen is the box a gesture swipes in (2026-10-08)', () => {
   it('swipes over the DEVICE size, not the tree root, when the two differ (an Android window short of the nav bar)', async () => {
     // The tree's root is the app window above a nav bar; the device is the panel.

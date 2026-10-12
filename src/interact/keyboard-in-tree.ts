@@ -4,7 +4,8 @@ import { frameText } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
-import { onScreen, usableScreen, type UsableScreen } from '../ui-tree/standing.js';
+import { onScreen } from '../ui-tree/standing.js';
+import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
 import {
   confirmHidden,

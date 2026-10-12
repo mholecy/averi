@@ -4,7 +4,7 @@ import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
 import { scrollStroke } from '../../src/interact/swipe.js';
-import type { UsableScreen } from '../../src/ui-tree/standing.js';
+import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { node } from './fake.js';
 
 /**

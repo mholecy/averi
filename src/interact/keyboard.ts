@@ -1,7 +1,7 @@
 import type { Point, Rect } from '../adapters/types.js';
 import { readingLine, readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { usableScreen } from '../ui-tree/standing.js';
+import { usableScreen } from '../ui-tree/usable-screen.js';
 import { inTreeModel } from './keyboard-in-tree.js';
 import {
   confirmHidden,

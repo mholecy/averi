@@ -1,7 +1,7 @@
 import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
 import { containsPoint, inferScreenSize, rectIntersection, type Edge } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
-import { usableScreenOf, type UsableScreen } from '../ui-tree/standing.js';
+import { usableScreenOf, type UsableScreen } from '../ui-tree/usable-screen.js';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -458,7 +458,7 @@ function keyboardClearance(uncovered: Rect): number {
 
 /**
  * The box a screen gesture swipes in: the usable screen
- * (ui-tree/standing.ts#UsableScreen), whose `oriented` box is the one
+ * (ui-tree/usable-screen.ts#UsableScreen), whose `oriented` box is the one
  * stroked in, and what the caller should say about where it came from.
  * The screen is a member, not the gesture's own shape: its `box` is the
  * box a JUDGEMENT quotes (the panel as built when a turn is no evidence),
@@ -482,7 +482,7 @@ export interface ScreenBox {
  * (the flow's `swipe:` step and the MCP `swipe` tool's `direction`) and by
  * the scroll loop (interact/scroll.ts), so a `swipe: up` and a
  * `scroll_until` to content below draw the same vector on the same screen.
- * It judges nothing: the box is ui-tree/standing.ts#usableScreenOf's
+ * It judges nothing: the box is ui-tree/usable-screen.ts#usableScreenOf's
  * (`oriented` — the device's screen turned as the tree's window says, else
  * a window the tree vouches for; the rules are there), and what this adds
  * is the gesture's own: the note and the throw.
