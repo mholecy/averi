@@ -37,6 +37,10 @@ A node one of those three rules would excuse still covers a target when all of t
    layer and the target in another (`stackedScreens`, asked of the node as of a scroller), and that holder is not the
    tree's root. WDA's root is the Application and its children are Windows; the uiautomator parser's several windows
    hang off a 0×0 root; idb's flat list has every node a child of its root. So across Windows nothing changes.
+   Nor in scrolled content: the holder neither scrolls nor lies in anything that scrolls — a scroll view's content
+   layers are one screen's. (Found by the differential harness: Finportal's RN `ScrollView` on the login screen with no
+   modal lays a full-screen background container, then its `0,0 402x877` content container, which read as a screen
+   stacked over the background's `0,0 402x102` frames.)
 2. **The layer carries something drawable.** The layer — the child of the holder on the node's branch — has a
    descendant that is neither an empty frame (an unlabelled, unvalued, unidentified `container`) nor an itemless
    toolbar (`carriesContent`).
@@ -83,10 +87,19 @@ the scroll read judging its target against `exposure`'s covers.
 ## The differential harness
 
 The owner's condition. OLD = 20307d2, NEW = this change, every section of the round-12 harness (ROUNDS, SEQ, TAP, PIXEL,
-PICK, GUARD, KEYPOS) over its 94 trees. The counts and every changed case, grouped by cause, are in the slice's diff
-report; the summary is below.
+PICK, GUARD, KEYPOS) over its 94 trees plus the four ui_snapshots of tests/fixtures/wda-ui-snapshot-stacked-layers.json.
+The counts and every changed case, grouped by cause, are in the slice's diff report (round 13 slice A).
 
-<!-- harness summary -->
+- **The 94 round-12 trees: 0 diffs in every section.** KEYPOS and SEQ: 0 diffs.
+- **Every diff is on a stacked-layer device tree, and on a target of the screen beneath the layer.**
+  - finportalForgot, contactsSheet and contactsSheetScrolled: TAP 5 652, PIXEL 1 956, PICK 8, GUARD 277, ROUNDS 50 627.
+  - The causes: "tapped" or "moved" becomes a refusal naming `forgot_overlay` or the sheet's form; "a WxH part shows"
+    becomes "nothing of it shows"; a pixel measurement becomes refused under the layer; a dismissal candidate under the
+    modal is skipped; and `scroll_until`'s `visible` stop becomes the exhausted stop naming the layer.
+  - No node of a presented layer changed, checked node by node.
+- **One unintended group was found and fixed.** It was on the login screen with no modal: its RN `ScrollView`'s content
+  container read as a screen stacked over its background frames. That fix is the scrolled-content condition above.
+  With it, that tree shows 0 diffs.
 
 ## Residuals accepted
 
@@ -102,7 +115,11 @@ report; the summary is below.
    a popover), a target that is itself a direct child of the node holding both, and an Android in-window overlay
    Compose flattens away. A layer drawn by the root's direct children (one window's top level, on a tree whose root is
    the window) reads as across Windows.
-5. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
+5. **`scroll_until` to a target beneath a layer swipes on the layer.** Before, it stopped `visible`, a false success.
+   Now it reads the target covered and strokes until the exhaustion rule stops it, naming the layer. The stroke box
+   comes from `drawnOver`, which this decision leaves unchanged, so up to `maxSwipes` strokes land on the layer: they
+   scroll a sheet's own form, or do nothing on a modal. The harness's ROUNDS cannot see `drawnOver`.
+6. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
 
 ## Bug notes
