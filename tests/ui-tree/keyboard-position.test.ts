@@ -175,7 +175,7 @@ describe('line — every source combination, every kind of subject (one look, on
     ['no source, an ordinary node: none', undefined, BAND(undefined), ROW, undefined],
     ['a reading only, no subject: the reading\'s', READ, BAND(undefined), undefined, READ],
     ['a reading only, an ordinary node: the reading\'s', READ, BAND(undefined), ROW, READ],
-    ['a reading only, a WDA-marked key: the reading\'s still — a WDA key is exempt from the reading\'s questions, not its line (D-C3a)', READ, BAND(undefined), WDA_KEY, READ],
+    ['a reading only, a WDA-marked key: the reading\'s still — a WDA key is exempt from the reading\'s questions, not its line', READ, BAND(undefined), WDA_KEY, READ],
     ['idb\'s band only, no subject: the band\'s, unwitnessed', undefined, BAND(589), undefined, { y: 589, witnessed: false }],
     ['idb\'s band only, an ordinary node: the band\'s', undefined, BAND(589), ROW, { y: 589, witnessed: false }],
     ['idb\'s band only, a key of the band: none', undefined, BAND(589), KEY, undefined],

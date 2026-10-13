@@ -8,10 +8,16 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * reading's: keyboard-cover.ts#readKeyboard, which stays outside standing,
  * ADR 0010). A position is the line nothing may be aimed, stroked or
  * measured under, and the nodes that are the keyboard's own UI, under no
- * line. One `KeyboardPosition` per look — a tree read and the reading built
- * off it — built from that tree's draw order (idb's band, free) and that
- * look's reading (its line, asked lazily); every reader asks it, and none
- * composes the line itself:
+ * line. Built from a tree's draw order (idb's band, free) and, where a
+ * reading is at hand, that reading (its line, asked lazily); every reader
+ * asks a position for the line and none merges the sources itself. The tap,
+ * its guard and the dismissal picker build one per look — a tree read and
+ * the reading built off it — and the pixel poll one per tree it judges, with
+ * no reading. `scroll_until`'s read builds more than one off one tree, none
+ * holding a reading: one for its judgement (idb's band and the read's
+ * keyboard marks; the reading's cover is the round's, offered beside it),
+ * and one for each stroke line (interact/scroll-read.ts#strokeLine), handed
+ * the line of the cover the round, or its probe, applied:
  * - the tap (interact/tap-judgement.ts: the on-screen rule with the tree's own
  *   line, the chrome aim with the reading's merged in, only when its
  *   centre is covered) and the dismissal picker (interact/keyboard-in-tree.ts
@@ -33,8 +39,8 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * table test, not the verbs.
  *
  * RESIDUAL — what the keyboard's own UI is exempt from differs per verb,
- * and is kept as it is (owner decision OD-3 of Spec D; unifying it changes
- * behaviour in cases no device has measured):
+ * and is kept as it is (ADR 0017; unifying it changes behaviour in cases no
+ * device has measured):
  * - the tap and the picker: a WDA key (`KeyboardReading.ofKeyboard`) is
  *   exempt from the reading's own questions (`over`/`frameOver` read
  *   `unknown`; the picker skips it as "the keyboard's own control"), NOT

@@ -15,7 +15,7 @@ import { node } from '../helpers/fake.js';
 // counts what it is asked. Each row's sentence is the one the tap's integration cases pin through `tapElement`
 // (tests/interact/resolve.test.ts); here it is the rule, one row per standing kind.
 
-// sceneOf (ui-tree/standing.ts), counted: the M5 rows below pin that a judgement derives no scene of its own.
+// sceneOf (ui-tree/standing.ts), counted: the look's-scene rows below pin that a judgement derives no scene of its own.
 const { walks } = vi.hoisted(() => ({ walks: { n: 0 } }));
 vi.mock('../../src/ui-tree/standing.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../src/ui-tree/standing.js')>();
@@ -249,7 +249,7 @@ describe('judgeTap(…).aim() — cut, cover, keyboard, after the guard', () => 
   });
 });
 
-describe('the reading\'s line — asked lazily, once (D-C3c)', () => {
+describe('the reading\'s line — asked lazily, once', () => {
   it('asked once when a node covers the centre', async () => {
     const { asked } = await judge(sheet(), 'row', { first: PIXEL }, { kb: reading(1380) });
     expect(asked).toEqual({ cover: 1, corroborated: 1 });
@@ -265,7 +265,7 @@ describe('the reading\'s line — asked lazily, once (D-C3c)', () => {
   });
 });
 
-describe('the look\'s scene — judgeTap reads it and derives none (M5)', () => {
+describe('the look\'s scene — judgeTap reads it and derives none', () => {
   /** `tree`'s scene as a spy: what judgeTap asks of it (`standing`, `clips`) is recorded, and answered by the real scene. */
   function spyScene(tree: UiNode) {
     const real = sceneOf(tree);

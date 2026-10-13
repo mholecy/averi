@@ -38,11 +38,12 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  *
  * A LOOK — the target resolved, its tree read — carries that tree's scene
  * (`SeenLook`, built by `withScene`: derived on first use, once). Every
- * judgement in interact/ reads the look's scene — the tap's and the
- * dismissal picker's — and none derives its own (`grep sceneOf
- * src/interact` finds only `withScene` and scroll-read's), so one look is
- * at most one draw-order walk. A convention the code keeps, not one the
- * types enforce: a SeenLook is a structural type.
+ * judgement of a look — the tap's and the dismissal picker's — reads the
+ * look's scene and derives none of its own, so one look is at most one
+ * draw-order walk. `scroll_until`'s read takes no look: it derives its own
+ * scene, once per read (scroll-read.ts#factsOf); `grep sceneOf src/interact`
+ * finds only `withScene` and that one. A convention the code keeps, not one
+ * the types enforce: a SeenLook is a structural type.
  */
 
 /**
@@ -161,10 +162,10 @@ export interface DismissResult {
  * and that tree's scene (ui-tree/standing.ts#Scene) — derived on first use,
  * once, and read by every judgement of the look: the tap's
  * (tap-judgement.ts#judgeTap, a TapLook as it stands) and the dismissal
- * picker's (keyboard-in-tree.ts#pickDismissal). Every judgement in
- * interact/ reads it and none derives its own (`grep sceneOf src/interact`
- * finds only `withScene` and scroll-read's), so a look is at most one
- * draw-order walk. Threaded, not cached by tree: a memo keyed by the tree
+ * picker's (keyboard-in-tree.ts#pickDismissal). Every tap and picker
+ * judgement reads it and derives none of its own, so a look is at most one
+ * draw-order walk; the scroll read, which takes no look, derives its own
+ * once per read (scroll-read.ts#factsOf). Threaded, not cached by tree: a memo keyed by the tree
  * would rest on trees never being mutated after their scene is built, a
  * contract only the scroll read states.
  */
