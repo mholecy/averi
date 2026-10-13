@@ -1513,6 +1513,16 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(window(target, layer), target)).toEqual([overlay]);
     });
 
+    it('`presented` lists only the surfaces the exception un-excuses — an unlabelled leaf, a scroll view — never a cover that covered anyway: a labelled leaf or a control of the layer (Safari\'s capsule bar, W3 of the round-12 check), whose sentence stays "scroll_until it first"', () => {
+      const target = pay();
+      const dim = uiNode({ role: 'other', rect: IPHONE });
+      const labelled = uiNode({ role: 'other', label: 'Address', rect: rect(0, 690, 402, 80) });
+      const button = uiNode({ role: 'button', label: 'Back', rect: rect(24, 700, 48, 48) });
+      const order = (...surface: UiNode[]) => drawOrder(window(target, uiNode({ role: 'container', rect: IPHONE, children: [...surface, card()] }))).exposure(target, IPHONE);
+      expect(order(dim)).toMatchObject({ covers: [dim], presented: [dim] });
+      expect(order(labelled, button)).toMatchObject({ covers: [labelled, button], presented: [] });
+    });
+
     it('a layer carrying nothing drawable stays excused: empty frames only, an itemless toolbar (WDA\'s `toolbar \'Toolbar\'` host, as Finportal and SwiftUI list it), or a layer that is itself the dimming node — a leaf the app named, an `other` over empty frames — with no card in it', () => {
       const frames = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] })] });
       const toolbarHost = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] })] });

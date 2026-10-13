@@ -261,9 +261,10 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
-   * The covers that are the SURFACE of a screen presented over the node (`overScreenBeneath`: a dimming leaf, a sheet's
-   * scroll view, on a later screen-sized layer stacked over its own), in `covers`' order; empty when none — never a
-   * control or a bar the layer carries (Safari's capsule bar). What the sentences read: a target under one lies under a
+   * The covers that are the SURFACE of a screen presented over the node (`presentedSurface`: a dimming leaf, a sheet's
+   * scroll view, on a later screen-sized layer stacked over its own — a frame row's excuse the exception took back), in
+   * `covers`' order; empty when none — never a control, a labelled node or a bar the layer carries, which cover anyway
+   * (Safari's capsule bar). What the sentences read: a target under one lies under a
    * presented screen no scroll moves it out from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
    */
   readonly presented: readonly UiNode[];
@@ -533,6 +534,24 @@ const fieldOf = (control: UiNode, target: Rect): boolean =>
 const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
 /**
+ * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target — before the
+ * exception over a presented screen (`overScreenBeneath`), which each of the three rows (`structural`,
+ * `screenSizedHost`, `contentFramed`, whose docs have the rules and their measurements) asks after its excuse. Named
+ * apart so `Exposure.presented` can tell a cover the exception un-excused from one that covers anyway.
+ */
+const FRAME_EXCUSES = {
+  structural: ({ node }: Placed, target: Placed, screenArea: number): boolean =>
+    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
+  screenSizedHost: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
+  // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
+  contentFramed: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
+} as const;
+
+/** A cover of `target` only through the exception: a frame row would excuse it, and it is a surface over a presented screen (`Exposure.presented`). */
+const presentedSurface = (placed: Placed, target: Placed, screenArea: number): boolean =>
+  Object.values(FRAME_EXCUSES).some((excuse) => excuse(placed, target, screenArea)) && overScreenBeneath(placed, target, screenArea);
+
+/**
  * THE judgement of what draws, one row per kind of node that does not. A
  * node draws for a question when no row excuses it there. Where the
  * columns differ, each answer is kept as its caller has been measured
@@ -610,16 +629,7 @@ const NOT_DRAWN = {
    */
   structural: {
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: (placed, { target, screenArea }) => {
-      const { node } = placed;
-      return (
-        STRUCTURAL_ROLES.has(node.role) &&
-        !node.label &&
-        !node.value &&
-        (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))) &&
-        !overScreenBeneath(placed, target, screenArea)
-      );
-    },
+    target: (placed, { target, screenArea }) => FRAME_EXCUSES.structural(placed, target, screenArea) && !overScreenBeneath(placed, target, screenArea),
   },
 
   /**
@@ -659,8 +669,7 @@ const NOT_DRAWN = {
    */
   screenSizedHost: {
     drawnOver: ({ node }, { screenArea }) => screenSized(node, screenArea),
-    target: (placed, { target, screenArea }) =>
-      !isInteractive(placed.node) && screenSized(placed.node, screenArea) && !overScreenBeneath(placed, target, screenArea),
+    target: (placed, { target, screenArea }) => FRAME_EXCUSES.screenSizedHost(placed, target, screenArea) && !overScreenBeneath(placed, target, screenArea),
   },
 
   /**
@@ -707,9 +716,7 @@ const NOT_DRAWN = {
    * `scrollable`: adapters/types.ts#UiNode.clipsDescendants).
    */
   contentFramed: {
-    // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
-    target: (placed, { target, screenArea }) =>
-      !isInteractive(placed.node) && placed.node.children.length > 0 && CONTENT_FRAMED_ROLES.has(placed.node.role) && !overScreenBeneath(placed, target, screenArea),
+    target: (placed, { target, screenArea }) => FRAME_EXCUSES.contentFramed(placed, target, screenArea) && !overScreenBeneath(placed, target, screenArea),
   },
 
   /**
@@ -1627,7 +1634,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        presented: over.filter((c) => overScreenBeneath(c.placed, places[0], seen.screenArea)).map((c) => c.node),
+        presented: over.filter((c) => presentedSurface(c.placed, places[0], seen.screenArea)).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,
