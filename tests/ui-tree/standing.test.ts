@@ -998,7 +998,7 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
  * shape, the screen above an applied cover instead when it leaves something, and above the navigation band only for a
  * `fully` stop the band's REGION refused at the bottom — cut on the first box's shape (the shapes kept).
  */
-describe('farEdgeFrames — the far edge\'s frames, cut by standing\'s own band cut', () => {
+describe('farEdgeFrames — the far edge\'s frames, cut beside the rule that sets band', () => {
   const UPRIGHT = box(1080, 2220);
   const TURNED = box(2220, 1080);
   const ANDROID: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT], statusBand: 66, navigationBand: 2154 };
