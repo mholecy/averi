@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
@@ -171,16 +172,49 @@ describe('tool descriptions on idb\'s keyboard band', () => {
   });
 });
 
-/** The structural row's trade-off (draw-order.ts NOT_DRAWN.structural), said where a refusal beside a floating action button is read. */
+/**
+ * The structural row's trade-off (draw-order.ts NOT_DRAWN.structural, FRAME_EXCUSES), said where a refusal beside a
+ * floating action button is read: which wrappers with children count as a cover, as the code excuses them — the
+ * screen's size (`screenSizedHost`), an unlabelled, unvalued one holding the target with its whole scroll view, or one
+ * with no identifier holding only empty frames.
+ */
 describe('tool descriptions on a wrapper counted as a cover', () => {
   it('tap says when a wrapper with children covers, and what to do beside a FAB', () => {
     expect(description('tap')).toContain(
-      'A wrapper with children (a container) laid after the content counts as drawn over all of its rect, unless it holds the target whole and is the screen\'s size or holds the target\'s whole scroll view,',
+      'A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over all of its rect, unless it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames —',
     );
     expect(description('tap')).toContain('tap the FAB\'s own button when that is the target, or scroll_until the row out of the host\'s band');
   });
 
   it('scroll_until points at it where it fails naming a cover', () => {
     expect(description('scroll_until')).toContain('it fails naming that element (on Android a floating action button\'s full-width host counts as one — see tap)');
+  });
+});
+
+/** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
+describe('tool descriptions on a screen presented over the target', () => {
+  const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+
+  it('tap: the general remedy defers to it, and its refusal says to close the screen first; a host with children is no such screen', () => {
+    expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below). ');
+    expect(description('tap')).toContain(
+      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first": \'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen\'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.',
+    );
+  });
+
+  it('scroll_until: one confirming read, then it stops without swiping further, saying which', () => {
+    expect(description('scroll_until')).toContain(
+      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read and stops without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it" — since a swipe there could dismiss a sheet or raise its discard prompt.',
+    );
+  });
+
+  it('troubleshooting: the entry, the wrapper sentence as the code has it, and the picker\'s exception over another screen', () => {
+    expect(TROUBLESHOOTING).toContain(
+      '- **`… a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen`** (tap or `scroll_until`): the target lies on the screen beneath a modal or sheet that is still up; nothing was tapped and no further swipe was sent.',
+    );
+    expect(TROUBLESHOOTING).toContain('A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over its whole rect, unless it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames:');
+    expect(TROUBLESHOOTING).toContain(
+      '— except over another screen: a scroll view of a modal or sheet laid in the same window over the entry\'s screen, or a full-screen leaf of it (its dimming view), covers the entry, which is skipped `covered by …`; a host with children there still does not.',
+    );
   });
 });
