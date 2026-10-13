@@ -76,7 +76,6 @@ export function cutRemedy(edge: Edge): string {
  */
 export const PRESENTED_OVER = 'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen';
 
-
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts
  * #whyNotTapped): `button "Sign in"`, `toolbar` — its role and its label

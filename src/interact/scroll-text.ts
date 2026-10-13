@@ -376,7 +376,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
       const under = `${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`;
       return new Error(
-        `scroll_until ${describe} stopped ${when} — element is in the viewport but ${under} — ${PRESENTED_OVER}, and a swipe on it may dismiss it, so none was sent. ` +
+        `scroll_until ${describe} stopped ${when} — element is in the viewport but ${under} — ${PRESENTED_OVER}, and a swipe on it may dismiss it, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
           `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       );
     }

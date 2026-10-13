@@ -1914,7 +1914,13 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     const played = play(IPHONE, [{ tree: login.tree, found: [] }, login, rowOf('finportalForgot', 'lang_sk'), rowOf('finportalForgot', 'lang_sk')]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'confirm', 'stop']);
     expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 1 });
-    expect(failureOf(played, 'id:lang_sk').message).toMatch(/^scroll_until id:lang_sk stopped after 1 swipe, without swiping further — /);
+    expect(failureOf(played, 'id:lang_sk').message).toMatch(/^scroll_until id:lang_sk stopped after 1 swipe, without swiping further — .*, and a swipe on it may dismiss it, so no further swipe was sent\. Last rect /);
+  });
+
+  it('no confirm left — the deadline reached on the first presented read: the stop comes at once, still with no stroke', () => {
+    const played = play(IPHONE, [{ ...rowOf('finportalForgot', 'lang_sk'), elapsedMs: IPHONE.timeoutMs }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    expect(played.outcome?.kind).toBe('presented');
   });
 
   it('a modal closing between the two reads: the confirming read finds the target clear — the stop is visible, still with no stroke', () => {
