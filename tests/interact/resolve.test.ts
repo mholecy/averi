@@ -99,6 +99,16 @@ describe('resolveNow — the one resolution policy, applied to one tree', () => 
       expect(() => resolveNow(tree, { id: 'dup' }, REFUSE)).toThrow(/Selector matches 2 elements: id:"dup"/);
     });
 
+    it('more than five candidates: both modes list the first five and say how many more there are', () => {
+      resetLayout();
+      const tree = screen(...['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((label) => el({ role: 'button', identifier: 'dup', label })));
+      const listed = ['A', 'B', 'C', 'D', 'E'].map((l) => `button id=dup label="${l}"`);
+      expect(() => resolveNow(tree, 'id:dup', REFUSE)).toThrow(
+        `Selector matches 7 elements: id:dup\n  ${listed.join('\n  ')}\n  …and 2 more\nNarrow it (add role:, id: or an exact text:) so exactly one element matches`,
+      );
+      expect(resolveNow(tree, 'id:dup', FIRST)?.note).toBe(`7 matches, none uniquely interactive; picked the first (${listed.join('; ')}; …and 2 more)`);
+    });
+
     it('a refusal is not a miss: resolveSettled propagates it at once instead of waiting out the budget', async () => {
       const { tree } = twoButtons();
       const fake = new FakeAdapter({ s: tree }, 's');
