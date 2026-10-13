@@ -1,6 +1,6 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
-import type { KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';

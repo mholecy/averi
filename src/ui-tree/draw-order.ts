@@ -130,7 +130,7 @@ export interface DrawOrder {
    * (soft-keyboard.ts#keyboardInTree stays `unknown` on an idb tree, and
    * with it every `shown`/`hidden` question of keyboard-cover.ts#readKeyboard
    * and the in-tree dismissal — a blind key there was measured to submit,
-   * K5d). One reader: ui-tree/keyboard-cover.ts#keyboardEdge, the one
+   * K5d). One reader: ui-tree/keyboard-position.ts#KeyboardPosition.line, the one
    * merge of every keyboard source into the line the tap, `scroll_until` and
    * the pixel assert judge and stroke against. Only a FLAT LIST
    * (`UiNode.flatList`, idb's mark) is read: WDA marks its band itself
@@ -144,7 +144,7 @@ export interface DrawOrder {
    * Is `node` idb's keyboard's OWN — its band's background, a key
    * (`sharesRow`), or a node listed after the background (Dictate)? The
    * keyboard's own UI on a flat list, as `UiNode.ofKeyboard` marks it on
-   * WDA's tree: under no band line (ui-tree/keyboard-cover.ts#keyboardEdge's
+   * WDA's tree: under no band line (ui-tree/keyboard-position.ts#KeyboardPosition.line's
    * `subject`). Always false on a tree with no band.
    */
   ofKeyboardBand(node: UiNode): boolean;

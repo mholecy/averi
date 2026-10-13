@@ -47,7 +47,7 @@ export interface ScrollUntilResult {
    *   loses to one above it), which can be a clean "fully visible"; a band that changes nothing is not applied.
    *   The band is a reading's the witness stood by, or — `source:
    *   'idb-band'`, present only then — idb's band, read off the tree by its
-   *   shape (ui-tree/keyboard-cover.ts#keyboardEdge): a keyboard LINE no
+   *   shape (ui-tree/keyboard-position.ts#KeyboardPosition.line): a keyboard LINE no
    *   reading says is shown, judged against all the same;
    *   docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
    * - `unlocated`: the window model's `unlocated` row — the input method

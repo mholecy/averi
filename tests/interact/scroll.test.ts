@@ -958,7 +958,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
  * idb's keyboard band in the stroke box (round 7, 2026-10-10; docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
  * soft-keyboard.md): idb marks no keyboard node, so the reading saw none and every stroke was `201 699 201 175` — a
  * touch-down on the keys (`Z X C V`, `5`), the form never scrolled, and the reply said "content exhausted". The band's
- * line (ui-tree/keyboard-cover.ts#keyboardEdge) now ends the stroke box, and (owner decision D2) the judgement is made above it.
+ * line (ui-tree/keyboard-position.ts#KeyboardPosition.line) now ends the stroke box, and (owner decision D2) the judgement is made above it.
  */
 describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
   const NO_STROKE_ON_KEYS = 'never on the keys';

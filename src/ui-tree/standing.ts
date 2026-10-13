@@ -13,7 +13,7 @@ import {
   type Cut,
   type Edge,
 } from './geometry.js';
-import type { KeyboardLine } from './keyboard-cover.js';
+import type { KeyboardLine } from './keyboard-position.js';
 import { tapPoint } from './selectors.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
@@ -237,7 +237,7 @@ export interface Scene {
  * (`stop`), its `fully: true` stop (`fully`), a tap, or the pixel assert's
  * read (`PixelPurpose`) — and the soft
  * keyboard's line the caller applies, if any
- * (ui-tree/keyboard-cover.ts#keyboardEdge builds it; `Scene`'s contract
+ * (ui-tree/keyboard-position.ts#KeyboardPosition.line builds it; `Scene`'s contract
  * says how each verb applies it, and what `witnessed` changes).
  */
 export type Purpose = TouchPurpose | PixelPurpose;

@@ -4,7 +4,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { farEdgeFrames, pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
-import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
+import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -672,9 +672,9 @@ describe('Scene.standing for the stop — a box that does not start at the origi
 const IPHONE_BARE = { box: box(402, 874), boxes: [box(402, 874)] };
 /** The Pixel_3a as built, no band read. */
 const PIXEL_BARE = { box: box(1080, 2220), boxes: [box(1080, 2220)] };
-/** The tap as interact/resolve.ts#refuseOffScreen asks it: with the tree's own keyboard line (idb's band, ui-tree/keyboard-cover.ts#keyboardEdge) for `n`. */
+/** The tap as interact/resolve.ts#refuseOffScreen asks it: with the tree's own keyboard line (idb's band, ui-tree/keyboard-position.ts#KeyboardPosition.line) for `n`. */
 const tapOf = (t: UiNode, n: UiNode): TouchPurpose => {
-  const line = keyboardEdge(undefined, sceneOf(t).order, n);
+  const line = keyboardPosition(sceneOf(t).order).line(n);
   return { of: 'tap', ...(line !== undefined && { keyboardTop: line }) };
 };
 /** An idb tree from `frame`-style elements (the idb parser's input). */

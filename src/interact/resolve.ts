@@ -1,7 +1,7 @@
 import { rectArea, type DeviceAdapter, type Point, type Rect, type Selector, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import { drawnOverText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
-import { keyboardEdge, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import { keyboardPosition, type KeyboardLine, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { sceneOf, type Scene, type Standing, type SystemBar } from '../ui-tree/standing.js';
@@ -520,9 +520,9 @@ export function systemBarRemedy(edge: SystemBar['edge'], scrolls: boolean | unde
  * (the first look's, or the one read again before a refusal), the scene of
  * the tree the node is in, and where the node stands for a tap there
  * (ui-tree/standing.ts#Scene.standing) — judged with the keyboard line the
- * tree alone gives (`keyboard`: idb's band, ui-tree/keyboard-cover.ts
- * #keyboardEdge with no reading — free, no device asked), never yet with a
- * reading's (`aimClearOfChrome` asks that lazily).
+ * tree alone gives (`keyboard`: idb's band, ui-tree/keyboard-position.ts
+ * #KeyboardPosition.line with no reading — free, no device asked), never yet
+ * with a reading's (`aimClearOfChrome` asks that lazily).
  */
 export interface TapJudgement {
   readonly screen: UsableScreen | undefined;
@@ -582,7 +582,7 @@ export async function refuseOffScreen(
 ): Promise<TapJudgement> {
   const scene = sceneOf(tree);
   // The first ask: the tree's own keyboard line (idb's band) and no reading's.
-  const keyboard = keyboardEdge(undefined, scene.order, node);
+  const keyboard = keyboardPosition(scene.order).line(node);
   const tap = { of: 'tap', ...(keyboard !== undefined && { keyboardTop: keyboard }) } as const;
   const first = scene.standing(node, screen, tap);
   if (onTheScreen(first)) return { screen, scene, standing: first, keyboard };
@@ -744,21 +744,22 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * a moved tap never lands on the status bar or the navigation bar (the
  * tree's root rect, or the node's own, when there is no screen — fail open,
  * as there). The keyboard line comes in two parts
- * (ui-tree/keyboard-cover.ts#keyboardEdge, which merges them):
+ * (ui-tree/keyboard-position.ts#KeyboardPosition.line, which merges them):
  * - the tree's own — idb's band — free, so `judged` was already asked with
  *   it (`refuseOffScreen`); a centre under it is `underKeyboard`, refused
  *   here with the keyboard's remedy (`keyboard.remedy`, the reading's) —
  *   docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
- * - a reading's (`keyboard.line`: the top of a cover the input method stands
- *   by, or WDA's band) — the soft keyboard is no cover node (Android lists
+ * - a reading's (`keyboard.position`'s `readingLine`, asked once: the top
+ *   of a cover the input method stands by, or WDA's band) — the soft keyboard is no cover node (Android lists
  *   none, and a band is believed only with its input method's word), so it
  *   is asked for ONLY when the centre is covered, and the standing asked
  *   again with the merged line: a piece under the keyboard is never aimed
  *   at. Its cost is the reading's, on that path only (on Android the
  *   touchable region and the witness, with the keyboard shown; nothing more
  *   with it hidden — the guard's first reading is reused).
- * A key of idb's band is the keyboard's own UI and under no band line, as
- * a WDA key is under no reading's.
+ * A key of idb's band is the keyboard's own UI and under no band line; a
+ * WDA key is exempt from the reading's questions, not from its line
+ * (ui-tree/keyboard-position.ts's residual).
  * docs/adr/0007-idb-keyboard-key-row-tiling.md
  *
  * Only nodes of the tree cover: a top bar the tree lists before the form —
@@ -773,7 +774,7 @@ export async function aimClearOfChrome(
   target: Target,
   node: UiNode,
   judged: TapJudgement,
-  keyboard: { readonly line: () => Promise<KeyboardLine | undefined>; readonly remedy: KeyboardRemedy },
+  keyboard: { readonly position: KeyboardPosition; readonly remedy: KeyboardRemedy },
   sent?: string,
 ): Promise<Aim> {
   const what = describeTarget(target);
@@ -781,7 +782,7 @@ export async function aimClearOfChrome(
   let standing = judged.standing;
   if (standing.kind === 'cut') throw new ClippedRefusal(refusal(cutFinding(standing.cut, node.rect, standing.minPiece)));
   if (standing.facts.centreCover !== undefined) {
-    const line = keyboardEdge(await keyboard.line(), judged.scene.order, node);
+    const line = keyboard.position.line(node, await keyboard.position.readingLine());
     if (line !== undefined && (line.y !== judged.keyboard?.y || line.witnessed !== judged.keyboard.witnessed)) {
       standing = judged.scene.standing(node, judged.screen, { of: 'tap', keyboardTop: line });
     }

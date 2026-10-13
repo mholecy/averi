@@ -17,7 +17,7 @@ keys as ordinary covers, with these effects:
 ## Decision
 
 idb's band is a `KeyboardLine` with `{ witnessed: false }`, built by the one merge,
-`ui-tree/keyboard-cover.ts#keyboardEdge`. The tap, `scroll_until`'s judgement and stroke, and the pixel assert all judge
+`ui-tree/keyboard-position.ts#KeyboardPosition.line`. The tap, `scroll_until`'s judgement and stroke, and the pixel assert all judge
 against it:
 
 - **The tap.** A centre under the line is refused with "under the soft keyboard … hide the keyboard first". This holds
