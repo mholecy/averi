@@ -1724,3 +1724,26 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     });
   });
 });
+
+describe('exposure.centreExcused — the later nodes the target column excused that hold the centre (the dismissal picker\'s one read, docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md)', () => {
+  const IPHONE = rect(0, 0, 402, 874);
+
+  it('counted at the node\'s reach, as `coverAt` asks: a keyboard-owned key pinned at the bottom of idb\'s flat list holds a text below its frame — excused, no cover, yet there', () => {
+    const app = uiNode({ role: 'other', label: 'app', rect: IPHONE });
+    const under = uiNode({ role: 'text', label: 'Under', rect: rect(42, 840, 150, 20) }); // centre (117,850), below the key's frame (780–824)
+    const key = uiNode({ role: 'button', label: 'Done', ofKeyboard: true, rect: rect(24, 780, 354, 44) });
+    const seen = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [app, under, key] })).exposure(under, IPHONE);
+    expect(seen).toMatchObject({ covers: [], centreExcused: [key], tapAt: { moved: false } });
+  });
+
+  it('only the excused that hold the centre — a cover there is a cover, not excused — and none when the centre lies outside `within`', () => {
+    const title = uiNode({ role: 'text', label: 'Title', rect: rect(100, 700, 200, 100) }); // centre (200,750)
+    const twin = uiNode({ role: 'button', label: 'Twin', rect: rect(100, 700, 200, 100) }); // the `sameFrame` row
+    const aside = uiNode({ role: 'button', label: 'Key', ofKeyboard: true, rect: rect(100, 700, 50, 30) }); // excused, off the centre
+    const bar = uiNode({ role: 'button', label: 'Bar', rect: rect(0, 745, 402, 10) }); // a cover across the centre
+    const order = drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [title, twin, aside, bar] }));
+    expect(order.exposure(title, IPHONE)).toMatchObject({ covers: [bar], centreCover: bar, centreExcused: [twin] });
+    // The box ends at 740, above the centre: the twin still meets what shows, but no tap lands at the centre.
+    expect(order.exposure(title, rect(0, 0, 402, 740))).toMatchObject({ covers: [], centreExcused: [] });
+  });
+});

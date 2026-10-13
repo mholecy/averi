@@ -38,7 +38,9 @@ import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type
  *   (`corroborated` for `witness`, `unlocated` for `unlocated`); a round asks
  *   at most once of each, the witness first. That re-entry is what keeps the
  *   reducer free of async: the two questions cost a device query each on
- *   Android, and which rounds pay them is the rule this module owns.
+ *   Android. Which read asks the witness is
+ *   interact/scroll-read.ts#judgeRead's rule; the probe's late witness and
+ *   `unlocated` are this module's.
  * - `confirm`: settle, read again, send nothing. `stroke`: draw the stroke
  *   the step describes and hand it back, as sent, in the next round's
  *   `drawn` — the "same stroke twice" identity is the points as sent
@@ -49,10 +51,8 @@ import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type
  * - `stop`: the scroll is over; `outcome` says how (interact/scroll-text.ts
  *   renders it — the reply or the failure, one switch over its kind).
  *
- * ORDER inside a round, fixed: the round's judgement over the whole screen,
- * then — when the reading offers a cover and the band is not moot — the
- * witness (`ask witness`), the covered judgement replacing the whole one
- * only when it stood by the band; motion observed (a read that read only);
+ * ORDER inside a round, fixed: the read's judgement, its `ask witness`
+ * included (interact/scroll-read.ts#judgeRead); motion observed (a read that read only);
  * the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness`
  * first for a band the moot rule left unasked — PROBE_REACH; then `ask

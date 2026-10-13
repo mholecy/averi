@@ -8,7 +8,7 @@ import type { TreeRead } from './read-tree.js';
  * stands?" (standing.ts#Scene judges on it): the tap (whose standing
  * the in-tree keyboard dismissal picker asks too,
  * interact/keyboard-in-tree.ts), `scroll_until`'s stop
- * (interact/scroll-rounds.ts, over the screen interact/scroll.ts reads each
+ * (interact/scroll-read.ts, over the screen interact/scroll.ts reads each
  * round), the pixel assert (verify/pixel-poll.ts#overElement) and, for
  * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and
  * its throw over it and judges nothing).
@@ -128,7 +128,7 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * one draw-order.ts sizes its hosts against — the root's rect, or the
  * largest node's when the root has no area) as a usable screen,
  * `from: 'tree'`, with no band. Every judgement with no usable screen reads
- * it, and nothing else: standing.ts#Scene's three purposes when handed
+ * it, and nothing else: standing.ts#Scene's purposes when handed
  * none, the pixel assert's last resort (verify/pixel-poll.ts) and the tap
  * refusal's quoted screen (interact/resolve.ts#refuseOffScreen).
  *
