@@ -21,6 +21,8 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
 const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
 const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
+/** The round-12 device check's ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
+const STACKED = JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
 
 describe('drawnOver — the nodes drawn over a clipping container (the floating tab bar)', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
@@ -1338,10 +1340,11 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       }
     });
 
-    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back (whether real bars nest so is unmeasured)', () => {
+    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back, and (ADR 0018) so does the content layer\'s own frame, the full-screen container carrying the form (whether real bars nest so is unmeasured)', () => {
       const text = iban();
       const { tree, back } = swiftForm(uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [text] }), (bar) => uiNode({ role: 'other', rect: IPHONE, children: [bar] }));
-      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([text]);
+      const content = tree.children[0].children[0].children[1];
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([content, content.children[0], text]);
     });
 
     it('both sides must be screens: Back in a full-screen host, the form beside that host in no screen-sized layer of its own — still the same screen, Back is tapped', () => {
@@ -1366,13 +1369,14 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree).exposure(backdrop, IPHONE).covers).not.toContain(row);
     });
 
-    it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text', () => {
+    it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text — and (ADR 0018) through its own surface: the layer, its frame and the web view, all carrying the text', () => {
       const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
       const terms = uiNode({ role: 'text', label: 'Terms and conditions', rect: rect(16, 690, 370, 80) });
       const screen = uiNode({ role: 'other', rect: IPHONE, children: [pay] });
       const modal = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [terms] })] })] });
       const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', label: 'window', rect: IPHONE, children: [screen, modal] })] });
-      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([terms]);
+      const frame = modal.children[0];
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([modal, frame, frame.children[0], terms]);
     });
 
     it('the residual, stated: a web view under the screen\'s size (above a tab bar) under a translucent bar covers Back through its own FRAME — its content excused, its frame no content-framed surface', () => {
@@ -1418,6 +1422,103 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const input = uiNode({ role: 'textfield', identifier: 'TextFieldWithComponentStyle', rect: rect(26, 366, 350, 30) });
       const label = uiNode({ role: 'text', identifier: 'TextFieldWithComponentStyle', label: 'IBAN', rect: rect(42, 372, 120, 18) });
       expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), input, label] })).exposure(input, IPHONE).covers).toEqual([]);
+    });
+  });
+});
+
+/**
+ * A later STACKED screen-sized layer covers the screen beneath it through its OWN surface, when the layer carries
+ * content (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, the owner's decision Q1 (a),
+ * 2026-10-13): a node `structural`, `screenSizedHost` or `contentFramed` would excuse by its frame still covers a target
+ * when, below the node holding both — inside one window — it lies in a screen-sized layer and the target in another
+ * (`stackedScreens`, asked of the node), and the layer carries something drawable; a bare frame of the layer stays
+ * excused. Measured on the round-12 device check's ui_snapshots (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
+ */
+describe('exposure — a later stacked screen layer covers the screen beneath through its own surface (ADR 0018)', () => {
+  const IPHONE = rect(0, 0, 402, 874);
+  const screen = (key: string) => STACKED.screens[key];
+  const byId = (tree: UiNode, id: string) => [...everyNode(tree)].find((n) => n.identifier === id || n.label === id)!;
+  /** An unidentified, unlabelled, unvalued `container` leaf — a bare frame. */
+  const bareFrame = (n: UiNode) => n.role === 'container' && n.children.length === 0 && !n.identifier && !n.label && !n.value;
+
+  it('measured, Finportal\'s RN transparent Modal (#248): lang_sk shows nothing — the dimming leaf `forgot_overlay` is on top at its centre; the layer\'s bare frames are no cover', () => {
+    const tree = screen('finportalForgot');
+    const seen = drawOrder(tree).exposure(byId(tree, 'lang_sk'), IPHONE);
+    expect(seen.shows).toBe(0);
+    expect(seen.centreCover?.identifier).toBe('forgot_overlay');
+    expect(seen.covers.filter(bareFrame)).toEqual([]);
+    expect(seen.tapAt).toBeUndefined();
+  });
+
+  it('measured, Contacts\' New Contact page sheet (#146, #150): the list\'s photo buttons show nothing — the sheet\'s form `scrollable 0,62 402x812` is on top at Kate Bell\'s; the dimming leaf `-402,-874 1206x2622` is no cover', () => {
+    for (const [key, label] of [['contactsSheet', 'Contact photo for Kate Bell'], ['contactsSheetScrolled', 'Contact photo for Hank M. Zakroff']] as const) {
+      const tree = screen(key);
+      const seen = drawOrder(tree).exposure(byId(tree, label), IPHONE);
+      expect(seen.shows).toBe(0);
+      expect(seen.covers.filter(bareFrame)).toEqual([]);
+    }
+    const tree = screen('contactsSheet');
+    expect(drawOrder(tree).exposure(byId(tree, 'Contact photo for Kate Bell'), IPHONE).centreCover).toMatchObject({ role: 'scrollable', rect: rect(0, 62, 402, 812) });
+  });
+
+  it('no regression, measured: the layer\'s own nodes, and every node of the login screen with no modal (#218), read uncovered', () => {
+    const coveredOf = (tree: UiNode, keep: (n: UiNode) => boolean) => {
+      const order = drawOrder(tree);
+      return [...everyNode(tree)].filter((n) => keep(n) && rectWithin(n.rect, IPHONE) && n.rect.width * n.rect.height > 0 && (isInteractive(n) || n.label) && order.exposure(n, IPHONE).covers.length > 0).map((n) => n.identifier ?? n.label);
+    };
+    expect(coveredOf(screen('finportalLogin'), () => true)).toEqual([]);
+    expect(coveredOf(screen('finportalForgot'), (n) => n.identifier?.startsWith('forgot_') === true)).toEqual([]);
+  });
+
+  describe('the rule\'s edges, on synthetic trees', () => {
+    const pay = () => uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
+    const card = () => uiNode({ role: 'text', label: 'Reset account', rect: rect(16, 301, 370, 220) });
+    /** One window: the screen beneath (a full-screen layer holding `target`), then `layer`. */
+    const window = (target: UiNode, layer: UiNode) =>
+      uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [target] }), layer] })] });
+    const covers = (tree: UiNode, target: UiNode) => drawOrder(tree).exposure(target, IPHONE).covers;
+
+    it('each of the three frame rules gives way: an unlabelled wrapper holding the target whole, a screen-sized host, a scroll view — each covers, with its content away from the target', () => {
+      const wrapper = uiNode({ role: 'container', rect: IPHONE, children: [card()] });
+      const host = uiNode({ role: 'toolbar', rect: IPHONE, children: [card()] });
+      const scroll = uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 812), children: [card()] });
+      for (const layer of [wrapper, host, scroll]) {
+        const target = pay();
+        expect(covers(window(target, layer), target)).toEqual([layer]);
+      }
+    });
+
+    it('a bare frame of the layer stays excused; a leaf the app named (the dimming root `forgot_overlay`) covers', () => {
+      const target = pay();
+      const bare = uiNode({ role: 'container', rect: IPHONE });
+      const overlay = uiNode({ role: 'container', identifier: 'forgot_overlay', rect: IPHONE });
+      const layer = uiNode({ role: 'container', rect: IPHONE, children: [overlay, bare, card()] });
+      expect(covers(window(target, layer), target)).toEqual([layer, overlay]);
+    });
+
+    it('a layer carrying nothing drawable stays excused: empty frames only, or an itemless toolbar (WDA\'s `toolbar \'Toolbar\'` host, as Finportal and SwiftUI list it)', () => {
+      const frames = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] })] });
+      const toolbarHost = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] })] });
+      for (const layer of [frames, toolbarHost]) {
+        const target = pay();
+        expect(covers(window(target, layer), target)).toEqual([]);
+      }
+    });
+
+    it('only inside one window: the same layer as a later WINDOW, a child of the root, covers only through its content — a pass-through window (the parked input-accessory Window, wda-source-myport-2fa-keyboard-parked.json, its Done toolbar at the bottom)', () => {
+      const target = pay();
+      const done = uiNode({ role: 'toolbar', label: 'Toolbar', rect: rect(0, 826, 402, 48), children: [uiNode({ role: 'button', label: 'Done', rect: rect(317, 831, 64, 38) })] });
+      const accessoryWindow = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [done] })] });
+      const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [target] })] }), accessoryWindow] });
+      expect(covers(tree, target)).toEqual([]);
+    });
+
+    it('not two screens: a target with no screen-sized layer of its own below the node holding both (a bar\'s button, a backdrop directly in it) — the later layer\'s frame is judged as before', () => {
+      const back = uiNode({ role: 'button', label: 'Back', rect: rect(16, 62, 44, 44) });
+      const bar = uiNode({ role: 'container', rect: rect(0, 62, 402, 54), children: [back] });
+      const content = uiNode({ role: 'container', rect: IPHONE, children: [card()] });
+      const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [bar, content] })] });
+      expect(covers(tree, back)).toEqual([]);
     });
   });
 });

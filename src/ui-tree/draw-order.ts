@@ -348,20 +348,64 @@ const screenLayerBelow = (from: Placed | undefined, above: Placed, screenArea: n
   return false;
 };
 
+/** The nearest node holding both `later` (above it) and `target`; undefined when none does. */
+const holderOf = (later: Placed, target: Placed): Placed | undefined => {
+  let both = later.parent;
+  while (both !== undefined && !within(target, both)) both = both.parent;
+  return both;
+};
+
 /**
  * `scroller` and `target` lie in two STACKED SCREENS (the `scrolledContent`
- * row): below the nearest node holding both, each lies in a screen-sized
+ * row; `overScreenBeneath` asks it of any node, inside one window): below the nearest node holding both, each lies in a screen-sized
  * layer of its own — the later one, the scroller's, drawn over the earlier
  * (an RN transparent Modal presented over the screen, a full-screen sheet)
  * — or that node is a root of no area, the parser's holder of several
  * WINDOWS, each drawn over the ones before it.
  */
 const stackedScreens = (scroller: Placed, target: Placed, screenArea: number): boolean => {
-  let both = scroller.parent;
-  while (both !== undefined && !within(target, both)) both = both.parent;
+  const both = holderOf(scroller, target);
   if (both === undefined) return false;
   if (both.parent === undefined && rectArea(both.node.rect) === 0) return true;
   return screenLayerBelow(scroller, both, screenArea) && screenLayerBelow(target.parent, both, screenArea);
+};
+
+/**
+ * `n` carries something DRAWABLE: a descendant that is neither an empty frame (`emptyFrame`) nor an itemless toolbar
+ * (`itemless`, whose frames are not looked into). False of a leaf, of a node of empty frames only (`framesOnly`), and of
+ * one whose content is only itemless toolbars (WDA's `toolbar 'Toolbar'` hosts, the parked accessory's Window).
+ */
+const carriesContent = (n: UiNode): boolean => n.children.some((child) => !itemless(child) && (!emptyFrame(child) || carriesContent(child)));
+
+/** The child of `both` on `placed`'s branch — or `placed` itself when it is one: the layer `placed` lies in below `both`. */
+const layerOf = (placed: Placed, both: Placed): Placed => {
+  let layer = placed;
+  while (layer.parent !== undefined && layer.parent !== both) layer = layer.parent;
+  return layer;
+};
+
+/**
+ * A LATER STACKED SCREEN over the target: the exception to the three rows that excuse a node of a target by its
+ * FRAME (`structural`'s wrapper, `screenSizedHost`, `contentFramed`). The node covers after all when
+ * - it is no bare frame (`emptyFrame` with nothing drawable in it — a spacer of the layer stays excused, so a leaf the
+ *   app named, the RN Modal's dimming root `forgot_overlay`, covers and an anonymous one does not);
+ * - it and the target lie in two STACKED SCREENS (`stackedScreens`, asked of the node as of a scroller: below the node
+ *   holding both, each lies in a screen-sized layer of its own) INSIDE ONE WINDOW — the node holding both is not the
+ *   tree's root, whose children are WDA's Windows (the parser's 0×0 holder of Android's, idb's flat list): a later
+ *   Window may be a pass-through one, the parked input-accessory Window over every screen
+ *   (wda-source-myport-2fa-keyboard-parked.json), so across Windows only content covers, as before;
+ * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
+ *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
+ * Measured: Finportal's RN transparent Modal (its dimming leaf, its frames, its card) and Contacts' New Contact page
+ * sheet (its form `scrollable 0,62 402x812`, 0.929 of the screen), each laid in the app's Window after the screen
+ * beneath, which a tap was sent to through the layer. The owner's decision (Q1 (a), 2026-10-13) and its residuals:
+ * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
+ */
+const overScreenBeneath = (placed: Placed, target: Placed, screenArea: number): boolean => {
+  if (emptyFrame(placed.node) && !carriesContent(placed.node)) return false;
+  const both = holderOf(placed, target);
+  if (both?.parent === undefined) return false;
+  return carriesContent(layerOf(placed, both).node) && stackedScreens(placed, target, screenArea);
 };
 
 /**
@@ -530,13 +574,27 @@ const NOT_DRAWN = {
    * unlabelled frames no longer cover the switcher they lie in), reads as
    * drawing nothing — a false "clear"; WDA gives such a node no trait that
    * tells it from the cell's background.
+   * Except over ANOTHER SCREEN (`overScreenBeneath`, ADR 0018): a wrapper
+   * that is, or lies in, a later screen-sized layer stacked over the
+   * target's own, in one window, whose layer carries content, covers — the
+   * React Native transparent Modal's dimming root `forgot_overlay 0,0
+   * 402x874` (a leaf the app named) and the frames holding the modal were
+   * excused here, and a tap on the login screen beneath was sent onto them.
    * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   structural: {
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: ({ node }, { target, screenArea }) =>
-      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
+    target: (placed, { target, screenArea }) => {
+      const { node } = placed;
+      return (
+        STRUCTURAL_ROLES.has(node.role) &&
+        !node.label &&
+        !node.value &&
+        (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))) &&
+        !overScreenBeneath(placed, target, screenArea)
+      );
+    },
   },
 
   /**
@@ -551,12 +609,19 @@ const NOT_DRAWN = {
    * of its screen; it draws nothing over them, yet every `keyboardDismiss`
    * tap on that screen was refused as "covered by toolbar". An interactive
    * one still covers: a full-screen `button` backdrop (an RN transparent
-   * Modal's Pressable) takes the tap. Accepted trade-off: a full-screen
-   * non-interactive host with nothing of its own at the point (an RN
-   * ScrollView in a transparent modal whose rows are below the title)
-   * reads as not covering, and the tap lands on it — for the in-tree
-   * keyboard dismissal (interact/keyboard-in-tree.ts#pickDismissal), on the
-   * guard's path a keyboard that stays, or a target gone, ends in
+   * Modal's Pressable) takes the tap. And so does a host that is, or lies
+   * in, a later screen-sized layer STACKED over the target's own screen in
+   * one window, carrying content (`overScreenBeneath`, ADR 0018 — the owner
+   * superseded the trade-off this row accepted, a transparent modal's host
+   * read as not covering): a sheet's or a modal's surface is a screen drawn
+   * over the screen beneath, measured to swallow the tap. The measured
+   * toolbar host stays excused: itemless, it carries nothing, and it lies in
+   * the title's own screen. Accepted trade-off still: a full-screen
+   * non-interactive host with nothing of its own at the point IN THE
+   * TARGET'S OWN SCREEN — or in a later Window, which may pass touches
+   * through — reads as not covering, and the tap lands on it; for the
+   * in-tree keyboard dismissal (interact/keyboard-in-tree.ts#pickDismissal),
+   * on the guard's path a keyboard that stays, or a target gone, ends in
    * `AfterDismissalTap`; a tap that hides the keyboard AND does something
    * of its own passes silently (`hidden by tapping <title> before
    * tapping`), and on the post-fill `dismiss()` path is reported as
@@ -570,7 +635,7 @@ const NOT_DRAWN = {
    */
   screenSizedHost: {
     drawnOver: ({ node }, { screenArea }) => screenSized(node, screenArea),
-    target: ({ node }, { screenArea }) => !isInteractive(node) && screenSized(node, screenArea),
+    target: (placed, { target, screenArea }) => !isInteractive(placed.node) && screenSized(placed.node, screenArea) && !overScreenBeneath(placed, target, screenArea),
   },
 
   /**
@@ -599,7 +664,11 @@ const NOT_DRAWN = {
    * (the input-accessory bar draws an opaque 48-pt bar, measured), and any non-interactive parent ("judge only by leaves",
    * which would drop a smaller card or sheet whose background is the
    * cover). What still covers: its content at the point, a childless
-   * scrollable, an interactive node of any role. Accepted trade-off, this
+   * scrollable, an interactive node of any role — and a scroll view that is,
+   * or lies in, a later screen-sized layer stacked over the target's own
+   * screen, carrying content (`overScreenBeneath`, ADR 0018): Contacts' New
+   * Contact page sheet's form `scrollable 0,62 402x812`, whose bare
+   * background took a tap sent to the list beneath. Accepted trade-off, this
    * row LOOSENS the guard: a scroll view really drawn over the point with
    * nothing non-structural there (a sheet's table whose row at the title is
    * a bare `Cell`) reads as not covering — the outcomes are the
@@ -614,7 +683,8 @@ const NOT_DRAWN = {
    */
   contentFramed: {
     // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
-    target: ({ node }) => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
+    target: (placed, { target, screenArea }) =>
+      !isInteractive(placed.node) && placed.node.children.length > 0 && CONTENT_FRAMED_ROLES.has(placed.node.role) && !overScreenBeneath(placed, target, screenArea),
   },
 
   /**
@@ -630,7 +700,8 @@ const NOT_DRAWN = {
    * outside its scroll view's frame on top of it; the scroll view itself
    * is judged by `contentFramed`. A row of the SAME scroll view as the
    * target (a sticky section header over a row) still covers, and so does
-   * the content of a scroller in a LATER screen — an RN transparent Modal
+   * the content of a scroller in a LATER screen (and, inside one window, that
+   * screen's own surface: `overScreenBeneath`, ADR 0018) — an RN transparent Modal
    * presented over the screen (a later screen-sized layer, in the same
    * window or another), a full-screen sheet's list, a later window under
    * the parser's 0×0 root (an assumption: uiautomator's z-order across

@@ -249,6 +249,42 @@ describe('judgeTap(…).aim() — cut, cover, keyboard, after the guard', () => 
   });
 });
 
+/**
+ * A later STACKED screen-sized layer's own surface covers the screen beneath it when it carries content (ADR 0018, the
+ * owner's decision Q1 (a), 2026-10-13) — the two bug notes of the round-12 device check, each a tap reported "Tapped"
+ * that landed on the layer, on the real ui_snapshots of those calls (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
+ */
+describe('judgeTap(…).aim() — a later stacked screen layer over the target (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
+  const screens = async () =>
+    (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+
+  it('the RN transparent Modal\'s dimming root over the login screen (#248): lang_sk is refused as under `forgot_overlay`, never tapped (device: "Tapped", the shim\'s tap at 290,251 swallowed)', async () => {
+    const { outcome } = await judge((await screens()).finportalForgot, 'lang_sk', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'CoveredRefusal: lang_sk is under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped',
+    );
+  });
+
+  it('…and login_title, its centre under the modal\'s card: nothing of it shows — the strip beside the card the device reply said "shows" is the overlay\'s', async () => {
+    const { outcome } = await judge((await screens()).finportalForgot, 'login_title', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'CoveredRefusal: login_title is under container id:forgot_modal (16,301 370x220) at its centre (201,303), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped',
+    );
+  });
+
+  it('the Contacts New Contact page sheet over the list (#146): a row\'s photo button under the sheet\'s bare background is refused as under the sheet (device: "Tapped" at 41,290)', async () => {
+    const { outcome } = await judge((await screens()).contactsSheet, 'Contact photo for Kate Bell', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'CoveredRefusal: Contact photo for Kate Bell is under scrollable (0,62 402x812) at its centre (41,290), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped',
+    );
+  });
+
+  it('no regression: the login screen with no modal (#218) — lang_sk tapped at its centre; and the modal\'s own Close is tapped at its centre', async () => {
+    expect(said((await judge((await screens()).finportalLogin, 'lang_sk', { first: IPHONE })).outcome)).toBe('{"point":{"x":290,"y":251}}');
+    expect(said((await judge((await screens()).finportalForgot, 'forgot_close', { first: IPHONE })).outcome)).toBe('{"point":{"x":201,"y":800}}');
+  });
+});
+
 describe('the reading\'s line — asked lazily, once', () => {
   it('asked once when a node covers the centre', async () => {
     const { asked } = await judge(sheet(), 'row', { first: PIXEL }, { kb: reading(1380) });
