@@ -15,7 +15,7 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * the reading built off it — and the pixel poll one per tree it judges, with
  * no reading. `scroll_until`'s read builds more than one off one tree, none
  * holding a reading: one for its judgement (idb's band and the read's
- * keyboard marks; the reading's cover is the round's, offered beside it),
+ * keyboard marks; the round's reading cover, when it offers one, is preferred over the band (scroll-read.ts#judgeRead)),
  * and one for each stroke line (interact/scroll-read.ts#strokeLine), handed
  * the line of the cover the round, or its probe, applied:
  * - the tap (interact/tap-judgement.ts: the on-screen rule with the tree's own
