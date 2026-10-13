@@ -1524,7 +1524,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
     it('`presented` lists only the surfaces the exception un-excuses — an unlabelled leaf, a scroll view — never a cover that covered anyway: a labelled leaf or a control of the layer (Safari\'s capsule bar, W3 of the round-12 check), whose sentence stays "scroll_until it first"', () => {
       const target = pay();
       const dim = uiNode({ role: 'other', rect: IPHONE });
-      const labelled = uiNode({ role: 'other', label: 'Address', rect: rect(0, 690, 402, 80) });
+      const labelled = uiNode({ role: 'other', label: 'Address', rect: IPHONE }); // screen-filling, so only its label keeps it from being the frame rows' to excuse
       const button = uiNode({ role: 'button', label: 'Back', rect: rect(24, 700, 48, 48) });
       const order = (...surface: UiNode[]) => drawOrder(window(target, uiNode({ role: 'container', rect: IPHONE, children: [...surface, card()] }))).exposure(target, IPHONE);
       expect(order(dim)).toMatchObject({ covers: [dim], presented: [dim] });
@@ -1555,7 +1555,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       const header = [...everyNode(login)].find((n) => n.role === 'container' && n.rect.height === 102)!;
       expect(drawOrder(login).exposure(header, IPHONE).covers).toEqual([]);
       const image = uiNode({ role: 'image', label: 'Header', rect: rect(0, 0, 402, 102) });
-      const gradient = uiNode({ role: 'other', rect: rect(0, 0, 402, 140) }); // a leaf of the content layer over the header: a surface, were the layers two screens
+      const gradient = uiNode({ role: 'other', rect: rect(0, 0, 402, 877) }); // a screen-filling leaf of the content layer over the header: a surface, were the layers two screens
       const content = uiNode({ role: 'container', rect: rect(0, 0, 402, 877), children: [gradient, card()] });
       const scroll = uiNode({ role: 'scrollable', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [image] }), content] });
       const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [scroll] })] });
