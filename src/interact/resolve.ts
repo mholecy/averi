@@ -189,11 +189,15 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
   if ('chosen' in pick) return { node: pick.chosen, ...(pick.note !== undefined && { note: pick.note }) };
   const candidates = pick.survivors;
   if (candidates.length === 0) return undefined;
+  // The first SHOWN candidates, then how many were left out — a list that
+  // stopped at five without saying so read as the whole match.
+  const SHOWN = 5;
+  const more = candidates.length - SHOWN;
   const summary = (sep: string) =>
-    candidates
-      .slice(0, 5)
-      .map((n) => `${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`)
-      .join(sep);
+    [
+      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`),
+      ...(more > 0 ? [`…and ${more} more`] : []),
+    ].join(sep);
   if (opts.ambiguous === 'refuse') {
     throw new AmbiguityRefusal(
       `Selector matches ${candidates.length} elements: ${describeTarget(target)}\n  ${summary('\n  ')}` +

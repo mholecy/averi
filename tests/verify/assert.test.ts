@@ -2053,7 +2053,7 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
   const BELOW = { x: 0, y: 1285, width: 1000, height: 715 };
   const COVERED =
     'the soft keyboard covers the element (element 100,200 800x100, keyboard 0,250 1000x1750) — ' +
-    'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the one configured for the guard to tap, before this assert, ' +
+    'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the screen title, before this assert, ' +
     'or `dismissKeyboard: true` on a fill that leaves it up); this adapter cannot hide it on its own (ADVICE)';
   const fill = (p: PNG, hex: string): void => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
@@ -2392,7 +2392,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
 describe('pixel asserts under idb\'s keyboard band (D2)', async () => {
   const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements as { AXUniqueId?: string | null; AXLabel?: string | null; frame: Record<string, number> }[];
   const KEYBOARD_REMEDY =
-    'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the one configured for the guard to tap, before this assert, ' +
+    'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the screen title, before this assert, ' +
     'or `dismissKeyboard: true` on a fill that leaves it up); this adapter cannot hide it on its own (ADVICE); failing closed, color unchecked';
   /** The number pad (band 0,589 402x285), value_date_select moved to `y`. */
   const pad = (y: number) => {

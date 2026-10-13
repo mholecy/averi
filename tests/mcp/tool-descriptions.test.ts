@@ -145,3 +145,42 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(snapshotNote(bare)).toContain('assert polls (3.25 s by default');
   });
 });
+
+/**
+ * What the descriptions say an idb tree's keyboard does (ADR 0006): idb marks
+ * no keyboard, but its band, read by its shape, is a keyboard line for the
+ * tap, scroll_until and the pixel assert alike — no description may say
+ * nothing changes under idb.
+ */
+describe('tool descriptions on idb\'s keyboard band', () => {
+  it('scroll_until judges against the band: viewport above it, swipes above it, no centre below it', () => {
+    expect(description('scroll_until')).toContain('With the soft keyboard up (Android; iOS with treeSource: wda, or idb\'s band read by its shape) the viewport is the screen ABOVE it');
+    expect(description('scroll_until')).toContain(
+      'With treeSource: idb nothing in the tree is marked as the keyboard; averi reads where its background starts by its shape and judges against that line as above: the swipes touch down above it, no stop has the element\'s centre below it, and with fully: true none of the element may lie below it.',
+    );
+    expect(description('scroll_until')).not.toContain('nothing changes there');
+  });
+
+  it('a color/ocr assert counts the band as covering', () => {
+    expect(description('assert')).toContain('one under the soft keyboard (Android; iOS with treeSource: wda, or idb\'s band read by its shape)');
+  });
+
+  it('the tap: a centre under the band is refused, and a covered node was measured absent from idb\'s tree', () => {
+    expect(description('tap')).toContain('a target whose centre lies below that line is REFUSED, nothing tapped');
+    expect(description('tap')).toContain('Measured twice on iOS 27, a covered node was absent from idb\'s tree and the tap timed out waiting for it to appear.');
+  });
+});
+
+/** The structural row's trade-off (draw-order.ts NOT_DRAWN.structural), said where a refusal beside a floating action button is read. */
+describe('tool descriptions on a wrapper counted as a cover', () => {
+  it('tap says when a wrapper with children covers, and what to do beside a FAB', () => {
+    expect(description('tap')).toContain(
+      'A wrapper with children (a container) laid after the content counts as drawn over all of its rect, unless it holds the target whole and is the screen\'s size or holds the target\'s whole scroll view,',
+    );
+    expect(description('tap')).toContain('tap the FAB\'s own button when that is the target, or scroll_until the row out of the host\'s band');
+  });
+
+  it('scroll_until points at it where it fails naming a cover', () => {
+    expect(description('scroll_until')).toContain('it fails naming that element (on Android a floating action button\'s full-width host counts as one — see tap)');
+  });
+});

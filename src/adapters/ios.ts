@@ -399,15 +399,27 @@ export class IosAdapter implements DeviceAdapter {
    * sentence also says where the measured dismissal is configured —
    * `app.ios.keyboardDismiss` in averi.yaml (flow/config.ts), which the
    * guard taps before a covered target — so the refusals above this layer
-   * point at the fix without naming an iOS config key themselves.
+   * point at the fix without naming an iOS config key themselves. That holds
+   * under WDA only: under idb no guard acts (the idb source marks no node as
+   * the keyboard — the comment above), the list is inert
+   * (config.ts#inertKeyboardDismissNote), and the refusal that reaches an
+   * idb user is the band line's (ADR 0006) — so there the sentence says to
+   * tap the dismissal yourself, and that the list applies under WDA.
    */
-  readonly keyboardAdvice =
-    'the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, ' +
-    "the return key submits from the field, WebDriverAgent's keyboard/dismiss fails and a swipe does nothing; " +
-    'a tap on a neutral, non-interactive element (a title label) was measured to hide it without submitting, ' +
-    'and so was the input-accessory toolbar\'s Done — name them under app.ios.keyboardDismiss in averi.yaml ' +
-    '(tap: { id: <title> }, accessory: true) and the guard taps the first one on screen before a covered target; ' +
-    'typing with a hardware keyboard keeps the software keyboard from showing';
+  get keyboardAdvice(): string {
+    const fix =
+      this.treeSource.kind === 'wda'
+        ? 'name them under app.ios.keyboardDismiss in averi.yaml (tap: { id: <title> }, accessory: true) and the guard taps the first one on screen before a covered target'
+        : 'tap one yourself first: with treeSource: idb no guard acts, so app.ios.keyboardDismiss is inert ' +
+          '(with treeSource: wda the guard taps its first on-screen entry before a covered target)';
+    return (
+      'the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, ' +
+      "the return key submits from the field, WebDriverAgent's keyboard/dismiss fails and a swipe does nothing; " +
+      'a tap on a neutral, non-interactive element (a title label) was measured to hide it without submitting, ' +
+      `and so was the input-accessory toolbar's Done — ${fix}; ` +
+      'typing with a hardware keyboard keeps the software keyboard from showing'
+    );
+  }
 
   async isAppRunning(bundleId: string): Promise<boolean> {
     const { stdout } = await this.simctl(['spawn', this.udid, 'launchctl', 'list']);
