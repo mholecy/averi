@@ -5,6 +5,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { farEdgeFrames, pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
+import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
@@ -54,8 +55,10 @@ const fixture = async (name: string): Promise<string> => readFile(new URL(`../fi
 const idbAt = async (name: string, ...path: string[]): Promise<UiNode> =>
   parseIdbDescribeAll(JSON.stringify(path.reduce<any>((j, k) => j[k], JSON.parse(await fixture(name)))));
 
-const IPHONE = { box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 };
-const PIXEL = { box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 };
+/** A usable screen (ui-tree/usable-screen.ts#UsableScreen) of the device's size, `oriented` its box: what every purpose is handed — the pixel assert judges `oriented`, the touches `box`/`boxes`. */
+const usable = (screen: StandingScreen): UsableScreen => ({ ...screen, oriented: screen.box, from: 'device' });
+const IPHONE = usable({ box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 });
+const PIXEL = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 });
 const PLAIN = { of: 'stop' } as const;
 /** A keyboard line (ui-tree/keyboard-cover.ts#KeyboardLine): WDA's band by default, witnessed; idb's band, which no reading stands by. */
 const wda = (y: number): KeyboardLine => ({ y, source: 'wda', witnessed: true });
@@ -372,7 +375,7 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
 
   it('portrait only (N-c): the Settings shape on a landscape box is measured', async () => {
     const t = parseDump(SETTINGS_FLUSH);
-    const landscape = { box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 2154 };
+    const landscape = usable({ box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 2154 });
     expect(said(sceneOf(t).standing(byId(t, 'title'), landscape, OCR(byId(t, 'title'))))).toMatchObject({ kind: 'reachable' });
   });
 
@@ -397,8 +400,8 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     const over = node({ role: 'button', identifier: 'over', rect: { x: 0, y: 1000, width: 1080, height: 200 } });
     const android = node({ role: 'container', rect: box(1080, 2220), children: [tall, over] });
     expect(said(sceneOf(android).standing(tall, { ...PIXEL_NAV }, OCR(tall)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'top' } });
-    expect(said(sceneOf(android).standing(tall, { box: box(1080, 2220), boxes: [box(1080, 2220)], navigationBand: 2154 }, OCR(tall)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom' } });
-    expect(said(sceneOf(android).standing(tall, { box: box(1080, 2220), boxes: [box(1080, 2220)] }, OCR(tall)))).toMatchObject({ kind: 'covered', cover: 'over' });
+    expect(said(sceneOf(android).standing(tall, usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], navigationBand: 2154 }), OCR(tall)))).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom' } });
+    expect(said(sceneOf(android).standing(tall, usable({ box: box(1080, 2220), boxes: [box(1080, 2220)] }), OCR(tall)))).toMatchObject({ kind: 'covered', cover: 'over' });
   });
 
   it('`covered.aboveKeyboard` is filled: false — the pixel judges no cover above a line, an element the band meets being under the keyboard first', async () => {
@@ -503,7 +506,7 @@ describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `f
       const bands = [{}, { statusBand: status }, ...(os === 'android' ? [{ statusBand: status, navigationBand: 2154 }, { statusBand: status, navigationBand: 2088 }] : [])];
       const scene = sceneOf(tree);
       for (const band of bands) {
-        const screen = { box, boxes: [box], ...band };
+        const screen = usable({ box, boxes: [box], ...band });
         for (const n of everyNode(tree)) {
           if (n === tree) continue;
           judged++;
@@ -557,6 +560,48 @@ describe('Scene.standing for the tap — the on-screen point rule (the in-tree k
   it('inside a box less both system bands; with no screen inside the root rect, or anywhere for a root of no area', () => {
     expect([tapAt(540, 100, PIXEL_NAV), tapAt(540, 30, PIXEL_NAV), tapAt(540, 2190, PIXEL_NAV), tapAt(540, 2300, PIXEL_NAV)]).toEqual(['reachable', 'systemBar', 'systemBar', 'offScreen']);
     expect([tapAt(540, 2300, undefined), tapAt(540, 2300, undefined, box(0, 0))]).toEqual(['offScreen', 'reachable']);
+  });
+});
+
+/**
+ * With no device screen, every purpose reads one definition (ui-tree/usable-screen.ts#treeScreen): a rooted tree is
+ * judged in its root rect; on a root of no area a touch fails open (every point on the screen, judged in the node's
+ * own rect — the stops adopt the tap's fallback, unreachable from `scroll_until`, whose round always holds a frame),
+ * and the pixel assert judges on the largest node.
+ */
+describe('Scene.standing with no screen — one "no device screen" for the tap, both stops and the pixel assert', () => {
+  /** A 100x100 node at (x,y) in a root of `rect`, with a 402x874 node beside it when the root has no area (idb's flat list's Application). */
+  const judgedAt = (x: number, y: number, rect: Rect, purpose: (n: UiNode) => Purpose): Standing | PixelStanding => {
+    const n = node({ role: 'button', identifier: 'n', rect: { x, y, width: 100, height: 100 } });
+    const t = node({ role: 'container', rect, children: rect.width * rect.height > 0 ? [n] : [node({ role: 'other', rect: box(402, 874) }), n] });
+    return sceneOf(t).standing(n, undefined, purpose(n));
+  };
+  it('a rooted tree: the tap and both stops judge in the root rect — a node past it is off the screen', () => {
+    for (const purpose of [TAP, PLAIN, FULLY]) {
+      expect(said(judgedAt(150, 1000, box(402, 874), () => purpose))).toMatchObject({ kind: 'offScreen', at: { x: 200, y: 1050 } });
+      expect(said(judgedAt(150, 300, box(402, 874), () => purpose))).toEqual({ kind: 'reachable', at: { x: 200, y: 350 } });
+    }
+  });
+  it('a root of no area: the tap and both stops fail open, judged in the node\'s own rect — reachable wherever it lies', () => {
+    for (const purpose of [TAP, PLAIN, FULLY]) {
+      const s = judgedAt(150, 1000, box(0, 0), () => purpose);
+      expect([said(s), s.facts.screen]).toEqual([{ kind: 'reachable', at: { x: 200, y: 1050 } }, { x: 150, y: 1000, width: 100, height: 100 }]);
+    }
+  });
+  it('a root of no area: the pixel assert judges on the largest node (402x874), never failing open', () => {
+    const s = judgedAt(150, 300, box(0, 0), (n) => OCR(n));
+    expect([said(s), s.facts.screen]).toEqual([{ kind: 'reachable', at: { x: 200, y: 350 } }, box(402, 874)]);
+  });
+});
+
+describe('Scene.standing for the pixel assert — it takes the usable screen and judges its single `oriented` box (D6)', () => {
+  it('a crowned child turning `oriented` but not `boxes` (402x874 as built, 874x402 oriented): judged on the turned box, not `box`', () => {
+    const n = node({ role: 'text', identifier: 'n', rect: { x: 500, y: 100, width: 200, height: 50 } });
+    const t = node({ role: 'container', rect: box(874, 402), children: [n] });
+    const usable: UsableScreen = { box: box(402, 874), boxes: [box(402, 874)], oriented: box(874, 402), from: 'device', statusBand: 62 };
+    const s = sceneOf(t).standing(n, usable, OCR(n));
+    // On `box` the frame would be 0,62 402x812, the node outside it; on `oriented` (landscape: no status band cut) it lies wholly inside.
+    expect([said(s), s.facts.screen, s.facts.visible]).toEqual([{ kind: 'reachable', at: { x: 600, y: 125 } }, box(874, 402), 1]);
   });
 });
 

@@ -6,7 +6,7 @@ import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-t
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { sceneOf, type Scene, type Standing, type SystemBar } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
-import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
+import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 
@@ -590,7 +590,7 @@ export async function refuseOffScreen(
   const second = scene.standing(node, again, tap);
   if (onTheScreen(second)) return { screen: again, scene, standing: second, keyboard };
   // Refused on the screen read again; on the first look's when none could be read again.
-  const [judged, standing] = again === undefined && screen !== undefined ? [screen, first] : [again ?? { box: tree.rect, boxes: [tree.rect] }, second];
+  const [judged, standing] = again === undefined && screen !== undefined ? [screen, first] : [again ?? treeScreen(tree), second];
   const what = describeTarget(target);
   const refuse = (finding: string): never => {
     throw new OffScreenRefusal(sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`);
