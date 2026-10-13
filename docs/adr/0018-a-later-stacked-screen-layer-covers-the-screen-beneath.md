@@ -2,7 +2,8 @@
 
 Status: accepted, 2026-10-13 (owner decision Q1 (a) on the round-12 device check's triage; accepted on the condition
 that the differential harness's diff is clean and explainable; narrowed the same day to option (a) — only surfaces that
-draw their whole rect — after the review of the slice found Safari's measured pass-through layer refused). Supersedes, in one part, ADR 0016's note that a
+draw their whole rect — after the review of the slice found Safari's measured pass-through layer refused; the owner
+confirmed option (a) and its residual 2, the RN modal whose dimming view is a wrapper with children, 2026-10-13). Supersedes, in one part, ADR 0016's note that a
 screen-sized dimming node holding the title whole is excused (see "What changes" below).
 
 ## Context
@@ -34,7 +35,9 @@ layer's own surface.
 A node on a screen PRESENTED over the target's covers the target — through its own surface — when it is a surface that
 draws its whole rect (`draw-order.ts#overScreenBeneath`, the owner's option (a) on the review of the slice):
 
-- in `structural`: a structural LEAF (no children) — the RN Modal's dimming root `forgot_overlay`;
+- in `structural`: a structural LEAF (no children) that FILLS THE SCREEN — the RN Modal's dimming root `forgot_overlay`;
+  a smaller leaf stays excused (every unmapped Android leaf is an `other`, every RN View leaf under WDA too: an icon's
+  parts or a field's wrapper are no screen's surface);
 - in `screenSizedHost` and `contentFramed`: a SCROLL VIEW (`CONTENT_FRAMED_ROLES`) with its rows — the sheet's form;
 - never a bare frame (an unlabelled, unvalued, unidentified `container` with nothing drawable in it), so the refusal
   names the surface the app named or the sheet's scroll view, not an anonymous spacer.
@@ -65,13 +68,10 @@ Kept excused: WDA's itemless `toolbar 'Toolbar'` hosts — the SwiftUI pushed sc
 toolbars; the Contacts sheet's own toolbars over its own title (the same screen); a target with no screen-sized layer of
 its own below the holder (a bar's button beside the content layer: Back stays tapped); Safari's capsule layer.
 
-**Platform scope.** The rule reads tree shapes, not a platform: WDA's iOS trees, and Android inside one window. On the
-round-12 Android dumps it changes one node of two trees (`snapF4`, `snapF5`: Finportal's login under the RN root). The
-node is the screen's own full-screen background `other 0,0 1080x2220`, listed first, whose screen-sized parent makes it a
-"layer" beneath the login content's: the content's structural leaves (the logo's and the flags' parts, the fields'
-wrappers) now cover it as well. It shows 45 % → 43 % and its tap point is unchanged; `scroll_until` to it, stuck as before,
-now ends "a screen is presented over it" where it said the pinned-bar layout defect (residual 8). idb's flat list never
-meets the rule (its holder is the root).
+**Platform scope.** The rule reads tree shapes, not a platform: WDA's iOS trees, and Android inside one window. No
+Android tree of the round-11 and round-12 checks changes (with the full-screen leaf condition, Finportal's Android
+login — its content's small leaves over the RN root's own background — reads as before). idb's flat list never meets
+the rule (its holder is the root).
 
 ## What changes
 
@@ -89,10 +89,15 @@ whichever cover is on top at its centre (the modal's card over the dim), its sen
 - the tap: `lang_sk is under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it; nothing
   of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under
   that screen; nothing was tapped`; `login_title`'s "330x10 part" is gone;
-- `scroll_until`, stuck: `… under container id:forgot_overlay … — 0% of it shows — and the content is exhausted: swiping
-  down no longer moves it, nor does swiping up. A screen is presented over it (a modal or a sheet) — close it first; no
-  scroll moves it out from under that screen. Last rect …`; at a bound, the shortfall ends `— a screen is presented over
-  it (…)`;
+- `scroll_until` STOPS WITHOUT A SWIPE (the `presented` outcome, interact/scroll-rounds.ts): a read whose judged match
+  lies under a presented surface is confirmed by one more read with no stroke between, then the scroll stops —
+  `scroll_until id:lang_sk stopped before any swipe — element is in the viewport but under container id:forgot_overlay
+  (0,0 402x874) at its centre (290,251), drawn over it — 0% of it shows — a screen is presented over it (a modal or a
+  sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it, so none was
+  sent. Last rect …` (after strokes: `stopped after N swipes, without swiping further`). A stroke on a presented page
+  sheet is a pull: it can dismiss the sheet or raise "Discard Changes?", and a sheet dismissed so would let the next
+  read find the target and report success. Should the screen be gone at the confirming read, the scroll stops as any
+  other (`visible` at once);
 - a pixel assert on it names the layer as chrome (its wording unchanged);
 - the dismissal picker skips such a candidate as `covered by container …` (its wording unchanged).
 
@@ -114,43 +119,48 @@ PICK, GUARD, KEYPOS) over its 94 trees plus EVERY device tree of the round-11 an
 idb ui_snapshot of run11-ios and run12-ios, each `snap*.txt` of run11-android and run12-android: 91 more, 185 in all).
 The counts and every changed case, grouped by cause, are in the slice's diff report (round 13 slice A).
 
-Final run (df5f683 against 20307d2), diffs per section and tree:
+Final run (5c7117b against 20307d2), diffs per section and tree:
 
 | Tree | Cause | ROUNDS | TAP | PIXEL | PICK | GUARD |
 |---|---|---|---|---|---|---|
-| run12-ios/FP-forgot-wda.json (#248) | the RN modal's dimming leaf `forgot_overlay` | 19 589 | 2 624 | 1 304 | 6 | 372 |
-| run12-ios/M1-wda-contacts-sheet.json (#146) | the page sheet's form `scrollable 0,62 402x812` | 17 782 | 2 040 | 238 | 1 | 17 |
-| run12-ios/M1-wda-contacts-sheet2.json (#150) | the same, scrolled | 17 784 | 2 052 | 414 | 1 | 48 |
-| run12-ios/C23-wda-contacts.json | the same sheet, another capture | 17 782 | 2 040 | 238 | 1 | 17 |
-| run12-ios/M1-wda-fees-sheet.json | mp-native's fees sheet form `scrollable 31,456 340x355`: the targets beneath, already refused under the sheet's panel, now told the sheet is presented; 47 nodes' covers gain the form | 5 900 | 920 | 252 | 0 | 72 |
-| run12-android/snapF4.txt, snapF5.txt | the screen's own full-screen background (Platform scope above) | 144 + 144 | 0 | 0 | 0 | 0 |
-| the 94 round-12 trees, the other 84 device trees — Safari's four (`W-wda-a`, `W-wda-b`, `W1-wda-b-bar-over-scrolled`, `W3-wda-b-scrolled`) among them | — | 0 | 0 | 0 | 0 | 0 |
+| run12-ios/FP-forgot-wda.json (#248) | the RN modal's dimming leaf `forgot_overlay` | 20 024 | 2 624 | 1 304 | 6 | 372 |
+| run12-ios/M1-wda-contacts-sheet.json (#146) | the page sheet's form `scrollable 0,62 402x812` | 18 584 | 2 040 | 238 | 1 | 17 |
+| run12-ios/M1-wda-contacts-sheet2.json (#150) | the same, scrolled | 18 584 | 2 052 | 414 | 1 | 48 |
+| run12-ios/C23-wda-contacts.json | the same sheet, another capture | 18 584 | 2 040 | 238 | 1 | 17 |
+| run12-ios/M1-wda-fees-sheet.json | mp-native's fees sheet form `scrollable 31,456 340x355` (targets beneath already refused under its panel, now told the sheet is presented) | 6 408 | 920 | 252 | 0 | 72 |
+| every other tree: the 94 round-12 trees and the 86 other device trees — Safari's four and Android's snapF4/F5 among them | — | 0 | 0 | 0 | 0 | 0 |
 
-KEYPOS: 0. SEQ: the two new scroll rows only (OLD's draw order stops them `visible`, the bug itself; compared sorted —
-the log's order varies between runs). On the five layered trees every TAP diff is a target of the screen beneath:
-"tapped", "moved" or "scroll_until it first" becomes the refusal saying the screen is presented over it (and 12 moved
-taps on the scrolled sheet now name the form as the cover at the centre, the piece unchanged). Node by node, no node of
-a presented layer changed.
+KEYPOS: 0. SEQ: the new scroll rows only (on OLD's draw order they stop `visible`, the bug itself; compared sorted).
+On the five layered trees every TAP diff is a target of the screen beneath: "tapped", "moved" or "scroll_until it
+first" becomes the refusal saying the screen is presented over it (12 moved taps on the scrolled sheet name the form as
+the centre's cover, the piece unchanged). ROUNDS: 79 568 plays become the `presented` stop with no stroke (from
+`visible` or from strokes then `stuck`); 1 968 stay `visible`, only their `covered.shows` changed (a sheet's row over a
+list row whose centre is clear); 648 two-match plays whose judged match lies ON the presented screen (the
+modal's or the sheet's own full-screen container, under its own card or fields) stroke as such a node did before.
+Node by node, no node of a presented layer changed.
 
 Earlier runs found what this decision now excludes: the RN `ScrollView`'s content layer over its background (the
 scrolled-content condition), Safari's capsule layer refusing every web element (TAP 3 186 and PIXEL 2 170 diffs on its
-four trees — option (a)), and the capsule bar's buttons and labelled leaves read as "presented" (the frame-excuse check of
-`presentedSurface`).
+four trees — option (a)), the capsule bar's buttons and labelled leaves read as "presented" (the frame-excuse check of
+`presentedSurface`), Android's small leaves of a content layer read as a screen's surface (the full-screen leaf
+condition), and `scroll_until` stroking on a presented page sheet (the `presented` stop).
 
 ## Residuals accepted
 
-(Numbered as before; 8 added with option (a) and the presented sentences.)
+(Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
 
-1. **What a layer inside one window still refuses beneath it**: a structural LEAF of the layer that is no bare frame (a
-   dimming view the app named, an unlabelled `other`), and a screen-sized scroll view of the layer, wherever they lie
-   over the target — when the layer is screen-sized and carries content. So a full-screen pass-through layer that is
-   ITSELF a leaf or a scroll view — an RN `ScrollView` with `pointerEvents="box-none"` laid over the screen, a
-   full-screen leaf a toast library lays in its host — refuses taps beneath it, and the agent reads "a screen is
-   presented over it — close it first". What it no longer refuses (option (a)): a pass-through HOST with children —
-   an RN Portal host, a FAB or Snackbar host with `box-none`, Safari's capsule — whose content alone covers, as before.
+1. **What a layer inside one window still refuses beneath it**: a structural LEAF of the layer that FILLS THE SCREEN
+   and is no bare frame (a dimming view the app named, an unlabelled `other`), and a scroll view of the layer, wherever
+   they lie over the target — when the layer is screen-sized and carries content. So a full-screen pass-through layer
+   that is ITSELF such a leaf or a scroll view — an RN `ScrollView` with `pointerEvents="box-none"` laid over the
+   screen, a full-screen leaf a toast library lays in its host — refuses taps beneath it, the agent reads "a screen is
+   presented over it — close it first", and `scroll_until` to a target beneath it stops without a swipe. What it does
+   not refuse: a pass-through HOST with children — an RN Portal host, a FAB or Snackbar host with `box-none`, Safari's
+   capsule — or a small leaf of one (an icon's View), whose content covers only where it lies, as before.
 2. **An RN modal whose dimming view is a wrapper WITH children** (the card inside the tinted view, no separate dim leaf)
    is not seen: its bare surface beside the card reads as no cover, and a tap there is sent to the screen beneath and
-   lands on the dim — as at 20307d2. Finportal's modal has a separate leaf; the shape is common elsewhere.
+   lands on the dim — as at 20307d2. Finportal's modal has a separate leaf; the shape is common elsewhere. Confirmed by
+   the owner, 2026-10-13.
 3. **A later Window is still seen only through its content.** An opaque presentation WDA lays in a Window of its own
    (none measured) has its bare surface read as no cover, as before.
 4. **The bar-in-a-full-screen-host shape** (`scrolledContent`'s stated residual: a bar nested in a full-screen host of
@@ -161,19 +171,14 @@ four trees — option (a)), and the capsule bar's buttons and labelled leaves re
    a popover), a target that is itself a direct child of the node holding both, and an Android in-window overlay
    Compose flattens away. A layer drawn by the root's direct children (one window's top level, on a tree whose root is
    the window) reads as across Windows.
-6. **`scroll_until` to a target beneath a presented screen swipes on that screen before it fails.** Before, it stopped
-   `visible`, a false success. Now it reads the target covered and strokes until the exhaustion rule stops it — then
-   says the screen is presented over it and to close it first. Stopping at once was not done: it needs an outcome of
-   its own and a confirming read (a modal being dismissed reads as presented for a frame or two), and the strokes'
-   cost is bounded. The stroke box comes from `drawnOver`, which this decision leaves unchanged, so up to `maxSwipes`
-   strokes land on the presented screen: they scroll a sheet's own form, or do nothing on a modal. The harness's
-   ROUNDS cannot see `drawnOver`.
+6. **`scroll_until` stops at a presented screen on its own reads**: two reads with no stroke between. A target whose
+   presented screen the tree does not show as one (residuals 2, 3, 5) is still stroked for, as before, and those
+   strokes land on that screen. The stroke box (`drawnOver`) is unchanged; the harness's ROUNDS cannot see it.
 7. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
-8. **A full-screen target of a screen whose content layer is laid after its background** (Finportal's Android login:
-   the RN root's `other 0,0 1080x2220`) reads as beneath a presented screen: the content's leaves cover it, and its
-   `scroll_until` failure says a screen is presented over it. Only the background node itself, which no flow targets;
-   every node of the content reads as before.
+8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
+   unidentified, unlabelled frame). A tap above a large-detent sheet — on the list beneath at (201,26) — is still moved
+   there or tapped; on a medium-detent sheet the area above it is that dim, and a tap there may dismiss the sheet.
 
 ## Bug notes
 
