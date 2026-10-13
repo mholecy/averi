@@ -35,6 +35,11 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * round and both models' dismissals ask a reading, so the guard and the
  * poll see one keyboard by construction, and neither model calls the
  * oracle itself.
+ *
+ * A LOOK — the target resolved, its tree read — carries that tree's scene
+ * (`SeenLook`, built by `withScene`: derived on first use, once), and every
+ * judgement of the look reads it — the tap's and the dismissal picker's —
+ * so one look is one draw-order walk by construction.
  */
 
 /**

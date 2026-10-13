@@ -43,6 +43,11 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * dismissal picker, `scroll_until`'s read and the pixel poll. A reading is
  * one of its inputs; this module imports nothing from it.
  *
+ * Its interface, eight exports: `readKeyboard` and the `KeyboardReading` it
+ * builds; the reading's cover (`KeyboardCover`) and `UNLOCATED_KEYBOARD`;
+ * and the verdicts its point questions answer (`FrameVerdict`, `Uncovered`,
+ * `KeyboardVerdict`, `Covering`) — answers to a question, not positions.
+ *
  * WHAT A READING ASKS, AND WHEN — stated once, here. Three oracle calls, each at most
  * ONCE per reading, each memoised on first need, in this order:
  * 1. `state()` — the window state, the band. Asked by every question
