@@ -21,7 +21,7 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
 const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
 const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
-/** The round-12 device check's ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
+/** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
 const STACKED = JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
 
 describe('drawnOver — the nodes drawn over a clipping container (the floating tab bar)', () => {
@@ -1427,11 +1427,10 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
 
 /**
  * A later STACKED screen-sized layer covers the screen beneath it through its OWN surface, when the layer carries
- * content (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, the owner's decision Q1 (a),
- * 2026-10-13): a node `structural`, `screenSizedHost` or `contentFramed` would excuse by its frame still covers a target
+ * content (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md): a node `structural`, `screenSizedHost` or `contentFramed` would excuse by its frame still covers a target
  * when, below the node holding both — inside one window — it lies in a screen-sized layer and the target in another
  * (`stackedScreens`, asked of the node), and the layer carries something drawable; a bare frame of the layer stays
- * excused. Measured on the round-12 device check's ui_snapshots (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
+ * excused. Measured on device ui_snapshots (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
  */
 describe('exposure — a later stacked screen layer covers the screen beneath through its own surface (ADR 0018)', () => {
   const IPHONE = rect(0, 0, 402, 874);
@@ -1521,7 +1520,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(window(target, layer), target)).toEqual([overlay]);
     });
 
-    it('`presented` lists only the surfaces the exception un-excuses — an unlabelled leaf, a scroll view — never a cover that covered anyway: a labelled leaf or a control of the layer (Safari\'s capsule bar, W3 of the round-12 check), whose sentence stays "scroll_until it first"', () => {
+    it('`presented` lists only the surfaces the exception un-excuses — an unlabelled leaf, a scroll view — never a cover that covered anyway: a labelled leaf or a control of the layer (Safari\'s capsule bar, #158), whose sentence stays "scroll_until it first"', () => {
       const target = pay();
       const dim = uiNode({ role: 'other', rect: IPHONE });
       const labelled = uiNode({ role: 'other', label: 'Address', rect: IPHONE }); // screen-filling, so only its label keeps it from being the frame rows' to excuse

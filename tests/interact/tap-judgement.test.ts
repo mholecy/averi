@@ -250,8 +250,8 @@ describe('judgeTap(…).aim() — cut, cover, keyboard, after the guard', () => 
 });
 
 /**
- * A later STACKED screen-sized layer's own surface covers the screen beneath it when it carries content (ADR 0018, the
- * owner's decision Q1 (a), 2026-10-13) — the two bug notes of the round-12 device check, each a tap reported "Tapped"
+ * A later STACKED screen-sized layer's own surface covers the screen beneath it when it carries content (ADR 0018) —
+ * the two bug notes it answers (docs/bugs/2026-10-13-ios-wda-*), each a tap reported "Tapped"
  * that landed on the layer, on the real ui_snapshots of those calls (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
  */
 describe('judgeTap(…).aim() — a later stacked screen layer over the target (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
@@ -284,7 +284,7 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     expect(said(outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
   });
 
-  it('…nor where the later layer carries only a bar: Safari\'s page B (#158), a link under the capsule\'s bottom bar — a pinned bar, so "scroll_until it first", as at 20307d2', async () => {
+  it('…nor where the later layer carries only a bar: Safari\'s page B (#158), a link under the capsule\'s bottom bar — a pinned bar, so "scroll_until it first"', async () => {
     const { outcome } = await judge((await screens()).safariPageB, 'Link number 12', { first: IPHONE });
     expect(said(outcome)).toBe(
       'CoveredRefusal: Link number 12 is under button "Page Menu" (90,792 48x48) at its centre (105,817), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped',

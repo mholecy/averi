@@ -33,7 +33,7 @@ layer's own surface.
 ## Decision
 
 A node on a screen PRESENTED over the target's covers the target — through its own surface — when it is a surface that
-draws its whole rect (`draw-order.ts#overScreenBeneath`, the owner's option (a) on the review of the slice):
+draws its whole rect (`draw-order.ts#givesWay`, the owner's option (a) on the review of the slice):
 
 - in `structural`: a structural LEAF (no children) that FILLS THE SCREEN — the RN Modal's dimming root `forgot_overlay`;
   a smaller leaf stays excused (every unmapped Android leaf is an `other`, every RN View leaf under WDA too: an icon's
@@ -90,7 +90,8 @@ whichever cover is on top at its centre (the modal's card over the dim), its sen
   of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under
   that screen; nothing was tapped`; `login_title`'s "330x10 part" is gone;
 - `scroll_until` STOPS WITHOUT A SWIPE (the `presented` outcome, interact/scroll-rounds.ts): a read whose judged match
-  lies under a presented surface is confirmed by one more read with no stroke between, then the scroll stops —
+  lies under a presented surface is confirmed by one more read with no stroke between (when the timeout leaves one;
+  else it stops on that read), then the scroll stops —
   `scroll_until id:lang_sk stopped before any swipe — element is in the viewport but under container id:forgot_overlay
   (0,0 402x874) at its centre (290,251), drawn over it — 0% of it shows — a screen is presented over it (a modal or a
   sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it, so none was
@@ -181,8 +182,12 @@ condition), and `scroll_until` stroking on a presented page sheet (the `presente
 7. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
-   unidentified, unlabelled frame). A tap above a large-detent sheet — on the list beneath at (201,26) — is still moved
-   there or tapped; on a medium-detent sheet the area above it is that dim, and a tap there may dismiss the sheet.
+   unidentified, unlabelled frame). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath
+   shows only under the status bar, where no tap goes: with the device's 62-pt status band a target of the list there
+   is refused — under the status bar, or, its centre under the form, as under a presented screen (the harness:
+   Contacts' `container 0,0 402x156`, centre (201,78)). Only with no status band known (a screen read without one, or
+   no screen) is that tap moved above the form, to (201,26) on its uncovered 402x52 — under the status bar. On a
+   medium-detent sheet the area above it is that dim, and a tap there may dismiss the sheet.
 
 ## Bug notes
 

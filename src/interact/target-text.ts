@@ -11,9 +11,11 @@ import { SIDES } from './swipe.js';
  * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
  * the shared wording. Phrases, not policies: what counts as cut is
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
- * caller's switch — and the remedy for a target under a screen presented over its own (`PRESENTED_OVER`), whose test is
- * ui-tree/standing.ts#underPresented. Shallow by design, like ui-tree/system-bar.ts: delete it
- * and each shared sentence reappears in its two or three callers.
+ * caller's switch — and the remedy for a target under a screen presented
+ * over its own (`PRESENTED_OVER`), whose test is
+ * ui-tree/standing.ts#underPresented. Shallow by design, like
+ * ui-tree/system-bar.ts: delete it and each shared sentence reappears in
+ * its two or three callers.
  *
  * Its words for a side come from one other interact/ module: swipe.ts#SIDES
  * — `past` and `lies` (where a node past a side lies) and `reveals` (the
