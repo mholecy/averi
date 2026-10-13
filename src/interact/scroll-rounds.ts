@@ -1,5 +1,5 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { aboveNavigationBand, belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -1248,8 +1248,8 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const { far } = FAR_EDGE[s.rules.direction];
     s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md
-    // Or IN the frame at that edge: across it — clipped there, or its centre in the status
-    // band, which the frames are cut below — or under something of the app
+    // Or IN the frame at that edge: across it — clipped there, or into a system
+    // band, which the frames are cut clear of — or under something of the app
     // drawn over its far side. Read so before any read saw it short, it
     // was never carried past, so `seenShort` alone never turned it: the
     // strokes pushed it on out through that edge — and at the end of the
@@ -1428,10 +1428,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
-  // Below the status band: a target whose centre a fling carried into it
-  // is past the far edge, and the next stroke turns back.
-  const judgedFrames: Rect[] =
-    cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
+  // Between the system bands: a target a fling carried into one — or one
+  // resting across the navigation band's top while the content lies above
+  // it — is past the far edge, and the next stroke turns back.
+  const banded = (b: Rect, shape: Rect = b): Rect => aboveNavigationBand(belowStatusBand(b, s.frame, shape), s.frame, shape);
+  const judgedFrames: Rect[] = cover?.above !== undefined ? [banded({ x: viewport.x, y: viewport.y, ...cover.above }, viewport)] : s.frame.boxes.map((b) => banded(b));
   const gesture = seen.screen?.oriented;
   const now: ThisRead | undefined =
     read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, gesture, cover };

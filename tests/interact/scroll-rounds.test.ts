@@ -1650,6 +1650,12 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
     expect(bound).toContain('— fully: true stops only with none of it under the bar (its centre is clear of the bar) (last rect');
   });
 
+  it('fully: true on row_30 with `direction: up` (content above): at the navigation band it is at the far edge — the first stroke turns and lifts it, no oscillation', () => {
+    const played = play({ ...ANDROID, direction: 'up', fully: true }, [row30(), row30(1600), row30(1600)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
   it('fully: true stops at 0 swipes on content no scroll lifts out of a band (the owner\'s 2026-10-13 decision): an edge-to-edge app bar 0,0 1080x210, a screen-sized node 0,40 1080x2180', () => {
     for (const rect of [{ x: 0, y: 0, width: 1080, height: 210 }, { x: 0, y: 40, width: 1080, height: 2180 }]) {
       expect(resultOf(play({ ...ANDROID, fully: true }, [{ found: [match(rect, 'hero')], screen: NAV }]))).toMatchObject({ swipes: 0, visible: 1 });
