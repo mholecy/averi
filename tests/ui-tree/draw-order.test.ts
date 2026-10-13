@@ -1496,10 +1496,12 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(window(target, layer), target)).toEqual([layer, overlay]);
     });
 
-    it('a layer carrying nothing drawable stays excused: empty frames only, or an itemless toolbar (WDA\'s `toolbar \'Toolbar\'` host, as Finportal and SwiftUI list it)', () => {
+    it('a layer carrying nothing drawable stays excused: empty frames only, an itemless toolbar (WDA\'s `toolbar \'Toolbar\'` host, as Finportal and SwiftUI list it), or a layer that is itself the dimming node — a leaf the app named, an `other` over empty frames — with no card in it', () => {
       const frames = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] })] });
       const toolbarHost = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] })] });
-      for (const layer of [frames, toolbarHost]) {
+      const namedDim = uiNode({ role: 'container', identifier: 'forgot_overlay', rect: IPHONE });
+      const dimOther = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE })] });
+      for (const layer of [frames, toolbarHost, namedDim, dimOther]) {
         const target = pay();
         expect(covers(window(target, layer), target)).toEqual([]);
       }
@@ -1511,6 +1513,17 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       const accessoryWindow = uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [done] })] });
       const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [target] })] }), accessoryWindow] });
       expect(covers(tree, target)).toEqual([]);
+    });
+
+    it('not in scrolled content: layers of one scroll view\'s content are one screen — measured, Finportal\'s RN ScrollView (#218): its full-screen background container\'s `0,0 402x102` frame, under the later `0,0 402x877` content container, has nothing over it; synthetic, a header image in the same shape', () => {
+      const login = screen('finportalLogin');
+      const header = [...everyNode(login)].find((n) => n.role === 'container' && n.rect.height === 102)!;
+      expect(drawOrder(login).exposure(header, IPHONE).covers).toEqual([]);
+      const image = uiNode({ role: 'image', label: 'Header', rect: rect(0, 0, 402, 102) });
+      const content = uiNode({ role: 'container', rect: rect(0, 0, 402, 877), children: [card()] });
+      const scroll = uiNode({ role: 'scrollable', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [image] }), content] });
+      const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [scroll] })] });
+      expect(covers(tree, image)).toEqual([]);
     });
 
     it('not two screens: a target with no screen-sized layer of its own below the node holding both (a bar\'s button, a backdrop directly in it) — the later layer\'s frame is judged as before', () => {

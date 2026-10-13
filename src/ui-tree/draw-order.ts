@@ -394,6 +394,9 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   tree's root, whose children are WDA's Windows (the parser's 0×0 holder of Android's, idb's flat list): a later
  *   Window may be a pass-through one, the parked input-accessory Window over every screen
  *   (wda-source-myport-2fa-keyboard-parked.json), so across Windows only content covers, as before;
+ * - and NOT IN SCROLLED CONTENT: the node holding both neither scrolls nor lies in anything that scrolls — layers of a
+ *   scroll view's content are one screen's (Finportal's RN ScrollView lays a full-screen background container and
+ *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
  * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
  *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
  * Measured: Finportal's RN transparent Modal (its dimming leaf, its frames, its card) and Contacts' New Contact page
@@ -404,7 +407,7 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
 const overScreenBeneath = (placed: Placed, target: Placed, screenArea: number): boolean => {
   if (emptyFrame(placed.node) && !carriesContent(placed.node)) return false;
   const both = holderOf(placed, target);
-  if (both?.parent === undefined) return false;
+  if (both?.parent === undefined || scrolls(both.node) || both.scroller !== undefined) return false;
   return carriesContent(layerOf(placed, both).node) && stackedScreens(placed, target, screenArea);
 };
 
