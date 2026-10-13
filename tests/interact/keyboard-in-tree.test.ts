@@ -598,27 +598,28 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       });
 
       /**
-       * Today's behaviour, PINNED WHILE THE OWNER DECIDES whether to refuse it (ADR 0016, residual 1): a labelled control
-       * of exactly the title's frame, listed after it, is read as the title listed again (the `sameFrame` row) and
-       * excused, so the dismissal is picked and the tap lands on the BUTTON's centre — here "Delete account". Before
-       * ADR 0016 it was skipped as "covered by button "Delete account"". On the post-fill `dismiss()` path this
-       * reports `hiddenBy: tapping …`: a wrong action said as a dismissal. If the owner chooses the explicit refusal,
-       * this test flips to `covered by button "Delete account"`.
+       * The explicit refusal (ADR 0016, residual 1, the owner's option (b)): a labelled control of exactly the title's
+       * frame, listed after it, is read by the tap as the title listed again (the `sameFrame` row) and excused — so a tap
+       * at the title's centre would press "Delete account". The picker refuses a candidate whose centre an excused
+       * INTERACTIVE node holds, naming it as a cover: a silently pressed control is worse than a skipped title.
        */
-      it('a labelled button of exactly the title\'s frame, listed after it, is excused as the title listed again: picked, the tap at the shared centre — today\'s behaviour, the owner deciding whether to refuse it', async () => {
+      it('a labelled button of exactly the title\'s frame, listed after it, holds the centre the tap would press: skipped, covered by it — nothing tapped', async () => {
         const button = node({ role: 'button', label: 'Delete account', identifier: 'delete_account', rect: { x: 36, y: 291, width: 330, height: 24 } });
-        expect(await pickOn(screenOf(loginTitle(), button), 'login_title')).toBe('tapped (201,303)');
+        expect(await pickOn(screenOf(loginTitle(), button), 'login_title')).toBe('covered by button "Delete account"');
+        // Two such controls: the one drawn on top — the last listed — is named, the one the tap would press.
+        const under = node({ role: 'button', label: 'Edit', rect: { x: 36, y: 291, width: 330, height: 24 } });
+        expect(await pickOn(screenOf(loginTitle(), under, button), 'login_title')).toBe('covered by button "Delete account"');
       });
 
-      it('the title\'s own unlabelled control — a text field over its label (ADR 0014\'s measured SWIFT row), a button spanning its wrapper — takes the tap, and the dismissal is picked: the tap lands on the control (ADR 0016\'s first residual)', async () => {
+      it('the title\'s own unlabelled control — a text field over its label (ADR 0014\'s measured SWIFT row), a button spanning its wrapper — is excused as no cover, but the tap would land on it: skipped, covered by the control (ADR 0016, the explicit refusal)', async () => {
         const field = node({
           role: 'container',
           rect: { x: 24, y: 431, width: 354, height: 52 },
           children: [node({ role: 'text', identifier: 'payee_label', label: 'Payee’s name', rect: { x: 42, y: 446, width: 103, height: 22 } }), node({ role: 'textfield', rect: { x: 42, y: 447, width: 318, height: 20 } })],
         });
-        expect(await pickOn(screenOf(field), 'payee_label')).toBe('tapped (94,457)');
+        expect(await pickOn(screenOf(field), 'payee_label')).toBe('covered by textfield');
         const row = node({ role: 'container', rect: { x: 24, y: 280, width: 354, height: 52 }, children: [loginTitle({ x: 42, y: 291, width: 200, height: 24 }), node({ role: 'button', rect: { x: 24, y: 280, width: 354, height: 52 } })] });
-        expect(await pickOn(screenOf(row), 'login_title')).toBe('tapped (142,303)');
+        expect(await pickOn(screenOf(row), 'login_title')).toBe('covered by button');
       });
 
       it('a row of a scroll view the title is not in, scrolled under it (WDA lists the top bar before the scroll view it is drawn over): picked', async () => {
@@ -626,9 +627,19 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(await pickOn(screenOf(loginTitle(), node({ role: 'container', rect: FULL, children: [form] })), 'login_title')).toBe('tapped (201,303)');
       });
 
-      it('a keyboard-owned node outside the band (constructed: an ofKeyboard subtree over the title) is no cover — the keyboard is the band\'s, judged first: picked (ADR 0016\'s second residual)', async () => {
-        const strip = node({ role: 'other', ofKeyboard: true, rect: { x: 0, y: 280, width: 402, height: 44 }, children: [node({ role: 'button', label: 'Suggestion', rect: { x: 0, y: 280, width: 402, height: 44 } })] });
-        expect(await pickOn(screenOf(loginTitle(), strip), 'login_title')).toBe('tapped (201,303)');
+      it('an INTERACTIVE row of a scroll view the title is not in, holding its centre, is excused as no cover, but the tap would press it: skipped, covered by the row (ADR 0016, the explicit refusal)', async () => {
+        const form = node({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 512 }, children: [node({ role: 'button', label: 'Beneficiary', rect: { x: 16, y: 280, width: 370, height: 52 } })] });
+        expect(await pickOn(screenOf(loginTitle(), node({ role: 'container', rect: FULL, children: [form] })), 'login_title')).toBe('covered by button "Beneficiary"');
+        // The same row under the title's left end only, clear of its centre (201,303): the tap presses the title.
+        const aside = node({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 512 }, children: [node({ role: 'button', label: 'Beneficiary', rect: { x: 16, y: 280, width: 120, height: 52 } })] });
+        expect(await pickOn(screenOf(loginTitle(), node({ role: 'container', rect: FULL, children: [aside] })), 'login_title')).toBe('tapped (201,303)');
+      });
+
+      it('a keyboard-owned node outside the band (constructed: an ofKeyboard subtree over the title) is no cover — the keyboard is the band\'s, judged first: picked (ADR 0016\'s second residual); a keyboard-owned CONTROL there the tap would press: skipped, covered by it', async () => {
+        const strip = (child: UiNode) => node({ role: 'other', ofKeyboard: true, rect: { x: 0, y: 280, width: 402, height: 44 }, children: [child] });
+        const rect = { x: 0, y: 280, width: 402, height: 44 };
+        expect(await pickOn(screenOf(loginTitle(), strip(node({ role: 'text', label: 'Suggestion', rect }))), 'login_title')).toBe('tapped (201,303)');
+        expect(await pickOn(screenOf(loginTitle(), strip(node({ role: 'button', label: 'Suggestion', rect }))), 'login_title')).toBe('covered by button "Suggestion"');
       });
 
       it('a labelled structural wrapper partly over the title, neither holding it whole nor frames only, covers — measured: the login\'s field wrappers under their own inner `container 36,367 330x52`: skipped (ADR 0016\'s third residual)', async () => {

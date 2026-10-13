@@ -246,6 +246,21 @@ export interface Exposure {
   /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — `coverAt` of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
   readonly centreCover?: UiNode;
   /**
+   * The nodes listed after it that hold its centre (inside `within`, at
+   * their reach, as `coverAt` asks) and that the `target` column EXCUSED —
+   * drawn there, by the table, as no cover of it — in pre-order; empty when
+   * none, or when the centre lies outside `within`. Not a cover: a tap at
+   * the centre is still `tapAt`'s, unmoved. What a tap there may still
+   * PRESS: a labelled control of exactly the node's frame (`sameFrame`), its
+   * own unlabelled control (`ownControl`), a row of a scroll view it is not
+   * in (`scrolledContent`) are excused for where a touch lands on the node,
+   * not for what else the touch triggers. One reader: the in-tree dismissal
+   * picker (interact/keyboard-in-tree.ts#pickDismissal), which refuses a
+   * candidate whose centre an interactive one of them holds (ADR 0016).
+   * Judged in the same pass as `covers`, no second walk.
+   */
+  readonly centreExcused: readonly UiNode[];
+  /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
    * `within` under no cover (no `centreCover`) — `moved: false`; else the
    * centre (`rectCentre`) of the largest uncovered piece whose sides are
@@ -651,7 +666,9 @@ const NOT_DRAWN = {
    * non-scrolling node of the sheet, can cover. The
    * container question never asks it. The in-tree keyboard dismissal's
    * title IS such a target: the picker asks the tap's standing, so a row
-   * scrolled under the title no longer refuses it.
+   * scrolled under the title no longer refuses it — unless the row is
+   * interactive and holds the title's centre, which the picker refuses on
+   * its own (`Exposure.centreExcused`): the tap would press the row.
    * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
    *
    * Under idb this row never fires: its list is FLAT, so no node has a
@@ -1076,7 +1093,8 @@ const NOT_DRAWN = {
    * keyboard dismissal picker judges the keyboard first, by the reading's
    * band (interact/keyboard-in-tree.ts#pickDismissal); a keyboard-owned
    * node outside the band does not refuse a dismissal (ADR 0016's
-   * residual).
+   * residual) unless it is a control holding the dismissal's centre
+   * (`Exposure.centreExcused`).
    */
   keyboard: {
     drawnOver: ({ inKeyboard }) => inKeyboard,
@@ -1489,10 +1507,12 @@ export function drawOrder(tree: UiNode): DrawOrder {
       // tree's order IS its draw order (an action sheet listed after the bar is drawn over it), so there only the items listed after the target count.
       // A flat list has no nesting, so no item listed before the target is its ancestor.
       const before = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
-      const over =
+      // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
+      const met =
         shown === undefined || about === undefined
           ? []
-          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined && drawsOverTarget(p, about)).map((p) => ({ node: p.node, reach: reach(p) }));
+          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined).map((p) => ({ node: p.node, reach: reach(p), draws: drawsOverTarget(p, about) }));
+      const over = met.filter((c) => c.draws);
       const covers = over.map((c) => c.node);
       const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
@@ -1501,6 +1521,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const centre = tapPoint(node);
       const onCentre = shown !== undefined && containsPoint(shown, centre);
       const centreCover = onCentre ? coverAt(centre) : undefined;
+      const centreExcused = onCentre ? met.filter((c) => !c.draws && containsPoint(c.reach, centre)).map((c) => c.node) : [];
       const tappable = largestRect(pieces.filter((r) => r.width >= minPiece && r.height >= minPiece));
       const tapAt: Exposure['tapAt'] =
         onCentre && centreCover === undefined
@@ -1514,6 +1535,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         reaches: over.map((c) => ({ ...c.reach })),
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
+        centreExcused,
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,

@@ -258,6 +258,8 @@ export interface StandingFacts {
   readonly covers: readonly UiNode[];
   readonly reaches: readonly Rect[];
   readonly centreCover?: UiNode;
+  /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
+  readonly centreExcused: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -489,6 +491,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
     covers: seen.covers,
     reaches: seen.reaches,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
+    centreExcused: seen.centreExcused,
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),
@@ -500,7 +503,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
 function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, fully: boolean, line: KeyboardLine | undefined): Standing {
   const { node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
-    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
+    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
     return { facts, kind: 'underKeyboard', line };
   }
   const frame = line === undefined ? { ...box } : { ...box, height: line.y - box.y };

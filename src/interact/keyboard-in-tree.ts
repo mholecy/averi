@@ -210,7 +210,8 @@ interface DismissalPick {
  * #keyboardEdge), asked once per call, by the first strategy that gets this
  * far — under WDA a witnessed line, which refuses nothing the band check
  * above has not:
- * - `reachable` at the centre — usable;
+ * - `reachable` at the centre, with no interactive node there it would
+ *   press — usable;
  * - off the screen or in a system band — `off screen at (x,y)`: a title
  *   scrolled above the viewport is still in the tree, WDA keeps off-screen
  *   nodes;
@@ -222,19 +223,23 @@ interface DismissalPick {
  *   (resolve.ts#cutSliverText); under a line no guard acts on (idb's band)
  *   — `under the keyboard`. Neither is reached under WDA today: iOS has no
  *   clipping container and no idb band.
- * What `tap` counts as a cover is a cover here, and nothing else is: a
- * title's own content listed beside it, its own unlabelled control, a node
- * of its frame, content of a scroll view it is not in and a keyboard-owned
- * node outside the band are not; a structural wrapper partly over it is.
- * "A node of its frame" and "content of a scroll view it is not in" take in
- * LABELLED CONTROLS: a `button "Delete account"` of exactly the title's rect
- * reads as the title listed again, and an interactive row of a scroll view
- * the title is not in is excused whether or not the title lies in a bar —
- * so the dismissal is picked and the tap presses the control. On the
- * guard's path that passes as `hidden by tapping … before tapping`; on the
- * post-fill `dismiss()` path it is reported as `hiddenBy: tapping <title>`,
- * a wrong action said as the dismissal. Kept for now; the owner decides
- * whether to refuse it (ADR 0016, residual 1).
+ * What `tap` counts as a cover is a cover here: a title's own content
+ * listed beside it, its own unlabelled control, a node of its frame,
+ * content of a scroll view it is not in and a keyboard-owned node outside
+ * the band are not; a structural wrapper partly over it is.
+ * One more refusal is the picker's own: a centre an excused node listed
+ * after the title holds, when that node is INTERACTIVE — `covered by
+ * <role> "<label>"`, naming it (`whyNotTapped`). The excuses above say
+ * where a touch lands on the title, not what else it presses: a `button
+ * "Delete account"` of exactly the title's rect reads as the title listed
+ * again, an interactive row of a scroll view the title is not in is
+ * excused whether or not the title lies in a bar, a text field is no cover
+ * of its own label — and a tap at the centre would press each. On the
+ * post-fill `dismiss()` path that would be reported as `hiddenBy: tapping
+ * <title>`, a wrong action said as the dismissal; a silently pressed
+ * control is worse than a skipped title. Which node holds the centre is
+ * read off the standing's facts (`StandingFacts.centreExcused`), judged in
+ * the same draw-order pass as the covers.
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
  * An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
@@ -303,15 +308,26 @@ const coverName = (cover: UiNode): string => `${cover.role}${cover.label === nul
 
 /**
  * Why a tap standing rules a dismissal out, as its skip line says it, or
- * undefined when it lands on the dismissal's centre, unmoved. A tap that
- * would move to an uncovered piece is no dismissal: the configured element's
- * centre is what was configured, so it is skipped naming the cover over the
- * centre.
+ * undefined when it lands on the dismissal's centre, unmoved, with nothing
+ * there it would press. A tap that would move to an uncovered piece is no
+ * dismissal: the configured element's centre is what was configured, so it
+ * is skipped naming the cover over the centre. A centre the tap reaches but
+ * an INTERACTIVE node listed after the candidate holds — one the `target`
+ * column excused as no cover (`StandingFacts.centreExcused`: a labelled
+ * control of exactly its frame, its own unlabelled control or a field over
+ * its label, a row of a scroll view it is not in, a keyboard-owned control
+ * outside the band) — is skipped naming that node, the last such (drawn on
+ * top): the tap would press it, and on the post-fill `dismiss()` path a
+ * pressed control would be reported as the dismissal. A silently pressed
+ * control is worse than a skipped title (ADR 0016, the owner's decision).
  */
 function whyNotTapped(standing: Standing, node: UiNode): string | undefined {
   switch (standing.kind) {
-    case 'reachable':
-      return standing.moved === undefined ? undefined : `covered by ${coverName(standing.moved.cover)}`;
+    case 'reachable': {
+      if (standing.moved !== undefined) return `covered by ${coverName(standing.moved.cover)}`;
+      const presses = standing.facts.centreExcused.filter(isInteractive).at(-1);
+      return presses === undefined ? undefined : `covered by ${coverName(presses)}`;
+    }
     case 'offScreen':
     case 'systemBar':
       return `off screen at (${standing.at.x},${standing.at.y})`;

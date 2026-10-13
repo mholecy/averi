@@ -1,6 +1,7 @@
 # 16. The in-tree dismissal picker asks the tap's standing
 
-Status: proposed, 2026-10-13. The owner approves it, with the sweep's list of every changed pick, before it merges.
+Status: accepted, 2026-10-13 (owner decision: the sweep's list of every changed pick approved; residual 1 decided as
+the explicit refusal).
 
 ## Context
 
@@ -23,7 +24,19 @@ where a `tap` would count a cover.
 The picker keeps its two keyboard checks first (`ofKeyboard`, then `frameOver`). It then asks the tap's standing of the
 candidate, with one scene per call (one draw-order walk) and the tap's own lazy keyboard line
 (`keyboardEdge(await readingLine(reading), scene.order, node)`). It picks the candidate only when the standing is
-`reachable` with no `moved` point.
+`reachable` with no `moved` point and no interactive node there that the tap would press.
+
+**The explicit refusal (owner decision, 2026-10-13).** The `target` column excuses a node for where a touch lands on
+the target — its own content, a node of its frame, its own unlabelled control, a row of a scroll view it is not in —
+not for what else the touch presses. So the picker also refuses a candidate whose centre is held by an INTERACTIVE
+node listed after it that the `target` column excused: skipped as `covered by <role> "<label>"`, naming the last such
+node (drawn on top). A silently pressed control is worse than a skipped title: on the post-fill `dismiss()` path a
+pressed button would be reported as `hiddenBy: tapping <title>`, a wrong action said as the dismissal, and nothing
+would say otherwise; a skipped title says why, and the next configured dismissal (or the refusal) follows. The node is
+read off the standing, not found by another walk: draw order's `exposure` judges every node listed after the target
+that meets it once, as a cover or excused, and reports the excused ones holding the centre beside the covers
+(`Exposure.centreExcused`, carried as `StandingFacts.centreExcused`); nothing else reads it, and the tap's standing is
+unchanged.
 
 The skip lines:
 
@@ -32,6 +45,7 @@ The skip lines:
 | `offScreen`, `systemBar` | `off screen at (x,y)`, as before |
 | `covered` | `covered by <role> "<label>"`, the standing's cover |
 | `reachable` with `moved` | `covered by <role> "<label>"`, the cover over the centre: the dismissal is never aimed off its centre |
+| `reachable`, an excused interactive node at the centre | `covered by <role> "<label>"`, that node (the last listed) |
 | `cut` | the tap's own clause (`interact/resolve.ts#cutSliverText`) |
 | `underKeyboard` | `under the keyboard` |
 
@@ -49,12 +63,12 @@ guarded target. P is a node listed after the candidate that holds its centre.
 
 | # | Shape of P (`NOT_DRAWN` row) | Before (`shadowing`) | After (tap standing) |
 |---|---|---|---|
-| 1 | a later sibling drawn on the candidate, narrower and inside it (`onTarget`/`drawnOn`); measured: `wda-source-rn-myport` `placeholder_screen` under `text "Scaffold is running."` | skipped: covered by P | picked |
-| 2 | content of a leaf candidate's drawn-on sibling (`onTarget`/`ownContent`) | skipped | picked |
-| 3 | exactly the candidate's rect (`sameFrame`), whatever its role — a labelled control included | skipped (unless structural): `covered by button "Delete account"` | picked; the tap lands on P, a button pressed (residual 1) |
-| 4 | its own unlabelled control, a sibling spanning or padded, or a text field over a label (`ownControl`, ADR 0014) | skipped: covered by button/textfield | picked; the tap lands on the control (residual 1) |
-| 5 | content of a scroll view the candidate is not in, listed after it (`scrolledContent`; WDA lists a top bar before the scroll view it is drawn over), an interactive row included, whether or not the candidate lies in a bar | skipped: covered by the row | picked; where the row is really drawn over the candidate, the tap lands on the row (residual 1) |
-| 6 | a keyboard-owned node outside the band frame (`keyboard`) | skipped | picked (residual 2) |
+| 1 | a later sibling drawn on the candidate, narrower and inside it (`onTarget`/`drawnOn`); measured: `wda-source-rn-myport` `placeholder_screen` under `text "Scaffold is running."` | skipped: covered by P | picked; skipped as covered by P when P is interactive and holds the centre |
+| 2 | content of a leaf candidate's drawn-on sibling (`onTarget`/`ownContent`) | skipped | picked; skipped when that content is interactive and holds the centre |
+| 3 | exactly the candidate's rect (`sameFrame`), whatever its role — a labelled control included | skipped (unless structural): `covered by button "Delete account"` | skipped when P is interactive (it holds the centre): `covered by button "Delete account"`, as before; picked when it is not (an underline image) |
+| 4 | its own unlabelled control, a sibling spanning or padded, or a text field over a label (`ownControl`, ADR 0014) | skipped: covered by button/textfield | skipped, as before: the control holds the centre and is interactive (`covered by textfield`, `covered by button`) |
+| 5 | content of a scroll view the candidate is not in, listed after it (`scrolledContent`; WDA lists a top bar before the scroll view it is drawn over), an interactive row included, whether or not the candidate lies in a bar | skipped: covered by the row | picked under a non-interactive row; skipped, `covered by <the row>`, when an interactive row holds the centre (residual 1) |
+| 6 | a keyboard-owned node outside the band frame (`keyboard`) | skipped | picked (residual 2); skipped when a keyboard-owned control holds the centre |
 | 7 | a scroll indicator (`scrollIndicator`) | picked (structural, already excused) | picked: unchanged |
 | 8 | a structural node with a label, a value or children, partly over it, neither holding it whole nor frames only (`structural`); measured: the login and 2FA field wrappers under their own inner `container 36,367 330x52` | picked | skipped: covered by container (residual 3) |
 | 9 | the centre covered but a large enough free piece (the tap would move) | skipped: covered by the last such node | skipped: covered by the centre's cover; it may name a different node |
@@ -64,28 +78,31 @@ guarded target. P is a node listed after the candidate that holds its centre.
 
 Measured over the fixtures (`inTreeModel(fake).dismiss()`, every non-interactive node with area as a candidate, a
 synthetic WDA band on trees without one), the WDA fixtures changed in 9 of 898 candidates: rows 8 (8 field wrappers
-over three login dumps and two 2FA dumps) and 1 (`placeholder_screen`). No title changed. On trees that cannot reach
-the picker (idb, Compose, uiautomator, synthetic slivers), 95 of 893 changed: Compose labels under their own control
-(row 4, 74), slivers (row 11, 16), idb's flat-list rows (row 12, 4) and one Compose wrapper (row 8).
+over three login dumps and two 2FA dumps) and 1 (`placeholder_screen`). No title changed. No WDA fixture has a
+candidate in row 3 or 5, so the explicit refusal changes none of them. On trees that cannot reach the picker (idb,
+Compose, uiautomator, synthetic slivers), 18 of 893 changed: slivers (row 11, 16), one idb flat-list row (row 12) and
+one Compose wrapper (row 8). Without the explicit refusal it was 95: the 77 more were Compose and uiautomator labels
+and icons under their own clickable control (row 4, 74 — 9 of them under a control of exactly their frame, row 3 too)
+and idb's SWIFT title over the form's textfield (row 12, 3), each refused by it with the words it had before.
 
 ## Residuals accepted
 
-1. **The title's own control.** A title whose unlabelled interactive sibling holds it, or a label inside a text field,
-   is now picked, and the dismissal tap lands on that control. A field's label focuses the field, so the confirming
-   looks end in `AfterDismissalTap`. A button's label presses the button. The picker's interactive-match filter already
-   had the same hazard for a text that is a button's own child, so this widens a stated hazard and does not create one.
+1. **An excused control at the centre is refused, not pressed** (the owner's decision, 2026-10-13). The `target`
+   column excuses controls the tap would press: a title's own unlabelled control or a text field over its label
+   (`ownControl`, row 4), a control of exactly the title's frame, which reads as the title listed again (`sameFrame`,
+   row 3 — a title followed by `button "Delete account"` with the same rect), and an interactive row of a scroll view
+   the title is not in (`scrolledContent`, row 5), excused whether or not the title lies in a bar drawn over the rows.
+   Picked, each would be pressed, and on the post-fill `dismiss()` path reported as `hiddenBy: tapping <title>`. The
+   picker refuses all of them, as the option put to the owner defined it — any excused interactive node at the centre, row 4
+   included, though a field's label only focuses the field — naming the node as `covered by <role> "<label>"`. Pinned:
+   `tests/interact/keyboard-in-tree.test.ts` (the same-frame button, the title's own control, the interactive scrolled
+   row, the keyboard-owned control; and the non-interactive shapes of each still picked).
 
-   It is wider than the title's own control. The `target` column excuses some labelled controls too, and the picker
-   then taps them: a control of exactly the title's frame (`sameFrame`, row 3), which reads as the title listed again —
-   a title followed by `button "Delete account"` with the same rect, skipped before as `covered by button "Delete
-   account"`, is now picked and the button pressed — and an interactive row of a scroll view the title is not in
-   (`scrolledContent`, row 5), which the row excuses whether or not the title lies in a bar that is drawn over the
-   rows. On the guard's path, a tap that hides the keyboard and does something of its own passes as `hidden by tapping
-   … before tapping`. On the post-fill `dismiss()` path it is reported as `hiddenBy: tapping <title>`: a wrong action,
-   reported as the dismissal, and nothing says otherwise. The owner decides between keeping this and an explicit
-   refusal (a candidate whose excused node at its centre is interactive skipped as `covered by …`). A picker test pins
-   today's behaviour (`tests/interact/keyboard-in-tree.test.ts`, the same-frame labelled button: picked, the tap at its
-   centre).
+   What it leaves: a title whose excused control is listed BEFORE it is picked (only nodes listed after the candidate
+   are asked, as for a cover), and a candidate's own interactive descendant at its centre is not asked (it is the
+   candidate's subtree, never draw order's). A tap that lands on a non-interactive excused node and still triggers
+   something (a gesture recogniser the tree does not mark) is not seen. The picker's interactive-match filter has the
+   same hazard for a text that is a button's own child, as before.
 2. **A keyboard-owned node outside the band frame** no longer skips the candidate. WDA's band includes the AutoFill bar
    and the accessory slot, so `frameOver` still refuses those points. Measured: the 2FA input-accessory bar (`Toolbar →
    Other → Button "Done"` at `0,518 402x48`, in a keyboard Window, wda-source-myport-2fa-keyboard-toolbar.json) is an
