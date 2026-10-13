@@ -17,6 +17,7 @@ import {
   type KeyboardAdapter,
   type KeyboardModel,
   type ResolvedClear,
+  type SeenLook,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
 import { describeTarget, resolveSettled, type Target } from './resolve.js';
@@ -191,7 +192,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
 }
 
 /** A look as the tap judges it (tap-judgement.ts#judgeTap): the look itself — its node, its tree and the scene it carries (keyboard-model.ts#SeenLook) — and where the keyboard lies on it, a position over that scene and the look's `reading`, whose remedy the refusals say. */
-function judging(look: TapLook, reading: KeyboardReading): { look: TapLook; keyboard: { position: KeyboardPosition; remedy: KeyboardRemedy } } {
+function judging(look: SeenLook, reading: KeyboardReading): { look: TapLook; keyboard: { position: KeyboardPosition; remedy: KeyboardRemedy } } {
   return { look, keyboard: { position: keyboardPosition(look.scene.order, reading), remedy: reading.remedy } };
 }
 

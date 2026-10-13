@@ -287,8 +287,9 @@ interface JudgedScreen {
  * exhaustive switch over `TapStanding`: a new kind fails to compile here.
  * `judgeTap` acts on the first row itself, before the guard; every other
  * row is `TapJudge.aim`'s, after it. `judgedScreen` is asked on the first
- * row only — which `aim` reaches by type alone, its standing having passed
- * the on-screen rule.
+ * row only — which `aim` never reaches at runtime — its standing passed the
+ * on-screen rule, and `full()` changes only the keyboard line — only the
+ * type admits it.
  */
 function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => JudgedScreen): Aim {
   const { centre } = standing.facts;

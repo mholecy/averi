@@ -5,7 +5,7 @@ import { withNote, withScene } from '../../src/interact/keyboard-model.js';
 import { FAST, hidesKeyboardOn, iosLoginFake, node } from '../helpers/fake.js';
 
 // ONE SCENE PER LOOK (interact/keyboard-model.ts#withScene): a look carries its tree's scene, derived on first use, and
-// every judgement of that look reads it — the tap's (interact/tap-judgement.ts#judgeTap) and the dismissal picker's
+// every judgement of that look in interact/ reads it — the tap's (interact/tap-judgement.ts#judgeTap) and the dismissal picker's
 // (interact/keyboard-in-tree.ts#pickDismissal) — none derives its own. Counted here as the walks sceneOf
 // (ui-tree/standing.ts) makes, one per tree it is handed; the guard's sleeps are not waited on.
 const { walked } = vi.hoisted(() => ({ walked: [] as UiNode[] }));
