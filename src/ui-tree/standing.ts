@@ -299,6 +299,8 @@ export interface StandingFacts {
   readonly centreCover?: UiNode;
   /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
   readonly centreExcused: readonly UiNode[];
+  /** draw-order.ts#Exposure's: the covers that lie on a screen presented over the node (a modal, a sheet); absent when none. */
+  readonly presented?: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -575,6 +577,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
     reaches: seen.reaches,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
     centreExcused: seen.centreExcused,
+    ...(seen.presented.length > 0 && { presented: seen.presented }),
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),

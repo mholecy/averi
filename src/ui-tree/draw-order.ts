@@ -261,6 +261,13 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
+   * The covers that lie on a screen PRESENTED over the node's (`presentedOver`: a later screen-sized layer stacked over
+   * its own, inside one window and outside scrolled content, carrying content — a modal, a sheet), in `covers`' order;
+   * empty when none. What the sentences read: a target under one is under a presented screen no scroll moves it out
+   * from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
+   */
+  readonly presented: readonly UiNode[];
+  /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
    * `within` under no cover (no `centreCover`) — `moved: false`; else the
    * centre (`rectCentre`) of the largest uncovered piece whose sides are
@@ -398,7 +405,8 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
  * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
  *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
- * Asked of a node the frame rows would excuse (`overScreenBeneath`).
+ * Asked of a node the frame rows would excuse (`overScreenBeneath`), and of every cover for the sentences
+ * (`Exposure.presented`).
  */
 const presentedOver = (placed: Placed, target: Placed, screenArea: number): boolean => {
   const both = holderOf(placed, target);
@@ -1593,7 +1601,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const met =
         shown === undefined || about === undefined
           ? []
-          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined).map((p) => ({ node: p.node, reach: reach(p), draws: drawsOverTarget(p, about) }));
+          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined).map((p) => ({ placed: p, node: p.node, reach: reach(p), draws: drawsOverTarget(p, about) }));
       const over = met.filter((c) => c.draws);
       const covers = over.map((c) => c.node);
       const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
@@ -1618,6 +1626,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
+        presented: over.filter((c) => presentedOver(c.placed, places[0], seen.screenArea)).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,

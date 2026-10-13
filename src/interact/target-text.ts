@@ -66,6 +66,19 @@ export function cutRemedy(edge: Edge): string {
 }
 
 /**
+ * THE remedy for a target under a screen PRESENTED over its own — a modal's
+ * dimming view, a sheet (ui-tree/draw-order.ts#Exposure.presented, ADR 0018):
+ * no scroll moves it out from under that screen, so neither "scroll_until it
+ * first" nor the pinned-bar "layout defect" is said. One wording for the
+ * tap's refusal (tap-judgement.ts) and `scroll_until`'s stuck and bound
+ * failures (scroll-text.ts).
+ */
+export const PRESENTED_OVER = 'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen';
+
+/** `cover`, named by a standing over its node, lies on a screen presented over it (`StandingFacts.presented`). */
+export const presentedCover = (facts: { readonly presented?: readonly UiNode[] }, cover: UiNode): boolean => facts.presented?.includes(cover) === true;
+
+/**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts
  * #whyNotTapped): `button "Sign in"`, `toolbar` — its role and its label
  * quoted, an empty label as `""`; nothing else.

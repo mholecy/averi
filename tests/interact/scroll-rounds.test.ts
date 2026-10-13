@@ -1870,3 +1870,40 @@ describe('round — a cover the target shows past only on its far side (the roun
     expect(reaches(played)).toEqual([1]);
   });
 });
+
+/**
+ * A target under a screen PRESENTED over its own (ADR 0018: a modal's dimming leaf, a sheet's form — a later stacked
+ * screen-sized layer in the app's Window): no scroll moves it out from under that screen, and the failure says so —
+ * not the pinned-bar "layout defect", which stays for every other cover (the CONTINUE rows above) (review of round 13
+ * slice A, M2). The strokes are still sent (ADR 0018's residual):
+ * the stroke box knows no layer. On the round-12 device check's ui_snapshots, held still.
+ */
+describe('round — a target under a screen presented over it (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { everyNode } = await import('../../src/adapters/types.js');
+  const screens = (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+  const rowsOf = (key: string, id: string, n: number): Row[] => {
+    const tree = screens[key];
+    const target = [...everyNode(tree)].find((x) => x.identifier === id || x.label === id)!;
+    return Array.from({ length: n }, () => ({ tree, found: [target] }));
+  };
+  const PRESENTED = 'A screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen.';
+
+  it('stuck: the RN modal\'s dimming leaf over lang_sk — the presented screen named, no layout defect', () => {
+    const played = play(IPHONE, rowsOf('finportalForgot', 'lang_sk', 4));
+    expect(played.outcome?.kind).toBe('stuck');
+    expect(failureOf(played, 'id:lang_sk').message).toBe(
+      'scroll_until id:lang_sk failed after 3 swipes — element is in the viewport but under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it — 0% of it shows — ' +
+        `and the content is exhausted: swiping down no longer moves it, nor does swiping up. ${PRESENTED} Last rect {"x":268,"y":235,"width":43,"height":32} in a 402x874 viewport`,
+    );
+  });
+
+  it('bound: the sheet\'s form over a row\'s photo button, the swipes run out — the shortfall says the presented screen too', () => {
+    const played = play({ ...IPHONE, maxSwipes: 1 }, rowsOf('contactsSheet', 'Contact photo for Kate Bell', 2));
+    expect(played.outcome?.kind).toBe('bound');
+    expect(failureOf(played, 'label:"Contact photo for Kate Bell"').message).toBe(
+      'scroll_until label:"Contact photo for Kate Bell" failed after 1 swipe (maxSwipes) — element reached the viewport but stayed under scrollable (0,62 402x812) at its centre (41,290), drawn over it — 0% of it shows (last rect {"x":18,"y":267,"width":45,"height":45}) — ' +
+        PRESENTED.replace(/^A/, 'a').replace(/\.$/, ''),
+    );
+  });
+});
