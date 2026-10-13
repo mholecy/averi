@@ -1,6 +1,7 @@
-import type { DeviceAdapter, Point, Rect } from '../adapters/types.js';
+import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
 import { readKeyboard, type Covering, type FrameVerdict, type KeyboardReading, type Uncovered } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { sceneOf, type Scene } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -148,19 +149,48 @@ export interface DismissResult {
 }
 
 /**
- * A model's answer when the keyboard left the point: the node as resolved
- * again, the tree it was resolved in (the chrome check, the last rule of a
- * tap, judges it there — tap-judgement.ts#TapJudge.aim), and the keyboard
- * sentence.
+ * A settled resolution as one LOOK: the node, the tree read that holds it,
+ * and that tree's scene (ui-tree/standing.ts#Scene) — derived on first use,
+ * once, and read by every judgement of the look: the tap's
+ * (tap-judgement.ts#judgeTap, a TapLook as it stands) and the dismissal
+ * picker's (keyboard-in-tree.ts#pickDismissal). None derives its own, so
+ * "one draw-order walk per look" holds by construction, not by each
+ * caller's care. Threaded, not cached by tree: a memo keyed by the tree
+ * would rest on trees never being mutated after their scene is built, a
+ * contract only the scroll read states.
  */
-export interface ClearedLook extends ResolvedSettled {
+export interface SeenLook extends ResolvedSettled {
+  readonly scene: Scene;
+}
+
+/** `resolved` as a look (SeenLook): the same fields, and its tree's scene, derived on first use. */
+export function withScene<R extends { readonly tree: UiNode }>(resolved: R): R & { readonly scene: Scene } {
+  let scene: Scene | undefined;
+  return {
+    ...resolved,
+    get scene() {
+      return (scene ??= sceneOf(resolved.tree));
+    },
+  };
+}
+
+/**
+ * A model's answer when the keyboard left the point: the node as resolved
+ * again, the tree it was resolved in with its scene (the chrome check, the
+ * last rule of a tap, judges it there — tap-judgement.ts#TapJudge.aim), and
+ * the keyboard sentence.
+ */
+export interface ClearedLook extends SeenLook {
   keyboardHidden?: string;
 }
 
-/** The guard's answer: the node and its tree, with the keyboard sentence folded into the resolution note and kept alone beside it. */
-export const withNote = (resolved: ResolvedSettled, keyboardHidden: string): ClearedLook => ({
+/** The guard's answer: the node and its tree — the same look, its scene the look's — with the keyboard sentence folded into the resolution note and kept alone beside it. */
+export const withNote = (resolved: SeenLook, keyboardHidden: string): ClearedLook => ({
   node: resolved.node,
   tree: resolved.tree,
+  get scene() {
+    return resolved.scene;
+  },
   note: resolved.note === undefined ? keyboardHidden : `${resolved.note}; ${keyboardHidden}`,
   keyboardHidden,
 });
@@ -184,9 +214,9 @@ export function failedLookMessage(e: unknown, refused: string, failed: (headline
   return [failed(headline), ...rest].join('\n');
 }
 
-/** What one look found: the target resolved again, where it is now, the keyboard read against that point, and the reading it came from (off the look's tree — the in-tree model's picker asks it again). */
+/** What one look found: the target resolved again (with its tree's scene, SeenLook), where it is now, the keyboard read against that point, and the reading it came from (off the look's tree — the in-tree model's picker asks it again). */
 export interface Look {
-  resolved: ResolvedSettled;
+  resolved: SeenLook;
   point: Point;
   verdict: FrameVerdict;
   reading: KeyboardReading;
@@ -215,9 +245,9 @@ export interface Look {
  * first (`confirmHidden` does for its looks).
  */
 export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: GuardOptions, failed: (e: unknown) => KeyboardGuardError): Promise<Look> {
-  let resolved: ResolvedSettled;
+  let resolved: SeenLook;
   try {
-    resolved = await resolveSettled(adapter, target, opts);
+    resolved = withScene(await resolveSettled(adapter, target, opts));
   } catch (e) {
     throw failed(e);
   }

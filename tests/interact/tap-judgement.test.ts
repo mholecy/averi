@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import { keyboardPosition } from '../../src/ui-tree/keyboard-position.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
-import { sceneOf } from '../../src/ui-tree/standing.js';
+import { sceneOf, type Scene } from '../../src/ui-tree/standing.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/tap-judgement.js';
 import { node } from '../helpers/fake.js';
@@ -14,6 +14,13 @@ import { node } from '../helpers/fake.js';
 // loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a hand-made reading that
 // counts what it is asked. Each row's sentence is the one the tap's integration cases pin through `tapElement`
 // (tests/interact/resolve.test.ts); here it is the rule, one row per standing kind.
+
+// sceneOf (ui-tree/standing.ts), counted: the M5 rows below pin that a judgement derives no scene of its own.
+const { walks } = vi.hoisted(() => ({ walks: { n: 0 } }));
+vi.mock('../../src/ui-tree/standing.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/ui-tree/standing.js')>();
+  return { ...real, sceneOf: (tree: UiNode) => (walks.n++, real.sceneOf(tree)) };
+});
 
 const BACK: KeyboardRemedy = { dismissal: 'back', advice: undefined };
 const NONE: KeyboardRemedy = { dismissal: 'none', advice: 'tap the title' };
@@ -255,6 +262,52 @@ describe('the reading\'s line — asked lazily, once (D-C3c)', () => {
     const look = { node: find(tree, 'row'), tree, scene: sceneOf(tree) };
     await judgeTap(viewport(PIXEL).adapter, 'row', look, undefined, { position: keyboardPosition(look.scene.order, kb.reading), remedy: BACK });
     expect(kb.asked).toEqual({ cover: 0, corroborated: 0 });
+  });
+});
+
+describe('the look\'s scene — judgeTap reads it and derives none (M5)', () => {
+  /** `tree`'s scene as a spy: what judgeTap asks of it (`standing`, `clips`) is recorded, and answered by the real scene. */
+  function spyScene(tree: UiNode) {
+    const real = sceneOf(tree);
+    const asked: string[] = [];
+    const scene: Scene = {
+      get order() {
+        return real.order;
+      },
+      get clips() {
+        asked.push('clips');
+        return real.clips;
+      },
+      standing: ((...args: Parameters<Scene['standing']>) => (asked.push('standing'), real.standing(...args))) as Scene['standing'],
+    };
+    return { scene, asked };
+  }
+  async function judgeOn(tree: UiNode, id: string, kb: ReturnType<typeof reading>) {
+    const { scene, asked } = spyScene(tree);
+    const position = keyboardPosition(scene.order, kb.reading);
+    walks.n = 0;
+    const outcome = await judgeTap(viewport(PIXEL).adapter, id, { node: find(tree, id), tree, scene }, undefined, { position, remedy: BACK })
+      .then((j) => j.aim())
+      .catch((e: unknown) => e as Error);
+    return { outcome, asked, walks: walks.n };
+  }
+
+  it('a covered centre judged again with the reading\'s line: both standings asked of the look\'s scene, no scene walked', async () => {
+    const { outcome, asked, walks } = await judgeOn(sheet(), 'row', reading(1380));
+    expect(outcome).not.toBeInstanceOf(Error);
+    expect(asked).toEqual(['standing', 'standing']);
+    expect(walks).toBe(0);
+  });
+  it("a centre under the navigation bar: the remedy's scroll view asked of the look's scene too", async () => {
+    const tree = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'button', label: 'Pay', identifier: 'pay', rect: { x: 0, y: 2160, width: 1080, height: 60 } })] });
+    const { scene, asked } = spyScene(tree);
+    const { adapter } = viewport(PIXEL);
+    const screen = await usableScreen(adapter, { tree });
+    walks.n = 0;
+    const refused = await judgeTap(adapter, 'pay', { node: find(tree, 'pay'), tree, scene }, screen, { position: keyboardPosition(scene.order, reading(undefined).reading), remedy: BACK }).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(OffScreenRefusal);
+    expect(asked).toEqual(['standing', 'standing', 'clips']);
+    expect(walks.n).toBe(0);
   });
 });
 

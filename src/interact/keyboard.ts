@@ -1,8 +1,7 @@
-import type { Point, Rect, UiNode } from '../adapters/types.js';
+import type { Point, Rect } from '../adapters/types.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf } from '../ui-tree/standing.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { usableScreen } from '../ui-tree/usable-screen.js';
 import { inTreeModel } from './keyboard-in-tree.js';
@@ -10,6 +9,7 @@ import {
   confirmHidden,
   lookAgain,
   withNote,
+  withScene,
   type ClearedLook,
   type DismissOptions,
   type DismissResult,
@@ -131,7 +131,7 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * why).
  */
 export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: Target, opts: GuardOptions): Promise<ResolvedClear> {
-  const first = await resolveSettled(adapter, target, opts);
+  const first = withScene(await resolveSettled(adapter, target, opts));
   // The keyboard read off the first look's tree — building it asks nothing;
   // its questions are put below, in the module doc's order.
   const reading = readKeyboard(adapter, first.tree);
@@ -190,9 +190,8 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   return clearOf(cleared.look, await (await judgeTap(adapter, target, after.look, screen, after.keyboard, hiding.sent)).aim());
 }
 
-/** A look as the tap judges it (tap-judgement.ts#judgeTap): its node and tree with the tree's scene, and where the keyboard lies on it — a position over that scene and the look's `reading`, whose remedy the refusals say. */
-function judging(r: { readonly node: UiNode; readonly tree: UiNode }, reading: KeyboardReading): { look: TapLook; keyboard: { position: KeyboardPosition; remedy: KeyboardRemedy } } {
-  const look: TapLook = { node: r.node, tree: r.tree, scene: sceneOf(r.tree) };
+/** A look as the tap judges it (tap-judgement.ts#judgeTap): the look itself — its node, its tree and the scene it carries (keyboard-model.ts#SeenLook) — and where the keyboard lies on it, a position over that scene and the look's `reading`, whose remedy the refusals say. */
+function judging(look: TapLook, reading: KeyboardReading): { look: TapLook; keyboard: { position: KeyboardPosition; remedy: KeyboardRemedy } } {
   return { look, keyboard: { position: keyboardPosition(look.scene.order, reading), remedy: reading.remedy } };
 }
 
