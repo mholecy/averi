@@ -135,8 +135,9 @@ On the five layered trees every TAP diff is a target of the screen beneath: "tap
 first" becomes the refusal saying the screen is presented over it (12 moved taps on the scrolled sheet name the form as
 the centre's cover, the piece unchanged). ROUNDS: 79 568 plays become the `presented` stop with no stroke (from
 `visible` or from strokes then `stuck`); 1 968 stay `visible`, only their `covered.shows` changed (a sheet's row over a
-list row whose centre is clear); 648 two-match plays whose judged match lies ON the presented screen (the
-modal's or the sheet's own full-screen container, under its own card or fields) stroke as such a node did before.
+list row whose centre is clear); 648 still stroke, as at 20307d2: 616 two-match plays whose judged match is a node of
+the presented screen itself (its full-screen container under its own card or fields: 304 on the modal, 104 on each
+sheet tree), and 32 whose beneath target lies under the keyboard (residual 6).
 Node by node, no node of a presented layer changed.
 
 Earlier runs found what this decision now excludes: the RN `ScrollView`'s content layer over its background (the
@@ -171,9 +172,12 @@ condition), and `scroll_until` stroking on a presented page sheet (the `presente
    a popover), a target that is itself a direct child of the node holding both, and an Android in-window overlay
    Compose flattens away. A layer drawn by the root's direct children (one window's top level, on a tree whose root is
    the window) reads as across Windows.
-6. **`scroll_until` stops at a presented screen on its own reads**: two reads with no stroke between. A target whose
-   presented screen the tree does not show as one (residuals 2, 3, 5) is still stroked for, as before, and those
-   strokes land on that screen. The stroke box (`drawnOver`) is unchanged; the harness's ROUNDS cannot see it.
+6. **`scroll_until` stops at a presented screen on its own reads**: two reads with no stroke between (or one, when no
+   confirming read is left), and only of a target JUDGED IN THE VIEWPORT under a presented surface. A target beneath
+   the screen that is off screen, under the keyboard, or not yet in the tree is still stroked for, as at 20307d2, and
+   those strokes land on the presented screen (the harness: `login_support_email` under the keyboard on Finportal's
+   modal, 32 plays ending at the bound). So is one whose presented screen the tree does not show as one (residuals 2,
+   3, 5). The stroke box (`drawnOver`) is unchanged; the harness's ROUNDS cannot see it.
 7. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
