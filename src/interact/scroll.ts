@@ -92,7 +92,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * the WDA band on iOS; what it asks the device is counted on
  * ui-tree/keyboard-cover.ts, WHAT A READING ASKS) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
- * shown keyboard (scroll-rounds.ts#coverOf): an element under it scores 0 or is clipped at
+ * shown keyboard (scroll-read.ts#coverOf): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke keeps clear of it
  * (`swipeVectorAbove`: the whole screen's stroke, its point on or near the
  * keyboard pulled up — the iOS device check, below), so it starts on
@@ -290,7 +290,7 @@ export async function scrollUntilVisible(
       const cover = await reading.cover();
       // The tree itself: what the round asks of it — the matches' clipping
       // ancestors, the largest scroller, the fingerprint, progress — it
-      // derives (scroll-rounds.ts#TreeFacts); nothing to hand in or forget.
+      // derives (scroll-read.ts#TreeFacts); nothing to hand in or forget.
       seen = {
         read: {
           tree,

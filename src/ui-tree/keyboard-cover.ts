@@ -41,8 +41,8 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * `keyboardEdge`'s (below): a corroborated reading's line (`readingLine`)
  * and idb's band merged in one place, read by the tap
  * (interact/resolve.ts#refuseOffScreen for its first ask, #aimClearOfChrome
- * for the lazy one), `scroll_until`'s round (interact/scroll-rounds.ts
- * #round, its judgement and its strokes) and the pixel poll
+ * for the lazy one), `scroll_until`'s read (interact/scroll-read.ts
+ * #judgeRead, its judgement and its strokes) and the pixel poll
  * (verify/pixel-poll.ts#overElement); which nodes are the
  * keyboard's own, under no line, is `keyboardSide`'s.
  *
@@ -488,7 +488,7 @@ export type KeyboardLine =
  * line's source. Synchronous and asks nothing: whether the witness stands
  * by the cover is the caller's question, put before this one —
  * `readingLine` asks it of the reading, `scroll_until`'s round through its
- * protocol (interact/scroll-rounds.ts#coverOf).
+ * protocol (interact/scroll-read.ts#coverOf).
  */
 export function coverLine(cover: KeyboardCover): KeyboardLine {
   return { y: cover.top.y, source: cover.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
@@ -500,7 +500,7 @@ export function coverLine(cover: KeyboardCover): KeyboardLine {
  * `corroborated` cost (the module doc); asked by the tap only when its
  * centre is covered (interact/resolve.ts#aimClearOfChrome). `scroll_until`
  * asks the same two through its round's protocol instead
- * (interact/scroll-rounds.ts#Cover).
+ * (interact/scroll-read.ts#Cover).
  */
 export async function readingLine(reading: KeyboardReading): Promise<KeyboardLine | undefined> {
   const cover = await reading.cover();

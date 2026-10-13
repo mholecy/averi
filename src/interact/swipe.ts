@@ -131,7 +131,7 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  * box's own, as short as the box: a short drag on the content rather than
  * a stroke on the panel. `keyboardTop` must lie inside the box (the caller
  * fails before stroking when a keyboard leaves nothing above it;
- * scroll-rounds.ts#coverOf). Pure.
+ * scroll-read.ts#coverOf). Pure.
  */
 export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Direction, meaning: SwipeMeaning): Stroke {
   const uncovered = { ...box, height: Math.min(box.height, keyboardTop - box.y) };
@@ -306,7 +306,7 @@ export interface StrokeRoom {
  * over the screen whole. One judgement of room, the keyboard in it. No gesture `box` at all (screenBox threw): no room.
  *
  * `over` gives the rects drawn over a candidate (ui-tree/draw-order.ts
- * #drawnOver, through scroll-rounds.ts#TreeFacts, or as a remembered
+ * #drawnOver, through scroll-read.ts#TreeFacts, or as a remembered
  * container carries them, scroll-rounds.ts#StrokeContainer) — the floating
  * tab bar of the note below: the list `0,825 1080x1395` ran under the bar's
  * host `66,1840 948x248`, the content-down stroke over it touched down at
