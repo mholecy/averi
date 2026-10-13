@@ -24,7 +24,7 @@ import {
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { IOS_MIN_STATUS_BAND, iosStatusBand } from '../../src/adapters/ios-status-band.js';
-import { usableScreen } from '../../src/ui-tree/standing.js';
+import { usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';

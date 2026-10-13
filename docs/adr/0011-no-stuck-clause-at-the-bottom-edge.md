@@ -15,8 +15,11 @@ scroll moves them up, so an element reaching the screen's bottom gets the scroll
 child advice there:
 
 - an element in no scroll view, as far as the tree says (`Clips.inScroller` false or unknown, which includes every idb
-  miss);
-- an element that is the screen itself (screen-sized).
+  miss) — and, when it is a full-bleed footer or screen-sized, its advice LEADS with the child;
+- an element that is the screen itself (screen-sized), under the navigation bar, only when no scroll lifts it out of the
+  band (`ui-tree/standing.ts#pinnedSurface`): in no scroll view, or taller than the room between the bars. Screen-sized
+  scroll content that fits the room gets the scroll advice (amended 2026-10-13, ADR 0009 (b)); a cover over it keeps
+  the screen advice.
 
 The rule is at `verify/pixel-poll.ts#judgeOver`.
 

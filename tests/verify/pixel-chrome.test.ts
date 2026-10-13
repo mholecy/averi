@@ -4,7 +4,8 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
-import { sceneOf, treeScreen, usableScreen, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { sceneOf, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 
@@ -278,7 +279,7 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
     expect(await judge(PIXEL_3A, tree, row, colorSampleRect)).toBeUndefined();
   });
 
-  it('neither the screen itself (screen-sized) nor a full-bleed header (laid from the top edge at full width) is cured by a scroll: each remedy leads with something in it, the header\'s naming its title; idb\'s root says the cover is content on its background', async () => {
+  it('neither the screen itself (screen-sized), a full-bleed header (laid from the top edge at full width) nor a full-bleed footer (a bottom sheet) in no scroll view is cured by a scroll: each remedy leads with something in it, the header\'s naming its title; in a scroll view the header is a row, scrolled; idb\'s root says the cover is content on its background', async () => {
     const NEVER = 'the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself out from under it';
     const HEADER = 'the capture would show it, not the element — assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it';
     const win = n('container', rect(0, 0, 402, 874), { identifier: 'screen' });
@@ -286,8 +287,20 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
       `the status bar is drawn over the element (element 0,0 402x874, status bar 0,0 402x62) — ${NEVER}`,
     );
     const header = n('container', rect(0, 0, 402, 116), { identifier: 'header' });
+    const pinnedHeader = n('application', rect(0, 0, 402, 874), { children: [header, n('scrollable', rect(0, 116, 402, 758))] });
+    expect(await judge(IPHONE, pinnedHeader, header, colorSampleRect)).toBe(`the status bar is drawn over the element (element 0,0 402x116, status bar 0,0 402x62) — ${HEADER}`);
+    // The same shape inside a scroll view is a list's row, which `scroll_until … fully: true` lifts out of the band: its advice is the scroll.
     const scrolled = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 874), { children: [header] })] });
-    expect(await judge(IPHONE, scrolled, header, colorSampleRect)).toBe(`the status bar is drawn over the element (element 0,0 402x116, status bar 0,0 402x62) — ${HEADER}`);
+    expect(await judge(IPHONE, scrolled, header, colorSampleRect)).toBe(
+      'the status bar is drawn over the element (element 0,0 402x116, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that',
+    );
+    // A full-width surface laid to the screen's bottom in no scroll view (a bottom sheet) under the navigation bar, read whole (ocr): its advice leads with what to assert instead.
+    const sheet = n('container', rect(0, 1100, 1080, 1120), { identifier: 'sheet' });
+    const withSheet = n('container', rect(0, 0, 1080, 2220), { children: [n('scrollable', rect(0, 0, 1080, 2220)), sheet] });
+    expect(await judge({ ...PIXEL_3A, navigationBand: 2154 }, withSheet, sheet)).toBe(
+      'the navigation bar is drawn over the element (element 0,1100 1080x1120, navigation bar 0,2154 1080x66) — the capture would show it, not the element — ' +
+        'assert something in it that lies clear of that (its content above the bar, say); no scroll moves an element laid to the screen\'s bottom edge out from under it',
+    );
     // Screen-sized below the bar (Android's content view, 97 % of the screen) under a dialog: the screen too.
     // (The dialog's panel covers through its content, its button here — the tap's `contentFramed` row; a childless, non-interactive sibling laid on the element is read as on it — both stated residuals.)
     const content = n('container', rect(0, 66, 1080, 2154), { identifier: 'content', children: [n('text', rect(66, 300, 900, 100), { label: 'Body' })] });
@@ -312,10 +325,10 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
 });
 
 /**
- * Code review of round 8, S3: the screen a pixel assert judges in is ui-tree/standing.ts#usableScreen's — the gesture
+ * The screen a pixel assert judges in is ui-tree/usable-screen.ts#usableScreen's — the gesture
  * box's derivation. With the device silent, a window the tree vouches for is the screen, not the tree's largest node.
  */
-describe('the screen without the device: the window the tree vouches for (ui-tree/standing.ts#usableScreenOf)', () => {
+describe('the screen without the device: the window the tree vouches for (ui-tree/usable-screen.ts#usableScreenOf)', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
   const silent = { viewport: async (): Promise<DeviceScreen> => Promise.reject(new Error('idb describe: no screen_dimensions')) };

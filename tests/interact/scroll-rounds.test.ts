@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Rect, Stroke, UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve.js';
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
-import { describeScrollResult } from '../../src/interact/scroll-text.js';
+import { describeScrollResult, scrollFailure } from '../../src/interact/scroll-text.js';
+import { scrollStroke } from '../../src/interact/swipe.js';
 import { node } from '../helpers/fake.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
 import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Played, type Row } from '../helpers/rounds.js';
-import type { UsableScreen } from '../../src/ui-tree/standing.js';
+import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
@@ -967,7 +968,7 @@ describe('round — the flush check across nested clipping containers, and a pro
 
   it('room is judged over the GESTURE box the stroke would be drawn in, not the judged frame: a landscape window crowned as a child turns the gesture box but not the frame — a container below the turned box\'s bottom has no room there, so no probe', () => {
     const PORTRAIT: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
-    const screen: UsableScreen = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/standing.ts#UsableScreen: turned gesture, panel as built judged
+    const screen: UsableScreen = { box: PORTRAIT, boxes: [PORTRAIT], oriented: { x: 0, y: 0, width: 2220, height: 1080 }, from: 'device' }; // ui-tree/usable-screen.ts#UsableScreen: turned gesture, panel as built judged
     const LOW: Rect = { x: 0, y: 1100, width: 1080, height: 600 };
     const played = play(FULLY_ANDROID, [{ found: [match({ x: 66, y: 1100, width: 948, height: 143 }, 'row')], scroller: LOW, screen }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
@@ -1606,6 +1607,128 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
     expect(failureOf(played, 'id:row_4').message).toContain(
       'failed after 0 swipes (maxSwipes) — element reached the viewport but its centre stays under the navigation bar at (540,2186), from y 2154 to the bottom of the screen (tree units)',
     );
+  });
+
+  /** accountDetail's row_30 66,2088 948x99: its centre (540,2138) clear of the band, its bottom 33 px into it. */
+  const row30 = (y = 2088): Row => ({ found: [match({ x: 66, y, width: 948, height: 99 }, 'row_30')], screen: NAV });
+
+  it('fully: true on row_30 reaching 33 px into the band: no stop at 0 swipes (the pixel assert\'s region rule) — stroked until it clears the band; the plain stop stops at once', () => {
+    const fully = play({ ...ANDROID, fully: true }, [row30(), row30(1600), row30(1600)]);
+    expect(strokesToward(fully)).toEqual(['down']);
+    expect(resultOf(fully)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(resultOf(play(ANDROID, [row30()]))).toEqual({ swipes: 0, visible: 1, clipped: [] });
+  });
+
+  it('fully: true on row_30 pinned there (no stroke moves it): stuck, naming the navigation bar it reaches into — not its centre, which a tap presses', () => {
+    const played = play({ ...ANDROID, fully: true, maxSwipes: 6 }, [row30(), row30(), row30(), row30()]);
+    expect(strokesToward(played)).toEqual(['down', 'down', 'up']);
+    expect(played.outcome?.kind).toBe('stuck');
+    const message = failureOf(played, 'id:row_30').message;
+    expect(message).toContain(
+      'it stays partly under the navigation bar, from y 2154 to the bottom of the screen (tree units), and the content is exhausted: ' +
+        'swiping down no longer moves it out from under the navigation bar',
+    );
+    expect(message).toContain('it is pinned under the navigation bar (a layout that does not keep clear of it?), and fully: true never stops on it (its centre is clear: a plain scroll_until stops on it, and a tap lands).');
+    expect(message).not.toContain('its centre stays');
+  });
+
+  it('fully: true at the bound: short of the navigation bar it reaches into, with what the plain stop and the tap still do', () => {
+    const played = play({ ...ANDROID, fully: true, maxSwipes: 0 }, [row30()]);
+    expect(failureOf(played, 'id:row_30').message).toContain(
+      'failed after 0 swipes (maxSwipes) — element reached the viewport but it stays partly under the navigation bar, from y 2154 to the bottom of the screen (tree units) — ' +
+        'fully: true stops only with none of it under the bar (its centre is clear: a plain scroll_until stops on it, and a tap lands) (last rect',
+    );
+  });
+
+  it('…its centre under something of the app: no promise of a stop or a tap, only that its centre is clear of the bar', () => {
+    const help = node({ role: 'button', identifier: 'help', rect: { x: 400, y: 2110, width: 200, height: 60 } });
+    const pinned = play({ ...ANDROID, fully: true, maxSwipes: 6 }, [1, 2, 3, 4].map(() => ({ ...row30(), over: [help] })));
+    expect(pinned.outcome?.kind).toBe('stuck');
+    const stuck = failureOf(pinned, 'id:row_30').message;
+    expect(stuck).toContain('and fully: true never stops on it (its centre is clear of the bar).');
+    expect(stuck).not.toContain('a tap lands');
+    const bound = failureOf(play({ ...ANDROID, fully: true, maxSwipes: 0 }, [{ ...row30(), over: [help] }]), 'id:row_30').message;
+    expect(bound).toContain('— fully: true stops only with none of it under the bar (its centre is clear of the bar) (last rect');
+  });
+
+  /**
+   * A CLOSED LOOP over the Pixel_3a with its navigation band: the content moves with every stroke (`frac` of the screen's
+   * height a full reach, clamped to `limits` — what the content can move each way), and the round reads it there next.
+   * The strokes and the outcome's sentence, in order.
+   */
+  const glide = (rules: RoundRules, rect: Rect, frac: number, limits: [number, number]): string[] => {
+    let state = startRounds(rules, { width: 1080, height: 2220, statusBand: 66, navigationBand: 2154 });
+    let off = 0;
+    let stroked: any;
+    const log: string[] = [];
+    for (let i = 0; i < 30; i++) {
+      const found = [match({ ...rect, y: rect.y + off }, 't')];
+      const seen: any = { read: { tree: treeOf({ found, rest: `at ${off}` }, ANDROID.screen), found, ofKeyboard: () => false, remedy: { dismissal: 'none' } }, elapsedMs: i * 400, screen: NAV, ...(stroked && { drawn: scrollStroke(stroked) }) };
+      let next = round(state, seen);
+      while (next.step.do === 'ask') {
+        if (next.step.what === 'witness') seen.corroborated = true;
+        else seen.unlocated = false;
+        next = round(state, seen);
+      }
+      state = next.state;
+      const step = next.step;
+      if (step.do === 'stop') return [...log, step.outcome.kind === 'visible' ? `visible @${rect.y + off}` : scrollFailure(step.outcome, 'id:"t"').message];
+      if (step.do === 'stroke') {
+        const d = Math.round(step.reach * 2220 * frac);
+        off = Math.max(limits[0], Math.min(limits[1], off + (step.toward === 'down' ? -d : d)));
+        log.push(`${step.toward} @${rect.y + off}`);
+      }
+      stroked = step.do === 'stroke' ? step : undefined;
+    }
+    return log;
+  };
+
+  it('closed loop, the plain stop: a 14-px row at 2147 (its centre in the band) whose content only moves away — turned back toward the band as ever, never pushed off and lost', () => {
+    const played = glide({ ...ANDROID, direction: 'up', maxSwipes: 8, timeoutMs: 60_000 }, { x: 66, y: 2147, width: 948, height: 14 }, 0.15, [0, 4000]);
+    expect(played.at(-1)).toContain('its centre stays under the navigation bar');
+    expect(played.at(-1)).not.toContain('did not stay');
+  });
+
+  it('the plain stop judges the far edge in frames NOT cut at the navigation band: row_4 in the band (2152, centre 2186) with `direction: up` is stroked the caller\'s way first', () => {
+    const played = play({ ...ANDROID, direction: 'up', maxSwipes: 1 }, [row(2152), row(2152)]);
+    expect(strokesToward(played)).toEqual(['up']);
+  });
+
+  it('…and so does a fully stop whose CENTRE is in the band (no region judged): row_4 with `direction: up` is stroked the caller\'s way first', () => {
+    const played = play({ ...ANDROID, direction: 'up', fully: true, maxSwipes: 1 }, [row(2152), row(2152)]);
+    expect(strokesToward(played)).toEqual(['up']);
+  });
+
+  it('closed loop, fully: true: a row reaching into the band (2108, 60 tall) the stuck probe pushes wholly into it is turned back, never pushed off and lost', () => {
+    const played = glide({ ...ANDROID, direction: 'up', fully: true, maxSwipes: 8, timeoutMs: 60_000 }, { x: 66, y: 2108, width: 948, height: 60 }, 0.3, [0, 4000]);
+    expect(played.at(-1)).not.toContain('did not stay');
+    expect(played.at(-1)).toContain('navigation bar');
+  });
+
+  it('fully: true on row_30 with `direction: up` (content above): at the navigation band it is at the far edge — the first stroke turns and lifts it, no oscillation', () => {
+    const played = play({ ...ANDROID, direction: 'up', fully: true }, [row30(), row30(1600), row30(1600)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+
+  it('fully: true stops at 0 swipes on content in no scroll view that no scroll lifts out of a band: an edge-to-edge app bar 0,0 1080x210, a screen-sized node 0,40 1080x2180, a bottom sheet 0,1100 1080x1120 — no stroke over a modal sheet', () => {
+    for (const rect of [{ x: 0, y: 0, width: 1080, height: 210 }, { x: 0, y: 40, width: 1080, height: 2180 }, { x: 0, y: 1100, width: 1080, height: 1120 }]) {
+      expect(resultOf(play({ ...ANDROID, fully: true }, [{ found: [match(rect, 'hero')], screen: NAV }]))).toMatchObject({ swipes: 0, visible: 1 });
+    }
+  });
+
+  it('…but a list row 0,0 1080x150 in a scroll view is a row a scroll lifts out of the status band: stroked until clear', () => {
+    const list: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+    const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 1080, height: 150 }, 'row')], scroller: list, screen: NAV });
+    const played = play({ ...ANDROID, fully: true }, [row(0), row(400), row(400)]);
+    expect(strokesToward(played)).toEqual(['up']);
+    expect(resultOf(played)).toMatchObject({ swipes: 1, visible: 1 });
+  });
+
+  it('…and on an iOS hero 0,0 402x300 under the 62-pt status bar', () => {
+    const box: Rect = { x: 0, y: 0, width: 402, height: 874 };
+    const screen: UsableScreen = { box, boxes: [box], oriented: box, from: 'device', statusBand: 62 };
+    expect(resultOf(play({ ...IPHONE, fully: true }, [{ found: [match({ x: 0, y: 0, width: 402, height: 300 }, 'hero')], screen }]))).toMatchObject({ swipes: 0, visible: 1 });
   });
 });
 

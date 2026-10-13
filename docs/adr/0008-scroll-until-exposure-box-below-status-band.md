@@ -29,6 +29,11 @@ dropped the straddling cover's part in the band is no longer subtracted. `shows`
 It never decides a kind, so no stop, refusal or turn changes. Making it continuous would cost a third `exposure` for each
 such node.
 
+**Amended by ADR 0009 (2026-10-13, round 10's `fully` region rule).** A `fully: true` stop now judges the system
+bands as a region: a node reaching into the status band past the 2-unit slack does not stop (unless no scroll lifts it
+out: a full-bleed header or footer, or a screen-sized node, in no scroll view — `pinnedSurface`). So for `fully` this cover cut decides a stop only for a node within the
+slack of the band, or one so exempt; it still sets `shows` for every node.
+
 ## Residuals accepted
 
 - In the case above, `shows` and its quoted percentage can be higher by the straddling cover's part in the band.

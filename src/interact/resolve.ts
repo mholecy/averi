@@ -4,7 +4,9 @@ import { drawnOverText, rectText, type Cut, type Edge } from '../ui-tree/geometr
 import { keyboardEdge, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
-import { sceneOf, usableScreen, type Scene, type Standing, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
+import { sceneOf, type Scene, type Standing, type SystemBar } from '../ui-tree/standing.js';
+import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
+import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 
@@ -494,46 +496,6 @@ export class PresentElementRefusal extends Error implements RefusedOnPresentElem
 export class OffScreenRefusal extends PresentElementRefusal {}
 
 /**
- * The status band as one clause — `under the status bar at (201,6), in the
- * top 62 of the screen (tree units), where a tap goes to the status bar` —
- * the words for a point there, read by the tap's refusal
- * (`refuseOffScreen`) and by `scroll_until`'s failures (scroll-text.ts),
- * so the two say the one fact alike. No platform named, and the band in the
- * tree's units — pt on iOS, px on Android, the units every rect in the same
- * reply is in.
- */
-export const underStatusBar = (at: Point, band: number): string =>
-  `under the status bar at (${at.x},${at.y}), in the top ${band} of the screen (tree units), where a tap goes to the status bar`;
-
-/**
- * The navigation band as one clause — `under the navigation bar at
- * (540,2186), from y 2154 to the bottom of the screen (tree units), where a
- * tap goes to the navigation bar` — `underStatusBar`'s twin at the bottom
- * edge, for the same two readers.
- */
-export const underNavigationBar = (at: Point, top: number): string =>
-  `under the navigation bar at (${at.x},${at.y}), from y ${top} to the bottom of the screen (tree units), where a tap goes to the navigation bar`;
-
-/** A point under a system bar (ui-tree/standing.ts#SystemBar), in that bar's clause. */
-export const underSystemBar = (at: Point, bar: SystemBar): string => (bar.edge === 'top' ? underStatusBar(at, bar.bottom) : underNavigationBar(at, bar.top));
-
-/** The bar a system band is: `status bar` at the top, `navigation bar` at the bottom. */
-export const systemBarName = (edge: SystemBar['edge']): string => (edge === 'top' ? 'status bar' : 'navigation bar');
-
-/**
- * The diagnosis of a target no scroll moves out from under the status bar, in the tap's refusal (`systemBarRemedy`) and in
- * `scroll_until`'s failure (scroll-text.ts) alike — a layout drawn under the bar without keeping clear of it (iOS's safe area,
- * Android's window insets).
- */
-export const PINNED_UNDER_STATUS_BAR = 'it is pinned under the status bar (a layout that does not keep clear of it?)';
-
-/** `PINNED_UNDER_STATUS_BAR`'s twin for the navigation bar: an edge-to-edge layout that keeps no clearance at the bottom. */
-export const PINNED_UNDER_NAVIGATION_BAR = 'it is pinned under the navigation bar (a layout that does not keep clear of it?)';
-
-/** The diagnosis for a target pinned under the bar at `edge`. */
-export const pinnedUnder = (edge: SystemBar['edge']): string => (edge === 'top' ? PINNED_UNDER_STATUS_BAR : PINNED_UNDER_NAVIGATION_BAR);
-
-/**
  * What to do about a target whose centre lies under a system bar (the bar
  * at `edge`), said as far as the tree knows it: the refusal had said
  * `scroll_until it first` of a button pinned at the top, which no scroll
@@ -674,13 +636,13 @@ export class CoveredRefusal extends PresentElementRefusal {}
 
 /**
  * The target resolved, settled, lies on screen, but it is CUT to a sliver by
- * its scroll container's edge (the owner's decision: refuse). Measured on
+ * its scroll container's edge: refused (ADR 0013). Measured on
  * mp-native's SWIFT form (Android): the "Payment details" toggle, 132 px
  * tall, read `66,1924 948x55` at the form's bottom edge (1978); the tap went to (540,1952), "Tapped" was reported, and
  * the section did not expand — nor for hand taps on the strip. Nothing is
  * tapped. The covered sliver's sibling (CoveredRefusal): what shows is cut
  * by a clip, not by a node drawn over it, and refused by the same minimum.
- * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
+ * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md
  */
 export class ClippedRefusal extends PresentElementRefusal {}
 

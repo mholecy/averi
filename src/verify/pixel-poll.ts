@@ -5,7 +5,9 @@ import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboa
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, screenSized, treeScreen, usableScreen, type Scene } from '../ui-tree/standing.js';
+import { fullBleedHeader, pinnedSurface, sceneOf, screenSized, singleBox, type Scene } from '../ui-tree/standing.js';
+import { systemBarName } from '../ui-tree/system-bar.js';
+import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -118,7 +120,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * - A keyboard the reading cannot see (a floating or split IME with no insets frame) is measured, as before the check.
  * - A stale `shown` costs covered rounds until the window state catches up; under a short timeout it fails closed.
  * - A colour assert fails closed on a keyboard under only its element's bottom edge, which its 12 % inset would skip.
- * - An element reaching into a band by design (a full-bleed header) fails closed whatever it shows; its advice leads with its title.
+ * - An element reaching into a band by design (a full-bleed header or footer in no scroll view) fails closed whatever it shows; its advice leads with its title or its content above the bar.
  * - A screen resized above the keyboard, a window under an ocr assert and idb's Application under a colour assert fail closed.
  * - A whole last row resting flush with the navigation bar in its list fails an ocr assert closed as possibly cut.
  * - What a tree does not list is no cover; what the pixel-cover exemptions drop is measured as the element (ADR 0003).
@@ -128,7 +130,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * one place they are — against a round of ~2.6–4.3 s there; on iOS no
  * extra read, the tree is the one the round found the element in. Then the
  * memoized `viewport()`, and walks of the round's tree: `inferScreenSize`'s
- * (the screen's shape, ui-tree/standing.ts#usableScreen), `screenOf`'s when
+ * (the screen's shape, ui-tree/usable-screen.ts#usableScreen), `screenOf`'s when
  * neither the device nor a window vouches for the screen (the last
  * fallback), one `drawOrder` walk (the keyboard edge's, every round that
  * reaches the check), and — on every round the reading leaves clear — the
@@ -437,8 +439,8 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * navigation bar's), the navigation bar's possible cut, then the app's own
  * covers, or undefined when nothing is over it (it fails closed, ADR
  * 0001). The screen is the usable screen's single `oriented` box
- * (ui-tree/standing.ts#usableScreen, which owns the derivation; D6, ADR
- * 0012), with the device's system bands — else the tree's own screen (ui-tree/standing.ts#treeScreen), with no
+ * (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; D6, ADR
+ * 0012), with the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#treeScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
  * gesture, so under a rectless root whose largest node is a scroll view's
  * tall content (402x2000 under a 402x874 window) a window-sized element is
@@ -458,14 +460,18 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * ancestry, so EVERY idb miss carries the clause), it is laid from the
  * screen's top edge under the status bar, or the cover holds the element
  * whole. Not for an element reaching the screen's bottom under the
- * navigation bar (ADR 0011). For the screen ITSELF — an element screen-sized
- * (ui-tree/standing.ts#screenSized) — no scroll can cure it, and the
- * remedy leads with the child; so too for an element laid from the
- * screen's top edge at full width, a full-bleed header — iOS's, or
- * Android 15+'s edge-to-edge app bar (`0,0 1080x220` under the 66-px band
- * fails a colour assert closed, ADR 0001) — whose remedy leads
- * with "assert something in it that lies clear of that (its title, say)":
- * the title, below the band, is judged on its own and passes. For idb's
+ * navigation bar (ADR 0011). Under a system bar, for content no scroll
+ * lifts out of the band (ui-tree/standing.ts#pinnedSurface: in no scroll
+ * view, or screen-sized scroll content taller than the room between the
+ * bars) the remedy leads with the child: the screen ITSELF (screen-sized);
+ * a full-bleed header — iOS's, or Android 15+'s edge-to-edge app bar
+ * (`0,0 1080x220` under the 66-px band fails a colour assert closed, ADR
+ * 0001) — with "assert something in it that lies clear of that (its
+ * title, say)": the title, below the band, is judged on its own and
+ * passes; a full-bleed footer (a bottom sheet) with "(its content above
+ * the bar, say)". The same shapes in a scroll view get the scroll advice:
+ * `scroll_until … fully: true` lifts them. Under a COVER, a screen-sized
+ * element or a full-bleed header keeps that advice wherever it lies. For idb's
  * flat-list root (`covered.overRoot`: its Application node, screen-sized,
  * and never a full-bleed header in a flat list) it says the node named is
  * content drawn over the root's background.
@@ -482,7 +488,7 @@ async function judgeOver(
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
   const screen = usable.oriented;
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
-  const standing = scene.standing(element, { box: screen, boxes: [screen], statusBand: usable.statusBand, navigationBand: usable.navigationBand }, purpose);
+  const standing = scene.standing(element, singleBox(usable), purpose);
   if (standing.kind === 'reachable') return undefined;
   if (standing.kind === 'underKeyboard') return keyboardOver(element.rect, standing.band, keyboard.remedy);
   const at = `(element ${rectText(element.rect)}`;
@@ -490,15 +496,16 @@ async function judgeOver(
   const pinned = scene.clips.inScroller(element) !== true;
   // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
   // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
-  const sized = screenSized(element.rect, screen);
-  const fullBleed = element.rect.y <= screen.y && element.rect.x <= screen.x && element.rect.x + element.rect.width >= screen.x + screen.width;
-  const never = sized ? 'screen' : fullBleed ? 'header' : undefined;
+  const never = screenSized(element.rect, screen) ? 'screen' : fullBleedHeader(element.rect, screen) ? 'header' : undefined;
   switch (standing.kind) {
     case 'systemBar': {
-      const bar = standing.bar.edge === 'top' ? 'status bar' : 'navigation bar';
+      const bar = systemBarName(standing.bar.edge);
       // Laid from the screen's top edge, under the status bar: a scroll may not move it (a pinned header's place).
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
-      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(never ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
+      // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
+      // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
+      const surface = pinnedSurface(element, screen, singleBox(usable), scene.clips);
+      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(surface ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
     }
     case 'cut':
       return (
@@ -524,15 +531,17 @@ async function judgeOver(
  * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
  * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
  * for an element laid from the screen's top edge at full width, a full-bleed header, whose title, clear of the band,
- * is what to assert; `root` — the screen, for idb's flat-list root,
+ * is what to assert; `footer` — the same for a full-width surface laid to the screen's bottom edge (a bottom sheet),
+ * whose content above the bar is what to assert; `root` — the screen, for idb's flat-list root,
  * whose cover is the app's own content laid on its background.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
-const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): string => {
+const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'footer' | 'root'): string => {
   const child = 'assert something in it that lies clear of that';
   if (kind === 'root') return `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${child}`;
   if (kind === 'screen') return `the capture would show it, not the element — ${child}; no scroll moves the screen itself out from under it`;
   if (kind === 'header') return `the capture would show it, not the element — ${child} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`;
+  if (kind === 'footer') return `the capture would show it, not the element — ${child} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`;
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   return kind === 'stuck' ? `${scroll} — or, if no scroll moves it out from under that, ${child}` : scroll;
 };

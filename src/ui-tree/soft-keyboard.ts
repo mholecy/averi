@@ -2,7 +2,7 @@ import { everyNode, KEYBOARD_ROLE, rectArea, STRUCTURAL_ROLES, type Rect, type S
 import { rectWithin } from './geometry.js';
 
 /**
- * What the TREE says about the soft keyboard (2026-10-07): the in-tree half
+ * What the TREE says about the soft keyboard: the in-tree half
  * of the reading that `KeyboardOracle` (adapters/types.ts) gives for the
  * window model. On a platform whose keyboard is part of the accessibility
  * tree (iOS), the tree source marks the node whose rect is the covered band
@@ -12,14 +12,14 @@ import { rectWithin } from './geometry.js';
  * every reader of the keyboard asks a reading built off the tree it already
  * holds (`keyboard-cover.ts#readKeyboard`, which reads the band and the
  * keyboard's own nodes through here), so none pays a device read for the
- * answer (a WDA `/source` is 0.6–0.98 s, measured that day). Since stage B
- * (the same day) it also answers "which of the keyboard's own controls
+ * answer (a WDA `/source` is 0.6–0.98 s, measured). It also answers
+ * "which of the keyboard's own controls
  * hides it" — `accessoryDismissButton`, the app's input-accessory toolbar's
  * trailing button — for the in-tree model's configured dismissals
  * (interact/keyboard-in-tree.ts). And it holds the vocabulary of what an
  * adapter can do about a covering keyboard (`KeyboardRemedy`, `cannotHide`),
- * the lowest layer every sentence that says so imports. Since round 7
- * (2026-10-10) it also reads idb's keyboard band, which carries no mark, by
+ * the lowest layer every sentence that says so imports. It also reads
+ * idb's keyboard band, which carries no mark, by
  * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a
  * LINE only (keyboard-cover.ts#keyboardEdge, over
  * draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard shown.
@@ -38,8 +38,8 @@ import { rectWithin } from './geometry.js';
  *   the mark whatever the screen shows, a WDA tree without it has no
  *   keyboard on screen, and the tree cannot say which source produced it.
  *   The tap guard and the pixel poll fail open on `unknown` and on `hidden` alike, so the
- *   distinction costs nothing there. Since stage B (2026-10-07) the
- *   in-tree `dismissKeyboard` reads it too, and acts only on `shown`: on
+ *   distinction costs nothing there. The in-tree `dismissKeyboard` reads
+ *   it too, and acts only on `shown`: on
  *   `unknown` it does nothing — an idb tree reads `unknown` whatever the
  *   screen shows, and a blind key there was measured to submit (K5d), so
  *   "cannot see a keyboard" means "press nothing", the opposite of the
@@ -55,17 +55,15 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
 
 /**
  * idb's SOFT KEYBOARD BAND, read by its shape over a flat list's nodes in
- * the list's order (`nodes`, pre-order: the synthetic root first) — moved
- * here from ui-tree/draw-order.ts (round 7, 2026-10-10), where
- * `keyboardOf` still reads it for `flatListReadingOrder` and `bottomPinned`
+ * the list's order (`nodes`, pre-order: the synthetic root first). Draw
+ * order (ui-tree/draw-order.ts) reads it through `keyboardOf` for `flatListReadingOrder` and `bottomPinned`
  * unchanged, and for its top (`DrawOrder.keyboardBandTop`, the one way the
  * keyboard edge knows it, keyboard-cover.ts#keyboardEdge). idb marks no keyboard node, so its keys — plain `button`s
  * listed LAST — are the only covers of the rows under it. Its background is
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the
  * screen's size), listed right AFTER the keys — the node listed just before
- * it lies wholly inside it (code review of round 7, MAJOR 1: without the
- * keys the shape alone is a bottom sheet's unlabelled background, which
+ * it lies wholly inside it (without the keys the shape alone is a bottom sheet's unlabelled background, which
  * pre-order lists BEFORE its own rows — a band at the sheet's top, with no
  * keyboard on screen, cut the strokes and the taps there); the keyboard is
  * that node and the run of nodes listed beside it (before and after, in the
@@ -73,7 +71,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
- * ui_snapshot replies (code review of round 7, MAJOR 1): the 14 with a
+ * ui_snapshot replies: the 14 with a
  * keyboard — run2 #250, run3 #45–#51, run7 #96, run8 #233, run9 #87, #95,
  * #184, #246, #420 — each read a band, its top 589 or 590, and the other
  * 193 none. Its two shapes: the SWIFT form's number pad (run2-ios #250,
@@ -109,8 +107,8 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
  * it: whether it lies under (or is) an `ofKeyboard` root — the keyboard's
  * own UI, keys and accessory toolbar alike — and whether it lies under (or
  * is) the `KEYBOARD_ROLE` band node. The one walk `keyboardSideNodes` and
- * `accessoryDismissButton` share: until 2026-10-07 (review of the stage B
- * branch) each carried the flags through a recursion of its own.
+ * `accessoryDismissButton` share, rather than each carrying the flags
+ * through a recursion of its own.
  */
 function* markedNodes(
   tree: UiNode,
@@ -125,15 +123,14 @@ function* markedNodes(
 
 /**
  * Every node of `tree` that is the keyboard's own UI — a key, the AutoFill
- * bar, the accessory toolbar's Done (review 2026-10-07): it, or an ancestor
+ * bar, the accessory toolbar's Done: it, or an ancestor
  * of it in `tree`, carries `ofKeyboard`. Such a node lies INSIDE the band
  * and is never "under" it: a tap on it is the thing the user does, not the
  * thing the guard prevents. A set of the tree's own objects, so membership
  * is by identity (a resolution hands back the node of the tree it resolved
  * from); a node the tree does not hold is not part of its keyboard. One
- * walk for every node at once (2026-10-08: `scroll_until` asks it of every
- * match each round; until 2026-10-09 a single-node `partOfKeyboard` walked
- * again per question). Empty for a tree with no mark (every Android tree).
+ * walk for every node at once (`scroll_until` asks it of every match each
+ * round; a per-node walk would walk again per question). Empty for a tree with no mark (every Android tree).
  * Read through a reading's `ofKeyboard` (keyboard-cover.ts#readKeyboard),
  * which builds it once per reading.
  */
@@ -145,13 +142,13 @@ export function keyboardSideNodes(tree: UiNode): ReadonlySet<UiNode> {
 
 /**
  * The input-accessory toolbar's trailing button — the app's own "Done" above
- * a number pad — when the keyboard's UI on screen has one (stage B,
- * 2026-10-07). Measured on the 2FA screen (docs/bugs/2026-10-05-ios-tap-
- * lands-on-soft-keyboard.md, K4 and the device check): a tap on that
+ * a number pad — when the keyboard's UI on screen has one. Measured on the
+ * 2FA screen (the bug note below, K4 and the device check): a tap on that
  * Button {317,523,64,38} hid the pad without submitting, both by hand and
  * through the `tap` tool; it is the one GENERIC non-submitting dismissal
  * seen, the keyboard's own return key having submitted (K5d) and WDA's
  * keyboard/dismiss having failed (K5a).
+ * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
  *
  * The rule, over the normalized tree: a node of role `toolbar` (the WDA
  * source's `Toolbar` type, adapters/wda-source.ts) that lies under an
@@ -168,8 +165,8 @@ export function keyboardSideNodes(tree: UiNode): ReadonlySet<UiNode> {
  * measured toolbar has a flexible space then "Done"). The button must have
  * area too, or its centre is no tap point. Nothing in the login fixtures
  * (no Toolbar at all) and nothing in the parked 2FA fixture: its Toolbar
- * Window holds no `inputView` and is not marked `ofKeyboard` (the stage A
- * residual on keyboardMarks) — with no band on screen there is nothing to
+ * Window holds no `inputView` and is not marked `ofKeyboard` (a residual
+ * stated on keyboardMarks) — with no band on screen there is nothing to
  * dismiss there either, so the two residuals agree.
  */
 export function accessoryDismissButton(tree: UiNode): UiNode | undefined {
@@ -206,7 +203,7 @@ export interface KeyboardRemedy {
  * The generic half of the in-tree model's sentence, written once for the
  * guard's refusal (interact/keyboard-in-tree.ts, KeyboardWithoutDismissal) and the
  * pixel poll's covered miss (verify/pixel-poll.ts) — here, the lowest layer
- * both import, as the review of 2026-10-07 asked, so "one phrase" holds by
+ * both import, so "one phrase" holds by
  * construction and not by two matching literals. "On its own", because the
  * `advice` that follows it is what DOES work.
  */

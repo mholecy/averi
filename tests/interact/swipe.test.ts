@@ -61,21 +61,12 @@ describe('swipeScreen — one table, two meanings', () => {
   });
 });
 
-/** The box's derivation is ui-tree/standing.ts#usableScreenOf's (tests/ui-tree/standing.test.ts); what stays here is the swipe drawn over it, its note and its throw. */
-describe('screenBox — the device screen is the box a gesture swipes in (2026-10-08)', () => {
-  it('swipes over the DEVICE size, not the tree root, when the two differ (an Android window short of the nav bar)', async () => {
-    // The tree's root is the app window above a nav bar; the device is the panel.
-    const fake = device(node({ rect: { x: 0, y: 0, width: 1080, height: 2274 } }), { width: 1080, height: 2400 });
-    await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
-    expect(fake.swipes).toEqual([{ from: { x: 540, y: 1920 }, to: { x: 540, y: 480 } }]); // the tree's box would be y 1819 → 455
-  });
-
-  it('turns the device box when the window fits the screen only sideways (landscape on a panel reported as built)', async () => {
-    const fake = device(node({ rect: { x: 0, y: 0, width: 2400, height: 1080 } }), { width: 1080, height: 2400 });
-    await swipeScreen(fake, { direction: 'left', meaning: 'finger' });
-    expect(fake.swipes).toEqual([{ from: { x: 1920, y: 540 }, to: { x: 480, y: 540 } }]);
-  });
-
+/**
+ * The box's derivation is ui-tree/usable-screen.ts#usableScreenOf's, pinned in tests/ui-tree/usable-screen.test.ts (the
+ * device size over the tree root, the turn a window witnesses, an inset window beside a nav bar, a walked height, the
+ * fallback window); what stays here is the swipe drawn over it — `oriented`, not the judged box — its note and its throw.
+ */
+describe('screenBox — the device screen is the box a gesture swipes in', () => {
   it('a tree that cannot be read loses only the orientation witness: the device box still stands, and the note says so', async () => {
     const fake = device(screen(), { width: 1000, height: 2000 });
     fake.uiTree = async () => {
@@ -93,31 +84,6 @@ describe('screenBox — the device screen is the box a gesture swipes in (2026-1
     const fake = device(tree, { width: 402, height: 874 });
     await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
     expect(fake.swipes).toEqual([{ from: { x: 437, y: 322 }, to: { x: 437, y: 80 } }]); // 874x402; as built it would be (201,699)→(201,175)
-  });
-
-  it('an Android landscape window beside a LEFT nav bar or cutout turns the box too — with and without a status bar above it', async () => {
-    // Not origin-anchored, so the tree walks it (reliable: false); its reach,
-    // 2400x1080, is the panel turned. The old tree box got this right.
-    for (const rect of [
-      { x: 126, y: 0, width: 2274, height: 1080 },
-      { x: 126, y: 63, width: 2274, height: 1017 },
-    ]) {
-      const fake = device(node({ rect }), { width: 1080, height: 2400, windowsBesideSystemBars: true });
-      await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
-      expect(fake.swipes).toEqual([{ from: { x: 1200, y: 864 }, to: { x: 1200, y: 216 } }]);
-    }
-  });
-
-  it('a WALKED height never votes: a landscape tree whose rows run to y=3000 still turns the panel, by its width (orient\'s incident)', async () => {
-    // No window rect (a rectless root over rows): the walk answers 852 wide —
-    // reliable — and 3000 tall, a content maximum that fits no panel.
-    const rows = node({
-      rect: { x: 0, y: 0, width: 0, height: 0 },
-      children: [node({ rect: { x: 0, y: 100, width: 852, height: 44 } }), node({ rect: { x: 0, y: 2956, width: 852, height: 44 } })],
-    });
-    const fake = device(rows, { width: 393, height: 852 });
-    await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
-    expect(fake.swipes).toEqual([{ from: { x: 426, y: 315 }, to: { x: 426, y: 79 } }]); // 852x393, not 393x852's (197,682)→(197,170)
   });
 
   it('an unreadable device size falls back to a reliable tree window, and says so', async () => {

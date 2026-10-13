@@ -88,7 +88,7 @@ const rectAssert = z
  * token names resolve in the superrepo layer, before the assert is written.
  * `deltaE` defaults to DEFAULT_TOLERANCE_DE (8) and is compared DIRECTLY —
  * without the 1.5x CONTRACT_TOL_FACTOR slack the contract axis gets (
- * the caller chose the hex); the real 2026-08-13 bug measures dE00 10.19,
+ * the caller chose the hex); the real bug it was written for measures dE00 10.19,
  * so the default catches it. `theme` is a declarative annotation naming the
  * theme the hex was authored for — averi does not switch device themes.
  */
@@ -118,7 +118,7 @@ const colorAssert = z
  *
  * This is not a slower `{element, text}` — it answers a different question.
  * The element assert reads the accessibility tree, i.e. what assistive
- * technology is TOLD; measured 2026-08-14, that is not what the screen shows:
+ * technology is TOLD; measured, that is not what the screen shows:
  * on iOS the visible 'CONTINUE' is absent from the tree entirely and
  * `credit_select` exposes 'To account' while rendering 'Select credit account'.
  * Use the element assert for a11y-facing copy, this one for what the user sees.
@@ -181,20 +181,20 @@ export const DEFAULT_BASELINE_DIR = '.averi/baselines';
 export const ASSERT_TIMEOUT_MS = 3_000;
 
 /**
- * The default budget of a color or ocr assert that names no `timeout`
- * (2026-10-06). A pixel assert's round is a tree read AND a settled pair of
- * captures, and since c444c79 a frame that settled over the element's region
- * only is measured on the NEXT round, once a second read confirms the rect —
- * two rounds on any screen with a clock or a caret. Measured that day on the
- * Android emulator (docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-
- * no-round-on-device.md): one round is a 2.7 s uiautomator read plus two
+ * The default budget of a color or ocr assert that names no `timeout`. A
+ * pixel assert's round is a tree read AND a settled pair of captures, and a
+ * frame that settled over the element's region only is measured on the NEXT
+ * round, once a second read confirms the rect — two rounds on any screen
+ * with a clock or a caret. Measured on the Android emulator (the bug note
+ * below): one round is a 2.7 s uiautomator read plus two
  * 0.65 s screencaps 300 ms apart, ~4.3 s, so two rounds and the pause
  * between them are ~8.9 s. With the shared 3 s these asserts could not pass
  * on that device even on a still screen: the 3 s only ever "worked" because
- * the capture overran it, which 4954ab4 stopped. 12 s covers two rounds
- * there with a margin for a slower emulator; a poll that passes returns as
- * soon as it does, so the larger budget costs only a failing assert.
- * Exported for the `assert` tool's description, which quotes it.
+ * the capture overran it, which the capture no longer does. 12 s covers two
+ * rounds there with a margin for a slower emulator; a poll that passes
+ * returns as soon as it does, so the larger budget costs only a failing
+ * assert. Exported for the `assert` tool's description, which quotes it.
+ * docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-no-round-on-device.md
  */
 export const PIXEL_ASSERT_TIMEOUT_MS = 12_000;
 
@@ -209,7 +209,7 @@ export interface VerifierOptions {
   timeoutMs?: number;
   /**
    * The OCR choice every `ocr` assert of this Verifier reads with: the
-   * verify run's one decision (run/verify.ts, 2026-10-08 — the same value
+   * verify run's one decision (run/verify.ts — the same value
    * its text table reads with) or a test's fake (`{ engine }`). Unset, the
    * host's (`ocrEngineFor()`) is chosen on the first `ocr` assert and kept
    * for the Verifier's life.
@@ -348,8 +348,8 @@ export class Verifier {
    * Geometry vs Figma-frame values, in % of screen width — the window width
    * `verify/scale.ts#windowWidth` judges for each round's tree, witnessed by
    * the device screen, the same answer the whole-screen comparator reads off
-   * its frame. A width it refuses fails the round closed (2026-10-07; a
-   * CONTENT width used to pass with a remark).
+   * its frame. A width it refuses fails the round closed (a CONTENT width
+   * passing with a remark would measure the wrong scale).
    * Polls like the other asserts: mid-animation geometry may legitimately be
    * off for a frame, so only the state at timeout is the verdict.
    */
@@ -387,7 +387,7 @@ export class Verifier {
    * to settle, decode, and only then measure — is the pixel poll's
    * (verify/pixel-poll.ts); the measurement — crop the rect, recognize,
    * compare, and every fail-closed sentence on the way — is
-   * text-parity.ts#measureOcrAssert's since 2026-10-08, as the colour
+   * text-parity.ts#measureOcrAssert's, as the colour
    * assert's is evaluateColorAssert's. What is here is the description and
    * the engine. The recognizer is closed over, so the poll never learns OCR
    * exists.
@@ -430,9 +430,8 @@ export class Verifier {
    * same captured frame the `ocr` assert measures against. The measurement
    * is one sample of that rect; the round around it is the pixel poll's
    * (verify/pixel-poll.ts), which hands it only a SETTLED, decoded frame.
-   * Since 2026-10-05 a frame that did not settle is a miss, never a sample —
-   * before, the last of six differing captures was measured and the number
-   * called a verdict.
+   * A frame that did not settle is a miss, never a sample — measuring the
+   * last of six differing captures would call a number a verdict.
    */
   private async assertColor(
     element: ElementSpec,
@@ -459,22 +458,21 @@ export class Verifier {
    * The shape the tree-only asserts share (ARCHITECTURE.md §8, "waits, not
    * sleeps"): read the tree, evaluate it, stop on a pass, otherwise remember
    * what it said and retry until the deadline. The color and ocr asserts
-   * poll through `pollPixels` (verify/pixel-poll.ts) since 2026-10-06, on
-   * the same loop and the same verdict translation (verify/poll-verdict.ts).
+   * poll through `pollPixels` (verify/pixel-poll.ts), on the same loop and
+   * the same verdict translation (verify/poll-verdict.ts).
    *
-   * The loop itself is `pollTree` (ui-tree/read-tree.ts) since 2026-10-03 —
-   * before that this method was one of three copies of it. What stays here
+   * The loop itself is `pollTree` (ui-tree/read-tree.ts), written once
+   * rather than copied per assert. What stays here
    * is the verifier's vocabulary: a PollVerdict in, an AssertResult out, and
    * the per-assert timeout wording.
    *
-   * `pollMs` is the interval between rounds and NOTHING else (2026-10-05):
-   * until then it was also forwarded to the capture as its stability delay,
-   * so an assert inside a flow (engine pollMs 500) waited 500 ms between
-   * stability captures and the same assert from the MCP tool 300 — the
-   * budget capture.ts documents as one. The round's deadline is handed to
-   * the capture instead (by the pixel poll since 2026-10-06; by the color and
-   * ocr evaluators through this method until then), so a capture stops short
-   * of it. Measured with the same fake-device harness as before (screencap
+   * `pollMs` is the interval between rounds and NOTHING else: forwarded to
+   * the capture as its stability delay too, it made an assert inside a flow
+   * (engine pollMs 500) wait 500 ms between stability captures and the same
+   * assert from the MCP tool 300 — the budget capture.ts documents as one.
+   * The round's deadline is handed to the capture instead (by the pixel
+   * poll), so a capture stops short of it. Measured with a fake-device
+   * harness, before that change and after (screencap
    * 300 ms, uiautomator dump 1.5 s, timeoutMs 3000, pollMs 300):
    *
    *   screen               before                        after
@@ -519,9 +517,9 @@ export class Verifier {
    * viewport. The raw trees disagree (Android prunes off-screen nodes, iOS
    * keeps them with off-viewport rects); this is the one portable meaning.
    *
-   * And not on a BARE tree (2026-10-08, ui-tree/verdict.ts): nothing in a
-   * cold launch's Android decor or WDA's splash matches any selector, so
-   * until then this assert PASSED there before the app had drawn a pixel.
+   * And not on a BARE tree (ui-tree/verdict.ts): nothing in a cold launch's
+   * Android decor or WDA's splash matches any selector, so without that
+   * rule this assert PASSED there before the app had drawn a pixel.
    * The leaf rule is the flow engine's too (flow/condition.ts asks the same
    * `absenceVerdict`), so an absent detect, wait, branch and assert cannot
    * disagree about one tree. An `unknown` round keeps polling like a visible
@@ -563,35 +561,33 @@ export class Verifier {
     const description = `screenshot matches baseline "${name}" (threshold ${threshold * 100}%)`;
     const path = join(this.baselineDir, this.adapter.platform, `${name}.png`);
     // The SETTLED frame (verify/capture.ts, png-only arm, the one stability
-    // budget). Until 2026-10-04 this was the one pixel reading that took a
-    // bare screenshot, so a baseline diff could compare two mid-animation
-    // frames — the flakiest assert by construction. It now costs the
-    // stability budget where it cost one capture (captures, wait and failure
-    // chances: capture.ts, STABILITY_*). Since 2026-10-05 the capture SAYS
+    // budget). A bare screenshot here would let a baseline diff compare two
+    // mid-animation frames — the flakiest assert by construction. It costs
+    // the stability budget where a bare one costs one capture (captures,
+    // wait and failure chances: capture.ts, STABILITY_*). The capture SAYS
     // whether it settled. CREATION fails closed on a frame seen moving —
-    // before, a screen that never settled (spinner, caret, live content)
-    // silently stored its last frame as the ground truth for every later
-    // run. A DIFF against an existing baseline still compares the last frame
+    // otherwise a screen that never settled (spinner, caret, live content)
+    // would silently store its last frame as the ground truth for every
+    // later run. A DIFF against an existing baseline still compares the last frame
     // and keeps its verdict, with the `⚠ frame:` note on the detail: a
-    // blinking caret or a clock inside the 1.5 s budget used to pass the
-    // diff under threshold, and the threshold exists for exactly that — a
-    // refusal there (tried the same day, withdrawn in review) would have
-    // tightened a passing assert. Re-baseline any screenshot assert that
-    // was flaky under the bare read.
+    // blinking caret or a clock inside the 1.5 s budget passes the diff
+    // under threshold, and the threshold exists for exactly that — a refusal
+    // there (tried, and withdrawn) would tighten a passing assert.
+    // Re-baseline any screenshot assert that was flaky under a bare read.
     //
-    // Since 2026-10-06 the baseline file is read BEFORE the capture, because
-    // the two paths now capture differently. CREATION takes
+    // The baseline file is read BEFORE the capture, because the two paths
+    // capture differently. CREATION takes
     // `captureBaselineFrame`: the same settled pair, then a confirmation
     // window of four more captures that must all match it, since a pair
     // ≈0.95 s apart (Android emulator; ≈0.8 s iOS simulator) lands in phase
     // with a ≈1 s caret blink and compared equal — a baseline was created
-    // on device from a caret screen, holding one phase of the blink
-    // (docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret
-    // .md; the schedule, its simulation and its cost are on capture.ts's
-    // BASELINE_CONFIRMATION_DELAYS_MS). A refusal there gets its own
-    // sentence, because two captures DID match. A DIFF takes plain
+    // on device from a caret screen, holding one phase of the blink (the
+    // schedule, its simulation and its cost are on capture.ts's
+    // BASELINE_CONFIRMATION_DELAYS_MS).
+    // A refusal there gets its own sentence, because two captures DID match. A DIFF takes plain
     // `captureFrame` exactly as before — same captures, same sleeps, same
     // `⚠ frame:` note — so only the once-per-baseline path pays the window.
+    // docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md
     // A read that fails for any reason means "create", as it did when the
     // read came second; reading first changes nothing but the order — except
     // that the read-to-write window is now the whole creation capture, ≈3 s
@@ -604,14 +600,14 @@ export class Verifier {
       baseline = await readFile(path);
     } catch {
       // A capture the adapter refuses fails THIS assert, closed, and assertAll
-      // goes on (2026-10-08) — pixel-poll.ts's header has the rule.
+      // goes on — pixel-poll.ts's header has the rule.
       let candidate: BaselineFrame;
       try {
         candidate = await captureBaselineFrame(this.adapter);
       } catch (e) {
         return { description, pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
       }
-      // Fail closed (review 2026-10-06): ONLY a confirmed window creates.
+      // Fail closed: ONLY a confirmed window creates.
       // The first cut refused on `confirmed === false`, so a frame without
       // the field — `unjudged`, which a deadline on this path would produce —
       // would have been stored unexamined. Each refusal is worded for what
@@ -655,7 +651,7 @@ export class Verifier {
 
 /**
  * Why a baseline candidate was not stored, in the words of what the capture
- * saw (2026-10-06). `moving` keeps its 2026-10-05 sentence verbatim; a pair
+ * saw. `moving` keeps the capture's own sentence verbatim; a pair
  * that settled and then changed in the confirmation window says so (two
  * captures DID match, so "each different from the last" would be false);
  * `unjudged` cannot happen today — baseline creation passes no deadline, so

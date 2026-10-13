@@ -445,10 +445,11 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
 /**
  * How far a label may overhang the text input it lies in and still be read
  * as that field's (`fieldOf`, the `ownControl` row), on every side, in the
- * tree's units: 2 — the owner's decision, "up to 1–2 pt";
+ * tree's units: 2, "up to 1–2 pt";
  * measured, the SWIFT form's `Payee’s name` `42,446 103x22` over its
  * `textfield 42,447 318x20`, 1 pt above and below. In pixels on Android, so
  * there a third of that — stricter, the safe direction.
+ * docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md
  */
 export const LABEL_OVERHANG = 2;
 
@@ -727,8 +728,8 @@ const NOT_DRAWN = {
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
    * its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) or a
    * floating tab bar's item (`tabBarsOf`). `target`
-   * only: the owner's decision on the bug note below, a regression of
-   * `flatListChrome`.
+   * only: the fix of a regression of `flatListChrome` (ADR 0015).
+   * docs/adr/0015-flat-list-reading-order-break.md
    * docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md
    *
    * Measured (tests/fixtures/idb-modal-listed-before-content.json): idb
@@ -954,8 +955,8 @@ const NOT_DRAWN = {
    * clickable overlay laid with an even margin over a centred text in its
    * card (the margin at most half the overlay's side).
    *
-   * And a THIRD shape, the text input over its own label (the owner's
-   * decision; the bug note below): an unlabelled, unvalued text
+   * And a THIRD shape, the text input over its own label (ADR 0014): an
+   * unlabelled, unvalued text
    * input that holds the label's centre, the label overhanging it by at
    * most `LABEL_OVERHANG` on any side (`fieldOf`) — neither spanning its
    * parent nor padded in it. Measured under WDA on the SWIFT form: `container
@@ -973,6 +974,7 @@ const NOT_DRAWN = {
    * is then not its placeholder — a residual, stated: a placeholder label
    * WDA keeps listing over a filled field is refused); any other control
    * of that shape (a button).
+   * docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md
    * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   ownControl: {

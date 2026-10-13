@@ -1,9 +1,10 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { aboveNavigationBand, belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type UsableScreen } from '../ui-tree/standing.js';
+import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
@@ -216,6 +217,8 @@ interface ThisRead {
   read: RoundRead;
   facts: TreeFacts;
   frames: readonly Rect[];
+  /** The frames short of the far edge is judged in (`observe`'s `seenShort`): `frames` uncut at the navigation band, so a target a stroke then pushes wholly into the band was seen short, and is turned back. */
+  screenFrames: readonly Rect[];
   /** The ROUND's gesture box (`RoundSeen.screen`), as this read was judged with it — not a fact of the read. */
   gesture: Rect | undefined;
   /** The cover the ROUND applied (after the witness), as this read was judged under it — not a fact of the read. */
@@ -441,7 +444,8 @@ export interface PastSide {
 export type InFrameShort =
   | { of: 'clipped'; judged: Judged }
   | { of: 'covered'; judged: Judged; cover: UiNode }
-  | { of: 'systemBar'; judged: Judged; bar: SystemBar }
+  /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
+  | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
   | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
@@ -634,7 +638,7 @@ export interface Rounds {
   readonly [opaque]: 'scroll-rounds';
 }
 
-/** The screen a round judges in: the usable screen's judging part (ui-tree/standing.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
+/** The screen a round judges in: the usable screen's judging part (ui-tree/usable-screen.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
 type Frame = StandingScreen;
 
 /**
@@ -650,7 +654,7 @@ interface State {
   readonly owesDrawn: boolean;
   /**
    * The visibility reference frame: the usable screen of the round's tree
-   * (ui-tree/standing.ts#usableScreen, through swipe.ts#screenBox) — the
+   * (ui-tree/usable-screen.ts#usableScreen, through swipe.ts#screenBox) — the
    * tap's screen too, so a stop the scroll calls visible is
    * judged on the screen the next tap is judged on, by construction: the
    * box (turned in landscape as the stroke already was; what a failure
@@ -952,7 +956,7 @@ function stops(j: Judged): boolean {
  * their sentences group it: a cut edge (`fully: true`), a centre off the
  * screen or one under idb's band (`underKeyboard` with something in the
  * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`;
- * a centre in a system band (the status bar's, the navigation bar's) `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
+ * a centre in a system band (the status bar's, the navigation bar's), or for `fully` any of it there past the slack, `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
  * `sliver`; anything of the app drawn over it `covered`, naming the cover
  * the standing names. Asked only of a match with something in the frame
  * that does not stop the round: a match that stops it is reported before
@@ -966,7 +970,7 @@ function shortOf(j: Judged): InFrameShort {
     case 'underKeyboard':
       return { of: 'clipped', judged: j };
     case 'systemBar':
-      return { of: 'systemBar', judged: j, bar: s.bar };
+      return { of: 'systemBar', judged: j, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
     case 'cut':
       return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
     case 'covered':
@@ -1179,7 +1183,7 @@ interface Observed {
  * next stroke.
  */
 function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
-  const { read, facts, frames } = now;
+  const { read, facts, frames, screenFrames } = now;
   const { found } = read;
   const { fingerprint, loading } = facts;
   const rects = found.map((n) => ({ ...n.rect }));
@@ -1246,8 +1250,8 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const { far } = FAR_EDGE[s.rules.direction];
     s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md
-    // Or IN the frame at that edge: across it — clipped there, or its centre in the status
-    // band, which the frames are cut below — or under something of the app
+    // Or IN the frame at that edge: across it — clipped there, or into a system
+    // band, which the frames are cut clear of — or under something of the app
     // drawn over its far side. Read so before any read saw it short, it
     // was never carried past, so `seenShort` alone never turned it: the
     // strokes pushed it on out through that edge — and at the end of the
@@ -1263,7 +1267,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
     const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
-    if (!beyond) s.seenShort = true;
+    if (!beyondFarEdgeIn(farFacts(best), s.rules.direction, screenFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
@@ -1428,11 +1432,18 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // nothing about motion: the comparisons wait for the next one that does.
   // Below the status band: a target whose centre a fling carried into it
   // is past the far edge, and the next stroke turns back.
-  const judgedFrames: Rect[] =
+  const screenFrames: Rect[] =
     cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
+  // And above the navigation band, for a `fully` stop the band's REGION
+  // refused (ui-tree/standing.ts#Standing's `band`): resting across the
+  // band's top with the content above it, it is past the far edge — the
+  // next stroke turns and lifts it. Only then: the plain stop, and every
+  // other standing, judge the far edge in the frames as ever.
+  const regionAtBottom = fully && best?.standing.kind === 'systemBar' && best.standing.band !== undefined && best.standing.bar.edge === 'bottom';
+  const judgedFrames: Rect[] = regionAtBottom ? screenFrames.map((f) => aboveNavigationBand(f, s.frame, viewport)) : screenFrames;
   const gesture = seen.screen?.oriented;
   const now: ThisRead | undefined =
-    read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, gesture, cover };
+    read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, screenFrames, gesture, cover };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.

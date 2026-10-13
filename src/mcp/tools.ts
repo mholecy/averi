@@ -34,11 +34,10 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * registered on a server this module BUILDS but never connects.
  *
  * Importing this file has no side effects — no registry, no transport, no
- * version read. Until 2026-10-03 the registrations lived in mcp/server.ts,
- * which constructed the registry and the server at module top level and ended
- * in a top-level `await server.connect(stdio)`: importing it opened a stdio
- * transport, so no handler could be exercised by a test. Three review rounds
- * hit that wall — a mutant replacing ensure_state's settled frame with a bare
+ * version read. Registrations in mcp/server.ts, which constructs the server
+ * and ends in a top-level `await server.connect(stdio)`, would open a stdio
+ * transport on import, so no handler could be exercised by a test. That
+ * wall was hit three times — a mutant replacing ensure_state's settled frame with a bare
  * `adapter.screenshot()` survived the whole suite, "tap and type_text refuse
  * an ambiguous selector" was verified only by reading, and tool-text.ts,
  * lifecycle.ts and util/version.ts were each split out because server.ts
@@ -53,7 +52,7 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * response content, `isError`.
  *
  * What is injected, and what is not: the registry (whose AdapterFactory seam
- * already existed; its DeviceDiscovery joined it 2026-10-08) and the version
+ * also carries its DeviceDiscovery) and the version
  * string. Config and contract files stay real files read from disk — a test
  * writes an averi.yaml into a temp dir and passes `configPath`, as a user
  * would. Rejected: a config-loader or file-system parameter. It would be a
@@ -61,28 +60,26 @@ import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
  * path-resolution rules (projectConfigPath, baselineDirFor) are exactly what
  * such a fake would skip.
  *
- * What a handler holds, since 2026-10-03 (later the same day; the same list
- * as ARCHITECTURE.md §2): its description and input schema, which includes
+ * What a handler holds (the same list as ARCHITECTURE.md §2): its description and input schema, which includes
  * parsing the assert specs; resolving the platform to an adapter through the
  * registry, this layer's own state; the config it needs, read ONCE per
  * call by flow/tool-config.ts#loadForCall under the tool's entry in
- * mcp/config-policy.ts#TOOL_CONFIG (since 2026-10-08; until then each
- * handler chose one of four loaders by hand, and `assert` ran two of them), and the
+ * mcp/config-policy.ts#TOOL_CONFIG (not one of four loaders chosen by hand
+ * per handler, where `assert` ran two of them), and the
  * answers asked of that loaded config (which build to install, which iOS
  * tree source and dismissals — flow/); one call into an adapter method,
  * interact/, run/ or flow/launch.ts (launch_app's, which resolves the
- * activity itself since 2026-10-09), handed the loaded config rather than a
+ * activity itself), handed the loaded config rather than a
  * path to read again; and the response — text through tool-text.ts or the
  * callee (a fill's through interact/fill-text.ts, shared with the flow line), wrapped by `text`/`image` below. The sequences once written out
  * here (ensure_state, run_flow, assert, the contract file read) are below
  * this layer.
  *
- * That is several statements, not one: this comment first said "ONE
- * delegation" and overclaimed. `install_app` chooses between the given path
+ * That is several statements, not "ONE delegation". `install_app` chooses between the given path
  * and the config's; `assert` parses its specs, resolves the adapter and the
  * baseline dir, then calls runAsserts; `verify` is the widest — it loads the
  * config, parses the specs, then calls runVerification. Every handler that
- * reads averi.yaml now starts with the same line, `loadForCall(TOOL_CONFIG.<tool>(…), cp)`
+ * reads averi.yaml starts with the same line, `loadForCall(TOOL_CONFIG.<tool>(…), cp)`
  * — the read stays here, above run/, so the policy has one caller shape
  * and nothing below reads the file again.
  */
@@ -118,8 +115,8 @@ const treeOpts = (settings: IosToolSettings): AdapterOpts => ({ treeSource: sett
  * ambiguous selector is REFUSED — an agent exploring through the tools has
  * not seen the tree it would be guessing in (interact/resolve.ts, Ambiguity;
  * a flow step picks the first, flow/engine.ts#FLOW_AMBIGUITY) — and the
- * call's dismissals go to the keyboard guard. Given once, as treeOpts is
- * (2026-10-09; the two handlers spelled it out until then); a fill adds its
+ * call's dismissals go to the keyboard guard. Given once, as treeOpts is,
+ * not spelled out per handler; a fill adds its
  * `clear`.
  */
 const guardOpts = (settings: IosToolSettings): Pick<GuardOptions, 'ambiguous' | 'dismissals'> => ({ ambiguous: 'refuse', dismissals: settings.dismissals });
@@ -150,9 +147,8 @@ const launchIntentInput = z
 /**
  * The operation defaults as the tool descriptions quote them — each derived
  * from the constant its module owns, so a default changed there cannot leave
- * a description stale (architecture review 2026-10-07, mcp-surface candidate
- * 3: half the numbers were derived, half were literals — "3 s" in three
- * places, "12 s", "Default 6", "~20 s"). tests/mcp/tool-descriptions.test.ts pins each
+ * a description stale (literals — "3 s" in three places, "12 s", "Default
+ * 6", "~20 s" — went stale beside derived numbers). tests/mcp/tool-descriptions.test.ts pins each
  * description against its constant.
  */
 const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/resolve.ts
@@ -197,9 +193,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   // The session's state that outlives one engine run — the clearState count
   // (flow/launch.ts#EngineSession). One per server: the server IS the
   // session. Every tool that runs the engine (ensure_state, run_flow, verify)
-  // hands it down, and launch_app, which wipes through the same launch
-  // (since 2026-10-09); until 2026-10-07 it was a module global in the
-  // engine, shared by every server in the process.
+  // hands it down, and launch_app, which wipes through the same launch. Not
+  // a module global in the engine, which every server in the process would
+  // share.
   const session = new EngineSession();
 
   registerTool(
@@ -489,10 +485,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Swipe until the element is visible in the viewport — the portable way to reach content below the fold (no coordinates). direction = where the content lies (down = below the current view). ' +
         'By default "visible" means INTERSECTS the viewport, so the element may still be clipped at an edge; a clipped stop says which edges clip it and what fraction is on screen, a clean one says "fully visible". ' +
-        'Another element of the app drawn over it (a pinned button bar, a floating tab bar listed after it in the tree) counts: by default the scroll goes on until its CENTRE is clear of such an element — the point a tap presses — and a stop with part of it still under one says so; with fully: true nothing may be drawn over any of it below the status bar (what lies only under the bar is hidden by it anyway). When swiping no longer moves it out from under one, it fails naming that element. The status bar (on iOS the top safe-area inset, 62 pt on a 402x874 iPhone; on Android the visible system status bar, 66 px on a 1080x2220 phone; a portrait screen only) counts as off the screen for the CENTRE: no stop — fully: true included — has the centre there (the point a tap presses), and a scroll that cannot move it out fails naming the status bar; the rest of the element may lie under it (fully: true judges clipping against the whole screen, so full-bleed content at the top stops once its centre lies below the status bar; one whose centre, rounded as a tap sends it, lies in the bar — at y 0, shorter than twice the bar\'s height less a point (122 pt or less under 62 pt) — never stops, and fails naming the status bar). A top bar the tree does not list, or lists before the scroll view (an iOS navigation bar under WDA), is not seen. ' +
+        'Another element of the app drawn over it (a pinned button bar, a floating tab bar listed after it in the tree) counts: by default the scroll goes on until its CENTRE is clear of such an element — the point a tap presses — and a stop with part of it still under one says so; with fully: true nothing may be drawn over any of it below the status bar (what lies only under the bar is hidden by it anyway). When swiping no longer moves it out from under one, it fails naming that element. The status bar (on iOS the top safe-area inset, 62 pt on a 402x874 iPhone; on Android the visible system status bar, 66 px on a 1080x2220 phone; a portrait screen only) counts as off the screen for the CENTRE: no stop — fully: true included — has the centre there (the point a tap presses), and a scroll that cannot move it out fails naming the status bar; for a default stop the rest of the element may lie under it, so full-bleed content at the top stops once its centre lies below the status bar (one whose centre, rounded as a tap sends it, lies in the bar — at y 0, shorter than twice the bar\'s height less a point (122 pt or less under 62 pt) — never stops, and fails naming the status bar). With fully: true none of the element may lie under the status bar, or the navigation bar the device reports (Android), past 2 units (pt on iOS, px on Android) — the rule a color/ocr assert applies: the scroll goes on, and an element that stays under a bar (a last row under an edge-to-edge navigation bar) fails naming the bar. Content in no scroll view that no scroll can lift out of a bar — a full-bleed header laid from the screen\'s top edge at full width, a full-width surface laid to its bottom edge (a bottom sheet), an element the size of the screen — or screen-sized scroll content taller than the room between the bars, is exempt and stops as before, and a color/ocr assert on it still fails closed (assert something in it clear of the bar); an ocr assert may also refuse an element whose bottom rests exactly on the navigation bar\'s top inside a list that ends there (it may be cut). A top bar the tree does not list, or lists before the scroll view (an iOS navigation bar under WDA), is not seen. ' +
         'Nor does a default stop rest on an element its scroll container cuts to a strip thinner than a tap needs (Android: its rect flush with the container\'s edge, its own content running on past it) — a tap refuses that strip, so the scroll goes on, and fails naming the cut when swiping no longer moves it. ' +
         'Pass fully: true when the next step MEASURES the element (a rect assert, a screenshot) — a clipped rect measures the clipped box, and fully: true fails loudly instead, naming the shortfall. ' +
-        'A stop reached after a swipe is reported only once a further read finds the element where it was (a fling can carry it on; one still moving after 3 such reads is reported as still moving); one a fling carried past the viewport (on Android also one then dumped clipped out past its scroll container\'s edge — never on the first read, where the given direction stands), or one resting in it at the edge the swipes push it out through (clipped there, its centre under the status bar, or under something of the app drawn over that side — or over all of it but a strip on that side — in that half of the screen), is swiped back, each turn with half the reach — also when a list drops it from the tree right after a read had it short of the edge it left through — and an element in the tree, off screen with a non-zero rect, that 2 swipes no longer move fails then ("content exhausted, or the swipes were not taken" — or, when the swipes touched down on something drawn over the list, naming it first), as does an element not in the tree after 2 identical swipes that change nothing on screen (not while a progress indicator shows); fully: true fails likewise on a clipped element 2 swipes no longer move; an element in the viewport that the swipes no longer move gets one swipe the other way first, when that way was not swiped yet, and fails only if that moves it neither. ' +
+        'A stop reached after a swipe is reported only once a further read finds the element where it was (a fling can carry it on; one still moving after 3 such reads is reported as still moving); one a fling carried past the viewport (on Android also one then dumped clipped out past its scroll container\'s edge — never on the first read, where the given direction stands), or one resting in it at the edge the swipes push it out through (clipped there, its centre under the status bar, with fully: true across the navigation bar\'s top (Android), or under something of the app drawn over that side — or over all of it but a strip on that side — in that half of the screen), is swiped back, each turn with half the reach — also when a list drops it from the tree right after a read had it short of the edge it left through — and an element in the tree, off screen with a non-zero rect, that 2 swipes no longer move fails then ("content exhausted, or the swipes were not taken" — or, when the swipes touched down on something drawn over the list, naming it first), as does an element not in the tree after 2 identical swipes that change nothing on screen (not while a progress indicator shows); fully: true fails likewise on a clipped element 2 swipes no longer move; an element in the viewport that the swipes no longer move gets one swipe the other way first, when that way was not swiped yet, and fails only if that moves it neither. ' +
         'On Android each swipe is drawn over the target\'s scroll container (the screen\'s largest before the target is found), touching down above anything drawn over the container\'s lower half (a floating tab bar) when the content lies below, and slowly enough to drag, not fling, the list — about 1 s for a full-screen stroke, ≈ 0.45 screen heights a second — so one swipe moves the content about its own length and no row is skipped between reads; fewer swipes fit in the timeout than before. ' +
         'On Android a node\'s bounds are cut to its scroll container (and the display), so a fully: true stop whose top or bottom edge (left/right for a sideways scroll) lies exactly on its scroll container\'s is checked with one short probe swipe toward that edge (well under a pull-to-refresh), drawn inside a scroll container with room for it: if nothing moves the stop stands and the reply says it was checked; if the element moves it is judged again. The probe counts as a swipe (a list\'s first row at rest costs one); with none left the reply says the edge may be cut. An element whose two edges along the scroll both lie on its scroll container\'s (it fills it exactly) is not probed — one probe cannot tell which side is cut — and the reply says it may be cut (usual for a card as tall as its carousel; check with a screenshot). ' +
         'With the soft keyboard up (Android; iOS with treeSource: wda) the viewport is the screen ABOVE it: the part of an element under the keyboard does not count as visible, the swipes touch down clear of it (and never higher than without a keyboard), and a reply clipped at the top edge of the keyboard, or a failure, names it (a keyboard that covers the whole screen fails at once). Nothing is pressed to hide it — press_key back first (Android) to judge the whole screen. ' +

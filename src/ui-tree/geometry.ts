@@ -47,7 +47,7 @@ export interface ScreenSize extends ScreenWidth {
    * the window by construction) or a screen-shaped child of a rectless root
    * (`child`: a guessed window, which may be an oversized node crowned as
    * one) — reliable or not; absent when the walk answered, whose height is
-   * a content maximum. Read by ui-tree/standing.ts#usableScreenOf: only a
+   * a content maximum. Read by ui-tree/usable-screen.ts#usableScreenOf: only a
    * window's own sides may suggest that the screen is turned, never a walked
    * extent.
    */
@@ -349,7 +349,7 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * window? `wm size` and `idb describe` report the panel as built — portrait
  * on a phone — whichever way it is held; the tree's window is laid out as the
  * screen is now. The one owner of "which way does this window say the screen
- * faces", for ui-tree/standing.ts#usableScreenOf (the box a gesture swipes
+ * faces", for ui-tree/usable-screen.ts#usableScreenOf (the box a gesture swipes
  * in and every judgement's usable screen). Here rather than in
  * verify/scale.ts: `interact/` may not import `verify/` (ARCHITECTURE.md
  * §2), and the question is rect arithmetic over a tree's size and the
@@ -401,11 +401,11 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * screen lands off-centre, not off-screen in the short axis; the tree
  * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
  * refusal (ui-tree/standing.ts#onScreen) does not take this answer alone —
- * ui-tree/standing.ts#UsableScreen says which boxes count (`boxes`), and a
+ * ui-tree/usable-screen.ts#UsableScreen says which boxes count (`boxes`), and a
  * child window that matches the panel neither way — this crowned node —
  * is no evidence there: the judgement uses the panel as built. A window
  * whose own sides say the panel is turned, or a turn on a walked width,
- * counts the box either way up (ui-tree/standing.ts#UsableScreen owns which).
+ * counts the box either way up (ui-tree/usable-screen.ts#UsableScreen owns which).
  */
 export function windowTurnsScreen(size: ScreenSize, screen: DeviceScreen): boolean {
   if (!usableSize(screen)) return false;
@@ -560,7 +560,7 @@ export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2
 
 /**
  * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as
- * ui-tree/standing.ts#UsableScreen's) at its top when `box` is portrait — the
+ * ui-tree/usable-screen.ts#UsableScreen's) at its top when `box` is portrait — the
  * part of it a point or a rect is judged on screen in; `box` itself with no
  * band, in landscape, or with no screen. `shape` is the screen box the band
  * belongs to when `box` was cut from it (the screen above a keyboard): its
@@ -579,16 +579,8 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
 }
 
 /**
- * `point` lies on the screen but in its status band: inside one of `boxes`,
- * and inside none of them less the band (`belowStatusBand`). The tap's
- * and the stop's standing (ui-tree/standing.ts#Scene.standing) asks it.
- */
-export const inStatusBand = (point: Point, screen: { boxes: readonly Rect[]; statusBand?: number }): boolean =>
-  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(belowStatusBand(box, screen), point));
-
-/**
  * `box` less the screen's navigation band (`DeviceScreen.navigationBand`,
- * the band's TOP line, carried as ui-tree/standing.ts#UsableScreen's) at its
+ * the band's TOP line, carried as ui-tree/usable-screen.ts#UsableScreen's) at its
  * bottom when `box` is portrait — `belowStatusBand`'s twin at the other
  * edge, `shape` as there. Portrait only: Android moves the bar to a side
  * in landscape, and the band, read while the screen was upright, may
@@ -601,10 +593,6 @@ export function aboveNavigationBand(box: Rect, screen: { navigationBand?: number
   if (top === undefined || top <= box.y || shape.height <= shape.width) return box;
   return { ...box, height: Math.max(0, Math.min(box.y + box.height, top) - box.y) };
 }
-
-/** `point` lies on the screen but in its navigation band: inside one of `boxes`, and inside none of them less the band (`aboveNavigationBand`) — `inStatusBand`'s twin. */
-export const inNavigationBand = (point: Point, screen: { boxes: readonly Rect[]; navigationBand?: number }): boolean =>
-  screen.boxes.some((box) => containsPoint(box, point)) && !screen.boxes.some((box) => containsPoint(aboveNavigationBand(box, screen), point));
 
 /**
  * How thick, in tree units (points on iOS, pixels on Android), an overlap
