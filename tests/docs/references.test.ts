@@ -77,6 +77,12 @@ const declaredAt = (source: string, name: string): number =>
     ),
   );
 
+/**
+ * `source` with its import statements blanked (same length, so offsets hold):
+ * `import { type X } from …` names X, it does not declare it.
+ */
+const withoutImports = (source: string): string => source.replace(/^import\b[^;]*;/gm, (m) => m.replace(/[^\n]/g, ' '));
+
 /** A reference into tests/ resolves against the tests, any other against src/. */
 function resolves(file: string, symbol: string): boolean {
   const [head, ...members] = symbol.split('.');
@@ -84,7 +90,7 @@ function resolves(file: string, symbol: string): boolean {
   // Each member is declared inside what it is a member of: after it, before the next top-level declaration.
   return pool.some((f) => {
     if (f !== file && !f.endsWith(`/${file}`)) return false;
-    const source = read(f);
+    const source = withoutImports(read(f));
     const at = declaredAt(source, head);
     if (at < 0) return false;
     const rest = source.slice(at);
@@ -94,19 +100,24 @@ function resolves(file: string, symbol: string): boolean {
   });
 }
 
+/** A comment line's lead: the indent, the `*` or `//`, the space after. */
+const LEAD = /^\s*(?:\*(?!\/)|\/\/)?\s*/;
+
 /**
  * The prose's lines, a path wrapped at a hyphen or a slash joined back to
  * its continuation (`docs/bugs/2026-10-09-` / ` * android-…md`, `scroll-` /
- * ` * rounds.ts#…`) — the comment's `*` or `//` dropped — each numbered by
+ * ` * rounds.ts#…`), and a pointer wrapped after its file (`scroll-read.ts`
+ * / ` * #judgeRead`, or `scroll-read.ts#` / ` * judgeRead`) — the comment's `*` or `//` dropped — each numbered by
  * the line it starts on.
  */
 function logicalLines(file: string): { line: number; text: string }[] {
   const lines = read(file).split('\n');
   const out: { line: number; text: string }[] = [];
+  const wrapped = (text: string, next: string): boolean => /[\w.#/-][-/]$|\.ts#$/.test(text) || (/\.ts$/.test(text) && next.replace(LEAD, '').startsWith('#'));
   for (let i = 0; i < lines.length; i++) {
     const start = i;
     let text = lines[i];
-    while (/[\w.#/-][-/]$/.test(text) && i + 1 < lines.length) text += lines[++i].replace(/^\s*(?:\*(?!\/)|\/\/)?\s*/, '');
+    while (i + 1 < lines.length && wrapped(text, lines[i + 1])) text += lines[++i].replace(LEAD, '');
     out.push({ line: start + 1, text });
   }
   return out;

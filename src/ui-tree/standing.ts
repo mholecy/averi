@@ -491,7 +491,7 @@ function systemBands(box: Rect, bands: Bands): { clear: Rect; top?: SystemBand<S
  * line to the screen's bottom — idb's band's own shape (soft-keyboard.ts
  * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
  * sentence quotes for it (the pixel assert's keyboard miss, through
- * `underKeyboard`; `scroll_until`'s cover, interact/scroll-rounds.ts
+ * `underKeyboard`; `scroll_until`'s cover, interact/scroll-read.ts
  * #bandCoverOf, on the box its round judges in).
  */
 export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });

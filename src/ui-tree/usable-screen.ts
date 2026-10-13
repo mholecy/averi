@@ -8,7 +8,7 @@ import type { TreeRead } from './read-tree.js';
  * stands?" (standing.ts#Scene judges on it): the tap (whose standing
  * the in-tree keyboard dismissal picker asks too,
  * interact/keyboard-in-tree.ts), `scroll_until`'s stop
- * (interact/scroll-rounds.ts, over the screen interact/scroll.ts reads each
+ * (interact/scroll-read.ts, over the screen interact/scroll.ts reads each
  * round), the pixel assert (verify/pixel-poll.ts#overElement) and, for
  * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and
  * its throw over it and judges nothing).

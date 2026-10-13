@@ -27,7 +27,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
  * `coversOf` reads `exposure`'s):
  * - `drawnOver(container)` — `scroll_until`'s stroke box
- *   (interact/scroll-rounds.ts#TreeFacts, swipe.ts#strokeRoom): what is
+ *   (interact/scroll-read.ts#TreeFacts, swipe.ts#strokeRoom): what is
  *   drawn over the clipping container a stroke goes over?
  * - `drawnOverAt(container, point)` — the exhausted stop's sentence
  *   (scroll-rounds.ts#touchedOn): which of those a stroke's touch-down hit
