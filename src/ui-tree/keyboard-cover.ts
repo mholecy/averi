@@ -481,10 +481,22 @@ export type KeyboardLine =
   | { readonly y: number; readonly source: 'idb-band'; readonly witnessed: false };
 
 /**
- * The line a reading stands by: the top of everything a SHOWN keyboard
- * covers (`cover().top`, a floating panel above the band included) when
- * the reading is `corroborated` — else none. `window` on the oracle's model,
- * `wda` on the in-tree one (its remedy says which). Costs what `cover` and
+ * The line a shown cover stands for, once its witness has stood by it: the
+ * top of everything it covers (`KeyboardCover.top`, a floating panel above
+ * the band included), `window` on the oracle's model and `wda` on the
+ * in-tree one — its remedy says which, the one mapping from a remedy to a
+ * line's source. Synchronous and asks nothing: whether the witness stands
+ * by the cover is the caller's question, put before this one —
+ * `readingLine` asks it of the reading, `scroll_until`'s round through its
+ * protocol (interact/scroll-rounds.ts#coverOf).
+ */
+export function coverLine(cover: KeyboardCover): KeyboardLine {
+  return { y: cover.top.y, source: cover.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
+}
+
+/**
+ * The line a reading stands by: its cover's line (`coverLine`) when the
+ * reading is `corroborated` — else none. Costs what `cover` and
  * `corroborated` cost (the module doc); asked by the tap only when its
  * centre is covered (interact/resolve.ts#aimClearOfChrome). `scroll_until`
  * asks the same two through its round's protocol instead
@@ -493,7 +505,7 @@ export type KeyboardLine =
 export async function readingLine(reading: KeyboardReading): Promise<KeyboardLine | undefined> {
   const cover = await reading.cover();
   if (cover === undefined || !(await reading.corroborated())) return undefined;
-  return { y: cover.top.y, source: reading.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
+  return coverLine(cover);
 }
 
 /** The higher of two lines (the smaller y), either of which may be absent; a tie keeps `a`. */

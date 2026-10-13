@@ -1,6 +1,6 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { aboveNavigationBand, belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
-import { keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import { coverLine, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
@@ -847,7 +847,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
   return state as unknown as Rounds;
 }
 
-/** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
+/** The cover a reading offers, its line the cover's (ui-tree/keyboard-cover.ts#coverLine), or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
 function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
   if (shown === undefined) return undefined;
   // The highest covered rect, not always the inset band: a floating
@@ -857,8 +857,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
   // docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
   const topCover = shown.top;
   if (topCover.y >= viewport.height) return undefined;
-  const line: KeyboardLine = { y: topCover.y, source: shown.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
-  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: shown.remedy, line };
+  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: shown.remedy, line: coverLine(shown) };
 }
 
 /**
