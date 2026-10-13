@@ -1,7 +1,8 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { nodeText, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
-import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import { readKeyboard } from '../ui-tree/keyboard-cover.js';
+import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -97,7 +98,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  *   has one, else the round's own tree, shared with the tap guard) asked
  *   `overlapping`, any positive overlap with the element's rect, never the
  *   witness; then idb's band, a keyboard line of the element's standing
- *   (ui-tree/keyboard-cover.ts#keyboardEdge). An element that IS the
+ *   (ui-tree/keyboard-position.ts#KeyboardPosition.line). An element that IS the
  *   keyboard's UI (a key, the toolbar's Done) reads as not covered. The
  *   remedy is the adapter's (`keyboardOver`).
  *   docs/adr/0010-pixel-assert-keyboard-first.md
@@ -366,7 +367,7 @@ class PixelPollMemory {
  * the witness (the header says why); then the element's standing for the
  * pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on
  * the usable screen (`judgeOver`), given idb's band as its keyboard line
- * (ui-tree/keyboard-cover.ts#keyboardEdge — no reading stands by it:
+ * (ui-tree/keyboard-position.ts#KeyboardPosition.line — no reading stands by it:
  * idb's reading is `unknown`), so an element its band meets is the same
  * keyboard miss, quoting the band, and its keys are no covers named
  * instead. `reads`: what the measurement reads (`PixelPollSpec.reads`; the
@@ -394,7 +395,7 @@ export async function overElement(
   const keyboard = readKeyboard(adapter, tree);
   const frame = await keyboard.overlapping(element.rect, element);
   if (frame !== undefined) return keyboardOver(element.rect, frame, keyboard.remedy);
-  return judgeOver(adapter, tree, element, { reads, glyphs, scene, keyboard: { line: keyboardEdge(undefined, scene.order, element), remedy: keyboard.remedy } });
+  return judgeOver(adapter, tree, element, { reads, glyphs, scene, keyboard: { line: keyboardPosition(scene.order).line(element), remedy: keyboard.remedy } });
 }
 
 /**

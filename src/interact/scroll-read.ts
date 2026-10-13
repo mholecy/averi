@@ -1,6 +1,7 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, type Cut } from '../ui-tree/geometry.js';
-import { coverLine, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
+import { coverLine, keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
@@ -98,7 +99,7 @@ export interface TreeFacts {
    * `mainScroller` give, undefined when this tree has no container with
    * that rect (one remembered from an earlier read: the list has moved
    * since), never any on iOS, which has no clipping container; and idb's
-   * keyboard band (ui-tree/keyboard-cover.ts#keyboardEdge over `order`),
+   * keyboard band (ui-tree/keyboard-position.ts#KeyboardPosition.line over `order`),
    * the line the strokes stay above (`strokeLine`) and the round judges
    * under (`bandCoverOf`).
    */
@@ -178,7 +179,7 @@ export interface Cover {
   topCover: Rect;
   above: DeviceScreen | undefined;
   remedy: KeyboardRemedy;
-  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): `window` or `wda` for a reading's cover, which the witness stood by; `idb-band` for idb's band (`bandCoverOf`), which no reading stands by — a centre under it stops nothing. */
+  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): witnessed for a reading's cover, which the witness stood by; unwitnessed for idb's band (`bandCoverOf`), which no reading stands by — a centre under it stops nothing. */
   line: KeyboardLine;
 }
 
@@ -248,14 +249,17 @@ export function judgeRead(read: RoundRead, screen: StandingScreen, fully: boolea
   // (`stops`), and the rest the round's steps after the judgement read.
   const facts = factsOf(read.tree);
   const whole = judgeOver(found, screen, facts, stop);
+  // Where the keyboard lies on this read (ui-tree/keyboard-position.ts): idb's band from the scene's draw order, and
+  // which nodes are the keyboard's own — the read's `ofKeyboard`; the reading's line is the round's protocol's (`coverOf`).
+  const position = keyboardPosition(facts.scene.order, { ofKeyboard: read.ofKeyboard });
   // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
-  const band = offered !== undefined ? undefined : bandCoverOf(keyboardEdge(undefined, facts.scene.order), viewport, read.remedy);
+  const band = offered !== undefined ? undefined : bandCoverOf(position.line(), viewport, read.remedy);
   const applied = offered ?? band;
   let cover: Cover | undefined;
   let best = whole;
   if (applied !== undefined) {
     // The keyboard's own UI is judged against the whole screen: the reading's (WDA's marks), and idb's band's own nodes.
-    const covered = judge(found, screen, facts, stop, { cover: applied, keyboardSide: keyboardSide(read.ofKeyboard, facts.scene.order) });
+    const covered = judge(found, screen, facts, stop, { cover: applied, owns: position.owns });
     // Moot: the read stops the round cleanly either way, on the same
     // judgement — the band changes nothing, and is neither asked about nor
     // reported. Otherwise the witness is asked THIS read (the module doc).
@@ -285,7 +289,7 @@ export function judgeRead(read: RoundRead, screen: StandingScreen, fully: boolea
   return { facts, best, cover, offered, frames, uncutFrames, strokeLine: strokeLine(cover, facts) };
 }
 
-/** The cover a reading offers, its line the cover's (ui-tree/keyboard-cover.ts#coverLine), or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
+/** The cover a reading offers, its line the cover's (ui-tree/keyboard-position.ts#coverLine), or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
 function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
   if (shown === undefined) return undefined;
   // The highest covered rect, not always the inset band: a floating
@@ -300,7 +304,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
 
 /**
  * idb's band as a cover the round applies: its line
- * (ui-tree/keyboard-cover.ts#keyboardEdge, no reading) as the band's rect —
+ * (ui-tree/keyboard-position.ts#KeyboardPosition.line, no reading) as the band's rect —
  * the viewport's width from the line to its bottom, the shape idb's band
  * has (soft-keyboard.ts#flatListKeyboardBand) — with the reading's
  * `remedy`. Applied with no witness: it is read off the very tree being
@@ -319,7 +323,7 @@ const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined =
 
 /**
  * The top edge a stroke is kept above (swipe.ts#strokeRoom's `coverTop`):
- * the keyboard edge (ui-tree/keyboard-cover.ts#keyboardEdge) of the applied
+ * the keyboard line (ui-tree/keyboard-position.ts#KeyboardPosition.line) of the applied
  * cover's line and idb's band (`TreeFacts.scene`'s draw order) — the band
  * whether or not the round applied it (a moot band changes no judgement,
  * but a stroke on it touches a key: the Contacts form and the SWIFT form's
@@ -331,7 +335,7 @@ const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined =
  * the band starts below the top bar's line, a fifth of the screen down.
  */
 export function strokeLine(cover: Cover | undefined, facts: Pick<TreeFacts, 'scene'>): KeyboardLine | undefined {
-  return keyboardEdge(cover?.line, facts.scene.order);
+  return keyboardPosition(facts.scene.order).line(undefined, cover?.line);
 }
 
 /**
@@ -355,10 +359,10 @@ function judge(
   frame: StandingScreen,
   facts: Pick<TreeFacts, 'scene'>,
   stop: StopOf,
-  cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
+  cover?: { cover: Cover; owns: (node: UiNode) => boolean },
 ): Judged | undefined {
   const scored = found.map((node): Judged => {
-    const under = cover === undefined || cover.keyboardSide(node) ? undefined : cover.cover;
+    const under = cover === undefined || cover.owns(node) ? undefined : cover.cover;
     const standing = facts.scene.standing(node, frame, { of: stop, ...(under !== undefined && { keyboardTop: under.line }) });
     return { node, ...(under !== undefined && { under }), standing };
   });

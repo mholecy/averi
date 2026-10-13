@@ -1446,7 +1446,7 @@ export class FlowEngine {
     const result = await this.tracingGuardFailure(action, run);
     if (result.keyboardHidden !== undefined) this.log(action, result.keyboardHidden);
     // The tap went off the target's centre, a node of the app being drawn
-    // over it (2026-10-09, interact/resolve.ts#aimClearOfChrome): said like
+    // over it (2026-10-09, interact/resolve.ts#TapJudge.aim): said like
     // the keyboard's line — the author's next step may depend on where.
     if (result.moved !== undefined) this.log(action, movedTapText(what, result.moved));
     return result;

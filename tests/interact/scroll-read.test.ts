@@ -76,7 +76,7 @@ describe('judgeRead — what one read means, row by row', () => {
         offered: 1500,
         frames: [box(1000, 1500)],
         uncutFrames: [box(1000, 1500)],
-        strokeLine: { y: 1500, source: 'window', witnessed: true },
+        strokeLine: { y: 1500, witnessed: true },
       });
     });
     it('denied: the whole-screen judgement stands, no cover applied, offered still, no line', () => {
@@ -101,7 +101,7 @@ describe('judgeRead — what one read means, row by row', () => {
     const all = { x: 0, y: 0, width: 1000, height: 2000 };
     const j = judged(judgeRead(readOf({ found: [match({ x: 0, y: 500, width: 100, height: 100 })], cover: coverOver(all) }), AS_BUILT, false, true));
     expect(j.cover?.above).toBeUndefined();
-    expect(said(j)).toMatchObject({ cover: 0, frames: [PHONE], strokeLine: { y: 0, source: 'window', witnessed: true } });
+    expect(said(j)).toMatchObject({ cover: 0, frames: [PHONE], strokeLine: { y: 0, witnessed: true } });
   });
 
   it('a reading cover whose top lies at or below the screen\'s bottom offers nothing', () => {
@@ -114,7 +114,7 @@ describe('judgeRead — what one read means, row by row', () => {
     const keys = ['Q', 'W', 'E'].map((k, i) => node({ role: 'button', label: k, rect: { x: 2 + 40 * i, y: 780, width: 38, height: 46 } }));
     const bandRow = (row: Rect): Row => ({ flatList: true, found: [match(row)], over: [...keys, node({ role: 'other', rect: { ...PAD } })] });
     const IDB: StandingScreen = { box: box(402, 874), boxes: [box(402, 874)] };
-    it('a row under it: no ask, the band applied as the cover, the row judged under it, the line `idb-band`', () => {
+    it('a row under it: no ask, the band applied as the cover, the row judged under it, the line unwitnessed', () => {
       const j = judgeRead(readOf(bandRow({ x: 20, y: 700, width: 362, height: 50 }), box(402, 874)), IDB, false);
       expect(said(judged(j))).toEqual({
         best: { id: 't', kind: 'underKeyboard', under: true },
@@ -122,12 +122,12 @@ describe('judgeRead — what one read means, row by row', () => {
         offered: undefined,
         frames: [box(402, 590)],
         uncutFrames: [box(402, 590)],
-        strokeLine: { y: 590, source: 'idb-band', witnessed: false },
+        strokeLine: { y: 590, witnessed: false },
       });
     });
     it('a row above it: the band moot and not applied, but the strokes still stay above it', () => {
       const j = judgeRead(readOf(bandRow({ x: 20, y: 200, width: 362, height: 50 }), box(402, 874)), IDB, false);
-      expect(said(judged(j))).toMatchObject({ best: { kind: 'reachable', under: false }, cover: undefined, frames: [box(402, 874)], strokeLine: { y: 590, source: 'idb-band', witnessed: false } });
+      expect(said(judged(j))).toMatchObject({ best: { kind: 'reachable', under: false }, cover: undefined, frames: [box(402, 874)], strokeLine: { y: 590, witnessed: false } });
     });
   });
 
@@ -189,10 +189,10 @@ describe('strokeLine — the line a read\'s strokes stay above', () => {
   it('a cover, no band: the cover\'s line', () => {
     const cover: KeyboardCover = coverOver(IME);
     const j = judged(judgeRead(readOf({ found: [match({ x: 0, y: 1480, width: 100, height: 100 })], cover }), AS_BUILT, false, true));
-    expect(strokeLine(j.cover, j.facts)).toEqual({ y: 1500, source: 'window', witnessed: true });
+    expect(strokeLine(j.cover, j.facts)).toEqual({ y: 1500, witnessed: true });
   });
   it('no cover, idb\'s band: the band\'s line', () => {
     const over = [node({ role: 'button', label: 'Q', rect: { x: 2, y: 780, width: 38, height: 46 } }), node({ role: 'other', rect: { x: 0, y: 590, width: 402, height: 284 } })];
-    expect(strokeLine(undefined, facts({ flatList: true, found: [], over }, box(402, 874)))).toEqual({ y: 590, source: 'idb-band', witnessed: false });
+    expect(strokeLine(undefined, facts({ flatList: true, found: [], over }, box(402, 874)))).toEqual({ y: 590, witnessed: false });
   });
 });

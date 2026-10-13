@@ -1,6 +1,7 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
 import { frameText } from '../ui-tree/geometry.js';
-import { keyboardEdge, readingLine, readKeyboard, type KeyboardLine, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
+import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
+import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
 import { sceneOf, type Scene, type TapStanding } from '../ui-tree/standing.js';
@@ -22,7 +23,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { cutSliverText, describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { cutSliverText, describeTarget, findTarget, tapStandings, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 
 /**
  * The IN-TREE model (iOS under WDA): the soft keyboard is part
@@ -206,10 +207,10 @@ interface DismissalPick {
  * its centre, unmoved — THE TAP'S STANDING (ui-tree/standing.ts#Scene,
  * `{ of: 'tap' }`) over `screen` (the guard's first-look screen; the
  * dismissal's own read), one scene per call, derived on first use, its
- * keyboard line the tap's (keyboard-cover.ts#readingLine merged by
- * #keyboardEdge), asked once per call, by the first strategy that gets this
- * far — under WDA a witnessed line, which refuses nothing the band check
- * above has not:
+ * keyboard line the tap's — the standing with the reading's line merged in
+ * (resolve.ts#tapStandings' `full`, the tap's own expression), the reading
+ * asked once per call, by the first strategy that gets this far — under
+ * WDA a witnessed line, which refuses nothing the band check above has not:
  * - `reachable` at the centre, with no interactive node there it would
  *   press — usable;
  * - off the screen or in a system band — `off screen at (x,y)`: a title
@@ -256,7 +257,7 @@ async function pickDismissal(
 ): Promise<DismissalPick> {
   const skipped: string[] = [];
   let scene: Scene | undefined; // derived once, by the first strategy that gets as far as asking the tap's standing
-  let line: Promise<KeyboardLine | undefined> | undefined; // the reading's line, asked once and only then
+  let position: KeyboardPosition | undefined; // built with it, off `keyboard`: the reading's line asked once and only then
   for (const d of dismissals) {
     const name = describeDismissal(d);
     if (d.kind === 'accessory') {
@@ -292,8 +293,8 @@ async function pickDismissal(
       continue;
     }
     scene ??= sceneOf(tree);
-    const keyboardTop = keyboardEdge(await (line ??= readingLine(keyboard)), scene.order, node);
-    const unusable = whyNotTapped(scene.standing(node, screen, { of: 'tap', ...(keyboardTop !== undefined && { keyboardTop }) }), node);
+    position ??= keyboardPosition(scene.order, keyboard);
+    const unusable = whyNotTapped(await tapStandings(scene, node, screen, position).full(), node);
     if (unusable !== undefined) {
       skipped.push(`${name}: ${unusable}`);
       continue;

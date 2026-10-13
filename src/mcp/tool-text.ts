@@ -29,7 +29,7 @@ import { formatSeconds } from '../util/duration.js';
 
 /**
  * `Tapped <selector>`, then — when the tap went elsewhere than the centre
- * (interact/resolve.ts#aimClearOfChrome, 2026-10-09) — where and why, then
+ * (interact/resolve.ts#TapJudge.aim, 2026-10-09) — where and why, then
  * the resolution note in parentheses when there was one.
  */
 export const tapText = (selector: string, note: string | undefined, moved?: string): string =>

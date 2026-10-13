@@ -21,7 +21,7 @@ import { rectWithin } from './geometry.js';
  * the lowest layer every sentence that says so imports. It also reads
  * idb's keyboard band, which carries no mark, by
  * its shape (`flatListKeyboardBand`) — known outside draw-order.ts as a
- * LINE only (keyboard-cover.ts#keyboardEdge, over
+ * LINE only (keyboard-position.ts#KeyboardPosition.line, over
  * draw-order.ts#DrawOrder.keyboardBandTop), never as a keyboard shown.
  */
 
@@ -58,7 +58,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * the list's order (`nodes`, pre-order: the synthetic root first). Draw
  * order (ui-tree/draw-order.ts) reads it through `keyboardOf` for `flatListReadingOrder` and `bottomPinned`
  * unchanged, and for its top (`DrawOrder.keyboardBandTop`, the one way the
- * keyboard edge knows it, keyboard-cover.ts#keyboardEdge). idb marks no keyboard node, so its keys — plain `button`s
+ * keyboard line knows it, keyboard-position.ts#KeyboardPosition.line). idb marks no keyboard node, so its keys — plain `button`s
  * listed LAST — are the only covers of the rows under it. Its background is
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the

@@ -13,7 +13,7 @@ import {
   type Cut,
   type Edge,
 } from './geometry.js';
-import type { KeyboardLine } from './keyboard-cover.js';
+import type { KeyboardLine } from './keyboard-position.js';
 import { tapPoint } from './selectors.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
@@ -121,7 +121,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     aimed under the keyboard. The tap asks with the tree's own line first
  *     (idb's band, free), and again with a reading's merged in only when the
  *     centre is covered, so the keyboard is read only then
- *     (interact/resolve.ts#aimClearOfChrome).
+ *     (interact/resolve.ts#TapJudge.aim).
  * - `facts` are the judgement's inputs, whatever the kind: what a caller's
  *   motion and sentences read (scroll_until's best-so-far, its far-edge
  *   turn and its failure text).
@@ -237,7 +237,7 @@ export interface Scene {
  * (`stop`), its `fully: true` stop (`fully`), a tap, or the pixel assert's
  * read (`PixelPurpose`) — and the soft
  * keyboard's line the caller applies, if any
- * (ui-tree/keyboard-cover.ts#keyboardEdge builds it; `Scene`'s contract
+ * (ui-tree/keyboard-position.ts#KeyboardPosition.line builds it; `Scene`'s contract
  * says how each verb applies it, and what `witnessed` changes).
  */
 export type Purpose = TouchPurpose | PixelPurpose;

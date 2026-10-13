@@ -25,7 +25,7 @@ const query = 'adb -s emulator-5554 shell dumpsys window displays';
 const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
 // The keyboard window's region beside the input method's word (2026-10-08): asked once state() read the band up.
 const touchable = "adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true";
-// The screen the tap point is judged against (2026-10-08, interact/resolve.ts#refuseOffScreen):
+// The screen the tap point is judged against (2026-10-08, interact/resolve.ts#judgeTap):
 // asked once per adapter, after the first settle, before the keyboard — the adapter memoizes it.
 const wmSize = 'adb -s emulator-5554 shell wm size';
 const PHYSICAL = 'Physical size: 1080x2220\n';
