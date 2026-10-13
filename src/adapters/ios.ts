@@ -410,7 +410,7 @@ export class IosAdapter implements DeviceAdapter {
     const fix =
       this.treeSource.kind === 'wda'
         ? 'name them under app.ios.keyboardDismiss in averi.yaml (tap: { id: <title> }, accessory: true) and the guard taps the first one on screen before a covered target'
-        : 'tap one yourself before the tap (a tap: step in a flow): with treeSource: idb no guard acts, so app.ios.keyboardDismiss is inert ' +
+        : 'tap one yourself first: with treeSource: idb no guard acts, so app.ios.keyboardDismiss is inert ' +
           '(with treeSource: wda the guard taps its first on-screen entry before a covered target)';
     return (
       'the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, ' +

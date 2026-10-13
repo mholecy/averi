@@ -799,12 +799,16 @@ export interface DeviceAdapter {
    */
   readonly keyboard?: KeyboardOracle;
   /**
-   * The in-tree model's one sentence: why THIS adapter cannot
+   * The in-tree model's sentence: why THIS adapter cannot
    * hide a soft keyboard that covers a target, and what was measured to work
-   * instead. Set only by an adapter WITHOUT the oracle (iOS: `IosAdapter`),
+   * instead — phrased for the adapter's configuration, which may change what
+   * works (`IosAdapter` says it per tree source: under WDA the guard taps the
+   * configured `app.ios.keyboardDismiss`, under idb no guard acts and the
+   * user taps it). Set only by an adapter WITHOUT the oracle,
    * quoted verbatim — in parentheses, after "this adapter cannot hide it on
    * its own" (`ui-tree/soft-keyboard.ts#cannotHide`, the one phrase: the
-   * advice is what DOES work) — by the refusals in interact/keyboard-in-tree.ts and
+   * advice is what DOES work) — by the refusals in interact/keyboard-in-tree.ts,
+   * interact/tap-judgement.ts, interact/scroll-text.ts and
    * verify/pixel-poll.ts, which own the generic halves of their sentences
    * and no platform fact. The adapter owns it because its facts are the
    * platform's — which key submits, which endpoint fails, which config key

@@ -172,7 +172,7 @@ describe('IosAdapter interactions', () => {
 
     it('under idb it says to tap one yourself: no guard acts there, so app.ios.keyboardDismiss is inert', () => {
       expect(adviceOn('idb')).toBe(
-        `${MEASURED} — tap one yourself before the tap (a tap: step in a flow): with treeSource: idb no guard acts, so app.ios.keyboardDismiss is inert (with treeSource: wda the guard taps its first on-screen entry before a covered target); ` +
+        `${MEASURED} — tap one yourself first: with treeSource: idb no guard acts, so app.ios.keyboardDismiss is inert (with treeSource: wda the guard taps its first on-screen entry before a covered target); ` +
           'typing with a hardware keyboard keeps the software keyboard from showing',
       );
     });

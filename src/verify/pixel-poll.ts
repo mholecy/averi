@@ -407,9 +407,11 @@ export async function overElement(
  * which keeps the keyboard up. When it has none (`'none'`, the in-tree
  * model) it names the flow's two ways:
  * a `tap:` step the AUTHOR adds on an element that hides the keyboard
- * (such as the one configured for the guard to tap — configuring it is
- * not enough here: the guard taps it only before a covered tap, and before
- * an assert nothing does), or `dismissKeyboard: true` on a fill that
+ * (such as the screen title — not "the one configured for the guard":
+ * under idb no guard acts, and under WDA configuring it is not enough here
+ * either: the guard taps it only before a covered tap, and before an
+ * assert nothing does; where it is configured, if anywhere, is the
+ * adapter's `advice`, which says so per tree source), or `dismissKeyboard: true` on a fill that
  * LEAVES it up. Not the fill option alone: it taps only on a band read
  * right after the fill, and HID typing usually parks the keyboard (no
  * band, a no-op, measured on device), while a
@@ -428,7 +430,7 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
     `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)}) — ` +
     (dismissal === 'back'
       ? 'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run'
-      : 'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the one configured for the guard to tap, ' +
+      : 'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the screen title, ' +
         `before this assert, or \`dismissKeyboard: true\` on a fill that leaves it up); ${cannotHide(advice)}`)
   );
 }
