@@ -584,10 +584,10 @@ export class Verifier {
     // on device from a caret screen, holding one phase of the blink (the
     // schedule, its simulation and its cost are on capture.ts's
     // BASELINE_CONFIRMATION_DELAYS_MS).
-    // docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md A refusal there gets its own
-    // sentence, because two captures DID match. A DIFF takes plain
+    // A refusal there gets its own sentence, because two captures DID match. A DIFF takes plain
     // `captureFrame` exactly as before — same captures, same sleeps, same
     // `⚠ frame:` note — so only the once-per-baseline path pays the window.
+    // docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md
     // A read that fails for any reason means "create", as it did when the
     // read came second; reading first changes nothing but the order — except
     // that the read-to-write window is now the whole creation capture, ≈3 s

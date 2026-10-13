@@ -217,6 +217,8 @@ interface ThisRead {
   read: RoundRead;
   facts: TreeFacts;
   frames: readonly Rect[];
+  /** The frames short of the far edge is judged in (`observe`'s `seenShort`): `frames` uncut at the navigation band, so a target a stroke then pushes wholly into the band was seen short, and is turned back. */
+  screenFrames: readonly Rect[];
   /** The ROUND's gesture box (`RoundSeen.screen`), as this read was judged with it — not a fact of the read. */
   gesture: Rect | undefined;
   /** The cover the ROUND applied (after the witness), as this read was judged under it — not a fact of the read. */
@@ -1181,7 +1183,7 @@ interface Observed {
  * next stroke.
  */
 function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
-  const { read, facts, frames } = now;
+  const { read, facts, frames, screenFrames } = now;
   const { found } = read;
   const { fingerprint, loading } = facts;
   const rects = found.map((n) => ({ ...n.rect }));
@@ -1265,7 +1267,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
     const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
-    if (!beyond) s.seenShort = true;
+    if (!beyondFarEdgeIn(farFacts(best), s.rules.direction, screenFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
@@ -1428,14 +1430,20 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // else every box that counts — for where the target stands against the
   // far edge (`observe`, `beyondFarEdge`). A read that did not read says
   // nothing about motion: the comparisons wait for the next one that does.
-  // Between the system bands: a target a fling carried into one — or one
-  // resting across the navigation band's top while the content lies above
-  // it — is past the far edge, and the next stroke turns back.
-  const banded = (b: Rect, shape: Rect = b): Rect => aboveNavigationBand(belowStatusBand(b, s.frame, shape), s.frame, shape);
-  const judgedFrames: Rect[] = cover?.above !== undefined ? [banded({ x: viewport.x, y: viewport.y, ...cover.above }, viewport)] : s.frame.boxes.map((b) => banded(b));
+  // Below the status band: a target whose centre a fling carried into it
+  // is past the far edge, and the next stroke turns back.
+  const screenFrames: Rect[] =
+    cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
+  // And above the navigation band, for a `fully` stop the band's REGION
+  // refused (ui-tree/standing.ts#Standing's `band`): resting across the
+  // band's top with the content above it, it is past the far edge — the
+  // next stroke turns and lifts it. Only then: the plain stop, and every
+  // other standing, judge the far edge in the frames as ever.
+  const regionAtBottom = fully && best?.standing.kind === 'systemBar' && best.standing.band !== undefined && best.standing.bar.edge === 'bottom';
+  const judgedFrames: Rect[] = regionAtBottom ? screenFrames.map((f) => aboveNavigationBand(f, s.frame, viewport)) : screenFrames;
   const gesture = seen.screen?.oriented;
   const now: ThisRead | undefined =
-    read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, gesture, cover };
+    read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, screenFrames, gesture, cover };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.

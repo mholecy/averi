@@ -144,11 +144,13 @@ import type { UsableScreen } from './usable-screen.js';
  *   true` first" stopped at once on a row reaching 33 px into the
  *   navigation band (accountDetail's `row_30` `66,2088 948x99`, its centre
  *   clear), and the agent looped. A node pinned in a band ends stuck naming
- *   the bar. Not for content no scroll lifts out of a band — a full-bleed
- *   header (`fullBleedHeader`) or a screen-sized node (`screenSized`): the
- *   `fully` stop stops on it as before, so a rect assert after it works,
- *   and a pixel assert on it fails closed with its own advice (assert
- *   something in it clear of the bar).
+ *   the bar. Not for content no scroll lifts out of a band
+ *   (`pinnedSurface`: in no scroll view, a full-bleed header or footer or a
+ *   screen-sized node): the `fully` stop stops on it as before, so a rect
+ *   assert after it works — no strokes over a modal sheet — and a pixel
+ *   assert on it fails closed with its own advice (assert something in it
+ *   clear of the bar). A scroll view's content is lifted, whatever its
+ *   shape.
  *   docs/adr/0009-android-navigation-band.md
  * - A sliver: uiautomator cuts every rect to its scroller, so a cut node's
  *   centre is always on the screen; the stop handed back the very strip the
@@ -168,12 +170,12 @@ import type { UsableScreen } from './usable-screen.js';
  *   of a turn suggested but not witnessed is never judged; landscape is
  *   unmeasured.
  *   docs/adr/0012-pixel-assert-residuals-d4-d6.md
- * - A `fully` stop on a full-bleed header or a screen-sized node does not
- *   promise a pixel assert: what lies under a bar fails it closed, with
- *   the advice to assert something in it clear of the bar. Content laid
- *   under the navigation bar at full width from the screen's bottom (a
- *   footer) is no full-bleed header: `fully` strokes on, and it ends stuck
- *   naming the bar.
+ * - A `fully` stop on content no scroll lifts out of a band
+ *   (`pinnedSurface`) does not promise a pixel assert: what lies under a
+ *   bar fails it closed, with the advice to assert something in it clear
+ *   of the bar. A scroll view's content taller than the room between the
+ *   bands but not screen-sized never stops `fully`: it ends stuck naming
+ *   the bar.
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
@@ -517,9 +519,8 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
   const cover = fully && facts.covers.length > 0 ? (facts.centreCover ?? facts.covers[facts.covers.length - 1]) : facts.centreCover;
   // `fully`: the system bands as a region, as the pixel assert judges them — any of the node past the slack.
   // docs/adr/0009-android-navigation-band.md
-  // Not for content no scroll lifts out of a band — a full-bleed header, a screen-sized node: it stops as before.
-  const liftable = !screenSized(node.rect, box) && !fullBleedHeader(node.rect, box);
-  const placed = fully && liftable && place === 'on' ? (systemBandOver(node.rect, box, bands) ?? place) : place;
+  // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
+  const placed = fully && place === 'on' && pinnedSurface(node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(node.rect, box, bands) ?? place) : place;
   return ordered<Standing>(
     pointPlaced(facts, placed, facts.visible),
     fully ? undefined : sliverCut(facts, facts.sliver),
@@ -616,6 +617,36 @@ export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >=
  * header's place, verify/pixel-poll.ts's remedy.
  */
 export const fullBleedHeader = (rect: Rect, box: Rect): boolean => rect.y <= box.y && rect.x <= box.x && rect.x + rect.width >= box.x + box.width;
+
+/**
+ * `rect` is a full-bleed footer on `box`: laid to the box's bottom edge at
+ * its full width (a bottom sheet, an edge-to-edge bottom bar under the
+ * navigation band) — `fullBleedHeader`'s twin at the bottom edge.
+ */
+export const fullBleedFooter = (rect: Rect, box: Rect): boolean =>
+  rect.y + rect.height >= box.y + box.height && rect.x <= box.x && rect.x + rect.width >= box.x + box.width;
+
+/**
+ * Content NO scroll lifts out of a system band, and which: a node in no
+ * scroll view (`Clips.inScroller` not true — idb's flat list, which cannot
+ * tell, counts as none, as the pixel assert's `pinned` does) that is the
+ * screen itself (`screenSized`), a full-bleed header (`fullBleedHeader`)
+ * or a full-bleed footer (`fullBleedFooter`); and, in a scroll view, the
+ * screen itself only when it is taller than the room between the bands
+ * (`box` less both, `systemBands`), which no scroll can clear it into.
+ * Undefined for anything else, a scroll view's content above all — a list
+ * row at the screen's top edge, a 1080x2000 page that fits between the
+ * bands — which a scroll does lift. A `fully`
+ * stop judges no band's region over it (`Scene`'s contract), and the pixel
+ * assert's advice for it leads with something in it clear of the bar.
+ * docs/adr/0009-android-navigation-band.md
+ */
+export function pinnedSurface(node: UiNode, box: Rect, bands: Bands, clips: Pick<Clips, 'inScroller'>): 'screen' | 'header' | 'footer' | undefined {
+  if (clips.inScroller(node) === true) return screenSized(node.rect, box) && node.rect.height > systemBands(box, bands).clear.height ? 'screen' : undefined;
+  if (screenSized(node.rect, box)) return 'screen';
+  if (fullBleedHeader(node.rect, box)) return 'header';
+  return fullBleedFooter(node.rect, box) ? 'footer' : undefined;
+}
 
 /**
  * The pixel assert's screen (D6): ONE box, the usable screen's `oriented`

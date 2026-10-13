@@ -5,7 +5,7 @@ import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboa
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { fullBleedHeader, sceneOf, screenSized, singleBox, type Scene } from '../ui-tree/standing.js';
+import { fullBleedHeader, pinnedSurface, sceneOf, screenSized, singleBox, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -498,7 +498,10 @@ async function judgeOver(
       const bar = systemBarName(standing.bar.edge);
       // Laid from the screen's top edge, under the status bar: a scroll may not move it (a pinned header's place).
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
-      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(never ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
+      // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
+      // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
+      const surface = pinnedSurface(element, screen, singleBox(usable), scene.clips);
+      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(surface ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
     }
     case 'cut':
       return (
@@ -528,11 +531,12 @@ async function judgeOver(
  * whose cover is the app's own content laid on its background.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
-const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'root'): string => {
+const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'footer' | 'root'): string => {
   const child = 'assert something in it that lies clear of that';
   if (kind === 'root') return `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${child}`;
   if (kind === 'screen') return `the capture would show it, not the element — ${child}; no scroll moves the screen itself out from under it`;
   if (kind === 'header') return `the capture would show it, not the element — ${child} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`;
+  if (kind === 'footer') return `the capture would show it, not the element — ${child} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`;
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   return kind === 'stuck' ? `${scroll} — or, if no scroll moves it out from under that, ${child}` : scroll;
 };
