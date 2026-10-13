@@ -6,6 +6,7 @@ import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
+import type { SeenLook } from './keyboard-model.js';
 import { cutRemedy, cutSliverText } from './target-text.js';
 
 /**
@@ -153,12 +154,8 @@ export class ClippedRefusal extends PresentElementRefusal {}
 
 // ─── The judgement of a look ─────────────────────────────────────────────────
 
-/** One resolved node on one read, with that read's scene — the look the tap judges (`judgeTap`). */
-export interface TapLook {
-  readonly node: UiNode;
-  readonly tree: UiNode;
-  readonly scene: Scene;
-}
+/** One resolved node on one read, with that read's scene — the look the tap judges (`judgeTap`): a SeenLook's three fields the judgement reads, so a table test builds one without the settle loop. */
+export type TapLook = Pick<SeenLook, 'node' | 'tree' | 'scene'>;
 
 /**
  * The tap's two standings of a node on one screen (ui-tree/standing.ts

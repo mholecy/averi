@@ -13,6 +13,13 @@ import { SIDES } from './swipe.js';
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
  * caller's switch. Shallow by design, like ui-tree/system-bar.ts: delete it
  * and each shared sentence reappears in its two or three callers.
+ *
+ * Its words for a side come from one other interact/ module: swipe.ts#SIDES
+ * — `past` and `lies` (where a node past a side lies) and `reveals` (the
+ * `scroll_until` direction that brings it back, which `cutRemedy` and
+ * `revealText` name). The table stays in swipe.ts because the stroke reads
+ * `reveals` too, and one table spells the four sides once. Still a leaf:
+ * swipe.ts imports nothing from interact/, so this module pulls in no verb.
  */
 
 /**
@@ -66,8 +73,8 @@ export function cutRemedy(edge: Edge): string {
  * Not geometry.ts#nodeText (`button "Sign in" (24,780 354x44)`, its id when
  * it has no label, an empty label skipped), on purpose: the skip line names a
  * cover in a list of reasons, where a rect adds length and not a decision.
- * The two phrasings are a choice, kept side by side (spec D's OD-6 (a));
- * one phrasing would change the skip lines `KeyboardWithoutDismissal` and the
- * `dismiss()` warning quote.
+ * The two phrasings are a choice, kept side by side: one phrasing would
+ * change the skip lines `KeyboardWithoutDismissal` and the `dismiss()`
+ * warning quote, words an agent may match on.
  */
 export const coverName = (cover: UiNode): string => `${cover.role}${cover.label === null ? '' : ` ${JSON.stringify(cover.label)}`}`;
