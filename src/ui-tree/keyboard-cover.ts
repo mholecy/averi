@@ -462,36 +462,31 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
 
 /**
  * A soft keyboard's top edge as a LINE nothing may be aimed or stroked
- * under, with where it came from:
- * - `window` — the Android window model's cover (the inset band, or a
- *   floating panel above it), the input method standing by it;
- * - `wda` — the band WDA marks in the tree (`KEYBOARD_ROLE`), read off the
- *   very tree being judged;
- * - `idb-band` — idb's band, read by its shape (draw-order.ts
- *   #DrawOrder.keyboardBandTop), a position and nothing more: no reading
- *   says the keyboard is shown (`keyboardInTree` stays `unknown`, K5d).
- * `witnessed`: a reading stands by it, so the tap's guard acts on a point
- * under it (interact/keyboard.ts) — true for `window` and `wda`, false for
- * `idb-band`, which no guard acts on: a centre under it is the judgement's
- * to refuse (ui-tree/standing.ts#Scene).
+ * under. `witnessed`: a reading stands by it, so the tap's guard acts on a
+ * point under it (interact/keyboard.ts) — the Android window model's cover
+ * (the inset band, or a floating panel above it), the input method standing
+ * by it, or the band WDA marks in the tree (`KEYBOARD_ROLE`), read off the
+ * very tree being judged; false for idb's band, read by its shape
+ * (draw-order.ts#DrawOrder.keyboardBandTop), a position and nothing more: no
+ * reading says the keyboard is shown (`keyboardInTree` stays `unknown`, K5d),
+ * and no guard acts on it — a centre under it is the judgement's to refuse
+ * (ui-tree/standing.ts#Scene). No adapter is named: `witnessed` is the one
+ * fact every judgement reads.
  * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
-export type KeyboardLine =
-  | { readonly y: number; readonly source: 'window' | 'wda'; readonly witnessed: true }
-  | { readonly y: number; readonly source: 'idb-band'; readonly witnessed: false };
+export type KeyboardLine = { readonly y: number; readonly witnessed: boolean };
 
 /**
  * The line a shown cover stands for, once its witness has stood by it: the
  * top of everything it covers (`KeyboardCover.top`, a floating panel above
- * the band included), `window` on the oracle's model and `wda` on the
- * in-tree one — its remedy says which, the one mapping from a remedy to a
- * line's source. Synchronous and asks nothing: whether the witness stands
+ * the band included), witnessed — whichever model read it, so no remedy is
+ * read. Synchronous and asks nothing: whether the witness stands
  * by the cover is the caller's question, put before this one —
  * `readingLine` asks it of the reading, `scroll_until`'s round through its
  * protocol (interact/scroll-read.ts#coverOf).
  */
 export function coverLine(cover: KeyboardCover): KeyboardLine {
-  return { y: cover.top.y, source: cover.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
+  return { y: cover.top.y, witnessed: true };
 }
 
 /**
@@ -525,7 +520,7 @@ const higher = (a: KeyboardLine | undefined, b: KeyboardLine | undefined): Keybo
  */
 export function keyboardEdge(reading: KeyboardLine | undefined, order: Pick<DrawOrder, 'keyboardBandTop' | 'ofKeyboardBand'>, subject?: UiNode): KeyboardLine | undefined {
   const top = order.keyboardBandTop;
-  const band: KeyboardLine | undefined = top === undefined || (subject !== undefined && order.ofKeyboardBand(subject)) ? undefined : { y: top, source: 'idb-band', witnessed: false };
+  const band: KeyboardLine | undefined = top === undefined || (subject !== undefined && order.ofKeyboardBand(subject)) ? undefined : { y: top, witnessed: false };
   return higher(reading, band);
 }
 

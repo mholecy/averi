@@ -178,7 +178,7 @@ export interface Cover {
   topCover: Rect;
   above: DeviceScreen | undefined;
   remedy: KeyboardRemedy;
-  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): `window` or `wda` for a reading's cover, which the witness stood by; `idb-band` for idb's band (`bandCoverOf`), which no reading stands by — a centre under it stops nothing. */
+  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): witnessed for a reading's cover, which the witness stood by; unwitnessed for idb's band (`bandCoverOf`), which no reading stands by — a centre under it stops nothing. */
   line: KeyboardLine;
 }
 

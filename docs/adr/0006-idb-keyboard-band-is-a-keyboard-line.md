@@ -16,7 +16,7 @@ keys as ordinary covers, with these effects:
 
 ## Decision
 
-idb's band is a `KeyboardLine` with `{ source: 'idb-band', witnessed: false }`, built by the one merge,
+idb's band is a `KeyboardLine` with `{ witnessed: false }`, built by the one merge,
 `ui-tree/keyboard-cover.ts#keyboardEdge`. The tap, `scroll_until`'s judgement and stroke, and the pixel assert all judge
 against it:
 

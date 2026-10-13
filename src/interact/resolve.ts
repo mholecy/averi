@@ -782,7 +782,7 @@ export async function aimClearOfChrome(
   if (standing.kind === 'cut') throw new ClippedRefusal(refusal(cutFinding(standing.cut, node.rect, standing.minPiece)));
   if (standing.facts.centreCover !== undefined) {
     const line = keyboardEdge(await keyboard.line(), judged.scene.order, node);
-    if (line !== undefined && (line.y !== judged.keyboard?.y || line.source !== judged.keyboard.source)) {
+    if (line !== undefined && (line.y !== judged.keyboard?.y || line.witnessed !== judged.keyboard.witnessed)) {
       standing = judged.scene.standing(node, judged.screen, { of: 'tap', keyboardTop: line });
     }
   }

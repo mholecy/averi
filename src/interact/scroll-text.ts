@@ -110,14 +110,15 @@ export interface ScrollUntilResult {
  * only when set, so a run without a keyboard, or one that settled, reports
  * what it always did. `shown` only when THIS stop was judged under a band
  * this round applied — a reading's the witness stood by, or idb's band
- * (`source: 'idb-band'`) — never a band checked on an earlier one.
+ * (`source: 'idb-band'`, said when its line is unwitnessed) — never a band
+ * checked on an earlier one.
  */
 export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): ScrollUntilResult {
   const { judged } = o;
   const { facts } = judged.standing;
   const keyboard: ScrollUntilResult['keyboard'] =
     judged.under !== undefined
-      ? { state: 'shown', frame: judged.under.topCover, ...(judged.under.line.source === 'idb-band' && { source: 'idb-band' as const }) }
+      ? { state: 'shown', frame: judged.under.topCover, ...(!judged.under.line.witnessed && { source: 'idb-band' as const }) }
       : o.unlocated
         ? { state: 'unlocated' }
         : undefined;

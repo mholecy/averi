@@ -370,11 +370,11 @@ describe('the keyboard window\'s region, read only once the band is up — the f
 
 /**
  * The keyboard edge: the top edge nothing may be aimed or stroked under — a corroborated reading's cover top
- * (`readingLine`), idb's band line (`DrawOrder.keyboardBandTop`), or the higher of the two — with its source.
+ * (`readingLine`), idb's band line (`DrawOrder.keyboardBandTop`), or the higher of the two — witnessed when a reading stands by it.
  */
 describe('keyboardEdge — a corroborated reading, idb\'s band, both, neither', () => {
-  const window = (y: number): KeyboardLine => ({ y, source: 'window', witnessed: true });
-  const IDB_589: KeyboardLine = { y: 589, source: 'idb-band', witnessed: false };
+  const window = (y: number): KeyboardLine => ({ y, witnessed: true });
+  const IDB_589: KeyboardLine = { y: 589, witnessed: false };
   /** A draw order that read idb's band at `top` (or none), and whose band holds `keys`. */
   const order = (top: number | undefined, ...keys: UiNode[]) => ({ keyboardBandTop: top, ofKeyboardBand: (n: UiNode) => keys.includes(n) });
   it.each([
@@ -424,7 +424,7 @@ describe('keyboardEdge — a key of idb\'s band, against an app row listed right
       ]),
     );
   };
-  const IDB_590: KeyboardLine = { y: 590, source: 'idb-band', witnessed: false };
+  const IDB_590: KeyboardLine = { y: 590, witnessed: false };
   it('Sign in at 20,700 362x50, listed right before the keys and alone on its row: under the band line', async () => {
     const tree = await login();
     expect(keyboardEdge(undefined, drawOrder(tree), tree.children.find((n) => n.label === 'Sign in'))).toEqual(IDB_590);
@@ -469,8 +469,8 @@ describe('keyboardEdge — a key of idb\'s band, against an app row listed right
 
 describe('readingLine — a reading\'s line, only when it stands by a shown cover', () => {
   const BAND = { x: 0, y: 1285, width: 1080, height: 935 };
-  it('the window model, corroborated: the cover\'s top, `window`, witnessed', async () => {
-    expect(await readingLine(readKeyboard(withOracle({ state: 'shown', frame: BAND }, 'shown').fake))).toEqual({ y: 1285, source: 'window', witnessed: true });
+  it('the window model, corroborated: the cover\'s top, witnessed', async () => {
+    expect(await readingLine(readKeyboard(withOracle({ state: 'shown', frame: BAND }, 'shown').fake))).toEqual({ y: 1285, witnessed: true });
   });
   it('the window model, its witness denying the band: none', async () => {
     expect(await readingLine(readKeyboard(withOracle({ state: 'shown', frame: BAND }, 'hidden').fake))).toBeUndefined();
@@ -478,9 +478,9 @@ describe('readingLine — a reading\'s line, only when it stands by a shown cove
   it('the window model, hidden: none', async () => {
     expect(await readingLine(readKeyboard(withOracle({ state: 'hidden' }).fake))).toBeUndefined();
   });
-  it('the in-tree model (WDA\'s marked band): `wda`, witnessed — read off the very tree', async () => {
+  it('the in-tree model (WDA\'s marked band): witnessed — read off the very tree', async () => {
     const tree = screen(node({ role: KEYBOARD_ROLE, rect: { x: 0, y: 539, width: 402, height: 335 } }));
-    expect(await readingLine(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toEqual({ y: 539, source: 'wda', witnessed: true });
+    expect(await readingLine(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toEqual({ y: 539, witnessed: true });
   });
   it('the in-tree model with no mark (every idb tree): none — idb\'s band is `keyboardEdge`\'s, never the reading\'s (K5d)', async () => {
     const tree = screen(node({ role: 'other', rect: { x: 0, y: 589, width: 402, height: 285 } }));
@@ -490,16 +490,17 @@ describe('readingLine — a reading\'s line, only when it stands by a shown cove
 
 describe('coverLine — the line a shown cover stands for, whoever asked the witness', () => {
   const BAND = { x: 0, y: 1285, width: 1080, height: 935 };
-  it('the window model (`back`): `window`, witnessed, at the band\'s top', () => {
-    expect(coverLine({ rects: [BAND], top: BAND, band: BAND, remedy: { dismissal: 'back', advice: undefined } })).toEqual({ y: 1285, source: 'window', witnessed: true });
+  it('witnessed, at the cover\'s top — the window model\'s (`back`) and the in-tree model\'s (`none`) alike: the line reads no remedy', () => {
+    expect(coverLine({ rects: [BAND], top: BAND, band: BAND, remedy: { dismissal: 'back', advice: undefined } })).toEqual({ y: 1285, witnessed: true });
+    expect(coverLine({ rects: [BAND], top: BAND, band: BAND, remedy: { dismissal: 'none', advice: 'ADVICE' } })).toEqual({ y: 1285, witnessed: true });
   });
-  it('the in-tree model (`none`): `wda`, witnessed', () => {
+  it('the in-tree model\'s band: witnessed, at its top', () => {
     const band = { x: 0, y: 539, width: 402, height: 335 };
-    expect(coverLine({ rects: [band], top: band, band, remedy: { dismissal: 'none', advice: 'ADVICE' } })).toEqual({ y: 539, source: 'wda', witnessed: true });
+    expect(coverLine({ rects: [band], top: band, band, remedy: { dismissal: 'none', advice: 'ADVICE' } })).toEqual({ y: 539, witnessed: true });
   });
   it('a floating Gboard: the PANEL\'s top (the highest covered rect), not the band\'s', () => {
     const panel = { x: 359, y: 1269, width: 681, height: 643 };
     const strip = { x: 0, y: 2088, width: 1080, height: 132 };
-    expect(coverLine({ rects: [strip, panel], top: panel, band: strip, remedy: { dismissal: 'back', advice: undefined } })).toEqual({ y: 1269, source: 'window', witnessed: true });
+    expect(coverLine({ rects: [strip, panel], top: panel, band: strip, remedy: { dismissal: 'back', advice: undefined } })).toEqual({ y: 1269, witnessed: true });
   });
 });

@@ -61,8 +61,8 @@ const IPHONE = usable({ box: box(402, 874), boxes: [box(402, 874)], statusBand: 
 const PIXEL = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 });
 const PLAIN = { of: 'stop' } as const;
 /** A keyboard line (ui-tree/keyboard-cover.ts#KeyboardLine): WDA's band by default, witnessed; idb's band, which no reading stands by. */
-const wda = (y: number): KeyboardLine => ({ y, source: 'wda', witnessed: true });
-const idb = (y: number): KeyboardLine => ({ y, source: 'idb-band', witnessed: false });
+const wda = (y: number): KeyboardLine => ({ y, witnessed: true });
+const idb = (y: number): KeyboardLine => ({ y, witnessed: false });
 const FULLY = { of: 'fully' } as const;
 
 /** A standing's kind with the fact its sentence quotes, as one plain value. */
@@ -89,7 +89,7 @@ const said = (s: Standing | PixelStanding): unknown => {
         ...('overRoot' in s && s.overRoot === true && { overRoot: true }),
       };
     case 'underKeyboard':
-      return { kind: s.kind, top: s.line.y, source: s.line.source, ...('band' in s && { band: s.band }) };
+      return { kind: s.kind, top: s.line.y, witnessed: s.line.witnessed, ...('band' in s && { band: s.band }) };
   }
 };
 
@@ -315,7 +315,7 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     // idb's flat list: its Application node, screen-sized, under the content listed over it — the root's own remedy.
     ['idb number pad: the Application root, colour: content on its background', () => idbAt('idb-swift-form-number-pad.json', 'elements'), 'Skeleton Internal', IPHONE, COLOUR, { kind: 'covered', cover: 'TextFieldWithComponentStyle', reach: { x: 42, y: 425, width: 318, height: 20 }, overRoot: true }],
     // D2: idb's band over the element — under the keyboard, the band's rect on the screen, whatever key lies over it.
-    ['idb number pad: value_date_select at rest (545), its bottom 8 pt into the band: under the keyboard', () => idbAt('idb-swift-form-number-pad.json', 'elements'), 'swift_payment.form.value_date_select', IPHONE, (n: UiNode) => OCR(n, idb(589)), { kind: 'underKeyboard', top: 589, source: 'idb-band', band: { x: 0, y: 589, width: 402, height: 285 } }],
+    ['idb number pad: value_date_select at rest (545), its bottom 8 pt into the band: under the keyboard', () => idbAt('idb-swift-form-number-pad.json', 'elements'), 'swift_payment.form.value_date_select', IPHONE, (n: UiNode) => OCR(n, idb(589)), { kind: 'underKeyboard', top: 589, witnessed: false, band: { x: 0, y: 589, width: 402, height: 285 } }],
     // D7 (N-b): mp-native's Account Detail at its top, drawn edge to edge — row_4 and its texts lie in 2154–2220.
     ['accountDetailTop row_4 66,2152 948x68, ocr: under the navigation bar', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, OCR, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…colour too: its sample 2160–2212 lies in the band', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, COLOUR, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
@@ -370,7 +370,7 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     (row as { rect: Rect }).rect = { ...row.rect, y: 539 };
     const purpose = COLOUR(row, idb(589));
     expect(purpose.of === 'pixel' && purpose.reads.y + purpose.reads.height).toBeLessThan(589);
-    expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band', band: { x: 0, y: 589, width: 402, height: 285 } });
+    expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false, band: { x: 0, y: 589, width: 402, height: 285 } });
   });
 
   it('portrait only (N-c): the Settings shape on a landscape box is measured', async () => {
@@ -633,12 +633,12 @@ describe('Scene.standing for the stop — under a keyboard line (the WDA band\'s
   });
   it('wholly under the band: under the keyboard, nothing of it in the frame', () => {
     const s = judged(700, PLAIN, 589);
-    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 589, source: 'wda' });
+    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 589, witnessed: true });
     expect(s.facts.visible).toBe(0);
   });
   it('a line at the top edge leaves nothing to judge: under the keyboard, nothing shows', () => {
     const s = judged(300, PLAIN, 0);
-    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 0, source: 'wda' });
+    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 0, witnessed: true });
     expect(s.facts).toMatchObject({ visible: 0, shows: 0, clipped: [], covers: [] });
   });
   it('a box that does not start at the origin: the frame runs from its top to the line, and a line at its top leaves nothing', () => {
@@ -646,7 +646,7 @@ describe('Scene.standing for the stop — under a keyboard line (the WDA band\'s
     const shifted = { box: { x: 0, y: 20, width: 402, height: 854 }, boxes: [{ x: 0, y: 20, width: 402, height: 854 }], statusBand: 62 };
     expect(sceneOf(t).standing(t.children[0], shifted, { ...FULLY, keyboardTop: wda(589) }).facts.screen).toEqual({ x: 0, y: 20, width: 402, height: 569 });
     const nothing = sceneOf(t).standing(t.children[0], shifted, { ...PLAIN, keyboardTop: wda(20) });
-    expect(said(nothing)).toEqual({ kind: 'underKeyboard', top: 20, source: 'wda' });
+    expect(said(nothing)).toEqual({ kind: 'underKeyboard', top: 20, witnessed: true });
     // Nothing to judge: no exposure asked, so no minimum piece.
     expect(nothing.facts).toMatchObject({ screen: { x: 0, y: 20, width: 402, height: 0 }, visible: 0 });
     expect(nothing.facts.minPiece).toBeUndefined();
@@ -783,15 +783,15 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
       '…a Fees row 570–630 under the keys: under the keyboard',
       () => numberPad((t) => t.children.splice(t.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 570, width: 354, height: 60 } }))),
       'fees',
-      { kind: 'underKeyboard', top: 589, source: 'idb-band' },
+      { kind: 'underKeyboard', top: 589, witnessed: false },
     ],
     // The owner's decision under D2: a row 520–680 with 362x70 above the band (590), its centre under key K — under the keyboard, never moved.
-    ['a row 520–680, its centre under key K: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('Button', 'Row', 20, 520, 362, 160, 'tall'), idbEl('Button', 'K', 180, 594, 44, 40), ...QWERTY(640), idbEl('Other', null, 0, 590, 402, 284)), 'tall', { kind: 'underKeyboard', top: 590, source: 'idb-band' }],
+    ['a row 520–680, its centre under key K: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('Button', 'Row', 20, 520, 362, 160, 'tall'), idbEl('Button', 'K', 180, 594, 44, 40), ...QWERTY(640), idbEl('Other', null, 0, 590, 402, 284)), 'tall', { kind: 'underKeyboard', top: 590, witnessed: false }],
     // An app row listed right before the keys, wholly in the band: no key — under the keyboard; a key sharing its row is the keyboard's own.
-    ['a login\'s Sign in at 20,700 362x50 before the keys: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', 'User', 20, 200, 362, 44, 'user'), idbEl('Button', 'Sign in', 20, 700, 362, 50, 'signin'), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'signin', { kind: 'underKeyboard', top: 590, source: 'idb-band' }],
+    ['a login\'s Sign in at 20,700 362x50 before the keys: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', 'User', 20, 200, 362, 44, 'user'), idbEl('Button', 'Sign in', 20, 700, 362, 50, 'signin'), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'signin', { kind: 'underKeyboard', top: 590, witnessed: false }],
     ['…its key Q: reachable, the keyboard\'s own', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', 'User', 20, 200, 362, 44, 'user'), idbEl('Button', 'Sign in', 20, 700, 362, 50, 'signin'), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'Q', { kind: 'reachable', at: { x: 21, y: 803 } }],
     // A field and its placeholder label behind the keyboard (one top and height, overlapping): no keys — under the keyboard.
-    ['a field and its placeholder behind the keyboard: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', null, 42, 700, 318, 20, 'field'), idbEl('StaticText', 'Placeholder', 42, 700, 60, 20), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'field', { kind: 'underKeyboard', top: 590, source: 'idb-band' }],
+    ['a field and its placeholder behind the keyboard: under the keyboard', async () => idbTree(idbEl('Application', 'App', 0, 0, 402, 874), idbEl('TextField', null, 42, 700, 318, 20, 'field'), idbEl('StaticText', 'Placeholder', 42, 700, 60, 20), ...QWERTY(780).slice(0, 4), idbEl('Other', null, 0, 590, 402, 284)), 'field', { kind: 'underKeyboard', top: 590, witnessed: false }],
     // A bottom sheet's unlabelled background with NO keyboard: no band — the row under Done is moved to its uncovered part.
     [
       'a bottom sheet\'s background, no keyboard: moved to the uncovered part',
@@ -1106,18 +1106,18 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
   it('the 589–596 strip between the band\'s top and the keys: centre (201,591), under no key — the tap and the plain stop: under the keyboard; with no line, reachable (the residual D2 closes)', async () => {
     const { t, row } = await pad(565);
     expect(said(sceneOf(t).standing(row, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 591 } });
-    expect(said(sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band' });
-    expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band' });
+    expect(said(sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false });
+    expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false });
     expect(said(sceneOf(t).standing(row, IPHONE, { ...FULLY, keyboardTop: idb(589) }))).toEqual({ kind: 'clipped', edges: ['bottom'] });
   });
   it('a centre under a key (`5`): under the keyboard, the key named by no kind — no tap moved above it either', async () => {
     const { t, row } = await pad(640);
     expect(said(sceneOf(t).standing(row, IPHONE, TAP))).toMatchObject({ kind: 'covered', cover: '5' });
     const tap = sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: idb(589) });
-    expect(said(tap)).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band' });
+    expect(said(tap)).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false });
     expect(tap.facts.covers).toEqual([]);
     expect(tap.facts.screen).toEqual({ x: 0, y: 62, width: 402, height: 527 });
-    expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, source: 'idb-band' });
+    expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false });
   });
   it('the same centre under a WITNESSED line: the plain stop stays on it (the guard hides the keyboard); the tap is judged as before', async () => {
     const { t, row } = await pad(565);
@@ -1146,7 +1146,7 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
     const without = sceneOf(t).standing(row, IPHONE, TAP);
     expect(without.kind === 'reachable' && without.moved !== undefined).toBe(true);
     const s = sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: idb(590) });
-    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 590, source: 'idb-band' });
+    expect(said(s)).toEqual({ kind: 'underKeyboard', top: 590, witnessed: false });
     expect(s.facts.screen).toEqual({ x: 0, y: 62, width: 402, height: 528 });
   });
   it('a centre above the line and clear: reachable at it, whatever lies under the line', async () => {
