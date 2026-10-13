@@ -69,7 +69,7 @@ export interface KeyboardPosition {
   /**
    * THE merge — the one merge of every keyboard source into the line the
    * tap, `scroll_until` and the pixel assert judge and stroke against: a
-   * reading's line (`reading`: `readingLine`'s, or the cover
+   * reading's line (`line`: `readingLine`'s, or the cover
    * `scroll_until`'s round applied) and idb's band line, the higher of the
    * two. Never both today — idb's reading is always `unknown`, and only
    * idb's flat list has a band — kept for a source that one day gives both.
@@ -78,7 +78,7 @@ export interface KeyboardPosition {
    * user does; a WDA key is under the reading's line all the same (the
    * module doc's residual).
    */
-  line(subject?: UiNode, reading?: KeyboardLine): KeyboardLine | undefined;
+  line(subject?: UiNode, line?: KeyboardLine): KeyboardLine | undefined;
   /**
    * The reading's line: its cover's (`coverLine`) once the reading is
    * `corroborated`, else none. Costs what `cover` and `corroborated` cost

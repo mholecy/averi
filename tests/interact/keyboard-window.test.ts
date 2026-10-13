@@ -357,6 +357,17 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     expect(result).toEqual({ note: sentence, keyboardHidden: sentence });
   });
 
+  it('vetoed, then cleared, the centre under a node of the app: the chrome check asks the reading of the look handed back — a fresh one (one more window read), not the first look\'s denied one', async () => {
+    const fake = staleFake();
+    fake.attachedKeyboard.windowAnswers.queue = [SHOWN, { state: 'hidden' }];
+    // A bar laid after the button over its centre (249,1466), leaving a 50-px strip above it: under the 65-px minimum.
+    fake.live().children.push(node({ role: 'button', identifier: 'bar', label: 'Bar', rect: { x: 0, y: 1450, width: 1080, height: 120 } }));
+    const events = recorded(fake);
+    await expect(resolveClearOfKeyboard(fake, 'id:login_submit', FAST)).rejects.toThrow('id:login_submit is under button "Bar" (0,1450 1080x120) at its centre (249,1466)');
+    expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'read', 'read', 'keyboard?']);
+    expect(fake.keys).toEqual([]);
+  });
+
   it('vetoed, clearing on the THIRD re-check: three waits, the witness asked again while it still covers, and the tap lands where the target is NOW', async () => {
     const fake = staleFake();
     fake.attachedKeyboard.windowAnswers.queue = [SHOWN, SHOWN, SHOWN, { state: 'hidden' }];

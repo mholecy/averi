@@ -7,7 +7,7 @@ import { keyboardPosition } from '../../src/ui-tree/keyboard-position.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
-import { ClippedRefusal, CoveredRefusal, judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/resolve.js';
+import { judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/resolve.js';
 import { node } from '../helpers/fake.js';
 
 // THE tap judgement of one look (interact/resolve.ts#judgeTap), as a table over a look and a screen — no settle loop, no
