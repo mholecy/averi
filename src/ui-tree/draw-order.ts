@@ -274,14 +274,6 @@ export interface Exposure {
   coverAt(point: Point): UiNode | undefined;
 }
 
-/**
- * The question of a container — `NOT_DRAWN`'s column judged against what
- * is `Seen` (`draws`); `drawnOverAt` reads it too. The other column,
- * `target`, is judged against a target as well (`SeenFor`,
- * `drawsOverTarget`).
- */
-type Question = 'drawnOver';
-
 /** One node in pre-order, with what a row may ask of where it is. */
 interface Placed {
   readonly node: UiNode;
@@ -323,14 +315,17 @@ interface SeenFor extends Seen {
 }
 
 /**
- * A kind of node judged to draw nothing of its own, per question: `true`
- * from a question's predicate excuses the node for that question; a
- * question without one counts the node as drawing, as far as this row is
- * concerned.
+ * A kind of node judged to draw nothing of its own, per column: `true`
+ * from a column's predicate excuses the node for that column; a column
+ * without one counts the node as drawing, as far as this row is concerned.
+ * `drawnOver` — a container's column, judged against what is `Seen`
+ * (`draws`; `drawnOverAt` reads it too); `target` — judged against a
+ * target as well (`SeenFor`, `drawsOverTarget`).
  */
-type Row = { readonly [Q in Question]?: (placed: Placed, seen: Seen) => boolean } & {
+interface Row {
+  readonly drawnOver?: (placed: Placed, seen: Seen) => boolean;
   readonly target?: (placed: Placed, seen: SeenFor) => boolean;
-};
+}
 
 /** A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none, the caller asks. */
 const fillsScreen = (r: Rect, screenArea: number): boolean => rectArea(r) >= screenArea * SCREEN_SIZED_FRACTION;
@@ -1423,7 +1418,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     return floor === undefined ? r : { ...r, height: Math.max(r.height, floor - r.y) };
   };
 
-  const draws = (placed: Placed, question: Question): boolean => !ROWS.some((row) => row[question]?.(placed, seen) === true);
+  const draws = (placed: Placed): boolean => !ROWS.some((row) => row.drawnOver?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
   /** What the `target` column knows of `target`: the tree's facts, and where its reading order breaks. */
   const asTarget = (target: Placed): SeenFor => ({ ...seen, target, flatList, contentFrom, barLine, readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets });
@@ -1440,7 +1435,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
     const found = order.find((p) => clips(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
-    return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p, 'drawnOver') ? [p.node] : []));
+    return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p) ? [p.node] : []));
   };
 
   /** `paintsOver`'s two exemptions (`DrawOrder.paintsOver`): the cover hangs off one of `target`'s own branches — the nearest ancestor of it holding the cover is not screen-sized. */
