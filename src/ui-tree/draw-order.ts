@@ -370,10 +370,10 @@ const holderOf = (later: Placed, target: Placed): Placed | undefined => {
  * the later one, the scroller's, drawn over the earlier
  * (an RN transparent Modal presented over the screen, a full-screen sheet)
  * — or that node is a root of no area, the parser's holder of several
- * WINDOWS, each drawn over the ones before it.
+ * WINDOWS, each drawn over the ones before it. `both`: the node holding
+ * both (`holderOf`), when the caller has already found it.
  */
-const stackedScreens = (scroller: Placed, target: Placed, screenArea: number): boolean => {
-  const both = holderOf(scroller, target);
+const stackedScreens = (scroller: Placed, target: Placed, screenArea: number, both = holderOf(scroller, target)): boolean => {
   if (both === undefined) return false;
   if (both.parent === undefined && rectArea(both.node.rect) === 0) return true;
   return screenLayerBelow(scroller, both, screenArea) && screenLayerBelow(target.parent, both, screenArea);
@@ -406,20 +406,21 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
  * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
  *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
- * Asked of a node the frame rows would excuse (`overScreenBeneath`).
+ * Asked of a node a frame row would excuse (`givesWay`).
  */
 const presentedOver = (placed: Placed, target: Placed, screenArea: number): boolean => {
   const both = holderOf(placed, target);
   if (both?.parent === undefined || scrolls(both.node) || both.scroller !== undefined) return false;
-  return carriesContent(layerOf(placed, both).node) && stackedScreens(placed, target, screenArea);
+  return carriesContent(layerOf(placed, both).node) && stackedScreens(placed, target, screenArea, both);
 };
 
 /**
- * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node `structural` would excuse as a LEAF that
- * FILLS THE SCREEN (`fillsScreen`), or a scroll view `screenSizedHost` or `contentFramed` would excuse as drawing only
- * through its rows, covers a target when it lies on a screen presented over the target's (`presentedOver`) and is no
- * bare frame (`emptyFrame` with nothing drawable in it — a spacer of the layer stays excused, so a leaf the app named,
- * the RN Modal's dimming root `forgot_overlay`, covers and an anonymous one does not). Only surfaces that draw their
+ * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses and whose own
+ * `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and
+ * `contentFramed`: a scroll view, drawing only through its rows) covers a target when it lies on a screen presented
+ * over the target's (`presentedOver`) and is no bare frame (`emptyFrame` with nothing drawable in it — a spacer of the
+ * layer stays excused, so a leaf the app named, the RN Modal's dimming root `forgot_overlay`, covers and an anonymous
+ * one does not). Only surfaces that draw their
  * whole rect: a dimming leaf, a sheet's scroll view. A smaller leaf stays excused: every unmapped Android leaf is an
  * `other`, every RN View leaf under WDA too, so an icon's parts or a field's wrapper would read as a screen's surface.
  * A wrapper or a host WITH children stays excused over another screen too — it may be a pass-through layer drawing
@@ -427,11 +428,11 @@ const presentedOver = (placed: Placed, target: Placed, screenArea: number): bool
  * app's Window after the web view, whose links were measured tapped.
  * Measured: Finportal's RN transparent Modal (its dimming leaf, its card) and Contacts' New Contact page sheet (its form
  * `scrollable 0,62 402x812`, 0.929 of the screen), each laid in the app's Window after the screen beneath, which a tap
- * was sent to through the layer. The owner's decision (Q1 (a), 2026-10-13) and its residuals:
+ * was sent to through the layer. The decision and its residuals:
  * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
-const overScreenBeneath = (placed: Placed, target: Placed, screenArea: number): boolean =>
-  (placed.node.children.length === 0 ? STRUCTURAL_ROLES.has(placed.node.role) && fillsScreen(placed.node.rect, screenArea) : CONTENT_FRAMED_ROLES.has(placed.node.role)) &&
+const givesWay = (row: FrameRow, placed: Placed, target: Placed, screenArea: number): boolean =>
+  FRAME_EXCUSES[row].overPresented(placed.node, screenArea) &&
   !(emptyFrame(placed.node) && !carriesContent(placed.node)) &&
   presentedOver(placed, target, screenArea);
 
@@ -535,22 +536,41 @@ const fieldOf = (control: UiNode, target: Rect): boolean =>
 const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
 /**
- * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target — before the
- * exception over a presented screen (`overScreenBeneath`), which each of the three rows (`structural`,
- * `screenSizedHost`, `contentFramed`, whose docs have the rules and their measurements) asks after its excuse. Named
- * apart so `Exposure.presented` can tell a cover the exception un-excused from one that covers anyway.
+ * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target — each with
+ * the part of it that gives way over a presented screen (`overPresented`, asked of a node `excuses` holds; the rest of
+ * the exception is `givesWay`'s, one for the three). The rows (`structural`, `screenSizedHost`, `contentFramed`, whose
+ * docs have the rules and their measurements) ask `frameExcused`; named apart so `Exposure.presented` can tell a cover
+ * the exception un-excused from one that covers anyway.
  */
 const FRAME_EXCUSES = {
-  structural: ({ node }: Placed, target: Placed, screenArea: number): boolean =>
-    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
-  screenSizedHost: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
-  // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
-  contentFramed: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
+  structural: {
+    excuses: ({ node }: Placed, target: Placed, screenArea: number): boolean =>
+      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
+    // A leaf that fills the screen: a dimming view. A wrapper with children may be a pass-through layer.
+    overPresented: (node: UiNode, screenArea: number): boolean => node.children.length === 0 && fillsScreen(node.rect, screenArea),
+  },
+  screenSizedHost: {
+    excuses: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
+    // A scroll view only (a sheet's form); any other host may pass touches through.
+    overPresented: (node: UiNode, _screenArea: number): boolean => CONTENT_FRAMED_ROLES.has(node.role),
+  },
+  contentFramed: {
+    // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
+    excuses: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
+    // Every scroll view this row excuses.
+    overPresented: (_node: UiNode, _screenArea: number): boolean => true,
+  },
 } as const;
 
-/** A cover of `target` only through the exception: a frame row would excuse it, and it is a surface over a presented screen (`Exposure.presented`). */
+type FrameRow = keyof typeof FRAME_EXCUSES;
+
+/** `row` excuses `placed` for `target`, and the exception over a presented screen does not take the excuse back (`givesWay`). */
+const frameExcused = (row: FrameRow, placed: Placed, target: Placed, screenArea: number): boolean =>
+  FRAME_EXCUSES[row].excuses(placed, target, screenArea) && !givesWay(row, placed, target, screenArea);
+
+/** A cover of `target` only through the exception: a frame row excuses it and gives way, a surface over a presented screen (`Exposure.presented`). */
 const presentedSurface = (placed: Placed, target: Placed, screenArea: number): boolean =>
-  Object.values(FRAME_EXCUSES).some((excuse) => excuse(placed, target, screenArea)) && overScreenBeneath(placed, target, screenArea);
+  (Object.keys(FRAME_EXCUSES) as FrameRow[]).some((row) => FRAME_EXCUSES[row].excuses(placed, target, screenArea) && givesWay(row, placed, target, screenArea));
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
@@ -619,7 +639,7 @@ const NOT_DRAWN = {
    * unlabelled frames no longer cover the switcher they lie in), reads as
    * drawing nothing — a false "clear"; WDA gives such a node no trait that
    * tells it from the cell's background.
-   * Except over ANOTHER SCREEN (`overScreenBeneath`, ADR 0018): a structural
+   * Except over ANOTHER SCREEN (`givesWay`, ADR 0018): a structural
    * LEAF on a screen presented over the target's covers — the React Native
    * transparent Modal's dimming root `forgot_overlay 0,0 402x874` (a leaf the
    * app named) was excused here, and a tap on the login screen beneath was
@@ -630,7 +650,7 @@ const NOT_DRAWN = {
    */
   structural: {
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
-    target: (placed, { target, screenArea }) => FRAME_EXCUSES.structural(placed, target, screenArea) && !overScreenBeneath(placed, target, screenArea),
+    target: (placed, { target, screenArea }) => frameExcused('structural', placed, target, screenArea),
   },
 
   /**
@@ -646,9 +666,9 @@ const NOT_DRAWN = {
    * tap on that screen was refused as "covered by toolbar". An interactive
    * one still covers: a full-screen `button` backdrop (an RN transparent
    * Modal's Pressable) takes the tap. And so does a screen-sized SCROLL VIEW
-   * on a screen presented over the target's (`overScreenBeneath`, ADR 0018):
+   * on a screen presented over the target's (`givesWay`, ADR 0018):
    * a sheet's form, measured to swallow the tap. Any other host stays
-   * excused, over another screen too — the owner kept the trade-off this
+   * excused, over another screen too — ADR 0018 keeps the trade-off this
    * row accepted for hosts that may pass touches through (Safari's
    * `CapsuleViewController`, measured): a full-screen non-interactive host
    * with nothing of its own at the point (an RN transparent modal whose
@@ -670,7 +690,7 @@ const NOT_DRAWN = {
    */
   screenSizedHost: {
     drawnOver: ({ node }, { screenArea }) => screenSized(node, screenArea),
-    target: (placed, { target, screenArea }) => FRAME_EXCUSES.screenSizedHost(placed, target, screenArea) && !overScreenBeneath(placed, target, screenArea),
+    target: (placed, { target, screenArea }) => frameExcused('screenSizedHost', placed, target, screenArea),
   },
 
   /**
@@ -701,7 +721,7 @@ const NOT_DRAWN = {
    * cover). What still covers: its content at the point, a childless
    * scrollable, an interactive node of any role — and a scroll view that is,
    * or lies in, a later screen-sized layer stacked over the target's own
-   * screen, carrying content (`overScreenBeneath`, ADR 0018): Contacts' New
+   * screen, carrying content (`givesWay`, ADR 0018): Contacts' New
    * Contact page sheet's form `scrollable 0,62 402x812`, whose bare
    * background took a tap sent to the list beneath. Accepted trade-off, this
    * row LOOSENS the guard: a scroll view really drawn over the point with
@@ -717,7 +737,7 @@ const NOT_DRAWN = {
    * `scrollable`: adapters/types.ts#UiNode.clipsDescendants).
    */
   contentFramed: {
-    target: (placed, { target, screenArea }) => FRAME_EXCUSES.contentFramed(placed, target, screenArea) && !overScreenBeneath(placed, target, screenArea),
+    target: (placed, { target, screenArea }) => frameExcused('contentFramed', placed, target, screenArea),
   },
 
   /**
@@ -734,7 +754,7 @@ const NOT_DRAWN = {
    * is judged by `contentFramed`. A row of the SAME scroll view as the
    * target (a sticky section header over a row) still covers, and so does
    * the content of a scroller in a LATER screen (and, inside one window, that
-   * screen's scroll view or dimming leaf: `overScreenBeneath`, ADR 0018) — an RN transparent Modal
+   * screen's scroll view or dimming leaf: `givesWay`, ADR 0018) — an RN transparent Modal
    * presented over the screen (a later screen-sized layer, in the same
    * window or another), a full-screen sheet's list, a later window under
    * the parser's 0×0 root (an assumption: uiautomator's z-order across
