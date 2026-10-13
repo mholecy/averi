@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { onScreen, pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingScreen, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -548,11 +548,15 @@ describe('Scene.standing for the tap — a keyboard line and a system band toget
   });
 });
 
-describe('onScreen — the on-screen point rule the tap and the dismissal picker share', () => {
-  const t = node({ role: 'container', rect: box(1080, 2220) });
+describe('Scene.standing for the tap — the on-screen point rule (the in-tree keyboard dismissal picker asks the same standing)', () => {
+  /** The tap's standing of a 2x2 node centred on (x,y) in a root of `rect`. */
+  const tapAt = (x: number, y: number, screen: StandingScreen | undefined, rect = box(1080, 2220)): Standing['kind'] => {
+    const n = node({ role: 'text', rect: { x: x - 1, y: y - 1, width: 2, height: 2 } });
+    return sceneOf(node({ role: 'container', rect, children: [n] })).standing(n, screen, TAP).kind;
+  };
   it('inside a box less both system bands; with no screen inside the root rect, or anywhere for a root of no area', () => {
-    expect([onScreen({ x: 540, y: 100 }, t, PIXEL_NAV), onScreen({ x: 540, y: 30 }, t, PIXEL_NAV), onScreen({ x: 540, y: 2190 }, t, PIXEL_NAV), onScreen({ x: 540, y: 2300 }, t, PIXEL_NAV)]).toEqual([true, false, false, false]);
-    expect([onScreen({ x: 540, y: 2300 }, t, undefined), onScreen({ x: 540, y: 2300 }, node({ role: 'container', rect: box(0, 0) }), undefined)]).toEqual([false, true]);
+    expect([tapAt(540, 100, PIXEL_NAV), tapAt(540, 30, PIXEL_NAV), tapAt(540, 2190, PIXEL_NAV), tapAt(540, 2300, PIXEL_NAV)]).toEqual(['reachable', 'systemBar', 'systemBar', 'offScreen']);
+    expect([tapAt(540, 2300, undefined), tapAt(540, 2300, undefined, box(0, 0))]).toEqual(['offScreen', 'reachable']);
   });
 });
 

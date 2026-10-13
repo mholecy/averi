@@ -5,9 +5,9 @@ import type { TreeRead } from './read-tree.js';
 /**
  * THE USABLE SCREEN — the one value every judgement of "on screen" reads,
  * built in one place, for every verb that asks "can this be used where it
- * stands?" (standing.ts#Scene judges on it): the tap's
- * on-screen rule (standing.ts#onScreen, which the in-tree keyboard dismissal picker
- * asks too, interact/keyboard-in-tree.ts), `scroll_until`'s stop
+ * stands?" (standing.ts#Scene judges on it): the tap (whose standing
+ * the in-tree keyboard dismissal picker asks too,
+ * interact/keyboard-in-tree.ts), `scroll_until`'s stop
  * (interact/scroll-rounds.ts, over the screen interact/scroll.ts reads each
  * round), the pixel assert (verify/pixel-poll.ts#overElement) and, for
  * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and

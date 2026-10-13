@@ -91,7 +91,7 @@ export const usableSize = ({ width, height }: { width: number; height: number })
  * A point in the platform's tree units (Android pixels, iOS points) — a tap
  * point, a swipe's end. Named here, beside the screen it lies on, because
  * `DeviceAdapter.swipe` takes it; the adapters, ui-tree's point helpers
- * (`tapPoint`, `containsPoint`, draw order's `shadowing`) and interact/ all
+ * (`tapPoint`, `containsPoint`, draw order's `drawnOverAt`) and interact/ all
  * name it here.
  */
 export interface Point {

@@ -30,8 +30,7 @@ import type { UsableScreen } from './usable-screen.js';
  * Contract of `standing(node, screen, purpose)`:
  * - The point judged is the node's centre as a tap sends it
  *   (selectors.ts#tapPoint). It is ON the screen when it lies in a box less
- *   the system bands (`onScreen`, the rule the in-tree dismissal picker
- *   asks too): the status band at a portrait box's top
+ *   the system bands: the status band at a portrait box's top
  *   (geometry.ts#belowStatusBand) and the navigation band at its bottom
  *   (geometry.ts#aboveNavigationBand). The tap judges in ANY of
  *   `screen.boxes`; the stop in `screen.box` alone (a caller judging in
@@ -259,6 +258,8 @@ export interface StandingFacts {
   readonly covers: readonly UiNode[];
   readonly reaches: readonly Rect[];
   readonly centreCover?: UiNode;
+  /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
+  readonly centreExcused: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -326,29 +327,6 @@ export function sceneOf(tree: UiNode): Scene {
   return scene;
 }
 
-/**
- * THE on-screen rule for a point about to be tapped — the target's centre
- * (`Scene.standing`) and a configured keyboard dismissal's
- * (interact/keyboard-in-tree.ts#pickDismissal): inside any of the screen's
- * `boxes` less its system bands. With no screen (no usable device size and
- * no window in the tree), inside the tree's root rect when it has one; with
- * none, on screen — the rule exists to stop a false "Tapped", and must never
- * be why a tap on a device that could not report its size did not happen.
- * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
- * a 402-wide screen is judged at 402, off it.
- *
- * Measured: idb lists a scroll view's content below the fold with real
- * rects, and a tap at (94,895) on a 402x874 screen landed nowhere and was
- * reported done; a tap at (201,6) went to iOS's status bar, which scrolled the form to its
- * top, and one at (256,3) on Google Contacts' collapsed app bar to
- * Android's; one at (540,2186) on mp-native's Account Detail, drawn edge to
- * edge, to the navigation bar.
- * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
- */
-export function onScreen(point: Point, tree: UiNode, screen: StandingScreen | undefined): boolean {
-  return placeOf(point, screen?.boxes ?? rootBoxes(tree), screen) === 'on';
-}
-
 /** A node being judged, and its centre. */
 interface Judged {
   readonly scene: Scene;
@@ -371,7 +349,28 @@ type RegionPlace = 'on' | { readonly bar: SystemBar; readonly band: Rect } | { r
 /** The no-screen boxes: the tree's root rect, or none (undefined) when it has no area — every point on the screen. */
 const rootBoxes = (tree: UiNode): Rect[] | undefined => (rectArea(tree.rect) > 0 ? [tree.rect] : undefined);
 
-/** Where `point` lies against `boxes` (none: on, failing open) and their system bands (`systemBands`): on, in the top band, in the bottom band (in that order), or off. */
+/**
+ * Where `point` lies against `boxes` (none: on, failing open) and their
+ * system bands (`systemBands`): on, in the top band, in the bottom band (in
+ * that order), or off. THE on-screen rule for a point about to be tapped —
+ * the target's centre, and a configured keyboard dismissal's
+ * (interact/keyboard-in-tree.ts#pickDismissal asks the tap's standing,
+ * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md).
+ * With no screen (no usable device size and no window in the tree), the
+ * tree's root rect is the one box (`rootBoxes`); with none, every point is
+ * on — the rule exists to stop a false "Tapped", and must never be why a
+ * tap on a device that could not report its size did not happen. The point
+ * is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on a
+ * 402-wide screen is judged at 402, off it.
+ *
+ * Measured: idb lists a scroll view's content below the fold with real
+ * rects, and a tap at (94,895) on a 402x874 screen landed nowhere and was
+ * reported done; a tap at (201,6) went to iOS's status bar, which scrolled
+ * the form to its top, and one at (256,3) on Google Contacts' collapsed app
+ * bar to Android's; one at (540,2186) on mp-native's Account Detail, drawn
+ * edge to edge, to the navigation bar.
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
+ */
 function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands): PointPlace {
   if (boxes === undefined) return 'on';
   const judged = boxes.map((box) => systemBands(box, bands));
@@ -492,6 +491,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
     covers: seen.covers,
     reaches: seen.reaches,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
+    centreExcused: seen.centreExcused,
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),
@@ -503,7 +503,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
 function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, fully: boolean, line: KeyboardLine | undefined): Standing {
   const { node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
-    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], shows: 0 };
+    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
     return { facts, kind: 'underKeyboard', line };
   }
   const frame = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
