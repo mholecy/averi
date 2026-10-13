@@ -3,7 +3,7 @@ import { largestScroller, type Cut } from '../ui-tree/geometry.js';
 import { coverLine, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 
 /**
  * What ONE read of the screen means for `scroll_until`: `judgeRead(read,
@@ -200,7 +200,7 @@ export interface Judged {
 type Frame = StandingScreen;
 
 /** The stop's purpose (ui-tree/standing.ts#TouchPurpose): the plain stop, or `fully` — `RoundRules.fully`, mapped once a read. */
-type StopOf = 'stop' | 'fully';
+type StopOf = Exclude<TouchPurpose['of'], 'tap'>;
 
 /**
  * One read's judgement (`judgeRead`) — every fact of the read the round's

@@ -337,6 +337,12 @@ function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
       return cutSliverText(standing.cut, node.rect, standing.minPiece);
     case 'underKeyboard':
       return 'under the keyboard';
+    default: {
+      // A kind added to the tap's standing must be worded here: falling
+      // through would read as "nothing in the way", and the picker would tap.
+      const unworded: never = standing;
+      return unworded;
+    }
   }
 }
 

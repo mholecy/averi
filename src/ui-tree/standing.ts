@@ -42,10 +42,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   a root of no area (its `failsOpen`) a touch — the tap, either stop —
  *   leaves every point on the screen and judges in the node's own rect,
  *   and the pixel assert judges on the largest node (`treeScreen`'s box).
- * - THE ORDER, once for every verb — after what only the stop judges first
+ * - THE ORDER, once for every verb — after what only the stops judge first
  *   (nothing of it in its frame: `underKeyboard` when a keyboard line
- *   applies and the node is in the box, else `offScreen`; with `fully`, a
- *   frame edge it runs past: `clipped`): its centre off the screen —
+ *   applies and the node is in the box, else `offScreen`; the `fully`
+ *   purpose: a frame edge it runs past, `clipped`): its centre off the screen —
  *   `offScreen`; its centre in a system band — `systemBar`, the top's
  *   before the bottom's (for `fully`, any of the node in a band past the
  *   slack too: the band as a region, `systemBandOver`, with its rect); cut
@@ -126,8 +126,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   motion and sentences read (scroll_until's best-so-far, its far-edge
  *   turn and its failure text).
  * - `farEdgeFrames(screen, best, above?)`: the frames `scroll_until`'s far
- *   edge is judged in, cut by the bands' own rule here, from the usable
- *   screen, the applied keyboard's room above its cover and the best
+ *   edge is judged in, cut here with geometry's band cutters from the
+ *   usable screen, the applied keyboard's room above its cover and the best
  *   standing, whose `band` decides the navigation cut — no caller re-cuts
  *   a band or reads `band` for it.
  *
@@ -197,7 +197,9 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   the first box's x, y and width with the cover's top y as its HEIGHT
  *   (not the top less the box's y — the boxes lie at the origin, so the two
  *   agree), and only when the cover leaves something above it: else every
- *   box, uncut by the keyboard.
+ *   box, uncut by the keyboard. Those two are decided where the cover's
+ *   `above` is built (interact/scroll-read.ts#Cover); this module takes the
+ *   size it is handed.
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
@@ -508,8 +510,10 @@ export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen
  * `band`, which only the `fully` purpose sets) — resting across the band's
  * top with the content above it, it is past the far edge, and the next
  * stroke turns and lifts it. Only then: every other standing judges the far
- * edge in the frames as ever. Cut here by the bands' own rule, so a band
- * rule changed in standing cannot leave the round's frames behind. The
+ * edge in the frames as ever. The cut reads `band` here, beside
+ * `fullyStanding`, its only writer, so the region rule and the frame it
+ * turns in cannot drift apart; the cuts themselves are geometry's band
+ * cutters, the ones `systemBands` composes, not `systemBands` itself. The
  * shapes are kept as the round always cut them, residuals of `Scene`'s
  * contract: the status band on each box's shape, the navigation band on the
  * first box's (`screen.box`).

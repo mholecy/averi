@@ -980,6 +980,9 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
     expectTypeOf(scene.standing(root, undefined, PLAIN)).toEqualTypeOf<Standing>();
     expectTypeOf(scene.standing(root, undefined, FULLY)).toEqualTypeOf<Standing>();
     expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<TapStanding>();
+    // The pixel purpose takes the usable screen: a bare standing screen (no `oriented`) is refused.
+    // @ts-expect-error
+    void (() => scene.standing(root, { box: root.rect, boxes: [root.rect] }, { of: 'pixel', reads: root.rect, glyphs: true }));
     expectTypeOf<TapStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
     expectTypeOf<Extract<TapStanding, { kind: 'reachable' }>>().toEqualTypeOf<Extract<Standing, { kind: 'reachable' }>>();
     expectTypeOf<Extract<PixelStanding, { kind: 'cut' }>['bar']>().toEqualTypeOf<{ readonly edge: 'bottom'; readonly top: number }>();
@@ -993,7 +996,7 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
 /**
  * The frames `scroll_until`'s far edge is judged in (`farEdgeFrames`): each box below the status band on its own
  * shape, the screen above an applied cover instead when it leaves something, and above the navigation band only for a
- * `fully` stop the band's REGION refused at the bottom — cut on the first box's shape (D-C6b, the shapes kept).
+ * `fully` stop the band's REGION refused at the bottom — cut on the first box's shape (the shapes kept).
  */
 describe('farEdgeFrames — the far edge\'s frames, cut by standing\'s own band cut', () => {
   const UPRIGHT = box(1080, 2220);
