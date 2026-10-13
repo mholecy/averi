@@ -975,7 +975,8 @@ export function rectText(r: Rect): string {
  * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
  * rect (`rectText`). The tap's chrome refusal and move
  * (interact/resolve.ts#TapJudge.aim) and `scroll_until`'s covered
- * sentences (interact/scroll-text.ts) share it.
+ * sentences (interact/scroll-text.ts) share it. The dismissal picker's skip
+ * line names a cover shorter, on purpose (interact/target-text.ts#coverName).
  */
 export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;

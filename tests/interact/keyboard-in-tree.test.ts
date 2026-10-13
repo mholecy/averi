@@ -678,7 +678,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(await pickOn(twofa, 'support_text')).toBe('under the keyboard');
       });
 
-      it('cut to a sliver at its scroll container\'s edge: skipped in the tap\'s own words (resolve.ts#cutSliverText)', async () => {
+      it('cut to a sliver at its scroll container\'s edge: skipped in the tap\'s own words (target-text.ts#cutSliverText)', async () => {
         const clipping = node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 280, width: 402, height: 200 }, children: [loginTitle({ x: 36, y: 280, width: 330, height: 20 }, [node({ role: 'text', rect: { x: 36, y: 240, width: 330, height: 52 } })])] }); // its text runs on past the edge: the evidence of a cut
         expect(await pickOn(screenOf(clipping), 'login_title')).toBe(
           "cut at its scroll container's top edge (container 0,280 402x200); only a 330x20 part of it shows, 20 deep across that edge, under the 24 a tap needs",

@@ -47,7 +47,7 @@ The skip lines:
 | `covered` | `covered by <role> "<label>"`, the standing's cover |
 | `reachable` with `moved` | `covered by <role> "<label>"`, the cover over the centre: the dismissal is never aimed off its centre |
 | `reachable`, an excused interactive node at the centre | `covered by <role> "<label>"`, that node (the last listed) |
-| `cut` | the tap's own clause (`interact/resolve.ts#cutSliverText`) |
+| `cut` | the tap's own clause (`interact/target-text.ts#cutSliverText`) |
 | `underKeyboard` | `under the keyboard` |
 
 `cut` and `underKeyboard` are not reached in production today: the picker runs only under WDA, and iOS has no clipping
