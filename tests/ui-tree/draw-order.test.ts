@@ -1489,7 +1489,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [target] }), layer] })] });
     const covers = (tree: UiNode, target: UiNode) => drawOrder(tree).exposure(target, IPHONE).covers;
 
-    it('only surfaces that draw their whole rect give way (the owner\'s option (a), review of round 13 slice A): a scroll view carrying its rows and a structural LEAF cover; an unlabelled wrapper or a screen-sized host WITH children stays excused — it may be a pass-through layer (Safari\'s `CapsuleViewController`)', () => {
+    it('only surfaces that draw their whole rect give way: a scroll view carrying its rows and a structural LEAF cover; an unlabelled wrapper or a screen-sized host WITH children stays excused — it may be a pass-through layer (Safari\'s `CapsuleViewController`)', () => {
       const scroll = uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 812), children: [card()] });
       const leaf = uiNode({ role: 'container', identifier: 'forgot_overlay', rect: IPHONE });
       for (const surface of [scroll, leaf]) {
@@ -1502,6 +1502,14 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       for (const layer of [wrapper, host]) {
         const target = pay();
         expect(covers(window(target, layer), target)).toEqual([]);
+      }
+    });
+
+    it('a leaf gives way only when it fills the screen: a small leaf of the layer over the target — an icon\'s `other`, a named view — stays excused and is no presented surface (an Android logo\'s parts, a Snackbar host\'s icon)', () => {
+      for (const leaf of [uiNode({ role: 'other', rect: rect(30, 705, 40, 40) }), uiNode({ role: 'container', identifier: 'snackbar_icon', rect: rect(30, 705, 40, 40) })]) {
+        const target = pay();
+        const seen = drawOrder(window(target, uiNode({ role: 'container', rect: IPHONE, children: [leaf, card()] }))).exposure(target, IPHONE);
+        expect(seen).toMatchObject({ covers: [], presented: [] });
       }
     });
 

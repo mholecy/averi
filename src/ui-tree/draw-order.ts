@@ -415,22 +415,23 @@ const presentedOver = (placed: Placed, target: Placed, screenArea: number): bool
 };
 
 /**
- * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node `structural` would excuse as a LEAF,
- * or a scroll view `screenSizedHost` or `contentFramed` would excuse as drawing only through its rows, covers a target
- * when it lies on a screen presented over the target's (`presentedOver`) and is no bare frame (`emptyFrame` with
- * nothing drawable in it — a spacer of the layer stays excused, so a leaf the app named, the RN Modal's dimming root
- * `forgot_overlay`, covers and an anonymous one does not). Only surfaces that draw their whole rect: a dimming leaf, a
- * sheet's scroll view. A wrapper or a host WITH children stays excused over another screen too — it may be a
- * pass-through layer drawing only its content: measured, Safari's `CapsuleViewController 0,0 402x874` (its bottom bar,
- * Back and Tabs) laid in the app's Window after the web view, whose links were measured tapped (the owner's option (a)
- * on the review of round 13 slice A).
+ * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node `structural` would excuse as a LEAF that
+ * FILLS THE SCREEN (`fillsScreen`), or a scroll view `screenSizedHost` or `contentFramed` would excuse as drawing only
+ * through its rows, covers a target when it lies on a screen presented over the target's (`presentedOver`) and is no
+ * bare frame (`emptyFrame` with nothing drawable in it — a spacer of the layer stays excused, so a leaf the app named,
+ * the RN Modal's dimming root `forgot_overlay`, covers and an anonymous one does not). Only surfaces that draw their
+ * whole rect: a dimming leaf, a sheet's scroll view. A smaller leaf stays excused: every unmapped Android leaf is an
+ * `other`, every RN View leaf under WDA too, so an icon's parts or a field's wrapper would read as a screen's surface.
+ * A wrapper or a host WITH children stays excused over another screen too — it may be a pass-through layer drawing
+ * only its content: measured, Safari's `CapsuleViewController 0,0 402x874` (its bottom bar, Back and Tabs) laid in the
+ * app's Window after the web view, whose links were measured tapped.
  * Measured: Finportal's RN transparent Modal (its dimming leaf, its card) and Contacts' New Contact page sheet (its form
  * `scrollable 0,62 402x812`, 0.929 of the screen), each laid in the app's Window after the screen beneath, which a tap
  * was sent to through the layer. The owner's decision (Q1 (a), 2026-10-13) and its residuals:
  * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
 const overScreenBeneath = (placed: Placed, target: Placed, screenArea: number): boolean =>
-  (placed.node.children.length === 0 ? STRUCTURAL_ROLES.has(placed.node.role) : CONTENT_FRAMED_ROLES.has(placed.node.role)) &&
+  (placed.node.children.length === 0 ? STRUCTURAL_ROLES.has(placed.node.role) && fillsScreen(placed.node.rect, screenArea) : CONTENT_FRAMED_ROLES.has(placed.node.role)) &&
   !(emptyFrame(placed.node) && !carriesContent(placed.node)) &&
   presentedOver(placed, target, screenArea);
 
