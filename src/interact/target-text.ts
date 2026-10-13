@@ -75,8 +75,8 @@ export function cutRemedy(edge: Edge): string {
  */
 export const PRESENTED_OVER = 'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen';
 
-/** `cover`, named by a standing over its node, lies on a screen presented over it (`StandingFacts.presented`). */
-export const presentedCover = (facts: { readonly presented?: readonly UiNode[] }, cover: UiNode): boolean => facts.presented?.includes(cover) === true;
+/** The node lies under a screen presented over it: a surface of one is among its covers (`StandingFacts.presented`), whichever cover is on top at its centre (the modal's card over the dim). */
+export const underPresented = (facts: { readonly presented?: readonly UiNode[] }): boolean => (facts.presented?.length ?? 0) > 0;
 
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts

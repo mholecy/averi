@@ -261,10 +261,10 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
-   * The covers that lie on a screen PRESENTED over the node's (`presentedOver`: a later screen-sized layer stacked over
-   * its own, inside one window and outside scrolled content, carrying content — a modal, a sheet), in `covers`' order;
-   * empty when none. What the sentences read: a target under one is under a presented screen no scroll moves it out
-   * from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
+   * The covers that are the SURFACE of a screen presented over the node (`overScreenBeneath`: a dimming leaf, a sheet's
+   * scroll view, on a later screen-sized layer stacked over its own), in `covers`' order; empty when none — never a
+   * control or a bar the layer carries (Safari's capsule bar). What the sentences read: a target under one lies under a
+   * presented screen no scroll moves it out from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
    */
   readonly presented: readonly UiNode[];
   /**
@@ -405,8 +405,7 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
  * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
  *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
- * Asked of a node the frame rows would excuse (`overScreenBeneath`), and of every cover for the sentences
- * (`Exposure.presented`).
+ * Asked of a node the frame rows would excuse (`overScreenBeneath`).
  */
 const presentedOver = (placed: Placed, target: Placed, screenArea: number): boolean => {
   const both = holderOf(placed, target);
@@ -430,7 +429,9 @@ const presentedOver = (placed: Placed, target: Placed, screenArea: number): bool
  * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
 const overScreenBeneath = (placed: Placed, target: Placed, screenArea: number): boolean =>
-  !(emptyFrame(placed.node) && !carriesContent(placed.node)) && presentedOver(placed, target, screenArea);
+  (placed.node.children.length === 0 ? STRUCTURAL_ROLES.has(placed.node.role) : CONTENT_FRAMED_ROLES.has(placed.node.role)) &&
+  !(emptyFrame(placed.node) && !carriesContent(placed.node)) &&
+  presentedOver(placed, target, screenArea);
 
 /**
  * The roles whose frame is not a surface: a node of one, non-interactive and
@@ -616,7 +617,7 @@ const NOT_DRAWN = {
         !node.label &&
         !node.value &&
         (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))) &&
-        !(node.children.length === 0 && overScreenBeneath(placed, target, screenArea))
+        !overScreenBeneath(placed, target, screenArea)
       );
     },
   },
@@ -659,7 +660,7 @@ const NOT_DRAWN = {
   screenSizedHost: {
     drawnOver: ({ node }, { screenArea }) => screenSized(node, screenArea),
     target: (placed, { target, screenArea }) =>
-      !isInteractive(placed.node) && screenSized(placed.node, screenArea) && !(CONTENT_FRAMED_ROLES.has(placed.node.role) && overScreenBeneath(placed, target, screenArea)),
+      !isInteractive(placed.node) && screenSized(placed.node, screenArea) && !overScreenBeneath(placed, target, screenArea),
   },
 
   /**
@@ -1626,7 +1627,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        presented: over.filter((c) => presentedOver(c.placed, places[0], seen.screenArea)).map((c) => c.node),
+        presented: over.filter((c) => overScreenBeneath(c.placed, places[0], seen.screenArea)).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,

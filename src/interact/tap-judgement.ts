@@ -7,7 +7,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutRemedy, cutSliverText, PRESENTED_OVER, presentedCover } from './target-text.js';
+import { cutRemedy, cutSliverText, PRESENTED_OVER, underPresented } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -313,7 +313,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
           ? `nothing of it shows${above}`
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps — close that screen first.
-      const remedy = presentedCover(standing.facts, standing.cover) ? PRESENTED_OVER : 'scroll_until it first';
+      const remedy = underPresented(standing.facts) ? PRESENTED_OVER : 'scroll_until it first';
       throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':

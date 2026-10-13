@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, presentedCover, revealText, untriedSideText } from './target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, underPresented, revealText, untriedSideText } from './target-text.js';
 import type { Cover, Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
@@ -328,7 +328,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       }
       if (short.of === 'covered') {
         // Under a screen presented over it (a modal, a sheet: ADR 0018): no layout defect, and no scroll moves it out.
-        const why = presentedCover(judged.standing.facts, short.cover)
+        const why = underPresented(judged.standing.facts)
           ? `${PRESENTED_OVER.charAt(0).toUpperCase()}${PRESENTED_OVER.slice(1)}.`
           : 'The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes.';
         return new Error(
@@ -429,7 +429,7 @@ function shortText(short: Shortfall): string {
     }
     case 'covered': {
       const { judged } = short;
-      const presented = presentedCover(judged.standing.facts, short.cover) ? ` — ${PRESENTED_OVER}` : '';
+      const presented = underPresented(judged.standing.facts) ? ` — ${PRESENTED_OVER}` : '';
       return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})${presented}`;
     }
     case 'systemBar': {

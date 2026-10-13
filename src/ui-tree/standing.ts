@@ -299,7 +299,7 @@ export interface StandingFacts {
   readonly centreCover?: UiNode;
   /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
   readonly centreExcused: readonly UiNode[];
-  /** draw-order.ts#Exposure's: the covers that lie on a screen presented over the node (a modal, a sheet); absent when none. */
+  /** draw-order.ts#Exposure's: the covers that are the surface of a screen presented over the node (a modal's dim, a sheet's form); absent when none. */
   readonly presented?: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
