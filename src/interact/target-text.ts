@@ -11,7 +11,8 @@ import { SIDES } from './swipe.js';
  * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
  * the shared wording. Phrases, not policies: what counts as cut is
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
- * caller's switch. Shallow by design, like ui-tree/system-bar.ts: delete it
+ * caller's switch — and the remedy for a target under a screen presented over its own (`PRESENTED_OVER`), whose test is
+ * ui-tree/standing.ts#underPresented. Shallow by design, like ui-tree/system-bar.ts: delete it
  * and each shared sentence reappears in its two or three callers.
  *
  * Its words for a side come from one other interact/ module: swipe.ts#SIDES
@@ -64,6 +65,16 @@ export function cutRemedy(edge: Edge): string {
   const direction = SIDES[edge].reveals;
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
 }
+
+/**
+ * THE remedy for a target under a screen PRESENTED over its own — a modal's
+ * dimming view, a sheet (ui-tree/draw-order.ts#Exposure.presented, ADR 0018):
+ * no scroll moves it out from under that screen, so neither "scroll_until it
+ * first" nor the pinned-bar "layout defect" is said. One wording for the
+ * tap's refusal (tap-judgement.ts) and `scroll_until`'s stop without a swipe
+ * (scroll-text.ts, the `presented` outcome).
+ */
+export const PRESENTED_OVER = 'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen';
 
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts

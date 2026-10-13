@@ -120,6 +120,9 @@ Moved here from the deleted column's prose, so the measurements are not lost.
   point and draws nothing, and what it carries is walked and judged by itself (an alert's text inside WDA's
   `Alert → container`). iOS dimming views come through as `other`. Under the `target` column a dimming `other` that is
   the screen's size and holds the title whole is excused the same; one only partly over it covers (row 8).
+  Superseded in that part by docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md (2026-10-13): a
+  dimming LEAF that is no bare frame and fills the screen, on a screen presented over the title's inside one window,
+  covers — the picker skips the title as `covered by …`.
 - **The keyboard's nodes counted** (review 2026-10-07): the band and a key over a point were covers, so a
   keyboard-owned node the band missed refused a dismissal. Now the band is judged first and the rest is residual 2.
 - **A row scrolled under a translucent bar** was after the bar's title in WDA's pre-order and read as a cover — a false

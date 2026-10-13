@@ -299,12 +299,21 @@ export interface StandingFacts {
   readonly centreCover?: UiNode;
   /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
   readonly centreExcused: readonly UiNode[];
+  /** draw-order.ts#Exposure's: the covers that are the surface of a screen presented over the node (a modal's dim, a sheet's form); absent when none. */
+  readonly presented?: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
   /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind — never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
 }
+
+/**
+ * The node lies under a screen PRESENTED over its own — a surface of one (a modal's dimming leaf, a sheet's form) is
+ * among its covers (`presented`), whichever cover is on top at its centre: the modal's card over the dim is still the
+ * modal's. Read as a yes/no on purpose: which surface it is changes no remedy (close that screen first, ADR 0018).
+ */
+export const underPresented = (facts: StandingFacts): boolean => (facts.presented?.length ?? 0) > 0;
 
 /** Where the node stands for a touch (the tap, the stop), and why: `facts`, and one kind with what its sentence quotes. */
 export type Standing = { readonly facts: StandingFacts } & (
@@ -575,6 +584,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
     reaches: seen.reaches,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
     centreExcused: seen.centreExcused,
+    ...(seen.presented.length > 0 && { presented: seen.presented }),
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),

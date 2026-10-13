@@ -1,13 +1,13 @@
 import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
 import { drawnOverText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
-import type { Scene, SystemBar, TapStanding } from '../ui-tree/standing.js';
+import { underPresented, type Scene, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutRemedy, cutSliverText } from './target-text.js';
+import { cutRemedy, cutSliverText, PRESENTED_OVER } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -312,7 +312,9 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
         standing.largest === undefined
           ? `nothing of it shows${above}`
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
-      throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — scroll_until it first`));
+      // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps — close that screen first.
+      const remedy = underPresented(standing.facts) ? PRESENTED_OVER : 'scroll_until it first';
+      throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':
       throw new CoveredRefusal(

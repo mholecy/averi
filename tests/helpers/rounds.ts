@@ -28,6 +28,8 @@ export interface Row {
   found?: readonly UiNode[];
   /** The read failed with this message. */
   error?: string;
+  /** The whole tree this read held, as a device gave it (a ui_snapshot) — `treeOf` returns it as is; `found` must be its nodes. Default: the tree `treeOf` builds from the row. */
+  tree?: UiNode;
   /** The usable screen swipe.ts#screenBox gave this round (`RoundSeen.screen`: the gesture box, `oriented`, and the boxes judged in on a read that read); default the device as built, `{ box, boxes: [box], oriented: box, from: 'device' }`; `null`: screenBox threw — no box this round, the frame stays. */
   screen?: UsableScreen | null;
   /** The reading's `cover()`: absent for a keyboard hidden or unknown. */
@@ -102,6 +104,7 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
  * container and its child) stays where it is, under that one.
  */
 export function treeOf(row: Row, screen: DeviceScreen): UiNode {
+  if (row.tree !== undefined) return row.tree;
   const found = row.found ?? [];
   const nested = (n: UiNode): boolean => found.some((m) => m !== n && contains(m, n));
   const chain = row.scrollers ?? (row.scroller !== undefined ? [row.scroller] : []);

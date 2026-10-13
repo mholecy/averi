@@ -1,7 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
+import { underPresented, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -162,6 +162,12 @@ export type RoundStep =
  *   layout defect, or the keyboard's edge when it is the bottom clip.
  * - `covered`: a corroborated cover leaves nothing above its top edge;
  *   nothing judged, no stroke sent.
+ * - `presented`: the judged match in the frame lies under a screen
+ *   presented over its own (ui-tree/standing.ts#underPresented: a modal's
+ *   dim, a sheet's form — ADR 0018), on two reads with no stroke between;
+ *   no further stroke sent — none moves it out, and one on that screen may
+ *   dismiss it (a page sheet's pull-to-dismiss). `cover`: the one the
+ *   sentence names.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -185,6 +191,7 @@ export type ScrollOutcome =
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
+  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect }
   | {
       kind: 'bound';
       swipes: number;
@@ -544,6 +551,8 @@ interface State {
   readonly carriedPast: boolean;
   /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke). */
   readonly confirmReads: number;
+  /** The last read found the judged match under a presented screen (`presented`): the next, after a confirm, decides. */
+  readonly presentedRead: boolean;
   readonly strokesSent: number;
   /** Where the content lay for the last stroke sent: the caller's direction, or its opposite after a fling past the target. For "swiping … no longer moves it". */
   readonly lastStroke: Direction;
@@ -665,6 +674,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     seenShort: false,
     carriedPast: false,
     confirmReads: 0,
+    presentedRead: false,
     strokesSent: 0,
     lastStroke: rules.direction,
     turns: 0,
@@ -1105,6 +1115,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // The stroke back (`stuckOn`) is answered by the first read that reads
   // after it; a round whose tree did not read strokes as the last read
   // round decided — back.
+  // `presentedRead` is this read's to set again (below).
+  const presentedBefore = s.presentedRead;
+  if (now !== undefined) s.presentedRead = false;
   const answersBack = now !== undefined && s.backPending;
   if (now !== undefined) s.backPending = false;
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
@@ -1175,6 +1188,17 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         unlocated = seen.unlocated;
       }
       return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }) });
+    }
+    // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
+    // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
+    // then, the read above stops as any other. Without a confirm left, stop on this read.
+    if (underPresented(best.standing.facts)) {
+      if ((current === 'settle' && presentedBefore) || !mayConfirm(s, seen.elapsedMs)) {
+        const cover = best.standing.kind === 'covered' ? best.standing.cover : (best.standing.facts.presented ?? []).at(-1)!;
+        return stop(s, { kind: 'presented', swipes: s.swipes, judged: best, cover, viewport });
+      }
+      s.presentedRead = true;
+      return confirm(s);
     }
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
