@@ -1873,37 +1873,53 @@ describe('round — a cover the target shows past only on its far side (the roun
 
 /**
  * A target under a screen PRESENTED over its own (ADR 0018: a modal's dimming leaf, a sheet's form — a later stacked
- * screen-sized layer in the app's Window): no scroll moves it out from under that screen, and the failure says so —
- * not the pinned-bar "layout defect", which stays for every other cover (the CONTINUE rows above) (review of round 13
- * slice A, M2). The strokes are still sent (ADR 0018's residual):
- * the stroke box knows no layer. On the round-12 device check's ui_snapshots, held still.
+ * screen-sized layer in the app's Window): no scroll moves it out from under that screen, and a stroke on the screen
+ * may dismiss it (a page sheet's pull-to-dismiss, a "Discard Changes?" prompt) — so the round confirms with one more
+ * read, sends no stroke, and stops naming the presented screen. On the round-12 device check's ui_snapshots.
  */
 describe('round — a target under a screen presented over it (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', async () => {
   const { readFile } = await import('node:fs/promises');
   const { everyNode } = await import('../../src/adapters/types.js');
   const screens = (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
-  const rowsOf = (key: string, id: string, n: number): Row[] => {
+  const rowOf = (key: string, id: string): Row => {
     const tree = screens[key];
-    const target = [...everyNode(tree)].find((x) => x.identifier === id || x.label === id)!;
-    return Array.from({ length: n }, () => ({ tree, found: [target] }));
+    return { tree, found: [[...everyNode(tree)].find((x) => x.identifier === id || x.label === id)!] };
   };
-  const PRESENTED = 'A screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen.';
+  const NONE_SENT = 'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it, so none was sent.';
 
-  it('stuck: the RN modal\'s dimming leaf over lang_sk — the presented screen named, no layout defect', () => {
-    const played = play(IPHONE, rowsOf('finportalForgot', 'lang_sk', 4));
-    expect(played.outcome?.kind).toBe('stuck');
-    expect(failureOf(played, 'id:lang_sk').message).toBe(
-      'scroll_until id:lang_sk failed after 3 swipes — element is in the viewport but under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it — 0% of it shows — ' +
-        `and the content is exhausted: swiping down no longer moves it, nor does swiping up. ${PRESENTED} Last rect {"x":268,"y":235,"width":43,"height":32} in a 402x874 viewport`,
+  it('the RN modal\'s dimming leaf over lang_sk: one confirming read, no stroke, then the stop naming the presented screen — fully or not, either direction', () => {
+    for (const fully of [false, true])
+      for (const direction of ['down', 'up'] as const) {
+        const played = play({ ...IPHONE, fully, direction }, [rowOf('finportalForgot', 'lang_sk'), rowOf('finportalForgot', 'lang_sk')]);
+        expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
+        expect(played.outcome?.kind).toBe('presented');
+        expect(failureOf(played, 'id:lang_sk').message).toBe(
+          'scroll_until id:lang_sk stopped before any swipe — element is in the viewport but under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it — 0% of it shows — ' +
+            `${NONE_SENT} Last rect {"x":268,"y":235,"width":43,"height":32} in a 402x874 viewport`,
+        );
+      }
+  });
+
+  it('the page sheet\'s form over a row\'s photo button (#146): no stroke on the sheet (a pull-to-dismiss), the stop names the form', () => {
+    const played = play(IPHONE, [rowOf('contactsSheet', 'Contact photo for Kate Bell'), rowOf('contactsSheet', 'Contact photo for Kate Bell')]);
+    expect(strokesToward(played)).toEqual([]);
+    expect(failureOf(played, 'label:"Contact photo for Kate Bell"').message).toBe(
+      'scroll_until label:"Contact photo for Kate Bell" stopped before any swipe — element is in the viewport but under scrollable (0,62 402x812) at its centre (41,290), drawn over it — 0% of it shows — ' +
+        `${NONE_SENT} Last rect {"x":18,"y":267,"width":45,"height":45} in a 402x874 viewport`,
     );
   });
 
-  it('bound: the sheet\'s form over a row\'s photo button, the swipes run out — the shortfall says the presented screen too', () => {
-    const played = play({ ...IPHONE, maxSwipes: 1 }, rowsOf('contactsSheet', 'Contact photo for Kate Bell', 2));
-    expect(played.outcome?.kind).toBe('bound');
-    expect(failureOf(played, 'label:"Contact photo for Kate Bell"').message).toBe(
-      'scroll_until label:"Contact photo for Kate Bell" failed after 1 swipe (maxSwipes) — element reached the viewport but stayed under scrollable (0,62 402x812) at its centre (41,290), drawn over it — 0% of it shows (last rect {"x":18,"y":267,"width":45,"height":45}) — ' +
-        PRESENTED.replace(/^A/, 'a').replace(/\.$/, ''),
-    );
+  it('the confirm is the presented screen\'s own: a target found clear after a stroke, then under a modal presented meanwhile, gets a confirming read of its own before the stop', () => {
+    const login = rowOf('finportalLogin', 'lang_sk');
+    const played = play(IPHONE, [{ tree: login.tree, found: [] }, login, rowOf('finportalForgot', 'lang_sk'), rowOf('finportalForgot', 'lang_sk')]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'confirm', 'stop']);
+    expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 1 });
+    expect(failureOf(played, 'id:lang_sk').message).toMatch(/^scroll_until id:lang_sk stopped after 1 swipe, without swiping further — /);
+  });
+
+  it('a modal closing between the two reads: the confirming read finds the target clear — the stop is visible, still with no stroke', () => {
+    const played = play(IPHONE, [rowOf('finportalForgot', 'lang_sk'), rowOf('finportalLogin', 'lang_sk')]);
+    expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
+    expect(played.outcome?.kind).toBe('visible');
   });
 });

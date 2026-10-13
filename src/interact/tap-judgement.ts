@@ -1,13 +1,13 @@
 import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
 import { drawnOverText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
-import type { Scene, SystemBar, TapStanding } from '../ui-tree/standing.js';
+import { underPresented, type Scene, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutRemedy, cutSliverText, PRESENTED_OVER, underPresented } from './target-text.js';
+import { cutRemedy, cutSliverText, PRESENTED_OVER } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,

@@ -308,6 +308,13 @@ export interface StandingFacts {
   readonly sliver?: Cut;
 }
 
+/**
+ * The node lies under a screen PRESENTED over its own — a surface of one (a modal's dimming leaf, a sheet's form) is
+ * among its covers (`presented`), whichever cover is on top at its centre: the modal's card over the dim is still the
+ * modal's. Read as a yes/no on purpose: which surface it is changes no remedy (close that screen first, ADR 0018).
+ */
+export const underPresented = (facts: StandingFacts): boolean => (facts.presented?.length ?? 0) > 0;
+
 /** Where the node stands for a touch (the tap, the stop), and why: `facts`, and one kind with what its sentence quotes. */
 export type Standing = { readonly facts: StandingFacts } & (
   /** `at`: the point a tap presses — the centre, or (`moved`, the tap's) the centre of the largest uncovered `piece`, `cover` being over the centre, chosen above a keyboard line when one applied. */

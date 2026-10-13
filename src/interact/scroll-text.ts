@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, underPresented, revealText, untriedSideText } from './target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, untriedSideText } from './target-text.js';
 import type { Cover, Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
@@ -280,8 +280,8 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
         : `, and swiping ${back} was tried earlier in the scroll`;
 
 /**
- * The failure for every outcome but `visible`, and its class: `stuck` a
- * plain Error (the element was there and seen); `covered` and `bound`
+ * The failure for every outcome but `visible`, and its class: `stuck` and
+ * `presented` a plain Error (the element was there and seen); `covered` and `bound`
  * through resolve.ts#absenceError — ElementNotFoundError only when no read
  * at any swipe held a match and the last read succeeded, so an `optional:`
  * scroll_until to an element not on this screen is skipped "(not present)"
@@ -327,13 +327,10 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
         );
       }
       if (short.of === 'covered') {
-        // Under a screen presented over it (a modal, a sheet: ADR 0018): no layout defect, and no scroll moves it out.
-        const why = underPresented(judged.standing.facts)
-          ? `${PRESENTED_OVER.charAt(0).toUpperCase()}${PRESENTED_OVER.slice(1)}.`
-          : 'The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes.';
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it${neither}. ${why} ${last}`,
+            `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
+            `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
         );
       }
       // Clipped at the keyboard's edge at the end of the content: the
@@ -370,6 +367,17 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
           `${frameText(cover.topCover)} ${cover.topCover.y + cover.topCover.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
           hideToJudgeWholeScreen(cover.remedy),
         o.evidence,
+      );
+    }
+    case 'presented': {
+      // Under a screen presented over it (ADR 0018): stopped without a swipe — none moves it out, and one on
+      // that screen may dismiss it. A plain Error, as `stuck`: the element was there and seen.
+      const { judged, cover, viewport } = o;
+      const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
+      const under = `${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`;
+      return new Error(
+        `scroll_until ${describe} stopped ${when} — element is in the viewport but ${under} — ${PRESENTED_OVER}, and a swipe on it may dismiss it, so none was sent. ` +
+          `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       );
     }
     case 'bound': {
@@ -429,8 +437,7 @@ function shortText(short: Shortfall): string {
     }
     case 'covered': {
       const { judged } = short;
-      const presented = underPresented(judged.standing.facts) ? ` — ${PRESENTED_OVER}` : '';
-      return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})${presented}`;
+      return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'systemBar': {
       const { judged } = short;
