@@ -1532,12 +1532,13 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(tree, target)).toEqual([]);
     });
 
-    it('not in scrolled content: layers of one scroll view\'s content are one screen — measured, Finportal\'s RN ScrollView (#218): its full-screen background container\'s `0,0 402x102` frame, under the later `0,0 402x877` content container, has nothing over it; synthetic, a header image in the same shape', () => {
+    it('not in scrolled content: layers of one scroll view\'s content are one screen — measured, Finportal\'s RN ScrollView (#218): its full-screen background container\'s `0,0 402x102` frame, under the later `0,0 402x877` content container, has nothing over it; synthetic, a header image in the same shape under a leaf of the content layer', () => {
       const login = screen('finportalLogin');
       const header = [...everyNode(login)].find((n) => n.role === 'container' && n.rect.height === 102)!;
       expect(drawOrder(login).exposure(header, IPHONE).covers).toEqual([]);
       const image = uiNode({ role: 'image', label: 'Header', rect: rect(0, 0, 402, 102) });
-      const content = uiNode({ role: 'container', rect: rect(0, 0, 402, 877), children: [card()] });
+      const gradient = uiNode({ role: 'other', rect: rect(0, 0, 402, 140) }); // a leaf of the content layer over the header: a surface, were the layers two screens
+      const content = uiNode({ role: 'container', rect: rect(0, 0, 402, 877), children: [gradient, card()] });
       const scroll = uiNode({ role: 'scrollable', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [image] }), content] });
       const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [scroll] })] });
       expect(covers(tree, image)).toEqual([]);
