@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { everyNode, KEYBOARD_ROLE, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
@@ -1340,11 +1340,11 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       }
     });
 
-    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back, and (ADR 0018) so does the content layer\'s own frame, the full-screen container carrying the form (whether real bars nest so is unmeasured)', () => {
+    it('the residual, stated: the same with the bar inside a full-screen host of its own reads as two stacked screens — the form\'s row covers Back, and (ADR 0018) so does the form\'s scroll view, a surface over the screen beneath (whether real bars nest so is unmeasured)', () => {
       const text = iban();
-      const { tree, back } = swiftForm(uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [text] }), (bar) => uiNode({ role: 'other', rect: IPHONE, children: [bar] }));
-      const content = tree.children[0].children[0].children[1];
-      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([content, content.children[0], text]);
+      const scroller = uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 512), children: [text] });
+      const { tree, back } = swiftForm(scroller, (bar) => uiNode({ role: 'other', rect: IPHONE, children: [bar] }));
+      expect(drawOrder(tree).exposure(back, IPHONE).covers).toEqual([scroller, text]);
     });
 
     it('both sides must be screens: Back in a full-screen host, the form beside that host in no screen-sized layer of its own — still the same screen, Back is tapped', () => {
@@ -1369,14 +1369,13 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(drawOrder(tree).exposure(backdrop, IPHONE).covers).not.toContain(row);
     });
 
-    it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text — and (ADR 0018) through its own surface: the layer, its frame and the web view, all carrying the text', () => {
+    it('an RN transparent Modal in the SAME window: the modal\'s full-screen layer, a later sibling of the screen\'s, covers the screen beneath through its web view\'s text', () => {
       const pay = uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
       const terms = uiNode({ role: 'text', label: 'Terms and conditions', rect: rect(16, 690, 370, 80) });
       const screen = uiNode({ role: 'other', rect: IPHONE, children: [pay] });
       const modal = uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'other', rect: IPHONE, children: [uiNode({ role: 'webview', rect: IPHONE, children: [terms] })] })] });
       const tree = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', label: 'window', rect: IPHONE, children: [screen, modal] })] });
-      const frame = modal.children[0];
-      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([modal, frame, frame.children[0], terms]);
+      expect(drawOrder(tree).exposure(pay, IPHONE).covers).toEqual([terms]);
     });
 
     it('the residual, stated: a web view under the screen\'s size (above a tab bar) under a translucent bar covers Back through its own FRAME — its content excused, its frame no content-framed surface', () => {
@@ -1470,6 +1469,18 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
     expect(coveredOf(screen('finportalForgot'), (n) => n.identifier?.startsWith('forgot_') === true)).toEqual([]);
   });
 
+  it('no regression, measured: Safari (#158, page B, reached by `tap role:text text:"Go to page B"` measured Tapped at #157) — no node of the web view reads covered by `CapsuleViewController 0,0 402x874`, the later full-screen layer that draws only its bottom bar', () => {
+    const tree = screen('safariPageB');
+    const order = drawOrder(tree);
+    const capsule = byId(tree, 'CapsuleViewController');
+    const web = [...everyNode(tree)].find((n) => n.role === 'webview' && n.identifier === 'WebView')!;
+    const underCapsule = [...everyNode(web)]
+      .filter((n) => n.rect.width * n.rect.height > 0 && rectWithin(n.rect, IPHONE))
+      .filter((n) => order.exposure(n, IPHONE).covers.some((c) => c === capsule || [...everyNode(capsule)].includes(c) && rectArea(c.rect) >= rectArea(IPHONE) * 0.9));
+    expect(underCapsule.map((n) => n.identifier ?? n.label ?? n.role)).toEqual([]);
+    expect(order.exposure(byId(tree, 'Link number 1'), IPHONE).covers).toEqual([]);
+  });
+
   describe('the rule\'s edges, on synthetic trees', () => {
     const pay = () => uiNode({ role: 'button', label: 'Pay', rect: rect(24, 700, 354, 50) });
     const card = () => uiNode({ role: 'text', label: 'Reset account', rect: rect(16, 301, 370, 220) });
@@ -1478,13 +1489,19 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [target] }), layer] })] });
     const covers = (tree: UiNode, target: UiNode) => drawOrder(tree).exposure(target, IPHONE).covers;
 
-    it('each of the three frame rules gives way: an unlabelled wrapper holding the target whole, a screen-sized host, a scroll view — each covers, with its content away from the target', () => {
+    it('only surfaces that draw their whole rect give way (the owner\'s option (a), review of round 13 slice A): a scroll view carrying its rows and a structural LEAF cover; an unlabelled wrapper or a screen-sized host WITH children stays excused — it may be a pass-through layer (Safari\'s `CapsuleViewController`)', () => {
+      const scroll = uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 812), children: [card()] });
+      const leaf = uiNode({ role: 'container', identifier: 'forgot_overlay', rect: IPHONE });
+      for (const surface of [scroll, leaf]) {
+        const target = pay();
+        const layer = uiNode({ role: 'container', rect: IPHONE, children: [surface, card()] });
+        expect(covers(window(target, layer), target)).toEqual([surface]);
+      }
       const wrapper = uiNode({ role: 'container', rect: IPHONE, children: [card()] });
       const host = uiNode({ role: 'toolbar', rect: IPHONE, children: [card()] });
-      const scroll = uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 812), children: [card()] });
-      for (const layer of [wrapper, host, scroll]) {
+      for (const layer of [wrapper, host]) {
         const target = pay();
-        expect(covers(window(target, layer), target)).toEqual([layer]);
+        expect(covers(window(target, layer), target)).toEqual([]);
       }
     });
 
@@ -1493,7 +1510,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       const bare = uiNode({ role: 'container', rect: IPHONE });
       const overlay = uiNode({ role: 'container', identifier: 'forgot_overlay', rect: IPHONE });
       const layer = uiNode({ role: 'container', rect: IPHONE, children: [overlay, bare, card()] });
-      expect(covers(window(target, layer), target)).toEqual([layer, overlay]);
+      expect(covers(window(target, layer), target)).toEqual([overlay]);
     });
 
     it('a layer carrying nothing drawable stays excused: empty frames only, an itemless toolbar (WDA\'s `toolbar \'Toolbar\'` host, as Finportal and SwiftUI list it), or a layer that is itself the dimming node — a leaf the app named, an `other` over empty frames — with no card in it', () => {
