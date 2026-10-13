@@ -237,8 +237,12 @@ describe('usableScreen — `fresh`: the device read again first (the tap\'s re-r
   });
 });
 
-describe('treeScreen — the pixel assert\'s last resort: the tree\'s own screen, no band', () => {
-  it('a root with a rect is that rect', () => {
-    expect(treeScreen(node({ rect: box(402, 874) }))).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree' });
+describe('treeScreen — THE "no device screen": the tree\'s own screen, no band, and whether a touch fails open', () => {
+  it('a root with a rect is that rect; a touch judges in it', () => {
+    expect(treeScreen(node({ rect: box(402, 874) }))).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree', failsOpen: false });
+  });
+  it('a root of no area (idb\'s synthetic 0x0 root): the largest node is the box, and a touch fails open', () => {
+    const tree = node({ rect: box(0, 0), children: [node({ rect: { x: 0, y: 100, width: 300, height: 50 } }), node({ rect: box(402, 874) })] });
+    expect(treeScreen(tree)).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree', failsOpen: true });
   });
 });

@@ -8,7 +8,6 @@ import {
   containsPoint,
   overlapsPastSlack,
   rectCentre,
-  screenOf,
   visibleFractionInViewport,
   type Clips,
   type Cut,
@@ -16,7 +15,7 @@ import {
 } from './geometry.js';
 import type { KeyboardLine } from './keyboard-cover.js';
 import { tapPoint } from './selectors.js';
-import type { UsableScreen } from './usable-screen.js';
+import { treeScreen, type UsableScreen } from './usable-screen.js';
 
 /**
  * THE SCENE of one tree: its draw order (draw-order.ts) and its clip facts
@@ -32,15 +31,21 @@ import type { UsableScreen } from './usable-screen.js';
  *   (selectors.ts#tapPoint). It is ON the screen when it lies in a box less
  *   the system bands: the status band at a portrait box's top
  *   (geometry.ts#belowStatusBand) and the navigation band at its bottom
- *   (geometry.ts#aboveNavigationBand). The tap judges in ANY of
- *   `screen.boxes`; the stop in `screen.box` alone (a caller judging in
- *   several boxes asks once a box and keeps the best). With no screen, the
- *   tree's root rect is the one box, and a root of no area leaves every
- *   point on the screen (fail open).
- * - THE ORDER, once for every verb — after what only the stop judges first
+ *   (geometry.ts#aboveNavigationBand).
+ * - WHICH BOX each purpose judges, picked here: the tap ANY of
+ *   `screen.boxes`; both stops `screen.box` alone (a caller judging in
+ *   several boxes asks once a box and keeps the best — scroll_until's read,
+ *   box by box, interact/scroll-read.ts#judgeRead); the pixel assert the
+ *   usable screen's single `oriented` box (`singleBox`, D6), whatever
+ *   `box` is. With no screen, every purpose reads ONE definition,
+ *   usable-screen.ts#treeScreen: the tree's own screen is the one box; on
+ *   a root of no area (its `failsOpen`) a touch — the tap, either stop —
+ *   leaves every point on the screen and judges in the node's own rect,
+ *   and the pixel assert judges on the largest node (`treeScreen`'s box).
+ * - THE ORDER, once for every verb — after what only the stops judge first
  *   (nothing of it in its frame: `underKeyboard` when a keyboard line
- *   applies and the node is in the box, else `offScreen`; with `fully`, a
- *   frame edge it runs past: `clipped`): its centre off the screen —
+ *   applies and the node is in the box, else `offScreen`; the `fully`
+ *   purpose: a frame edge it runs past, `clipped`): its centre off the screen —
  *   `offScreen`; its centre in a system band — `systemBar`, the top's
  *   before the bottom's (for `fully`, any of the node in a band past the
  *   slack too: the band as a region, `systemBandOver`, with its rect); cut
@@ -56,8 +61,8 @@ import type { UsableScreen } from './usable-screen.js';
  *   edge, whose remedy is a scroll toward it.
  *   docs/adr/0005-cut-before-cover.md
  * - THE PIXEL ASSERT (`PixelPurpose`) judges a REGION, not a point, in
- *   `screen.box` alone (verify/pixel-poll.ts hands it the usable screen's
- *   `oriented` box) — the same order, its place a region's:
+ *   one box, the usable screen's `oriented` (verify/pixel-poll.ts hands it
+ *   the usable screen) — the same order, its place a region's:
  *   - under the band `keyboardTop` marks (`bandRect`) when the node's rect
  *     meets it at all — `underKeyboard`, before the system bands; its
  *     `keyboardTop` is idb's band only, the reading's frame being the
@@ -78,7 +83,7 @@ import type { UsableScreen } from './usable-screen.js';
  *     list's screen-sized root (draw-order.ts#listsAncestry, read here so
  *     the pixel assert does not).
  *     docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
- *   The keyboard's band is drawn on `screen.box`, the box judged (not the
+ *   The keyboard's band is drawn on `oriented`, the box judged (not the
  *   tree's own screen), so a device wider than the tree quotes the device's
  *   band (idb's number pad on a 430x932 device: `0,589 430x343`), and a
  *   node listed between the tree's bottom and the device's (`42,885
@@ -91,15 +96,21 @@ import type { UsableScreen } from './usable-screen.js';
  *   reads, as `exposure`'s touch covers (the kind names the pixel cover).
  *   docs/adr/0008-scroll-until-exposure-box-below-status-band.md
  * - What each verb counts:
- *   - the stop (`{ of: 'stop' }`) judges in its frame — the box, cut above
+ *   - both stops judge in one frame (`inStopFrame`) — the box, cut above
  *     `keyboardTop` when given (the box's width, from its top down to the
  *     line; a line at or above its top leaves nothing: no exposure is
  *     asked, nothing shows) — `underKeyboard` too when nothing of it lies
- *     above any line. Plain: a sliver is cut, and only a cover over
- *     the centre covers. `fully`: no cut — a stop flush with a clipping
- *     container is scroll_until's flush probe's
- *     (interact/scroll-rounds.ts#PROBE_REACH) — and any cover covers (the
- *     one over the centre, else the last drawn).
+ *     above any line. The plain stop (`{ of: 'stop' }`): a sliver is cut,
+ *     and only a cover over the centre covers. The `fully` stop
+ *     (`{ of: 'fully' }`, `scroll_until`'s `fully: true`) is its own
+ *     purpose, its rules its judgement (`fullyStanding`): an edge past the
+ *     frame first (`clipped`, only this purpose's); no cut — a stop flush
+ *     with a clipping container is scroll_until's flush probe's
+ *     (interact/scroll-rounds.ts#PROBE_REACH); any cover covers (the one
+ *     over the centre, else the last drawn); the system bands judged as a
+ *     region (below, Why so; `systemBar.band`, only this purpose's); and,
+ *     beside the standing, the far edge's frames cut above the navigation
+ *     band when that region refused it at the bottom (`farEdgeFrames`).
  *   - the tap (`{ of: 'tap' }`) judges in the box that holds the centre (the
  *     first box when none does), less the system bands, so a moved tap is
  *     never aimed into one. A cover over the centre moves the tap to the
@@ -114,6 +125,11 @@ import type { UsableScreen } from './usable-screen.js';
  * - `facts` are the judgement's inputs, whatever the kind: what a caller's
  *   motion and sentences read (scroll_until's best-so-far, its far-edge
  *   turn and its failure text).
+ * - `farEdgeFrames(screen, best, above?)`: the frames `scroll_until`'s far
+ *   edge is judged in, cut here with geometry's band cutters from the
+ *   usable screen, the applied keyboard's room above its cover and the best
+ *   standing, whose `band` decides the navigation cut — no caller re-cuts
+ *   a band or reads `band` for it.
  *
  * Why so:
  * - The plain stop is the next tap's point: its centre on the screen and
@@ -175,6 +191,15 @@ import type { UsableScreen } from './usable-screen.js';
  *   of the bar. A scroll view's content taller than the room between the
  *   bands but not screen-sized never stops `fully`: it ends stuck naming
  *   the bar.
+ * - The far edge's frames (`farEdgeFrames`) keep the round's shapes: the
+ *   status band is cut from each box on its own shape, the navigation band
+ *   on the first box's (`screen.box`); the frame above a keyboard cover is
+ *   the first box's x, y and width with the cover's top y as its HEIGHT
+ *   (not the top less the box's y — the boxes lie at the origin, so the two
+ *   agree), and only when the cover leaves something above it: else every
+ *   box, uncut by the keyboard. Those two are decided where the cover's
+ *   `above` is built (interact/scroll-read.ts#Cover); this module takes the
+ *   size it is handed.
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
@@ -195,24 +220,35 @@ export interface Scene {
   readonly order: DrawOrder;
   /** The tree's clip facts (geometry.ts#clipsOf), their ancestry as draw order reads it (draw-order.ts#listsAncestry). */
   readonly clips: Clips;
-  /** The pixel assert's standing: its own union (`PixelStanding`). */
-  standing(node: UiNode, screen: StandingScreen | undefined, purpose: PixelPurpose): PixelStanding;
-  /** The tap's and the stop's standing. */
+  /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
+  standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
+  /** The tap's standing: a `Standing` never `clipped` (`TapStanding`). */
+  standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
+  /** The stops' standing (and the tap's, asked as a `TouchPurpose`). */
   standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
-  standing(node: UiNode, screen: StandingScreen | undefined, purpose: Purpose): Standing | PixelStanding;
+  standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
 }
 
 /**
- * What a verb means to do with the node — `scroll_until`'s stop, `fully` or
- * plain, a tap, or the pixel assert's read (`PixelPurpose`) — and the soft
+ * What a verb means to do with the node — `scroll_until`'s plain stop
+ * (`stop`), its `fully: true` stop (`fully`), a tap, or the pixel assert's
+ * read (`PixelPurpose`) — and the soft
  * keyboard's line the caller applies, if any
  * (ui-tree/keyboard-cover.ts#keyboardEdge builds it; `Scene`'s contract
  * says how each verb applies it, and what `witnessed` changes).
  */
 export type Purpose = TouchPurpose | PixelPurpose;
 
-/** The purposes that judge a point a touch goes to — `scroll_until`'s stop and the tap — answered by a `Standing`. */
-export type TouchPurpose = { readonly of: 'stop'; readonly fully: boolean; readonly keyboardTop?: KeyboardLine } | { readonly of: 'tap'; readonly keyboardTop?: KeyboardLine };
+/**
+ * The purposes that judge a point a touch goes to — `scroll_until`'s two
+ * stops and the tap — answered by a `Standing`. `fully` is its own purpose,
+ * not a flag on the stop: the rules it switches are its judgement
+ * (`fullyStanding`), read in one place (`Scene`'s contract).
+ */
+export type TouchPurpose = { readonly of: 'stop' | 'fully'; readonly keyboardTop?: KeyboardLine } | TapPurpose;
+
+/** The tap's purpose (`TouchPurpose`). */
+export type TapPurpose = { readonly of: 'tap'; readonly keyboardTop?: KeyboardLine };
 
 /**
  * The pixel assert's purpose (`Scene`'s contract): `reads`, the part of the
@@ -283,6 +319,9 @@ export type Standing = { readonly facts: StandingFacts } & (
   | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine }
 );
 
+/** Where the node stands for the tap: a `Standing` of every kind but `clipped`, which only a `fully` stop judges. */
+export type TapStanding = Exclude<Standing, { readonly kind: 'clipped' }>;
+
 /** Where the node stands for the pixel assert (`Scene`'s contract: a region, never off the screen, never clipped), and why. */
 export type PixelStanding = { readonly facts: StandingFacts } & (
   | { readonly kind: 'reachable'; readonly at: Point }
@@ -309,20 +348,24 @@ export function sceneOf(tree: UiNode): Scene {
     },
     standing,
   };
-  function standing(node: UiNode, screen: StandingScreen | undefined, purpose: PixelPurpose): PixelStanding;
+  function standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
+  function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
-  function standing(node: UiNode, screen: StandingScreen | undefined, purpose: Purpose): Standing | PixelStanding;
+  function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: Purpose): Standing | PixelStanding {
     const judged: Judged = { scene, node, centre: tapPoint(node) };
     if (purpose.of === 'pixel') {
-      const box = screen?.box ?? screenOf(tree);
-      return pixelStanding(judged, regionPlace(node.rect, purpose, box, screen), box, screen, purpose, !listsAncestry(tree));
+      // The overloads hand the pixel purpose a usable screen: it picks its own box, `oriented` (`singleBox`).
+      const single = singleBox((screen as UsableScreen | undefined) ?? treeScreen(tree));
+      return pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single), single.box, single, purpose, !listsAncestry(tree));
     }
-    const boxes = screen === undefined ? rootBoxes(tree) : purpose.of === 'stop' ? [screen.box] : screen.boxes;
-    const place = placeOf(judged.centre, boxes, screen);
-    return purpose.of === 'stop'
-      ? stopStanding(judged, place, screen?.box ?? tree.rect, screen, purpose.fully, purpose.keyboardTop)
-      : tapStanding(judged, place, chosenBox(judged.centre, screen, tree, node), boxes ?? [], screen, purpose.keyboardTop);
+    const touch = touchScreen(screen, tree);
+    if (purpose.of === 'tap') {
+      return tapStanding(judged, placeOf(judged.centre, touch?.boxes, touch), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
+    }
+    const place = placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch);
+    const box = touch?.box ?? node.rect;
+    return purpose.of === 'fully' ? fullyStanding(judged, place, box, touch, purpose.keyboardTop) : stopStanding(judged, place, box, touch, purpose.keyboardTop);
   }
   return scene;
 }
@@ -346,8 +389,17 @@ interface SystemBand<B extends SystemBar = SystemBar> {
 /** Where the pixel assert's region lies: on the screen, in a system band (with the band's rect), or under the band a keyboard line marks — never off the screen. */
 type RegionPlace = 'on' | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
-/** The no-screen boxes: the tree's root rect, or none (undefined) when it has no area — every point on the screen. */
-const rootBoxes = (tree: UiNode): Rect[] | undefined => (rectArea(tree.rect) > 0 ? [tree.rect] : undefined);
+/**
+ * The screen a touch (the tap, either stop) is judged on: the one handed
+ * in, else the tree's own (usable-screen.ts#treeScreen, THE "no device
+ * screen") — or none when that fails open (a root of no area): every point
+ * on the screen, the node judged in its own rect.
+ */
+function touchScreen(screen: StandingScreen | undefined, tree: UiNode): StandingScreen | undefined {
+  if (screen !== undefined) return screen;
+  const own = treeScreen(tree);
+  return own.failsOpen ? undefined : own;
+}
 
 /**
  * Where `point` lies against `boxes` (none: on, failing open) and their
@@ -357,8 +409,8 @@ const rootBoxes = (tree: UiNode): Rect[] | undefined => (rectArea(tree.rect) > 0
  * (interact/keyboard-in-tree.ts#pickDismissal asks the tap's standing,
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md).
  * With no screen (no usable device size and no window in the tree), the
- * tree's root rect is the one box (`rootBoxes`); with none, every point is
- * on — the rule exists to stop a false "Tapped", and must never be why a
+ * tree's own screen is the one box (`touchScreen`); on a root of no area,
+ * none, and every point is on — the rule exists to stop a false "Tapped", and must never be why a
  * tap on a device that could not report its size did not happen. The point
  * is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on a
  * 402-wide screen is judged at 402, off it.
@@ -444,9 +496,37 @@ function systemBands(box: Rect, bands: Bands): { clear: Rect; top?: SystemBand<S
  */
 export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });
 
-/** The tap's box: the box that holds the centre, else the first; with no screen the tree's root rect, or the node's own when the root has no area. */
-const chosenBox = (centre: Point, screen: StandingScreen | undefined, tree: UiNode, node: UiNode): Rect =>
-  screen?.boxes.find((b) => containsPoint(b, centre)) ?? screen?.box ?? (rectArea(tree.rect) > 0 ? tree.rect : node.rect);
+/**
+ * The frames `scroll_until`'s far edge is judged in, for one read
+ * (interact/scroll-read.ts#judgeRead): `uncutFrames`, the frames short of
+ * the far edge is judged in — the screen above an applied keyboard cover
+ * when it leaves something (`above`, the size of what it leaves: the
+ * first box's x, y and width, the cover's top y as its height), else every
+ * box that counts, uncut by the keyboard — each below the status band on
+ * its own shape: a target whose centre a fling carried into the band is
+ * past the far edge, and the next stroke turns back. `frames`: the same,
+ * and above the navigation band when `best` (the best match's standing) is
+ * a `fully` stop the band's REGION refused at the bottom (`Standing`'s
+ * `band`, which only the `fully` purpose sets) — resting across the band's
+ * top with the content above it, it is past the far edge, and the next
+ * stroke turns and lifts it. Only then: every other standing judges the far
+ * edge in the frames as ever. The cut reads `band` here, beside
+ * `fullyStanding`, its only writer, so the region rule and the frame it
+ * turns in cannot drift apart; the cuts themselves are geometry's band
+ * cutters, the ones `systemBands` composes, not `systemBands` itself. The
+ * shapes are kept as the round always cut them, residuals of `Scene`'s
+ * contract: the status band on each box's shape, the navigation band on the
+ * first box's (`screen.box`).
+ */
+export function farEdgeFrames(screen: StandingScreen, best: Standing | undefined, above?: { readonly width: number; readonly height: number }): { frames: Rect[]; uncutFrames: Rect[] } {
+  const box = screen.box;
+  const uncutFrames = above !== undefined ? [belowStatusBand({ x: box.x, y: box.y, ...above }, screen, box)] : screen.boxes.map((b) => belowStatusBand(b, screen));
+  const regionAtBottom = best?.kind === 'systemBar' && best.band !== undefined && best.bar.edge === 'bottom';
+  return { frames: regionAtBottom ? uncutFrames.map((f) => aboveNavigationBand(f, screen, box)) : uncutFrames, uncutFrames };
+}
+
+/** The tap's box: the box that holds the centre, else the first (`touchScreen`'s; the node's own rect when it fails open). */
+const chosenBox = (centre: Point, screen: StandingScreen): Rect => screen.boxes.find((b) => containsPoint(b, centre)) ?? screen.box;
 
 /**
  * THE ORDER (`Scene`'s contract), once for every verb, after what only the
@@ -462,17 +542,17 @@ function ordered<S>(placed: S | undefined, cut: S | undefined, cover: () => S | 
 }
 
 /** A touch's place as its answer: off the screen, or its centre in a system band; undefined when on the screen. */
-function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): Standing | undefined {
+function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): TapStanding | undefined {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
   return place === 'on' ? undefined : { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
 }
 
 /** A touch's cut to a sliver as its answer, when the frame left a minimum to judge it by. */
-const sliverCut = (facts: StandingFacts, cut: Cut | undefined): Standing | undefined =>
+const sliverCut = (facts: StandingFacts, cut: Cut | undefined): TapStanding | undefined =>
   cut !== undefined && facts.minPiece !== undefined ? { facts, kind: 'cut', cut, minPiece: facts.minPiece } : undefined;
 
 /** The centre under `line` (one no guard acts on) as its answer, else undefined. */
-const underLine = (facts: StandingFacts, line: KeyboardLine | undefined): Standing | undefined =>
+const underLine = (facts: StandingFacts, line: KeyboardLine | undefined): TapStanding | undefined =>
   line !== undefined && facts.centre.y >= line.y ? { facts, kind: 'underKeyboard', line } : undefined;
 
 /** `box` cut above a keyboard line — the box's width, from its top down to the line (no height for a line at or above its top); `box` itself with no line or one at or below its bottom. */
@@ -499,35 +579,67 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
   return { facts, seen };
 }
 
-/** The stop's standing (`Scene`'s contract). */
-function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, fully: boolean, line: KeyboardLine | undefined): Standing {
+/**
+ * What both stops judge first, in their frame (`Scene`'s contract): `box`
+ * cut above the keyboard line when one applies, its covers judged below the
+ * status band on the box's own shape. `outside` is the answer when nothing
+ * of the node lies in that frame — the line at or above the box's top
+ * leaves no frame at all; else `underKeyboard` when some of it lies in the
+ * box under the line, `offScreen` when none does — and undefined otherwise,
+ * the facts then being the frame's for the purpose's own judgement.
+ */
+function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: Standing } {
   const { node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
     const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
-    return { facts, kind: 'underKeyboard', line };
+    return { facts, outside: { facts, kind: 'underKeyboard', line } };
   }
   const frame = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
   // Its covers below the status band; what shows keeps the node's own part in the band (`bandShows`).
   // docs/adr/0008-scroll-until-exposure-box-below-status-band.md
   const exposed = belowStatusBand(frame, bands, box);
   const facts = bandShows(judged, frame, exposed, factsIn(judged, frame, exposed).facts);
-  if (facts.visible === 0) {
-    if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, kind: 'underKeyboard', line };
-    return { facts, kind: 'offScreen', at: centre, visible: 0 };
-  }
-  if (fully && facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
-  const cover = fully && facts.covers.length > 0 ? (facts.centreCover ?? facts.covers[facts.covers.length - 1]) : facts.centreCover;
-  // `fully`: the system bands as a region, as the pixel assert judges them — any of the node past the slack.
-  // docs/adr/0009-android-navigation-band.md
-  // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
-  const placed = fully && place === 'on' && pinnedSurface(node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(node.rect, box, bands) ?? place) : place;
+  if (facts.visible > 0) return { facts };
+  if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, outside: { facts, kind: 'underKeyboard', line } };
+  return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0 } };
+}
+
+/** THE ORDER past the frame, for both stops: where it lies, cut, covered by `cover`, its centre under a line no guard acts on — else `reachable` at its centre. */
+function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: Standing | undefined, cover: UiNode | undefined, line: KeyboardLine | undefined): Standing {
   return ordered<Standing>(
     pointPlaced(facts, placed, facts.visible),
-    fully ? undefined : sliverCut(facts, facts.sliver),
+    cut,
     () => (cover === undefined ? undefined : { facts, kind: 'covered', cover, aboveKeyboard: line !== undefined }),
     underLine(facts, line?.witnessed === false ? line : undefined),
-    { facts, kind: 'reachable', at: centre },
+    { facts, kind: 'reachable', at: facts.centre },
   );
+}
+
+/** The plain stop's standing (`Scene`'s contract): its centre placed, a sliver cut, a cover over its centre alone. */
+function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
+  const { facts, outside } = inStopFrame(judged, box, bands, line);
+  if (outside !== undefined) return outside;
+  return stopOrdered(facts, place, sliverCut(facts, facts.sliver), facts.centreCover, line);
+}
+
+/**
+ * The `fully` stop's standing (`Scene`'s contract) — the plain stop's frame
+ * and order, with its own rules: an edge past the frame first (`clipped`);
+ * no sliver (a stop flush with a clipping container is scroll_until's flush
+ * probe's, interact/scroll-rounds.ts#PROBE_REACH); any cover covers (the
+ * one over the centre, else the last drawn); and the system bands judged as
+ * a REGION past the slack (`systemBandOver`), the band's rect carried —
+ * except for content no scroll lifts out of a band (`pinnedSurface`).
+ */
+function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
+  const { facts, outside } = inStopFrame(judged, box, bands, line);
+  if (outside !== undefined) return outside;
+  if (facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
+  // The system bands as a region, as the pixel assert judges them — any of the node past the slack.
+  // docs/adr/0009-android-navigation-band.md
+  // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
+  const placed = place === 'on' && pinnedSurface(judged.node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(judged.node.rect, box, bands) ?? place) : place;
+  return stopOrdered(facts, placed, undefined, facts.centreCover ?? facts.covers.at(-1), line);
 }
 
 /**
@@ -548,7 +660,7 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 }
 
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
-function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
+function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): TapStanding {
   const { scene, node } = judged;
   const box = systemBands(chosen, bands).clear;
   const within = aboveLine(box, line);
@@ -556,7 +668,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
   const frame = unwitnessed === undefined ? box : within;
   const { facts, seen } = factsIn(judged, frame);
   const offScreenVisible = boxes.length === 0 ? 0 : Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
-  const cover = (): Standing | undefined => {
+  const cover = (): TapStanding | undefined => {
     const over = seen.centreCover;
     if (over === undefined) return undefined;
     const aboveKeyboard = within !== box;
@@ -565,7 +677,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
     if (!piece.tapAt.moved) return { facts, kind: 'reachable', at: piece.tapAt.point };
     return { facts, kind: 'reachable', at: piece.tapAt.point, moved: { piece: piece.tapAt.piece, cover: over, aboveKeyboard } };
   };
-  return ordered<Standing>(pointPlaced(facts, place, offScreenVisible), sliverCut(facts, facts.sliver), cover, underLine(facts, unwitnessed), { facts, kind: 'reachable', at: facts.centre });
+  return ordered<TapStanding>(pointPlaced(facts, place, offScreenVisible), sliverCut(facts, facts.sliver), cover, underLine(facts, unwitnessed), { facts, kind: 'reachable', at: facts.centre });
 }
 
 /**
@@ -654,7 +766,7 @@ export function pinnedSurface(node: UiNode, box: Rect, bands: Bands, clips: Pick
  * other orientation of a turn suggested but not witnessed is never judged.
  * docs/adr/0012-pixel-assert-residuals-d4-d6.md
  */
-export const singleBox = (usable: UsableScreen): StandingScreen => ({
+const singleBox = (usable: UsableScreen): StandingScreen => ({
   box: usable.oriented,
   boxes: [usable.oriented],
   statusBand: usable.statusBand,

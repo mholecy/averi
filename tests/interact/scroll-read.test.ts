@@ -131,7 +131,7 @@ describe('judgeRead — what one read means, row by row', () => {
     });
   });
 
-  describe('the frames the far edge is judged in', () => {
+  describe('the frames the far edge is judged in (ui-tree/standing.ts#farEdgeFrames, asked by the read)', () => {
     const IPHONE = box(402, 874);
     it('below the status band, on each box\'s own shape: the upright box cut, the turned one (landscape) not', () => {
       const turned = box(874, 402);

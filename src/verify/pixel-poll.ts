@@ -5,7 +5,7 @@ import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboa
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { fullBleedHeader, pinnedSurface, sceneOf, screenSized, singleBox, type Scene } from '../ui-tree/standing.js';
+import { fullBleedHeader, pinnedSurface, sceneOf, screenSized, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -439,8 +439,9 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * navigation bar's), the navigation bar's possible cut, then the app's own
  * covers, or undefined when nothing is over it (it fails closed, ADR
  * 0001). The screen is the usable screen's single `oriented` box
- * (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; D6, ADR
- * 0012), with the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#treeScreen), with no
+ * (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; the
+ * pixel purpose picks it, ui-tree/standing.ts#Scene; D6, ADR 0012), with
+ * the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#treeScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
  * gesture, so under a rectless root whose largest node is a scroll view's
  * tall content (402x2000 under a 402x874 window) a window-sized element is
@@ -488,7 +489,8 @@ async function judgeOver(
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
   const screen = usable.oriented;
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
-  const standing = scene.standing(element, singleBox(usable), purpose);
+  // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
+  const standing = scene.standing(element, usable, purpose);
   if (standing.kind === 'reachable') return undefined;
   if (standing.kind === 'underKeyboard') return keyboardOver(element.rect, standing.band, keyboard.remedy);
   const at = `(element ${rectText(element.rect)}`;
@@ -504,7 +506,7 @@ async function judgeOver(
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
       // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
       // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
-      const surface = pinnedSurface(element, screen, singleBox(usable), scene.clips);
+      const surface = pinnedSurface(element, screen, usable, scene.clips);
       return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(surface ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
     }
     case 'cut':

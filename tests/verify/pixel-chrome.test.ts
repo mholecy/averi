@@ -52,12 +52,11 @@ async function sweep(androidBand?: number, reads: (r: Rect) => Rect = (r) => r, 
   let judged = 0;
   for (const [name, tree, device] of await fixtureTrees(androidBand, androidNavigation)) {
     const usable = (await usableScreen({ viewport: async () => device }, { tree })) ?? treeScreen(tree);
-    const screen = { box: usable.oriented, boxes: [usable.oriented], statusBand: usable.statusBand, navigationBand: usable.navigationBand };
     const scene = sceneOf(tree);
     for (const n of everyNode(tree)) {
       if (n === tree || n.ofKeyboard === true || !(n.rect.width * n.rect.height > 0)) continue;
       judged++;
-      const s = scene.standing(n, screen, { of: 'pixel', reads: reads(n.rect), glyphs: reads === OCR });
+      const s = scene.standing(n, usable, { of: 'pixel', reads: reads(n.rect), glyphs: reads === OCR });
       if (s.kind !== 'reachable') misses.push(`${name}: ${nodeText(n)} — ${overIt(s)}`);
     }
   }

@@ -3,7 +3,7 @@ import { frameText } from '../ui-tree/geometry.js';
 import { keyboardEdge, readingLine, readKeyboard, type KeyboardLine, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
-import { sceneOf, type Scene, type Standing } from '../ui-tree/standing.js';
+import { sceneOf, type Scene, type TapStanding } from '../ui-tree/standing.js';
 import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
 import {
@@ -321,7 +321,7 @@ const coverName = (cover: UiNode): string => `${cover.role}${cover.label === nul
  * pressed control would be reported as the dismissal. A silently pressed
  * control is worse than a skipped title (ADR 0016, the owner's decision).
  */
-function whyNotTapped(standing: Standing, node: UiNode): string | undefined {
+function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
   switch (standing.kind) {
     case 'reachable': {
       if (standing.moved !== undefined) return `covered by ${coverName(standing.moved.cover)}`;
@@ -337,8 +337,12 @@ function whyNotTapped(standing: Standing, node: UiNode): string | undefined {
       return cutSliverText(standing.cut, node.rect, standing.minPiece);
     case 'underKeyboard':
       return 'under the keyboard';
-    case 'clipped':
-      throw new Error(`keyboard dismissal: a tap standing ${standing.kind}`);
+    default: {
+      // A kind added to the tap's standing must be worded here: falling
+      // through would read as "nothing in the way", and the picker would tap.
+      const unworded: never = standing;
+      return unworded;
+    }
   }
 }
 

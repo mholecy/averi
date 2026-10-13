@@ -1,4 +1,4 @@
-import { usableSize, type DeviceAdapter, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, usableSize, type DeviceAdapter, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
 import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, type ScreenSize } from './geometry.js';
 import type { TreeRead } from './read-tree.js';
 
@@ -22,9 +22,10 @@ import type { TreeRead } from './read-tree.js';
  *   own height (`trustworthyHeight`: a walked height is the lowest content
  *   edge, which a scroll view inflates without limit) — and usable; else no
  *   usable screen (undefined). What that means is the caller's: the gesture
- *   box throws and nothing is swiped, the tap judges by the tree's root rect
- *   and then fails open, the scroll keeps the last round's screen, the
- *   pixel assert takes `treeScreen`.
+ *   box throws and nothing is swiped, the scroll keeps the last round's
+ *   screen, and every judgement — the tap, the stops, the pixel assert —
+ *   takes `treeScreen`, THE "no device screen" (a touch fails open on a root
+ *   of no area).
  * - `boxes` — the boxes a point or a rect is judged ON SCREEN in, so the
  *   scroll and the tap after it agree by construction (the rule is
  *   `judgedBoxes`): the oriented box alone when a window witnessed the
@@ -60,7 +61,7 @@ export interface UsableScreen {
   readonly boxes: readonly Rect[];
   /** The device's screen turned as the tree's window says (else the window, else the tree's screen): the box a gesture strokes in, and the pixel assert's single box. */
   readonly oriented: Rect;
-  /** Where the box came from: the device's size, a window the tree vouches for, or (`treeScreen`, the pixel assert's last resort) the tree's own screen. */
+  /** Where the box came from: the device's size, a window the tree vouches for, or (`treeScreen`, the "no device screen") the tree's own screen. */
   readonly from: 'device' | 'window' | 'tree';
   /** adapters/types.ts#DeviceScreen.statusBand, when `from` is the device. */
   readonly statusBand?: number;
@@ -123,13 +124,24 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
 }
 
 /**
- * The tree's own screen (geometry.ts#screenOf, the one draw-order.ts sizes
- * its hosts against) as a usable screen, `from: 'tree'`, with no band — the
- * pixel assert's last resort when `usableScreen` has none.
+ * THE "no device screen": the tree's own screen (geometry.ts#screenOf, the
+ * one draw-order.ts sizes its hosts against — the root's rect, or the
+ * largest node's when the root has no area) as a usable screen,
+ * `from: 'tree'`, with no band. Every judgement with no usable screen reads
+ * it, and nothing else: standing.ts#Scene's three purposes when handed
+ * none, the pixel assert's last resort (verify/pixel-poll.ts) and the tap
+ * refusal's quoted screen (interact/resolve.ts#refuseOffScreen).
+ *
+ * `failsOpen`: the root has no area (idb's synthetic 0x0 root). A TOUCH
+ * purpose — the tap, either stop — then places every point on the screen
+ * and judges in the node's own rect: the on-screen rule exists to stop a
+ * false "Tapped", and must never be why a tap on a device that could not
+ * report its size did not happen. The pixel assert judges on `box`, the
+ * largest node, as ever: it reads a region, and fails closed.
  */
-export function treeScreen(tree: UiNode): UsableScreen {
+export function treeScreen(tree: UiNode): UsableScreen & { readonly failsOpen: boolean } {
   const box = screenOf(tree);
-  return { box, boxes: [box], oriented: box, from: 'tree' };
+  return { box, boxes: [box], oriented: box, from: 'tree', failsOpen: !(rectArea(tree.rect) > 0) };
 }
 
 /**
