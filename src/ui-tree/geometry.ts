@@ -651,7 +651,7 @@ export interface Clips {
    * Android's `scrollable="true"`, whose descendants' bounds uiautomator has
    * already cut to it), NEAREST FIRST, as their rects; empty for a node with
    * none, which is every node of an iOS tree. `scroll_until`'s
-   * round asks it of each match (interact/scroll-rounds.ts#TreeFacts), to
+   * round asks it of each match (interact/scroll-read.ts#TreeFacts), to
    * tell a `fully: true` stop whose edge sits exactly on a clipping
    * ancestor's — possibly cut there — from one inside them all
    * (interact/scroll-rounds.ts#PROBE_REACH), and to pick the box its strokes
@@ -688,7 +688,7 @@ export interface Clips {
    *
    * Cost: each node's answer is kept, per minimum, for the life of the
    * `Clips` — derived once a round for every match (the round's scene,
-   * interact/scroll-rounds.ts#factsOf), once a tap — so an ancestor shared by the matches is judged
+   * interact/scroll-read.ts#factsOf), once a tap — so an ancestor shared by the matches is judged
    * once. An ancestor is judged at all only when the node is flush with an
    * edge it is shallower than the minimum across: a wrapper filling its
    * scroller (flush with all four edges, its subtree the whole list) is
@@ -929,7 +929,7 @@ function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
  * The largest node of the tree that clips its descendants
  * (scroll-containers.ts#clips, by area), as its rect — the screen's own scroll
  * view, which `scroll_until` strokes over while the target's own container
- * is not known yet (interact/scroll-rounds.ts#TreeFacts.mainScroller). Largest, not first: a carousel above a page's list is
+ * is not known yet (interact/scroll-read.ts#TreeFacts.mainScroller). Largest, not first: a carousel above a page's list is
  * the smaller of the two. Undefined when none (every iOS tree). One walk.
  */
 export function largestScroller(tree: UiNode): Rect | undefined {

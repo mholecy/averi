@@ -1,25 +1,27 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { aboveNavigationBand, belowStatusBand, flushEdges, largestScroller, rectArea, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
-import { keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
-import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
-import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
+import type { KeyboardLine } from '../ui-tree/keyboard-cover.js';
+import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
+import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
- * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what one read of the
- * screen means for the scroll, and what to do next. Every rule that compares
+ * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
+ * screen means for the scroll ACROSS reads, and what to do next. Every rule that compares
  * a read with an earlier one, and every fact the loop carried from round to
  * round, lives here and nowhere else: the confirming reads
  * (SETTLE_CONFIRM_READS), the turn after a fling and its halved reach, the
  * stuck and exhausted tests (UNMOVED_STROKES_EXHAUST, the same stroke
- * twice), the moot band, the cover carried to a round whose tree did not
+ * twice), the cover carried to a round whose tree did not
  * read, the frame kept across such a round, and the deadline — each
- * reachable by a test without a scripted device. Where the match stands for
- * the stop (in frame, covered, cut, under a band) is not decided here: that
- * is ui-tree/standing.ts#Scene.standing's, which this module asks.
+ * reachable by a test without a scripted device. What one read means on
+ * its own — the cover that applies, the moot band and the witness, the
+ * match judged best, the frames — is interact/scroll-read.ts#judgeRead's,
+ * which `round` calls once per read that read; where the match stands for
+ * the stop (in frame, covered, cut, under a band) is
+ * ui-tree/standing.ts#Scene.standing's, which that module asks.
  *
  * Pure: no adapter, no clock, no I/O, no exceptions but the protocol's own
  * (below). Deterministic: the same state and seen give the same step, so a
@@ -105,124 +107,26 @@ export interface RoundSeen {
 }
 
 /**
- * A tree that read, as the round needs it: the TREE itself — the round
- * derives what it asks of it (`TreeFacts`) — the matches the driver found
- * in it, the judged screen, and the SYNCHRONOUS facts of the round's
- * keyboard reading (ui-tree/keyboard-cover.ts#readKeyboard), never the
- * reading itself: its two async questions reach the round only as answers
- * to an `ask`, and a reading is never held across rounds (the
- * keyboard-cover.ts doc's rule) — the driver builds one per round.
- *
- * Five fields. The facts derived from the tree — the matches' clipping
- * ancestors, the largest clipping container, the tree's fingerprint and
- * whether it showed progress — are pure functions of the tree, so the round
- * derives them (`factsOf`): a driver cannot omit one and silently disable a
- * rule.
- */
-interface RoundRead {
-  /**
-   * This round's tree, as read (in-process data: the round stays pure).
-   * Never mutated once handed in — by the driver, a test or the round:
-   * its facts (`factsOf`) are derived from it on each call, so a tree
-   * changed between an `ask` and the re-entry would be judged by two
-   * different trees in one round.
-   */
-  tree: UiNode;
-  /** The matches of the target to judge, in tree order (resolve.ts#matchesToJudge: the one the next tap acts on when the preference picks one, else every match) — nodes OF `tree`: their clipping ancestors are looked up by identity. */
-  found: readonly UiNode[];
-  /** The reading's `cover()`: everything a shown keyboard covers; undefined when hidden or unknown. */
-  cover?: KeyboardCover;
-  /** The reading's `ofKeyboard`: is this node the keyboard's own UI (judged against the whole screen, never under the band)? */
-  ofKeyboard: (node: UiNode) => boolean;
-  /** The reading's `remedy` — what the adapter can do about a covering keyboard — for the sentences of a round that applied idb's band, which no `cover` carries. */
-  remedy: KeyboardRemedy;
-}
-
-/** What the round asks of a tree that read — derived by `factsOf`, never handed in. */
-interface TreeFacts {
-  /**
-   * The tree's scene (ui-tree/standing.ts#sceneOf), once a round: the
-   * judgement (`judge`, `Scene.standing`); a match's clipping ancestors,
-   * nearest first (`clips.scrollersOf`) — Android's scroll containers, to
-   * whose edges uiautomator has already cut the match's bounds; empty when
-   * it has none (every node of an iOS tree) — for the `fully: true` stop's
-   * flush check (PROBE_REACH) and the box the strokes are drawn in
-   * (swipe.ts#strokeRoom); what is drawn OVER a clipping container (the
-   * floating tab bar) — `order.drawnOver`, what a stroke over it keeps
-   * clear of (swipe.ts#strokeRoom cuts the box above them), and
-   * `order.drawnOverAt`, the one a stroke that still touched down on it
-   * names (`touchedOn`), asked of the rects `clips.scrollersOf` and
-   * `mainScroller` give, undefined when this tree has no container with
-   * that rect (one remembered from an earlier read: the list has moved
-   * since), never any on iOS, which has no clipping container; and idb's
-   * keyboard band (ui-tree/keyboard-cover.ts#keyboardEdge over `order`),
-   * the line the strokes stay above (`strokeTop`) and the round judges
-   * under (`bandCoverOf`).
-   */
-  scene: Scene;
-  /**
-   * The largest clipping container (ui-tree/geometry.ts#largestScroller) —
-   * the screen's own scroll view, for a stroke while the target's own
-   * container is not known (it has not been read yet). Undefined when the
-   * tree has none (iOS).
-   */
-  mainScroller: Rect | undefined;
-  /**
-   * A cheap fingerprint of the WHOLE tree (ui-tree/read-tree.ts
-   * #treeFingerprint) — every node's role, text, id and rect — for "the
-   * strokes changed nothing at all" when the target is not in the tree
-   * (UNMOVED_STROKES_EXHAUST).
-   */
-  fingerprint: string;
-  /**
-   * The tree shows a progress indicator (ui-tree/read-tree.ts#showsProgress:
-   * a `progress` node with area — Android's ProgressBar, which a Compose
-   * progress indicator also dumps as) — the screen may be loading, so an
-   * unchanged fingerprint does not say the content is exhausted.
-   */
-  loading: boolean;
-}
-
-/**
- * `TreeFacts` of a tree: the scene's draw order and clip facts (each
- * derived on first use), the largest scroller, the fingerprint and the
- * progress check. Derived ONCE per call of `round`, BEFORE the judgement,
- * and handed to it and along (`ThisRead`) — each fact from one
- * derivation. A call that re-enters after an `ask witness` (the ask most
- * re-entries are for, which needs only the judgement), an `ask unlocated`
- * (a `fully: true` or bound stop, once a scroll) or an `ask witness`
- * before a probe derives them again: no cache, so the module holds no
- * state between calls (a cache by tree object was dropped for that) — the fingerprint, the progress check and the
- * largest scroller are walked on a round that then asks for the witness
- * too, a pure walk of an in-memory tree beside a device read.
- */
-function factsOf(tree: UiNode): TreeFacts {
-  return {
-    scene: sceneOf(tree),
-    mainScroller: largestScroller(tree),
-    fingerprint: treeFingerprint(tree),
-    loading: showsProgress(tree),
-  };
-}
-
-/**
  * One read that read, as the round has gathered it by `observe`: the read,
- * its tree's facts, the frames the round judged in (the screen above an
- * applied keyboard, or each box that counts), the gesture box (the round's
- * `RoundSeen.screen` box; undefined when there is none) and the cover the
- * round applied. One value, so the steps after the judgement read the same
- * facts.
+ * and of its judgement (interact/scroll-read.ts#ReadJudgement) its tree's
+ * facts, the frames it was judged in (the screen above an applied
+ * keyboard, or each box that counts), the cover applied and the line its
+ * strokes stay above — with the gesture box (the round's `RoundSeen.screen`
+ * box; undefined when there is none). One value, so the steps after the
+ * judgement read the same facts.
  */
 interface ThisRead {
   read: RoundRead;
   facts: TreeFacts;
   frames: readonly Rect[];
   /** The frames short of the far edge is judged in (`observe`'s `seenShort`): `frames` uncut at the navigation band, so a target a stroke then pushes wholly into the band was seen short, and is turned back. */
-  screenFrames: readonly Rect[];
+  uncutFrames: readonly Rect[];
   /** The ROUND's gesture box (`RoundSeen.screen`), as this read was judged with it — not a fact of the read. */
   gesture: Rect | undefined;
-  /** The cover the ROUND applied (after the witness), as this read was judged under it — not a fact of the read. */
+  /** The cover the read applied (after the witness), as it was judged under it. */
   cover: Cover | undefined;
+  /** The line this read's strokes stay above (scroll-read.ts#strokeLine). */
+  strokeLine: KeyboardLine | undefined;
 }
 
 /** What to do next. */
@@ -250,53 +154,6 @@ export type RoundStep =
   | { do: 'stroke'; toward: Direction; reach: number; coverTop?: number; box?: Rect; probe?: true; maxTravel?: number }
   /** The scroll is over. */
   | { do: 'stop'; outcome: ScrollOutcome };
-
-/**
- * A shown soft keyboard as the round may apply it — a reading's cover (`coverOf`), or idb's band (`bandCoverOf`): its frame,
- * the part of the screen it leaves — everything above its TOP edge, full
- * width — and what the adapter can do about it. Above the top edge, not
- * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
- * band from y 539/589 of 874) runs to the bottom, so the two are the same;
- * a band that does not costs content below it, which can only make the
- * scroll swipe more or fail naming the keyboard — never report as visible
- * what is under it. `above` undefined: the band starts at or above y 0 and
- * leaves nothing (a full-screen extract-mode IME, unmeasured).
- *
- * `topCover` is the HIGHEST covered rect (`KeyboardCover.top`), not always
- * the inset band: with a floating Gboard (measured on API 33) it is the panel,
- * [359,1269][1040,1912], 681 px wide and mid-screen. The
- * invariant: only its `.y` is meaningful as a cut — the rect need not be
- * full width nor reach the bottom; the rest of it is quoted in messages.
- * The cost of the full-width cut, accepted (it never certifies a covered
- * target): content beside the panel (x < 359 there) and in the gap between
- * the panel and the strip below it is never judged visible, so a target
- * there that cannot be scrolled above the panel fails `scroll_until` with
- * the keyboard named, though the tap guard — which tests the panel's rect
- * itself — would tap it; and a panel dragged near the top leaves a short
- * stroke box (a residual).
- */
-export interface Cover {
-  topCover: Rect;
-  above: DeviceScreen | undefined;
-  remedy: KeyboardRemedy;
-  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): `window` or `wda` for a reading's cover, which the witness stood by; `idb-band` for idb's band (`bandCoverOf`), which no reading stands by — a centre under it stops nothing. */
-  line: KeyboardLine;
-}
-
-/**
- * One match as judged: the keyboard cover it was judged under (none for a
- * whole-screen judgement or a keyboard-side node) and where it stands for
- * the stop (ui-tree/standing.ts#Scene.standing) — the kind `stops` and
- * `shortOf` read, and the facts the rest of the round and the sentences
- * read: how much of it is in the frame, the frame's edges it extends past,
- * what of the app is drawn over it inside that frame (the covers, the one
- * over its centre, how much of it shows) and its cut to a sliver.
- */
-export interface Judged {
-  node: UiNode;
-  under?: Cover;
-  standing: Standing;
-}
 
 /**
  * Every way a scroll ends — one member per sentence the reader acts on
@@ -439,14 +296,6 @@ export interface PastSide {
   side: Edge;
   clippedOut: boolean;
 }
-
-/** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
-export type InFrameShort =
-  | { of: 'clipped'; judged: Judged }
-  | { of: 'covered'; judged: Judged; cover: UiNode }
-  /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
-  | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
-  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
@@ -672,7 +521,7 @@ interface State {
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   readonly lastCover: Cover | undefined;
   readonly coveredRounds: number;
-  /** The keyboard edge the last round whose tree READ stroked above (`strokeTop`: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
+  /** The keyboard edge the last round whose tree READ stroked above (scroll-read.ts#strokeLine: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
   readonly lastReadEdge: KeyboardLine | undefined;
 
   // How the target moved, read for read: a swipe that does not move the element is the only honest
@@ -846,152 +695,6 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
   };
   return state as unknown as Rounds;
 }
-
-/** The cover a reading offers, or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
-function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
-  if (shown === undefined) return undefined;
-  // The highest covered rect, not always the inset band: a floating
-  // Gboard's panel mid-screen above its 132-px strip — so a target
-  // behind it is judged under the cover and the stroke starts above it. Full
-  // width above its top, as for any band that does not reach the sides.
-  // docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
-  const topCover = shown.top;
-  if (topCover.y >= viewport.height) return undefined;
-  const line: KeyboardLine = { y: topCover.y, source: shown.remedy.dismissal === 'back' ? 'window' : 'wda', witnessed: true };
-  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: shown.remedy, line };
-}
-
-/**
- * idb's band as a cover the round applies: its line
- * (ui-tree/keyboard-cover.ts#keyboardEdge, no reading) as the band's rect —
- * the viewport's width from the line to its bottom, the shape idb's band
- * has (soft-keyboard.ts#flatListKeyboardBand) — with the reading's
- * `remedy`. Applied with no witness: it is read off the very tree being
- * judged, as WDA's band is. None when there is no band, or it lies at or
- * below the viewport's bottom.
- * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
- */
-function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): Cover | undefined {
-  if (line === undefined || line.y >= viewport.y + viewport.height) return undefined;
-  const topCover = bandRect(line, viewport);
-  return { topCover, above: line.y <= 0 ? undefined : { width: viewport.width, height: line.y }, remedy, line };
-}
-
-/**
- * The top edge a stroke is kept above (swipe.ts#strokeRoom's `coverTop`):
- * the keyboard edge (ui-tree/keyboard-cover.ts#keyboardEdge) of the applied
- * cover's line and idb's band (`TreeFacts.scene`'s draw order) — the band
- * whether or not the round applied it (a moot band changes no judgement,
- * but a stroke on it touches a key: the Contacts form and the SWIFT form's
- * number pad were stroked from y 699).
- * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
- * No guard on where the band lies in the gesture box: a top at or below
- * the box's bottom changes no stroke (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
- * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
- * the band starts below the top bar's line, a fifth of the screen down.
- */
-function strokeTop(cover: Cover | undefined, scene: Scene): KeyboardLine | undefined {
-  return keyboardEdge(cover?.line, scene.order);
-}
-
-/**
- * The MOST revealed match, not the first: an id can sit on a container and
- * its child, and reporting the clipped one of the two would invent a defect
- * (the driver hands in only the match the next tap acts on when the
- * preference picks one — resolve.ts#matchesToJudge — so this chooses only
- * among matches the tap could not tell apart either).
- * Most revealed by what SHOWS — in the frame and under nothing of the app —
- * which is what is in the frame when nothing is drawn over it; a match
- * that stops the round first (`better`). Each match's standing for the stop
- * is the scene's (ui-tree/standing.ts#Scene.standing), in the frame's box
- * with its system bands. Under a cover, a keyboard-side node (the round's
- * reading's `ofKeyboard`, one walk per round) is judged against the whole
- * screen; every other node against the part above the cover's top edge,
- * and what is drawn over a node is counted only there: a bar under the
- * keyboard covers nothing the round can see.
- */
-function judge(
-  found: readonly UiNode[],
-  frame: Frame,
-  facts: Pick<TreeFacts, 'scene'> | undefined,
-  fully: boolean,
-  cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
-): Judged | undefined {
-  if (facts === undefined) return undefined;
-  const scored = found.map((node): Judged => {
-    const under = cover === undefined || cover.keyboardSide(node) ? undefined : cover.cover;
-    const standing = facts.scene.standing(node, frame, { of: 'stop', fully, ...(under !== undefined && { keyboardTop: under.line }) });
-    return { node, ...(under !== undefined && { under }), standing };
-  });
-  return scored.sort((a, b) => better(a, b))[0];
-}
-
-/** The whole-screen judgement over every box that counts (`UsableScreen.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'scene'> | undefined, fully: boolean): Judged | undefined {
-  return frame.boxes
-    .map((box) => judge(found, { ...frame, box }, facts, fully))
-    .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best) < 0) ? j : best), undefined);
-}
-
-/**
- * The order of two judgements, best first (a comparator): a match that
- * STOPS the round (`stops`) before one that does not — a match showing
- * more but with its centre covered must not hide one the next tap would hit
- * — then the one more of which shows (`shows` ranks only; ui-tree/standing.ts
- * #bandShows says what it counts under the status band).
- * docs/adr/0008-scroll-until-exposure-box-below-status-band.md
- */
-function better(a: Judged, b: Judged): number {
-  return Number(stops(b)) - Number(stops(a)) || b.standing.facts.shows - a.standing.facts.shows;
-}
-
-/** THE stop condition: the judged match stands `reachable` for the stop (ui-tree/standing.ts#Scene.standing owns the rule). */
-function stops(j: Judged): boolean {
-  return j.standing.kind === 'reachable';
-}
-
-/**
- * What a judged match in the frame is short of a stop (`stops`) — the one
- * rule the stuck and the bound sentences read, the standing's kind as
- * their sentences group it: a cut edge (`fully: true`), a centre off the
- * screen or one under idb's band (`underKeyboard` with something in the
- * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`;
- * a centre in a system band (the status bar's, the navigation bar's), or for `fully` any of it there past the slack, `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
- * `sliver`; anything of the app drawn over it `covered`, naming the cover
- * the standing names. Asked only of a match with something in the frame
- * that does not stop the round: a match that stops it is reported before
- * any stuck or bound test — a broken invariant, and throws.
- */
-function shortOf(j: Judged): InFrameShort {
-  const s = j.standing;
-  switch (s.kind) {
-    case 'clipped':
-    case 'offScreen':
-    case 'underKeyboard':
-      return { of: 'clipped', judged: j };
-    case 'systemBar':
-      return { of: 'systemBar', judged: j, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
-    case 'cut':
-      return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
-    case 'covered':
-      return { of: 'covered', judged: j, cover: s.cover };
-    case 'reachable':
-      throw new Error('scroll round: no shortfall for a match standing reachable (a stop is reported first)');
-  }
-}
-
-/** Would this judgement end the round cleanly — a stop, no stroke, no failure? */
-const endsClean = (j: Judged | undefined): boolean => j !== undefined && stops(j);
-
-/**
- * The two judgements say the same thing about the same node. `clipped` is
- * not compared: the box above a band lies inside the viewport, so the same
- * node scoring the same fraction against both has no area between the
- * band's top and the screen's bottom, and its edges agree (comparing them
- * would be dead code).
- */
-const sameJudgement = (a: Judged | undefined, b: Judged | undefined): boolean =>
-  a === undefined || b === undefined ? a === b : a.node === b.node && a.standing.facts.visible === b.standing.facts.visible;
 
 /**
  * The FAR edge of a scroll toward `direction` — the edge of the frame its
@@ -1183,7 +886,7 @@ interface Observed {
  * next stroke.
  */
 function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
-  const { read, facts, frames, screenFrames } = now;
+  const { read, facts, frames, uncutFrames } = now;
   const { found } = read;
   const { fingerprint, loading } = facts;
   const rects = found.map((n) => ({ ...n.rect }));
@@ -1267,7 +970,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.rules.direction, cover, f));
     const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
-    if (!beyondFarEdgeIn(farFacts(best), s.rules.direction, screenFrames)) s.seenShort = true;
+    if (!beyondFarEdgeIn(farFacts(best), s.rules.direction, uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
@@ -1380,70 +1083,30 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (found.length > 0) s.everFound = true;
   const viewport = s.frame.box;
 
-  // The round judged twice when a keyboard is up: over the whole screen,
-  // and over the screen ABOVE the cover (`coverOf`) — the covered judgement
-  // stands only when the band changes the round and the witness stood by it.
-  const offered = read === undefined ? undefined : coverOf(read.cover, viewport);
-  // The tree's facts, once a round (`factsOf`): what is drawn over what
-  // (ui-tree/draw-order.ts) — the judgement's covers, and the stroke's —
-  // each match's clipping ancestors, for the plain stop's sliver rule
-  // (`stops`), and the rest the steps after the judgement read.
-  const facts = read === undefined ? undefined : factsOf(read.tree);
-  const whole = judgeOver(found, s.frame, facts, fully);
-  // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
-  const band = offered !== undefined || read === undefined || facts === undefined ? undefined : bandCoverOf(keyboardEdge(undefined, facts.scene.order), viewport, read.remedy);
-  const applied = offered ?? band;
-  let cover: Cover | undefined;
-  let best = whole;
-  if (applied !== undefined && read !== undefined && facts !== undefined) {
-    // The keyboard's own UI is judged against the whole screen: the reading's (WDA's marks), and idb's band's own nodes.
-    const covered = judge(found, s.frame, facts, fully, { cover: applied, keyboardSide: keyboardSide(read.ofKeyboard, facts.scene.order) });
-    // Moot: the round stops cleanly either way, on the same judgement — the
-    // band changes nothing, and is neither asked about nor reported.
-    // Otherwise the witness is asked THIS round, never remembered: a
-    // scroll can hide a keyboard (a list that dismisses it on drag) and
-    // leave the window state stale-shown behind it.
-    const moot = endsClean(whole) && sameJudgement(whole, covered);
-    if (!moot) {
-      // idb's band asks no witness: no reading stands by it, nor could deny it (`bandCoverOf`).
-      if (offered === undefined) {
-        cover = applied;
-        best = covered;
-      } else {
-        if (seen.corroborated === undefined) return ask('witness');
-        if (seen.corroborated) {
-          cover = offered;
-          best = covered;
-        }
-      }
-    }
-  }
+  // What this read means (interact/scroll-read.ts#judgeRead): the tree's
+  // facts, the cover that applies and the one offered, the best match
+  // judged and the frames — or the witness to ask first, which changes
+  // nothing (the state comes back as it went in). A round whose tree did
+  // not read judges nothing.
+  const judged = read === undefined ? undefined : judgeRead(read, s.frame, fully, seen.corroborated);
+  if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
+  const best = judged?.best;
+  const cover = judged?.cover;
+  const offered = judged?.offered;
   if (cover !== undefined) {
     s.lastCover = cover;
     s.coveredRounds++;
   }
-  // The line this read's strokes stay above — its cover's and idb's band,
-  // whether or not the round applied the band (`strokeTop`); a round whose
-  // tree did not read keeps the last read round's, as its cover.
-  if (read !== undefined && facts !== undefined) s.lastReadEdge = strokeTop(cover, facts.scene);
-  // The frames this round judged in — the screen above an applied keyboard,
-  // else every box that counts — for where the target stands against the
-  // far edge (`observe`, `beyondFarEdge`). A read that did not read says
-  // nothing about motion: the comparisons wait for the next one that does.
-  // Below the status band: a target whose centre a fling carried into it
-  // is past the far edge, and the next stroke turns back.
-  const screenFrames: Rect[] =
-    cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, s.frame, viewport)] : s.frame.boxes.map((b) => belowStatusBand(b, s.frame));
-  // And above the navigation band, for a `fully` stop the band's REGION
-  // refused (ui-tree/standing.ts#Standing's `band`): resting across the
-  // band's top with the content above it, it is past the far edge — the
-  // next stroke turns and lifts it. Only then: the plain stop, and every
-  // other standing, judge the far edge in the frames as ever.
-  const regionAtBottom = fully && best?.standing.kind === 'systemBar' && best.standing.band !== undefined && best.standing.bar.edge === 'bottom';
-  const judgedFrames: Rect[] = regionAtBottom ? screenFrames.map((f) => aboveNavigationBand(f, s.frame, viewport)) : screenFrames;
+  // The line this read's strokes stay above (`ReadJudgement.strokeLine`); a
+  // round whose tree did not read keeps the last read round's, as its cover.
+  if (judged !== undefined) s.lastReadEdge = judged.strokeLine;
+  // A read that did not read says nothing about motion: the comparisons
+  // wait for the next one that does.
   const gesture = seen.screen?.oriented;
   const now: ThisRead | undefined =
-    read === undefined || facts === undefined ? undefined : { read, facts, frames: judgedFrames, screenFrames, gesture, cover };
+    read === undefined || judged === undefined
+      ? undefined
+      : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames, gesture, cover, strokeLine: judged.strokeLine };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
@@ -1506,7 +1169,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           // above it — the probe would touch down off it and move nothing.
           // Twice only to keep the ask order: no room even over the whole
           // screen is `room` with no witness asked.
-          const over = roomOver(strokeTop(probeCover, now.facts.scene)?.y);
+          const over = roomOver(strokeLine(probeCover, now.facts)?.y);
           if (over === undefined) flush = { edge, container, ...noRoom };
           else {
             const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
@@ -1633,7 +1296,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // stroked once the IME is gone, the target's nearest container. `over` is looked up by the candidate's own
   // rect object — strokeRoom hands back the one it was given — so nested
   // containers of equal rects keep their own.
-  const kept = (now === undefined ? s.lastReadEdge : strokeTop(cover, now.facts.scene))?.y;
+  const kept = (now === undefined ? s.lastReadEdge : now.strokeLine)?.y;
   const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, kept, (w) => candidates.find((c) => c.rect === w)?.over);
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
@@ -1741,7 +1404,7 @@ interface BoundRound {
   readonly readError: Error | undefined;
   /** The target's matches in this round's tree. */
   readonly found: readonly UiNode[];
-  /** The best of them as judged (`judge`), if any. */
+  /** The best of them as judged (scroll-read.ts#judge), if any. */
   readonly best: Judged | undefined;
   /** The frame it was judged in — the screen box (`State.frame`) — which an `offFrame` failure quotes. */
   readonly viewport: Rect;
@@ -1768,7 +1431,7 @@ function shortfall(s: State, { readError, found, best, viewport, cover }: BoundR
     const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
     return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[s.rules.direction].far }) };
   }
-  // In the tree: `judge` scores every match, so this read judged one and `past` is this read's.
+  // In the tree: scroll-read.ts#judge scores every match, so this read judged one and `past` is this read's.
   return {
     of: 'offFrame',
     rect: (best?.node ?? found[0]).rect,

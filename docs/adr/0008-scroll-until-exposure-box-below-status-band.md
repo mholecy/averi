@@ -16,14 +16,14 @@ The stop judges its covers below the status band (`geometry.ts#belowStatusBand`)
 order is written at `ui-tree/standing.ts#Scene`.
 
 The node's own part in the band still counts in `shows` (`standing.ts#bandShows`). A match seen only in the band
-therefore still outranks one off the frame (`scroll-rounds.ts#better`). Where the cut dropped no cover, `shows` is
+therefore still outranks one off the frame (`scroll-read.ts#better`). Where the cut dropped no cover, `shows` is
 exactly the whole frame's.
 
 **The `bandShows` edge discontinuity stays.** Take a node with a cover lying only in the band and a cover straddling
 the band's edge. It shows slightly more than the same node with the straddling cover alone, because once a cover is
 dropped the straddling cover's part in the band is no longer subtracted. `shows` decides two things only:
 
-- which match ranks first (`scroll-rounds.ts#better`);
+- which match ranks first (`scroll-read.ts#better`);
 - the "N% of it shows" figure in a PARTLY UNDER note.
 
 It never decides a kind, so no stop, refusal or turn changes. Making it continuous would cost a third `exposure` for each

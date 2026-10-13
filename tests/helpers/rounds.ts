@@ -96,7 +96,7 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
  * containers (outermost first, each `clipsDescendants`), `mainScroller`
  * beside them, the nodes drawn `over` them, a progress node when `loading`,
  * and `rest`. The round
- * derives every tree fact from it (scroll-rounds.ts#TreeFacts) as it does
+ * derives every tree fact from it (scroll-read.ts#TreeFacts) as it does
  * from a device's — the row says what is ON the screen, never what the
  * round should conclude. A match nested in another match (an id on a
  * container and its child) stays where it is, under that one.

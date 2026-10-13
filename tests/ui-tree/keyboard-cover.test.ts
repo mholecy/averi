@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import { KEYBOARD_ROLE, type KeyboardTouchable, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
-import { keyboardEdge, readingLine, readKeyboard, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
+import { coverLine, keyboardEdge, readingLine, readKeyboard, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, recorded, screen, type FakeKeyboard } from '../helpers/fake.js';
@@ -485,5 +485,21 @@ describe('readingLine — a reading\'s line, only when it stands by a shown cove
   it('the in-tree model with no mark (every idb tree): none — idb\'s band is `keyboardEdge`\'s, never the reading\'s (K5d)', async () => {
     const tree = screen(node({ role: 'other', rect: { x: 0, y: 589, width: 402, height: 285 } }));
     expect(await readingLine(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toBeUndefined();
+  });
+});
+
+describe('coverLine — the line a shown cover stands for, whoever asked the witness', () => {
+  const BAND = { x: 0, y: 1285, width: 1080, height: 935 };
+  it('the window model (`back`): `window`, witnessed, at the band\'s top', () => {
+    expect(coverLine({ rects: [BAND], top: BAND, band: BAND, remedy: { dismissal: 'back', advice: undefined } })).toEqual({ y: 1285, source: 'window', witnessed: true });
+  });
+  it('the in-tree model (`none`): `wda`, witnessed', () => {
+    const band = { x: 0, y: 539, width: 402, height: 335 };
+    expect(coverLine({ rects: [band], top: band, band, remedy: { dismissal: 'none', advice: 'ADVICE' } })).toEqual({ y: 539, source: 'wda', witnessed: true });
+  });
+  it('a floating Gboard: the PANEL\'s top (the highest covered rect), not the band\'s', () => {
+    const panel = { x: 359, y: 1269, width: 681, height: 643 };
+    const strip = { x: 0, y: 2088, width: 1080, height: 132 };
+    expect(coverLine({ rects: [strip, panel], top: panel, band: strip, remedy: { dismissal: 'back', advice: undefined } })).toEqual({ y: 1269, source: 'window', witnessed: true });
   });
 });
