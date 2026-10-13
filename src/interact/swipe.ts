@@ -14,20 +14,20 @@ export interface SideWords {
    * The `scroll_until` direction (where the content lies) that reveals what
    * lies past this edge: content beyond the top lies up, and so on — read by
    * `scroll_until`'s probe and its stroke toward a cut edge
-   * (scroll-rounds.ts), by the tap's cut-sliver remedy (resolve.ts#cutRemedy,
+   * (scroll-rounds.ts), by the tap's cut-sliver remedy (target-text.ts#cutRemedy,
    * which `scroll_until`'s sliver failures quote) and by the hints for a node
-   * past a side (resolve.ts#revealText, #untriedSideText).
+   * past a side (target-text.ts#revealText, #untriedSideText).
    */
   readonly reveals: Direction;
-  /** Where a node past this edge lies, before what it lies past: `clipped out above its scroll container`, `left of the viewport` (resolve.ts#pastSideText, #zeroAreaHint). */
+  /** Where a node past this edge lies, before what it lies past: `clipped out above its scroll container`, `left of the viewport` (target-text.ts#pastSideText, resolve.ts#zeroAreaHint). */
   readonly past: string;
-  /** The same side standing alone: `if it lies to the left` (resolve.ts#untriedSideText). */
+  /** The same side standing alone: `if it lies to the left` (target-text.ts#untriedSideText). */
   readonly lies: string;
 }
 
 /**
  * Each EDGE of a rect's words — one table, a field per use, so the four
- * sides are spelled once (resolve.ts's sentences read it too).
+ * sides are spelled once (target-text.ts's sentences and resolve.ts's hint read it too).
  */
 export const SIDES: Readonly<Record<Edge, SideWords>> = {
   top: { reveals: 'up', past: 'above', lies: 'above' },

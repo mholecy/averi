@@ -18,7 +18,7 @@ edge.
 The tap and the plain stop judge in one order: off the screen, then the system bands (top, then bottom), then cut,
 then covered, then under the keyboard. The order is written once at `ui-tree/standing.ts#Scene`. A covered sliver is
 reported as a cut at a named edge, with the direction of the scroll that reveals it. The tap and `scroll_until` share
-the sentence (`interact/resolve.ts#cutSliverText`).
+the sentence (`interact/target-text.ts#cutSliverText`).
 
 The other purposes share that order but judge less or more in it:
 

@@ -5,7 +5,8 @@ import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
-import { absenceError, cutRemedy, cutSliverText, pastSideText, revealText, untriedSideText } from './resolve.js';
+import { absenceError } from './resolve.js';
+import { cutRemedy, cutSliverText, pastSideText, revealText, untriedSideText } from './target-text.js';
 import type { Cover, Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
@@ -147,7 +148,7 @@ function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): st
   return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
 }
 
-/** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (resolve.ts#cutSliverText). */
+/** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (target-text.ts#cutSliverText). */
 function sliverText({ judged, cut, minPiece }: Extract<Shortfall, { of: 'sliver' }>): string {
   return cutSliverText(cut, judged.node.rect, minPiece);
 }

@@ -22,7 +22,8 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { cutSliverText, describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { coverName, cutSliverText } from './target-text.js';
 
 /**
  * The IN-TREE model (iOS under WDA): the soft keyboard is part
@@ -220,7 +221,7 @@ interface DismissalPick {
  *   piece of it free, where a tap would MOVE: the configured element's
  *   centre is what was configured, so the dismissal is never aimed off it;
  * - cut to a sliver at its scroll container's edge — the tap's own clause
- *   (resolve.ts#cutSliverText); under a line no guard acts on (idb's band)
+ *   (target-text.ts#cutSliverText); under a line no guard acts on (idb's band)
  *   — `under the keyboard`. Neither is reached on a WDA tree: iOS has no
  *   clipping container and no idb band.
  * What `tap` counts as a cover is a cover here: a title's own content
@@ -302,9 +303,6 @@ async function pickDismissal(
   }
   return { skipped };
 }
-
-/** A cover as a skip line names it: `button "Sign in"`, `toolbar`. */
-const coverName = (cover: UiNode): string => `${cover.role}${cover.label === null ? '' : ` ${JSON.stringify(cover.label)}`}`;
 
 /**
  * Why a tap standing rules a dismissal out, as its skip line says it, or

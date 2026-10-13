@@ -9,6 +9,7 @@ import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
+import { cutRemedy, cutSliverText, pastSideText, revealText } from './target-text.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -358,24 +359,6 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
 export const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
 
 /**
- * Where a node read wholly past `side` lies — `clipped out above its scroll
- * container` when Android dumped it so (UiNode.clippedOut), `above the
- * viewport` when its rect lies there — the one wording of it, for this
- * wait's hint and `scroll_until`'s failure (scroll-text.ts).
- */
-export function pastSideText(side: Edge, clippedOut: boolean): string {
-  return clippedOut ? `clipped out ${SIDES[side].past} its scroll container` : `${SIDES[side].past} the viewport`;
-}
-
-/** The scroll that brings back a node lying past `side`: `scroll_until it with direction: "up"` (swipe.ts#SIDES). */
-export const revealText = (side: Edge): string => `scroll_until it with direction: "${SIDES[side].reveals}"`;
-
-/** The direction to try for a target that may lie past `side` and was never read there: `if it lies above, try direction: "up"`. */
-export function untriedSideText(side: Edge): string {
-  return `if it lies ${SIDES[side].lies}, try direction: "${SIDES[side].reveals}"`;
-}
-
-/**
  * The hint for a target this tree matched, but only with zero-area nodes —
  * resolveNow's filter, the reason it answered `undefined` — or undefined
  * when it matched nothing (or something resolveNow took). When every such
@@ -676,31 +659,6 @@ const INHERITED_CUT_WAY_PAST =
 /** The tap's finding for a node cut to a sliver (`cut`, of a node whose rect is `shown`, under `minPiece`), its remedy and its way past. */
 const cutFinding = (cut: Cut, shown: Rect, minPiece: number): string =>
   `${cutSliverText(cut, shown, minPiece)} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
-
-/**
- * THE sentence for a node cut to a sliver (`Clips.cutSliver`'s answer, `cut`, of a
- * node whose rect is `shown`): `cut at its scroll container's bottom edge
- * (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across
- * that edge, under the 65 a tap needs`; a cut inherited from what the node
- * lies in (`Cut.within`) says so after the container — `…(container
- * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
- * part…`. Said by the tap's refusal
- * (`aimClearOfChrome`) and by `scroll_until`'s sliver failures
- * (scroll-text.ts) — one wording.
- */
-export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
-  const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;
-  return (
-    `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)})${within}; only a ${shown.width}x${shown.height} part of it shows, ` +
-    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
-  );
-}
-
-/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
-export function cutRemedy(edge: Edge): string {
-  const direction = SIDES[edge].reveals;
-  return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
-}
 
 /**
  * How to hide a keyboard a tap refused a centre under: only a line no guard
