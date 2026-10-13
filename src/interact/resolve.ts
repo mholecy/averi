@@ -5,6 +5,7 @@ import { keyboardEdge, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { sceneOf, type Scene, type Standing, type SystemBar } from '../ui-tree/standing.js';
+import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
@@ -493,51 +494,6 @@ export class PresentElementRefusal extends Error implements RefusedOnPresentElem
  * line the step's ✗ quotes.
  */
 export class OffScreenRefusal extends PresentElementRefusal {}
-
-/**
- * THE words for each system bar (ui-tree/standing.ts#SystemBar), by edge: its
- * name, and the diagnosis of a target pinned under it — a layout drawn under
- * the bar without keeping clear of it (iOS's safe area, Android's window
- * insets; at the bottom, an edge-to-edge layout that keeps no clearance).
- * The tap's refusal (`systemBarRemedy`), `scroll_until`'s failures
- * (scroll-text.ts) and the pixel assert's (verify/pixel-poll.ts) read them,
- * so the three say one fact alike.
- */
-const SYSTEM_BAR_WORDS: Readonly<Record<SystemBar['edge'], { readonly name: string; readonly pinned: string }>> = {
-  top: { name: 'status bar', pinned: 'it is pinned under the status bar (a layout that does not keep clear of it?)' },
-  bottom: { name: 'navigation bar', pinned: 'it is pinned under the navigation bar (a layout that does not keep clear of it?)' },
-};
-
-/** The bar a system band is: `status bar` at the top, `navigation bar` at the bottom. */
-export const systemBarName = (edge: SystemBar['edge']): string => SYSTEM_BAR_WORDS[edge].name;
-
-/** The diagnosis for a target pinned under the bar at `edge`. */
-export const pinnedUnder = (edge: SystemBar['edge']): string => SYSTEM_BAR_WORDS[edge].pinned;
-
-/** Where the bar's band lies, in the tree's units: `in the top 62 of the screen`, `from y 2154 to the bottom of the screen`. */
-const bandText = (bar: SystemBar): string => (bar.edge === 'top' ? `in the top ${bar.bottom} of the screen` : `from y ${bar.top} to the bottom of the screen`);
-
-/**
- * A point under a system bar as one clause — `under the status bar at
- * (201,6), in the top 62 of the screen (tree units), where a tap goes to the
- * status bar`, `under the navigation bar at (540,2186), from y 2154 to the
- * bottom of the screen (tree units), …` — read by the tap's refusal
- * (`refuseOffScreen`) and by `scroll_until`'s failures (scroll-text.ts). No
- * platform named, and the band in the tree's units — pt on iOS, px on
- * Android, the units every rect in the same reply is in.
- */
-export const underSystemBar = (at: Point, bar: SystemBar): string => {
-  const name = systemBarName(bar.edge);
-  return `under the ${name} at (${at.x},${at.y}), ${bandText(bar)} (tree units), where a tap goes to the ${name}`;
-};
-
-/**
- * A rect reaching into a system bar's band, its centre clear, as one clause
- * — `partly under the navigation bar, from y 2154 to the bottom of the
- * screen (tree units)` — `scroll_until`'s words for a `fully: true` stop the
- * band's region refuses (ui-tree/standing.ts#Standing's `band`).
- */
-export const partlyUnderSystemBar = (bar: SystemBar): string => `partly under the ${systemBarName(bar.edge)}, ${bandText(bar)} (tree units)`;
 
 /**
  * What to do about a target whose centre lies under a system bar (the bar

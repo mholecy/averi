@@ -4,7 +4,8 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
-import { absenceError, cutRemedy, cutSliverText, partlyUnderSystemBar, pastSideText, pinnedUnder, revealText, systemBarName, underSystemBar, untriedSideText } from './resolve.js';
+import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
+import { absenceError, cutRemedy, cutSliverText, pastSideText, revealText, untriedSideText } from './resolve.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Cover, type Flush, type Judged, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -243,9 +244,9 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
 
 /**
  * `its centre stays under the status bar at (201,53), in the top 62 of the screen (tree units), …` — the tap refusal's
- * clause for the same point (resolve.ts#underSystemBar), at either system bar; or, for a `fully: true` stop the band's
+ * clause for the same point (ui-tree/system-bar.ts#underSystemBar), at either system bar; or, for a `fully: true` stop the band's
  * region refused with the centre clear, `it stays partly under the navigation bar, from y 2154 …`
- * (resolve.ts#partlyUnderSystemBar).
+ * (ui-tree/system-bar.ts#partlyUnderSystemBar).
  */
 const systemBarText = ({ judged, bar, band }: Extract<Shortfall, { of: 'systemBar' }>): string =>
   band === undefined ? `its centre stays ${underSystemBar(tapPoint(judged.node), bar)}` : `it stays ${partlyUnderSystemBar(bar)}`;

@@ -1,5 +1,4 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
-import { systemBarName } from '../interact/resolve.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { nodeText, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
 import { keyboardEdge, readKeyboard, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
@@ -7,6 +6,7 @@ import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { fullBleedHeader, sceneOf, screenSized, singleBox, type Scene } from '../ui-tree/standing.js';
+import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
