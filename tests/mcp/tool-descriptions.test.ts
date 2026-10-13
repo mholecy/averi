@@ -181,7 +181,7 @@ describe('tool descriptions on idb\'s keyboard band', () => {
 describe('tool descriptions on a wrapper counted as a cover', () => {
   it('tap says when a wrapper with children covers, and what to do beside a FAB', () => {
     expect(description('tap')).toContain(
-      'A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over all of its rect, unless it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames —',
+      'A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over all of its rect, unless, among others, it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames —',
     );
     expect(description('tap')).toContain('tap the FAB\'s own button when that is the target, or scroll_until the row out of the host\'s band');
   });
@@ -202,9 +202,9 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
-  it('scroll_until: one confirming read, then it stops without swiping further, saying which', () => {
+  it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
     expect(description('scroll_until')).toContain(
-      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read and stops without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it" — since a swipe there could dismiss a sheet or raise its discard prompt.',
+      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it" — since a swipe there could dismiss a sheet or raise its discard prompt.',
     );
   });
 
@@ -212,9 +212,13 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(
       '- **`… a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen`** (tap or `scroll_until`): the target lies on the screen beneath a modal or sheet that is still up; nothing was tapped and no further swipe was sent.',
     );
-    expect(TROUBLESHOOTING).toContain('A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over its whole rect, unless it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames:');
+    expect(TROUBLESHOOTING).toContain('A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over its whole rect, unless, among others, it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames:');
     expect(TROUBLESHOOTING).toContain(
-      '— except over another screen: a scroll view of a modal or sheet laid in the same window over the entry\'s screen, or a full-screen leaf of it (its dimming view), covers the entry, which is skipped `covered by …`; a host with children there still does not.',
+      'still is. Over another screen these excuses lapse: a scroll view of a modal or sheet laid in the same window over the entry\'s screen, or a full-screen leaf of it (its dimming view), covers the entry, which is skipped `covered by …`; a host with children there still does not.',
+    );
+    expect(TROUBLESHOOTING).toContain('(a host with children: Safari\'s full-screen host of its bottom bar) is no such screen');
+    expect(TROUBLESHOOTING).toContain(
+      'and so does a modal\'s full-screen dimming view or a sheet\'s scroll view over the screen beneath.',
     );
   });
 });
