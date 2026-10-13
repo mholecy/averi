@@ -4,13 +4,15 @@ import { SIDES } from './swipe.js';
 
 /**
  * The phrases a target cut to a sliver, or lying past a side, is said in —
- * one wording for every verb that says it: the tap's refusal
- * (resolve.ts#aimClearOfChrome), the wait's hint (resolve.ts#zeroAreaHint),
- * `scroll_until`'s failures (scroll-text.ts) and the dismissal picker's skip
- * lines (keyboard-in-tree.ts#whyNotTapped). Phrases, not policies: what
- * counts as cut is geometry.ts#Clips.cutSliver's, and which phrase a reply
- * says is its caller's switch. Shallow by design, like ui-tree/system-bar.ts:
- * delete it and each sentence reappears in two or three callers.
+ * one wording for every verb that says it: the tap's refusal (resolve.ts),
+ * the wait's hint (resolve.ts#zeroAreaHint), `scroll_until`'s failures
+ * (scroll-text.ts) and the dismissal picker's skip lines
+ * (keyboard-in-tree.ts#whyNotTapped) — and the picker's short name for a
+ * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
+ * the shared wording. Phrases, not policies: what counts as cut is
+ * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
+ * caller's switch. Shallow by design, like ui-tree/system-bar.ts: delete it
+ * and each shared sentence reappears in its two or three callers.
  */
 
 /**
