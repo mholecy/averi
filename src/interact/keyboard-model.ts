@@ -62,7 +62,7 @@ export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' 
  * A resolved node whose tap point no soft keyboard covers, and the point a
  * tap on it goes to — its centre, or an uncovered piece of
  * it when a node of the app is drawn over the centre
- * (resolve.ts#aimClearOfChrome).
+ * (resolve.ts#TapJudge.aim).
  */
 export interface ResolvedClear extends Resolved {
   /** Where to tap: the centre (`tapPoint`), or the moved point `moved` describes. */
@@ -150,7 +150,7 @@ export interface DismissResult {
 /**
  * A model's answer when the keyboard left the point: the node as resolved
  * again, the tree it was resolved in (the chrome check, the last rule of a
- * tap, judges it there — resolve.ts#aimClearOfChrome), and the keyboard
+ * tap, judges it there — resolve.ts#TapJudge.aim), and the keyboard
  * sentence.
  */
 export interface ClearedLook extends ResolvedSettled {
@@ -283,7 +283,7 @@ export interface CoveredLook {
 export interface Hiding {
   /** The side effect: the window model's `back`, the in-tree model's tap on the picked element. */
   perform(): Promise<void>;
-  /** What `perform` sent, as a clause — `back was pressed to hide the soft keyboard`, `id:"login_title" was tapped at (201,303) to hide the soft keyboard` — for a refusal after it that must say something was (the off-screen rule, resolve.ts#refuseOffScreen). */
+  /** What `perform` sent, as a clause — `back was pressed to hide the soft keyboard`, `id:"login_title" was tapped at (201,303) to hide the soft keyboard` — for a refusal after it that must say something was (the off-screen rule, resolve.ts#judgeTap). */
   sent: string;
   /** How many looks after it before the last still-covering one refuses: one for `back` (the frame decides), KEYBOARD_HIDE_CONFIRM_LOOKS for a dismissal tap (a hide animation caught mid-way is not a refusal). */
   looks: number;

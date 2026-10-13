@@ -23,7 +23,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { cutSliverText, describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { cutSliverText, describeTarget, findTarget, tapStandings, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 
 /**
  * The IN-TREE model (iOS under WDA): the soft keyboard is part
@@ -207,10 +207,10 @@ interface DismissalPick {
  * its centre, unmoved — THE TAP'S STANDING (ui-tree/standing.ts#Scene,
  * `{ of: 'tap' }`) over `screen` (the guard's first-look screen; the
  * dismissal's own read), one scene per call, derived on first use, its
- * keyboard line the tap's (the reading's line merged with the tree's,
- * ui-tree/keyboard-position.ts#KeyboardPosition.line), asked once per call,
- * by the first strategy that gets this far — under WDA a witnessed line,
- * which refuses nothing the band check above has not:
+ * keyboard line the tap's — the standing with the reading's line merged in
+ * (resolve.ts#tapStandings' `full`, the tap's own expression), the reading
+ * asked once per call, by the first strategy that gets this far — under
+ * WDA a witnessed line, which refuses nothing the band check above has not:
  * - `reachable` at the centre, with no interactive node there it would
  *   press — usable;
  * - off the screen or in a system band — `off screen at (x,y)`: a title
@@ -294,8 +294,7 @@ async function pickDismissal(
     }
     scene ??= sceneOf(tree);
     position ??= keyboardPosition(scene.order, keyboard);
-    const keyboardTop = position.line(node, await position.readingLine());
-    const unusable = whyNotTapped(scene.standing(node, screen, { of: 'tap', ...(keyboardTop !== undefined && { keyboardTop }) }), node);
+    const unusable = whyNotTapped(await tapStandings(scene, node, screen, position).full(), node);
     if (unusable !== undefined) {
       skipped.push(`${name}: ${unusable}`);
       continue;

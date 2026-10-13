@@ -974,7 +974,7 @@ export function rectText(r: Rect): string {
  * How a sentence names a NODE drawn over another — `button "Continue to
  * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
  * rect (`rectText`). The tap's chrome refusal and move
- * (interact/resolve.ts#aimClearOfChrome) and `scroll_until`'s covered
+ * (interact/resolve.ts#TapJudge.aim) and `scroll_until`'s covered
  * sentences (interact/scroll-text.ts) share it.
  */
 export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
@@ -985,7 +985,7 @@ export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect
  * "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over
  * it` — the `at its centre` clause when the cover is the one at the
  * target's centre. One spelling for the tap's
- * chrome refusal and move (interact/resolve.ts#aimClearOfChrome) and
+ * chrome refusal and move (interact/resolve.ts#TapJudge.aim) and
  * `scroll_until`'s covered sentences (interact/scroll-text.ts).
  */
 export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point): string =>

@@ -31,7 +31,7 @@ const bandText = (bar: SystemBar): string => (bar.edge === 'top' ? `in the top $
  * (201,6), in the top 62 of the screen (tree units), where a tap goes to the
  * status bar`, `under the navigation bar at (540,2186), from y 2154 to the
  * bottom of the screen (tree units), …` — read by the tap's refusal
- * (interact/resolve.ts#refuseOffScreen) and by `scroll_until`'s failures
+ * (interact/resolve.ts#judgeTap) and by `scroll_until`'s failures
  * (interact/scroll-text.ts). No
  * platform named, and the band in the tree's units — pt on iOS, px on
  * Android, the units every rect in the same reply is in.

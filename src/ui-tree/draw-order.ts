@@ -36,7 +36,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   drawn over a node about to be tapped or scrolled to — a pinned CTA bar,
  *   a floating tab bar, a top bar laid after the form — what of it still
  *   shows, and where a tap on it should go (interact/resolve.ts#
- *   aimClearOfChrome for the tap and the fill's focus tap,
+ *   TapJudge.aim for the tap and the fill's focus tap,
  *   standing.ts#Scene.standing for `scroll_until`'s stop, and the tap's
  *   standing again for the in-tree keyboard dismissal picker,
  *   interact/keyboard-in-tree.ts#pickDismissal).
