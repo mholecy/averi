@@ -23,12 +23,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Six questions, one per caller, read from three columns of `NOT_DRAWN`
+ * Five questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
  * `coversOf` reads `exposure`'s):
- * - `shadowing(node, point)` — the tap guard's dismissal picker
- *   (interact/keyboard-in-tree.ts#pickDismissal): is a configured dismissal
- *   target drawn over at its tap point?
  * - `drawnOver(container)` — `scroll_until`'s stroke box
  *   (interact/scroll-rounds.ts#TreeFacts, swipe.ts#strokeRoom): what is
  *   drawn over the clipping container a stroke goes over?
@@ -40,7 +37,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   a floating tab bar, a top bar laid after the form — what of it still
  *   shows, and where a tap on it should go (interact/resolve.ts#
  *   aimClearOfChrome for the tap and the fill's focus tap,
- *   standing.ts#Scene.standing for `scroll_until`'s stop).
+ *   standing.ts#Scene.standing for `scroll_until`'s stop, and the tap's
+ *   standing again for the in-tree keyboard dismissal picker,
+ *   interact/keyboard-in-tree.ts#pickDismissal).
  *   docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  * - `paintsOver(node, within)` — a pixel assert's chrome
  *   (ui-tree/standing.ts#Scene.standing's pixel purpose): which of
@@ -52,7 +51,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
  *   drawn over the strip a node cut short of its own content would gain?
  *
- * The three columns read the rows differently on purpose — each column of
+ * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
  * they differ the row says why. Only nodes of the tree are covers: what a
  * tree does not list (the translucent top bar idb gives as its button and
@@ -67,19 +66,6 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * subtraction of a cover from a target included — is geometry.ts's.
  */
 export interface DrawOrder {
-  /**
-   * The node drawn over `point` on top of `node`, if any: the LAST node
-   * after `node`'s subtree in pre-order — its first place in the tree, and
-   * none of its own subtree wherever else the same object appears — that
-   * draws (`NOT_DRAWN`'s `shadowing` column) and contains the point
-   * (`containsPoint`: right and bottom edges exclusive). Undefined when
-   * nothing does, or when `node` is not in this tree. The keyboard's own
-   * nodes are not exempt: a target
-   * under the keyboard is caught first by the band check (with its own
-   * reason), and a keyboard-owned node over the point that the band missed
-   * is a real cover.
-   */
-  shadowing(node: UiNode, point: Point): UiNode | undefined;
   /**
    * The nodes drawn over a clipping container, in pre-order: every node
    * after the container's subtree whose rect meets the container's with
@@ -108,7 +94,8 @@ export interface DrawOrder {
    * no keyboard node, and its band is read with the input method's word,
    * ui-tree/keyboard-cover.ts — so the caller cuts it out of `within`). The
    * covers are the nodes after `node`'s subtree in pre-order (its first
-   * place in the tree, as `shadowing`) — and, in idb's flat list, a
+   * place in the tree, and none of its own subtree wherever else the same
+   * object appears) — and, in idb's flat list, a
    * floating tab bar's items listed before it, when it lies outside the bar
    * (`tabBarsOf`: idb lists the bar first; a nested tree's order is its draw
    * order) — that draw for a
@@ -273,12 +260,12 @@ export interface Exposure {
 }
 
 /**
- * The questions of a point and of a container — `NOT_DRAWN`'s columns
- * judged against what is `Seen` (`draws`); `drawnOverAt` reads
- * `drawnOver`'s. The third column, `target`, is judged against a target
- * too (`SeenFor`, `drawsOverTarget`).
+ * The question of a container — `NOT_DRAWN`'s column judged against what
+ * is `Seen` (`draws`); `drawnOverAt` reads it too. The other column,
+ * `target`, is judged against a target as well (`SeenFor`,
+ * `drawsOverTarget`).
  */
-type Question = 'shadowing' | 'drawnOver';
+type Question = 'drawnOver';
 
 /** One node in pre-order, with what a row may ask of where it is. */
 interface Placed {
@@ -475,23 +462,15 @@ const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 const NOT_DRAWN = {
   /**
    * No area: nothing to draw (a zero-width text, a collapsed view). Every
-   * question; for `shadowing` it is belt and braces — `containsPoint`
-   * already rejects a rect of no area.
+   * question.
    */
   noArea: {
-    shadowing: ({ node }) => !(rectArea(node.rect) > 0),
     drawnOver: ({ node }) => !(rectArea(node.rect) > 0),
     target: ({ node }) => !(rectArea(node.rect) > 0),
   },
 
   /**
    * STRUCTURAL ROLES (`container`, `other` — every source's wrappers).
-   *
-   * `shadowing`: any node of one is excused, with or without children or a
-   * label — a full-screen `Other` of a later Window contains every point
-   * and draws nothing; what it carries is walked and judged by itself (an
-   * alert's text inside WDA's Alert → container). iOS dimming views come
-   * through as `other`, so they never cover.
    *
    * `drawnOver`: only a structural LEAF with no label and no value is
    * excused (a spacer, an empty Box — empty area). A Compose tree is all
@@ -515,8 +494,8 @@ const NOT_DRAWN = {
    * wrapper after the target in pre-order — WDA lays a screen's content in
    * `Other` frames the screen's size or the form's, Windows after Windows —
    * says nothing about the target's surface; what it carries is walked and
-   * judged by itself, as the point question judges every structural node.
-   * Not the point question's blanket excuse: a wrapper only PARTLY over the
+   * judged by itself (an alert's text inside WDA's Alert → container).
+   * Not every structural node: a wrapper only PARTLY over the
    * target is a bar's frame, the case the tab-bar host measured. And not
    * every wrapper holding the target: the measured host
    * `66,1840 948x248` holds a small target in a row at y 1845–1875 whole,
@@ -545,7 +524,6 @@ const NOT_DRAWN = {
    * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   structural: {
-    shadowing: ({ node }) => STRUCTURAL_ROLES.has(node.role),
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
     target: ({ node }, { target, screenArea }) =>
       STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
@@ -557,33 +535,30 @@ const NOT_DRAWN = {
    * draws through its content, which is walked. A childless one draws
    * itself (a full-screen image or text).
    *
-   * `shadowing`: a NON-INTERACTIVE one only (the bug note below): WDA gives a
+   * `target`: a NON-INTERACTIVE one only (the bug note below): WDA gives a
    * SwiftUI pushed screen's toolbar host as `toolbar 'Toolbar'` with the
-   * screen's full frame AFTER the title in pre-order; it draws nothing over
-   * the title, yet every `keyboardDismiss` tap on that screen was refused
-   * as "covered by toolbar". An interactive one still covers: a
-   * full-screen `button` backdrop (an RN transparent Modal's Pressable)
-   * takes the tap. Accepted trade-off: a full-screen non-interactive host
-   * with nothing of its own at the point (an RN ScrollView in a
-   * transparent modal whose rows are below the title) reads as not
-   * covering, and the dismissal tap lands on it — on the guard's path a
-   * keyboard that stays, or a target gone, ends in `AfterDismissalTap`; a
-   * tap that hides the keyboard AND does something of its own passes
-   * silently (`hidden by tapping <title> before tapping`), and on the
-   * post-fill `dismiss()` path is reported as `hiddenBy: tapping <title>`.
-   * "Has children" is a weak signal: the measured toolbar's only child is
-   * an empty container.
+   * screen's full frame AFTER the title in pre-order — and after every row
+   * of its screen; it draws nothing over them, yet every `keyboardDismiss`
+   * tap on that screen was refused as "covered by toolbar". An interactive
+   * one still covers: a full-screen `button` backdrop (an RN transparent
+   * Modal's Pressable) takes the tap. Accepted trade-off: a full-screen
+   * non-interactive host with nothing of its own at the point (an RN
+   * ScrollView in a transparent modal whose rows are below the title)
+   * reads as not covering, and the tap lands on it — for the in-tree
+   * keyboard dismissal (interact/keyboard-in-tree.ts#pickDismissal), on the
+   * guard's path a keyboard that stays, or a target gone, ends in
+   * `AfterDismissalTap`; a tap that hides the keyboard AND does something
+   * of its own passes silently (`hidden by tapping <title> before
+   * tapping`), and on the post-fill `dismiss()` path is reported as
+   * `hiddenBy: tapping <title>`. "Has children" is a weak signal: the
+   * measured toolbar's only child is an empty container.
    * docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md
    *
-   * `drawnOver`: whatever its interactivity — the row was taken over from
-   * `shadowing`'s without the interactive exception, and no measurement
-   * has asked it either way (the tree keeps no `clickable`).
-   *
-   * `target`: `shadowing`'s — the SwiftUI toolbar host lies after every
-   * row of its screen, and a full-screen backdrop button takes the tap.
+   * `drawnOver`: whatever its interactivity — `target`'s rule without the
+   * interactive exception; no measurement has asked it either way (the
+   * tree keeps no `clickable`).
    */
   screenSizedHost: {
-    shadowing: ({ node }, { screenArea }) => !isInteractive(node) && screenSized(node, screenArea),
     drawnOver: ({ node }, { screenArea }) => screenSized(node, screenArea),
     target: ({ node }, { screenArea }) => !isInteractive(node) && screenSized(node, screenArea),
   },
@@ -593,8 +568,9 @@ const NOT_DRAWN = {
    * whatever its size, covers a point only through its descendants, never
    * through its own frame — the screen-sized host rule without the size.
    *
-   * `shadowing` (measured on the device with the toolbar host's rule
-   * above): with the toolbar host excused, the next node after the title
+   * `target` (measured on the device with the toolbar host's rule above,
+   * for the in-tree keyboard dismissal's title): with the toolbar host
+   * excused, the next node after the title
    * in pre-order — the form's `scrollable 0 0 402 512`, 58 % of the screen,
    * so no host by size — covered the title at (201,84) and the dismissal
    * was refused "covered by scrollable"; its frame runs under the
@@ -617,23 +593,17 @@ const NOT_DRAWN = {
    * row LOOSENS the guard: a scroll view really drawn over the point with
    * nothing non-structural there (a sheet's table whose row at the title is
    * a bare `Cell`) reads as not covering — the outcomes are the
-   * screen-sized host's above. Residual the other way: a row scrolled UNDER
-   * a translucent bar is after the bar's title in WDA's pre-order, so it
-   * still reads as cover — a false refusal, the safe direction. Android's
-   * scroll containers never meet this question: the guard there has an
-   * oracle.
+   * screen-sized host's above. A row scrolled UNDER a translucent bar is
+   * the `scrolledContent` row's. The scroll view itself also lies under the
+   * bar's buttons, which WDA lists before it, and the SWIFT form's measured
+   * WDA tree has it after the title.
    *
    * `drawnOver`: not excused — no measurement asked it (no iOS tree has a
    * clipping container, and a Compose scroller is `container`, not
    * `scrollable`: adapters/types.ts#UiNode.clipsDescendants).
-   *
-   * `target`: `shadowing`'s, for its reason — the form's scroll view runs
-   * under the translucent top bar whose buttons WDA lists before it, and
-   * the SWIFT form's measured WDA tree has it after the title.
    */
   contentFramed: {
     // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
-    shadowing: ({ node }) => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
     target: ({ node }) => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
   },
 
@@ -679,11 +649,10 @@ const NOT_DRAWN = {
    * screen (a bottom sheet's list laid in the screen's own layer, over a
    * form) hides nothing through its rows — only its frame, or a
    * non-scrolling node of the sheet, can cover. The
-   * point and the container questions never ask it: the dismissal picker's
-   * title IS such a target, and its `contentFramed` row was measured with
-   * a row under the title still covering (accepted there as a false
-   * refusal, the safe direction for a keyboard dismissal; for a tap target
-   * it is not: it refuses BackButton).
+   * container question never asks it. The in-tree keyboard dismissal's
+   * title IS such a target: the picker asks the tap's standing, so a row
+   * scrolled under the title no longer refuses it.
+   * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
    *
    * Under idb this row never fires: its list is FLAT, so no node has a
    * scroll-view ancestor — `flatListChrome` stands in for it over the top
@@ -1051,13 +1020,14 @@ const NOT_DRAWN = {
    * `other` to every type they do NOT map — a SegmentedControl, Stepper,
    * SearchField — so an unlabelled `other` may be a control and is an item.
    *
-   * `shadowing` (the bug note below): measured under WDA on the stock Contacts "New
+   * `target` (the bug note below): measured under WDA on the stock Contacts "New
    * Contact" sheet (UIKit, iPhone 17, iOS 27): after the title `text 'New
    * Contact' 149 89 104 22` come the form's `scrollable 0 62 402 812`
    * (the `contentFramed` row) and two `toolbar 'Toolbar'`s, `0 83 402 48`
    * and `0 62 402 812`, each holding ONE empty `Other` (→ `container`) of
    * its own rect; EACH alone contained the title's point (201,100) and
-   * refused the dismissal as "covered by toolbar", while the screenshot
+   * refused the keyboard dismissal on the title as "covered by toolbar",
+   * while the screenshot
    * shows nothing over the title. So "itemless" is judged by content, not
    * by child count; the 48-pt one is a bar's size, which no host rule
    * excuses. A toolbar's surface is its ITEMS (WDA lists a bar button, a
@@ -1065,28 +1035,25 @@ const NOT_DRAWN = {
    * draw nothing. Narrow on purpose: only `toolbar`; any descendant with a
    * label, value or identifier, or of any other role, at any depth, is an
    * item, and the toolbar then covers as itself (the input-accessory bar's
-   * Done: Toolbar → Other → Button). Accepted residual, this row LOOSENS
-   * the guard: an opaque itemless bar drawn over the dismissal reads as not
-   * covering, and the tap lands on a bar with no item — likely a keyboard
-   * that stays, ending in `AfterDismissalTap`. The one silent wrong action:
+   * Done: Toolbar → Other → Button). The two toolbars also lie after every
+   * field of the form and over the nav bar's Cancel. Accepted residual,
+   * this row LOOSENS the guard: an opaque itemless bar drawn over the
+   * dismissal reads as not covering, and the tap lands on a bar with no
+   * item — likely a keyboard that stays, ending in `AfterDismissalTap`. The one silent wrong action:
    * a bar whose item WDA does not list as content (not an accessibility
    * element, or listed only as an empty frame) reads as itemless, and the
    * dismissal tap can trigger that item. Platform scope: only the WDA
    * parser assigns `toolbar` (adapters/wda-source.ts); a future mapping to
    * it inherits this row and must be judged against it. A keyboard-owned
-   * itemless toolbar (none measured) is excused like any other: the
-   * `keyboard` row counts for this question, and the band — which contains
-   * the accessory slot — still catches a point there.
+   * itemless toolbar (none measured) is excused by the `keyboard` row as
+   * well, and the band — which contains the accessory slot — still catches
+   * a point there for the dismissal picker.
    * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md
    *
    * `drawnOver`: not excused — no measurement asked it (no WDA tree has a
    * clipping container).
-   *
-   * `target`: `shadowing`'s — the measured sheet's two itemless toolbars
-   * lie after every field of the form and over the nav bar's Cancel.
    */
   itemlessToolbar: {
-    shadowing: ({ node }) => itemless(node),
     target: ({ node }) => itemless(node),
   },
 
@@ -1094,9 +1061,6 @@ const NOT_DRAWN = {
    * THE KEYBOARD'S OWN SUBTREES (`UiNode.ofKeyboard` on the node or an
    * ancestor, or the band `KEYBOARD_ROLE` marks — the same nodes on WDA,
    * where the band lies in the keyboard's Window).
-   *
-   * `shadowing`: counted — the keyboard is one more thing drawn over a
-   * point (see `DrawOrder.shadowing`).
    *
    * `drawnOver`: left out, as covers and as the container itself: the
    * keyboard is `scroll_until`'s round's cover, read with its witness
@@ -1108,7 +1072,11 @@ const NOT_DRAWN = {
    * caller's, cut out of `within` with its witness; Android has no
    * keyboard node at all, so a cover read here would judge the two
    * platforms differently (and an adapter with the oracle never reads the
-   * keyboard from its tree: a band there is no cover either).
+   * keyboard from its tree: a band there is no cover either). The in-tree
+   * keyboard dismissal picker judges the keyboard first, by the reading's
+   * band (interact/keyboard-in-tree.ts#pickDismissal); a keyboard-owned
+   * node outside the band does not refuse a dismissal (ADR 0016's
+   * residual).
    */
   keyboard: {
     drawnOver: ({ inKeyboard }) => inKeyboard,
@@ -1441,7 +1409,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
   /** What the `target` column knows of `target`: the tree's facts, and where its reading order breaks. */
   const asTarget = (target: Placed): SeenFor => ({ ...seen, target, flatList, contentFrom, barLine, readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine), bottomChrome, paddedTouchTargets });
-  /** Every place of `node` in the walk — the same object may sit at several (`shadowing`'s rule). */
+  /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
   const laterThan = (places: readonly Placed[], keep: (p: Placed) => boolean): Placed[] =>
@@ -1491,11 +1459,6 @@ export function drawOrder(tree: UiNode): DrawOrder {
         const hides = read !== undefined && overlapsPastSlack(reach, read);
         return !hides || ownContentOf(target, placed, reach) || clickableLayer(target, placed) ? [] : [{ node: cover, reach: { ...reach } }];
       });
-    },
-    shadowing(node, point) {
-      const places = placesOf(node);
-      if (places.length === 0) return undefined;
-      return laterThan(places, (p) => draws(p, 'shadowing') && containsPoint(p.node.rect, point)).at(-1)?.node;
     },
     drawnOver,
     drawnOverAt(container, point) {

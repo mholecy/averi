@@ -400,7 +400,7 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * describes — turns the box. A gesture over a turned box on an unturned
  * screen lands off-centre, not off-screen in the short axis; the tree
  * offers nothing to tell the two apart. That cost is a SWIPE's only: a tap
- * refusal (ui-tree/standing.ts#onScreen) does not take this answer alone —
+ * refusal (ui-tree/standing.ts#Scene, the tap's standing) does not take this answer alone —
  * ui-tree/usable-screen.ts#UsableScreen says which boxes count (`boxes`), and a
  * child window that matches the panel neither way — this crowned node —
  * is no evidence there: the judgement uses the panel as built. A window

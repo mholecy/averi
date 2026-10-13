@@ -30,8 +30,7 @@ import type { UsableScreen } from './usable-screen.js';
  * Contract of `standing(node, screen, purpose)`:
  * - The point judged is the node's centre as a tap sends it
  *   (selectors.ts#tapPoint). It is ON the screen when it lies in a box less
- *   the system bands (`onScreen`, the rule the in-tree dismissal picker
- *   asks too): the status band at a portrait box's top
+ *   the system bands: the status band at a portrait box's top
  *   (geometry.ts#belowStatusBand) and the navigation band at its bottom
  *   (geometry.ts#aboveNavigationBand). The tap judges in ANY of
  *   `screen.boxes`; the stop in `screen.box` alone (a caller judging in
@@ -324,29 +323,6 @@ export function sceneOf(tree: UiNode): Scene {
       : tapStanding(judged, place, chosenBox(judged.centre, screen, tree, node), boxes ?? [], screen, purpose.keyboardTop);
   }
   return scene;
-}
-
-/**
- * THE on-screen rule for a point about to be tapped — the target's centre
- * (`Scene.standing`) and a configured keyboard dismissal's
- * (interact/keyboard-in-tree.ts#pickDismissal): inside any of the screen's
- * `boxes` less its system bands. With no screen (no usable device size and
- * no window in the tree), inside the tree's root rect when it has one; with
- * none, on screen — the rule exists to stop a false "Tapped", and must never
- * be why a tap on a device that could not report its size did not happen.
- * The point is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on
- * a 402-wide screen is judged at 402, off it.
- *
- * Measured: idb lists a scroll view's content below the fold with real
- * rects, and a tap at (94,895) on a 402x874 screen landed nowhere and was
- * reported done; a tap at (201,6) went to iOS's status bar, which scrolled the form to its
- * top, and one at (256,3) on Google Contacts' collapsed app bar to
- * Android's; one at (540,2186) on mp-native's Account Detail, drawn edge to
- * edge, to the navigation bar.
- * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
- */
-export function onScreen(point: Point, tree: UiNode, screen: StandingScreen | undefined): boolean {
-  return placeOf(point, screen?.boxes ?? rootBoxes(tree), screen) === 'on';
 }
 
 /** A node being judged, and its centre. */

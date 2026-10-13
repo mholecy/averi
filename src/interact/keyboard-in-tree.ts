@@ -1,10 +1,9 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder, type DrawOrder } from '../ui-tree/draw-order.js';
 import { frameText } from '../ui-tree/geometry.js';
-import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
+import { keyboardEdge, readingLine, readKeyboard, type KeyboardLine, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
-import { onScreen } from '../ui-tree/standing.js';
+import { sceneOf, type Scene, type Standing } from '../ui-tree/standing.js';
 import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
 import {
@@ -23,7 +22,7 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { cutSliverText, describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 
 /**
  * The IN-TREE model (iOS under WDA): the soft keyboard is part
@@ -203,13 +202,31 @@ interface DismissalPick {
  * (the reading's `ofKeyboard`: a tap on a key or on Done is what `accessory`
  * is for),
  * has its centre clear of the band (a configured element under the keyboard
- * would be the very tap this guard refuses), on screen — the tap's on-screen
- * point rule (ui-tree/standing.ts#onScreen) over `screen` (the guard's
- * first-look screen; the dismissal's own read): a title scrolled above the
- * viewport is still in the tree, WDA keeps off-screen nodes — and not drawn
- * over by later content
- * (ui-tree/draw-order.ts#shadowing: an alert, a sheet, a navigation bar's
- * label). An `accessory` is usable when `accessoryDismissButton` answers;
+ * would be the very tap this guard refuses), and a tap on it would land on
+ * its centre, unmoved — THE TAP'S STANDING (ui-tree/standing.ts#Scene,
+ * `{ of: 'tap' }`) over `screen` (the guard's first-look screen; the
+ * dismissal's own read), one scene per call, derived on first use, its
+ * keyboard line the tap's own lazy ask (keyboard-cover.ts#readingLine
+ * merged by #keyboardEdge — under WDA a witnessed line, which refuses
+ * nothing the band check above has not):
+ * - `reachable` at the centre — usable;
+ * - off the screen or in a system band — `off screen at (x,y)`: a title
+ *   scrolled above the viewport is still in the tree, WDA keeps off-screen
+ *   nodes;
+ * - drawn over (an alert, a sheet, a navigation bar's label) — `covered by
+ *   <role> "<label>"`, naming the cover; so is a centre covered with a
+ *   piece of it free, where a tap would MOVE: the configured element's
+ *   centre is what was configured, so the dismissal is never aimed off it;
+ * - cut to a sliver at its scroll container's edge — the tap's own clause
+ *   (resolve.ts#cutSliverText); under a line no guard acts on (idb's band)
+ *   — `under the keyboard`. Neither is reached under WDA today: iOS has no
+ *   clipping container and no idb band.
+ * What `tap` counts as a cover is a cover here, and nothing else is: a
+ * title's own content listed beside it, its own unlabelled control, a node
+ * of its frame, content of a scroll view it is not in and a keyboard-owned
+ * node outside the band are not; a structural wrapper partly over it is.
+ * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
+ * An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
  * check is repeated here. `keyboard` must be a reading OF `tree`: its band
  * and its `ofKeyboard` set are that tree's, and a node of another tree is
@@ -223,7 +240,8 @@ async function pickDismissal(
   screen: UsableScreen | undefined,
 ): Promise<DismissalPick> {
   const skipped: string[] = [];
-  let order: DrawOrder | undefined; // walked once, by the first strategy that gets as far as asking it
+  let scene: Scene | undefined; // derived once, by the first strategy that gets as far as asking the tap's standing
+  let line: Promise<KeyboardLine | undefined> | undefined; // the reading's line, asked once and only then
   for (const d of dismissals) {
     const name = describeDismissal(d);
     if (d.kind === 'accessory') {
@@ -254,23 +272,48 @@ async function pickDismissal(
       skipped.push(`${name}: the keyboard's own control`);
       continue;
     }
-    const at = tapPoint(node);
-    if ((await keyboard.frameOver(at)).kind === 'covered') {
+    if ((await keyboard.frameOver(tapPoint(node))).kind === 'covered') {
       skipped.push(`${name}: under the keyboard`);
       continue;
     }
-    if (!onScreen(at, tree, screen)) {
-      skipped.push(`${name}: off screen at (${at.x},${at.y})`);
-      continue;
-    }
-    const over = (order ??= drawOrder(tree)).shadowing(node, at);
-    if (over !== undefined) {
-      skipped.push(`${name}: covered by ${over.role}${over.label === null ? '' : ` ${JSON.stringify(over.label)}`}`);
+    scene ??= sceneOf(tree);
+    const keyboardTop = keyboardEdge(await (line ??= readingLine(keyboard)), scene.order, node);
+    const unusable = whyNotTapped(scene.standing(node, screen, { of: 'tap', ...(keyboardTop !== undefined && { keyboardTop }) }), node);
+    if (unusable !== undefined) {
+      skipped.push(`${name}: ${unusable}`);
       continue;
     }
     return { picked: { node, what }, skipped };
   }
   return { skipped };
+}
+
+/** A cover as a skip line names it: `button "Sign in"`, `toolbar`. */
+const coverName = (cover: UiNode): string => `${cover.role}${cover.label === null ? '' : ` ${JSON.stringify(cover.label)}`}`;
+
+/**
+ * Why a tap standing rules a dismissal out, as its skip line says it, or
+ * undefined when it lands on the dismissal's centre, unmoved. A tap that
+ * would move to an uncovered piece is no dismissal: the configured element's
+ * centre is what was configured, so it is skipped naming the cover over the
+ * centre.
+ */
+function whyNotTapped(standing: Standing, node: UiNode): string | undefined {
+  switch (standing.kind) {
+    case 'reachable':
+      return standing.moved === undefined ? undefined : `covered by ${coverName(standing.moved.cover)}`;
+    case 'offScreen':
+    case 'systemBar':
+      return `off screen at (${standing.at.x},${standing.at.y})`;
+    case 'covered':
+      return `covered by ${coverName(standing.cover)}`;
+    case 'cut':
+      return cutSliverText(standing.cut, node.rect, standing.minPiece);
+    case 'underKeyboard':
+      return 'under the keyboard';
+    case 'clipped':
+      throw new Error(`keyboard dismissal: a tap standing ${standing.kind}`);
+  }
 }
 
 /** The sentence a refusal or a warning ends with when nothing was picked: which strategies there were and why each was passed over. */

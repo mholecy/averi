@@ -72,8 +72,8 @@ decision:
   - a display whose natural rotation is landscape, such as a tablet held portrait.
 - The flush cut is read by shape. A whole last row resting flush with the bar fails an ocr assert closed too.
 - The band is kept until a launch or a fresh read, as the status band is.
-- The in-tree keyboard dismissal picker inherits the band's point rule (`ui-tree/standing.ts#onScreen`). This is inert:
-  Android never reaches the picker.
+- The in-tree keyboard dismissal picker inherits the band's point rule: it asks the tap's standing
+  (`docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md`). This is inert: Android never reaches the picker.
 
 ## Bug note
 

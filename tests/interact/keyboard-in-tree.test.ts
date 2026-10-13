@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Rect, UiNode } from '../../src/adapters/types.js';
+import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { AfterDismissalTap, AfterKeyboardDismissal, KeyboardWithoutDismissal, dismissKeyboard, resolveClearOfKeyboard, type KeyboardDismissal } from '../../src/interact/keyboard.js';
 import { KEYBOARD_HIDE_DELAY_MS } from '../../src/interact/keyboard-model.js';
@@ -484,7 +484,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         }
       });
 
-      it('a root without a rect: the DEVICE screen judges — the tap\'s own on-screen rule (ui-tree/standing.ts#onScreen, one owner)', async () => {
+      it('a root without a rect: the DEVICE screen judges — the tap\'s own standing (ui-tree/standing.ts#Scene, one owner)', async () => {
         const fake = iosFake();
         fake.live().rect = { x: 0, y: 0, width: 0, height: 0 };
         fake.viewportSize = { width: 402, height: 874 };
@@ -503,6 +503,109 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         await tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] });
         expect(fake.taps).toEqual(['login_title', 'login_submit']);
       });
+
+    /**
+     * The picker asks the TAP's standing (ui-tree/standing.ts#Scene, `{ of: 'tap' }`) after its two keyboard checks:
+     * a dismissal is used when a tap on it would land on its centre, unmoved — what `tap` would count as a cover is a
+     * cover, and nothing else is. One test per shape whose answer that decided (docs/adr/0016-the-dismissal-picker-asks-
+     * the-tap-standing.md, its before/after table), each on a constructed WDA screen or a measured dump.
+     */
+    describe('the tap\'s standing decides: what a tap would count as a cover, and only that (ADR 0016)', () => {
+      const FULL = { x: 0, y: 0, width: 402, height: 874 };
+      /** The dismissal `tap id:<id>` on `screen` (a WDA band among its root's children) after a fill: `tapped (x,y)`, or the skip clause the warning gives. A tap there hides the keyboard. */
+      const pickOn = async (screen: UiNode, id: string, device?: FakeAdapter['viewportSize']): Promise<string> => {
+        const fake = new FakeAdapter({ screen }, 'screen', (_id, self) => dropBand(self.live()));
+        fake.viewportSize = device;
+        fake.platform = 'ios';
+        fake.keyboard = undefined;
+        fake.keyboardAdvice = 'ADVICE';
+        const result = await dismissKeyboard(fake, { ambiguous: 'refuse', dismissals: [{ kind: 'tap', target: { id } }] });
+        if (result.hiddenBy !== undefined) return `tapped (${fake.tapPoints[0].x},${fake.tapPoints[0].y})`;
+        return result.warning?.match(/\(tap id:"[^"]*": (.*)\) — the next tap/)?.[1] ?? `unexpected: ${JSON.stringify(result)}`;
+      };
+      /** The login screen's root with `children` laid in it, then the band {0,539,402,335}. */
+      const screenOf = (...children: UiNode[]) => node({ role: 'container', rect: FULL, children: [...children, bandNode()] });
+      const loginTitle = (rect: Rect = { x: 36, y: 291, width: 330, height: 24 }, children: UiNode[] = []) => node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect, children }); // centre (201,303)
+      const dump = async (name: string) => parseWdaSource(await readFile(new URL(`../fixtures/wda-source-${name}.json`, import.meta.url), 'utf8'));
+
+      it('its centre in a system band reads as off the screen, as before — iOS\'s status band (62 pt): "off screen at (x,y)", where a tap would press the status bar', async () => {
+        const screen = screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })); // centre (201,32)
+        expect(await pickOn(screen, 'login_title', { width: 402, height: 874, statusBand: 62 })).toBe('off screen at (201,32)');
+        expect(await pickOn(screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })), 'login_title', { width: 402, height: 874 })).toBe('tapped (201,32)');
+      });
+
+      it('a later sibling drawn on the title (narrower, inside it) is its own content — measured: the RN screen\'s text "Scaffold is running." 138,479 126x18 on `placeholder_screen` 0,116 402x758 (WDA lists a view\'s texts as its siblings): picked', async () => {
+        const rn = await dump('rn-myport');
+        rn.children.push(bandNode());
+        expect(await pickOn(rn, 'placeholder_screen')).toBe('tapped (201,495)');
+      });
+
+      it('what a sibling drawn on a childless title holds, one wrapper down, is its own content (a badge\'s text): picked', async () => {
+        const badge = node({ role: 'container', rect: { x: 120, y: 291, width: 160, height: 24 }, children: [node({ role: 'text', label: 'new', rect: { x: 150, y: 295, width: 100, height: 16 } })] });
+        expect(await pickOn(screenOf(loginTitle(), badge), 'login_title')).toBe('tapped (201,303)');
+      });
+
+      it('a later node of exactly the title\'s frame is the same element listed again: picked', async () => {
+        expect(await pickOn(screenOf(loginTitle(), node({ role: 'image', label: 'underline', rect: { x: 36, y: 291, width: 330, height: 24 } })), 'login_title')).toBe('tapped (201,303)');
+      });
+
+      it('the title\'s own unlabelled control — a text field over its label (ADR 0014\'s measured SWIFT row), a button spanning its wrapper — takes the tap, and the dismissal is picked: the tap lands on the control (ADR 0016\'s first residual)', async () => {
+        const field = node({
+          role: 'container',
+          rect: { x: 24, y: 431, width: 354, height: 52 },
+          children: [node({ role: 'text', identifier: 'payee_label', label: 'Payee’s name', rect: { x: 42, y: 446, width: 103, height: 22 } }), node({ role: 'textfield', rect: { x: 42, y: 447, width: 318, height: 20 } })],
+        });
+        expect(await pickOn(screenOf(field), 'payee_label')).toBe('tapped (94,457)');
+        const row = node({ role: 'container', rect: { x: 24, y: 280, width: 354, height: 52 }, children: [loginTitle({ x: 42, y: 291, width: 200, height: 24 }), node({ role: 'button', rect: { x: 24, y: 280, width: 354, height: 52 } })] });
+        expect(await pickOn(screenOf(row), 'login_title')).toBe('tapped (142,303)');
+      });
+
+      it('a row of a scroll view the title is not in, scrolled under it (WDA lists the top bar before the scroll view it is drawn over): picked', async () => {
+        const form = node({ role: 'scrollable', rect: { x: 0, y: 0, width: 402, height: 512 }, children: [node({ role: 'text', label: 'Beneficiary', rect: { x: 16, y: 280, width: 370, height: 52 } })] });
+        expect(await pickOn(screenOf(loginTitle(), node({ role: 'container', rect: FULL, children: [form] })), 'login_title')).toBe('tapped (201,303)');
+      });
+
+      it('a keyboard-owned node outside the band (constructed: an ofKeyboard subtree over the title) is no cover — the keyboard is the band\'s, judged first: picked (ADR 0016\'s second residual)', async () => {
+        const strip = node({ role: 'other', ofKeyboard: true, rect: { x: 0, y: 280, width: 402, height: 44 }, children: [node({ role: 'button', label: 'Suggestion', rect: { x: 0, y: 280, width: 402, height: 44 } })] });
+        expect(await pickOn(screenOf(loginTitle(), strip), 'login_title')).toBe('tapped (201,303)');
+      });
+
+      it('a labelled structural wrapper partly over the title, neither holding it whole nor frames only, covers — measured: the login\'s field wrappers under their own inner `container 36,367 330x52`: skipped (ADR 0016\'s third residual)', async () => {
+        const login = await dump('myport-login-keyboard');
+        expect(await pickOn(login, 'login_username_field')).toBe('covered by container');
+        expect(await pickOn(login, 'login_password_field')).toBe('covered by container');
+      });
+
+      it('a centre covered with a large enough piece free — where a tap would MOVE — is skipped naming the cover over the centre, not the last node drawn there: the dismissal is never aimed off its centre', async () => {
+        const wrapped = node({ role: 'container', rect: { x: 36, y: 291, width: 330, height: 24 }, children: [loginTitle()] });
+        const badge = node({ role: 'image', label: 'badge', rect: { x: 180, y: 291, width: 40, height: 24 } }); // the title's 144x24 left of it is free
+        const strip = node({ role: 'other', ofKeyboard: true, rect: { x: 0, y: 280, width: 402, height: 44 }, children: [node({ role: 'button', label: 'Suggestion', rect: { x: 0, y: 280, width: 402, height: 44 } })] });
+        expect(await pickOn(screenOf(wrapped, badge, strip), 'login_title')).toBe('covered by image "badge"');
+      });
+
+      it('under a keyboard line no guard acts on (idb\'s band, read by its shape) while clear of the band WDA marks: skipped "under the keyboard" — constructed, the two never meet on a device', async () => {
+        const el = (type: string, AXLabel: string | null, AXUniqueId: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId, frame: { x, y, width, height } });
+        const keys = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((k, i) => el('Button', k, null, 2 + 40 * i, 780, 38, 46));
+        const flat = parseIdbDescribeAll(JSON.stringify([el('Application', 'App', null, 0, 0, 402, 874), el('StaticText', 'Note', 'note', 42, 600, 120, 20), ...keys, el('Other', null, null, 0, 590, 402, 284)]));
+        flat.children.push(bandNode({ x: 0, y: 700, width: 402, height: 174 })); // the WDA band, below the note's centre (102,610)
+        expect(await pickOn(flat, 'note')).toBe('under the keyboard');
+      });
+
+      it('under the measured input-accessory bar (wda-source-myport-2fa-keyboard-toolbar.json: Toolbar → Other → Button "Done" at 0,518 402x48, in a keyboard Window): skipped "under the keyboard" — WDA\'s band takes in the accessory slot, so the bar, no cover of a target, never decides', async () => {
+        const twofa = await dump('myport-2fa-keyboard-toolbar');
+        const support = [...everyNode(twofa)].find((n) => n.label?.startsWith('Pri probléme'))!;
+        support.identifier = 'support_text';
+        support.rect = { ...support.rect, y: 530 }; // its centre (201,550) in the bar's slot
+        expect(await pickOn(twofa, 'support_text')).toBe('under the keyboard');
+      });
+
+      it('cut to a sliver at its scroll container\'s edge: skipped in the tap\'s own words (resolve.ts#cutSliverText)', async () => {
+        const clipping = node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 280, width: 402, height: 200 }, children: [loginTitle({ x: 36, y: 280, width: 330, height: 20 }, [node({ role: 'text', rect: { x: 36, y: 240, width: 330, height: 52 } })])] }); // its text runs on past the edge: the evidence of a cut
+        expect(await pickOn(screenOf(clipping), 'login_title')).toBe(
+          "cut at its scroll container's top edge (container 0,280 402x200); only a 330x20 part of it shows, 20 deep across that edge, under the 24 a tap needs",
+        );
+      });
+    });
     });
 
     it('the keyboard is gone only on the SECOND confirming look after the dismissal tap (a hide animation caught mid-way): the target is tapped, not refused', async () => {
