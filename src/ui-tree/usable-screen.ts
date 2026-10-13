@@ -128,7 +128,7 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * one draw-order.ts sizes its hosts against — the root's rect, or the
  * largest node's when the root has no area) as a usable screen,
  * `from: 'tree'`, with no band. Every judgement with no usable screen reads
- * it, and nothing else: standing.ts#Scene's three purposes when handed
+ * it, and nothing else: standing.ts#Scene's purposes when handed
  * none, the pixel assert's last resort (verify/pixel-poll.ts) and the tap
  * refusal's quoted screen (interact/resolve.ts#refuseOffScreen).
  *
