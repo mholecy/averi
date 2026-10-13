@@ -12,7 +12,7 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * off it — built from that tree's draw order (idb's band, free) and that
  * look's reading (its line, asked lazily); every reader asks it, and none
  * composes the line itself:
- * - the tap (interact/resolve.ts: the on-screen rule with the tree's own
+ * - the tap (interact/tap-judgement.ts: the on-screen rule with the tree's own
  *   line, the chrome aim with the reading's merged in, only when its
  *   centre is covered) and the dismissal picker (interact/keyboard-in-tree.ts
  *   #pickDismissal, the same merged line);

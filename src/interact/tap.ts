@@ -27,17 +27,17 @@ export type TapAdapter = KeyboardAdapter;
  * `⚠ tap`).
  *
  * The same call refuses a node whose centre lies off the screen — an
- * OffScreenRefusal (resolve.ts#judgeTap), nothing tapped: idb lists
+ * OffScreenRefusal (tap-judgement.ts#judgeTap), nothing tapped: idb lists
  * a scroll view's content below the fold with real rects.
  * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
  *
- * The point is the guard's too (resolve.ts#TapJudge.aim): the centre,
+ * The point is the guard's too (tap-judgement.ts#TapJudge.aim): the centre,
  * unless a node of the app is drawn over it — then an uncovered piece large
  * enough to aim at, said in `moved` (the MCP reply puts it after the
  * selector; the flow traces it as `⚠ tap`), or a CoveredRefusal, nothing
  * tapped ("Tapped" pressed a payment form's pinned CONTINUE). The same check
  * first refuses a target its scroll container cuts to a strip under that
- * piece's minimum — a ClippedRefusal (resolve.ts#TapJudge.aim), nothing
+ * piece's minimum — a ClippedRefusal (tap-judgement.ts#TapJudge.aim), nothing
  * tapped. Where the node stands is ui-tree/standing.ts#Scene's.
  * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  *

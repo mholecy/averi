@@ -6,7 +6,7 @@ import type { SystemBar } from './standing.js';
  * name, and the diagnosis of a target pinned under it — a layout drawn under
  * the bar without keeping clear of it (iOS's safe area, Android's window
  * insets; at the bottom, an edge-to-edge layout that keeps no clearance).
- * The tap's refusal (interact/resolve.ts#systemBarRemedy), `scroll_until`'s
+ * The tap's refusal (interact/tap-judgement.ts#systemBarRemedy), `scroll_until`'s
  * failures (interact/scroll-text.ts) and the pixel assert's
  * (verify/pixel-poll.ts) read them, so the three say one fact alike. Here,
  * in the UI-tree layer every one of them may import, as geometry.ts's
@@ -31,7 +31,7 @@ const bandText = (bar: SystemBar): string => (bar.edge === 'top' ? `in the top $
  * (201,6), in the top 62 of the screen (tree units), where a tap goes to the
  * status bar`, `under the navigation bar at (540,2186), from y 2154 to the
  * bottom of the screen (tree units), …` — read by the tap's refusal
- * (interact/resolve.ts#judgeTap) and by `scroll_until`'s failures
+ * (interact/tap-judgement.ts#judgeTap) and by `scroll_until`'s failures
  * (interact/scroll-text.ts). No
  * platform named, and the band in the tree's units — pt on iOS, px on
  * Android, the units every rect in the same reply is in.

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
-import { OffScreenRefusal } from '../../src/interact/resolve.js';
+import { OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';

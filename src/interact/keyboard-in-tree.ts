@@ -23,7 +23,8 @@ import {
   type KeyboardModel,
   type ClearedLook,
 } from './keyboard-model.js';
-import { describeTarget, findTarget, tapStandings, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
+import { tapStandings } from './tap-judgement.js';
 import { coverName, cutSliverText } from './target-text.js';
 
 /**
@@ -209,7 +210,7 @@ interface DismissalPick {
  * `{ of: 'tap' }`) over `screen` (the guard's first-look screen; the
  * dismissal's own read), one scene per call, derived on first use, its
  * keyboard line the tap's — the standing with the reading's line merged in
- * (resolve.ts#tapStandings' `full`, the tap's own expression), the reading
+ * (tap-judgement.ts#tapStandings' `full`, the tap's own expression), the reading
  * asked once per call, by the first strategy that gets this far — under
  * WDA a witnessed line, which refuses nothing the band check above has not:
  * - `reachable` at the centre, with no interactive node there it would

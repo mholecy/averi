@@ -79,7 +79,7 @@ export interface UsableScreen {
  *
  * `fresh` reads the device's screen again first (`viewport({ fresh: true
  * })`) — the tap's re-read before it refuses a point as off the screen
- * (interact/resolve.ts#judgeTap): the adapter memoizes the size, and
+ * (interact/tap-judgement.ts#judgeTap): the adapter memoizes the size, and
  * a fold, an unfold or a `wm size` change would otherwise refuse taps for
  * the server's life. A fresh read that FAILS is dropped by the memo
  * (adapters/viewport-memo.ts), so the plain read after it asks the device
@@ -130,7 +130,7 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * `from: 'tree'`, with no band. Every judgement with no usable screen reads
  * it, and nothing else: standing.ts#Scene's purposes when handed
  * none, the pixel assert's last resort (verify/pixel-poll.ts) and the tap
- * refusal's quoted screen (interact/resolve.ts#judgeTap).
+ * refusal's quoted screen (interact/tap-judgement.ts#judgeTap).
  *
  * `failsOpen`: the root has no area (idb's synthetic 0x0 root). A TOUCH
  * purpose — the tap, either stop — then places every point on the screen

@@ -7,12 +7,12 @@ import { keyboardPosition } from '../../src/ui-tree/keyboard-position.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
-import { judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/resolve.js';
+import { judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/tap-judgement.js';
 import { node } from '../helpers/fake.js';
 
-// THE tap judgement of one look (interact/resolve.ts#judgeTap), as a table over a look and a screen — no settle loop, no
-// keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a hand-made reading that counts what
-// it is asked. Each row's sentence is the one the tap's integration cases pin through `tapElement`
+// THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look and a screen — no settle
+// loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a hand-made reading that
+// counts what it is asked. Each row's sentence is the one the tap's integration cases pin through `tapElement`
 // (tests/interact/resolve.test.ts); here it is the rule, one row per standing kind.
 
 const BACK: KeyboardRemedy = { dismissal: 'back', advice: undefined };

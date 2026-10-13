@@ -19,7 +19,8 @@ import {
   type ResolvedClear,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
-import { describeTarget, judgeTap, resolveSettled, type Aim, type TapLook, type Target } from './resolve.js';
+import { describeTarget, resolveSettled, type Target } from './resolve.js';
+import { judgeTap, type Aim, type TapLook } from './tap-judgement.js';
 
 /**
  * The soft-keyboard guard and the post-fill dismissal, written ONCE over
@@ -53,10 +54,10 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
 /**
  * resolveSettled, plus the three rules every tap on a resolved node shares,
  * in this order: the point about to be tapped must lie on the screen
- * (resolve.ts#judgeTap; an OffScreenRefusal, nothing sent, when it does
+ * (tap-judgement.ts#judgeTap; an OffScreenRefusal, nothing sent, when it does
  * not), not under the soft keyboard, and — last, on the node and tree the
  * guard hands back — not under a node of the app drawn over it
- * (resolve.ts#TapJudge.aim: the tap moves to an uncovered piece large
+ * (tap-judgement.ts#TapJudge.aim: the tap moves to an uncovered piece large
  * enough, said in `moved`, or a CoveredRefusal; first a ClippedRefusal for
  * a target cut to a sliver at its scroll container's edge). Where the node
  * stands is ui-tree/standing.ts#Scene's; the tap's judgement of one look is
@@ -136,7 +137,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   const reading = readKeyboard(adapter, first.tree);
   const opened = judging(first, reading);
   // The other rule every tap on a resolved node shares: its point must lie
-  // ON the screen (resolve.ts#judgeTap, the reasons there). Asked before the
+  // ON the screen (tap-judgement.ts#judgeTap, the reasons there). Asked before the
   // keyboard is, so a target below the fold costs no `back` and no
   // dismissal tap; asked again of the node a guard that acted hands back,
   // since the layout moves when the keyboard goes (an iOS keyboard-avoiding
@@ -157,7 +158,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // The LAST rule — nothing of the app drawn over the point, else an
   // uncovered piece of the target or a CoveredRefusal, and first no target
   // cut to a sliver (a ClippedRefusal) — is the judgement's `aim()`
-  // (resolve.ts#TapJudge.aim, the reasons there), on the look the tap goes
+  // (tap-judgement.ts#TapJudge.aim, the reasons there), on the look the tap goes
   // to: the keyboard is read for it only when the centre is covered, off
   // that look's own reading, so what it already asked is not asked again.
   if (opening.kind === 'clear' || opening.kind === 'unknown') return clearOf(first, await judge.aim());
@@ -189,7 +190,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   return clearOf(cleared.look, await (await judgeTap(adapter, target, after.look, screen, after.keyboard, hiding.sent)).aim());
 }
 
-/** A look as the tap judges it (resolve.ts#judgeTap): its node and tree with the tree's scene, and where the keyboard lies on it — a position over that scene and the look's `reading`, whose remedy the refusals say. */
+/** A look as the tap judges it (tap-judgement.ts#judgeTap): its node and tree with the tree's scene, and where the keyboard lies on it — a position over that scene and the look's `reading`, whose remedy the refusals say. */
 function judging(r: { readonly node: UiNode; readonly tree: UiNode }, reading: KeyboardReading): { look: TapLook; keyboard: { position: KeyboardPosition; remedy: KeyboardRemedy } } {
   const look: TapLook = { node: r.node, tree: r.tree, scene: sceneOf(r.tree) };
   return { look, keyboard: { position: keyboardPosition(look.scene.order, reading), remedy: reading.remedy } };

@@ -702,7 +702,7 @@ export interface Clips {
    * scroll-containers.ts#scrolls — or undefined when the tree cannot say:
    * a listing without ancestry (`ancestry` false: idb's flat list), and a
    * node of another tree. Whether `scroll_until` can move the target out
-   * from under a system bar (interact/resolve.ts#systemBarRemedy, the
+   * from under a system bar (interact/tap-judgement.ts#systemBarRemedy, the
    * pixel assert's remedy). Cost: one walk of the tree, on the first ask.
    */
   inScroller(node: UiNode): boolean | undefined;
@@ -951,7 +951,7 @@ export function largestScroller(tree: UiNode): Rect | undefined {
  *   verify/'s
  *   sentences (the text table's off-screen region, the pixel poll's
  *   position change and its soft-keyboard miss, which quotes the keyboard
- *   beside the element this way), resolve.ts's off-screen tap, the fill's
+ *   beside the element this way), tap-judgement.ts's off-screen tap, the fill's
  *   not-an-input caveat, and keyboard-cover.ts's stderr diagnostic for a
  *   refused floating panel (the touchable region and the band beside it,
  *   both quoted as rects).
@@ -974,7 +974,7 @@ export function rectText(r: Rect): string {
  * How a sentence names a NODE drawn over another — `button "Continue to
  * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
  * rect (`rectText`). The tap's chrome refusal and move
- * (interact/resolve.ts#TapJudge.aim) and `scroll_until`'s covered
+ * (interact/tap-judgement.ts#TapJudge.aim) and `scroll_until`'s covered
  * sentences (interact/scroll-text.ts) share it. The dismissal picker's skip
  * line names a cover shorter, on purpose (interact/target-text.ts#coverName).
  */
@@ -986,7 +986,7 @@ export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect
  * "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over
  * it` — the `at its centre` clause when the cover is the one at the
  * target's centre. One spelling for the tap's
- * chrome refusal and move (interact/resolve.ts#TapJudge.aim) and
+ * chrome refusal and move (interact/tap-judgement.ts#TapJudge.aim) and
  * `scroll_until`'s covered sentences (interact/scroll-text.ts).
  */
 export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point): string =>
