@@ -1,7 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { underPresented, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { presentedCover, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -164,10 +164,11 @@ export type RoundStep =
  *   nothing judged, no stroke sent.
  * - `presented`: the judged match in the frame lies under a screen
  *   presented over its own (ui-tree/standing.ts#underPresented: a modal's
- *   dim, a sheet's form — ADR 0018), on two reads with no stroke between;
- *   no further stroke sent — none moves it out, and one on that screen may
- *   dismiss it (a page sheet's pull-to-dismiss). `cover`: the one the
- *   sentence names.
+ *   dim, a sheet's form — ADR 0018), on two reads with no stroke between,
+ *   or on one when no confirm is left; no further stroke sent — none moves
+ *   it out, and one on that screen may dismiss it (a page sheet's
+ *   pull-to-dismiss). `cover`: the one the sentence names
+ *   (ui-tree/standing.ts#presentedCover).
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -1192,10 +1193,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
     // then, the read above stops as any other. Without a confirm left, stop on this read.
-    if (underPresented(best.standing.facts)) {
+    const presented = presentedCover(best.standing);
+    if (presented !== undefined) {
       if ((current === 'settle' && presentedBefore) || !mayConfirm(s, seen.elapsedMs)) {
-        const cover = best.standing.kind === 'covered' ? best.standing.cover : (best.standing.facts.presented ?? []).at(-1)!;
-        return stop(s, { kind: 'presented', swipes: s.swipes, judged: best, cover, viewport });
+        return stop(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: presented, viewport });
       }
       s.presentedRead = true;
       return confirm(s);

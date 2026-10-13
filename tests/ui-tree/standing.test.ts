@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { farEdgeFrames, pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { farEdgeFrames, pinnedSurface, presentedCover, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -1153,5 +1153,22 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
     const { t } = await pad(545);
     const iban = byId(t, 'IBAN*');
     expect(said(sceneOf(t).standing(iban, IPHONE, { ...TAP, keyboardTop: idb(589) }))).toEqual(said(sceneOf(t).standing(iban, IPHONE, TAP)));
+  });
+});
+
+describe('presentedCover — the cover a sentence names for a node under a screen presented over its own (ADR 0018)', () => {
+  const dim = node({ identifier: 'forgot_overlay', rect: { x: 0, y: 0, width: 402, height: 874 } });
+  const card = node({ identifier: 'card', rect: { x: 20, y: 200, width: 362, height: 300 } });
+  const form = node({ role: 'scrollable', rect: { x: 0, y: 62, width: 402, height: 812 } });
+  const facts = (presented?: UiNode[]) => ({ ...(presented !== undefined && { presented }) }) as unknown as StandingFacts;
+  it('covered: the cover over its centre, whichever surface is presented (the modal\'s card over the dim)', () => {
+    expect(presentedCover({ facts: facts([dim]), kind: 'covered', cover: card, aboveKeyboard: false })).toBe(card);
+  });
+  it('any other kind: the last presented surface among its covers', () => {
+    expect(presentedCover({ facts: facts([dim, form]), kind: 'reachable', at: { x: 1, y: 1 } })).toBe(form);
+  });
+  it('under no presented screen: none, whatever the kind', () => {
+    expect(presentedCover({ facts: facts(), kind: 'covered', cover: card, aboveKeyboard: false })).toBeUndefined();
+    expect(presentedCover({ facts: facts([]), kind: 'reachable', at: { x: 1, y: 1 } })).toBeUndefined();
   });
 });

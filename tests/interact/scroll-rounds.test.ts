@@ -1875,7 +1875,8 @@ describe('round — a cover the target shows past only on its far side (the roun
  * A target under a screen PRESENTED over its own (ADR 0018: a modal's dimming leaf, a sheet's form — a later stacked
  * screen-sized layer in the app's Window): no scroll moves it out from under that screen, and a stroke on the screen
  * may dismiss it (a page sheet's pull-to-dismiss, a "Discard Changes?" prompt) — so the round confirms with one more
- * read, sends no stroke, and stops naming the presented screen. On the round-12 device check's ui_snapshots.
+ * read, sends no stroke, and stops naming the presented screen. On the measured ui_snapshots
+ * (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
  */
 describe('round — a target under a screen presented over it (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', async () => {
   const { readFile } = await import('node:fs/promises');
