@@ -1,10 +1,9 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
-import { aboveNavigationBand, belowStatusBand, largestScroller } from '../ui-tree/geometry.js';
+import { aboveNavigationBand, belowStatusBand, largestScroller, type Cut } from '../ui-tree/geometry.js';
 import { coverLine, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen } from '../ui-tree/standing.js';
-import type { InFrameShort } from './scroll-rounds.js';
+import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 
 /**
  * What ONE read of the screen means for `scroll_until`: `judgeRead(read,
@@ -133,12 +132,12 @@ export interface TreeFacts {
  * progress check. Derived ONCE per `judgeRead` — once per call of
  * scroll-rounds.ts#round that read — BEFORE the judgement, and handed to it
  * and along (`ReadJudgement.facts`, which the round keeps for the steps
- * after the judgement) — each fact from one derivation. A call that re-enters after an `ask witness` (the ask most
- * re-entries are for, which needs only the judgement), an `ask unlocated`
+ * after the judgement) — each fact from one derivation. A call that
+ * re-enters after an `ask witness` (the ask most re-entries are for, which needs only the judgement), an `ask unlocated`
  * (a `fully: true` or bound stop, once a scroll) or an `ask witness`
  * before a probe derives them again: no cache, so the module holds no
- * state between calls (a cache by tree object was dropped for that) — the fingerprint, the progress check and the
- * largest scroller are walked on a round that then asks for the witness
+ * state between calls (a cache by tree object was dropped for that) —
+ * the fingerprint, the progress check and the largest scroller are walked on a round that then asks for the witness
  * too, a pure walk of an in-memory tree beside a device read.
  */
 function factsOf(tree: UiNode): TreeFacts {
@@ -390,6 +389,14 @@ function better(a: Judged, b: Judged): number {
 export function stops(j: Judged): boolean {
   return j.standing.kind === 'reachable';
 }
+
+/** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
+export type InFrameShort =
+  | { of: 'clipped'; judged: Judged }
+  | { of: 'covered'; judged: Judged; cover: UiNode }
+  /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
+  | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
+  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
  * What a judged match in the frame is short of a stop (`stops`) — the one

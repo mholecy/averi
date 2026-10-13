@@ -4,7 +4,7 @@ import type { KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
-import { judgeRead, shortOf, stops, strokeLine, type Cover, type Judged, type RoundRead, type TreeFacts } from './scroll-read.js';
+import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
@@ -296,14 +296,6 @@ export interface PastSide {
   side: Edge;
   clippedOut: boolean;
 }
-
-/** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
-export type InFrameShort =
-  | { of: 'clipped'; judged: Judged }
-  | { of: 'covered'; judged: Judged; cover: UiNode }
-  /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
-  | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
-  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
 
 /**
  * How many reads a stop reached after a stroke may spend waiting for the
