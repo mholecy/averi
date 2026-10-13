@@ -4,7 +4,7 @@ import type { KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
-import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type RoundRead, type TreeFacts } from './scroll-read.js';
+import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
@@ -110,24 +110,13 @@ export interface RoundSeen {
  * One read that read, as the round has gathered it by `observe`: the read,
  * and of its judgement (interact/scroll-read.ts#ReadJudgement) its tree's
  * facts, the frames it was judged in (the screen above an applied
- * keyboard, or each box that counts), the cover applied and the line its
- * strokes stay above — with the gesture box (the round's `RoundSeen.screen`
- * box; undefined when there is none). One value, so the steps after the
- * judgement read the same facts.
+ * keyboard, or each box that counts), the frames short of the far edge is
+ * judged in (`uncutFrames`: uncut at the navigation band, so a target a
+ * stroke then pushes wholly into the band was seen short, and is turned
+ * back) and the line its strokes stay above. One value, so the steps after
+ * the judgement read the same facts.
  */
-interface ThisRead {
-  read: RoundRead;
-  facts: TreeFacts;
-  frames: readonly Rect[];
-  /** The frames short of the far edge is judged in (`observe`'s `seenShort`): `frames` uncut at the navigation band, so a target a stroke then pushes wholly into the band was seen short, and is turned back. */
-  uncutFrames: readonly Rect[];
-  /** The ROUND's gesture box (`RoundSeen.screen`), as this read was judged with it — not a fact of the read. */
-  gesture: Rect | undefined;
-  /** The cover the read applied (after the witness), as it was judged under it. */
-  cover: Cover | undefined;
-  /** The line this read's strokes stay above (scroll-read.ts#strokeLine). */
-  strokeLine: KeyboardLine | undefined;
-}
+type ThisRead = Pick<ReadJudgement, 'facts' | 'frames' | 'uncutFrames' | 'strokeLine'> & { readonly read: RoundRead };
 
 /** What to do next. */
 export type RoundStep =
@@ -1103,10 +1092,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // A read that did not read says nothing about motion: the comparisons
   // wait for the next one that does.
   const gesture = seen.screen?.oriented;
-  const now: ThisRead | undefined =
-    read === undefined || judged === undefined
-      ? undefined
-      : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames, gesture, cover, strokeLine: judged.strokeLine };
+  const now: ThisRead | undefined = read === undefined || judged === undefined ? undefined : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames, strokeLine: judged.strokeLine };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.

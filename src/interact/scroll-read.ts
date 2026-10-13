@@ -1,9 +1,9 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
-import { aboveNavigationBand, belowStatusBand, largestScroller, type Cut } from '../ui-tree/geometry.js';
+import { largestScroller, type Cut } from '../ui-tree/geometry.js';
 import { coverLine, keyboardEdge, keyboardSide, type KeyboardCover, type KeyboardLine } from '../ui-tree/keyboard-cover.js';
 import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 
 /**
  * What ONE read of the screen means for `scroll_until`: `judgeRead(read,
@@ -199,6 +199,9 @@ export interface Judged {
 /** The screen a read is judged in: the round's frame, the usable screen's judging part (ui-tree/usable-screen.ts#UsableScreen). */
 type Frame = StandingScreen;
 
+/** The stop's purpose (ui-tree/standing.ts#TouchPurpose): the plain stop, or `fully` — `RoundRules.fully`, mapped once a read. */
+type StopOf = 'stop' | 'fully';
+
 /**
  * One read's judgement (`judgeRead`) — every fact of the read the round's
  * cross-read steps read.
@@ -213,9 +216,10 @@ export interface ReadJudgement {
   /** The reading's cover, applied or not — for the probe's late witness (scroll-rounds.ts#round). Never idb's band. */
   readonly offered: Cover | undefined;
   /**
-   * The frames the far edge is judged in: the screen above an applied
-   * cover, else every box that counts — each below the status band, and
-   * above the navigation band for a `fully` stop the band's region refused.
+   * The frames the far edge is judged in (ui-tree/standing.ts#farEdgeFrames):
+   * the screen above an applied cover, else every box that counts — each
+   * below the status band, and above the navigation band for a `fully` stop
+   * the band's region refused.
    */
   readonly frames: readonly Rect[];
   /** `frames` uncut at the navigation band — the frames short of the far edge is judged in. */
@@ -234,6 +238,8 @@ export interface ReadJudgement {
 export function judgeRead(read: RoundRead, screen: Frame, fully: boolean, corroborated?: boolean): { ask: 'witness' } | ReadJudgement {
   const viewport = screen.box;
   const { found } = read;
+  // The stop's purpose, mapped from the tool's flag once (ui-tree/standing.ts#TouchPurpose).
+  const stop: StopOf = fully ? 'fully' : 'stop';
   // The round judged twice when a keyboard is up: over the whole screen,
   // and over the screen ABOVE the cover (`coverOf`) — the covered judgement
   // stands only when the band changes the round and the witness stood by it.
@@ -243,7 +249,7 @@ export function judgeRead(read: RoundRead, screen: Frame, fully: boolean, corrob
   // each match's clipping ancestors, for the plain stop's sliver rule
   // (`stops`), and the rest the round's steps after the judgement read.
   const facts = factsOf(read.tree);
-  const whole = judgeOver(found, screen, facts, fully);
+  const whole = judgeOver(found, screen, facts, stop);
   // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
   const band = offered !== undefined ? undefined : bandCoverOf(keyboardEdge(undefined, facts.scene.order), viewport, read.remedy);
   const applied = offered ?? band;
@@ -251,7 +257,7 @@ export function judgeRead(read: RoundRead, screen: Frame, fully: boolean, corrob
   let best = whole;
   if (applied !== undefined) {
     // The keyboard's own UI is judged against the whole screen: the reading's (WDA's marks), and idb's band's own nodes.
-    const covered = judge(found, screen, facts, fully, { cover: applied, keyboardSide: keyboardSide(read.ofKeyboard, facts.scene.order) });
+    const covered = judge(found, screen, facts, stop, { cover: applied, keyboardSide: keyboardSide(read.ofKeyboard, facts.scene.order) });
     // Moot: the read stops the round cleanly either way, on the same
     // judgement — the band changes nothing, and is neither asked about nor
     // reported. Otherwise the witness is asked THIS read (the module doc).
@@ -272,18 +278,10 @@ export function judgeRead(read: RoundRead, screen: Frame, fully: boolean, corrob
   }
   // The frames this read was judged in — the screen above an applied
   // keyboard, else every box that counts — for where the target stands
-  // against the far edge (scroll-rounds.ts#observe, #beyondFarEdge).
-  // Below the status band: a target whose centre a fling carried into it
-  // is past the far edge, and the next stroke turns back.
-  const uncutFrames: Rect[] =
-    cover?.above !== undefined ? [belowStatusBand({ x: viewport.x, y: viewport.y, ...cover.above }, screen, viewport)] : screen.boxes.map((b) => belowStatusBand(b, screen));
-  // And above the navigation band, for a `fully` stop the band's REGION
-  // refused (ui-tree/standing.ts#Standing's `band`): resting across the
-  // band's top with the content above it, it is past the far edge — the
-  // next stroke turns and lifts it. Only then: the plain stop, and every
-  // other standing, judge the far edge in the frames as ever.
-  const regionAtBottom = fully && best?.standing.kind === 'systemBar' && best.standing.band !== undefined && best.standing.bar.edge === 'bottom';
-  const frames: Rect[] = regionAtBottom ? uncutFrames.map((f) => aboveNavigationBand(f, screen, viewport)) : uncutFrames;
+  // against the far edge (scroll-rounds.ts#observe, #beyondFarEdge), cut by
+  // standing's own band cut (ui-tree/standing.ts#farEdgeFrames), which reads
+  // the best standing's band for the navigation cut.
+  const { frames, uncutFrames } = farEdgeFrames(screen, best?.standing, cover?.above);
   // The line this read's strokes stay above — its cover's and idb's band,
   // whether or not the read applied the band (`strokeLine`).
   return { facts, best, cover, offered, frames, uncutFrames, strokeLine: strokeLine(cover, facts) };
@@ -355,21 +353,21 @@ function judge(
   found: readonly UiNode[],
   frame: Frame,
   facts: Pick<TreeFacts, 'scene'>,
-  fully: boolean,
+  stop: StopOf,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
 ): Judged | undefined {
   const scored = found.map((node): Judged => {
     const under = cover === undefined || cover.keyboardSide(node) ? undefined : cover.cover;
-    const standing = facts.scene.standing(node, frame, { of: 'stop', fully, ...(under !== undefined && { keyboardTop: under.line }) });
+    const standing = facts.scene.standing(node, frame, { of: stop, ...(under !== undefined && { keyboardTop: under.line }) });
     return { node, ...(under !== undefined && { under }), standing };
   });
   return scored.sort((a, b) => better(a, b))[0];
 }
 
 /** The whole-screen judgement over every box that counts (`UsableScreen.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'scene'>, fully: boolean): Judged | undefined {
+function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'scene'>, stop: StopOf): Judged | undefined {
   return frame.boxes
-    .map((box) => judge(found, { ...frame, box }, facts, fully))
+    .map((box) => judge(found, { ...frame, box }, facts, stop))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best) < 0) ? j : best), undefined);
 }
 

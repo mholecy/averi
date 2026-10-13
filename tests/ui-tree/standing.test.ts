@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingScreen, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { farEdgeFrames, pinnedSurface, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -56,11 +56,11 @@ const idbAt = async (name: string, ...path: string[]): Promise<UiNode> =>
 
 const IPHONE = { box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 };
 const PIXEL = { box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 };
-const PLAIN = { of: 'stop', fully: false } as const;
+const PLAIN = { of: 'stop' } as const;
 /** A keyboard line (ui-tree/keyboard-cover.ts#KeyboardLine): WDA's band by default, witnessed; idb's band, which no reading stands by. */
 const wda = (y: number): KeyboardLine => ({ y, source: 'wda', witnessed: true });
 const idb = (y: number): KeyboardLine => ({ y, source: 'idb-band', witnessed: false });
-const FULLY = { of: 'stop', fully: true } as const;
+const FULLY = { of: 'fully' } as const;
 
 /** A standing's kind with the fact its sentence quotes, as one plain value. */
 const said = (s: Standing | PixelStanding): unknown => {
@@ -928,17 +928,78 @@ describe('Scene.standing for the stop — the status band and a keyboard line (m
 });
 
 describe('Scene.standing — the purpose names the answer\'s union', () => {
-  it('the pixel purpose answers a PixelStanding (its band, bar and reach always there, its own cut at a bar); the tap and the stop a Standing', () => {
+  it('the pixel purpose answers a PixelStanding (its band, bar and reach always there, its own cut at a bar); both stops a Standing; the tap a Standing never `clipped`', () => {
     const root = node({ rect: box(402, 874) });
     const scene = sceneOf(root);
     expectTypeOf(scene.standing(root, undefined, { of: 'pixel', reads: root.rect, glyphs: true })).toEqualTypeOf<PixelStanding>();
     expectTypeOf(scene.standing(root, undefined, PLAIN)).toEqualTypeOf<Standing>();
-    expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<Standing>();
+    expectTypeOf(scene.standing(root, undefined, FULLY)).toEqualTypeOf<Standing>();
+    expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<TapStanding>();
+    expectTypeOf<TapStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
+    expectTypeOf<Extract<TapStanding, { kind: 'reachable' }>>().toEqualTypeOf<Extract<Standing, { kind: 'reachable' }>>();
     expectTypeOf<Extract<PixelStanding, { kind: 'cut' }>['bar']>().toEqualTypeOf<{ readonly edge: 'bottom'; readonly top: number }>();
     expectTypeOf<Extract<PixelStanding, { kind: 'covered' }>['reach']>().toEqualTypeOf<Rect>();
     expectTypeOf<Extract<PixelStanding, { kind: 'systemBar' }>['band']>().toEqualTypeOf<Rect>();
     expectTypeOf<Extract<PixelStanding, { kind: 'underKeyboard' }>['band']>().toEqualTypeOf<Rect>();
     expectTypeOf<PixelStanding['kind']>().toEqualTypeOf<'reachable' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
+  });
+});
+
+/**
+ * The frames `scroll_until`'s far edge is judged in (`farEdgeFrames`): each box below the status band on its own
+ * shape, the screen above an applied cover instead when it leaves something, and above the navigation band only for a
+ * `fully` stop the band's REGION refused at the bottom — cut on the first box's shape (D-C6b, the shapes kept).
+ */
+describe('farEdgeFrames — the far edge\'s frames, cut by standing\'s own band cut', () => {
+  const UPRIGHT = box(1080, 2220);
+  const TURNED = box(2220, 1080);
+  const ANDROID: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT], statusBand: 66, navigationBand: 2154 };
+  /** A full-width row on the 1080x2220 phone at `y`, `height` high, judged for `purpose` on `screen`. */
+  const rowAt = (y: number, height: number, purpose: TouchPurpose, screen: StandingScreen = ANDROID): Standing => {
+    const r = node({ role: 'button', identifier: 'row', rect: { x: 0, y, width: 1080, height } });
+    return sceneOf(node({ role: 'container', rect: UPRIGHT, children: [r] })).standing(r, screen, purpose);
+  };
+  const BELOW_STATUS = { x: 0, y: 66, width: 1080, height: 2154 };
+
+  it('no bands, no cover, no best: every box as it is', () => {
+    expect(farEdgeFrames({ box: UPRIGHT, boxes: [UPRIGHT, TURNED] }, undefined)).toEqual({ frames: [UPRIGHT, TURNED], uncutFrames: [UPRIGHT, TURNED] });
+  });
+  it('each box below the status band on its own shape: the upright box cut, the turned one (landscape) not', () => {
+    const screen: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT, TURNED], statusBand: 66 };
+    expect(farEdgeFrames(screen, undefined)).toEqual({ frames: [BELOW_STATUS, TURNED], uncutFrames: [BELOW_STATUS, TURNED] });
+  });
+  it('above an applied cover: the first box\'s x, y and width, the cover\'s top y as the HEIGHT (not the top less the box\'s y), below the status band', () => {
+    const lowered = { x: 0, y: 100, width: 402, height: 874 };
+    expect(farEdgeFrames({ box: lowered, boxes: [lowered] }, undefined, { width: 402, height: 500 }).frames).toEqual([{ x: 0, y: 100, width: 402, height: 500 }]);
+    expect(farEdgeFrames(IPHONE, undefined, { width: 402, height: 500 }).frames).toEqual([{ x: 0, y: 62, width: 402, height: 438 }]);
+  });
+  it('a cover leaving nothing above it (no `above`): every box, uncut by the keyboard', () => {
+    const screen: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT, TURNED], statusBand: 66 };
+    expect(farEdgeFrames(screen, undefined, undefined).frames).toEqual([BELOW_STATUS, TURNED]);
+  });
+  it('a `fully` stop the navigation band\'s REGION refused (a row across its top, its centre clear): the frames cut above the band too, the short-of frames not', () => {
+    const best = rowAt(2100, 100, FULLY);
+    expect(said(best)).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } });
+    expect(farEdgeFrames(ANDROID, best)).toEqual({ frames: [{ x: 0, y: 66, width: 1080, height: 2088 }], uncutFrames: [BELOW_STATUS] });
+  });
+  it('no navigation cut for any other standing: the same row\'s plain stop (reachable), a centre in the band (no region), a `fully` region at the TOP', () => {
+    const uncut = { frames: [BELOW_STATUS], uncutFrames: [BELOW_STATUS] };
+    expect(farEdgeFrames(ANDROID, rowAt(2100, 100, PLAIN))).toEqual(uncut);
+    const centreIn = rowAt(2160, 50, FULLY);
+    expect(said(centreIn)).toMatchObject({ kind: 'systemBar', bar: { edge: 'bottom' } });
+    expect(farEdgeFrames(ANDROID, centreIn)).toEqual(uncut);
+    const top = rowAt(40, 200, FULLY);
+    expect(said(top)).toMatchObject({ kind: 'systemBar', bar: { edge: 'top' }, band: { x: 0, y: 0, width: 1080, height: 66 } });
+    expect(farEdgeFrames(ANDROID, top)).toEqual(uncut);
+  });
+  it('two boxes: the navigation band cut on the FIRST box\'s shape — a landscape first box cuts neither, the upright second box included', () => {
+    const wide = box(1000, 600);
+    const tall = box(600, 1000);
+    const screen: StandingScreen = { box: wide, boxes: [wide, tall], navigationBand: 900 };
+    const best = rowAt(2100, 100, FULLY);
+    expect(farEdgeFrames(screen, best)).toEqual({ frames: [wide, tall], uncutFrames: [wide, tall] });
+    // Cut on its own shape, the upright box would lose its bottom 100: the first box's shape decides, as the round always did.
+    expect(farEdgeFrames({ box: tall, boxes: [tall], navigationBand: 900 }, best).frames).toEqual([{ x: 0, y: 0, width: 600, height: 900 }]);
   });
 });
 
