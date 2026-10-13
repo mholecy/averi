@@ -221,7 +221,7 @@ interface DismissalPick {
  *   centre is what was configured, so the dismissal is never aimed off it;
  * - cut to a sliver at its scroll container's edge — the tap's own clause
  *   (resolve.ts#cutSliverText); under a line no guard acts on (idb's band)
- *   — `under the keyboard`. Neither is reached under WDA today: iOS has no
+ *   — `under the keyboard`. Neither is reached on a WDA tree: iOS has no
  *   clipping container and no idb band.
  * What `tap` counts as a cover is a cover here: a title's own content
  * listed beside it, its own unlabelled control, a node of its frame,
@@ -319,7 +319,7 @@ const coverName = (cover: UiNode): string => `${cover.role}${cover.label === nul
  * outside the band) — is skipped naming that node, the last such (drawn on
  * top): the tap would press it, and on the post-fill `dismiss()` path a
  * pressed control would be reported as the dismissal. A silently pressed
- * control is worse than a skipped title (ADR 0016, the owner's decision).
+ * control is worse than a skipped title (ADR 0016).
  */
 function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
   switch (standing.kind) {

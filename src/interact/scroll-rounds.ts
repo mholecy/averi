@@ -79,6 +79,9 @@ export interface RoundRules {
   timeoutMs: number;
 }
 
+/** One tree read as the round is handed it (scroll-read.ts#RoundRead) — part of this protocol (`RoundSeen.read`), so it is importable from here. */
+export type { RoundRead } from './scroll-read.js';
+
 /** What one round saw — the driver's gathering, or a test's table row. */
 export interface RoundSeen {
   /** This round's tree read: what it held, or the error that stood in for it (a miss, not a failure — read-tree.ts#readTreeOrError). */

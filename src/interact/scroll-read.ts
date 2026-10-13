@@ -133,12 +133,13 @@ export interface TreeFacts {
  * scroll-rounds.ts#round that read — BEFORE the judgement, and handed to it
  * and along (`ReadJudgement.facts`, which the round keeps for the steps
  * after the judgement) — each fact from one derivation. A call that
- * re-enters after an `ask witness` (the ask most re-entries are for, which needs only the judgement), an `ask unlocated`
- * (a `fully: true` or bound stop, once a scroll) or an `ask witness`
- * before a probe derives them again: no cache, so the module holds no
- * state between calls (a cache by tree object was dropped for that) —
- * the fingerprint, the progress check and the largest scroller are walked on a round that then asks for the witness
- * too, a pure walk of an in-memory tree beside a device read.
+ * re-enters after an `ask witness` (the ask most re-entries are for, which
+ * needs only the judgement), an `ask unlocated` (a `fully: true` or bound
+ * stop, once a scroll) or an `ask witness` before a probe derives them
+ * again: the module holds no state between calls, so nothing is cached —
+ * the fingerprint, the progress check and the largest scroller are walked
+ * on a round that then asks for the witness too, a pure walk of an
+ * in-memory tree beside a device read.
  */
 function factsOf(tree: UiNode): TreeFacts {
   return {
@@ -196,9 +197,6 @@ export interface Judged {
   standing: Standing;
 }
 
-/** The screen a read is judged in: the round's frame, the usable screen's judging part (ui-tree/usable-screen.ts#UsableScreen). */
-type Frame = StandingScreen;
-
 /** The stop's purpose (ui-tree/standing.ts#TouchPurpose): the plain stop, or `fully` — `RoundRules.fully`, mapped once a read. */
 type StopOf = Exclude<TouchPurpose['of'], 'tap'>;
 
@@ -235,7 +233,7 @@ export interface ReadJudgement {
  * answer, on the round's re-entry) is not given yet. The module doc has
  * the rule.
  */
-export function judgeRead(read: RoundRead, screen: Frame, fully: boolean, corroborated?: boolean): { ask: 'witness' } | ReadJudgement {
+export function judgeRead(read: RoundRead, screen: StandingScreen, fully: boolean, corroborated?: boolean): { ask: 'witness' } | ReadJudgement {
   const viewport = screen.box;
   const { found } = read;
   // The stop's purpose, mapped from the tool's flag once (ui-tree/standing.ts#TouchPurpose).
@@ -297,7 +295,7 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
   // docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
   const topCover = shown.top;
   if (topCover.y >= viewport.height) return undefined;
-  return { topCover, above: topCover.y <= 0 ? undefined : { width: viewport.width, height: topCover.y }, remedy: shown.remedy, line: coverLine(shown) };
+  return { topCover, above: aboveTop(topCover.y, viewport), remedy: shown.remedy, line: coverLine(shown) };
 }
 
 /**
@@ -313,8 +311,11 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
 function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): Cover | undefined {
   if (line === undefined || line.y >= viewport.y + viewport.height) return undefined;
   const topCover = bandRect(line, viewport);
-  return { topCover, above: line.y <= 0 ? undefined : { width: viewport.width, height: line.y }, remedy, line };
+  return { topCover, above: aboveTop(line.y, viewport), remedy, line };
 }
+
+/** A cover's `above` (`Cover`): the viewport's width down to the cover's top `y`, or none when the top lies at or above y 0. */
+const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined => (y <= 0 ? undefined : { width: viewport.width, height: y });
 
 /**
  * The top edge a stroke is kept above (swipe.ts#strokeRoom's `coverTop`):
@@ -351,7 +352,7 @@ export function strokeLine(cover: Cover | undefined, facts: Pick<TreeFacts, 'sce
  */
 function judge(
   found: readonly UiNode[],
-  frame: Frame,
+  frame: StandingScreen,
   facts: Pick<TreeFacts, 'scene'>,
   stop: StopOf,
   cover?: { cover: Cover; keyboardSide: (node: UiNode) => boolean },
@@ -365,7 +366,7 @@ function judge(
 }
 
 /** The whole-screen judgement over every box that counts (`UsableScreen.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: Frame, facts: Pick<TreeFacts, 'scene'>, stop: StopOf): Judged | undefined {
+function judgeOver(found: readonly UiNode[], frame: StandingScreen, facts: Pick<TreeFacts, 'scene'>, stop: StopOf): Judged | undefined {
   return frame.boxes
     .map((box) => judge(found, { ...frame, box }, facts, stop))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best) < 0) ? j : best), undefined);

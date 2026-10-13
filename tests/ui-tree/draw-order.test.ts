@@ -252,14 +252,14 @@ describe('the two questions disagree on purpose, per row', () => {
 });
 
 /**
- * The `target` column's rules for the shapes the deleted `shadowing` question was pinned on — its rows still answer
- * them for every target (the tap, `scroll_until`'s stop, the pixel assert and, since ADR 0016, the in-tree dismissal
- * picker), so each measured shape is re-asked here as `exposure(target, screen).covers`: the screen-sized host and its
- * size edge, the itemless toolbar (the Contacts sheet) and what makes a toolbar's item, the content-framed scroll view
- * (the SWIFT form) and what still covers as itself, and the measured input-accessory bar.
- * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
+ * The `target` column's rules on measured iOS shapes that sit over or around a target — rows answered for every
+ * target (the tap, `scroll_until`'s stop, the pixel assert and the in-tree dismissal picker), each asked here as
+ * `exposure(target, screen).covers`: the screen-sized host and its size edge, the itemless toolbar (the Contacts
+ * sheet) and what makes a toolbar's item, the content-framed scroll view (the SWIFT form) and what still covers as
+ * itself, and the measured input-accessory bar.
+ * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md ("What `shadowing` was measured on")
  */
-describe('the target column: the shared predicates, on the shapes the shadowing question was measured on', () => {
+describe('the target column: the shared predicates, on measured hosts, toolbars, content-framed scroll views and the accessory bar', () => {
   const SCREEN = rect(0, 0, 400, 800);
   /** A text node at 50,50 100x100 — the target — unless overridden. */
   const text = (partial: Partial<UiNode> = {}): UiNode => uiNode({ role: 'text', rect: rect(50, 50, 100, 100), ...partial });
