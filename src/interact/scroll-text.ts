@@ -251,6 +251,14 @@ const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
 const systemBarText = ({ judged, bar, band }: Extract<Shortfall, { of: 'systemBar' }>): string =>
   band === undefined ? `its centre stays ${underSystemBar(tapPoint(judged.node), bar)}` : `it stays ${partlyUnderSystemBar(bar)}`;
 
+/**
+ * What still reaches a node the band's REGION alone keeps a `fully: true` stop off (its centre clear of the bar):
+ * the plain stop and the tap — said only when nothing of the app is drawn over its centre, which would stop them
+ * too; else only that its centre is clear of the bar.
+ */
+const centreClear = ({ judged }: Extract<Shortfall, { of: 'systemBar' }>): string =>
+  judged.standing.facts.centreCover === undefined ? 'its centre is clear: a plain scroll_until stops on it, and a tap lands' : 'its centre is clear of the bar';
+
 /** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
 const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);
 
@@ -295,8 +303,8 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // scroll never swiped.
       if (short.of === 'systemBar') {
         const pinned = pinnedUnder(short.bar.edge);
-        // A `fully` stop refused by the band's region: its centre is clear, so the plain stop and the tap still reach it.
-        const reach = short.band === undefined ? 'no step taps it' : 'fully: true never stops on it (its centre is clear: a plain scroll_until stops on it, and a tap lands)';
+        // A `fully` stop refused by the band's region: its centre is clear of the bar (`centreClear`).
+        const reach = short.band === undefined ? 'no step taps it' : `fully: true never stops on it (${centreClear(short)})`;
         const other =
           o.otherWay === 'untried'
             ? ` — try direction: "${back}"; if no direction moves it, ${pinned}, and ${reach}. `
@@ -419,7 +427,8 @@ function shortText(short: Shortfall): string {
     }
     case 'systemBar': {
       const { judged } = short;
-      return `element reached the viewport but ${systemBarText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
+      const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;
+      return `element reached the viewport but ${systemBarText(short)}${region} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'sliver': {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(short.cut.edge)})`;

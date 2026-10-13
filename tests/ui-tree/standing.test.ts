@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { onScreen, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { fullBleedHeader, onScreen, sceneOf, screenSized, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardEdge, type KeyboardLine } from '../../src/ui-tree/keyboard-cover.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -236,8 +236,8 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
     ['accountDetail row_30 reaching 33 px into the band, fully: true: under the navigation bar, as a region', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 2138 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…plain stop: reachable (its centre clear)', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 540, y: 2138 } }],
     ['…tap: reachable', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 540, y: 2138 } }],
-    // The top band likewise: contactsSyncPromo's "Close sheet" scrim 0,0 1080x1087 lies under the 66-px status bar, its centre (540,544) clear.
-    ['contactsSyncPromo "Close sheet" 0,0 1080x1087, fully: true: under the status bar, as a region', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, FULLY, { kind: 'systemBar', at: { x: 540, y: 544 }, bar: { edge: 'top', bottom: 66 }, band: { x: 0, y: 0, width: 1080, height: 66 } }],
+    // No scroll lifts a full-bleed header out of the band (the owner's 2026-10-13 decision): contactsSyncPromo's "Close sheet" scrim 0,0 1080x1087, laid from the top edge at full width, stops `fully` as before.
+    ['contactsSyncPromo "Close sheet" 0,0 1080x1087 (full-bleed), fully: true: reachable', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, FULLY, { kind: 'reachable', at: { x: 540, y: 544 } }],
     ['…plain stop: reachable', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, PLAIN, { kind: 'reachable', at: { x: 540, y: 544 } }],
   ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
     const t = await tree();
@@ -492,9 +492,10 @@ describe('parity — `scroll_until X` then `tap X`: a plain stop that is reachab
 });
 
 describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `fully` stop that is reachable leaves nothing of the app, and no system band, over what the assert reads', () => {
-  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered, never under a system bar (one way: the pixel assert is stricter)', async () => {
+  it('every node of every fixture, every screen of the first half, one box (the pixel assert judges one): never covered; never under a system bar but for content no scroll lifts out of it — a full-bleed header, a screen-sized node, the stated exemption (one way: the pixel assert is stricter)', async () => {
     let judged = 0;
     let reachable = 0;
+    let exempt = 0;
     const broken: string[] = [];
     for (const [name, tree, os] of await everyFixture()) {
       const box: Rect = os === 'ios' ? { x: 0, y: 0, width: 402, height: 874 } : { x: 0, y: 0, width: 1080, height: 2220 };
@@ -511,15 +512,20 @@ describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `f
           reachable++;
           for (const purpose of [OCR(n), COLOUR(n)]) {
             const pixel = scene.standing(n, screen, purpose);
+            if (pixel.kind === 'systemBar' && (fullBleedHeader(n.rect, box) || screenSized(n.rect, box))) {
+              exempt++;
+              continue;
+            }
             if (pixel.kind === 'systemBar' || pixel.kind === 'covered') broken.push(`${name} ${JSON.stringify(band)} ${n.role} ${JSON.stringify(n.rect)}: pixel ${pixel.kind}`);
           }
         }
       }
     }
     expect(broken).toEqual([]);
-    // Not vacuous: thousands judged, most of them reachable.
+    // Not vacuous: thousands judged, most of them reachable, and the exemption met (full-bleed roots and app bars).
     expect(judged).toBeGreaterThan(4000);
     expect(reachable).toBeGreaterThan(judged / 2);
+    expect(exempt).toBeGreaterThan(0);
   });
 });
 
@@ -864,12 +870,18 @@ describe('Scene.standing for the stop — the status band and a keyboard line (m
     // No band read (an Android adapter): the row at -20 stops, its centre (201,6) on the screen.
     ['…at -20 with no band read, plain', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE_BARE, PLAIN, { kind: 'reachable', at: { x: 201, y: 6 } }],
     // Full-bleed content at the top: the plain stop's ROUNDED centre decides — 0,0 402x123 (61.5 sent as 62) stops,
-    // 402x122 (61) does not; `fully` stops on none of them, each lying under the bar (a region), the centre's rule first.
+    // 402x122 (61) does not; `fully` likewise — the region rule exempts content no scroll lifts out of the band.
     ['a hero 0,0 402x300, plain', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 150 } }],
     ['a hero 0,0 402x123, plain', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 62 } }],
     ['a hero 0,0 402x122, plain: under the status bar', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 122) })), 'hero', IPHONE, PLAIN, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
-    ['a hero 0,0 402x300, fully: true: under the status bar, as a region', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 150 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
-    ['a hero 0,0 402x123, fully: true: likewise', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 62 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
+    ['a hero 0,0 402x300, fully: true: reachable — a full-bleed header, which no scroll lifts out of the band (the owner\'s 2026-10-13 decision)', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 300) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 150 } }],
+    ['a hero 0,0 402x123, fully: true: likewise', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
+    // Not full-bleed (inset 10 a side): the region rule holds.
+    ['a card 10,0 382x300, fully: true: under the status bar, as a region', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: { x: 10, y: 0, width: 382, height: 300 } })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 150 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
+    // Android 15+'s edge-to-edge app bar under the 66-px band, and a screen-sized root: `fully` stops on each as before.
+    ['an edge-to-edge app bar 0,0 1080x210, fully: true: reachable', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: box(1080, 210) })), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 105 } }],
+    // Screen-sized but not laid from the top edge (0,40 1080x2180, into both bands): stops as before too.
+    ['a screen-sized node 0,40 1080x2180 into both bands, fully: true: reachable', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: { x: 0, y: 40, width: 1080, height: 2180 } })), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 1130 } }],
     ['a hero 0,0 402x122, fully: true: its centre under the status bar (the centre\'s rule, no region)', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 122) })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 61 }, bar: { edge: 'top', bottom: 62 } }],
   ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
     const t = await tree();

@@ -27,6 +27,12 @@ decision:
   "scroll_until … `fully: true` first" stopped at once on mp-native accountDetail's `row_30` `66,2088 948x99` (its centre
   (540,2138) clear, its bottom 33 px into the band at 2154), and the agent looped; eight small nodes at the status band
   did the same.
+- **N-a, `fully`, content no scroll lifts (amended 2026-10-13, owner, round 10 verification).** The region rule does
+  NOT apply to a full-bleed header (laid from the screen's top edge at full width, `standing.ts#fullBleedHeader`) or a
+  screen-sized node (`standing.ts#screenSized`). The `fully` stop stops on it as before, so a rect assert after it
+  works: an iOS hero `0,0 402x300`, an Android 15+ edge-to-edge app bar `0,0 1080x210`. A pixel assert on it still fails
+  closed, with its own advice: assert something in it clear of the bar (its title, say). Without the exemption such a
+  node never stopped; reached from a scrolled list, it went to `maxSwipes` with no advice.
 - **N-b.** The pixel assert fails closed when what it reads overlaps the band past the slack (ADR 0002). There is one
   more case, for OCR ONLY. The element's bottom lies flush (±1) with the band's top, inside a clipping scroller whose
   bottom is flush with it too (`standing.ts#cutAtNavigationBar`). That fails an ocr assert closed as possibly cut. A
@@ -35,8 +41,10 @@ decision:
 
 ## Residuals accepted
 
-- `fully` never stops on content laid under the status bar by design (a full-bleed header, a screen-sized root). It
-  ends stuck naming the bar, as a pixel assert on it fails closed. The plain stop stops on it.
+- A `fully` stop on a full-bleed header or a screen-sized node does not promise a pixel assert: what lies under a bar
+  fails it closed, with the child advice.
+- Content laid at full width under the navigation bar from the screen's bottom (a footer) is no full-bleed header:
+  `fully` strokes on, and a pinned one ends stuck naming the bar.
 - The band is portrait only. In landscape the navigation bar moves to a side, and nothing reads it there.
 - The band fails open, judged as if no band were read, in three cases:
   - a `dumpsys window displays` that lists a second display of a different size;

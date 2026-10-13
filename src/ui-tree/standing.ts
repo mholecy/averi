@@ -139,12 +139,16 @@ import type { UsableScreen } from './usable-screen.js';
  *   the navigation mode.
  * - `fully` judges the bands as a REGION, by the pixel assert's rule and
  *   slack (`systemBandOver`): it stops only with none of the node in a band
- *   past the slack, so a pixel assert after it is never refused for a band.
+ *   past the slack, so a pixel assert after it is not refused for a band.
  *   Judged by the centre alone, the pixel remedy "scroll_until … `fully:
  *   true` first" stopped at once on a row reaching 33 px into the
  *   navigation band (accountDetail's `row_30` `66,2088 948x99`, its centre
  *   clear), and the agent looped. A node pinned in a band ends stuck naming
- *   the bar.
+ *   the bar. Not for content no scroll lifts out of a band — a full-bleed
+ *   header (`fullBleedHeader`) or a screen-sized node (`screenSized`): the
+ *   `fully` stop stops on it as before, so a rect assert after it works,
+ *   and a pixel assert on it fails closed with its own advice (assert
+ *   something in it clear of the bar).
  *   docs/adr/0009-android-navigation-band.md
  * - A sliver: uiautomator cuts every rect to its scroller, so a cut node's
  *   centre is always on the screen; the stop handed back the very strip the
@@ -164,9 +168,12 @@ import type { UsableScreen } from './usable-screen.js';
  *   of a turn suggested but not witnessed is never judged; landscape is
  *   unmeasured.
  *   docs/adr/0012-pixel-assert-residuals-d4-d6.md
- * - `fully` never stops on content laid under the status bar by design (a
- *   full-bleed header, a screen-sized root): it ends stuck naming the bar,
- *   as a pixel assert on it fails closed. The plain stop stops on it.
+ * - A `fully` stop on a full-bleed header or a screen-sized node does not
+ *   promise a pixel assert: what lies under a bar fails it closed, with
+ *   the advice to assert something in it clear of the bar. Content laid
+ *   under the navigation bar at full width from the screen's bottom (a
+ *   footer) is no full-bleed header: `fully` strokes on, and it ends stuck
+ *   naming the bar.
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
@@ -510,7 +517,9 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
   const cover = fully && facts.covers.length > 0 ? (facts.centreCover ?? facts.covers[facts.covers.length - 1]) : facts.centreCover;
   // `fully`: the system bands as a region, as the pixel assert judges them — any of the node past the slack.
   // docs/adr/0009-android-navigation-band.md
-  const placed = fully && place === 'on' ? (systemBandOver(node.rect, box, bands) ?? place) : place;
+  // Not for content no scroll lifts out of a band — a full-bleed header, a screen-sized node: it stops as before.
+  const liftable = !screenSized(node.rect, box) && !fullBleedHeader(node.rect, box);
+  const placed = fully && liftable && place === 'on' ? (systemBandOver(node.rect, box, bands) ?? place) : place;
   return ordered<Standing>(
     pointPlaced(facts, placed, facts.visible),
     fully ? undefined : sliverCut(facts, facts.sliver),

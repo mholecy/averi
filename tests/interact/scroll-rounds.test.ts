@@ -1631,11 +1631,35 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
     expect(message).not.toContain('its centre stays');
   });
 
-  it('fully: true at the bound: short of the navigation bar it reaches into', () => {
+  it('fully: true at the bound: short of the navigation bar it reaches into, with what the plain stop and the tap still do', () => {
     const played = play({ ...ANDROID, fully: true, maxSwipes: 0 }, [row30()]);
     expect(failureOf(played, 'id:row_30').message).toContain(
-      'failed after 0 swipes (maxSwipes) — element reached the viewport but it stays partly under the navigation bar, from y 2154 to the bottom of the screen (tree units) (last rect',
+      'failed after 0 swipes (maxSwipes) — element reached the viewport but it stays partly under the navigation bar, from y 2154 to the bottom of the screen (tree units) — ' +
+        'fully: true stops only with none of it under the bar (its centre is clear: a plain scroll_until stops on it, and a tap lands) (last rect',
     );
+  });
+
+  it('…its centre under something of the app: no promise of a stop or a tap, only that its centre is clear of the bar', () => {
+    const help = node({ role: 'button', identifier: 'help', rect: { x: 400, y: 2110, width: 200, height: 60 } });
+    const pinned = play({ ...ANDROID, fully: true, maxSwipes: 6 }, [1, 2, 3, 4].map(() => ({ ...row30(), over: [help] })));
+    expect(pinned.outcome?.kind).toBe('stuck');
+    const stuck = failureOf(pinned, 'id:row_30').message;
+    expect(stuck).toContain('and fully: true never stops on it (its centre is clear of the bar).');
+    expect(stuck).not.toContain('a tap lands');
+    const bound = failureOf(play({ ...ANDROID, fully: true, maxSwipes: 0 }, [{ ...row30(), over: [help] }]), 'id:row_30').message;
+    expect(bound).toContain('— fully: true stops only with none of it under the bar (its centre is clear of the bar) (last rect');
+  });
+
+  it('fully: true stops at 0 swipes on content no scroll lifts out of a band (the owner\'s 2026-10-13 decision): an edge-to-edge app bar 0,0 1080x210, a screen-sized node 0,40 1080x2180', () => {
+    for (const rect of [{ x: 0, y: 0, width: 1080, height: 210 }, { x: 0, y: 40, width: 1080, height: 2180 }]) {
+      expect(resultOf(play({ ...ANDROID, fully: true }, [{ found: [match(rect, 'hero')], screen: NAV }]))).toMatchObject({ swipes: 0, visible: 1 });
+    }
+  });
+
+  it('…and on an iOS hero 0,0 402x300 under the 62-pt status bar', () => {
+    const box: Rect = { x: 0, y: 0, width: 402, height: 874 };
+    const screen: UsableScreen = { box, boxes: [box], oriented: box, from: 'device', statusBand: 62 };
+    expect(resultOf(play({ ...IPHONE, fully: true }, [{ found: [match({ x: 0, y: 0, width: 402, height: 300 }, 'hero')], screen }]))).toMatchObject({ swipes: 0, visible: 1 });
   });
 });
 
