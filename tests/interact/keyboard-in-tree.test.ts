@@ -503,6 +503,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         await tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] });
         expect(fake.taps).toEqual(['login_title', 'login_submit']);
       });
+    });
 
     /**
      * The picker asks the TAP's standing (ui-tree/standing.ts#Scene, `{ of: 'tap' }`) after its two keyboard checks:
@@ -528,7 +529,54 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       const loginTitle = (rect: Rect = { x: 36, y: 291, width: 330, height: 24 }, children: UiNode[] = []) => node({ role: 'text', identifier: 'login_title', label: 'Prihlásenie', rect, children }); // centre (201,303)
       const dump = async (name: string) => parseWdaSource(await readFile(new URL(`../fixtures/wda-source-${name}.json`, import.meta.url), 'utf8'));
 
-      it('its centre in a system band reads as off the screen, as before — iOS\'s status band (62 pt): "off screen at (x,y)", where a tap would press the status bar', async () => {
+      // A pin of UNCHANGED words: every skip clause the picker gave before ADR 0016 reads the same, each in the place it
+      // comes in the warning — the keyboard's own control (asked first, by the reading's `ofKeyboard`) among them.
+      it('unchanged — every existing skip clause reads as before, in the order the strategies were configured', async () => {
+        const text = (identifier: string, y: number, extra: Partial<UiNode> = {}) => node({ role: 'text', identifier, rect: { x: 36, y, width: 330, height: 24 }, ...extra });
+        const screen = screenOf(
+          node({ role: 'button', label: 'Submit', rect: { x: 36, y: 100, width: 330, height: 44 } }),
+          text('twin', 160),
+          text('twin', 200),
+          text('kb_hint', 240, { ofKeyboard: true }), // a keyboard-owned node clear of the band: the reading's, by its mark
+          text('in_band', 600), // centre (201,612), in the band {0,539,402,335}
+          text('above', -60), // centre (201,-48)
+          text('under_alert', 291), // centre (201,303)
+          node({ role: 'text', label: 'Session expired', rect: { x: 20, y: 280, width: 362, height: 120 } }),
+        );
+        const fake = new FakeAdapter({ screen }, 'screen');
+        fake.platform = 'ios';
+        fake.keyboard = undefined;
+        fake.keyboardAdvice = 'ADVICE';
+        const dismissals: KeyboardDismissal[] = [
+          { kind: 'tap', target: { id: 'nowhere' } },
+          { kind: 'tap', target: { label: 'Submit' } },
+          { kind: 'tap', target: { id: 'twin' } },
+          { kind: 'tap', target: { id: 'kb_hint' } },
+          { kind: 'tap', target: { id: 'in_band' } },
+          { kind: 'tap', target: { id: 'above' } },
+          { kind: 'tap', target: { id: 'under_alert' } },
+          { kind: 'accessory' },
+        ];
+        const result = await dismissKeyboard(fake, { ambiguous: 'refuse', dismissals });
+        expect(result.warning).toBe(
+          'the soft keyboard is up and was left up: none of the configured dismissals is usable on this screen (' +
+            [
+              'tap id:"nowhere": not found',
+              'tap label:"Submit": only interactive match (button) — a dismissal must be a non-interactive element',
+              'tap id:"twin": 2 matches',
+              'tap id:"kb_hint": the keyboard\'s own control',
+              'tap id:"in_band": under the keyboard',
+              'tap id:"above": off screen at (201,-48)',
+              'tap id:"under_alert": covered by text "Session expired"',
+              'accessory: no accessory toolbar on screen',
+            ].join('; ') +
+            ') — the next tap under it will be refused',
+        );
+        expect(fake.taps).toEqual([]);
+      });
+
+      // A pin of UNCHANGED behaviour (ADR 0016, row 10): the old picker's `onScreen` gave the same words; it passes there too.
+      it('unchanged — its centre in a system band reads as off the screen, as before — iOS\'s status band (62 pt): "off screen at (x,y)", where a tap would press the status bar', async () => {
         const screen = screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })); // centre (201,32)
         expect(await pickOn(screen, 'login_title', { width: 402, height: 874, statusBand: 62 })).toBe('off screen at (201,32)');
         expect(await pickOn(screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })), 'login_title', { width: 402, height: 874 })).toBe('tapped (201,32)');
@@ -547,6 +595,19 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 
       it('a later node of exactly the title\'s frame is the same element listed again: picked', async () => {
         expect(await pickOn(screenOf(loginTitle(), node({ role: 'image', label: 'underline', rect: { x: 36, y: 291, width: 330, height: 24 } })), 'login_title')).toBe('tapped (201,303)');
+      });
+
+      /**
+       * Today's behaviour, PINNED WHILE THE OWNER DECIDES whether to refuse it (ADR 0016, residual 1): a labelled control
+       * of exactly the title's frame, listed after it, is read as the title listed again (the `sameFrame` row) and
+       * excused, so the dismissal is picked and the tap lands on the BUTTON's centre — here "Delete account". Before
+       * ADR 0016 it was skipped as "covered by button "Delete account"". On the post-fill `dismiss()` path this
+       * reports `hiddenBy: tapping …`: a wrong action said as a dismissal. If the owner chooses the explicit refusal,
+       * this test flips to `covered by button "Delete account"`.
+       */
+      it('a labelled button of exactly the title\'s frame, listed after it, is excused as the title listed again: picked, the tap at the shared centre — today\'s behaviour, the owner deciding whether to refuse it', async () => {
+        const button = node({ role: 'button', label: 'Delete account', identifier: 'delete_account', rect: { x: 36, y: 291, width: 330, height: 24 } });
+        expect(await pickOn(screenOf(loginTitle(), button), 'login_title')).toBe('tapped (201,303)');
       });
 
       it('the title\'s own unlabelled control — a text field over its label (ADR 0014\'s measured SWIFT row), a button spanning its wrapper — takes the tap, and the dismissal is picked: the tap lands on the control (ADR 0016\'s first residual)', async () => {
@@ -576,11 +637,15 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(await pickOn(login, 'login_password_field')).toBe('covered by container');
       });
 
-      it('a centre covered with a large enough piece free — where a tap would MOVE — is skipped naming the cover over the centre, not the last node drawn there: the dismissal is never aimed off its centre', async () => {
+      it('a centre covered with a large enough piece free — where a tap would MOVE — is skipped naming the cover over the centre, not the first or the last cover of the title, nor the last node drawn there: the dismissal is never aimed off its centre', async () => {
         const wrapped = node({ role: 'container', rect: { x: 36, y: 291, width: 330, height: 24 }, children: [loginTitle()] });
-        const badge = node({ role: 'image', label: 'badge', rect: { x: 180, y: 291, width: 40, height: 24 } }); // the title's 144x24 left of it is free
+        // Three covers of the title, in this order; only the middle one holds its centre (201,303). The pieces between
+        // them (104x24 and 106x24) are free, so a tap would move there.
+        const left = node({ role: 'image', label: 'left', rect: { x: 36, y: 291, width: 40, height: 24 } });
+        const badge = node({ role: 'image', label: 'badge', rect: { x: 180, y: 291, width: 40, height: 24 } });
+        const right = node({ role: 'image', label: 'right', rect: { x: 326, y: 291, width: 40, height: 24 } });
         const strip = node({ role: 'other', ofKeyboard: true, rect: { x: 0, y: 280, width: 402, height: 44 }, children: [node({ role: 'button', label: 'Suggestion', rect: { x: 0, y: 280, width: 402, height: 44 } })] });
-        expect(await pickOn(screenOf(wrapped, badge, strip), 'login_title')).toBe('covered by image "badge"');
+        expect(await pickOn(screenOf(wrapped, left, badge, right, strip), 'login_title')).toBe('covered by image "badge"');
       });
 
       it('under a keyboard line no guard acts on (idb\'s band, read by its shape) while clear of the band WDA marks: skipped "under the keyboard" — constructed, the two never meet on a device', async () => {
@@ -591,7 +656,9 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(await pickOn(flat, 'note')).toBe('under the keyboard');
       });
 
-      it('under the measured input-accessory bar (wda-source-myport-2fa-keyboard-toolbar.json: Toolbar → Other → Button "Done" at 0,518 402x48, in a keyboard Window): skipped "under the keyboard" — WDA\'s band takes in the accessory slot, so the bar, no cover of a target, never decides', async () => {
+      // A pin of UNCHANGED behaviour: the band's `frameOver` answers before the standing is asked, as it did before the
+      // standing was; it passes on the old picker too. It says where the bar `shadowing` was measured on now stands.
+      it('unchanged — under the measured input-accessory bar (wda-source-myport-2fa-keyboard-toolbar.json: Toolbar → Other → Button "Done" at 0,518 402x48, in a keyboard Window): skipped "under the keyboard" — WDA\'s band takes in the accessory slot, so the bar, no cover of a target, never decides', async () => {
         const twofa = await dump('myport-2fa-keyboard-toolbar');
         const support = [...everyNode(twofa)].find((n) => n.label?.startsWith('Pri probléme'))!;
         support.identifier = 'support_text';
@@ -605,7 +672,6 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
           "cut at its scroll container's top edge (container 0,280 402x200); only a 330x20 part of it shows, 20 deep across that edge, under the 24 a tap needs",
         );
       });
-    });
     });
 
     it('the keyboard is gone only on the SECOND confirming look after the dismissal tap (a hide animation caught mid-way): the target is tapped, not refused', async () => {

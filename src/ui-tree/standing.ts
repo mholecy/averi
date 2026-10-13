@@ -347,7 +347,28 @@ type RegionPlace = 'on' | { readonly bar: SystemBar; readonly band: Rect } | { r
 /** The no-screen boxes: the tree's root rect, or none (undefined) when it has no area — every point on the screen. */
 const rootBoxes = (tree: UiNode): Rect[] | undefined => (rectArea(tree.rect) > 0 ? [tree.rect] : undefined);
 
-/** Where `point` lies against `boxes` (none: on, failing open) and their system bands (`systemBands`): on, in the top band, in the bottom band (in that order), or off. */
+/**
+ * Where `point` lies against `boxes` (none: on, failing open) and their
+ * system bands (`systemBands`): on, in the top band, in the bottom band (in
+ * that order), or off. THE on-screen rule for a point about to be tapped —
+ * the target's centre, and a configured keyboard dismissal's
+ * (interact/keyboard-in-tree.ts#pickDismissal asks the tap's standing,
+ * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md).
+ * With no screen (no usable device size and no window in the tree), the
+ * tree's root rect is the one box (`rootBoxes`); with none, every point is
+ * on — the rule exists to stop a false "Tapped", and must never be why a
+ * tap on a device that could not report its size did not happen. The point
+ * is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on a
+ * 402-wide screen is judged at 402, off it.
+ *
+ * Measured: idb lists a scroll view's content below the fold with real
+ * rects, and a tap at (94,895) on a 402x874 screen landed nowhere and was
+ * reported done; a tap at (201,6) went to iOS's status bar, which scrolled
+ * the form to its top, and one at (256,3) on Google Contacts' collapsed app
+ * bar to Android's; one at (540,2186) on mp-native's Account Detail, drawn
+ * edge to edge, to the navigation bar.
+ * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
+ */
 function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands): PointPlace {
   if (boxes === undefined) return 'on';
   const judged = boxes.map((box) => systemBands(box, bands));

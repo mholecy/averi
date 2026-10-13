@@ -51,9 +51,9 @@ guarded target. P is a node listed after the candidate that holds its centre.
 |---|---|---|---|
 | 1 | a later sibling drawn on the candidate, narrower and inside it (`onTarget`/`drawnOn`); measured: `wda-source-rn-myport` `placeholder_screen` under `text "Scaffold is running."` | skipped: covered by P | picked |
 | 2 | content of a leaf candidate's drawn-on sibling (`onTarget`/`ownContent`) | skipped | picked |
-| 3 | exactly the candidate's rect (`sameFrame`) | skipped (unless structural) | picked |
+| 3 | exactly the candidate's rect (`sameFrame`), whatever its role — a labelled control included | skipped (unless structural): `covered by button "Delete account"` | picked; the tap lands on P, a button pressed (residual 1) |
 | 4 | its own unlabelled control, a sibling spanning or padded, or a text field over a label (`ownControl`, ADR 0014) | skipped: covered by button/textfield | picked; the tap lands on the control (residual 1) |
-| 5 | content of a scroll view the candidate is not in, listed after it (`scrolledContent`; WDA lists a top bar before the scroll view it is drawn over) | skipped: covered by the row | picked |
+| 5 | content of a scroll view the candidate is not in, listed after it (`scrolledContent`; WDA lists a top bar before the scroll view it is drawn over), an interactive row included, whether or not the candidate lies in a bar | skipped: covered by the row | picked; where the row is really drawn over the candidate, the tap lands on the row (residual 1) |
 | 6 | a keyboard-owned node outside the band frame (`keyboard`) | skipped | picked (residual 2) |
 | 7 | a scroll indicator (`scrollIndicator`) | picked (structural, already excused) | picked: unchanged |
 | 8 | a structural node with a label, a value or children, partly over it, neither holding it whole nor frames only (`structural`); measured: the login and 2FA field wrappers under their own inner `container 36,367 330x52` | picked | skipped: covered by container (residual 3) |
@@ -74,6 +74,18 @@ the picker (idb, Compose, uiautomator, synthetic slivers), 95 of 893 changed: Co
    is now picked, and the dismissal tap lands on that control. A field's label focuses the field, so the confirming
    looks end in `AfterDismissalTap`. A button's label presses the button. The picker's interactive-match filter already
    had the same hazard for a text that is a button's own child, so this widens a stated hazard and does not create one.
+
+   It is wider than the title's own control. The `target` column excuses some labelled controls too, and the picker
+   then taps them: a control of exactly the title's frame (`sameFrame`, row 3), which reads as the title listed again —
+   a title followed by `button "Delete account"` with the same rect, skipped before as `covered by button "Delete
+   account"`, is now picked and the button pressed — and an interactive row of a scroll view the title is not in
+   (`scrolledContent`, row 5), which the row excuses whether or not the title lies in a bar that is drawn over the
+   rows. On the guard's path, a tap that hides the keyboard and does something of its own passes as `hidden by tapping
+   … before tapping`. On the post-fill `dismiss()` path it is reported as `hiddenBy: tapping <title>`: a wrong action,
+   reported as the dismissal, and nothing says otherwise. The owner decides between keeping this and an explicit
+   refusal (a candidate whose excused node at its centre is interactive skipped as `covered by …`). A picker test pins
+   today's behaviour (`tests/interact/keyboard-in-tree.test.ts`, the same-frame labelled button: picked, the tap at its
+   centre).
 2. **A keyboard-owned node outside the band frame** no longer skips the candidate. WDA's band includes the AutoFill bar
    and the accessory slot, so `frameOver` still refuses those points. Measured: the 2FA input-accessory bar (`Toolbar →
    Other → Button "Done"` at `0,518 402x48`, in a keyboard Window, wda-source-myport-2fa-keyboard-toolbar.json) is an
@@ -94,14 +106,8 @@ Moved here from the deleted column's prose, so the measurements are not lost.
   keyboard-owned node the band missed refused a dismissal. Now the band is judged first and the rest is residual 2.
 - **A row scrolled under a translucent bar** was after the bar's title in WDA's pre-order and read as a cover — a false
   refusal, accepted then as the safe direction for a dismissal. It is row 5 now.
-- **The on-screen point rule** (`onScreen`, now the tap standing's place of a point): inside any of the screen's boxes
-  less its system bands; with no screen, inside the tree's root rect when it has one; with none, on screen. The rule
-  exists to stop a false "Tapped", and must never be why a tap on a device that could not report its size did not
-  happen. The point is the one sent (`tapPoint` rounds), so a centre at x 401.5 on a 402-wide screen is judged at 402,
-  off it. Measured: idb lists a scroll view's content below the fold with real rects, and a tap at (94,895) on a
-  402x874 screen landed nowhere and was reported done; a tap at (201,6) went to iOS's status bar, which scrolled the
-  form to its top; one at (256,3) on Google Contacts' collapsed app bar went to Android's; one at (540,2186) on
-  mp-native's Account Detail, drawn edge to edge, to the navigation bar.
+- **The on-screen point rule** (`onScreen`) is now the tap standing's place of a point. Its rule, why it fails open,
+  the rounding it judges and its measurements are stated beside it: `ui-tree/standing.ts#placeOf`.
 
 ## Bug notes
 

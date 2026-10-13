@@ -252,6 +252,198 @@ describe('the two questions disagree on purpose, per row', () => {
 });
 
 /**
+ * The `target` column's rules for the shapes the deleted `shadowing` question was pinned on — its rows still answer
+ * them for every target (the tap, `scroll_until`'s stop, the pixel assert and, since ADR 0016, the in-tree dismissal
+ * picker), so each measured shape is re-asked here as `exposure(target, screen).covers`: the screen-sized host and its
+ * size edge, the itemless toolbar (the Contacts sheet) and what makes a toolbar's item, the content-framed scroll view
+ * (the SWIFT form) and what still covers as itself, and the measured input-accessory bar.
+ * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
+ */
+describe('the target column: the shared predicates, on the shapes the shadowing question was measured on', () => {
+  const SCREEN = rect(0, 0, 400, 800);
+  /** A text node at 50,50 100x100 — the target — unless overridden. */
+  const text = (partial: Partial<UiNode> = {}): UiNode => uiNode({ role: 'text', rect: rect(50, 50, 100, 100), ...partial });
+  const screen = (...children: UiNode[]): UiNode => uiNode({ role: 'container', rect: SCREEN, children });
+  const coversIn = (tree: UiNode, target: UiNode, within = SCREEN) => drawOrder(tree).exposure(target, within).covers;
+
+  describe('a screen-sized host draws through its content, never through its own frame (docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md)', () => {
+    /** A `toolbar` host of `height` holding a frame of its size and, in it, one item away from the target — so the itemless-toolbar rule cannot excuse it and the size rule alone decides. */
+    const host = (height: number) =>
+      uiNode({ role: 'toolbar', rect: rect(0, 0, 400, height), children: [uiNode({ role: 'container', rect: rect(0, 0, 400, height), children: [uiNode({ role: 'button', label: 'Done', rect: rect(300, 650, 80, 40) })] })] });
+
+    it('the size rule\'s edge: exactly SCREEN_SIZED_FRACTION (0.9) of the screen is a host — no cover; just under it, the host and its frame cover as themselves', () => {
+      const target = text({ label: 'title' });
+      expect(coversIn(screen(target, host(720)), target)).toEqual([]); // 400x720 = 288000 = 0.9 × 320000
+      const below = host(719);
+      expect(coversIn(screen(target, below), target)).toEqual([below, below.children[0]]);
+    });
+
+    it('a root with no rect: the screen is the tree\'s largest rect — a host of its size is no cover, a smaller one is', () => {
+      const target = text({ label: 'title' });
+      const rootless = (h: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: SCREEN }), target, h] });
+      expect(coversIn(rootless(host(800)), target)).toEqual([]);
+      const small = host(700);
+      expect(coversIn(rootless(small), target)).toEqual([small, small.children[0]]);
+    });
+
+    it('the measured SwiftUI toolbar host (402x874 `toolbar \'Toolbar\'` → one empty container, after the title): no cover — and the screen is the ROOT\'s rect, so a tall scroll content earlier in the tree does not shrink it', () => {
+      const full = rect(0, 0, 402, 874);
+      const title = uiNode({ role: 'text', label: 'SWIFT PAYMENT', identifier: 'swift_payment.form.title', rect: rect(135, 73, 131, 22) });
+      const app = (...children: UiNode[]) => uiNode({ role: 'application', rect: full, children });
+      expect(coversIn(app(title, uiNode({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', rect: full, children: [uiNode({ role: 'container', rect: full })] })), title, full)).toEqual([]);
+      const withItem = uiNode({ role: 'toolbar', rect: full, children: [uiNode({ role: 'container', rect: full, children: [uiNode({ role: 'button', label: 'Done', rect: rect(300, 800, 80, 40) })] })] });
+      expect(coversIn(app(uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 3000) }), title, withItem), title, full)).toEqual([]);
+    });
+
+    it('an interactive or childless screen-sized node still covers as itself: a full-screen backdrop button (an RN transparent Modal\'s Pressable), an image, a text', () => {
+      const target = text({ label: 'title' });
+      const backdrop = uiNode({ role: 'button', label: 'Close', rect: SCREEN, children: [text({ label: 'elsewhere', rect: rect(0, 600, 400, 100) })] });
+      const image = uiNode({ role: 'image', rect: SCREEN });
+      const leafText = text({ label: 'Terms', rect: SCREEN });
+      for (const cover of [backdrop, image, leafText]) expect(coversIn(screen(target, cover), target)).toEqual([cover]);
+    });
+
+    it('a host with content over the target covers through that content — an alert\'s text in WDA\'s Alert → container; the same host with nothing of its own there reads as not covering (the accepted trade-off)', () => {
+      const target = text({ label: 'title' });
+      const message = text({ label: 'Session expired', rect: rect(60, 60, 280, 160) });
+      const toolbarHost = (...children: UiNode[]) => uiNode({ role: 'toolbar', rect: SCREEN, children });
+      expect(coversIn(screen(target, toolbarHost(message)), target)).toEqual([message]);
+      const alert = uiNode({ role: 'container', rect: rect(60, 60, 280, 160), children: [message] });
+      expect(coversIn(screen(target, toolbarHost(alert)), target)).toEqual([alert, message]);
+      expect(coversIn(screen(target, toolbarHost(text({ label: 'elsewhere', rect: rect(0, 600, 400, 100) }))), target)).toEqual([]);
+    });
+  });
+
+  /**
+   * The Contacts "New Contact" sheet under WDA (UIKit, iPhone 17, iOS 27, 2026-10-09,
+   * docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md): after the title
+   * `text 'New Contact' 149 89 104 22` (in `container id:"New Contact" 0 78 402 54`), the form's `scrollable 0 62 402 812`,
+   * then two `toolbar 'Toolbar'`s, `0 83 402 48` and `0 62 402 812`, each holding one empty `Other` → `container` of its
+   * own rect; then the keyboard's band. Each toolbar alone had refused the title's dismissal as covered.
+   */
+  describe('an itemless toolbar covers nothing, whatever its size; a toolbar with any item covers as itself (the Contacts sheet, 2026-10-09)', () => {
+    const full = rect(0, 0, 402, 874);
+    const BAR = rect(0, 83, 402, 48);
+    const SHEET = rect(0, 62, 402, 812);
+    const title = uiNode({ role: 'text', label: 'New Contact', rect: rect(149, 89, 104, 22) });
+    const titleBox = uiNode({ role: 'container', identifier: 'New Contact', rect: rect(0, 78, 402, 54), children: [title] });
+    const form = uiNode({ role: 'scrollable', rect: SHEET, children: [uiNode({ role: 'textfield', identifier: 'First name', rect: rect(20, 300, 360, 44) })] });
+    /** The measured shape by default: one empty same-rect frame. */
+    const frame = (r: UiNode['rect'], children: UiNode[] = []) => uiNode({ role: 'container', rect: r, children });
+    const toolbar = (r: UiNode['rect'], children: UiNode[] = [frame(r)]) => uiNode({ role: 'toolbar', label: 'Toolbar', rect: r, children });
+    const band = uiNode({ role: KEYBOARD_ROLE, ofKeyboard: true, rect: rect(0, 573, 402, 301) });
+    const app = (...after: UiNode[]) => uiNode({ role: 'application', rect: full, children: [uiNode({ role: 'other', rect: full, children: [titleBox, form, ...after] }), band] });
+    const covers = (tree: UiNode, target = title) => drawOrder(tree).exposure(target, full).covers;
+
+    it('the measured shape — both toolbars — and each alone: nothing covers the title; nor does a childless toolbar, or one of empty frames nested to any depth', () => {
+      expect(covers(app(toolbar(BAR), toolbar(SHEET)))).toEqual([]);
+      expect(covers(app(toolbar(BAR)))).toEqual([]); // the 48-pt one: a bar's size, which no screen-sized host rule excuses
+      expect(covers(app(toolbar(SHEET)))).toEqual([]);
+      expect(covers(app(toolbar(BAR, [])))).toEqual([]);
+      expect(covers(app(toolbar(BAR, [frame(BAR, [frame(BAR), frame(BAR, [frame(BAR)])])])))).toEqual([]);
+    });
+
+    it('`other` is not a frame — the role an iOS parser gives every type it does not map (a SegmentedControl, a Stepper) — so an unlabelled one is an item, and its toolbar covers as itself; through the WDA parser too', () => {
+      const segmented = uiNode({ role: 'other', rect: rect(120, 90, 160, 32) });
+      const bar = toolbar(BAR, [frame(BAR, [segmented])]);
+      expect(covers(app(bar))).toEqual([bar, bar.children[0]]); // the segment itself, an unlabelled structural leaf, is the `structural` row's
+      const wdaRect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+      const parsed = parseWdaSource(
+        JSON.stringify({
+          type: 'Application', label: 'Contacts', rect: wdaRect(0, 0, 402, 874), children: [
+            { type: 'StaticText', label: 'New Contact', rect: wdaRect(149, 89, 104, 22) },
+            { type: 'Toolbar', label: 'Toolbar', rect: wdaRect(0, 83, 402, 48), children: [{ type: 'SegmentedControl', rect: wdaRect(120, 90, 160, 32) }] },
+          ],
+        }),
+      );
+      const nodes = [...everyNode(parsed)];
+      const parsedBar = nodes.find((n) => n.role === 'toolbar')!;
+      expect(parsedBar.children.map((c) => c.role)).toEqual(['other']);
+      expect(drawOrder(parsed).exposure(nodes.find((n) => n.label === 'New Contact')!, full).covers).toContain(parsedBar);
+    });
+
+    it('a descendant that could be an item — labelled, valued, identified, or of any non-frame role, at any depth, away from the title — and the toolbar covers as itself', () => {
+      const elsewhere = rect(300, 125, 80, 34);
+      const items = [
+        uiNode({ role: 'container', label: 'Draft', rect: elsewhere }),
+        uiNode({ role: 'other', value: '1', rect: elsewhere }),
+        uiNode({ role: 'container', identifier: 'save', rect: elsewhere }),
+        uiNode({ role: 'button', rect: elsewhere }), // an unlabelled control
+        uiNode({ role: 'image', rect: elsewhere }), // an unlabelled icon
+      ];
+      for (const item of items) {
+        const nested = toolbar(BAR, [frame(BAR, [frame(BAR, [item])])]);
+        expect(covers(app(nested))).toEqual([nested, nested.children[0], nested.children[0].children[0]]);
+      }
+    });
+
+    it('a toolbar with ANY item covers at the bar\'s size, its item elsewhere (the input-accessory bar\'s Done); a screen-sized one only through its item over the title', () => {
+      const withItem = toolbar(BAR, [uiNode({ role: 'button', label: 'Cancel', rect: rect(16, 125, 60, 6) })]);
+      expect(covers(app(withItem))).toEqual([withItem]);
+      const item = uiNode({ role: 'text', label: 'Draft', rect: rect(150, 90, 100, 20) });
+      expect(covers(app(toolbar(SHEET, [item])))).toEqual([item]);
+    });
+
+    it('the excuse is the toolbar\'s alone: a childless image or text of the bar\'s rect, and an interactive node, still cover', () => {
+      const image = uiNode({ role: 'image', rect: BAR });
+      const label = uiNode({ role: 'text', label: 'Toolbar', rect: BAR });
+      const button = uiNode({ role: 'button', rect: BAR });
+      for (const cover of [image, label, button]) expect(covers(app(toolbar(BAR), cover))).toEqual([cover]);
+    });
+
+    /**
+     * The one measured toolbar WITH an item: the 2FA screen's input-accessory bar, an opaque 48-pt bar. It lies in the
+     * keyboard's Window, which WDA's parser marks `ofKeyboard`, so as the tree comes it is the `keyboard` row's (ADR 0016,
+     * residual 2: with the band in, its slot is the band's). With the band's Window and that mark taken off, the bar is
+     * judged by the toolbar rows alone — and covers, being no itemless toolbar.
+     */
+    it('measured, wda-source-myport-2fa-keyboard-toolbar.json: the input-accessory `Toolbar → Other → Button "Done"` at 0,518 402x48 covers the app\'s support text 16,547 370x40 under its slot, judged by its own rows — and is the keyboard\'s, no cover, as the tree comes', async () => {
+      const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-2fa-keyboard-toolbar.json', import.meta.url), 'utf8'));
+      const accessory = [...everyNode(tree)].find((n) => n.role === 'toolbar')!;
+      expect(accessory.rect).toEqual(rect(0, 518, 402, 48));
+      const support = [...everyNode(tree)].find((n) => n.label?.startsWith('Pri probléme'))!;
+      expect(support.rect).toEqual(rect(16, 547, 370, 40));
+      const withoutBand = { ...tree, children: tree.children.filter((w) => ![...everyNode(w)].some((n) => n.role === KEYBOARD_ROLE)) };
+      expect(drawOrder(withoutBand).exposure(support, full).covers).toEqual([]); // the keyboard Window's mark: the `keyboard` row
+      const unmark = (w: UiNode): UiNode => {
+        const copy = { ...w };
+        delete copy.ofKeyboard;
+        return copy;
+      };
+      const unmarked = { ...withoutBand, children: withoutBand.children.map(unmark) };
+      expect(drawOrder(unmarked).exposure(support, full).covers).toContain(accessory);
+    });
+  });
+
+  /**
+   * The SWIFT form under WDA (device check at e9e6509, the toolbar host's bug note): with the toolbar host excused, the
+   * form's `scrollable 0 0 402 512` — after the title, 58 % of the screen, its frame under the translucent top bar, its
+   * first row at y 150 — had covered the title at (201,84).
+   */
+  describe('a scroll view with content covers only through that content, whatever its size (device check 2026-10-08)', () => {
+    const full = rect(0, 0, 402, 874);
+    const title = uiNode({ role: 'text', label: 'SWIFT PAYMENT', identifier: 'swift_payment.form.title', rect: rect(135, 73, 131, 22) });
+    const row = (identifier: string, y: number) => uiNode({ role: 'button', identifier, rect: rect(16, y, 370, 52) });
+    const FORM = rect(0, 0, 402, 512);
+    const app = (...children: UiNode[]) => uiNode({ role: 'application', rect: full, children: [uiNode({ role: 'other', rect: full, children })] });
+    const covers = (tree: UiNode) => drawOrder(tree).exposure(title, full).covers;
+
+    it('the form\'s scrollable after the title, its rows away from it: no cover', () => {
+      expect(covers(app(title, uiNode({ role: 'scrollable', rect: FORM, children: [row('swift_payment.form.debit_select', 150), row('swift_payment.form.priority_select', 681)] })))).toEqual([]);
+    });
+
+    it('a childless scrollable, an interactive node of the form\'s size, a same-sized webview with content and a smaller toolbar with an item elsewhere still cover as themselves', () => {
+      const elsewhere = () => [row('elsewhere', 400)];
+      const empty = uiNode({ role: 'scrollable', rect: FORM });
+      const backdrop = uiNode({ role: 'button', rect: FORM, children: elsewhere() });
+      const web = uiNode({ role: 'webview', rect: FORM, children: elsewhere() });
+      const card = uiNode({ role: 'toolbar', rect: rect(20, 60, 362, 200), children: elsewhere() });
+      for (const cover of [empty, backdrop, web, card]) expect(covers(app(title, cover))).toEqual([cover]);
+    });
+  });
+});
+
+/**
  * `exposure(node, within)` — what of a tap or scroll target shows inside the box its caller judges in (the screen, cut
  * above a witnessed keyboard), and where a tap on it should go (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-
  * app-chrome.md). Each case is a measured shape from that note's device checks, abridged.

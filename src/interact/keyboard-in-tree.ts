@@ -206,9 +206,10 @@ interface DismissalPick {
  * its centre, unmoved — THE TAP'S STANDING (ui-tree/standing.ts#Scene,
  * `{ of: 'tap' }`) over `screen` (the guard's first-look screen; the
  * dismissal's own read), one scene per call, derived on first use, its
- * keyboard line the tap's own lazy ask (keyboard-cover.ts#readingLine
- * merged by #keyboardEdge — under WDA a witnessed line, which refuses
- * nothing the band check above has not):
+ * keyboard line the tap's (keyboard-cover.ts#readingLine merged by
+ * #keyboardEdge), asked once per call, by the first strategy that gets this
+ * far — under WDA a witnessed line, which refuses nothing the band check
+ * above has not:
  * - `reachable` at the centre — usable;
  * - off the screen or in a system band — `off screen at (x,y)`: a title
  *   scrolled above the viewport is still in the tree, WDA keeps off-screen
@@ -225,6 +226,15 @@ interface DismissalPick {
  * title's own content listed beside it, its own unlabelled control, a node
  * of its frame, content of a scroll view it is not in and a keyboard-owned
  * node outside the band are not; a structural wrapper partly over it is.
+ * "A node of its frame" and "content of a scroll view it is not in" take in
+ * LABELLED CONTROLS: a `button "Delete account"` of exactly the title's rect
+ * reads as the title listed again, and an interactive row of a scroll view
+ * the title is not in is excused whether or not the title lies in a bar —
+ * so the dismissal is picked and the tap presses the control. On the
+ * guard's path that passes as `hidden by tapping … before tapping`; on the
+ * post-fill `dismiss()` path it is reported as `hiddenBy: tapping <title>`,
+ * a wrong action said as the dismissal. Kept for now; the owner decides
+ * whether to refuse it (ADR 0016, residual 1).
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
  * An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
