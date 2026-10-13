@@ -155,6 +155,28 @@ describe('IosAdapter interactions', () => {
     expect(adapter.keyboard).toBeUndefined();
     expect('keyboard' in adapter).toBe(false); // not even a stub: the class declares nothing
   });
+
+  describe('keyboardAdvice — what works against a covering keyboard, said for the tree source the guard does or does not act on', () => {
+    const MEASURED =
+      'the keyboard is part of the accessibility tree and no key hides it without a side effect: there is no back key, ' +
+      "the return key submits from the field, WebDriverAgent's keyboard/dismiss fails and a swipe does nothing; " +
+      "a tap on a neutral, non-interactive element (a title label) was measured to hide it without submitting, and so was the input-accessory toolbar's Done";
+    const adviceOn = (kind: 'idb' | 'wda') => new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: { ...NO_TREE, kind } }).keyboardAdvice;
+
+    it('under WDA it names app.ios.keyboardDismiss, which the guard taps before a covered target', () => {
+      expect(adviceOn('wda')).toBe(
+        `${MEASURED} — name them under app.ios.keyboardDismiss in averi.yaml (tap: { id: <title> }, accessory: true) and the guard taps the first one on screen before a covered target; ` +
+          'typing with a hardware keyboard keeps the software keyboard from showing',
+      );
+    });
+
+    it('under idb it says to tap one yourself: no guard acts there, so app.ios.keyboardDismiss is inert', () => {
+      expect(adviceOn('idb')).toBe(
+        `${MEASURED} — tap one yourself before the tap (a tap: step in a flow): with treeSource: idb no guard acts, so app.ios.keyboardDismiss is inert (with treeSource: wda the guard taps its first on-screen entry before a covered target); ` +
+          'typing with a hardware keyboard keeps the software keyboard from showing',
+      );
+    });
+  });
 });
 
 describe('IosAdapter.uiTree and dispose — one delegation each to the tree source', () => {
