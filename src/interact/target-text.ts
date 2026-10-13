@@ -4,7 +4,7 @@ import { SIDES } from './swipe.js';
 
 /**
  * The phrases a target cut to a sliver, or lying past a side, is said in —
- * one wording for every verb that says it: the tap's refusal (resolve.ts),
+ * one wording for every verb that says it: the tap's refusal (tap-judgement.ts),
  * the wait's hint (resolve.ts#zeroAreaHint), `scroll_until`'s failures
  * (scroll-text.ts) and the dismissal picker's skip lines
  * (keyboard-in-tree.ts#whyNotTapped) — and the picker's short name for a
@@ -41,7 +41,7 @@ export function untriedSideText(side: Edge): string {
  * lies in (`Cut.within`) says so after the container — `…(container
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
  * part…`. Said by the tap's refusal
- * (resolve.ts#judgeTap), by `scroll_until`'s sliver failures
+ * (tap-judgement.ts#judgeTap), by `scroll_until`'s sliver failures
  * (scroll-text.ts) and by the picker's skip line — one wording.
  */
 export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {

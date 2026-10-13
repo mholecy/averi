@@ -15,7 +15,7 @@ Each would change behaviour beyond the refactor.
 ## Decision
 
 - **D4: no fresh re-read.** The pixel assert reads the device's size from the adapter's memo, never afresh. The tap's
-  `fresh` re-read (`interact/resolve.ts#judgeTap`) stays the tap's alone.
+  `fresh` re-read (`interact/tap-judgement.ts#judgeTap`) stays the tap's alone.
 - **D5: the visible strip.** A node cut by its scroll container is measured on what shows of it. The one exception is the
   ocr crop flush at the navigation bar (ADR 0009, N-b). Revisit when a second source of clip evidence appears.
 - **D6: one box.** The pixel assert judges a single box, the usable screen's `oriented` one.

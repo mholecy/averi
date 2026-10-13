@@ -9,18 +9,8 @@ import type { UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { tapText } from '../../src/mcp/tool-text.js';
-import {
-  absenceError,
-  AmbiguityRefusal,
-  ClippedRefusal,
-  CoveredRefusal,
-  DEFAULT_SETTLE_TIMEOUT_MS,
-  ElementNotFoundError,
-  OffScreenRefusal,
-  resolveNow,
-  resolvePresent,
-  resolveSettled,
-} from '../../src/interact/resolve.js';
+import { absenceError, AmbiguityRefusal, DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolveNow, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
+import { ClippedRefusal, CoveredRefusal, OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { IOS_MIN_STATUS_BAND, iosStatusBand } from '../../src/adapters/ios-status-band.js';

@@ -67,7 +67,7 @@ export interface FillResult {
   note?: string;
   /** The soft keyboard covered the field and was hidden before the focus tap (keyboard.ts: `back`, or a configured dismissal tapped) — the sentence, also in `note`. */
   keyboardHidden?: string;
-  /** The focus tap went elsewhere than the field's centre, a node of the app being drawn over it (resolve.ts#TapJudge.aim, 2026-10-09) — the clause, also in `note` as `focus tap <moved>`. */
+  /** The focus tap went elsewhere than the field's centre, a node of the app being drawn over it (tap-judgement.ts#TapJudge.aim, 2026-10-09) — the clause, also in `note` as `focus tap <moved>`. */
   moved?: string;
   /**
    * The fill was legal but suspicious: a masked field already held `held`

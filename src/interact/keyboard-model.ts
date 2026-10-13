@@ -1,6 +1,7 @@
-import type { DeviceAdapter, Point, Rect } from '../adapters/types.js';
+import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
 import { readKeyboard, type Covering, type FrameVerdict, type KeyboardReading, type Uncovered } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { sceneOf, type Scene } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -34,6 +35,14 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * round and both models' dismissals ask a reading, so the guard and the
  * poll see one keyboard by construction, and neither model calls the
  * oracle itself.
+ *
+ * A LOOK — the target resolved, its tree read — carries that tree's scene
+ * (`SeenLook`, built by `withScene`: derived on first use, once). Every
+ * judgement in interact/ reads the look's scene — the tap's and the
+ * dismissal picker's — and none derives its own (`grep sceneOf
+ * src/interact` finds only `withScene` and scroll-read's), so one look is
+ * at most one draw-order walk. A convention the code keeps, not one the
+ * types enforce: a SeenLook is a structural type.
  */
 
 /**
@@ -62,7 +71,7 @@ export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' 
  * A resolved node whose tap point no soft keyboard covers, and the point a
  * tap on it goes to — its centre, or an uncovered piece of
  * it when a node of the app is drawn over the centre
- * (resolve.ts#TapJudge.aim).
+ * (tap-judgement.ts#TapJudge.aim).
  */
 export interface ResolvedClear extends Resolved {
   /** Where to tap: the centre (`tapPoint`), or the moved point `moved` describes. */
@@ -148,19 +157,49 @@ export interface DismissResult {
 }
 
 /**
- * A model's answer when the keyboard left the point: the node as resolved
- * again, the tree it was resolved in (the chrome check, the last rule of a
- * tap, judges it there — resolve.ts#TapJudge.aim), and the keyboard
- * sentence.
+ * A settled resolution as one LOOK: the node, the tree read that holds it,
+ * and that tree's scene (ui-tree/standing.ts#Scene) — derived on first use,
+ * once, and read by every judgement of the look: the tap's
+ * (tap-judgement.ts#judgeTap, a TapLook as it stands) and the dismissal
+ * picker's (keyboard-in-tree.ts#pickDismissal). Every judgement in
+ * interact/ reads it and none derives its own (`grep sceneOf src/interact`
+ * finds only `withScene` and scroll-read's), so a look is at most one
+ * draw-order walk. Threaded, not cached by tree: a memo keyed by the tree
+ * would rest on trees never being mutated after their scene is built, a
+ * contract only the scroll read states.
  */
-export interface ClearedLook extends ResolvedSettled {
+export interface SeenLook extends ResolvedSettled {
+  readonly scene: Scene;
+}
+
+/** `resolved` as a look (SeenLook): the same fields, and its tree's scene, derived on first use. */
+export function withScene<R extends { readonly tree: UiNode }>(resolved: R): R & { readonly scene: Scene } {
+  let scene: Scene | undefined;
+  return {
+    ...resolved,
+    get scene() {
+      return (scene ??= sceneOf(resolved.tree));
+    },
+  };
+}
+
+/**
+ * A model's answer when the keyboard left the point: the node as resolved
+ * again, the tree it was resolved in with its scene (the chrome check, the
+ * last rule of a tap, judges it there — tap-judgement.ts#TapJudge.aim), and
+ * the keyboard sentence.
+ */
+export interface ClearedLook extends SeenLook {
   keyboardHidden?: string;
 }
 
-/** The guard's answer: the node and its tree, with the keyboard sentence folded into the resolution note and kept alone beside it. */
-export const withNote = (resolved: ResolvedSettled, keyboardHidden: string): ClearedLook => ({
+/** The guard's answer: the node and its tree — the same look, its scene the look's — with the keyboard sentence folded into the resolution note and kept alone beside it. */
+export const withNote = (resolved: SeenLook, keyboardHidden: string): ClearedLook => ({
   node: resolved.node,
   tree: resolved.tree,
+  get scene() {
+    return resolved.scene;
+  },
   note: resolved.note === undefined ? keyboardHidden : `${resolved.note}; ${keyboardHidden}`,
   keyboardHidden,
 });
@@ -184,9 +223,9 @@ export function failedLookMessage(e: unknown, refused: string, failed: (headline
   return [failed(headline), ...rest].join('\n');
 }
 
-/** What one look found: the target resolved again, where it is now, the keyboard read against that point, and the reading it came from (off the look's tree — the in-tree model's picker asks it again). */
+/** What one look found: the target resolved again (with its tree's scene, SeenLook), where it is now, the keyboard read against that point, and the reading it came from (off the look's tree — the in-tree model's picker asks it again). */
 export interface Look {
-  resolved: ResolvedSettled;
+  resolved: SeenLook;
   point: Point;
   verdict: FrameVerdict;
   reading: KeyboardReading;
@@ -215,9 +254,9 @@ export interface Look {
  * first (`confirmHidden` does for its looks).
  */
 export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: GuardOptions, failed: (e: unknown) => KeyboardGuardError): Promise<Look> {
-  let resolved: ResolvedSettled;
+  let resolved: SeenLook;
   try {
-    resolved = await resolveSettled(adapter, target, opts);
+    resolved = withScene(await resolveSettled(adapter, target, opts));
   } catch (e) {
     throw failed(e);
   }
@@ -283,7 +322,7 @@ export interface CoveredLook {
 export interface Hiding {
   /** The side effect: the window model's `back`, the in-tree model's tap on the picked element. */
   perform(): Promise<void>;
-  /** What `perform` sent, as a clause — `back was pressed to hide the soft keyboard`, `id:"login_title" was tapped at (201,303) to hide the soft keyboard` — for a refusal after it that must say something was (the off-screen rule, resolve.ts#judgeTap). */
+  /** What `perform` sent, as a clause — `back was pressed to hide the soft keyboard`, `id:"login_title" was tapped at (201,303) to hide the soft keyboard` — for a refusal after it that must say something was (the off-screen rule, tap-judgement.ts#judgeTap). */
   sent: string;
   /** How many looks after it before the last still-covering one refuses: one for `back` (the frame decides), KEYBOARD_HIDE_CONFIRM_LOOKS for a dismissal tap (a hide animation caught mid-way is not a refusal). */
   looks: number;

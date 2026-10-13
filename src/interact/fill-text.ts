@@ -111,7 +111,7 @@ export function fillReply(fill: FillResult, selector: string): string {
 /**
  * The fill's note: what resolving the field said (`Resolved.note`), then —
  * when the focus tap went off the field's centre, a node of the app being
- * drawn over it (interact/resolve.ts#TapJudge.aim, `Aim.moved`) —
+ * drawn over it (interact/tap-judgement.ts#TapJudge.aim, `Aim.moved`) —
  * `focus tap <moved>`, after it. Its words here with every fill sentence
  * (code review S6; until then spelled in fill.ts).
  */

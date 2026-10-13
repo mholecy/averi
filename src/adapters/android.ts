@@ -509,7 +509,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * - An answer is dropped by `launch` — the foreground app changes there,
    *   and with it whether the bar shows (an immersive app hides it) — and
    *   replaced by `viewport({ fresh: true })`: the tap's refusal path
-   *   (resolve.ts#judgeTap) and the window witness (verify/
+   *   (tap-judgement.ts#judgeTap) and the window witness (verify/
    *   capture.ts). Otherwise it is kept: read per call, it would cost one
    *   adb call (18–37 ms through execFile, keyboardState's figures) on every
    *   `viewport()`, where the keyboard guard already spends one.

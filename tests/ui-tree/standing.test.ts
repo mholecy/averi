@@ -672,7 +672,7 @@ describe('Scene.standing for the stop — a box that does not start at the origi
 const IPHONE_BARE = { box: box(402, 874), boxes: [box(402, 874)] };
 /** The Pixel_3a as built, no band read. */
 const PIXEL_BARE = { box: box(1080, 2220), boxes: [box(1080, 2220)] };
-/** The tap as interact/resolve.ts#judgeTap asks it: with the tree's own keyboard line (idb's band, ui-tree/keyboard-position.ts#KeyboardPosition.line) for `n`. */
+/** The tap as interact/tap-judgement.ts#judgeTap asks it: with the tree's own keyboard line (idb's band, ui-tree/keyboard-position.ts#KeyboardPosition.line) for `n`. */
 const tapOf = (t: UiNode, n: UiNode): TouchPurpose => {
   const line = keyboardPosition(sceneOf(t).order).line(n);
   return { of: 'tap', ...(line !== undefined && { keyboardTop: line }) };
