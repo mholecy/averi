@@ -80,6 +80,12 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * `Dictate 325,805 68x69` after it). Shape, not labels: key labels follow the
  * language and the layout. The app's own PIN pad (run5-ios #81) has no such
  * background, and is content. Undefined when no node has that shape.
+ * Not of the run: iOS 27's QuickType bar, which idb lists as a plain
+ * button ABOVE the background (Finportal's login, 2026-10-13: `Passwords
+ * 30,546 342x44` over `other 0,590 402x284`), so the top stays the
+ * background's and the bar reads as app content above it — tapped as
+ * asked; idb drops an app node whose centre lies behind the bar, as it does
+ * one under the band (ADR 0007's residuals).
  * Residual, stated: a sheet's background listed right after a row of the
  * content behind it that lies inside the sheet, or a tab bar's unlabelled
  * background listed after its buttons (no idb dump has either), reads as a

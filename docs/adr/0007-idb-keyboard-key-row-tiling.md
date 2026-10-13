@@ -1,6 +1,7 @@
 # 7. idb's own keys are read by how they tile the band
 
-Status: accepted, 2026-10-12 (owner, with the slice-4 device check).
+Status: accepted, 2026-10-12 (owner, with the slice-4 device check). Residuals amended 2026-10-13 (owner, with the
+round-12 device check): the QuickType bar lies above the band, not inside it.
 
 ## Context
 
@@ -27,10 +28,22 @@ This rule was chosen over two others:
 
 ## Residuals accepted
 
-- A key alone on its row reads as content under the line, so a tap on it is refused. A lone QuickType suggestion such
-  as "Passwords" is an example.
+- A key alone on its row INSIDE the band reads as content under the line, so a tap on it is refused. No idb dump has
+  one: the lone suggestion this residual first named lies outside the band (next item).
+- The QuickType bar is not of the band. On iOS 27 idb lists it ABOVE the band's background, as a plain button
+  (Finportal's login, 2026-10-13: `button 'Passwords' 30,546 342x44` over `other 0,590 402x284`; WDA's keyboard frame for
+  the same keyboard is `0,546 402x328` and includes it). It does not lie inside the background, so it is not of the run
+  (`soft-keyboard.ts#flatListKeyboardBand`), and the line stays at the background's top, 590. The bar reads as app
+  content above the keyboard, and a tap on it is sent and presses it. That is what was asked: the keyboard's own
+  controls are tappable (the `tap` tool's description says so). Not a defect (owner decision, 2026-10-13).
+- What that leaves is small. idb leaves out of its tree an app node whose centre lies in the bar's strip, 546–590, as it
+  does one under the band (Finportal's `login_submit 36,547 109x48` was dropped), so a tap on it times out waiting for it
+  to appear; it is not refused. A node idb did keep there would be judged against the bar as an ordinary cover listed after
+  it (idb lists the bar after the app's nodes), not against the line: refused naming `button "Passwords"`, or moved to a
+  piece beside it. No dump has one. The bar showed only on the first focus after a launch.
 - Two app nodes side by side behind the keyboard, not overlapping, read as keys. No idb dump has them.
 
 ## Bug note
 
-No tracked note. The shapes are recorded on `draw-order.ts#sharesRow`.
+No tracked note. The shapes are recorded on `draw-order.ts#sharesRow`. The round-12 device check's note on the
+QuickType bar is not tracked yet.

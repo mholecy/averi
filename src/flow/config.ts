@@ -57,8 +57,11 @@ type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
  * idb tree marks no node as the keyboard — every reader keys on
  * `KEYBOARD_ROLE` (ui-tree/soft-keyboard.ts), which only the WDA parser
  * assigns (wda-source.ts#keyboardMarks) and the idb parser never does — so
- * under `treeSource: idb` — the default — nothing is ever covered or
- * dismissed and the list is inert. NOT "the idb tree carries no keyboard"
+ * under `treeSource: idb` — the default — no guard dismisses anything and
+ * the list is inert. What the tap does refuse there is a centre under idb's
+ * band, read by its shape (ADR 0006, keyboard-position.ts#KeyboardPosition.line);
+ * the sentence says so, since "no tap is ever refused" (until 2026-10-13)
+ * stopped being true with that decision. NOT "the idb tree carries no keyboard"
  * (the sentence until 2026-10-09): on iOS 27 idb lists the keys, as plain
  * `button`s ('Q' … 'return'), and the band, as an unmapped type read as
  * `other` (0,590 402×284 on Contacts' "New Contact"; docs/bugs/2026-10-09-
@@ -81,7 +84,7 @@ export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   if (kind === 'wda') return undefined;
   return (
     `app.ios.keyboardDismiss is set but app.ios.treeSource is ${kind}${ios.treeSource === undefined ? ' (the default)' : ''}: ` +
-    `the ${kind} tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no tap is ever refused or hidden and the list is inert — set treeSource: wda for it to apply`
+    `the ${kind} tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no guard hides it before a tap and the list is inert (a tap whose centre lies under its band, read by shape, is refused instead) — set treeSource: wda for it to apply`
   );
 }
 
