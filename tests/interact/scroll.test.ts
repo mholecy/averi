@@ -1114,7 +1114,7 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(fake.swipes[0]).toEqual({ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } });
   });
 
-  it('a band top at the gesture box\'s bottom (a device box ending at 589) changes no stroke: the same as with no band (code review of round 7, MINOR 3 — why strokeTop has no guard)', async () => {
+  it('a band top at the gesture box\'s bottom (a device box ending at 589) changes no stroke: the same as with no band (why strokeLine has no guard)', async () => {
     const strokes = async (band: boolean) => {
       const { tree, street } = await numberPad();
       if (!band) tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);
