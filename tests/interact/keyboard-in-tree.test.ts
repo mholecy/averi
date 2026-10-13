@@ -575,7 +575,8 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(fake.taps).toEqual([]);
       });
 
-      // A pin of UNCHANGED behaviour (ADR 0016, row 10): the old picker's `onScreen` gave the same words; it passes there too.
+      // A pin of UNCHANGED behaviour (ADR 0016, row 10): a centre in a system band is skipped as `off screen at (x,y)`,
+      // and the same title clear of any band is tapped.
       it('unchanged — its centre in a system band reads as off the screen, as before — iOS\'s status band (62 pt): "off screen at (x,y)", where a tap would press the status bar', async () => {
         const screen = screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })); // centre (201,32)
         expect(await pickOn(screen, 'login_title', { width: 402, height: 874, statusBand: 62 })).toBe('off screen at (201,32)');
@@ -667,8 +668,8 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(await pickOn(flat, 'note')).toBe('under the keyboard');
       });
 
-      // A pin of UNCHANGED behaviour: the band's `frameOver` answers before the standing is asked, as it did before the
-      // standing was; it passes on the old picker too. It says where the bar `shadowing` was measured on now stands.
+      // A pin of UNCHANGED behaviour: the band's `frameOver` answers before the standing is asked, so a target in the
+      // measured input-accessory bar's slot is skipped under the keyboard — the bar itself never decides.
       it('unchanged — under the measured input-accessory bar (wda-source-myport-2fa-keyboard-toolbar.json: Toolbar → Other → Button "Done" at 0,518 402x48, in a keyboard Window): skipped "under the keyboard" — WDA\'s band takes in the accessory slot, so the bar, no cover of a target, never decides', async () => {
         const twofa = await dump('myport-2fa-keyboard-toolbar');
         const support = [...everyNode(twofa)].find((n) => n.label?.startsWith('Pri probléme'))!;

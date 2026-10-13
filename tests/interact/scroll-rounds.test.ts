@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, Stroke, UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve.js';
-import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRules } from '../../src/interact/scroll-rounds.js';
+import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRead, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult, scrollFailure } from '../../src/interact/scroll-text.js';
 import { scrollStroke } from '../../src/interact/swipe.js';
 import { node } from '../helpers/fake.js';
@@ -55,8 +55,8 @@ const wdaGone: Row = { found: [], cover: coverOver(WDA_BAND, NO_BACK) };
 /** Rows reading `ys` in turn, each one match built by `at`, with `extra` on every row. */
 const reads = (ys: readonly number[], at: (y: number) => UiNode, extra: Row = {}): Row[] => ys.map((y) => ({ ...extra, found: [at(y)] }));
 
-/** A `RoundRead` by hand, for the protocol's own calls: `found` in their tree (rounds.ts#treeOf), no keyboard node. */
-const readOf = (found: UiNode[], extra: { cover?: KeyboardCover } = {}) => ({ tree: treeOf({ found }, ANDROID.screen), found, ofKeyboard: () => false, remedy: { dismissal: 'back' as const }, ...extra });
+/** A `RoundRead` by hand — the protocol's read, imported from the protocol's module — for its own calls: `found` in their tree (rounds.ts#treeOf), no keyboard node. */
+const readOf = (found: UiNode[], extra: { cover?: KeyboardCover } = {}): RoundRead => ({ tree: treeOf({ found }, ANDROID.screen), found, ofKeyboard: () => false, remedy: { dismissal: 'back' as const }, ...extra });
 
 describe('round — the protocol', () => {
   it('an ask leaves the state as it came in, and the same seen with the answer goes on', () => {

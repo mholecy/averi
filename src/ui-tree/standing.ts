@@ -1,4 +1,4 @@
-import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { drawOrder, listsAncestry, type DrawOrder, type Exposure } from './draw-order.js';
 import {
   aboveNavigationBand,
@@ -199,7 +199,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   agree), and only when the cover leaves something above it: else every
  *   box, uncut by the keyboard. Those two are decided where the cover's
  *   `above` is built (interact/scroll-read.ts#Cover); this module takes the
- *   size it is handed.
+ *   size it is handed. Its cuts are geometry's band cutters, not
+ *   `systemBands`: a change to how `systemBands` composes the two (its fail
+ *   open when the navigation band reaches above the status band, say) does
+ *   not reach the far edge's frames.
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
@@ -352,11 +355,11 @@ export function sceneOf(tree: UiNode): Scene {
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
-  function standing(node: UiNode, screen: StandingScreen | undefined, purpose: Purpose): Standing | PixelStanding {
+  function standing(node: UiNode, screen: StandingScreen | UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
     const judged: Judged = { scene, node, centre: tapPoint(node) };
     if (purpose.of === 'pixel') {
-      // The overloads hand the pixel purpose a usable screen: it picks its own box, `oriented` (`singleBox`).
-      const single = singleBox((screen as UsableScreen | undefined) ?? treeScreen(tree));
+      // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
+      const single = singleBox(screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree));
       return pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single), single.box, single, purpose, !listsAncestry(tree));
     }
     const touch = touchScreen(screen, tree);
@@ -518,9 +521,9 @@ export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen
  * contract: the status band on each box's shape, the navigation band on the
  * first box's (`screen.box`).
  */
-export function farEdgeFrames(screen: StandingScreen, best: Standing | undefined, above?: { readonly width: number; readonly height: number }): { frames: Rect[]; uncutFrames: Rect[] } {
+export function farEdgeFrames(screen: StandingScreen, best: Standing | undefined, above?: DeviceScreen): { frames: Rect[]; uncutFrames: Rect[] } {
   const box = screen.box;
-  const uncutFrames = above !== undefined ? [belowStatusBand({ x: box.x, y: box.y, ...above }, screen, box)] : screen.boxes.map((b) => belowStatusBand(b, screen));
+  const uncutFrames = above !== undefined ? [belowStatusBand({ x: box.x, y: box.y, width: above.width, height: above.height }, screen, box)] : screen.boxes.map((b) => belowStatusBand(b, screen));
   const regionAtBottom = best?.kind === 'systemBar' && best.band !== undefined && best.bar.edge === 'bottom';
   return { frames: regionAtBottom ? uncutFrames.map((f) => aboveNavigationBand(f, screen, box)) : uncutFrames, uncutFrames };
 }
