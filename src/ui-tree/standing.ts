@@ -331,6 +331,16 @@ export type Standing = { readonly facts: StandingFacts } & (
   | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine }
 );
 
+/**
+ * The cover a sentence names for a node under a screen presented over its own (`underPresented`): the one over its
+ * centre when it is `covered` (the modal's card over the dim), else the last presented surface among its covers;
+ * undefined when it lies under none.
+ */
+export const presentedCover = (standing: Standing): UiNode | undefined => {
+  if (!underPresented(standing.facts)) return undefined;
+  return standing.kind === 'covered' ? standing.cover : standing.facts.presented?.at(-1);
+};
+
 /** Where the node stands for the tap: a `Standing` of every kind but `clipped`, which only a `fully` stop judges. */
 export type TapStanding = Exclude<Standing, { readonly kind: 'clipped' }>;
 
