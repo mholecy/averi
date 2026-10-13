@@ -663,6 +663,13 @@ const dumpedToggleAt = (y: number, height: number) => {
 };
 /** A tree of `children` on a `root` box. */
 const on = (root: Rect, ...children: UiNode[]) => node({ role: 'container', rect: root, children });
+/** idb's flat list: the Application, a row `hero` 402x150 at `y`, and a button below it. */
+const idbRow = (y: number) =>
+  parseIdbDescribeAll(JSON.stringify([
+    { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
+    { type: 'Other', AXLabel: 'Hero', AXUniqueId: 'hero', frame: { x: 0, y, width: 402, height: 150 } },
+    { type: 'Button', AXLabel: 'Go', AXUniqueId: null, frame: { x: 20, y: 600, width: 362, height: 50 } },
+  ]));
 /** A node `hero` at `rect` inside a scroll view filling `root` (uiautomator's `scrollable="true"`: it clips). */
 const inList = (root: Rect, rect: Rect) => on(root, node({ role: 'container', rect: root, clipsDescendants: true, children: [node({ role: 'container', identifier: 'hero', rect })] }));
 /** The idb SWIFT form at rest with priority_select at `y` and `height`, and `extra` listed last. */
@@ -889,6 +896,9 @@ describe('Scene.standing for the stop — the status band and a keyboard line (m
     ['a screen-sized 0,160 1080x2000 in a scroll view (it fits between the bands), fully: true: under the navigation bar, as a region', () => inList(box(1080, 2220), { x: 0, y: 160, width: 1080, height: 2000 }), 'hero', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 1160 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     // …unless it is taller than the room between the bands (2220 − 66 − 66 = 2088): no scroll lifts all of it out, and it stops as before.
     ['a screen-sized 0,0 1080x2100 in a scroll view, taller than the room between the bands, fully: true: reachable', () => inList(box(1080, 2220), { x: 0, y: 0, width: 1080, height: 2100 }), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 1050 } }],
+    // idb's flat list cannot say whether a node lies in a scroll view (`inScroller` undefined): it counts as none.
+    ['idb: a row 0,0 402x150 laid from the top edge at full width, fully: true: reachable (exempt)', () => idbRow(0), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 75 } }],
+    ['idb: the same row at 0,20, no full-bleed header, fully: true: under the status bar, as a region', () => idbRow(20), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 95 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
     // The bottom edge alike: a full-width surface reaching the screen's bottom in no scroll view (a bottom sheet) stops at once; in one, it is lifted.
     ['a bottom sheet 0,1100 1080x1120 in no scroll view, fully: true: reachable', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: { x: 0, y: 1100, width: 1080, height: 1120 } })), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 1660 } }],
     ['…the same surface in a scroll view: under the navigation bar, as a region', () => inList(box(1080, 2220), { x: 0, y: 1100, width: 1080, height: 1120 }), 'hero', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 1660 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],

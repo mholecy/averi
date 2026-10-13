@@ -1694,6 +1694,11 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
     expect(strokesToward(played)).toEqual(['up']);
   });
 
+  it('…and so does a fully stop whose CENTRE is in the band (no region judged): row_4 with `direction: up` is stroked the caller\'s way first', () => {
+    const played = play({ ...ANDROID, direction: 'up', fully: true, maxSwipes: 1 }, [row(2152), row(2152)]);
+    expect(strokesToward(played)).toEqual(['up']);
+  });
+
   it('closed loop, fully: true: a row reaching into the band (2108, 60 tall) the stuck probe pushes wholly into it is turned back, never pushed off and lost', () => {
     const played = glide({ ...ANDROID, direction: 'up', fully: true, maxSwipes: 8, timeoutMs: 60_000 }, { x: 66, y: 2108, width: 948, height: 60 }, 0.3, [0, 4000]);
     expect(played.at(-1)).not.toContain('did not stay');

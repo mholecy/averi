@@ -120,7 +120,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * - A keyboard the reading cannot see (a floating or split IME with no insets frame) is measured, as before the check.
  * - A stale `shown` costs covered rounds until the window state catches up; under a short timeout it fails closed.
  * - A colour assert fails closed on a keyboard under only its element's bottom edge, which its 12 % inset would skip.
- * - An element reaching into a band by design (a full-bleed header) fails closed whatever it shows; its advice leads with its title.
+ * - An element reaching into a band by design (a full-bleed header or footer in no scroll view) fails closed whatever it shows; its advice leads with its title or its content above the bar.
  * - A screen resized above the keyboard, a window under an ocr assert and idb's Application under a colour assert fail closed.
  * - A whole last row resting flush with the navigation bar in its list fails an ocr assert closed as possibly cut.
  * - What a tree does not list is no cover; what the pixel-cover exemptions drop is measured as the element (ADR 0003).
@@ -460,14 +460,18 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * ancestry, so EVERY idb miss carries the clause), it is laid from the
  * screen's top edge under the status bar, or the cover holds the element
  * whole. Not for an element reaching the screen's bottom under the
- * navigation bar (ADR 0011). For the screen ITSELF — an element screen-sized
- * (ui-tree/standing.ts#screenSized) — no scroll can cure it, and the
- * remedy leads with the child; so too for an element laid from the
- * screen's top edge at full width, a full-bleed header — iOS's, or
- * Android 15+'s edge-to-edge app bar (`0,0 1080x220` under the 66-px band
- * fails a colour assert closed, ADR 0001) — whose remedy leads
- * with "assert something in it that lies clear of that (its title, say)":
- * the title, below the band, is judged on its own and passes. For idb's
+ * navigation bar (ADR 0011). Under a system bar, for content no scroll
+ * lifts out of the band (ui-tree/standing.ts#pinnedSurface: in no scroll
+ * view, or screen-sized scroll content taller than the room between the
+ * bars) the remedy leads with the child: the screen ITSELF (screen-sized);
+ * a full-bleed header — iOS's, or Android 15+'s edge-to-edge app bar
+ * (`0,0 1080x220` under the 66-px band fails a colour assert closed, ADR
+ * 0001) — with "assert something in it that lies clear of that (its
+ * title, say)": the title, below the band, is judged on its own and
+ * passes; a full-bleed footer (a bottom sheet) with "(its content above
+ * the bar, say)". The same shapes in a scroll view get the scroll advice:
+ * `scroll_until … fully: true` lifts them. Under a COVER, a screen-sized
+ * element or a full-bleed header keeps that advice wherever it lies. For idb's
  * flat-list root (`covered.overRoot`: its Application node, screen-sized,
  * and never a full-bleed header in a flat list) it says the node named is
  * content drawn over the root's background.
@@ -527,7 +531,8 @@ async function judgeOver(
  * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
  * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
  * for an element laid from the screen's top edge at full width, a full-bleed header, whose title, clear of the band,
- * is what to assert; `root` — the screen, for idb's flat-list root,
+ * is what to assert; `footer` — the same for a full-width surface laid to the screen's bottom edge (a bottom sheet),
+ * whose content above the bar is what to assert; `root` — the screen, for idb's flat-list root,
  * whose cover is the app's own content laid on its background.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */

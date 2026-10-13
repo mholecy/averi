@@ -325,7 +325,7 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
 });
 
 /**
- * Code review of round 8, S3: the screen a pixel assert judges in is ui-tree/usable-screen.ts#usableScreen's — the gesture
+ * The screen a pixel assert judges in is ui-tree/usable-screen.ts#usableScreen's — the gesture
  * box's derivation. With the device silent, a window the tree vouches for is the screen, not the tree's largest node.
  */
 describe('the screen without the device: the window the tree vouches for (ui-tree/usable-screen.ts#usableScreenOf)', () => {

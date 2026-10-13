@@ -41,11 +41,13 @@ decision:
     of the far edge is judged in the uncut frames, so a node a stroke then pushes wholly into the band is turned back,
     not pushed on and lost.
   - (b) The exemption applies only to a node in NO scroll view (`Clips.inScroller` not true, as the pixel assert's
-    `pinned`; idb's flat list, which cannot tell, counts as none). A list row whose top lies on the screen's top edge
+    `pinned`). idb's flat list cannot tell (`inScroller` undefined), and counts as in no scroll view: the owner's
+    decision, ratified 2026-10-13 (round 10 verification 3). A list row whose top lies on the screen's top edge
     (`0,0 1080x150` in a list), or a screen-sized page that fits between the bands (`0,160 1080x2000` in a list), is a
     scroll view's content, which a scroll lifts: `fully` strokes on. A screen-sized node in a scroll view stays exempt
     only when it is taller than the room between the bands, which no scroll can clear it into (WDA's 2FA screen
-    `0,0 402x826` in its scroll view, against 812 pt between the 62-pt status band and the bottom).
+    `0,0 402x826` in its scroll view, against 812 pt between the 62-pt status band and the bottom). This tall-content
+    clause is the owner's decision, ratified 2026-10-13 (round 10 verification 3).
   - (c) The exemption is symmetric at the bottom edge: a full-width surface laid to the screen's bottom in no scroll
     view (`standing.ts#fullBleedFooter`; a bottom sheet `0,1100 1080x1120`) stops at once — no strokes over a modal
     sheet. A pixel assert on it fails closed with its own advice: assert something in it clear of the bar (its content
@@ -58,8 +60,9 @@ decision:
 
 ## Residuals accepted
 
-- A `fully` stop on a full-bleed header, a full-bleed footer or a screen-sized node in no scroll view does not promise a
-  pixel assert: what lies under a bar fails it closed, with the child advice.
+- A `fully` stop on a full-bleed header, a full-bleed footer or a screen-sized node in no scroll view, or on
+  screen-sized scroll content taller than the room between the bars, does not promise a pixel assert: what lies under a
+  bar fails it closed, with the child advice.
 - A scroll view's content taller than the room between the bands but not screen-sized (a tall narrow node) never stops
   `fully`: it ends stuck naming the bar.
 - The band is portrait only. In landscape the navigation bar moves to a side, and nothing reads it there.
