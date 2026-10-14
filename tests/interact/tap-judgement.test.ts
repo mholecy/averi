@@ -291,6 +291,30 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
+  it('the SWIFT form\'s Fees sheet at its half detent (#153): the From row under the sheet\'s LABELLED dim, UIKit\'s `PopoverDismissRegion`, is refused as under a presented screen — close it first (device: "scroll_until it first", whose stroke moved the sheet)', async () => {
+    const { outcome } = await judge((await screens()).swiftFeesSheet, 'swift_payment.form.debit_select', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'CoveredRefusal: swift_payment.form.debit_select is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,195), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
+    );
+  });
+
+  it('Contacts\' discard popover over the New Contact sheet (#93): a row of the sheet under the popover\'s labelled `PopoverDismissRegion` is refused as under a presented screen (device: "scroll_until it first", whose stroke closed the popover)', async () => {
+    const { outcome } = await judge((await screens()).contactsDiscardPopover, 'Insert add instant message', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'CoveredRefusal: Insert add instant message is under container "dismiss popup" (0,0 402x874) at its centre (52,271), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
+    );
+  });
+
+  it('…as after the device\'s stroke moved the sheet to Expanded (#158), its dim then unlabelled: the same remedy, labelled dim or not', async () => {
+    expect(said((await judge((await screens()).swiftFeesSheetExpanded, 'swift_payment.form.debit_select', { first: IPHONE })).outcome)).toMatch(
+      / — a screen is presented over it \(a modal or a sheet\) — close it first; no scroll moves it out from under that screen; nothing was tapped$/,
+    );
+  });
+
+  it('…and the Fees sheet\'s own row, laid after the labelled dim on the presented layer, is tapped at its centre', async () => {
+    expect(said((await judge((await screens()).swiftFeesSheet, 'swift_payment.form.fees_sheet.row_1', { first: IPHONE })).outcome)).toMatch(/^\{"point":/);
+  });
+
   it('no regression: the login screen with no modal (#218) — lang_sk tapped at its centre; and the modal\'s own Close is tapped at its centre', async () => {
     expect(said((await judge((await screens()).finportalLogin, 'lang_sk', { first: IPHONE })).outcome)).toBe('{"point":{"x":290,"y":251}}');
     expect(said((await judge((await screens()).finportalForgot, 'forgot_close', { first: IPHONE })).outcome)).toBe('{"point":{"x":201,"y":800}}');
