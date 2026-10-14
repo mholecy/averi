@@ -70,10 +70,11 @@ export interface Recording {
 const KINDS: Record<Platform, readonly SourceKind[]> = { ios: ['wda', 'idb'], android: ['uiautomator'] };
 
 /**
- * Every capture of every run under `dir`, sorted by id (the shard split and
- * the report's order depend on it). Strict: a directory without a manifest,
- * a capture file that is missing, or a source kind its platform has no
- * reader for is an error naming it — a corpus that silently loses trees
+ * Every capture of every run under `dir`, sorted by id (the report's order
+ * depends on it). Strict: a directory without a manifest, an unknown
+ * platform, a form other than raw or normalized, a capture file that is
+ * missing, or a source kind its platform has no reader for is an error
+ * naming it — a corpus that silently loses trees
  * would report fewer diffs, which reads as "no change".
  */
 export async function loadCorpus(dir: string): Promise<Recording[]> {
@@ -87,8 +88,14 @@ export async function loadCorpus(dir: string): Promise<Recording[]> {
     } catch (e) {
       throw new Error(`corpus run ${run}: no readable manifest.json (${(e as Error).message})`, { cause: e });
     }
+    if (!Object.hasOwn(KINDS, manifest.platform)) {
+      throw new Error(`corpus run ${run}: platform ${JSON.stringify(manifest.platform)} is not one of ${Object.keys(KINDS).join(', ')}`);
+    }
     for (const c of manifest.captures) {
       const id = `${run}/${c.file}`;
+      if (c.form !== 'raw' && c.form !== 'normalized') {
+        throw new Error(`corpus capture ${id}: form ${JSON.stringify(c.form)} is not raw or normalized`);
+      }
       if (!KINDS[manifest.platform]?.includes(c.source)) {
         throw new Error(`corpus capture ${id}: source ${c.source} is not one the ${manifest.platform} adapter reads (${KINDS[manifest.platform]?.join(', ')})`);
       }

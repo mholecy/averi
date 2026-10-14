@@ -60,6 +60,16 @@ describe('loadCorpus', () => {
     await expect(loadCorpus(dir)).rejects.toThrow(/run-a\/x\.xml.*uiautomator.*ios/);
   });
 
+  it('refuses a platform it does not know, naming the run', async () => {
+    await run('run-a', { platform: 'harmony', captures: [] }, {});
+    await expect(loadCorpus(dir)).rejects.toThrow(/run-a.*"harmony"/);
+  });
+
+  it('refuses a form other than raw or normalized, naming the capture', async () => {
+    await run('run-a', { platform: 'ios', captures: [{ file: 'x.json', source: 'wda', form: 'parsed' }] }, { 'x.json': '{}' });
+    await expect(loadCorpus(dir)).rejects.toThrow(/run-a\/x\.json.*"parsed"/);
+  });
+
   it('refuses a directory without a manifest rather than skipping its trees', async () => {
     await mkdir(join(dir, 'stray'));
     await expect(loadCorpus(dir)).rejects.toThrow(/stray.*manifest\.json/);
