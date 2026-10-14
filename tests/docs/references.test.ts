@@ -54,6 +54,8 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   'docs/bugs/2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md',
   // Untracked in the main checkout, not yet on this branch's base; cited by draw-order's `hidden` row, UiNode.hidden and ADR 0019.
   'docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md',
+  // Untracked in the main checkout; cited by ADR 0018's amendment "No stroke onto a presented screen".
+  'docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>

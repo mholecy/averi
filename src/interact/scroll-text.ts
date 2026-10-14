@@ -7,7 +7,7 @@ import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, untriedSideText } from './target-text.js';
-import type { Cover, Judged } from './scroll-read.js';
+import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -371,12 +371,18 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
     }
     case 'presented': {
       // Under a screen presented over it (ADR 0018): stopped without a swipe — none moves it out, and one on
-      // that screen may dismiss it. A plain Error, as `stuck`: the element was there and seen.
+      // that screen may dismiss it. A plain Error, as `stuck`: the element was there and seen. Judged in the
+      // viewport under that screen, the sentence says what is over it; not judged there (`touchDown`), why not
+      // and where the next swipe would have landed — on that screen (`notInViewportText`). "The next swipe", not
+      // "the swipe toward it": a turn, or a caller's direction away from the target, strokes the other way.
       const { judged, cover, viewport } = o;
       const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
-      const under = `${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`;
+      const where =
+        o.touchDown === undefined
+          ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
+          : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${nodeText(cover)}`;
       return new Error(
-        `scroll_until ${describe} stopped ${when} — element is in the viewport but ${under} — ${PRESENTED_OVER}, and a swipe on it may dismiss it, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+        `scroll_until ${describe} stopped ${when} — ${where} — ${PRESENTED_OVER}, and a swipe on it may dismiss it, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
           `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       );
     }
@@ -392,9 +398,58 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
             `in those, visibility was judged, and the swipe drawn, in the screen above it — ${hideToJudgeWholeScreen(o.keyboard.cover.remedy)}`
           : '';
       const unlocated = o.unlocated ? `; ${UNLOCATED_KEYBOARD} — the swipes may have landed on it; hide or dock it and scroll again` : '';
-      return absenceError(`scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}`, o.evidence);
+      // The swipe the bound held back would have touched down on a presented screen: said once, with its remedy —
+      // the reader's next step would otherwise be another scroll that lands there.
+      const presented =
+        o.presented === undefined
+          ? ''
+          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${nodeText(o.presented.surface)} — ${PRESENTED_OVER}`;
+      return absenceError(`scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, o.evidence);
     }
   }
+}
+
+/**
+ * Why a judged match was NOT judged in the viewport, for the `presented` stop whose next swipe would have touched
+ * down on the presented screen (scroll-rounds.ts#ScrollOutcome's `touchDown`) — one clause per reason, by where it
+ * stands (ui-tree/standing.ts#Standing):
+ * - wholly outside the frame: `element lies below the viewport` (target-text.ts#pastSideText, the side it lies past);
+ * - under the soft keyboard: `element lies under the soft keyboard: its centre (201,661) is below the keyboard's top
+ *   edge at y 573` — the tap's refusal's words for the same point (tap-judgement.ts);
+ * - in the frame but short of the stop: `element is in the viewport but …`, in the words the stuck and bound
+ *   sentences give that shortfall (scroll-read.ts#shortOf: clipped at an edge, cut to a sliver by its scroll
+ *   container, its centre under a system bar, or under something of its own screen).
+ */
+function notInViewportText(judged: Judged, viewport: Rect): string {
+  const { standing, node } = judged;
+  if (standing.kind === 'underKeyboard') {
+    const { x, y } = tapPoint(node);
+    return `element lies under the soft keyboard: its centre (${x},${y}) is below the keyboard's top edge at y ${standing.line.y}`;
+  }
+  if (standing.facts.visible === 0) {
+    const side = wholePast(node.rect, viewport);
+    return `element lies ${side === undefined ? 'outside the viewport' : pastSideText(side, node.clippedOut === side)}`;
+  }
+  const short = shortOf(judged);
+  switch (short.of) {
+    case 'clipped':
+      return `element is in the viewport but ${describeClip(standing.facts.clipped, standing.facts.visible, judged.under?.topCover)}`;
+    case 'sliver':
+      return `element is in the viewport but ${sliverText(short)}`;
+    case 'systemBar':
+      return `element is in the viewport but ${systemBarText(short)}`;
+    case 'covered':
+      return `element is in the viewport but ${underText(short)}`;
+  }
+}
+
+/** The side of `viewport` a rect lies wholly past — below before above, as a scroll down finds it — or undefined when it lies past none wholly. */
+function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
+  if (rect.y >= viewport.y + viewport.height) return 'bottom';
+  if (rect.y + rect.height <= viewport.y) return 'top';
+  if (rect.x >= viewport.x + viewport.width) return 'right';
+  if (rect.x + rect.width <= viewport.x) return 'left';
+  return undefined;
 }
 
 /** Which bound ended it, as the failure's cause. */

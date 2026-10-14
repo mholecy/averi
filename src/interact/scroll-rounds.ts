@@ -5,7 +5,7 @@ import { presentedCover, type StandingScreen, type SystemBar } from '../ui-tree/
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
+import { OPPOSITE, SIDES, sameStroke, scrollStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -162,13 +162,17 @@ export type RoundStep =
  *   layout defect, or the keyboard's edge when it is the bottom clip.
  * - `covered`: a corroborated cover leaves nothing above its top edge;
  *   nothing judged, no stroke sent.
- * - `presented`: the judged match in the frame lies under a screen
- *   presented over its own (ui-tree/standing.ts#underPresented: a modal's
- *   dim, a sheet's form — ADR 0018), on two reads with no stroke between,
- *   or on one when no confirm is left; no further stroke sent — none moves
- *   it out, and one on that screen may dismiss it (a page sheet's
- *   pull-to-dismiss). `cover`: the one the sentence names
- *   (ui-tree/standing.ts#presentedCover).
+ * - `presented`: a screen is presented over the judged match's own (ADR 0018:
+ *   a modal's dim, a sheet's form, a popover's `dismiss popup`), on two
+ *   reads with no stroke between, or on one when no confirm is left; no
+ *   further stroke sent — none moves it out, and one on that screen may
+ *   dismiss it (a page sheet's pull-to-dismiss, a popover closed by a touch
+ *   on its dim). Either the match lies in the frame under that screen
+ *   (ui-tree/standing.ts#underPresented; `cover` the one the sentence names,
+ *   ui-tree/standing.ts#presentedCover), or — `touchDown` set — it was not
+ *   judged in the frame (below the fold, under the soft keyboard, cut or
+ *   clipped) and the next stroke would touch down at `touchDown` on `cover`,
+ *   a surface of that screen (ui-tree/draw-order.ts#DrawOrder.presentedAt).
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -192,7 +196,7 @@ export type ScrollOutcome =
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect }
+  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point }
   | {
       kind: 'bound';
       swipes: number;
@@ -204,6 +208,8 @@ export type ScrollOutcome =
       keyboard?: { cover: Cover; rounds: number; read: number };
       unlocated: boolean;
       evidence: WaitEvidence;
+      /** The swipe the bound held back would have touched down at `touchDown` on `surface`, a screen presented over the target's (`presentedTouchDown`). */
+      presented?: { surface: UiNode; touchDown: Point };
     };
 
 /**
@@ -552,8 +558,13 @@ interface State {
   readonly carriedPast: boolean;
   /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke). */
   readonly confirmReads: number;
-  /** The last read found the judged match under a presented screen (`presented`): the next, after a confirm, decides. */
-  readonly presentedRead: boolean;
+  /**
+   * The `presented` stop the last read that read would have made — its judged match under a presented screen, or its
+   * next stroke touching down on one — held for one more read with no stroke between (`round`): the next read that
+   * reads decides; a read that does not read is confirmed again while the budget allows, then this stop is made, as
+   * the last read that read left it. Never a stroke in between: one drawn blind would land on that screen.
+   */
+  readonly presentedHold: Extract<ScrollOutcome, { kind: 'presented' }> | undefined;
   readonly strokesSent: number;
   /** Where the content lay for the last stroke sent: the caller's direction, or its opposite after a fling past the target. For "swiping … no longer moves it". */
   readonly lastStroke: Direction;
@@ -593,8 +604,9 @@ interface State {
    * The stuck turn: the
    * direction the target was stuck in when, the other way never stroked,
    * ONE stroke was drawn back instead of failing — set once, never cleared;
-   * once only, as after it both ways were stroked (`strokedToward`). `backPending`: that stroke is the last sent and
-   * no read that read has answered it yet.
+   * once only, as after it both ways were stroked (`strokedToward`). `backPending`: that stroke is decided — sent, or
+   * held for a presented screen's confirming read at its touch-down (`round`) — and no read that read after it was
+   * sent has answered it yet.
    */
   readonly stuckOn: Direction | undefined;
   readonly backPending: boolean;
@@ -675,7 +687,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     seenShort: false,
     carriedPast: false,
     confirmReads: 0,
-    presentedRead: false,
+    presentedHold: undefined,
     strokesSent: 0,
     lastStroke: rules.direction,
     turns: 0,
@@ -1115,12 +1127,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
   // The stroke back (`stuckOn`) is answered by the first read that reads
   // after it; a round whose tree did not read strokes as the last read
-  // round decided — back.
-  // `presentedRead` is this read's to set again (below).
-  const presentedBefore = s.presentedRead;
-  if (now !== undefined) s.presentedRead = false;
-  const answersBack = now !== undefined && s.backPending;
-  if (now !== undefined) s.backPending = false;
+  // round decided — back. Only a read after the stroke was SENT answers it:
+  // one held for a presented screen's confirming read (the touch-down stop,
+  // below) is still to be sent, and that read — no stroke between — would
+  // otherwise read "unmoved" and say swiping back moved nothing.
+  // `presentedHold` is this read's to set again (below).
+  const presentedBefore = s.presentedHold !== undefined;
+  if (now !== undefined) s.presentedHold = undefined;
+  const answersBack = now !== undefined && current === 'stroke' && s.backPending;
+  if (answersBack) s.backPending = false;
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
     if (stops(best)) {
       // The probe moved nothing: the match is where it was sent from — the
@@ -1194,13 +1209,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
     // then, the read above stops as any other. Without a confirm left, stop on this read.
     const presented = presentedCover(best.standing);
-    if (presented !== undefined) {
-      if ((current === 'settle' && presentedBefore) || !mayConfirm(s, seen.elapsedMs)) {
-        return stop(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: presented, viewport });
-      }
-      s.presentedRead = true;
-      return confirm(s);
-    }
+    if (presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: presented, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the
@@ -1241,6 +1250,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // again, within the same budget, rather than stroke away from a stop the
   // last read saw.
   if ((current === 'settle' || s.probe !== undefined) && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+  // A presented stop held for its confirming read (`presentedHold`) and no read left to confirm it with: stop as the
+  // last read that read left it — never a stroke drawn blind, which would land on the screen that read saw presented
+  // (a read failing three times after the popover's hold had stroked onto its dim). Not a wait to the deadline: the
+  // reads are failing, and the last one that read is the evidence there is.
+  if (read === undefined && s.presentedHold !== undefined) return stop(s, s.presentedHold);
   const evidence: WaitEvidence = { sighted: s.everFound, treesRead: s.treesRead, readError };
   // A keyboard that leaves nothing above it: nothing but its own UI can be
   // judged, and no stroke can start on the content — fail now, naming it,
@@ -1263,6 +1277,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       unlocated = seen.unlocated;
     }
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s, now.facts);
+    // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
+    // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`).
+    const onPresented = presentedTouchDown(plannedStroke(s, now, gesture).step, best, now);
     const by: BoundBy =
       exhausted !== undefined
       ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
@@ -1278,42 +1295,30 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
       evidence,
+      ...(onPresented !== undefined && { presented: onPresented }),
     });
   }
-  // Toward the caller's direction, or back after a fling past the target,
-  // the reach halved per turn so the scroll converges (`nextStroke`). A
-  // round whose tree did not read has no reading of its own and keeps the
-  // keyboard edge of the last round that DID read (`lastReadEdge`) rather
-  // than stroke through the keyboard it last saw.
-  const { toward, reach, turn } = nextStroke(s);
-  // Over the target's scroll containers once a read has placed it in
-  // them, else the screen's largest (swipe.ts#strokeRoom): the
-  // stroke touches down on what scrolls, and its length is that
-  // container's 60 %, never the screen's — a 1417-px list is not stroked
-  // 1332 px. A round whose tree did not read keeps the last read round's
-  // candidates.
-  const candidates = strokeCandidates(s, now?.facts);
+  // The stroke this round draws (`plannedStroke`): its direction and reach, its container's box and cover.
+  const { step: stroke, turn, candidates, room } = plannedStroke(s, now, gesture);
   s.lastCandidates = candidates;
   // The latest cut read for the target's containers is the one a later read
   // that has lost a rect falls back to — not the oldest.
   if (s.targetContainers !== undefined && now !== undefined) s.targetContainers = candidates;
-  // The container and the box, decided once, for this stroke's `toward`
-  // (swipe.ts#strokeRoom; the container is judged for the stroke drawn over
-  // it, not for the caller's direction): the first candidate with room, met
-  // with the gesture box above the stroke's cover — the keyboard's, or what
-  // is drawn over the container (the floating tab bar; a round whose tree did not read keeps the last read
-  // round's, as its keyboard) — or the gesture box whole when none has room
-  // under the keyboard alone — a stroke toward the target is still
-  // worth drawing over the screen; a probe never comes here. Judged EVERY
-  // round, with that round's gesture box and cover, not once at the read
-  // that found the target: a strip the IME left no room in at that read is
-  // stroked once the IME is gone, the target's nearest container. `over` is looked up by the candidate's own
-  // rect object — strokeRoom hands back the one it was given — so nested
-  // containers of equal rects keep their own.
-  const kept = (now === undefined ? s.lastReadEdge : now.strokeLine)?.y;
-  const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, kept, (w) => candidates.find((c) => c.rect === w)?.over);
-  const coverTop = room === undefined ? kept : room.coverTop;
-  const box = room?.box ?? gesture;
+  // Where this stroke would touch down, asked on behalf of a target this read holds but did not judge in the frame
+  // (off it, under the soft keyboard, cut or clipped, or short of the stop under something of its own screen): a
+  // surface of a screen PRESENTED over the target's there (`presentedTouchDown`) means the stroke lands on that
+  // screen, not on the target's — it moves nothing toward the target and may dismiss the screen: the device check
+  // stroked from (201,699) for a cell below the fold of Contacts' New Contact sheet, closed the "Discard Changes"
+  // popover over it, and read the cell "fully visible after 1 swipe"; under the SWIFT form's Fees half sheet two
+  // strokes moved the sheet to another detent and read "content exhausted". So, as for a target judged under such a
+  // screen (above): one more read with no stroke between, then stop `presented` — or, should the screen be gone from
+  // the touch-down by then, stroke as before. Only for a target this read holds: one not in the tree has nothing to
+  // ask on behalf of, and is still stroked for (ADR 0018, residual 6).
+  const onPresented = presentedTouchDown(stroke, best, now);
+  if (onPresented !== undefined && best !== undefined) {
+    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown }, current === 'settle' && presentedBefore, seen.elapsedMs);
+  }
+  const { toward } = stroke;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
   if (turn) s.turns++;
   if (!s.strokedToward.includes(toward)) s.strokedToward = [...s.strokedToward, toward];
@@ -1324,10 +1329,62 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   s.since = 'stroke';
   s.swipes++;
   s.owesDrawn = true;
-  return {
-    state: s as unknown as Rounds,
-    step: { do: 'stroke', toward, reach, ...(coverTop !== undefined && { coverTop }), ...(box !== undefined && { box: { ...box } }) },
-  };
+  return { state: s as unknown as Rounds, step: stroke };
+}
+
+/**
+ * The stroke a round draws next, decided without drawing it — pure, so the bound can ask where the stroke it holds
+ * back would have touched down. Toward the caller's direction, or back after a fling past the target, the reach
+ * halved per turn so the scroll converges (`nextStroke`). Over the target's scroll containers once a read has placed
+ * it in them, else the screen's largest (swipe.ts#strokeRoom): the stroke touches down on what scrolls, and its
+ * length is that container's 60 %, never the screen's — a 1417-px list is not stroked 1332 px. A round whose tree
+ * did not read keeps the last read round's candidates and the keyboard edge of the last round that DID read
+ * (`lastReadEdge`) rather than stroke through the keyboard it last saw. The container and the box, decided once, for
+ * this stroke's `toward` (swipe.ts#strokeRoom; the container is judged for the stroke drawn over it, not for the
+ * caller's direction): the first candidate with room, met with the gesture box above the stroke's cover — the
+ * keyboard's, or what is drawn over the container (the floating tab bar) — or the gesture box whole when none has
+ * room under the keyboard alone — a stroke toward the target is still worth drawing over the screen; a probe never
+ * comes here. Judged EVERY round, with that round's gesture box and cover, not once at the read that found the
+ * target: a strip the IME left no room in at that read is stroked once the IME is gone, the target's nearest
+ * container. `over` is looked up by the candidate's own rect object — strokeRoom hands back the one it was given —
+ * so nested containers of equal rects keep their own.
+ */
+function plannedStroke(
+  s: State,
+  now: ThisRead | undefined,
+  gesture: Rect | undefined,
+): { step: Extract<RoundStep, { do: 'stroke' }>; turn: boolean; candidates: readonly StrokeContainer[]; room: StrokeRoom | undefined } {
+  const { toward, reach, turn } = nextStroke(s);
+  const candidates = strokeCandidates(s, now?.facts);
+  const kept = (now === undefined ? s.lastReadEdge : now.strokeLine)?.y;
+  const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, kept, (w) => candidates.find((c) => c.rect === w)?.over);
+  const coverTop = room === undefined ? kept : room.coverTop;
+  const box = room?.box ?? gesture;
+  const step = { do: 'stroke' as const, toward, reach, ...(coverTop !== undefined && { coverTop }), ...(box !== undefined && { box: { ...box } }) };
+  return { step, turn, candidates, room };
+}
+
+/**
+ * Where `stroke` would touch down — the driver's own point (swipe.ts#scrollStroke's `from`) — when that point lies
+ * on a surface of a screen presented over `best`'s own (ui-tree/draw-order.ts#DrawOrder.presentedAt, ADR 0018), asked
+ * on behalf of the target this read holds; undefined when it does not, when this round did not read, or when the
+ * stroke has no box. Only the touch-down is asked: it is where the gesture is recognised.
+ */
+function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): { surface: UiNode; touchDown: Point } | undefined {
+  if (best === undefined || now === undefined || stroke.box === undefined) return undefined;
+  const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
+  const surface = now.facts.scene.order.presentedAt(best.node, touchDown);
+  return surface === undefined ? undefined : { surface, touchDown };
+}
+
+/**
+ * A `presented` stop (`outcome`) on this read: made at once when this read confirms the last one's hold
+ * (`confirming`) or no confirming read is left; else held (`presentedHold`) for one more read with no stroke between.
+ */
+function holdPresented(s: Mutable<State>, outcome: Extract<ScrollOutcome, { kind: 'presented' }>, confirming: boolean, elapsedMs: number): { state: Rounds; step: RoundStep } {
+  if (confirming || !mayConfirm(s, elapsedMs)) return stop(s, outcome);
+  s.presentedHold = outcome;
+  return confirm(s);
 }
 
 /**

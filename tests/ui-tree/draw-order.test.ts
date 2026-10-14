@@ -21,6 +21,8 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
 const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
 const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
+/** The iPhone 17's screen, 402x874 pt. */
+const IPHONE_BOX = rect(0, 0, 402, 874);
 /** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
 const STACKED = JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
 
@@ -1581,6 +1583,73 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       const tree = uiNode({ role: 'container', label: 'MyPort', rect: IPHONE, children: [uiNode({ role: 'container', rect: IPHONE, children: [bar, content] })] });
       expect(covers(tree, back)).toEqual([]);
     });
+  });
+});
+
+/**
+ * Where a stroke for a target would touch down, asked on the target's behalf: is that point on a surface of a screen
+ * presented over the target's own (`presentedSurface`, ADR 0018)? `scroll_until` asks it before every stroke for a
+ * target it has not judged in the viewport — one below the fold has no covers (`exposure` judges only what shows), so
+ * the presented stop of a target in the viewport never sees it, and the stroke lands on the presented screen. Measured
+ * on device ui_snapshots (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
+ */
+describe('presentedAt — the presented screen\'s surface at a point, asked for a target wherever it lies (ADR 0018)', () => {
+  const screen = (key: string) => STACKED.screens[key];
+  const find = (tree: UiNode, keep: (n: UiNode) => boolean) => [...everyNode(tree)].find(keep)!;
+  /** The touch-down of a 60 % stroke down over the 402x874 screen (swipe.ts#scrollStroke). */
+  const TOUCH_DOWN = { x: 201, y: 699 };
+
+  it('measured, Contacts\' discard popover with the keyboard down: the sheet\'s cell "add instant message" at y 1306, below the fold, has no covers — and the stroke\'s touch-down lies on the popover\'s dim `dismiss popup 0,0 402x874`', () => {
+    const tree = screen('contactsDiscardPopoverKeyboardDown');
+    const cell = find(tree, (n) => n.role === 'container' && n.label === 'add instant message');
+    const order = drawOrder(tree);
+    expect(order.exposure(cell, IPHONE_BOX)).toMatchObject({ covers: [], presented: [] });
+    expect(order.presentedAt(cell, TOUCH_DOWN)).toMatchObject({ label: 'dismiss popup', identifier: 'PopoverDismissRegion', rect: rect(0, 0, 402, 874) });
+  });
+
+  it('measured, the SWIFT form under the Fees half sheet: `payee_city_input` at y 937 — the last surface at the point is named, the sheet\'s form `scrollable 31,456 340x355` over the dim `-402,-874 1206x2622`; above the sheet only the dim', () => {
+    const tree = screen('swiftFeesSheet');
+    const field = find(tree, (n) => n.identifier === 'swift_payment.form.payee_city_input');
+    const order = drawOrder(tree);
+    expect(order.presentedAt(field, TOUCH_DOWN)).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
+    expect(order.presentedAt(field, { x: 201, y: 175 })).toMatchObject({ label: 'dismiss popup', rect: rect(-402, -874, 1206, 2622) });
+  });
+
+  it('a target of the presented screen itself is stroked on its own screen: the page sheet\'s cell "add url" below its fold, at the same point on the sheet\'s form — none', () => {
+    const tree = screen('contactsSheet');
+    const cell = find(tree, (n) => n.role === 'container' && n.label === 'add url');
+    expect(drawOrder(tree).presentedAt(cell, TOUCH_DOWN)).toBeUndefined();
+  });
+
+  it('residual, measured on the Fees half sheet: a node of the screen beneath with the SAME frame as a presented surface — the hidden twin `PopoverDismissRegion` listed in the SWIFT form\'s own layer — is not asked about the real dim at a point both hold: the target column excuses a node of the target\'s own frame (`sameFrame`), so none is named; the sheet\'s form below the dim still is', () => {
+    const tree = screen('swiftFeesSheet');
+    const [twin, dim] = [...everyNode(tree)].filter((n) => n.label === 'dismiss popup');
+    expect(twin.rect).toEqual(dim.rect);
+    const order = drawOrder(tree);
+    expect(order.presentedAt(twin, { x: 201, y: 175 })).toBeUndefined();
+    expect(order.presentedAt(twin, TOUCH_DOWN)).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
+  });
+
+  it('none with no screen presented (Finportal\'s login), and none for a node not in this tree', () => {
+    const login = screen('finportalLogin');
+    const order = drawOrder(login);
+    expect(order.presentedAt(find(login, (n) => n.identifier === 'lang_sk'), TOUCH_DOWN)).toBeUndefined();
+    expect(order.presentedAt(uiNode({ role: 'button', label: 'elsewhere', rect: rect(0, 1000, 402, 50) }), TOUCH_DOWN)).toBeUndefined();
+  });
+
+  it('only a surface that draws over the node as a target counts — Finportal\'s Android login (its measured shape): the RN root\'s full-screen background leaf, then a later layer holding the `login_screen` scroll view over the whole screen. That scroll view is no cover of the background (the `target` column excuses it), so it is no presented surface over it either', () => {
+    const PIXEL = rect(0, 0, 1080, 2220);
+    const full = (children: UiNode[], more: Partial<UiNode> = {}) => uiNode({ role: 'container', rect: PIXEL, children, ...more });
+    const background = uiNode({ role: 'other', rect: PIXEL });
+    const card = uiNode({ role: 'container', identifier: 'login_card', rect: rect(44, 476, 992, 1100), children: [uiNode({ role: 'text', label: 'Login', identifier: 'login_title', rect: rect(99, 696, 882, 66) })] });
+    const loginScreen = uiNode({ role: 'scrollable', identifier: 'login_screen', rect: PIXEL, clipsDescendants: true, children: [full([card])] });
+    const layers = full([full([background]), full([full([uiNode({ role: 'scrollable', rect: PIXEL, children: [full([full([loginScreen])])] })])])]);
+    const tree = full([full([full([full([full([layers], { identifier: 'content' })], { identifier: 'action_bar_root' })])])], { paddedTouchTargets: true });
+    const order = drawOrder(tree);
+    const seen = order.exposure(background, PIXEL);
+    expect(seen.covers).not.toContain(loginScreen);
+    expect(seen.presented).toEqual([]);
+    expect(order.presentedAt(background, { x: 540, y: 1776 })).toBeUndefined();
   });
 });
 
