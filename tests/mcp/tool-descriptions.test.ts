@@ -153,7 +153,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
 
   it('scroll_until: the timeout is checked once a round, so a call can run past it by one swipe, its settle and one more round', () => {
     expect(description('scroll_until')).toContain(
-      'The timeout is checked once a round, after its tree read and keyboard queries, so a call can run past it by one swipe, the settle after it and one more round — its tree read and, on Android, its keyboard queries (the window state; with a keyboard up, its touchable region and the input method\'s word too, each under its own timeout) — the round that shows what that swipe did; the time a failure reports includes them. ',
+      'The timeout is checked once a round, after its tree read (and, on Android, its keyboard queries), so a call can run past it by one swipe, the settle after it and one more such round — the one that shows what that swipe did; the time a failure reports includes all of it. ',
     );
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(
       'The budget is checked once a round, after its tree read and keyboard queries, so the time taken can pass `timeoutMs` by one swipe, the settle after it and one more round — its tree read and, on Android, its keyboard queries — and includes them.',
