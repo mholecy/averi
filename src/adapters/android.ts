@@ -744,9 +744,11 @@ export class AndroidAdapter implements DeviceAdapter {
    * (keyboardTouchable, below).
    *
    * The inset's top is the docked keyboard's line, and the right one —
-   * measured with Gboard docked (1080x2220): the window manager's touchable
-   * region started at 1398, as the ITYPE_IME frame did; `dumpsys
-   * input_method`'s own `touchableRegion` started at 1332, over Gboard's
+   * measured with Gboard docked (1080x2220): `dumpsys window InputMethod`'s
+   * touchable region (the one keyboardTouchable reads) started at 1398, the
+   * top of the ITYPE_IME frame measured docked before (`frame=[0,1398]
+   * [1080,2220]`, below; this probe did not capture the frame); `dumpsys
+   * input_method`'s `touchableRegion` started at 1332, over Gboard's
    * transparent top strip. A guarded tap on a field centred in that strip
    * judged it clear of the keyboard, pressed no back, sent `input tap 540
    * 1367`, and the field took focus — the strip routes to the app, so 1332
