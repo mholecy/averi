@@ -55,6 +55,12 @@ describe('field/error pairing', () => {
     expect(target.error).toBe('Required');
   });
 
+  it('a zero-height field is not the next field below itself', () => {
+    const target = field('amount', 100, 0);
+    attachFieldErrors([target, text('amount', 110, 'Required')]);
+    expect(target.error).toBe('Required');
+  });
+
   it('ignores a same-identifier text that has no label', () => {
     const target = field('amount', 100);
     attachFieldErrors([target, text('amount', 130, null)]);
@@ -71,6 +77,76 @@ describe('field/error pairing', () => {
     });
     attachFieldErrors([target, button]);
     expect(target.error).toBeUndefined();
+  });
+
+  describe('fields sharing one component identifier', () => {
+    // mp-native's SWIFT form on WDA: every field and its floating title carry
+    // `TextFieldWithComponentStyle`, each title starting 1 pt above its field.
+    const ID = 'TextFieldWithComponentStyle';
+    const titled = (y: number, label: string): [UiNode, UiNode] => [
+      node({ role: 'text', identifier: ID, label, rect: { x: 42, y: y - 1, width: 47, height: 22 } }),
+      node({ role: 'textfield', identifier: ID, rect: { x: 42, y, width: 318, height: 20 } }),
+    ];
+
+    it('the next field’s title just above it is not this field’s error', () => {
+      const [ibanTitle, iban] = titled(357, 'IBAN*');
+      const [bicTitle, bic] = titled(425, 'BIC*');
+      attachFieldErrors([ibanTitle, iban, bicTitle, bic]);
+      expect(iban.error).toBeUndefined();
+      expect(bic.error).toBeUndefined();
+    });
+
+    it('a validation message between a field and the next field’s title still pairs', () => {
+      const [ibanTitle, iban] = titled(357, 'IBAN*');
+      const [bicTitle, bic] = titled(425, 'BIC*');
+      const invalid = node({ role: 'text', identifier: ID, label: 'Invalid IBAN', rect: { x: 42, y: 380, width: 200, height: 16 } });
+      attachFieldErrors([ibanTitle, iban, bicTitle, bic, invalid]);
+      expect(iban.error).toBe('Invalid IBAN');
+      expect(bic.error).toBeUndefined();
+    });
+
+    it('a validation message under the last field pairs', () => {
+      const [ibanTitle, iban] = titled(357, 'IBAN*');
+      const [bicTitle, bic] = titled(425, 'BIC*');
+      const required = node({ role: 'text', identifier: ID, label: 'Required', rect: { x: 42, y: 448, width: 200, height: 16 } });
+      attachFieldErrors([ibanTitle, iban, bicTitle, bic, required]);
+      expect(iban.error).toBeUndefined();
+      expect(bic.error).toBe('Required');
+    });
+
+    it('a validation message above a later field with no title of its own still pairs with the field it lies under', () => {
+      const [ibanTitle, iban] = titled(357, 'IBAN*');
+      const invalid = node({ role: 'text', identifier: ID, label: 'Invalid IBAN', rect: { x: 42, y: 380, width: 200, height: 16 } });
+      const untitled = node({ role: 'textfield', identifier: ID, rect: { x: 42, y: 425, width: 318, height: 20 } });
+      attachFieldErrors([ibanTitle, iban, invalid, untitled]);
+      expect(iban.error).toBe('Invalid IBAN');
+      expect(untitled.error).toBeUndefined();
+    });
+
+    it('a field with a label reaching into its top AND a placeholder inside it lends neither to the field above', () => {
+      // The amount field as measured (idb and WDA): "Amount*" y 283 h 16 ends
+      // 3 pt inside the field at y 296, and "Value*" sits inside the field.
+      const above = field(ID, 220);
+      const amount = node({ role: 'textfield', identifier: ID, rect: { x: 42, y: 296, width: 232, height: 21 } });
+      attachFieldErrors([
+        above,
+        node({ role: 'text', identifier: ID, label: 'Amount*', rect: { x: 42, y: 283, width: 51, height: 16 } }),
+        amount,
+        node({ role: 'text', identifier: ID, label: 'Value*', rect: { x: 42, y: 296, width: 49, height: 21 } }),
+      ]);
+      expect(above.error).toBeUndefined();
+      expect(amount.error).toBeUndefined();
+    });
+
+    it('never takes a text lying past the next same-identifier field', () => {
+      // Titles that overlap their own field (idb's spelling of the same form)
+      // and a later field's message: none of it is the first field's.
+      const first = field(ID, 100);
+      const second = field(ID, 200);
+      attachFieldErrors([first, text(ID, 100, 'First'), second, text(ID, 200, 'Second'), text(ID, 230, 'Too long')]);
+      expect(first.error).toBeUndefined();
+      expect(second.error).toBe('Too long');
+    });
   });
 
   it('leaves a field with no candidate untouched', () => {
