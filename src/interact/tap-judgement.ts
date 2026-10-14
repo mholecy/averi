@@ -1,6 +1,7 @@
-import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
-import { drawnOverText, rectText, type Cut } from '../ui-tree/geometry.js';
+import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { drawnOverText, nodeText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
+import { isInteractive } from '../ui-tree/selectors.js';
 import { underPresented, type Scene, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
@@ -313,7 +314,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
           ? `nothing of it shows${above}`
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps — close that screen first.
-      const remedy = underPresented(standing.facts) ? PRESENTED_OVER : 'scroll_until it first';
+      const remedy = underPresented(standing.facts) ? PRESENTED_OVER : positionerRemedy(standing.cover) ?? 'scroll_until it first';
       throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':
@@ -328,6 +329,25 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       return unhandled;
     }
   }
+}
+
+/** The most of a wrapper's area its one child may take and still count as SMALL for `positionerRemedy`: a quarter. */
+const SMALL_CHILD_FRACTION = 0.25;
+
+/**
+ * The remedy for a target under a WRAPPER that may only position its one child: a structural node (`container`,
+ * `other`) whose only child is a control (selectors.ts#isInteractive) of at most `SMALL_CHILD_FRACTION` of its area —
+ * Android's floating action button host (Clock's `fab_container` 1080x352 holding its 264x264 FAB, 18 % of it). Such a
+ * wrapper still counts as drawn over its whole rect (draw-order.ts's `structural` row: the tree cannot tell it from a
+ * tab bar's host that swallows touches), so the refusal stands; this says what to do instead of only scrolling. A host
+ * of several children — a tab bar's — gets none. Undefined when the cover is no such wrapper.
+ * The trade-off as the agent reads it: mcp/tools.ts, the `tap` description.
+ */
+function positionerRemedy(cover: UiNode): string | undefined {
+  if (!STRUCTURAL_ROLES.has(cover.role) || cover.children.length !== 1) return undefined;
+  const [child] = cover.children;
+  if (!isInteractive(child) || !(rectArea(child.rect) <= rectArea(cover.rect) * SMALL_CHILD_FRACTION)) return undefined;
+  return `the wrapper may only position its one child, ${nodeText(child)}: tap that child when it is the target, or scroll_until it out of the wrapper's band first`;
 }
 
 /** The on-screen rule's refusal of a centre off the screen or under a system bar (the module's doc). */
