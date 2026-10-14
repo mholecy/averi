@@ -1,8 +1,11 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { attachFieldErrors } from '../../src/adapters/field-errors.js';
 import { everyNode } from '../../src/adapters/types.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { node } from '../helpers/fake.js';
+
+const fixture = (name: string): Promise<string> => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
 
 /**
  * The field/error pairing rule now has ONE owner shared by both iOS tree
@@ -146,6 +149,189 @@ describe('field/error pairing', () => {
       attachFieldErrors([first, text(ID, 100, 'First'), second, text(ID, 200, 'Second'), text(ID, 230, 'Too long')]);
       expect(first.error).toBeUndefined();
       expect(second.error).toBe('Too long');
+    });
+  });
+
+  describe('a message carrying its own error identifier', () => {
+    // mp-native's SWIFT form with the IBAN message shown, as both tree sources
+    // returned it (tests/fixtures/ios-ui-snapshot-swift-iban-error.json): the
+    // message is `swift_payment.form.iban_input_error`, while the IBAN input and
+    // every other field and title share `TextFieldWithComponentStyle`.
+    const SWIFT = async (): Promise<Record<'idb' | 'wda', UiNode>> =>
+      (JSON.parse(await fixture('ios-ui-snapshot-swift-iban-error.json')) as { screens: Record<'idb' | 'wda', UiNode> }).screens;
+    const MESSAGE = "The IBAN you've entered is not valid. Please adjust and try again";
+    const errors = (tree: UiNode): [string, number, string | undefined][] =>
+      [...everyNode(tree)].filter((n) => n.role === 'textfield').map((n) => [n.value ?? '', n.rect.y, n.error]);
+
+    it.each(['idb', 'wda'] as const)('pairs with the IBAN field above it, and with no other field (%s)', async (source) => {
+      const tree = (await SWIFT())[source];
+      attachFieldErrors(everyNode(tree));
+      const paired = errors(tree).filter(([, , error]) => error !== undefined);
+      expect(paired).toEqual([['XX12', 364, MESSAGE]]);
+    });
+
+    it('a screen-level error far below a field is not that field’s (Account Detail, idb)', async () => {
+      // tests/fixtures/idb-ui-snapshot-account-detail-error.json: the search
+      // field at the top of the screen, and 337 pt below it, in its column,
+      // `accounts.detail.error` "That's an error" — the screen's error state.
+      const tree = (JSON.parse(await fixture('idb-ui-snapshot-account-detail-error.json')) as { screen: UiNode }).screen;
+      attachFieldErrors(everyNode(tree));
+      expect(errors(tree)).toEqual([['Search', 67, undefined]]);
+    });
+
+    // Synthetic rows below share one component identifier on every field, as
+    // the SWIFT form does, so only the message's own identifier can pair it.
+    const input = (x: number, y: number, width = 300): UiNode =>
+      node({ role: 'textfield', identifier: 'Component', rect: { x, y, width, height: 20 } });
+    const message = (x: number, y: number, width = 300, label = 'Invalid', id = 'form.iban_input_error'): UiNode =>
+      node({ role: 'text', identifier: id, label, rect: { x, y, width, height: 30 } });
+
+    it('pairs with nothing when no field above it shares its column', () => {
+      // A field above-left that the message does not reach horizontally is
+      // another column's field, however near it is vertically.
+      const left = input(0, 100, 150);
+      attachFieldErrors([left, message(200, 130, 150)]);
+      expect(left.error).toBeUndefined();
+    });
+
+    it('pairs with nothing when the only field in its column lies below it', () => {
+      // A message describes the field above it; the field under it is the
+      // next thing on the form, not what the message is about.
+      const below = input(0, 200);
+      attachFieldErrors([message(0, 100), below]);
+      expect(below.error).toBeUndefined();
+    });
+
+    it.each([
+      ['form.iban_input_error', true],
+      ['form.iban.error', true],
+      ['form-iban-error', true],
+      ['form.iban_input_ERROR', true],
+      ['form.ibanerror', false],
+      ['form.error_iban', false],
+      ['IbanError', false],
+    ])('the identifier %s names its text an error: %s', (id, names) => {
+      const iban = input(0, 100);
+      attachFieldErrors([iban, message(0, 130, 300, 'Invalid', id)]);
+      expect(iban.error).toBe(names ? 'Invalid' : undefined);
+    });
+
+    it('pairs with the nearer of two stacked fields, never the one past it', () => {
+      const first = input(0, 100);
+      const second = input(0, 160);
+      attachFieldErrors([first, second, message(0, 190)]);
+      expect(first.error).toBeUndefined();
+      expect(second.error).toBe('Invalid');
+    });
+
+    it('pairs with nothing when a field of its column lies between it and the field above', () => {
+      // The second field starts under the first and reaches past the
+      // message's top: the message sits inside that field's own span, so it
+      // is not the first field's, and it is not below the second.
+      const first = input(0, 100);
+      const second = node({ role: 'textfield', identifier: 'Component', rect: { x: 0, y: 160, width: 300, height: 40 } });
+      attachFieldErrors([first, second, message(0, 190)]);
+      expect(first.error).toBeUndefined();
+      expect(second.error).toBeUndefined();
+    });
+
+    it('counts a message starting exactly at the field’s bottom as below it', () => {
+      const iban = input(0, 100); // bottom = 120
+      attachFieldErrors([iban, message(0, 120)]);
+      expect(iban.error).toBe('Invalid');
+    });
+
+    describe('how far below the field it may start', () => {
+      // At most 24 pt below the field's bottom, or the field's own height when
+      // that is more: the IBAN message starts 16 pt under its 20 pt field.
+      it.each([
+        [20, 24, true],
+        [20, 25, false],
+        [48, 48, true],
+        [48, 49, false],
+      ])('a %i pt field, a message %i pt below its bottom: pairs %s', (height, gap, pairs) => {
+        const f = node({ role: 'textfield', identifier: 'Component', rect: { x: 0, y: 100, width: 300, height } });
+        attachFieldErrors([f, message(0, 100 + height + gap)]);
+        expect(f.error).toBe(pairs ? 'Invalid' : undefined);
+      });
+    });
+
+    it('a field of another column between them does not keep it from the field above', () => {
+      // A narrow field to the right, starting between the IBAN field's bottom
+      // and the message's top: it is not in the message's column.
+      const iban = input(0, 100, 150);
+      const aside = input(200, 125, 100);
+      attachFieldErrors([iban, aside, message(0, 130, 150)]);
+      expect(iban.error).toBe('Invalid');
+      expect(aside.error).toBeUndefined();
+    });
+
+    describe('a field with no identifier', () => {
+      // The message's own identifier names it an error; the field needs no
+      // identifier to be the one it lies under, or to stand between them.
+      const bare = (y: number): UiNode => node({ role: 'textfield', identifier: null, rect: { x: 0, y, width: 300, height: 20 } });
+
+      it('takes the message under it', () => {
+        const f = bare(100);
+        attachFieldErrors([f, message(0, 130)]);
+        expect(f.error).toBe('Invalid');
+      });
+
+      it('lying between them keeps it from the field above', () => {
+        const iban = input(0, 100);
+        const between = node({ role: 'textfield', identifier: null, rect: { x: 0, y: 125, width: 300, height: 20 } });
+        attachFieldErrors([iban, between, message(0, 130)]);
+        expect(iban.error).toBeUndefined();
+        expect(between.error).toBeUndefined();
+      });
+    });
+
+    describe('two fields side by side on one row', () => {
+      // An expiry/CVV-style row: two inputs at the same height, 20 pt apart.
+      const row = (): [UiNode, UiNode] => [input(0, 100, 140), input(160, 100, 140)];
+
+      it('a message under one of them pairs with that one alone', () => {
+        const [left, right] = row();
+        attachFieldErrors([left, right, message(160, 130, 140)]);
+        expect(left.error).toBeUndefined();
+        expect(right.error).toBe('Invalid');
+      });
+
+      it('a message reaching under both pairs with the one it overlaps more', () => {
+        // Listed after the field it barely reaches, so document order alone
+        // would pick the wrong one.
+        const [left, right] = row();
+        attachFieldErrors([left, right, message(100, 130, 200)]);
+        expect(left.error).toBeUndefined();
+        expect(right.error).toBe('Invalid');
+      });
+
+      it('a message overlapping both equally pairs with the first listed', () => {
+        const [left, right] = row();
+        attachFieldErrors([left, right, message(0, 130, 300)]);
+        expect(left.error).toBe('Invalid');
+        expect(right.error).toBeUndefined();
+      });
+    });
+
+    it('gives way to a message carrying the field’s own identifier', () => {
+      // Listed last and nearer, so neither order nor distance hands it the
+      // field: the same-identifier message is the field's by convention.
+      const amount = node({ role: 'textfield', identifier: 'amount', rect: { x: 0, y: 100, width: 300, height: 20 } });
+      attachFieldErrors([amount, text('amount', 160, 'Too large'), message(0, 125, 300, 'Invalid', 'amount_error')]);
+      expect(amount.error).toBe('Too large');
+    });
+
+    it.each([
+      ['farther', [185, 150]],
+      ['nearer', [150, 185]],
+    ] as const)('of two such messages under one field, the nearer pairs (the %s listed first)', (_, ys) => {
+      // A 48 pt field, so both lie close enough under it (bottom 148: 2 and
+      // 37 pt below). Both orders, so neither the first nor the last listed
+      // wins by document order alone.
+      const iban = node({ role: 'textfield', identifier: 'Component', rect: { x: 0, y: 100, width: 300, height: 48 } });
+      attachFieldErrors([iban, ...ys.map((y) => message(0, y, 300, y === 150 ? 'Nearer' : 'Farther'))]);
+      expect(iban.error).toBe('Nearer');
     });
   });
 
