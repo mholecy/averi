@@ -26,6 +26,15 @@ It could also have stayed ahead of them, where the old round put it.
 - **The miss continues the poll.** The round is a fail-closed miss that quotes both rects and captures nothing. The poll
   goes on, so a keyboard that leaves before the deadline costs a round, not the verdict.
 
+## Amendment: the off-screen case and the thin sliver (2026-10-14)
+
+K1's reading is still asked first, before any standing. Inside the standing, the pixel standing's off-screen case
+precedes idb's keyboard band: when nothing of what the assert reads lies on the screen, nothing is on the screen to be
+under the keyboard, so the region is judged off the screen first. The thin sliver — an element the screen's edge leaves
+no thicker than the slack on the screen (ADR 0002) — comes after idb's keyboard band and before the system bands, so an
+element under the band is a keyboard miss, as under WDA's and Android's reading (`ui-tree/standing.ts#regionPlace`). See
+ADR 0018, "Amendment: presented judged of the node".
+
 ## Residuals accepted
 
 - When the reading cannot see the keyboard, the old behaviour returns silently. Examples: a floating or split IME that
