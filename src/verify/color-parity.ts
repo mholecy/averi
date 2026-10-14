@@ -97,6 +97,13 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
  * is, so the standing finds nothing of what it reads on the screen (ui-tree/standing.ts, its `offScreen` kind).
  * `patches` reads inside it too, but for a rect under ~60 png px a side, whose corner patches' 9-px squares reach a
  * few pixels past the 12 % line.
+ *
+ * ONE region assumes `screen` times the png scale IS the png: the judge clips to `screen` in units, the sampler to the
+ * png in pixels. It holds for the usable screen's `oriented` box, the device's screen as the png is, and for the
+ * tree's fallback box (usable-screen.ts#treeScreen, no device screen) while the root is the whole screen. It can
+ * diverge, unmeasured on a device, where the box is not the screen: a root of no area fails open (the standing hands
+ * the node's own rect, so nothing is clipped), and a root that is a crowned child window, or a window short of the
+ * bars, clips the judge where the sampler does not.
  */
 export const colorSampleRect = (rect: Rect, screen: Rect): Rect => {
   const bounds = (r: Rect): EdgeBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });

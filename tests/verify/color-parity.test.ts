@@ -17,6 +17,7 @@ import {
   validateColorContract,
 } from '../../src/verify/color-parity.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
+import { treeScreen } from '../../src/ui-tree/usable-screen.js';
 
 /**
  * Synthetic in-memory captures modeled on the live-validated 2026-08-14 run:
@@ -728,5 +729,21 @@ describe('colorSampleRect — the region the sampler reads, in tree units', () =
   it('a rect with nothing on the screen: its inset, off the screen as the rect is — the pixel assert\'s standing judges it off the screen', () => {
     const got = colorSampleRect({ x: 24, y: 1209, width: 354, height: 52 }, SCREEN);
     for (const [k, v] of [['x', 66.48], ['y', 1215.24], ['width', 269.04], ['height', 39.52]] as const) expect(got[k]).toBeCloseTo(v, 6);
+  });
+
+  it('on the tree\'s fallback box (no device screen): the root\'s rect, which agrees with the sampler while the root times the scale is the png', () => {
+    const box = treeScreen(root(402, 874, [])).oriented;
+    const rect = { x: 24, y: 869, width: 354, height: 52 };
+    const judged = colorSampleRect(rect, box);
+    const read = sampled(rect);
+    for (const k of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(judged[k] - read[k])).toBeLessThan(1);
+  });
+
+  it('unmeasured: a root that is not the whole screen (a window short of the bars) clips the judge where the sampler does not', () => {
+    const box = treeScreen(n({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 800 } })).oriented;
+    const rect = { x: 24, y: 780, width: 354, height: 52 };
+    expect(colorSampleRect(rect, box).y + colorSampleRect(rect, box).height).toBeLessThan(800);
+    const read = sampled(rect);
+    expect(read.y + read.height).toBeGreaterThan(800);
   });
 });
