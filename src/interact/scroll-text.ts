@@ -8,7 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ReadTime, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
@@ -485,16 +485,22 @@ function boundText(by: BoundBy, swipes: number): string {
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
     case 'timeout':
-      return `after ${by.timeoutMs}ms (timeout; ${swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`}; ${readTimeText(by.reads)})`;
+      return timeoutText(by, swipes);
   }
 }
 
 /**
- * What the timeout's tree reads took: `1 tree read took 38204ms`, `3 tree reads took 18000ms, the last 6000ms` — so a
- * budget the reads spent (a tree source restarting under the scroll) does not read as content that never came.
+ * The timeout bound's words: the time spent, then the budget it ran past, the swipes sent and what the tree reads took
+ * — `after 38204ms (timeout 15000ms; no swipe was sent; 1 tree read took 38204ms)`, `after 18000ms (timeout 15000ms;
+ * 2 swipes sent; 3 tree reads took 18000ms, the last 6000ms)` — so a budget the reads spent (a tree source slow or
+ * restarting under the scroll) does not read as content that never came into view. Exported for the troubleshooting
+ * reference, which quotes one rendering (tests/mcp/tool-descriptions.test.ts pins it).
  */
-function readTimeText({ count, totalMs, lastMs }: ReadTime): string {
-  return `${countOf(count, 'tree read')} took ${totalMs}ms${count > 1 ? `, the last ${lastMs}ms` : ''}`;
+export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: number): string {
+  const sent = swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`;
+  const { count, totalMs, lastMs } = by.reads;
+  const reads = `${countOf(count, 'tree read')} took ${totalMs}ms${count > 1 ? `, the last ${lastMs}ms` : ''}`;
+  return `after ${by.elapsedMs}ms (timeout ${by.timeoutMs}ms; ${sent}; ${reads})`;
 }
 
 /** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */

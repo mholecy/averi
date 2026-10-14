@@ -321,3 +321,15 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 });
+
+/**
+ * scroll_until's timeout reply (interact/scroll-text.ts#timeoutText): the troubleshooting reference quotes one
+ * rendering of it, derived here from the owner — never typed out — so the entry cannot drift from the reply.
+ */
+describe('troubleshooting on a scroll_until timeout', () => {
+  it('quotes the reply as interact/scroll-text.ts renders it: the time spent, the budget, no swipe sent, what the read took', async () => {
+    const { timeoutText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const rendered = timeoutText({ of: 'timeout', timeoutMs: 15_000, elapsedMs: 38_204, reads: { count: 1, totalMs: 38_204, lastMs: 38_204 } }, 0);
+    expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(`\`scroll_until … failed ${rendered} — …\``);
+  });
+});

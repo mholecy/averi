@@ -111,7 +111,17 @@ describe('round — the judgement and the stop', () => {
       /scroll_until id:submit_button failed after 4 swipes \(maxSwipes\) — element in tree but never intersected the 1000x2000 viewport/,
     );
     const timedOut = play({ ...SCROLLING, maxSwipes: 50, timeoutMs: 1 }, [{ found: [button(50_000)], elapsedMs: 1 }]);
-    expect(failureOf(timedOut, describeTarget({ id: 'submit_button' })).message).toMatch(/scroll_until id:"submit_button" failed after 1ms \(timeout; no swipe was sent; 1 tree read took 0ms\)/);
+    expect(failureOf(timedOut, describeTarget({ id: 'submit_button' })).message).toMatch(/scroll_until id:"submit_button" failed after 1ms \(timeout 1ms; no swipe was sent; 1 tree read took 0ms\)/);
+  });
+
+  it('a timeout says how many swipes it sent and how long the tree reads took, so a budget the reads spent does not read as the content\'s fault', () => {
+    // The Safari case: the one read outlasted the budget (a tree source restarting under it) — no swipe was ever sent, and the time
+    // spent is said beside the budget it ran past.
+    const slow = play(SCROLLING, [{ found: [button(50_000)], elapsedMs: 38_204, readMs: 38_204 }]);
+    expect(failureOf(slow, 'id:submit_button').message).toMatch(/^scroll_until id:submit_button failed after 38204ms \(timeout 2000ms; no swipe was sent; 1 tree read took 38204ms\) — element in tree but never intersected/);
+    // A read that failed took its time too: it is counted with the rest.
+    const failing = play(SCROLLING, [{ error: 'WDA /source timed out', readMs: 1_000 }, { found: [button(49_990)], elapsedMs: 2_500, readMs: 1_500 }]);
+    expect(failureOf(failing, 'id:submit_button').message).toContain('failed after 2500ms (timeout 2000ms; 1 swipe sent; 2 tree reads took 2500ms, the last 1500ms)');
   });
 
   it('a stop at 0 swipes was not stroked: reported on its one read, no confirming read', () => {
@@ -1274,17 +1284,8 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     );
     const late = play({ ...IPHONE, fully: true }, [{ ...form(771), readMs: 400 }, { ...form(772), elapsedMs: 2_000, readMs: 1_500 }]);
     expect(failureOf(late, 'id:priority').message).toBe(
-      `scroll_until id:priority failed after 2000ms (timeout; 1 swipe sent; 2 tree reads took 1900ms, the last 1500ms) — element reached the viewport but stayed under ${COVER} at its centre (201,798), drawn over it — 15% of it shows (last rect {"x":24,"y":772,"width":354,"height":52})`,
+      `scroll_until id:priority failed after 2000ms (timeout 2000ms; 1 swipe sent; 2 tree reads took 1900ms, the last 1500ms) — element reached the viewport but stayed under ${COVER} at its centre (201,798), drawn over it — 15% of it shows (last rect {"x":24,"y":772,"width":354,"height":52})`,
     );
-  });
-
-  it('a timeout says how many swipes it sent and how long the tree reads took, so a budget the reads spent does not read as the content\'s fault', () => {
-    // The Safari case: the one read outlasted the budget (a tree source restarting under it) — no swipe was ever sent.
-    const slow = play(IPHONE, [{ ...form(1_200), elapsedMs: 38_204, readMs: 38_204 }]);
-    expect(failureOf(slow, 'id:priority').message).toMatch(/^scroll_until id:priority failed after 2000ms \(timeout; no swipe was sent; 1 tree read took 38204ms\) — element in tree but never intersected/);
-    // A read that failed took its time too: it is counted with the rest.
-    const failing = play(IPHONE, [{ error: 'WDA /source timed out', readMs: 1_000 }, { ...form(1_200), elapsedMs: 2_500, readMs: 1_500 }]);
-    expect(failureOf(failing, 'id:priority').message).toContain('failed after 2000ms (timeout; 1 swipe sent; 2 tree reads took 2500ms, the last 1500ms)');
   });
 
   it('of two matches, the one more of which shows is judged: a duplicate under the bar does not hold a stop the other makes', () => {

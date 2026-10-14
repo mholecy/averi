@@ -247,13 +247,14 @@ export type Flush =
 export type BoundBy =
   | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn }
   | { of: 'maxSwipes' }
-  | { of: 'timeout'; timeoutMs: number; reads: ReadTime };
+  | { of: 'timeout'; timeoutMs: number; elapsedMs: number; reads: ReadTime };
 
 /**
  * The tree reads of a scroll that timed out: how many (every round reads once, a failed read included), how long they
  * took in all and the last one. A WDA restart under the scroll (the Safari case: no swipe sent, one 38 s read against
  * the 15 s budget) shows here, and not as content that never came into view; the restart itself is reported by the
- * tree source on stderr, not in the reply.
+ * tree source on stderr, not in the reply. The bound carries the time spent (`elapsedMs`, what the round that stopped
+ * was stamped with) beside the budget: a read that outlasts it ends the scroll well past it.
  */
 export interface ReadTime {
   count: number;
@@ -1307,7 +1308,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
-        : { of: 'timeout', timeoutMs: s.rules.timeoutMs, reads: s.reads };
+        : { of: 'timeout', timeoutMs: s.rules.timeoutMs, elapsedMs: seen.elapsedMs, reads: s.reads };
     return stop(s, {
       kind: 'bound',
       swipes: s.swipes,
