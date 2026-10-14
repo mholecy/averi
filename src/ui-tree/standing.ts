@@ -620,8 +620,8 @@ interface SystemBand<B extends SystemBar = SystemBar> {
   readonly band: Rect;
 }
 
-/** Where the pixel assert's region lies: on the screen, off it (`off`: nothing of what it reads on the box, or — the element's on-screen part — a sliver too thin to measure), in a system band (with the band's rect), or under the band a keyboard line marks. */
-type RegionPlace = 'on' | { readonly off: Rect | undefined } | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
+/** Where the pixel assert's region lies: on the screen, off it (`wholly`: nothing of what it reads on the box; `sliver`: the element's on-screen part, `on`, too thin to measure), in a system band (with the band's rect), or under the band a keyboard line marks. */
+type RegionPlace = 'on' | { readonly off: 'wholly' } | { readonly off: 'sliver'; readonly on: Rect } | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /**
  * The screen a touch (the tap, either stop) is judged on: the one handed
@@ -684,7 +684,7 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  */
 function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
-  if (on === undefined) return { off: undefined };
+  if (on === undefined) return { off: 'wholly' };
   // idb's keyboard band before a thin sliver, as before the system bands (ADR 0010): the element under the band is a
   // keyboard miss, worded as WDA's and Android's reading words it. Nothing wholly off the box meets the band.
   // docs/adr/0010-pixel-assert-keyboard-first.md
@@ -693,7 +693,7 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
   }
   const sliver = on === box ? undefined : thinSliver(rect, on, box);
-  if (sliver !== undefined) return { off: sliver };
+  if (sliver !== undefined) return { off: 'sliver', on: sliver };
   return systemBandOver(reads, box, bands) ?? 'on';
 }
 
@@ -974,7 +974,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   };
   const placed = ((): PixelJudgement | undefined => {
     if (place === 'on') return undefined;
-    if ('off' in place) return { facts, kind: 'offScreen', box: { ...box }, ...(place.off !== undefined && { sliver: { ...place.off } }) };
+    if ('off' in place) return { facts, kind: 'offScreen', box: { ...box }, ...(place.off === 'sliver' && { sliver: { ...place.on } }) };
     if ('keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
     return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, band: place.band };
   })();
