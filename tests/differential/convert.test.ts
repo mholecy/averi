@@ -31,9 +31,10 @@ describe('classify', () => {
     ['a filtered snapshot (a list of nodes)', `#71 (1.7s)\n${JSON.stringify([tree('a'), tree('b')])}`, 'ios', ['skip', 'a filtered snapshot: a node list, not a tree']],
     ['WDA\'s XML /source', '<?xml version="1.0" encoding="UTF-8"?><XCUIElementTypeApplication/>', 'ios', ['skip', 'WDA XML source: no parser reads that format']],
     ['WDA\'s XML /source in its JSON envelope', '{\n  "value" : "<?xml version=\\"1.0\\"?><XCUIElementTypeApplication/>"\n}', 'ios', ['skip', 'WDA XML source: no parser reads that format']],
-    ['a flattened text listing', "button id=None lab='add address' val='' 20,969 362x51", 'ios', ['skip', 'not a tree (no JSON tree in it: a text listing or a log)']],
-  ] as const)('%s', (_name, text, platform, want) => {
-    const c = classify(text, platform);
+    ['a flattened text listing', "button id=None lab='add address' val='' 20,969 362x51", 'ios', ['skip', 'not a tree (no JSON in it: a text listing or a log)'], 'a.txt'],
+    ['a .json that holds no tree (a tool listing)', '#1 (0.0s)\n## list_devices\n{"type":"object"}', 'ios', ['skip', 'not a tree'], 'tools.json'],
+  ] as const)('%s', (_name, text, platform, want, file?: string) => {
+    const c = classify(text, platform, file);
     expect(c.kind === 'capture' ? [c.kind, c.source, c.form] : [c.kind, c.reason]).toEqual(want);
   });
 });
@@ -95,7 +96,7 @@ describe('DeviceRunConverter', () => {
       ['snap.json', 'wda', 'normalized'],
       ['session-6.json', 'wda', 'normalized'],
     ]);
-    expect(convert.counts.get('run12-ios')).toEqual({ files: 3, fileRepeats: 1, skipped: ['a.txt (not a tree (no JSON tree in it: a text listing or a log))'], logged: 2, loggedTaken: 1 });
+    expect(convert.counts.get('run12-ios')).toEqual({ files: 3, fileRepeats: 1, skipped: ['a.txt (not a tree (no JSON in it: a text listing or a log))'], logged: 2, loggedTaken: 1 });
     expect(b.manifest.note).toMatch(/a\.txt/);
   });
 });

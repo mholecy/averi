@@ -104,7 +104,7 @@ const SCREENLESS: ReadonlySet<ToolName> = new Set(['tap', 'assert']);
 const GUARDED: ReadonlySet<ToolName> = new Set(['tap']);
 const KEYBOARD: ReadonlySet<ToolName> = new Set(['tap', 'scroll_until']);
 const PIXELS: ReadonlySet<ToolName> = new Set(['tap', 'assert']);
-/** The targets the costly variants (real scale, another screen) run on. */
+/** How many targets the costly variants (real scale, another screen) run on — `spread`'s choice. */
 const SUBSET = 3;
 
 /** The screens the device checks ran on, when a manifest names none: the iPhone 17 simulator, the Pixel_3a AVD. */
@@ -120,7 +120,7 @@ const scaled = (s: Screen, k: number): Screen => ({ width: Math.round(s.width * 
  * The device variants of a recording. Every variant but the costly two answers screenshots at HALF the screen: a
  * frame's decode (pngjs) is most of a pixel assert's cost — a 1080x2220 frame takes ~100 ms — and scale 0.5 is inside
  * the pixel asserts' plausible range (verify/scale.ts). `real scale` (3x on iOS, 1x on Android) and `other screen` (a
- * device that differs from the tree) run on the first SUBSET targets.
+ * device that differs from the tree) run on SUBSET targets spread over the screen (`spread`).
  */
 function variantsOf(recording: Recording, snapshot: Snapshot): Variant[] {
   const screen = recording.screen ?? DEFAULT_SCREEN[recording.platform];
@@ -264,6 +264,30 @@ function snapshotOf(oldReply: string, newReply: string): Snapshot {
  * wording (which names the budget) and costs a twelfth of the captures.
  */
 const ASSERT_BUDGET_MS = 1_000;
+
+/**
+ * `n` targets for a costly variant, spread over the screen. Tree order puts the screen-sized wrappers first, and a
+ * colour assert on one of those samples the whole frame, so a node covering 90 % of the screen or more is never
+ * taken. Of the rest: the first whose centre lies in each vertical third of the screen, top to bottom; where a third
+ * has none, the first, the last and the middle of those not yet taken fill in, in that order (a node off the screen
+ * among them).
+ */
+export function spread<T extends { rect: { x: number; y: number; width: number; height: number } }>(targets: readonly T[], screen: Screen, n: number): T[] {
+  const area = screen.width * screen.height;
+  const small = targets.filter((t) => t.rect.width * t.rect.height < 0.9 * area);
+  const chosen: T[] = [];
+  for (let k = 0; k < n; k++) {
+    const top = (screen.height * k) / n, bottom = (screen.height * (k + 1)) / n;
+    const hit = small.find((t) => !chosen.includes(t) && t.rect.y + t.rect.height / 2 >= top && t.rect.y + t.rect.height / 2 < bottom);
+    if (hit !== undefined) chosen.push(hit);
+  }
+  const rest = small.filter((t) => !chosen.includes(t));
+  for (const i of [0, rest.length - 1, Math.floor((rest.length - 1) / 2)]) {
+    if (chosen.length >= n || rest.length === 0) break;
+    if (!chosen.includes(rest[i])) chosen.push(rest[i]);
+  }
+  return chosen;
+}
 
 /** A distinct colour per target index — never the frame's grey — as `#rrggbb` and its channels. */
 function colourOf(i: number): { hex: string; rgb: readonly [number, number, number] } {
@@ -437,7 +461,8 @@ export async function compareRecording(recording: Recording, oldSide: Side, newS
     if (variant.name !== base.name && wanted.has('ui_snapshot')) await both(variant.name, o, n, { tool: 'ui_snapshot', args: { platform: recording.platform } }, config);
     for (const call of treeCalls(recording, wanted, snapshot.shared)) await both(variant.name, o, n, call, config);
     const scale = variant.profile.frame.width / (variant.profile.screen ?? recording.screen ?? DEFAULT_SCREEN[recording.platform]).width;
-    const mine = targets.slice(0, variant.targets ?? Infinity);
+    const screen = recording.screen ?? DEFAULT_SCREEN[recording.platform];
+    const mine = variant.targets === undefined ? targets : spread(targets, screen, variant.targets);
     for (const [i, t] of mine.entries()) for (const call of plan(recording.platform, t, i, wanted, variant.asserts ?? ['element', 'color', 'ocr'], scale)) await both(variant.name, o, n, call, config);
   }
   await o.close();

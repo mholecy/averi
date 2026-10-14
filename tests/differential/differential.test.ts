@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { installVirtualClock } from '../../scripts/differential/clock.js';
 import type { Recording } from '../../scripts/differential/corpus.js';
-import { compareRecording, groupDiffs } from '../../scripts/differential/differential.js';
+import { compareRecording, groupDiffs, spread } from '../../scripts/differential/differential.js';
 import { installFakeDevice } from '../../scripts/differential/fake-device.js';
 import { loadSide, type Side } from '../../scripts/differential/side.js';
 import { COMPOSE } from '../helpers/android-dumps.js';
@@ -117,5 +117,23 @@ describe('compareRecording', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it('the costly variants\' targets: never a node covering 90 % of the screen, then one per vertical third, top to bottom', () => {
+    const at = (name: string, y: number, height = 40, width = 300) => ({ name, rect: { x: 0, y, width, height } });
+    const screen = { width: 402, height: 874 };
+    const targets = [
+      at('root', 0, 874, 402),
+      at('wrapper', 0, 800, 402),
+      at('almost the screen', 20, 800, 402),
+      at('header', 60),
+      at('title', 100),
+      at('row', 400),
+      at('row 2', 450),
+      at('footer', 780),
+    ];
+    expect(spread(targets, screen, 3).map((t) => t.name)).toEqual(['header', 'row', 'footer']);
+    // A third with nothing in it: the first, middle and last of the rest fill in.
+    expect(spread([at('a', 10), at('b', 20), at('c', 30), at('d', 40)], screen, 3).map((t) => t.name)).toEqual(['a', 'b', 'd']);
   });
 });

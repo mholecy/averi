@@ -131,9 +131,10 @@ export type Classified =
  *  - a JSON object with a `value` element → raw WDA (`/source?format=json`);
  *  - a JSON array of idb elements (`type` + `frame`/`AXFrame`) → raw idb (`ui describe-all --json`);
  *  - a UiNode tree (after a `#<call> (<s>)` header line, if any) → normalized, idb when its root is idb's flat list;
- *  - a JSON array of UiNodes → skipped, a filtered snapshot; anything else → skipped, not a tree.
+ *  - a JSON array of UiNodes → skipped, a filtered snapshot; anything else → skipped, not a tree (`file`'s extension
+ *    tells a .json that holds no tree from a text listing).
  */
-export function classify(text: string, platform: 'ios' | 'android'): Classified {
+export function classify(text: string, platform: 'ios' | 'android', file = ''): Classified {
   if (/^\s*(<\?xml|<hierarchy|\{\s*"value"\s*:\s*"<\?xml)/.test(text)) {
     if (text.includes('<hierarchy')) return { kind: 'capture', source: 'uiautomator', form: 'raw', body: text };
     return { kind: 'skip', reason: 'WDA XML source: no parser reads that format' };
@@ -164,7 +165,8 @@ export function classify(text: string, platform: 'ios' | 'android'): Classified 
     };
   }
   if (Array.isArray(value) && value.length > 0 && value.every(isUiNode)) return { kind: 'skip', reason: 'a filtered snapshot: a node list, not a tree' };
-  return { kind: 'skip', reason: value === undefined ? 'not a tree (no JSON tree in it: a text listing or a log)' : 'not a tree' };
+  // A .json file that holds no tree (a tool listing behind a header line) is "not a tree"; another file holding no JSON is a listing or a log.
+  return { kind: 'skip', reason: value === undefined && !file.endsWith('.json') ? 'not a tree (no JSON in it: a text listing or a log)' : 'not a tree' };
 }
 
 /** Every file under `dir`, subdirectories included, as paths relative to it, sorted. */
@@ -206,7 +208,7 @@ export class DeviceRunConverter {
     this.counts.set(name, count);
     for (const rel of await filesUnder(dir)) {
       if (!/\.(json|txt|xml|raw)$/.test(rel)) continue;
-      const c = classify(await readFile(join(dir, rel), 'utf8'), platform);
+      const c = classify(await readFile(join(dir, rel), 'utf8'), platform, rel);
       if (c.kind === 'skip') {
         count.skipped.push(`${rel} (${c.reason})`);
         continue;
