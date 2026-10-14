@@ -50,7 +50,7 @@ the trees with diffs, the diffs grouped by what changed — numbers and quoted v
 is one group, `device calls only` when the replies agree, with an example each), `diffs.jsonl` (every differing call,
 both outcomes) and, with `--all`, `calls.jsonl` (every call).
 
-On 12 cores a corpus of 385 trees (about 214 000 calls, each on both sides) takes about four and a half minutes.
+On 12 cores a corpus of 479 trees (about 245 000 calls, each on both sides) takes about five and a half minutes.
 
 Per tree:
 
@@ -118,10 +118,12 @@ manifest's `note`: WDA's XML `/source` (no parser reads it), filtered snapshots,
 
 **Rebuilt runs are not device captures.** A run may hold raw payloads REBUILT from normalized trees — the corpus's
 `rebuilt-idb-ios` holds an idb `describe-all` list rebuilt from each normalized idb tree (idb's normalization maps
-element by element, so the inverse is exact up to the type within a role, and an OLD parser gives each tree back). Such
+element by element, so the inverse is exact up to the type within a role and minus the parser's own marks, such as a
+field's `error`: 41 of its 94 trees carry such marks from the parser that read them, so an OLD parser gives back 53 of
+the 94 exactly). Such
 a run says so in its manifest (`device` and `note`, and each capture's `note`), and every tree in it is also in its own
 run as normalized: it lets an idb parser change show where no raw payload was saved (the IBAN `_error` pairing), but
-it is no evidence of what a device sends. `convert.ts` does not build it: the script that does is kept in the run's
+it is no evidence of what a device sends. `report.md` lists each run replayed with what its manifest says it is. `convert.ts` does not build it: the script that does is kept in the run's
 directory, outside the repository like the corpus.
 
 ```sh

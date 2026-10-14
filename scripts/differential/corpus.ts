@@ -123,3 +123,23 @@ export async function loadCorpus(dir: string): Promise<Recording[]> {
   }
   return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
+
+/**
+ * The report's "Runs" lines: each run this run replayed, its tree count, and what its manifest says it is (`device`,
+ * `note`) — so a run whose payloads are not device captures (README.md, "Rebuilt runs are not device captures") never
+ * reads as one in the header's raw count. `ids` are the replayed recordings' ids (`<run>/<file>`).
+ */
+export async function runLines(dir: string, ids: readonly string[]): Promise<string[]> {
+  const counts = new Map<string, number>();
+  for (const id of ids) {
+    const run = id.slice(0, id.indexOf('/'));
+    counts.set(run, (counts.get(run) ?? 0) + 1);
+  }
+  const lines: string[] = [];
+  for (const [run, n] of [...counts].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    const { device, note } = JSON.parse(await readFile(join(dir, run, 'manifest.json'), 'utf8')) as RunManifest;
+    const says = [device, note].filter((s) => s !== undefined && s !== '').join(' — ');
+    lines.push(`- ${run}: ${n} trees${says === '' ? '' : ` — ${says}`}`);
+  }
+  return lines;
+}

@@ -258,7 +258,7 @@ async function fixtureRuns(repo: string): Promise<{ ios: Built; android: Built }
   for (const [k, v] of Object.entries((await j('wda-ui-snapshot-stacked-layers.json')).screens as Json)) add(ios, `wda-ui-snapshot-stacked-layers.${k}.json`, JSON.stringify(v), { source: 'wda', form: 'normalized' });
   // The fixture's root lacks `paddedTouchTargets`, which AndroidAdapter marks on every root it reads — added, as the scratch harness did.
   for (const [k, v] of Object.entries((await j('android-ui-snapshot-compose.json')).screens as Json)) {
-    add(android, `android-ui-snapshot-compose.${k}.json`, JSON.stringify({ ...(v as Json), paddedTouchTargets: true }), { source: 'uiautomator', form: 'normalized', note: 'paddedTouchTargets added to the root (captured before the parser marked it)' });
+    add(android, `android-ui-snapshot-compose.${k}.json`, JSON.stringify({ ...(v as Json), paddedTouchTargets: true }), { source: 'uiautomator', form: 'normalized', note: "paddedTouchTargets added to the root: the fixture's root lacks it" });
   }
   // The dumps exist only as constants in the checkout's tests/helpers (no fixture file holds them), so they are imported
   // from there — the strings the tests read, not a copy that could drift from them.

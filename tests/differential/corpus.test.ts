@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadCorpus } from '../../scripts/differential/corpus.js';
+import { loadCorpus, runLines } from '../../scripts/differential/corpus.js';
 
 // The corpus a differential run reads (scripts/differential/README.md, "Corpus format"): one directory per capture
 // run, a manifest naming each tree's platform, source kind and form, and the tree files beside it.
@@ -73,5 +73,18 @@ describe('loadCorpus', () => {
   it('refuses a directory without a manifest rather than skipping its trees', async () => {
     await mkdir(join(dir, 'stray'));
     await expect(loadCorpus(dir)).rejects.toThrow(/stray.*manifest\.json/);
+  });
+});
+
+describe('runLines', () => {
+  it('names each replayed run with its tree count and what its manifest says it is, so a rebuilt run never reads as a device capture', async () => {
+    await run('rebuilt', { platform: 'ios', device: 'none: REBUILT from normalized trees', note: 'not device captures', captures: [] }, {});
+    await run('device', { platform: 'ios', device: 'iPhone 17 simulator', captures: [] }, {});
+    await run('bare', { platform: 'android', captures: [] }, {});
+    expect(await runLines(dir, ['rebuilt/a.json', 'device/b.json', 'rebuilt/c.json', 'bare/d.xml'])).toEqual([
+      '- bare: 1 trees',
+      '- device: 1 trees — iPhone 17 simulator',
+      '- rebuilt: 2 trees — none: REBUILT from normalized trees — not device captures',
+    ]);
   });
 });

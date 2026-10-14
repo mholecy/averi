@@ -5,7 +5,7 @@ import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { loadCorpus, type Recording } from './corpus.js';
+import { loadCorpus, runLines, type Recording } from './corpus.js';
 import { groupDiffs, type RecordingResult, type ToolName } from './differential.js';
 
 /**
@@ -187,6 +187,10 @@ async function parent(): Promise<void> {
     '| tool | calls (each on both sides) | diffs | ms, both sides |',
     '|---|---|---|---|',
     ...[...byTool].sort().map(([t, c]) => `| ${t} | ${c.calls} | ${c.diffs} | ${Math.round(c.ms)} |`),
+    '',
+    '## Runs (what each manifest says it is: a rebuilt run is no device capture)',
+    '',
+    ...(await runLines(resolve(values.corpus), results.map((r) => r.recording))),
     '',
     '## Device commands the fake does not model',
     '',
