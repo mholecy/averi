@@ -109,4 +109,12 @@ describe('the fake device records what a tool would have sent', () => {
     const blind = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: undefined, frame: PIXEL });
     await expect(blind.viewport()).rejects.toThrow(/wm size/);
   });
+
+  it('Android: a shown keyboard is the docked Gboard\'s band until `back` hides it', async () => {
+    const android = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: PIXEL, frame: PIXEL, keyboard: 'shown' });
+    expect(await android.keyboard!.state()).toEqual({ state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } });
+    await android.pressKey('back');
+    expect((await android.keyboard!.state()).state).toBe('hidden');
+    expect(deviceCalls()).toEqual(['adb shell dumpsys window displays', 'adb shell input keyevent 4', 'adb shell dumpsys window displays']);
+  });
 });
