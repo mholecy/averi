@@ -1,7 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { presentedCover, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -168,8 +168,8 @@ export type RoundStep =
  *   further stroke sent — none moves it out, and one on that screen may
  *   dismiss it (a page sheet's pull-to-dismiss, a popover closed by a touch
  *   on its dim). Either the match lies in the frame under that screen
- *   (ui-tree/standing.ts#underPresented; `cover` the one the sentence names,
- *   ui-tree/standing.ts#presentedCover), or — `touchDown` set — it was not
+ *   (its standing's remedy is `presented`, ui-tree/standing.ts#Remedy; `cover`
+ *   the one the sentence names, that remedy's), or — `touchDown` set — it was not
  *   judged in the frame (below the fold, under the soft keyboard, cut or
  *   clipped) and the next stroke would touch down at `touchDown` on `cover`,
  *   a surface of that screen (ui-tree/draw-order.ts#DrawOrder.presentedAt).
@@ -1208,8 +1208,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
     // then, the read above stops as any other. Without a confirm left, stop on this read.
-    const presented = presentedCover(best.standing);
-    if (presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: presented, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    // The standing's own remedy decides it (ui-tree/standing.ts#Remedy, presented first, whatever the kind).
+    const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
+    if (remedy?.of === 'presented') return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the

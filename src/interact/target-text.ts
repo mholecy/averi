@@ -14,8 +14,8 @@ import { SIDES } from './swipe.js';
  * the shared wording. Phrases, not policies: what counts as cut is
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
  * caller's switch — and the remedy for a target under a screen presented
- * over its own (`PRESENTED_OVER`), whose test is
- * ui-tree/standing.ts#underPresented and whose words live in
+ * over its own (`PRESENTED_OVER`), a case of ui-tree/standing.ts#Remedy
+ * (the standing decides it), whose words live in
  * ui-tree/standing.ts#presentedRemedy (the pixel assert says them too, of
  * "the element"; this module names them for a target, "it"). Shallow by
  * design, like ui-tree/system-bar.ts: delete it and each shared sentence
@@ -90,8 +90,9 @@ export function cutRemedy(edge: Edge): string {
  * THE remedy for a target under a screen PRESENTED over its own — a modal's
  * dimming view, a sheet (ui-tree/draw-order.ts#Exposure.presented, ADR 0018):
  * no scroll moves it out from under that screen, so neither "scroll_until it
- * first" nor the pinned-bar "layout defect" is said. One wording for the
- * tap's refusal (tap-judgement.ts) and `scroll_until`'s stop without a swipe
+ * first" nor the pinned-bar "layout defect" is said — the standing's remedy
+ * `presented` (ui-tree/standing.ts#Remedy), whatever the target's kind. One
+ * wording for the tap's refusal (tap-judgement.ts) and `scroll_until`'s stop without a swipe
  * (scroll-text.ts, the `presented` outcome); its words are
  * ui-tree/standing.ts#presentedRemedy's, which the pixel assert says too.
  */

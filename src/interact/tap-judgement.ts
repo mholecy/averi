@@ -2,7 +2,7 @@ import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, 
 import { drawnOverText, nodeText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive } from '../ui-tree/selectors.js';
-import { underPresented, type Scene, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
+import type { Scene, SystemBar, TapStanding, TouchRemedy } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -295,8 +295,10 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     case 'offScreen':
     case 'systemBar':
       throw offScreenRefusal(standing, told, judgedScreen());
-    case 'cut':
-      throw new ClippedRefusal(told.refusal(cutFinding(standing.cut, told.node.rect, standing.minPiece)));
+    case 'cut': {
+      const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece);
+      throw new ClippedRefusal(told.refusal(standing.remedy.of === 'presented' ? `${cut} — ${PRESENTED_OVER}` : cutFinding(cut, standing.cut)));
+    }
     case 'reachable': {
       if (standing.moved === undefined) return { point: standing.at };
       const { at: point, moved } = standing;
@@ -313,15 +315,16 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
         standing.largest === undefined
           ? `nothing of it shows${above}`
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
-      // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps — close that screen first.
-      const remedy = underPresented(standing.facts) ? PRESENTED_OVER : positionerRemedy(standing.cover) ?? 'scroll_until it first';
+      // The standing's remedy (ui-tree/standing.ts#Remedy): beneath a presented screen, close it first; else scroll —
+      // refined, for a wrapper that may only position its one child, by the tap's own positioner hint.
+      const remedy = standing.remedy.of === 'presented' ? PRESENTED_OVER : positionerRemedy(standing.cover) ?? 'scroll_until it first';
       throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':
       throw new CoveredRefusal(
         told.refusal(
           `${underKeyboardText(centre, standing.line.y)}, where a tap presses the keyboard — ` +
-            `scroll_until it first, or ${hideIt(told.remedy)}`,
+            (standing.remedy.of === 'presented' ? PRESENTED_OVER : `scroll_until it first, or ${hideIt(told.remedy)}`),
         ),
       );
     default: {
@@ -352,37 +355,39 @@ function positionerRemedy(cover: UiNode): string | undefined {
 }
 
 /** The on-screen rule's refusal of a centre off the screen or under a system bar (the module's doc). */
-function offScreenRefusal(standing: OffTheScreen, { node, scene, refusal }: Told, { judged, reread = '' }: JudgedScreen): OffScreenRefusal {
+function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { judged, reread = '' }: JudgedScreen): OffScreenRefusal {
+  const presented = standing.remedy.of === 'presented';
   if (standing.kind === 'systemBar') {
-    return new OffScreenRefusal(refusal(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${systemBarRemedy(standing.bar.edge, scene.clips.inScroller(node))}`));
+    return new OffScreenRefusal(refusal(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${presented ? PRESENTED_OVER : systemBarRemedy(standing.bar.edge, standing.remedy)}`));
   }
   const { at, visible } = standing;
   const size = `${judged.box.width}x${judged.box.height}`;
   const where = `at (${at.x},${at.y}) on a ${size} screen${judged.boxes.length > 1 ? ' either way up' : ''}${reread}`;
   const part =
     visible > 0
-      ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — scroll_until it with fully: true first`
-      : ` (rect ${rectText(node.rect)}) — scroll_until it first`;
+      ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — ${presented ? PRESENTED_OVER : 'scroll_until it with fully: true first'}`
+      : ` (rect ${rectText(node.rect)}) — ${presented ? PRESENTED_OVER : 'scroll_until it first'}`;
   return new OffScreenRefusal(refusal(`off screen ${where}${part}`));
 }
 
 /**
  * What to do about a target whose centre lies under a system bar (the bar
- * at `edge`), said as far as the tree knows it: the refusal had said
+ * at `edge`), said as far as the tree knows it — the standing's remedy
+ * (ui-tree/standing.ts#Remedy, which asks the tree's scroll ancestry,
+ * geometry.ts#Clips.inScroller), rendered: the refusal had said
  * `scroll_until it first` of a button pinned at the top, which no scroll
- * moves. In a scroll view (`scrolls`, ui-tree/geometry.ts#Clips.inScroller),
- * `scroll_until` moves it out from under the bar; in none, it is pinned
- * there — a layout that does not keep clear of the bar — and no step
- * reaches it; where the tree cannot say (idb's flat list), both. The
- * refusal stays a refusal either way — the safe direction, and terminal in
- * an `optional:` step (flow/engine.ts). Cost, on the refusal path only:
- * `Clips.inScroller`'s one walk of the tree (ui-tree/geometry.ts#clipsOf's
- * own walk is every tap's: its standing asks the cut first).
+ * moves. In a scroll view (`scroll`), `scroll_until` moves it out from
+ * under the bar; in none (`pinned`), it is pinned there — a layout that
+ * does not keep clear of the bar — and no step reaches it; where the tree
+ * cannot say (`stuck`: idb's flat list), both. The refusal stays a refusal
+ * either way — the safe direction, and terminal in an `optional:` step
+ * (flow/engine.ts). Beneath a presented screen the caller says that
+ * screen's remedy instead (`PRESENTED_OVER`).
  */
-function systemBarRemedy(edge: SystemBar['edge'], scrolls: boolean | undefined): string {
+function systemBarRemedy(edge: SystemBar['edge'], remedy: TouchRemedy): string {
   const pinned = `no scroll moves it out: ${pinnedUnder(edge)} — fix the layout, or tap something else`;
-  if (scrolls === true) return 'it lies in a scroll view — scroll_until it first, to move it out from under the bar';
-  if (scrolls === false) return `it lies in no scroll view, so ${pinned}`;
+  if (remedy.of === 'scroll') return 'it lies in a scroll view — scroll_until it first, to move it out from under the bar';
+  if (remedy.of === 'pinned') return `it lies in no scroll view, so ${pinned}`;
   return `if it lies in a scroll view, scroll_until it first, to move it out from under the bar; if not, ${pinned}`;
 }
 
@@ -393,8 +398,10 @@ const INHERITED_CUT_WAY_PAST =
   'if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates';
 
 /**
- * The tap's finding for a node cut to a sliver (`cut`, of a node whose rect
- * is `shown`, under `minPiece`), its remedy and its way past — the refusal
+ * The tap's finding for a node cut to a sliver (`sliver`, target-text.ts
+ * #cutSliverText's sentence of `cut`), its remedy and its way past, when its
+ * standing's remedy is the plain `scroll` (beneath a presented screen the
+ * caller says that screen's remedy instead) — the refusal
  * of a node cut to a sliver (ui-tree/standing.ts#Scene.standing's `cut`;
  * geometry.ts#Clips.cutSliver owns what counts as cut, and
  * draw-order.ts#MIN_TAP_PIECE_FRACTION the minimum). A sliver also
@@ -415,8 +422,7 @@ const INHERITED_CUT_WAY_PAST =
  * (UiNode.clipsDescendants, Android's) are cut: an iOS tree has none, so
  * this never refuses there.
  */
-const cutFinding = (cut: Cut, shown: Rect, minPiece: number): string =>
-  `${cutSliverText(cut, shown, minPiece)} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
+const cutFinding = (sliver: string, cut: Cut): string => `${sliver} — ${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
 
 /**
  * How to hide a keyboard a tap refused a centre under: only a line no guard
